@@ -705,6 +705,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	} else {
 		dagRunID = genDAGRunID()
 	}
+	helper.dagRunID = dagRunID
 
 	logDir := d.Config.Paths.LogDir
 	logFile := filepath.Join(d.Config.Paths.LogDir, dagRunID+".log")

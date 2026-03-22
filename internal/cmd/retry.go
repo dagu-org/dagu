@@ -140,10 +140,6 @@ func runRetry(ctx *Context, args []string) error {
 			exec.PreservedQueueTriggerType(status),
 			status.ScheduleTime,
 			func(execCtx context.Context) (exec.DAGRunAttempt, error) {
-				if status.Status == core.Queued {
-					attempt.SetDAG(dag)
-					return attempt, nil
-				}
 				opts := exec.NewDAGRunAttemptOptions{Retry: true}
 				if !rootRun.Zero() && rootRun.ID != dagRunID {
 					opts.RootDAGRun = &rootRun

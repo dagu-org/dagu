@@ -5,6 +5,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
@@ -220,7 +221,7 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, entry exec.Pro
 
 	attempt, err := z.findAttempt(ctx, entry)
 	if err != nil {
-		return fmt.Errorf("find attempt: %w", err)
+		return z.cleanupOrphanedStaleEntry(ctx, entry, attemptKey, err)
 	}
 
 	status, err := attempt.ReadStatus(ctx)
@@ -267,5 +268,18 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, entry exec.Pro
 	}
 	z.clearAttemptState(attemptKey)
 
+	return nil
+}
+
+func (z *ZombieDetector) cleanupOrphanedStaleEntry(ctx context.Context, entry exec.ProcEntry, attemptKey string, findErr error) error {
+	if !errors.Is(findErr, exec.ErrDAGRunIDNotFound) {
+		return fmt.Errorf("find attempt: %w", findErr)
+	}
+
+	logger.Info(ctx, "Removing orphaned stale proc entry with no persisted DAG run", tag.Error(findErr))
+	z.clearAttemptState(attemptKey)
+	if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
+		return fmt.Errorf("remove orphaned stale proc: %w", err)
+	}
 	return nil
 }

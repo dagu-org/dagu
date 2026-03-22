@@ -97,11 +97,21 @@ func (s *RetryScanner) Start(ctx context.Context) {
 
 func (s *RetryScanner) scan(ctx context.Context) error {
 	now := s.clock().UTC()
-	targets := s.retryTargetNames()
-	for _, name := range targets {
-		if err := s.processLatestAttempt(ctx, name, now); err != nil {
+	from := exec.NewUTC(now.Add(-s.retryWindow))
+
+	failedRuns, err := s.listFailedRuns(ctx, from)
+	if err != nil {
+		return err
+	}
+
+	for _, listed := range failedRuns {
+		if listed == nil {
+			continue
+		}
+		if err := s.processFailedRun(ctx, listed, now); err != nil {
 			logger.Error(ctx, "Retry scanner failed to process DAG run",
-				tag.DAG(name),
+				tag.DAG(listed.Name),
+				tag.RunID(listed.DAGRunID),
 				tag.Error(err),
 			)
 		}
@@ -109,60 +119,127 @@ func (s *RetryScanner) scan(ctx context.Context) error {
 	return nil
 }
 
-func (s *RetryScanner) processLatestAttempt(ctx context.Context, dagName string, now time.Time) error {
-	attempt, err := s.dagRunStore.LatestAttempt(ctx, dagName)
+func (s *RetryScanner) listFailedRuns(ctx context.Context, from exec.TimeInUTC) ([]*exec.DAGRunStatus, error) {
+	baseOpts := []exec.ListDAGRunStatusesOption{
+		exec.WithStatuses([]core.Status{core.Failed}),
+		exec.WithFrom(from),
+		exec.WithoutLimit(),
+	}
+
+	targets := s.retryTargetNames()
+	if len(targets) == 0 {
+		return nil, nil
+	}
+
+	var failedRuns []*exec.DAGRunStatus
+	for _, name := range targets {
+		opts := append([]exec.ListDAGRunStatusesOption{}, baseOpts...)
+		opts = append(opts, exec.WithExactName(name))
+		items, err := s.dagRunStore.ListStatuses(ctx, opts...)
+		if err != nil {
+			return nil, err
+		}
+		failedRuns = append(failedRuns, items...)
+	}
+
+	return failedRuns, nil
+}
+
+func (s *RetryScanner) processFailedRun(
+	ctx context.Context,
+	listed *exec.DAGRunStatus,
+	now time.Time,
+) error {
+	if listed == nil {
+		return nil
+	}
+	if metadata, ok := retryMetadataFromStatus(listed); ok {
+		return s.processFailedRunFromSummary(ctx, listed, metadata, now)
+	}
+	return s.processFailedRunLegacy(ctx, listed, now)
+}
+
+func (s *RetryScanner) processFailedRunFromSummary(
+	ctx context.Context,
+	listed *exec.DAGRunStatus,
+	metadata dagRetryMetadata,
+	now time.Time,
+) error {
+	if !listed.Parent.Zero() {
+		return nil
+	}
+
+	decision := s.evaluateRetryDecision(ctx, listed, metadata, now)
+	if !decision.enqueue {
+		if decision.reason != "" {
+			logger.Debug(ctx, "Retry scanner skipped DAG run",
+				tag.DAG(listed.Name),
+				tag.RunID(listed.DAGRunID),
+				slog.String("skip_reason", decision.reason),
+			)
+		}
+		return nil
+	}
+
+	err := exec.EnqueueRetry(ctx, s.dagRunStore, s.queueStore, nil, listed, exec.EnqueueRetryOptions{
+		AutoRetry: true,
+	})
 	if err != nil {
-		if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
+		if errors.Is(err, exec.ErrRetryStaleLatest) {
+			logger.Debug(ctx, "Retry scanner skipped DAG run",
+				tag.DAG(listed.Name),
+				tag.RunID(listed.DAGRunID),
+				slog.String("skip_reason", "stale_latest"),
+			)
 			return nil
 		}
+		return err
+	}
+
+	logger.Info(ctx, "Retry scanner ensured DAG-level retry is queued",
+		tag.DAG(listed.Name),
+		tag.RunID(listed.DAGRunID),
+		slog.String("next_retry_at", decision.nextRetryAt.Format(time.RFC3339)),
+		slog.Duration("computed_delay", decision.computedDelay),
+	)
+	return nil
+}
+
+func (s *RetryScanner) processFailedRunLegacy(
+	ctx context.Context,
+	listed *exec.DAGRunStatus,
+	now time.Time,
+) error {
+	ref := listed.DAGRun()
+	attempt, err := s.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
 		return err
 	}
 
 	latestStatus, err := attempt.ReadStatus(ctx)
 	if err != nil {
-		if errors.Is(err, exec.ErrNoStatusData) {
-			return nil
-		}
 		return err
 	}
-	if latestStatus.Status != core.Failed || !latestStatus.Parent.Zero() {
+	if latestStatus.AttemptID != listed.AttemptID || latestStatus.Status != core.Failed {
+		return nil
+	}
+	if !latestStatus.Parent.Zero() {
 		return nil
 	}
 
-	referenceTime, ok := retryReferenceTime(latestStatus)
+	dagSnapshot, err := attempt.ReadDAG(ctx)
+	if err != nil {
+		return err
+	}
+
+	metadata, ok := retryMetadataFromDAG(dagSnapshot)
 	if !ok {
 		logger.Debug(ctx, "Retry scanner skipped DAG run",
 			tag.DAG(latestStatus.Name),
 			tag.RunID(latestStatus.DAGRunID),
-			slog.String("skip_reason", "missing_retry_reference_time"),
+			slog.String("skip_reason", "retry_policy_missing"),
 		)
 		return nil
-	}
-	if s.retryWindow > 0 && referenceTime.Before(now.Add(-s.retryWindow)) {
-		logger.Debug(ctx, "Retry scanner skipped DAG run",
-			tag.DAG(latestStatus.Name),
-			tag.RunID(latestStatus.DAGRunID),
-			slog.String("skip_reason", "outside_retry_window"),
-		)
-		return nil
-	}
-
-	metadata, ok := retryMetadataFromStatus(latestStatus)
-	var dagSnapshot *core.DAG
-	if !ok {
-		dagSnapshot, err = attempt.ReadDAG(ctx)
-		if err != nil {
-			return err
-		}
-		metadata, ok = retryMetadataFromDAG(dagSnapshot)
-		if !ok {
-			logger.Debug(ctx, "Retry scanner skipped DAG run",
-				tag.DAG(latestStatus.Name),
-				tag.RunID(latestStatus.DAGRunID),
-				slog.String("skip_reason", "retry_policy_missing"),
-			)
-			return nil
-		}
 	}
 
 	decision := s.evaluateRetryDecision(ctx, latestStatus, metadata, now)

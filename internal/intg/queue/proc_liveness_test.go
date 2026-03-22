@@ -104,7 +104,7 @@ max_active_runs: 1
 steps:
   - name: echo
     command: echo hello
-`, WithProcConfig(50*time.Millisecond, 50*time.Millisecond, 100*time.Millisecond)).
+`, WithProcConfig(50*time.Millisecond, 50*time.Millisecond, 100*time.Millisecond), WithZombieConfig(50*time.Millisecond, 1)).
 		Enqueue(1)
 	defer f.Stop()
 
