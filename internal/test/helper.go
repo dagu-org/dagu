@@ -6,6 +6,8 @@ package test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -751,11 +753,12 @@ func (a *Agent) RunError(t *testing.T) {
 func (a *Agent) RunCancel(t *testing.T) {
 	t.Helper()
 
+	attemptID := newTestAttemptID(t)
 	proc, err := a.ProcStore.Acquire(a.Context, a.ProcGroup(), exec1.ProcMeta{
 		StartedAt:    time.Now().Unix(),
 		Name:         a.Name,
 		DAGRunID:     a.dagRunID,
-		AttemptID:    "attempt_" + a.dagRunID,
+		AttemptID:    attemptID,
 		RootName:     a.Name,
 		RootDAGRunID: a.dagRunID,
 	})
@@ -802,6 +805,15 @@ func (a *Agent) RunSuccess(t *testing.T) {
 
 func (a *Agent) Abort() {
 	a.Signal(a.Context, syscall.SIGTERM)
+}
+
+func newTestAttemptID(t *testing.T) string {
+	t.Helper()
+
+	b := make([]byte, 3)
+	_, err := rand.Read(b)
+	require.NoError(t, err)
+	return hex.EncodeToString(b)
 }
 
 // SyncBuffer provides thread-safe buffer operations

@@ -344,23 +344,11 @@ type mockProcStore struct {
 	mock.Mock
 }
 
-func (m *mockProcStore) hasExpectedCall(method string) bool {
-	for _, call := range m.ExpectedCalls {
-		if call.Method == method {
-			return true
-		}
-	}
-	return false
-}
-
 func (m *mockProcStore) Lock(_ context.Context, _ string) error { return nil }
 
 func (m *mockProcStore) Unlock(_ context.Context, _ string) {}
 
 func (m *mockProcStore) Acquire(ctx context.Context, groupName string, meta exec.ProcMeta) (exec.ProcHandle, error) {
-	if !m.hasExpectedCall("Acquire") {
-		return nil, nil
-	}
 	args := m.Called(ctx, groupName, meta)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -369,41 +357,26 @@ func (m *mockProcStore) Acquire(ctx context.Context, groupName string, meta exec
 }
 
 func (m *mockProcStore) CountAlive(ctx context.Context, groupName string) (int, error) {
-	if !m.hasExpectedCall("CountAlive") {
-		return 0, nil
-	}
 	args := m.Called(ctx, groupName)
 	return args.Int(0), args.Error(1)
 }
 
 func (m *mockProcStore) CountAliveByDAGName(ctx context.Context, groupName, dagName string) (int, error) {
-	if !m.hasExpectedCall("CountAliveByDAGName") {
-		return 0, nil
-	}
 	args := m.Called(ctx, groupName, dagName)
 	return args.Int(0), args.Error(1)
 }
 
 func (m *mockProcStore) IsRunAlive(ctx context.Context, groupName string, dagRun exec.DAGRunRef) (bool, error) {
-	if !m.hasExpectedCall("IsRunAlive") {
-		return false, nil
-	}
 	args := m.Called(ctx, groupName, dagRun)
 	return args.Bool(0), args.Error(1)
 }
 
 func (m *mockProcStore) IsAttemptAlive(ctx context.Context, groupName string, dagRun exec.DAGRunRef, attemptID string) (bool, error) {
-	if !m.hasExpectedCall("IsAttemptAlive") {
-		return false, nil
-	}
 	args := m.Called(ctx, groupName, dagRun, attemptID)
 	return args.Bool(0), args.Error(1)
 }
 
 func (m *mockProcStore) ListAlive(ctx context.Context, groupName string) ([]exec.DAGRunRef, error) {
-	if !m.hasExpectedCall("ListAlive") {
-		return nil, nil
-	}
 	args := m.Called(ctx, groupName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -412,9 +385,6 @@ func (m *mockProcStore) ListAlive(ctx context.Context, groupName string) ([]exec
 }
 
 func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]exec.DAGRunRef, error) {
-	if !m.hasExpectedCall("ListAllAlive") {
-		return nil, nil
-	}
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -423,9 +393,6 @@ func (m *mockProcStore) ListAllAlive(ctx context.Context) (map[string][]exec.DAG
 }
 
 func (m *mockProcStore) ListEntries(ctx context.Context, groupName string) ([]exec.ProcEntry, error) {
-	if !m.hasExpectedCall("ListEntries") {
-		return nil, nil
-	}
 	args := m.Called(ctx, groupName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -434,21 +401,18 @@ func (m *mockProcStore) ListEntries(ctx context.Context, groupName string) ([]ex
 }
 
 func (m *mockProcStore) LatestFreshEntryByDAGName(ctx context.Context, groupName, dagName string) (*exec.ProcEntry, error) {
-	if !m.hasExpectedCall("LatestFreshEntryByDAGName") {
-		return nil, nil
-	}
 	args := m.Called(ctx, groupName, dagName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
+	}
+	if entry, ok := args.Get(0).(*exec.ProcEntry); ok {
+		return entry, args.Error(1)
 	}
 	entry := args.Get(0).(exec.ProcEntry)
 	return &entry, args.Error(1)
 }
 
 func (m *mockProcStore) ListAllEntries(ctx context.Context) ([]exec.ProcEntry, error) {
-	if !m.hasExpectedCall("ListAllEntries") {
-		return nil, nil
-	}
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -457,9 +421,6 @@ func (m *mockProcStore) ListAllEntries(ctx context.Context) ([]exec.ProcEntry, e
 }
 
 func (m *mockProcStore) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) error {
-	if !m.hasExpectedCall("RemoveIfStale") {
-		return nil
-	}
 	args := m.Called(ctx, entry)
 	return args.Error(0)
 }

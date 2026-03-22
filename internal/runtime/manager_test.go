@@ -38,12 +38,12 @@ func TestManager(t *testing.T) {
 				status := transform.NewStatusBuilder(dag.DAG).Create(
 					dagRunID, core.Running, 0, time.Now(),
 				)
-				w.WriteHeader(http.StatusOK)
 				jsonData, err := json.Marshal(status)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
+				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(jsonData)
 			},
 		)

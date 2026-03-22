@@ -197,6 +197,9 @@ func (pg *ProcGroup) listEntriesLocked(_ context.Context) ([]exec.ProcEntry, err
 
 	dagEntries, err := os.ReadDir(pg.baseDir)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return []exec.ProcEntry{}, nil
+		}
 		return nil, err
 	}
 
@@ -208,6 +211,9 @@ func (pg *ProcGroup) listEntriesLocked(_ context.Context) ([]exec.ProcEntry, err
 		dagDir := filepath.Join(pg.baseDir, dagEntry.Name())
 		procEntries, err := os.ReadDir(dagDir)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return nil, err
 		}
 		for _, procEntry := range procEntries {
@@ -225,6 +231,9 @@ func (pg *ProcGroup) listEntriesLocked(_ context.Context) ([]exec.ProcEntry, err
 	for _, file := range files {
 		entry, err := readProcEntry(file, pg.groupName, pg.staleTime, now)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return nil, err
 		}
 		entries = append(entries, entry)

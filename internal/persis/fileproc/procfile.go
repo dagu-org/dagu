@@ -159,8 +159,11 @@ func readProcEntry(path, groupName string, staleTime time.Duration, now time.Tim
 	if err != nil {
 		return exec.ProcEntry{}, err
 	}
-	if len(data) <= heartbeatSize {
-		return exec.ProcEntry{}, fmt.Errorf("%w: proc file %s is too short", errInvalidProcFile, path)
+	if len(data) < heartbeatSize {
+		return exec.ProcEntry{}, fmt.Errorf("%w: proc file %s is shorter than the %d-byte heartbeat header", errInvalidProcFile, path, heartbeatSize)
+	}
+	if len(data) == heartbeatSize {
+		return exec.ProcEntry{}, fmt.Errorf("%w: proc file %s is missing metadata payload", errInvalidProcFile, path)
 	}
 
 	lastHeartbeatAt := int64(binary.BigEndian.Uint64(data[:heartbeatSize])) //nolint:gosec
@@ -196,6 +199,9 @@ func readProcEntry(path, groupName string, staleTime time.Duration, now time.Tim
 		return exec.ProcEntry{}, fmt.Errorf("%w: proc path/body DAG name mismatch for %s", errInvalidProcFile, path)
 	}
 
+	// Use both filesystem mtime and the persisted heartbeat payload: recent writes
+	// can make mtime fresher than the last synced payload, while the stored
+	// heartbeat remains the durable fallback if mtime lags or is preserved.
 	fresh := now.Sub(info.ModTime()) < staleTime
 	if !fresh {
 		fresh = now.Sub(heartbeatTime) < staleTime
