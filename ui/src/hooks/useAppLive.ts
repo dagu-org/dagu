@@ -10,6 +10,10 @@ import {
   type AppLiveEvent,
   type LiveConnectionState,
 } from './AppLiveManager';
+import {
+  isAbortLikeError,
+  LIVE_INVALIDATION_COOLDOWN_MS,
+} from '@/lib/requestTimeout';
 
 const INITIAL_STATE: LiveConnectionState = {
   isConnected: false,
@@ -57,6 +61,7 @@ export function useLiveInvalidation<T>({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
   const pendingRef = useRef(false);
+  const cooldownUntilRef = useRef(0);
 
   matcherRef.current = matcher;
   mutateRef.current = mutate;
@@ -76,7 +81,12 @@ export function useLiveInvalidation<T>({
       inFlightRef.current = true;
       try {
         await mutateRef.current();
-      } catch {
+        cooldownUntilRef.current = 0;
+      } catch (error) {
+        if (isAbortLikeError(error)) {
+          cooldownUntilRef.current =
+            Date.now() + LIVE_INVALIDATION_COOLDOWN_MS;
+        }
         // The stream is advisory. Errors stay surfaced by the query itself.
       } finally {
         inFlightRef.current = false;
@@ -88,13 +98,15 @@ export function useLiveInvalidation<T>({
     };
 
     const scheduleRevalidate = (delay: number = debounceMs): void => {
+      const cooldownMs = Math.max(0, cooldownUntilRef.current - Date.now());
+      const effectiveDelay = Math.max(delay, cooldownMs);
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
       debounceTimerRef.current = setTimeout(() => {
         debounceTimerRef.current = null;
         void runRevalidate();
-      }, delay);
+      }, effectiveDelay);
     };
 
     const unsubscribe = appLiveManager.subscribe(remoteNode, config.apiURL, {
@@ -115,6 +127,7 @@ export function useLiveInvalidation<T>({
       }
       inFlightRef.current = false;
       pendingRef.current = false;
+      cooldownUntilRef.current = 0;
     };
   }, [config.apiURL, debounceMs, enabled, remoteNode]);
 

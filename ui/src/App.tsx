@@ -23,6 +23,10 @@ import {
 import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
+import {
+  fetchWithTimeout,
+  shouldRetryQueryError,
+} from './lib/requestTimeout';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
@@ -166,7 +170,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${config.apiURL}/remote-nodes?remoteNode=local`,
           { headers }
         );
@@ -205,6 +209,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       <SWRConfig value={{
         fetcher: fetchJson,
         onError: console.error,
+        shouldRetryOnError: shouldRetryQueryError,
         revalidateOnFocus: false,
         revalidateOnReconnect: false,
       }}>

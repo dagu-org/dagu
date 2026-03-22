@@ -6,7 +6,11 @@ import {
   TooltipTrigger,
 } from '../../../../components/ui/tooltip';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useQuery } from '../../../../hooks/api';
+import { isAbortLikeError } from '../../../../lib/requestTimeout';
+import {
+  fetchDAGRunDetails,
+  type DAGRunDetails,
+} from '../../hooks/dagRunDetailsRequest';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 type Node = components['schemas']['Node'];
@@ -15,6 +19,20 @@ type StepDetailsTooltipProps = {
   dagRun: DAGRunSummary;
   children: React.ReactNode;
 };
+
+const HOVER_FETCH_DELAY_MS = 400;
+const HOVER_CACHE_TTL_MS = 30_000;
+const hoverDetailsCache = new Map<
+  string,
+  { expiresAt: number; details: DAGRunDetails }
+>();
+
+function toError(
+  error: unknown,
+  fallbackMessage: string = 'Failed to load step details'
+): Error {
+  return error instanceof Error ? error : new Error(fallbackMessage);
+}
 
 function getStepName(node: Node, index: number) {
   return node.step?.name || `Step ${index + 1}`;
@@ -55,37 +73,100 @@ export function StepDetailsTooltip({
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const [isOpen, setIsOpen] = React.useState(false);
+  const [details, setDetails] = React.useState<DAGRunDetails | null>(null);
+  const [error, setError] = React.useState<Error | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const fetchTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controllerRef = React.useRef<AbortController | null>(null);
 
   const canRequestDetails = Boolean(dagRun.name && dagRun.dagRunId);
+  const cacheKey = `${remoteNode}:${dagRun.name}:${dagRun.dagRunId}`;
 
-  const queryKey =
-    isOpen && canRequestDetails
-      ? '/dag-runs/{name}/{dagRunId}'
-      : (undefined as unknown as '/dag-runs/{name}/{dagRunId}');
-
-  const { data, error, isLoading } = useQuery(
-    queryKey,
-    isOpen && canRequestDetails
-      ? {
-          params: {
-            path: {
-              name: dagRun.name,
-              dagRunId: dagRun.dagRunId,
-            },
-            query: {
-              remoteNode,
-            },
-          },
-        }
-      : null,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      refreshInterval: 0,
+  React.useEffect(() => {
+    if (fetchTimerRef.current) {
+      clearTimeout(fetchTimerRef.current);
+      fetchTimerRef.current = null;
     }
-  );
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+      controllerRef.current = null;
+    }
 
-  const nodes = data?.dagRunDetails?.nodes || [];
+    if (!isOpen || !canRequestDetails) {
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
+    const cached = hoverDetailsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      setDetails(cached.details);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setDetails(null);
+    setError(null);
+    setIsLoading(true);
+
+    fetchTimerRef.current = setTimeout(() => {
+      const controller = new AbortController();
+      controllerRef.current = controller;
+
+      void fetchDAGRunDetails(
+        {
+          remoteNode,
+          name: dagRun.name,
+          dagRunId: dagRun.dagRunId,
+        },
+        { signal: controller.signal }
+      )
+        .then((nextDetails) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          hoverDetailsCache.set(cacheKey, {
+            details: nextDetails,
+            expiresAt: Date.now() + HOVER_CACHE_TTL_MS,
+          });
+          setDetails(nextDetails);
+          setError(null);
+        })
+        .catch((fetchError) => {
+          if (controller.signal.aborted && isAbortLikeError(fetchError)) {
+            return;
+          }
+          setError(toError(fetchError));
+        })
+        .finally(() => {
+          if (controllerRef.current === controller) {
+            controllerRef.current = null;
+            setIsLoading(false);
+          }
+        });
+    }, HOVER_FETCH_DELAY_MS);
+
+    return () => {
+      if (fetchTimerRef.current) {
+        clearTimeout(fetchTimerRef.current);
+        fetchTimerRef.current = null;
+      }
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        controllerRef.current = null;
+      }
+    };
+  }, [
+    cacheKey,
+    canRequestDetails,
+    dagRun.dagRunId,
+    dagRun.name,
+    isOpen,
+    remoteNode,
+  ]);
+
+  const nodes = details?.nodes || [];
   const runningSteps = nodes.filter(
     (node) => node.status === NodeStatus.Running
   );
@@ -115,7 +196,7 @@ export function StepDetailsTooltip({
         )}
         {canRequestDetails && error && (
           <div className="text-xs text-error">
-            Failed to load step details
+            {error.message || 'Failed to load step details'}
           </div>
         )}
         {canRequestDetails && !isLoading && !error && (

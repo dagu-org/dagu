@@ -257,12 +257,19 @@ func (f *fixture) Stop() {
 
 // Status returns the latest persisted status for the given DAG run.
 func (f *fixture) Status(runID string) (*exec.DAGRunStatus, error) {
+	ctx := f.th.Context
+	cancel := func() {}
+	if ctx.Err() != nil {
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	}
+	defer cancel()
+
 	ref := exec.NewDAGRunRef(f.dag.Name, runID)
-	attempt, err := f.th.DAGRunStore.FindAttempt(f.th.Context, ref)
+	attempt, err := f.th.DAGRunStore.FindAttempt(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	return attempt.ReadStatus(f.th.Context)
+	return attempt.ReadStatus(ctx)
 }
 
 // MustStatus returns the latest persisted status and fails the test on error.

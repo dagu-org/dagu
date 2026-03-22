@@ -131,6 +131,17 @@ func TestDataRootRuns(t *testing.T) {
 		require.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
 	})
 
+	t.Run("FindByDAGRunIDHonorsCanceledContext", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		dr := setupTestDataRoot(t)
+		_ = dr.CreateTestDAGRun(t, "test-id1", exec.NewUTC(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)))
+
+		_, err := dr.FindByDAGRunID(ctx, "test-id1")
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
 	t.Run("Latest", func(t *testing.T) {
 		root := setupTestDataRoot(t)
 

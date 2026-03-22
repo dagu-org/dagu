@@ -4,9 +4,15 @@
 package api
 
 import (
+	"context"
+	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	openapiv1 "github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -134,4 +140,121 @@ func TestApplyInlineEnqueueTags_InvalidYAML(t *testing.T) {
 
 	_, err := applyInlineEnqueueTags([]byte("{{invalid yaml"), "env=prod")
 	require.Error(t, err)
+}
+
+var _ exec.DAGRunStore = (*blockingDAGRunStore)(nil)
+
+type blockingDAGRunStore struct{}
+
+func (blockingDAGRunStore) CreateAttempt(context.Context, *core.DAG, time.Time, string, exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) RecentAttempts(context.Context, string, int) []exec.DAGRunAttempt {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) LatestAttempt(context.Context, string) (exec.DAGRunAttempt, error) {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) ListStatuses(ctx context.Context, _ ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (blockingDAGRunStore) CompareAndSwapLatestAttemptStatus(context.Context, exec.DAGRunRef, string, core.Status, func(*exec.DAGRunStatus) error) (*exec.DAGRunStatus, bool, error) {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) FindAttempt(context.Context, exec.DAGRunRef) (exec.DAGRunAttempt, error) {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) FindSubAttempt(context.Context, exec.DAGRunRef, string) (exec.DAGRunAttempt, error) {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) CreateSubAttempt(context.Context, exec.DAGRunRef, string) (exec.DAGRunAttempt, error) {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) RemoveOldDAGRuns(context.Context, string, int, ...exec.RemoveOldDAGRunsOption) ([]string, error) {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) RenameDAGRuns(context.Context, string, string) error {
+	panic("not implemented")
+}
+
+func (blockingDAGRunStore) RemoveDAGRun(context.Context, exec.DAGRunRef) error {
+	panic("not implemented")
+}
+
+func TestAPIListDAGRunsReturnsGatewayTimeoutWhenReadDeadlineExpires(t *testing.T) {
+	t.Parallel()
+
+	api := &API{
+		dagRunStore: blockingDAGRunStore{},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	defer cancel()
+
+	resp, err := api.ListDAGRuns(ctx, openapiv1.ListDAGRunsRequestObject{})
+	require.NoError(t, err)
+
+	timeoutResp, ok := resp.(openapiv1.ListDAGRunsdefaultJSONResponse)
+	require.True(t, ok)
+	require.Equal(t, http.StatusGatewayTimeout, timeoutResp.StatusCode)
+	require.Equal(t, openapiv1.ErrorCodeTimeout, timeoutResp.Body.Code)
+	require.Equal(t, "dag-run list request timed out", timeoutResp.Body.Message)
+}
+
+type blockingLatestAttemptStore struct {
+	blockingDAGRunStore
+}
+
+func (blockingLatestAttemptStore) LatestAttempt(ctx context.Context, _ string) (exec.DAGRunAttempt, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestWithDAGRunReadTimeoutReturnsDeadlineExceededOnLateSuccess(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+
+	_, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs/{name}/{dagRunId}",
+	}, func(readCtx context.Context) (string, error) {
+		<-readCtx.Done()
+		return "late-success", nil
+	})
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestGetDAGRunDetailsReturnsClientClosedRequestWhenReadCanceled(t *testing.T) {
+	t.Parallel()
+
+	api := &API{
+		dagRunStore: blockingLatestAttemptStore{},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	resp, err := api.GetDAGRunDetails(ctx, openapiv1.GetDAGRunDetailsRequestObject{
+		Name:     "test",
+		DagRunId: "latest",
+	})
+	require.NoError(t, err)
+
+	canceledResp, ok := resp.(*openapiv1.GetDAGRunDetailsdefaultJSONResponse)
+	require.True(t, ok)
+	require.Equal(t, statusClientClosedRequest, canceledResp.StatusCode)
+	require.Equal(t, openapiv1.ErrorCodeInternalError, canceledResp.Body.Code)
+	require.Equal(t, "dag-run details request canceled", canceledResp.Body.Message)
 }

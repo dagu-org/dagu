@@ -114,6 +114,22 @@ func TestAttempt_Read(t *testing.T) {
 	assert.Equal(t, core.Succeeded.String(), latestStatus.Status.String())
 }
 
+func TestAttempt_ReadStatusHonorsCanceledContext(t *testing.T) {
+	dir := createTempDir(t)
+	file := filepath.Join(dir, "status.dat")
+
+	writeJSONToFile(t, file, createTestStatus(core.Running))
+
+	att, err := NewAttempt(file, nil)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err = att.ReadStatus(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
 func TestAttempt_Compact(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")

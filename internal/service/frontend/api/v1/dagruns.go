@@ -41,8 +41,91 @@ import (
 
 var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
+const dagRunReadTimeout = 10 * time.Second
+const statusClientClosedRequest = 499
+
+type dagRunReadRequestInfo struct {
+	endpoint    string
+	dagName     string
+	dagRunID    string
+	subDAGRunID string
+}
+
 func sanitizeFilename(s string) string {
 	return filenameUnsafeChars.ReplaceAllString(s, "_")
+}
+
+func (info dagRunReadRequestInfo) attrs(duration time.Duration) []slog.Attr {
+	attrs := []slog.Attr{
+		tag.Endpoint(info.endpoint),
+		tag.Duration(duration),
+	}
+	if info.dagName != "" {
+		attrs = append(attrs, tag.DAG(info.dagName))
+	}
+	if info.dagRunID != "" {
+		attrs = append(attrs, tag.RunID(info.dagRunID))
+	}
+	if info.subDAGRunID != "" {
+		attrs = append(attrs, tag.SubRunID(info.subDAGRunID))
+	}
+	return attrs
+}
+
+func withDAGRunReadTimeout[T any](
+	ctx context.Context,
+	info dagRunReadRequestInfo,
+	read func(context.Context) (T, error),
+) (T, error) {
+	readCtx, cancel := context.WithTimeout(ctx, dagRunReadTimeout)
+	defer cancel()
+
+	startedAt := time.Now()
+	result, err := read(readCtx)
+	if readErr := readCtx.Err(); readErr != nil {
+		duration := time.Since(startedAt)
+		switch {
+		case errors.Is(readErr, context.DeadlineExceeded):
+			logger.Warn(ctx, "DAG run read timed out", info.attrs(duration)...)
+			var zero T
+			return zero, context.DeadlineExceeded
+		case errors.Is(readErr, context.Canceled):
+			logger.Warn(ctx, "DAG run read canceled", info.attrs(duration)...)
+			var zero T
+			return zero, context.Canceled
+		}
+	}
+	if err == nil {
+		return result, nil
+	}
+
+	duration := time.Since(startedAt)
+	switch {
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(readCtx.Err(), context.DeadlineExceeded):
+		logger.Warn(ctx, "DAG run read timed out", info.attrs(duration)...)
+		var zero T
+		return zero, context.DeadlineExceeded
+	case errors.Is(err, context.Canceled), errors.Is(readCtx.Err(), context.Canceled):
+		logger.Warn(ctx, "DAG run read canceled", info.attrs(duration)...)
+		var zero T
+		return zero, context.Canceled
+	default:
+		return result, err
+	}
+}
+
+func dagRunReadTimeoutResponse(message string) api.Error {
+	return api.Error{
+		Code:    api.ErrorCodeTimeout,
+		Message: message,
+	}
+}
+
+func dagRunReadCanceledResponse(message string) api.Error {
+	return api.Error{
+		Code:    api.ErrorCodeInternalError,
+		Message: message,
+	}
 }
 
 // buildLogReadOptions constructs LogReadOptions from request parameters.
@@ -421,8 +504,28 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 		opts = append(opts, exec.WithTags(tags))
 	}
 
-	dagRuns, err := a.listDAGRuns(ctx, opts)
+	var dagName, dagRunID string
+	if request.Params.Name != nil {
+		dagName = *request.Params.Name
+	}
+	if request.Params.DagRunId != nil {
+		dagRunID = *request.Params.DagRunId
+	}
+
+	dagRuns, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs",
+		dagName:  dagName,
+		dagRunID: dagRunID,
+	}, func(readCtx context.Context) ([]api.DAGRunSummary, error) {
+		return a.listDAGRuns(readCtx, opts)
+	})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return api.ListDAGRunsdefaultJSONResponse{
+				StatusCode: http.StatusGatewayTimeout,
+				Body:       dagRunReadTimeoutResponse("dag-run list request timed out"),
+			}, nil
+		}
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)
 	}
 
@@ -453,8 +556,25 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 		opts = append(opts, exec.WithDAGRunID(*request.Params.DagRunId))
 	}
 
-	dagRuns, err := a.listDAGRuns(ctx, opts)
+	var dagRunID string
+	if request.Params.DagRunId != nil {
+		dagRunID = *request.Params.DagRunId
+	}
+
+	dagRuns, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs/{name}",
+		dagName:  request.Name,
+		dagRunID: dagRunID,
+	}, func(readCtx context.Context) ([]api.DAGRunSummary, error) {
+		return a.listDAGRuns(readCtx, opts)
+	})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return api.ListDAGRunsByNamedefaultJSONResponse{
+				StatusCode: http.StatusGatewayTimeout,
+				Body:       dagRunReadTimeoutResponse("dag-run list request timed out"),
+			}, nil
+		}
 		return nil, fmt.Errorf("error listing dag-runs: %w", err)
 	}
 
@@ -1257,8 +1377,26 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 
 // GetDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetailsRequestObject) (api.GetDAGRunDetailsResponseObject, error) {
-	resp, err := a.getDAGRunDetailsData(ctx, request.Name, request.DagRunId)
+	resp, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs/{name}/{dagRunId}",
+		dagName:  request.Name,
+		dagRunID: request.DagRunId,
+	}, func(readCtx context.Context) (api.GetDAGRunDetails200JSONResponse, error) {
+		return a.getDAGRunDetailsData(readCtx, request.Name, request.DagRunId)
+	})
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return &api.GetDAGRunDetailsdefaultJSONResponse{
+				StatusCode: statusClientClosedRequest,
+				Body:       dagRunReadCanceledResponse("dag-run details request canceled"),
+			}, nil
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return &api.GetDAGRunDetailsdefaultJSONResponse{
+				StatusCode: http.StatusGatewayTimeout,
+				Body:       dagRunReadTimeoutResponse("dag-run details request timed out"),
+			}, nil
+		}
 		return &api.GetDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: err.Error(),
@@ -1332,8 +1470,27 @@ func (a *API) GetDAGRunSpec(ctx context.Context, request api.GetDAGRunSpecReques
 // GetSubDAGRunDetails implements api.StrictServerInterface.
 func (a *API) GetSubDAGRunDetails(ctx context.Context, request api.GetSubDAGRunDetailsRequestObject) (api.GetSubDAGRunDetailsResponseObject, error) {
 	root := exec.NewDAGRunRef(request.Name, request.DagRunId)
-	dagStatus, err := a.dagRunMgr.FindSubDAGRunStatus(ctx, root, request.SubDAGRunId)
+	dagStatus, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint:    "/dag-runs/{name}/{dagRunId}/sub/{subDAGRunId}",
+		dagName:     request.Name,
+		dagRunID:    request.DagRunId,
+		subDAGRunID: request.SubDAGRunId,
+	}, func(readCtx context.Context) (*exec.DAGRunStatus, error) {
+		return a.dagRunMgr.FindSubDAGRunStatus(readCtx, root, request.SubDAGRunId)
+	})
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return &api.GetSubDAGRunDetailsdefaultJSONResponse{
+				StatusCode: statusClientClosedRequest,
+				Body:       dagRunReadCanceledResponse("sub dag-run details request canceled"),
+			}, nil
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return &api.GetSubDAGRunDetailsdefaultJSONResponse{
+				StatusCode: http.StatusGatewayTimeout,
+				Body:       dagRunReadTimeoutResponse("sub dag-run details request timed out"),
+			}, nil
+		}
 		return &api.GetSubDAGRunDetails404JSONResponse{
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("sub dag-run ID %s not found for DAG %s", request.SubDAGRunId, request.Name),

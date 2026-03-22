@@ -1,5 +1,7 @@
 declare const getConfig: () => { apiURL: string };
 
+import { fetchWithTimeout } from './requestTimeout';
+
 /**
  * Fetches JSON from the configured API base URL and returns the parsed response body.
  */
@@ -17,7 +19,7 @@ export default async function fetchJson<JSON = unknown>(
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${getConfig().apiURL}${input}`, {
+  const response = await fetchWithTimeout(`${getConfig().apiURL}${input}`, {
     ...init,
     headers,
   });
