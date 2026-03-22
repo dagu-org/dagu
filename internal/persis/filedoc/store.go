@@ -749,30 +749,79 @@ func propagateModTime(nodes []*agent.DocTreeNode) time.Time {
 	return maxTime
 }
 
+func compareNodeNames(a, b *agent.DocTreeNode) int {
+	if cmp := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); cmp != 0 {
+		return cmp
+	}
+	return strings.Compare(a.ID, b.ID)
+}
+
+func compareNodeModTime(a, b *agent.DocTreeNode) int {
+	switch {
+	case a.ModTime.Before(b.ModTime):
+		return -1
+	case a.ModTime.After(b.ModTime):
+		return 1
+	default:
+		return compareNodeNames(a, b)
+	}
+}
+
+func reverseCompare(cmp int) int {
+	switch {
+	case cmp < 0:
+		return 1
+	case cmp > 0:
+		return -1
+	default:
+		return 0
+	}
+}
+
+func compareTreeNodes(a, b *agent.DocTreeNode, sortField, sortOrder string) int {
+	switch sortField {
+	case "type":
+		var cmp int
+		switch a.Type {
+		case b.Type:
+			cmp = compareNodeNames(a, b)
+		case "directory":
+			cmp = -1
+		default:
+			cmp = 1
+		}
+		if sortOrder == "desc" {
+			return reverseCompare(cmp)
+		}
+		return cmp
+	case "mtime":
+		if a.Type != b.Type {
+			if a.Type == "directory" {
+				return -1
+			}
+			return 1
+		}
+		if a.Type == "directory" {
+			return compareNodeNames(a, b)
+		}
+		cmp := compareNodeModTime(a, b)
+		if sortOrder == "desc" {
+			return reverseCompare(cmp)
+		}
+		return cmp
+	default: // "name"
+		cmp := compareNodeNames(a, b)
+		if sortOrder == "desc" {
+			return reverseCompare(cmp)
+		}
+		return cmp
+	}
+}
+
 // sortTreeNodes sorts nodes recursively according to the given sort field and order.
 func sortTreeNodes(nodes []*agent.DocTreeNode, sortField, sortOrder string) {
 	sort.Slice(nodes, func(i, j int) bool {
-		var less bool
-		switch sortField {
-		case "type":
-			if nodes[i].Type != nodes[j].Type {
-				less = nodes[i].Type == "directory"
-			} else {
-				less = strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
-			}
-		case "mtime":
-			if nodes[i].ModTime.Equal(nodes[j].ModTime) {
-				less = strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
-			} else {
-				less = nodes[i].ModTime.Before(nodes[j].ModTime)
-			}
-		default: // "name"
-			less = strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
-		}
-		if sortOrder == "desc" {
-			return !less
-		}
-		return less
+		return compareTreeNodes(nodes[i], nodes[j], sortField, sortOrder) < 0
 	})
 	for _, node := range nodes {
 		if len(node.Children) > 0 {
