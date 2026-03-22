@@ -39,6 +39,7 @@ type httpConfig struct {
 	Body          string            `json:"body" mapstructure:"body"`
 	Silent        bool              `json:"silent" mapstructure:"silent"`
 	Debug         bool              `json:"debug" mapstructure:"debug"`
+	Format        string            `json:"format" mapstructure:"format"`
 	JSON          bool              `json:"json" mapstructure:"json"`
 	SkipTLSVerify bool              `json:"skip_tls_verify" mapstructure:"skip_tls_verify"`
 }
@@ -173,6 +174,10 @@ func (e *http) writeTextResult(rsp *resty.Response) error {
 	return nil
 }
 
+func (e *http) isJSONFormat() bool {
+	return e.cfg.Format == "json" || e.cfg.JSON
+}
+
 func (e *http) Run(_ context.Context) error {
 	rsp, err := e.req.Execute(strings.ToUpper(e.method), e.url)
 	if err != nil {
@@ -181,7 +186,7 @@ func (e *http) Run(_ context.Context) error {
 
 	resCode := rsp.StatusCode()
 
-	if e.cfg.JSON {
+	if e.isJSONFormat() {
 		if err = e.writeJSONResult(rsp); err != nil {
 			return err
 		}
