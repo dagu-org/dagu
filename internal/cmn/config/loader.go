@@ -224,6 +224,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	}
 
 	cfg.Paths.ConfigFileUsed = configFileUsed
+	l.finalizeBaseEnv(cfg)
 	cfg.Warnings = l.warnings
 
 	return cfg, nil
@@ -311,6 +312,28 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 	}
 
 	return nil
+}
+
+func (l *ConfigLoader) finalizeBaseEnv(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+
+	overrides := append([]string{}, l.additionalBaseEnv...)
+	if cfg.Paths.ConfigFileUsed != "" {
+		overrides = append(overrides, fmt.Sprintf("DAGU_CONFIG=%s", cfg.Paths.ConfigFileUsed))
+	}
+	if cfg.Paths.Executable != "" {
+		overrides = append(overrides, fmt.Sprintf("DAGU_EXECUTABLE=%s", cfg.Paths.Executable))
+	}
+	if cfg.Core.DefaultShell != "" {
+		overrides = append(overrides, fmt.Sprintf("SHELL=%s", cfg.Core.DefaultShell))
+	}
+	if cfg.Core.TZ != "" {
+		overrides = append(overrides, fmt.Sprintf("TZ=%s", cfg.Core.TZ))
+	}
+
+	cfg.Core.BaseEnv.variables = withEnvOverrides(cfg.Core.BaseEnv.variables, overrides...)
 }
 
 func (l *ConfigLoader) loadPeerConfig(def PeerDef) Peer {

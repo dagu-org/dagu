@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,7 +23,6 @@ import (
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +55,9 @@ type schedulerConfig struct {
 // newFixture creates a new queue integration test fixture.
 func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 	t.Helper()
+	if !raceEnabled() {
+		t.Parallel()
+	}
 
 	f := &fixture{t: t, schedDone: make(chan error, 1)}
 
@@ -204,35 +205,12 @@ func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 	go func() {
 		th := f.th
 		th.Context = ctx
-		f.schedDone <- runBackgroundCommand(th, cmd.Scheduler(), test.CmdTest{
+		f.schedDone <- th.ExecuteCommand(cmd.Scheduler(), test.CmdTest{
 			Args:        []string{"scheduler", "--dagu-home", home},
 			ExpectedOut: []string{"Scheduler started"},
 		})
 	}()
 	return f
-}
-
-func runBackgroundCommand(th test.Command, cmd *cobra.Command, testCase test.CmdTest) error {
-	cmdRoot := &cobra.Command{Use: "root"}
-	cmdRoot.AddCommand(cmd)
-
-	args := append([]string{}, testCase.Args...)
-	if th.Config != nil && th.Config.Paths.ConfigFileUsed != "" {
-		args = append(args, "--config", th.Config.Paths.ConfigFileUsed)
-	}
-	cmdRoot.SetArgs(args)
-
-	if err := cmdRoot.ExecuteContext(th.Context); err != nil {
-		return err
-	}
-
-	output := th.LoggingOutput.String()
-	for _, expectedOutput := range testCase.ExpectedOut {
-		if expectedOutput != "" && !strings.Contains(output, expectedOutput) {
-			return fmt.Errorf("expected output %q not found in command output", expectedOutput)
-		}
-	}
-	return nil
 }
 
 // WaitDrain waits for the queue to empty.

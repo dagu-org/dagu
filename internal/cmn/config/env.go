@@ -40,6 +40,30 @@ func (b BaseEnv) AsSlice() []string {
 	return append([]string{}, b.variables...)
 }
 
+func withEnvOverrides(base []string, overrides ...string) []string {
+	env := append([]string{}, base...)
+	indexByKey := make(map[string]int, len(env))
+	for i, entry := range env {
+		key, _, found := strings.Cut(entry, "=")
+		if found {
+			indexByKey[key] = i
+		}
+	}
+	for _, entry := range overrides {
+		key, _, found := strings.Cut(entry, "=")
+		if !found {
+			continue
+		}
+		if idx, ok := indexByKey[key]; ok {
+			env[idx] = entry
+			continue
+		}
+		indexByKey[key] = len(env)
+		env = append(env, entry)
+	}
+	return env
+}
+
 // case-insensitive matching on Windows).
 func filterEnv(envs []string, allow map[string]bool, prefixes []string) []string {
 	var filtered []string

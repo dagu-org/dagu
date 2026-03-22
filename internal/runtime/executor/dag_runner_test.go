@@ -463,20 +463,34 @@ func TestCleanup_NonExistentFile(t *testing.T) {
 }
 
 func TestExecutablePath(t *testing.T) {
-	// Test with environment variable
-	testPath := "/custom/path/to/dagu"
-	_ = os.Setenv("DAGU_EXECUTABLE", testPath)
-	defer func() { _ = os.Unsetenv("DAGU_EXECUTABLE") }()
+	t.Run("UsesConfigExecutableBeforeEnv", func(t *testing.T) {
+		ctx := config.WithConfig(context.Background(), &config.Config{
+			Paths: config.PathsConfig{Executable: "/configured/path/to/dagu"},
+		})
+		_ = os.Setenv("DAGU_EXECUTABLE", "/env/path/to/dagu")
+		defer func() { _ = os.Unsetenv("DAGU_EXECUTABLE") }()
 
-	path, err := executablePath()
-	assert.NoError(t, err)
-	assert.Equal(t, testPath, path)
+		path, err := executablePath(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, "/configured/path/to/dagu", path)
+	})
 
-	// Test without environment variable
-	_ = os.Unsetenv("DAGU_EXECUTABLE")
-	path, err = executablePath()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, path)
+	t.Run("FallsBackToEnv", func(t *testing.T) {
+		testPath := "/custom/path/to/dagu"
+		_ = os.Setenv("DAGU_EXECUTABLE", testPath)
+		defer func() { _ = os.Unsetenv("DAGU_EXECUTABLE") }()
+
+		path, err := executablePath(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, testPath, path)
+	})
+
+	t.Run("FallsBackToCurrentExecutable", func(t *testing.T) {
+		_ = os.Unsetenv("DAGU_EXECUTABLE")
+		path, err := executablePath(context.Background())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, path)
+	})
 }
 
 func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {

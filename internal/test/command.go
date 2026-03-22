@@ -4,6 +4,7 @@
 package test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,28 +29,18 @@ type Command struct {
 
 func (th Command) RunCommand(t *testing.T, cmd *cobra.Command, testCase CmdTest) {
 	t.Helper()
-
-	cmdRoot := &cobra.Command{Use: "root"}
-	cmdRoot.AddCommand(cmd)
-
-	// Set arguments.
-	cmdRoot.SetArgs(withConfigFlag(testCase.Args, th.Config))
-
-	// Run the command
-	err := cmdRoot.ExecuteContext(th.Context)
-	require.NoError(t, err)
-
-	output := th.LoggingOutput.String()
-
-	// Check if the expected output is present in the standard output.
-	for _, expectedOutput := range testCase.ExpectedOut {
-		require.Contains(t, output, expectedOutput)
-	}
+	require.NoError(t, th.ExecuteCommand(cmd, testCase))
 }
 
 // RunCommandWithError runs a command and returns the error (if any) without failing the test.
 func (th Command) RunCommandWithError(t *testing.T, cmd *cobra.Command, testCase CmdTest) error {
 	t.Helper()
+	return th.ExecuteCommand(cmd, testCase)
+}
+
+// ExecuteCommand runs a command and validates the expected output without touching testing.T.
+// It is safe to use from background goroutines in tests.
+func (th Command) ExecuteCommand(cmd *cobra.Command, testCase CmdTest) error {
 	cmdRoot := &cobra.Command{Use: "root"}
 	cmdRoot.AddCommand(cmd)
 
@@ -58,18 +49,17 @@ func (th Command) RunCommandWithError(t *testing.T, cmd *cobra.Command, testCase
 
 	// Run the command
 	err := cmdRoot.ExecuteContext(th.Context)
-
-	if err == nil {
-		output := th.LoggingOutput.String()
-		// Check if the expected output is present in the standard output.
-		for _, expectedOutput := range testCase.ExpectedOut {
-			if len(expectedOutput) > 0 {
-				require.Contains(t, output, expectedOutput)
-			}
-		}
+	if err != nil {
+		return err
 	}
 
-	return err
+	output := th.LoggingOutput.String()
+	for _, expectedOutput := range testCase.ExpectedOut {
+		if len(expectedOutput) > 0 && !strings.Contains(output, expectedOutput) {
+			return fmt.Errorf("expected output %q not found in command output", expectedOutput)
+		}
+	}
+	return nil
 }
 
 func SetupCommand(t *testing.T, opts ...HelperOption) Command {

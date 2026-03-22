@@ -1,0 +1,72 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package runtime_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
+
+func TestRepairStaleLocalRunDoesNotMutateReadStatusSnapshot(t *testing.T) {
+	t.Parallel()
+
+	sharedStatus := &exec.DAGRunStatus{
+		Name:       "test",
+		DAGRunID:   "run-1",
+		AttemptID:  "attempt-1",
+		Status:     core.Running,
+		StartedAt:  time.Now().Add(-time.Minute).UTC().Format(time.RFC3339),
+		FinishedAt: exec.FormatTime(time.Time{}),
+		Nodes: []*exec.Node{
+			{
+				Step:   core.Step{Name: "step-1"},
+				Status: core.NodeRunning,
+			},
+		},
+	}
+
+	attempt := &exec.MockDAGRunAttempt{Status: sharedStatus}
+	attempt.On("Open", mock.Anything).Return(nil).Once()
+
+	var written exec.DAGRunStatus
+	attempt.
+		On("Write", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			written = args.Get(1).(exec.DAGRunStatus)
+		}).
+		Return(nil).
+		Once()
+	attempt.On("Close", mock.Anything).Return(nil).Once()
+
+	repaired, repairedNow, err := runtime.RepairStaleLocalRun(context.Background(), attempt, &core.DAG{})
+	require.NoError(t, err)
+	require.True(t, repairedNow)
+	require.NotNil(t, repaired)
+	require.NotSame(t, sharedStatus, repaired)
+	require.NotSame(t, sharedStatus.Nodes[0], repaired.Nodes[0])
+
+	require.Equal(t, core.Running, sharedStatus.Status)
+	require.Equal(t, core.NodeRunning, sharedStatus.Nodes[0].Status)
+	require.Empty(t, sharedStatus.Nodes[0].Error)
+
+	require.Equal(t, core.Failed, repaired.Status)
+	require.Equal(t, core.NodeFailed, repaired.Nodes[0].Status)
+	require.Equal(t, staleLocalRunErrorText(), repaired.Nodes[0].Error)
+	require.Equal(t, core.Failed, written.Status)
+	require.Equal(t, core.NodeFailed, written.Nodes[0].Status)
+	require.Equal(t, staleLocalRunErrorText(), written.Nodes[0].Error)
+
+	attempt.AssertExpectations(t)
+}
+
+func staleLocalRunErrorText() string {
+	return "process terminated unexpectedly - stale local process detected"
+}

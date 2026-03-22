@@ -34,28 +34,50 @@ func RepairStaleLocalRun(
 		return fullStatus, false, nil
 	}
 
-	fullStatus.Status = core.Failed
-	fullStatus.FinishedAt = exec.FormatTime(time.Now())
+	repairedStatus := cloneStatusForStaleRunRepair(fullStatus)
+	repairedStatus.Status = core.Failed
+	repairedStatus.FinishedAt = exec.FormatTime(time.Now())
 
-	if len(fullStatus.Nodes) == 0 {
+	if len(repairedStatus.Nodes) == 0 {
 		if dag == nil {
 			return nil, false, fmt.Errorf("dag is required when rebuilding missing nodes")
 		}
-		fullStatus.Nodes = exec.NewNodesFromSteps(dag.Steps)
+		repairedStatus.Nodes = exec.NewNodesFromSteps(dag.Steps)
 	}
 
-	for _, node := range fullStatus.Nodes {
+	for _, node := range repairedStatus.Nodes {
 		if node.Status == core.NodeRunning || node.Status == core.NodeNotStarted {
 			node.Status = core.NodeFailed
 			node.Error = staleLocalRunError
 		}
 	}
 
-	if err := writeAttemptStatus(ctx, attempt, *fullStatus); err != nil {
+	if err := writeAttemptStatus(ctx, attempt, *repairedStatus); err != nil {
 		return nil, false, err
 	}
 
-	return fullStatus, true, nil
+	return repairedStatus, true, nil
+}
+
+func cloneStatusForStaleRunRepair(status *exec.DAGRunStatus) *exec.DAGRunStatus {
+	if status == nil {
+		return nil
+	}
+
+	cloned := *status
+	if len(status.Nodes) > 0 {
+		cloned.Nodes = make([]*exec.Node, 0, len(status.Nodes))
+		for _, node := range status.Nodes {
+			if node == nil {
+				cloned.Nodes = append(cloned.Nodes, nil)
+				continue
+			}
+			nodeCopy := *node
+			cloned.Nodes = append(cloned.Nodes, &nodeCopy)
+		}
+	}
+
+	return &cloned
 }
 
 func writeAttemptStatus(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) error {

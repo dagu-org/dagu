@@ -194,7 +194,7 @@ func (e *SubDAGExecutor) newLocalCLICommand(
 	target string,
 	trailingArgs ...string,
 ) (*osexec.Cmd, error) {
-	executable, err := executablePath()
+	executable, err := executablePath(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find executable path: %w", err)
 	}
@@ -208,9 +208,9 @@ func (e *SubDAGExecutor) newLocalCLICommand(
 
 	cmd := osexec.CommandContext(ctx, executable, fullArgs...) // nolint:gosec
 	cmd.Dir = workDir
-	cmd.Env = os.Environ()
 
 	rCtx := exec.GetContext(ctx)
+	cmd.Env = baseEnvForLocalCLI(rCtx)
 	cmd.Env = append(cmd.Env, rCtx.AllEnvs()...)
 	if e.externalStepRetry {
 		cmd.Env = append(cmd.Env, exec.EnvKeyExternalStepRetry+"=1")
@@ -232,6 +232,16 @@ func (e *SubDAGExecutor) injectTraceContext(ctx context.Context, cmd *osexec.Cmd
 		logger.Debug(logCtx, "No trace context to inject into sub DAG")
 	}
 	return cmd
+}
+
+func baseEnvForLocalCLI(rCtx exec.Context) []string {
+	if rCtx.BaseEnv != nil {
+		env := rCtx.BaseEnv.AsSlice()
+		if len(env) > 0 {
+			return env
+		}
+	}
+	return os.Environ()
 }
 
 // BuildCoordinatorTask creates a coordinator task for distributed execution
@@ -818,7 +828,10 @@ func (e *SubDAGExecutor) Kill(sig os.Signal) error {
 }
 
 // executablePath returns the path to the dagu executable.
-func executablePath() (string, error) {
+func executablePath(ctx context.Context) (string, error) {
+	if cfg := config.GetConfig(ctx); cfg != nil && cfg.Paths.Executable != "" {
+		return cfg.Paths.Executable, nil
+	}
 	if path := os.Getenv("DAGU_EXECUTABLE"); path != "" {
 		return path, nil
 	}
