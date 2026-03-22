@@ -1817,6 +1817,36 @@ func TestListTreeSortNestedChildren(t *testing.T) {
 	assert.Equal(t, "dir/c-child", result.Items[0].Children[2].ID)
 }
 
+func TestListTreeSortMtimeKeepsDirectoriesAlphabetical(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "alpha/child", "alpha"))
+	require.NoError(t, store.Create(ctx, "beta/child", "beta"))
+	require.NoError(t, store.Create(ctx, "old-file", "old"))
+	require.NoError(t, store.Create(ctx, "new-file", "new"))
+
+	now := time.Now()
+	setModTime(t, filepath.Join(store.baseDir, "alpha", "child.md"), now.Add(-4*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "beta", "child.md"), now.Add(-1*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "old-file.md"), now.Add(-3*time.Hour))
+	setModTime(t, filepath.Join(store.baseDir, "new-file.md"), now)
+
+	result, err := store.List(ctx, agent.ListDocsOptions{
+		Page:    1,
+		PerPage: 50,
+		Sort:    agent.DocSortFieldMTime,
+		Order:   agent.DocSortOrderDesc,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 4)
+
+	assert.Equal(t, "alpha", result.Items[0].ID)
+	assert.Equal(t, "beta", result.Items[1].ID)
+	assert.Equal(t, "new-file", result.Items[2].ID)
+	assert.Equal(t, "old-file", result.Items[3].ID)
+}
+
 func TestListTreeSortPaginationConsistency(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
