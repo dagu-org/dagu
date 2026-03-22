@@ -45,7 +45,7 @@ func (th Command) ExecuteCommand(cmd *cobra.Command, testCase CmdTest) error {
 	cmdRoot.AddCommand(cmd)
 
 	// Set arguments.
-	cmdRoot.SetArgs(withConfigFlag(testCase.Args, th.Config))
+	cmdRoot.SetArgs(WithConfigFlag(testCase.Args, th.Config))
 
 	// Run the command
 	err := cmdRoot.ExecuteContext(th.Context)
@@ -69,8 +69,8 @@ func SetupCommand(t *testing.T, opts ...HelperOption) Command {
 	return Command{Helper: Setup(t, opts...)}
 }
 
-// withConfigFlag appends --config <file> unless already present.
-func withConfigFlag(args []string, cfg *config.Config) []string {
+// WithConfigFlag appends --config <file> unless already present.
+func WithConfigFlag(args []string, cfg *config.Config) []string {
 	if cfg == nil || cfg.Paths.ConfigFileUsed == "" {
 		return args
 	}

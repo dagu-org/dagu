@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/test"
@@ -20,7 +21,7 @@ import (
 // executeCommand runs a cobra command with silenced errors and usage output.
 func executeCommand(ctx context.Context, c *cobra.Command, args []string) error {
 	c.SetContext(ctx)
-	c.SetArgs(args)
+	c.SetArgs(test.WithConfigFlag(args, config.GetConfig(ctx)))
 	c.SilenceErrors = true
 	c.SilenceUsage = true
 	return c.Execute()
