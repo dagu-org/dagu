@@ -116,3 +116,28 @@ func TestProcHandle_RemovesEmptyParentDir(t *testing.T) {
 	_, err = os.Stat(dagDir)
 	require.ErrorIs(t, err, os.ErrNotExist, "empty DAG directory should be removed")
 }
+
+func TestProcHandle_StartPublishesInitializedFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	ctx := context.Background()
+
+	meta := testProcMetaFromRun(exec.NewDAGRunRef("test_proc", "run-1"))
+	fileName := procFilePath(tmpDir, exec.NewUTC(time.Now()), meta)
+	proc := NewProcHandler(fileName, meta, 0, 0)
+
+	require.NoError(t, proc.startHeartbeat(ctx))
+	t.Cleanup(func() {
+		_ = proc.Stop(ctx)
+	})
+
+	entries, err := os.ReadDir(filepath.Dir(fileName))
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.Equal(t, filepath.Base(fileName), entries[0].Name())
+
+	entry, err := readProcEntry(fileName, meta.Name, time.Minute, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, meta, entry.Meta)
+}

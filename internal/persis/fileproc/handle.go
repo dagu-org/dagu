@@ -98,7 +98,8 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	fd, err := os.OpenFile(p.fileName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	heartbeatUnix := time.Now().Unix()
+	fd, err := p.openInitializedProcFile(heartbeatUnix)
 	if err != nil {
 		p.started.Store(false)
 		return err
@@ -107,27 +108,6 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	hbCtx, cancel := context.WithCancel(ctx)
 	p.cancel = cancel
 	p.canceled.Store(false)
-
-	heartbeatUnix := time.Now().Unix()
-	if err := writeProcFile(fd, heartbeatUnix, p.meta); err != nil {
-		_ = fd.Close()
-		if err := os.Remove(p.fileName); err != nil {
-			logger.Error(ctx, "Failed to remove heartbeat file", tag.Error(err))
-		}
-
-		// If the directory is empty after removing the file, remove the directory as well
-		entries, err := os.ReadDir(dir)
-		if err == nil && len(entries) == 0 {
-			if err := os.Remove(dir); err != nil {
-				logger.Info(ctx, "Failed to remove empty heartbeat directory",
-					tag.Error(err))
-			}
-		}
-
-		p.started.Store(false)
-		return err
-	}
-	_ = fd.Sync()
 
 	p.wg.Add(1)
 
@@ -211,16 +191,10 @@ func (p *ProcHandle) recreateFile(heartbeatUnix int64) (*os.File, error) {
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
-	// Use O_CREATE without O_EXCL — intentional recreation of deleted file
-	fd, err := os.OpenFile(p.fileName, os.O_CREATE|os.O_RDWR, 0600)
+	fd, err := p.openInitializedProcFile(heartbeatUnix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to recreate file: %w", err)
 	}
-	if err := writeProcFile(fd, heartbeatUnix, p.meta); err != nil {
-		_ = fd.Close()
-		return nil, fmt.Errorf("failed to write proc file: %w", err)
-	}
-	_ = fd.Sync()
 	return fd, nil
 }
 
@@ -229,4 +203,41 @@ func writeHeartbeat(fd *os.File, heartbeatUnix int64) error {
 	binary.BigEndian.PutUint64(buf, uint64(heartbeatUnix)) //nolint:gosec // caller uses local unix timestamp
 	_, err := fd.WriteAt(buf, 0)
 	return err
+}
+
+func (p *ProcHandle) openInitializedProcFile(heartbeatUnix int64) (*os.File, error) {
+	dir := filepath.Dir(p.fileName)
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(p.fileName)+".*.tmp")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp proc file: %w", err)
+	}
+	tmpName := tmpFile.Name()
+	cleanupTemp := func() {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpName)
+	}
+
+	if err := writeProcFile(tmpFile, heartbeatUnix, p.meta); err != nil {
+		cleanupTemp()
+		return nil, fmt.Errorf("failed to write proc file: %w", err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		cleanupTemp()
+		return nil, fmt.Errorf("failed to sync temp proc file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return nil, fmt.Errorf("failed to close temp proc file: %w", err)
+	}
+	if err := os.Rename(tmpName, p.fileName); err != nil {
+		_ = os.Remove(tmpName)
+		return nil, fmt.Errorf("failed to publish proc file: %w", err)
+	}
+
+	fd, err := os.OpenFile(p.fileName, os.O_RDWR, 0600)
+	if err != nil {
+		_ = os.Remove(p.fileName)
+		return nil, fmt.Errorf("failed to reopen proc file: %w", err)
+	}
+	return fd, nil
 }
