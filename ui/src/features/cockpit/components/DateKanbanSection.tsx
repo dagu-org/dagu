@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { components } from '@/api/v1/schema';
 import dayjs from '@/lib/dayjs';
 import { useDateKanbanData } from '../hooks/useDateKanbanData';
@@ -23,11 +23,17 @@ export function DateKanbanSection({
   selectedWorkspace,
   onCardClick,
 }: Props): React.ReactElement {
+  const yesterdayStr = useMemo(
+    () => dayjs(todayStr).subtract(1, 'day').format('YYYY-MM-DD'),
+    [todayStr]
+  );
   const isToday = date === todayStr;
+  const isLive = isToday || date === yesterdayStr;
   const { columns, error, isLoading, isEmpty, retry } = useDateKanbanData(
     date,
     selectedWorkspace,
-    isToday
+    isToday,
+    isLive
   );
 
   return (
