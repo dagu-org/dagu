@@ -30,12 +30,11 @@ var _ executor.Executor = (*commandExecutor)(nil)
 var _ executor.ExitCoder = (*commandExecutor)(nil)
 
 type commandExecutor struct {
-	mu           sync.Mutex
-	config       *commandConfig
-	cmd          *exec.Cmd
-	scriptFile   string
-	exitCode     int
-	scriptFailed bool // set on failure to prevent temp script cleanup
+	mu         sync.Mutex
+	config     *commandConfig
+	cmd        *exec.Cmd
+	scriptFile string
+	exitCode   int
 	// stderrTail stores a rolling tail of recent stderr lines
 	stderrTail *executor.TailWriter
 }
@@ -56,9 +55,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 		}
 		e.scriptFile = scriptFile
 		defer func() {
-			if !e.scriptFailed {
-				_ = os.Remove(scriptFile)
-			}
+			_ = os.Remove(scriptFile)
 		}()
 	}
 	// Wrap stderr with a tailing writer so we can include recent
@@ -88,9 +85,6 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	if err := e.cmd.Start(); err != nil {
 		e.exitCode = exitCodeFromError(err)
 		e.mu.Unlock()
-		if e.config.Script != "" && e.scriptFile != "" {
-			e.scriptFailed = true
-		}
 		if tail := e.stderrTail.Tail(); tail != "" {
 			tail = e.annotateStderrTail(tail)
 			return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)
@@ -119,9 +113,6 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	case err := <-waitDone:
 		if err != nil {
 			e.exitCode = exitCodeFromError(err)
-			if e.config.Script != "" && e.scriptFile != "" {
-				e.scriptFailed = true
-			}
 			if tail := e.stderrTail.Tail(); tail != "" {
 				tail = e.annotateStderrTail(tail)
 				return fmt.Errorf("%w\nrecent stderr (tail):\n%s", err, tail)

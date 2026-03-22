@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -987,11 +988,16 @@ func TestCommandExecutor_ScriptErrorAnnotation(t *testing.T) {
 	assert.Contains(t, stderrOutput, "echo line4")
 	// Failing line should be marked with >>
 	assert.Contains(t, stderrOutput, " >>    3: nonexistent_command_xyz_12345")
+
+	ce := exec.(*commandExecutor)
+	assert.NotEmpty(t, ce.scriptFile)
+	_, statErr := os.Stat(ce.scriptFile)
+	assert.True(t, os.IsNotExist(statErr), "script file should be deleted after failure")
 }
 
-// TestCommandExecutor_ScriptPreservedOnFailure tests that temp script files
-// are preserved when execution fails.
-func TestCommandExecutor_ScriptPreservedOnFailure(t *testing.T) {
+// TestCommandExecutor_ScriptCleanedOnFailure tests that temp script files
+// are cleaned up when execution fails.
+func TestCommandExecutor_ScriptCleanedOnFailure(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping Unix-specific test on Windows")
 	}
@@ -1016,9 +1022,7 @@ func TestCommandExecutor_ScriptPreservedOnFailure(t *testing.T) {
 	ce := exec.(*commandExecutor)
 	assert.NotEmpty(t, ce.scriptFile)
 	_, statErr := os.Stat(ce.scriptFile)
-	assert.NoError(t, statErr, "script file should be preserved on failure")
-
-	t.Cleanup(func() { _ = os.Remove(ce.scriptFile) })
+	assert.True(t, os.IsNotExist(statErr), "script file should be deleted on failure")
 }
 
 // TestCommandExecutor_ScriptCleanedOnSuccess tests that temp script files
@@ -1047,6 +1051,48 @@ func TestCommandExecutor_ScriptCleanedOnSuccess(t *testing.T) {
 	ce := exec.(*commandExecutor)
 	_, statErr := os.Stat(ce.scriptFile)
 	assert.True(t, os.IsNotExist(statErr), "script file should be deleted on success")
+}
+
+// TestCommandExecutor_ScriptCleanedOnCancel tests that temp script files
+// are cleaned up when execution stops via context cancellation.
+func TestCommandExecutor_ScriptCleanedOnCancel(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping Unix-specific test on Windows")
+	}
+
+	tmpDir := t.TempDir()
+
+	step := core.Step{
+		Name:   "test",
+		Script: "sleep 10",
+		Dir:    tmpDir,
+	}
+
+	baseCtx := setupTestContext(t, nil, step)
+	env := runtime.GetEnv(baseCtx)
+	env.WorkingDir = tmpDir
+	baseCtx = runtime.WithEnv(baseCtx, env)
+
+	ctx, cancel := context.WithTimeout(baseCtx, 50*time.Millisecond)
+	defer cancel()
+
+	exec, err := NewCommand(ctx, step)
+	require.NoError(t, err)
+
+	err = exec.Run(ctx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+
+	ce := exec.(*commandExecutor)
+	assert.NotEmpty(t, ce.scriptFile)
+	_, statErr := os.Stat(ce.scriptFile)
+	assert.True(t, os.IsNotExist(statErr), "script file should be deleted after cancellation")
+
+	entries, err := os.ReadDir(tmpDir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		assert.False(t, strings.HasPrefix(entry.Name(), "dagu_script-"),
+			"temporary script file should be cleaned up after cancellation: %s", entry.Name())
+	}
 }
 
 // TestCommandExecutor_WorkingDirectory tests working directory is set correctly
