@@ -328,12 +328,12 @@ func TestLoad_BaseEnvIncludesConfigDerivedOverrides(t *testing.T) {
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
 	executablePath := filepath.Join(tempDir, "bin", "dagu")
-	err := os.WriteFile(configFile, []byte(fmt.Sprintf(`
+	err := os.WriteFile(configFile, fmt.Appendf(nil, `
 default_shell: /bin/sh
 tz: UTC
 paths:
   executable: %s
-`, executablePath)), 0o600)
+`, executablePath), 0o600)
 	require.NoError(t, err)
 
 	cfg := testLoad(t, WithConfigFile(configFile), WithAppHomeDir(tempDir))
