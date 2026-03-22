@@ -3,16 +3,10 @@ import { Maximize2, X } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useQuery } from '../../../../hooks/api';
-import { whenEnabled } from '../../../../hooks/queryUtils';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGRuns,
-} from '../../../../hooks/useAppLive';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
+import { useBoundedDAGRunDetails } from '../../hooks/useBoundedDAGRunDetails';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
 
 type Props = {
@@ -37,54 +31,46 @@ function DAGRunDetailsPanel({
   const parentDAGRunId = searchParams.get('dagRunId');
   const parentName = searchParams.get('dagRunName') || name;
   const isSubDAGRun = Boolean(subDAGRunId && parentDAGRunId && parentName);
-  const liveEnabled = isSubDAGRun || Boolean(name && dagRunId);
-
-  const liveState = useLiveConnection(liveEnabled);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const subDAGQueryEnabled = Boolean(isSubDAGRun);
-  const dagRunQueryEnabled = !isSubDAGRun && Boolean(name && dagRunId);
-
-  // Sub-DAG query (only enabled for sub-DAG runs)
-  const subDAGQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    whenEnabled(subDAGQueryEnabled, {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: parentName as string,
-          dagRunId: parentDAGRunId as string,
-          subDAGRunId: subDAGRunId as string,
-        },
-      },
-    }),
-    liveFallbackOptions(liveState)
-  );
-  useLiveDAGRuns(subDAGQuery.mutate, subDAGQueryEnabled);
-
-  // Regular DAG query — SWR is the single source of truth, refreshed by live invalidations
-  const dagRunQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}',
-    whenEnabled(dagRunQueryEnabled, {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: name || '',
+  const detailsTarget = isSubDAGRun
+    ? {
+        remoteNode,
+        name: name || '',
+        dagRunId: dagRunId || 'latest',
+        parentName: parentName as string,
+        parentDAGRunId: parentDAGRunId as string,
+        subDAGRunId: subDAGRunId as string,
+      }
+    : name
+      ? {
+          remoteNode,
+          name,
           dagRunId: dagRunId || 'latest',
-        },
-      },
-    }),
-    liveFallbackOptions(liveState)
-  );
-  useLiveDAGRuns(dagRunQuery.mutate, dagRunQueryEnabled);
+        }
+      : null;
 
-  // Select data source: sub-DAG query or regular query
-  const { mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
-  const data = isSubDAGRun ? subDAGQuery.data : dagRunQuery.data;
+  const {
+    data: latestDetails,
+    error,
+    refresh,
+  } = useBoundedDAGRunDetails({
+    target: detailsTarget,
+    enabled: detailsTarget !== null,
+    pollIntervalMs: detailsTarget ? 2000 : 0,
+  });
+
+  const expectedDagRunId = isSubDAGRun ? (subDAGRunId as string) : (dagRunId || 'latest');
+  const data =
+    latestDetails?.dagRunId === expectedDagRunId
+      ? { dagRunDetails: latestDetails }
+      : null;
 
   const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate(), 500);
-  }, [mutate]);
+    setTimeout(() => {
+      void refresh();
+    }, 500);
+  }, [refresh]);
 
   const handleFullscreenClick = React.useCallback(
     (e?: React.MouseEvent) => {
@@ -137,6 +123,15 @@ function DAGRunDetailsPanel({
 
   // Only show loading on initial load, not when switching DAG runs
   if (!data) {
+    if (error) {
+      return (
+        <div className="flex h-full items-start justify-center p-4">
+          <div className="w-full rounded-lg border border-error/30 bg-error-muted p-4 text-sm text-error">
+            {error.message || 'Failed to load DAG run details'}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingIndicator />

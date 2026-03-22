@@ -4,8 +4,7 @@ import { AppBarContext } from '../../../contexts/AppBarContext';
 import { usePageContext } from '../../../contexts/PageContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
-import { useQuery } from '../../../hooks/api';
-import { whenEnabled } from '../../../hooks/queryUtils';
+import { useBoundedDAGRunDetails } from '../../../features/dag-runs/hooks/useBoundedDAGRunDetails';
 
 type ApiError = {
   response?: { status?: number };
@@ -58,47 +57,43 @@ function DAGRunDetailsPage() {
   const parentName = searchParams.get('dagRunName') || name;
 
   const canQuerySubDag = !!(subDAGRunId && parentDAGRunId && parentName);
-  const subDAGQueryEnabled = Boolean(canQuerySubDag);
-  const dagRunQueryEnabled = !canQuerySubDag && Boolean(name && dagRunId);
-
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-
-  const subDAGQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    whenEnabled(subDAGQueryEnabled, {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: parentName as string,
-          dagRunId: parentDAGRunId as string,
-          subDAGRunId: subDAGRunId as string,
-        },
-      },
-    }),
-    { refreshInterval: subDAGQueryEnabled ? 2000 : 0 }
-  );
-
-  const dagRunQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}',
-    whenEnabled(dagRunQueryEnabled, {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: name || '',
+  const detailsTarget = canQuerySubDag
+    ? {
+        remoteNode,
+        name: name || '',
+        dagRunId: dagRunId || 'latest',
+        parentName: parentName as string,
+        parentDAGRunId: parentDAGRunId as string,
+        subDAGRunId: subDAGRunId as string,
+      }
+    : name
+      ? {
+          remoteNode,
+          name,
           dagRunId: dagRunId || 'latest',
-        },
-      },
-    }),
-    { refreshInterval: dagRunQueryEnabled ? 2000 : 0 }
-  );
+        }
+      : null;
 
-  const { data, error, mutate } = canQuerySubDag ? subDAGQuery : dagRunQuery;
+  const {
+    data: latestDetails,
+    error,
+    refresh,
+  } = useBoundedDAGRunDetails({
+    target: detailsTarget,
+    enabled: detailsTarget !== null,
+    pollIntervalMs: detailsTarget ? 2000 : 0,
+  });
 
   const refreshFn = useCallback(() => {
-    setTimeout(() => mutate(), 500);
-  }, [mutate]);
+    setTimeout(() => {
+      void refresh();
+    }, 500);
+  }, [refresh]);
 
-  const dagRunDetails = data?.dagRunDetails;
+  const expectedDagRunId = subDAGRunId || dagRunId || 'latest';
+  const dagRunDetails =
+    latestDetails?.dagRunId === expectedDagRunId ? latestDetails : null;
   const displayDAGRunId = subDAGRunId || dagRunId || '';
 
   function getDisplayName(): string {
@@ -122,11 +117,11 @@ function DAGRunDetailsPage() {
     return () => setContext(null);
   }, [displayName, displayDAGRunId, setContext]);
 
-  if (error) {
+  if (error && !dagRunDetails) {
     return <ErrorDisplay error={error} name={name} dagRunId={dagRunId} />;
   }
 
-  if (!data || !dagRunDetails) {
+  if (!dagRunDetails) {
     return null;
   }
 

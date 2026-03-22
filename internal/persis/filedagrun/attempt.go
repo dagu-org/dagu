@@ -267,7 +267,7 @@ func (att *Attempt) Compact(ctx context.Context) error {
 
 // compactLocked performs actual compaction with the lock already held
 func (att *Attempt) compactLocked(ctx context.Context) error {
-	status, err := att.parseLocked()
+	status, err := att.parseLocked(ctx)
 	if err == io.EOF {
 		return nil // Empty file, nothing to compact
 	}
@@ -343,13 +343,13 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (att *Attempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
+func (att *Attempt) ReadStatus(ctx context.Context) (*exec.DAGRunStatus, error) {
 	// Try to use cache first if available
 	if att.cache != nil {
 		status, cacheErr := att.cache.LoadLatest(att.file, func() (*exec.DAGRunStatus, error) {
 			att.mu.RLock()
 			defer att.mu.RUnlock()
-			return att.parseLocked()
+			return att.parseLocked(ctx)
 		})
 
 		if cacheErr == nil {
@@ -359,7 +359,7 @@ func (att *Attempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
 
 	// Cache miss or disabled, perform a direct read
 	att.mu.RLock()
-	parsed, parseErr := att.parseLocked()
+	parsed, parseErr := att.parseLocked(ctx)
 	att.mu.RUnlock()
 
 	if parseErr != nil {
@@ -375,16 +375,20 @@ func (att *Attempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
 
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
-func (att *Attempt) parseLocked() (*exec.DAGRunStatus, error) {
-	return ParseStatusFile(att.file)
+func (att *Attempt) parseLocked(ctx context.Context) (*exec.DAGRunStatus, error) {
+	return parseStatusFileWithContext(ctx, att.file)
 }
 
 // ParseStatusFile reads the status file and returns the last valid status.
 // The bufferSize parameter controls the size of the read buffer.
 func ParseStatusFile(file string) (*exec.DAGRunStatus, error) {
+	return parseStatusFileWithContext(context.Background(), file)
+}
+
+func parseStatusFileWithContext(ctx context.Context, file string) (*exec.DAGRunStatus, error) {
 	f, err := os.Open(file) //nolint:gosec
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
 	}
 	defer func() {
 		_ = f.Close()
@@ -397,6 +401,9 @@ func ParseStatusFile(file string) (*exec.DAGRunStatus, error) {
 
 	// Read append-only file from the beginning and find the last status
 	for {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
+		}
 		line, nextOffset, err := readLineFrom(f, offset)
 		if err == io.EOF {
 			if result == nil {
@@ -404,7 +411,7 @@ func ParseStatusFile(file string) (*exec.DAGRunStatus, error) {
 			}
 			return result, nil
 		} else if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
+			return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
 		}
 
 		offset = nextOffset

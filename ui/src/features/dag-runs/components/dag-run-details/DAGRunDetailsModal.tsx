@@ -6,11 +6,10 @@ import { Button } from '@/components/ui/button';
 import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
-import { useQuery } from '../../../../hooks/api';
-import { whenEnabled } from '../../../../hooks/queryUtils';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
+import { useBoundedDAGRunDetails } from '../../hooks/useBoundedDAGRunDetails';
 import DAGRunDetailsContent from './DAGRunDetailsContent';
 
 type DAGRunDetailsModalProps = {
@@ -72,44 +71,38 @@ function DAGRunDetailsModal({
   const canQuerySubDag = Boolean(subDAGRunId && parentDAGRunId && parentName);
   const subDAGQueryEnabled = isOpen && canQuerySubDag;
   const dagRunQueryEnabled = isOpen && !canQuerySubDag && Boolean(name);
-
-  const subDAGQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
-    whenEnabled(subDAGQueryEnabled, {
-      params: {
-        query: { remoteNode },
-        path: {
-          name: parentName,
-          dagRunId: parentDAGRunId ?? '',
-          subDAGRunId: subDAGRunId ?? '',
-        },
-      },
-    }),
-    {
-      refreshInterval: subDAGQueryEnabled ? 2000 : 0,
-    }
-  );
-
-  const dagRunQuery = useQuery(
-    '/dag-runs/{name}/{dagRunId}',
-    whenEnabled(dagRunQueryEnabled, {
-      params: {
-        query: { remoteNode },
-        path: {
+  const detailsTarget = subDAGQueryEnabled
+    ? {
+        remoteNode,
+        name: name || '',
+        dagRunId: dagRunId || 'latest',
+        parentName,
+        parentDAGRunId: parentDAGRunId ?? '',
+        subDAGRunId: subDAGRunId ?? '',
+      }
+    : dagRunQueryEnabled
+      ? {
+          remoteNode,
           name: name || '',
           dagRunId: dagRunId || 'latest',
-        },
-      },
-    }),
-    {
-      refreshInterval: dagRunQueryEnabled ? 2000 : 0,
-    }
-  );
+        }
+      : null;
 
-  const activeQuery = canQuerySubDag ? subDAGQuery : dagRunQuery;
-  const { data, isLoading, isValidating, mutate } = activeQuery;
+  const {
+    data: latestDetails,
+    error,
+    isLoading,
+    isValidating,
+    refresh,
+  } = useBoundedDAGRunDetails({
+    target: detailsTarget,
+    enabled: subDAGQueryEnabled || dagRunQueryEnabled,
+    pollIntervalMs: isOpen ? 2000 : 0,
+  });
 
-  const freshDetails = data?.dagRunDetails;
+  const expectedDagRunId = canQuerySubDag ? (subDAGRunId ?? '') : (dagRunId || 'latest');
+  const freshDetails =
+    latestDetails?.dagRunId === expectedDagRunId ? latestDetails : null;
   const displayData = freshDetails ?? previousDataRef.current?.dagRunDetails;
   const displayName = freshDetails ? name : (previousDataRef.current?.name ?? name);
   const displayDagRunId = freshDetails ? dagRunId : (previousDataRef.current?.dagRunId ?? dagRunId);
@@ -142,8 +135,10 @@ function DAGRunDetailsModal({
   }, [isOpen, name, dagRunId, setContext]);
 
   const refreshFn = useCallback(() => {
-    setTimeout(() => mutate(), 500);
-  }, [mutate]);
+    setTimeout(() => {
+      void refresh();
+    }, 500);
+  }, [refresh]);
 
   const handleFullscreenClick = useCallback(
     (e?: React.MouseEvent): void => {
@@ -253,6 +248,13 @@ function DAGRunDetailsModal({
               {isInitialLoading && (
                 <div className="flex items-center justify-center h-full">
                   <LoadingIndicator />
+                </div>
+              )}
+              {!isInitialLoading && error && !displayData && (
+                <div className="p-4">
+                  <div className="rounded-lg border border-error/30 bg-error-muted p-4 text-sm text-error">
+                    {error.message || 'Failed to load DAG run details'}
+                  </div>
                 </div>
               )}
               {!isInitialLoading && displayData && (

@@ -7,6 +7,7 @@ import {
 } from 'swr-openapi';
 import { isMatch } from 'lodash-es';
 import type { paths } from '../api/v1/schema';
+import { fetchWithTimeout } from '../lib/requestTimeout';
 
 const authMiddleware: Middleware = {
   async onRequest({ request }) {
@@ -20,6 +21,7 @@ const authMiddleware: Middleware = {
 
 const client = createClient<paths>({
   baseUrl: getConfig().apiURL,
+  fetch: fetchWithTimeout,
 });
 client.use(authMiddleware);
 

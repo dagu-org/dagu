@@ -99,13 +99,16 @@ const dagRunTimestampLen = len("20060102_150405Z")
 // It scans the year/month/day hierarchy in reverse chronological order and
 // returns the first exact match, which preserves the "newest run wins" behavior
 // without materializing and sorting all matches across the full history tree.
-func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun, error) {
+func (dr *DataRoot) FindByDAGRunID(ctx context.Context, dagRunID string) (*DAGRun, error) {
 	years, err := listDirsSorted(dr.dagRunsDir, true, reYear)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list years: %w", err)
 	}
 
 	for _, year := range years {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		yearPath := filepath.Join(dr.dagRunsDir, year)
 		months, err := listDirsSorted(yearPath, true, reMonth)
 		if err != nil {
@@ -113,6 +116,9 @@ func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun,
 		}
 
 		for _, month := range months {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			monthPath := filepath.Join(yearPath, month)
 			days, err := listDirsSorted(monthPath, true, reDay)
 			if err != nil {
@@ -120,8 +126,11 @@ func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun,
 			}
 
 			for _, day := range days {
+				if err := ctx.Err(); err != nil {
+					return nil, err
+				}
 				dayPath := filepath.Join(monthPath, day)
-				run, err := findDAGRunInDay(dayPath, dagRunID)
+				run, err := findDAGRunInDay(ctx, dayPath, dagRunID)
 				if err != nil {
 					return nil, fmt.Errorf("failed to scan day directory %s: %w", dayPath, err)
 				}
@@ -135,7 +144,7 @@ func (dr *DataRoot) FindByDAGRunID(_ context.Context, dagRunID string) (*DAGRun,
 	return nil, fmt.Errorf("%w: %s", exec.ErrDAGRunIDNotFound, dagRunID)
 }
 
-func findDAGRunInDay(dayPath, dagRunID string) (*DAGRun, error) {
+func findDAGRunInDay(ctx context.Context, dayPath, dagRunID string) (*DAGRun, error) {
 	entries, err := os.ReadDir(dayPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -145,6 +154,9 @@ func findDAGRunInDay(dayPath, dagRunID string) (*DAGRun, error) {
 	}
 
 	for i := len(entries) - 1; i >= 0; i-- {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		entry := entries[i]
 		if !entry.IsDir() {
 			continue
