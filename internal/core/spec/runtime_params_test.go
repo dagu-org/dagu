@@ -235,6 +235,177 @@ params:
 	assert.JSONEq(t, `{"base_dir":"/custom/base","output_dir":"/custom/base/output"}`, resolved.ParamsJSON)
 }
 
+func TestResolveRuntimeParams_RejectsUnknownNamedParam_InlineTyped(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: reject-unknown
+params:
+  - name: region
+    type: string
+    required: true
+steps:
+  - name: echo
+    command: echo "$region"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	_, err = ResolveRuntimeParams(context.Background(), dag, "region=us-west-2 regoin=typo", ResolveRuntimeParamsOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "regoin")
+}
+
+func TestResolveRuntimeParams_AcceptsKnownNamedParam_InlineTyped(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: accept-known
+params:
+  - name: region
+    type: string
+    required: true
+steps:
+  - name: echo
+    command: echo "$region"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(context.Background(), dag, "region=us-west-2", ResolveRuntimeParamsOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"region=us-west-2"}, resolved.Params)
+}
+
+func TestResolveRuntimeParams_RejectsUnknownNamedParam_LegacyNamed(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: reject-unknown-legacy
+params:
+  - region: us-east-1
+steps:
+  - name: echo
+    command: echo "$region"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	_, err = ResolveRuntimeParams(context.Background(), dag, "region=us-west-2 regoin=typo", ResolveRuntimeParamsOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "regoin")
+}
+
+func TestResolveRuntimeParams_AcceptsAnythingWhenNoParamsDeclared(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: no-params
+steps:
+  - name: echo
+    command: echo hello
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(context.Background(), dag, "foo=bar baz=qux", ResolveRuntimeParamsOptions{})
+	require.NoError(t, err)
+	assert.NotNil(t, resolved)
+}
+
+func TestResolveRuntimeParams_RejectsUnknownViaJSON_InlineTyped(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: reject-json-unknown
+params:
+  - name: region
+    type: string
+    required: true
+steps:
+  - name: echo
+    command: echo "$region"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	_, err = ResolveRuntimeParams(context.Background(), dag, `{"region":"us-west-2","regoin":"typo"}`, ResolveRuntimeParamsOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "regoin")
+}
+
+func TestResolveRuntimeParams_ExternalSchemaRejectsUnknownWhenForbidden(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "params.schema.json")
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+  "type": "object",
+  "properties": {
+    "region": {
+      "type": "string"
+    }
+  },
+  "required": ["region"],
+  "additionalProperties": false
+}`), 0o600))
+
+	dagPath := filepath.Join(dir, "external-reject.yaml")
+	require.NoError(t, os.WriteFile(dagPath, []byte(`
+name: external-reject
+params:
+  schema: params.schema.json
+`), 0o600))
+
+	dag, err := Load(context.Background(), dagPath, WithoutEval())
+	require.NoError(t, err)
+
+	_, err = ResolveRuntimeParams(context.Background(), dag, "region=us-west-2 regoin=typo", ResolveRuntimeParamsOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "regoin")
+}
+
+func TestResolveRuntimeParams_ExternalSchemaAllowsExtraWhenPermitted(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	schemaPath := filepath.Join(dir, "params.schema.json")
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+  "type": "object",
+  "properties": {
+    "region": {
+      "type": "string"
+    }
+  },
+  "required": ["region"],
+  "additionalProperties": true
+}`), 0o600))
+
+	dagPath := filepath.Join(dir, "external-allow.yaml")
+	require.NoError(t, os.WriteFile(dagPath, []byte(`
+name: external-allow
+params:
+  schema: params.schema.json
+`), 0o600))
+
+	dag, err := Load(context.Background(), dagPath, WithoutEval())
+	require.NoError(t, err)
+
+	resolved, err := ResolveRuntimeParams(context.Background(), dag, "region=us-west-2 extra=ok", ResolveRuntimeParamsOptions{})
+	require.NoError(t, err)
+	assert.NotNil(t, resolved)
+}
+
 func TestToFloat64_RejectsUnsafeIntegerPrecision(t *testing.T) {
 	t.Parallel()
 
