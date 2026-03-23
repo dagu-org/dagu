@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"slices"
 
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -104,11 +105,7 @@ func matchCondition(ctx context.Context, c *core.Condition) error {
 }
 
 func evalCommand(ctx context.Context, shell []string, c *core.Condition) error {
-	var opts []eval.Option
-	if len(shell) > 0 {
-		opts = append(opts, eval.OnlyReplaceVars())
-	}
-	commandToRun, err := EvalString(ctx, c.Condition, opts...)
+	commandToRun, err := EvalString(ctx, c.Condition, eval.OnlyReplaceVars())
 	if err != nil {
 		return fmt.Errorf("failed to evaluate command: %w", err)
 	}
@@ -119,8 +116,14 @@ func evalCommand(ctx context.Context, shell []string, c *core.Condition) error {
 }
 
 func runShellCommand(ctx context.Context, shell []string, commandToRun string) error {
-	args := append(shell[1:], "-c", commandToRun)
+	args := make([]string, len(shell)-1)
+	copy(args, shell[1:])
+	if !slices.Contains(args, "-c") {
+		args = append(args, "-c")
+	}
+	args = append(args, commandToRun)
 	cmd := exec.CommandContext(ctx, shell[0], args...) // nolint:gosec
+	cmd.Env = append(cmd.Env, AllEnvs(ctx)...)
 	_, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrConditionNotMet, err)
@@ -130,6 +133,7 @@ func runShellCommand(ctx context.Context, shell []string, commandToRun string) e
 
 func runDirectCommand(ctx context.Context, commandToRun string) error {
 	cmd := exec.CommandContext(ctx, commandToRun)
+	cmd.Env = append(cmd.Env, AllEnvs(ctx)...)
 	_, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrConditionNotMet, err)
