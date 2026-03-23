@@ -151,6 +151,17 @@ func TestEvalConditions(t *testing.T) {
 				},
 			},
 		},
+		// Environment variable passthrough tests
+		{
+			name:       "CommandWithDAGEnvVars",
+			conditions: []*core.Condition{{Condition: "test ${TEST_CONDITION} -eq 100"}},
+		},
+		{
+			name:                "CommandWithDAGEnvVarsNotMet",
+			conditions:          []*core.Condition{{Condition: "test ${TEST_CONDITION} -eq 999"}},
+			wantErr:             true,
+			wantConditionNotMet: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -177,4 +188,23 @@ func TestEvalConditions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEvalConditions_ShellWithDuplicateCFlag(t *testing.T) {
+	ctx := newTestContext()
+	// Shell already includes -c; should not get doubled
+	err := runtime.EvalConditions(ctx, []string{"sh", "-c"}, []*core.Condition{
+		{Condition: "true"},
+	})
+	require.NoError(t, err)
+}
+
+func TestEvalConditions_NilShell(t *testing.T) {
+	ctx := newTestContext()
+	// With nil shell, OnlyReplaceVars should still be applied and
+	// the condition should run as a direct command
+	err := runtime.EvalConditions(ctx, nil, []*core.Condition{
+		{Condition: "true"},
+	})
+	require.NoError(t, err)
 }
