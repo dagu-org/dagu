@@ -188,6 +188,11 @@ func (e *DAGExecutor) shouldUseDistributedExecution(dag *core.DAG) bool {
 	return core.ShouldDispatchToCoordinator(dag, e.coordinatorCli != nil, e.defaultExecMode)
 }
 
+// IsDistributed returns whether the given DAG would use distributed execution.
+func (e *DAGExecutor) IsDistributed(dag *core.DAG) bool {
+	return e.shouldUseDistributedExecution(dag)
+}
+
 // dispatchToCoordinator dispatches a task to the coordinator for distributed execution.
 // This is called after the job has been persisted (for START operations via HandleJob)
 // or when retrying dispatch (for RETRY operations from queue handler).

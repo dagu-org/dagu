@@ -7,12 +7,15 @@ import (
 	"context"
 	"errors"
 	osexec "os/exec"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -159,4 +162,107 @@ func TestIsPreStartExecutionFailure(t *testing.T) {
 			require.Equal(t, tc.want, isPreStartExecutionFailure(tc.err))
 		})
 	}
+}
+
+// mockDispatcher implements exec.Dispatcher for testing dispatch behavior.
+type mockDispatcher struct {
+	callCount atomic.Int32
+	errFunc   func(callNum int32) error
+}
+
+func (m *mockDispatcher) Dispatch(_ context.Context, _ *coordinatorv1.Task) error {
+	n := m.callCount.Add(1)
+	if m.errFunc != nil {
+		return m.errFunc(n)
+	}
+	return nil
+}
+
+func (m *mockDispatcher) Cleanup(_ context.Context) error { return nil }
+
+func (m *mockDispatcher) GetDAGRunStatus(_ context.Context, _, _ string, _ *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
+	return nil, nil
+}
+
+func (m *mockDispatcher) RequestCancel(_ context.Context, _, _ string, _ *exec.DAGRunRef) error {
+	return nil
+}
+
+func TestDispatchAndWaitForStartup_TransientRetryThenSuccess(t *testing.T) {
+	dagRunStore := &mockDAGRunStore{}
+	procStore := &mockProcStore{}
+	runRef := exec.NewDAGRunRef("test-dag", "run-1")
+
+	// Dispatcher fails twice with a transient error, then succeeds.
+	disp := &mockDispatcher{
+		errFunc: func(n int32) error {
+			if n <= 2 {
+				return errors.New("no available workers")
+			}
+			return nil
+		},
+	}
+
+	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "")
+	dag := &core.DAG{Name: "test-dag"}
+	status := &exec.DAGRunStatus{Status: core.Queued, TriggerType: core.TriggerTypeScheduler}
+
+	// After dispatch succeeds, the process should become alive.
+	procStore.On("IsRunAlive", mock.Anything, "test-queue", runRef).Return(true, nil).Once()
+
+	p := &QueueProcessor{
+		dagRunStore: dagRunStore,
+		procStore:   procStore,
+		dagExecutor: dagExec,
+		quit:        make(chan struct{}),
+		wakeUpCh:    make(chan struct{}, 1),
+		backoffConfig: BackoffConfig{
+			InitialInterval:    10 * time.Millisecond,
+			MaxInterval:        50 * time.Millisecond,
+			MaxRetries:         5,
+			StartupGracePeriod: 10 * time.Millisecond,
+		},
+	}
+
+	started := p.dispatchAndWaitForStartup(context.Background(), "test-queue", runRef, dag, "run-1", status)
+	require.True(t, started)
+	require.GreaterOrEqual(t, disp.callCount.Load(), int32(3))
+	procStore.AssertExpectations(t)
+}
+
+func TestDispatchAndWaitForStartup_PermanentErrorStopsRetry(t *testing.T) {
+	dagRunStore := &mockDAGRunStore{}
+	procStore := &mockProcStore{}
+
+	// Dispatcher always returns a permanent error (selector mismatch).
+	disp := &mockDispatcher{
+		errFunc: func(_ int32) error {
+			return backoff.PermanentError(errors.New("no workers match the required selector"))
+		},
+	}
+
+	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "")
+	dag := &core.DAG{Name: "test-dag"}
+	status := &exec.DAGRunStatus{Status: core.Queued, TriggerType: core.TriggerTypeScheduler}
+	runRef := exec.NewDAGRunRef("test-dag", "run-1")
+
+	p := &QueueProcessor{
+		dagRunStore: dagRunStore,
+		procStore:   procStore,
+		dagExecutor: dagExec,
+		quit:        make(chan struct{}),
+		wakeUpCh:    make(chan struct{}, 1),
+		backoffConfig: BackoffConfig{
+			InitialInterval:    10 * time.Millisecond,
+			MaxInterval:        50 * time.Millisecond,
+			MaxRetries:         5,
+			StartupGracePeriod: 10 * time.Millisecond,
+		},
+	}
+
+	started := p.dispatchAndWaitForStartup(context.Background(), "test-queue", runRef, dag, "run-1", status)
+	require.False(t, started)
+	// Should have been called exactly once (permanent error stops retries).
+	require.Equal(t, int32(1), disp.callCount.Load())
+	procStore.AssertNotCalled(t, "IsRunAlive", mock.Anything, mock.Anything, mock.Anything)
 }

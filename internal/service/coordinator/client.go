@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -161,7 +162,16 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 					slog.String("coordinator-id", member.ID),
 				)
 
-				return fmt.Errorf("failed to dispatch task to coordinator %s: %w", member.ID, err)
+				wrapped := fmt.Errorf("failed to dispatch task to coordinator %s: %w", member.ID, err)
+
+				// FailedPrecondition means permanent misconfiguration (e.g. selector mismatch).
+				// Stop retrying across coordinators and across the outer backoff loop.
+				if st, ok := status.FromError(err); ok && st.Code() == codes.FailedPrecondition {
+					return backoff.PermanentError(wrapped)
+				}
+
+				// Unavailable and other transient errors will be retried.
+				return wrapped
 			}
 
 			logger.Info(ctx, "Task dispatched successfully",
@@ -259,8 +269,14 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []exec.HostInfo,
 				tag.Host(member.Host),
 				tag.Port(member.Port),
 				tag.Error(err))
-			lastErr = err
 			cli.recordFailure(err)
+
+			// Permanent errors (e.g. selector mismatch) should not try other coordinators.
+			if errors.Is(err, backoff.ErrPermanent) {
+				return err
+			}
+
+			lastErr = err
 		} else {
 			// Success - record and return immediately
 			cli.recordSuccess(ctx)
