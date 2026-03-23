@@ -96,9 +96,9 @@ func TestBuildParamsJSON(t *testing.T) {
 		},
 		{
 			name: "OverridesMergedAndSerialized",
-			ctx:  testBuildContextWithOpts(BuildOpts{Parameters: "FOO=baz EXTRA=qux"}),
+			ctx:  testBuildContextWithOpts(BuildOpts{Parameters: "FOO=baz COUNT=2"}),
 			dag:  &dag{Params: "FOO=bar COUNT=1"},
-			want: `{"FOO":"baz","COUNT":"1","EXTRA":"qux"}`,
+			want: `{"FOO":"baz","COUNT":"2"}`,
 		},
 		{
 			name: "PreservesRawJSONInput",

@@ -648,14 +648,14 @@ func TestOverrideParams(t *testing.T) {
 		override := []paramPair{
 			{Name: "foo", Value: "overridden"},
 		}
-		overrideParams(&params, override)
+		require.NoError(t, overrideParams(&params, override))
 		assert.Equal(t, []paramPair{
 			{Name: "foo", Value: "overridden"},
 			{Name: "bar", Value: "keep"},
 		}, params)
 	})
 
-	t.Run("AddNewNamedParam", func(t *testing.T) {
+	t.Run("RejectsUnknownNamedParam", func(t *testing.T) {
 		t.Parallel()
 		params := []paramPair{
 			{Name: "foo", Value: "bar"},
@@ -663,11 +663,10 @@ func TestOverrideParams(t *testing.T) {
 		override := []paramPair{
 			{Name: "baz", Value: "qux"},
 		}
-		overrideParams(&params, override)
-		assert.Equal(t, []paramPair{
-			{Name: "foo", Value: "bar"},
-			{Name: "baz", Value: "qux"},
-		}, params)
+		err := overrideParams(&params, override)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `"baz"`)
+		assert.Contains(t, err.Error(), "accepted parameters are: foo")
 	})
 
 	t.Run("OverrideByPosition", func(t *testing.T) {
@@ -679,7 +678,7 @@ func TestOverrideParams(t *testing.T) {
 		override := []paramPair{
 			{Name: "", Value: "new-first"},
 		}
-		overrideParams(&params, override)
+		require.NoError(t, overrideParams(&params, override))
 		assert.Equal(t, []paramPair{
 			{Name: "", Value: "new-first"},
 			{Name: "", Value: "second"},
@@ -695,7 +694,7 @@ func TestOverrideParams(t *testing.T) {
 			{Name: "", Value: "new-first"},
 			{Name: "", Value: "new-second"},
 		}
-		overrideParams(&params, override)
+		require.NoError(t, overrideParams(&params, override))
 		assert.Equal(t, []paramPair{
 			{Name: "", Value: "new-first"},
 			{Name: "", Value: "new-second"},
@@ -707,7 +706,7 @@ func TestOverrideParams(t *testing.T) {
 		params := []paramPair{
 			{Name: "foo", Value: "bar"},
 		}
-		overrideParams(&params, []paramPair{})
+		require.NoError(t, overrideParams(&params, []paramPair{}))
 		assert.Equal(t, []paramPair{
 			{Name: "foo", Value: "bar"},
 		}, params)
@@ -719,10 +718,23 @@ func TestOverrideParams(t *testing.T) {
 		override := []paramPair{
 			{Name: "foo", Value: "bar"},
 		}
-		overrideParams(&params, override)
+		require.NoError(t, overrideParams(&params, override))
 		assert.Equal(t, []paramPair{
 			{Name: "foo", Value: "bar"},
 		}, params)
+	})
+
+	t.Run("PositionalOnlyDefaultsAcceptNamedOverrides", func(t *testing.T) {
+		t.Parallel()
+		params := []paramPair{
+			{Name: "", Value: "val1"},
+			{Name: "", Value: "val2"},
+		}
+		override := []paramPair{
+			{Name: "foo", Value: "bar"},
+		}
+		require.NoError(t, overrideParams(&params, override))
+		assert.Len(t, params, 3)
 	})
 }
 

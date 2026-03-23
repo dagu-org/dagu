@@ -1165,6 +1165,16 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 		return err
 	}
 
+	if err := core.ValidateStartParams(dag.DefaultParams, core.StartParamInput{
+		RawParams: params,
+	}); err != nil {
+		return &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
 	triggerTypeStr := ""
 	if triggerType != core.TriggerTypeUnknown {

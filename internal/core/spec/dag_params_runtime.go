@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -81,7 +82,9 @@ func resolveLegacyRuntimePairs(entries []dagParamEntry, rawParams string, params
 		if err != nil {
 			return nil, core.NewValidationError("params", rawParams, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
-		overrideParams(&finalPairs, overridePairs)
+		if err := overrideParams(&finalPairs, overridePairs); err != nil {
+			return nil, err
+		}
 	}
 
 	if len(paramsList) > 0 {
@@ -89,7 +92,9 @@ func resolveLegacyRuntimePairs(entries []dagParamEntry, rawParams string, params
 		if err != nil {
 			return nil, core.NewValidationError("params", paramsList, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 		}
-		overrideParams(&finalPairs, overridePairs)
+		if err := overrideParams(&finalPairs, overridePairs); err != nil {
+			return nil, err
+		}
 	}
 
 	return finalPairs, nil
@@ -161,6 +166,10 @@ func parseOverridePairs(rawParams string, paramsList []string) ([]paramPair, err
 }
 
 func applyOverridePairsTracked(entries []dagParamEntry, override []paramPair) ([]dagParamEntry, []bool, error) {
+	if err := rejectUnknownNamedParamsForEntries(entries, override); err != nil {
+		return nil, nil, err
+	}
+
 	result := cloneParamEntries(entries)
 	overridden := make([]bool, len(result))
 	positionalIndex := 0
@@ -200,6 +209,46 @@ func applyOverridePairsTracked(entries []dagParamEntry, override []paramPair) ([
 	}
 
 	return result, overridden, nil
+}
+
+// rejectUnknownNamedParamsForEntries checks that all named overrides match a
+// declared entry name. Only enforced when at least one entry has a non-empty,
+// non-numeric Name (the DAG declares named params).
+func rejectUnknownNamedParamsForEntries(entries []dagParamEntry, overrides []paramPair) error {
+	declaredNames := make(map[string]struct{})
+	for _, e := range entries {
+		if e.Name != "" && !isPositionalName(e.Name) {
+			declaredNames[e.Name] = struct{}{}
+		}
+	}
+	if len(declaredNames) == 0 {
+		return nil
+	}
+
+	var unknown []string
+	for _, p := range overrides {
+		if p.Name == "" || isPositionalName(p.Name) {
+			continue
+		}
+		if _, ok := declaredNames[p.Name]; !ok {
+			unknown = append(unknown, p.Name)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+
+	accepted := make([]string, 0, len(declaredNames))
+	for name := range declaredNames {
+		accepted = append(accepted, name)
+	}
+	sort.Strings(accepted)
+
+	return fmt.Errorf(
+		"unknown parameter(s): %s; accepted parameters are: %s",
+		quotedNames(unknown),
+		strings.Join(accepted, ", "),
+	)
 }
 
 func runtimePairsFromEntries(entries []dagParamEntry) []paramPair {

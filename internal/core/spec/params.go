@@ -14,7 +14,11 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 )
 
-func overrideParams(paramPairs *[]paramPair, override []paramPair) {
+func overrideParams(paramPairs *[]paramPair, override []paramPair) error {
+	if err := rejectUnknownNamedParams(*paramPairs, override); err != nil {
+		return err
+	}
+
 	// Override the default parameters with the command line parameters
 	pairsIndex := make(map[string]int)
 	for i, paramPair := range *paramPairs {
@@ -39,6 +43,65 @@ func overrideParams(paramPairs *[]paramPair, override []paramPair) {
 			*paramPairs = append(*paramPairs, paramPair)
 		}
 	}
+	return nil
+}
+
+// rejectUnknownNamedParams checks that all named overrides match a declared
+// parameter name. It only enforces this when at least one default has a
+// non-empty, non-numeric Name (i.e. the DAG declares named params).
+// Positional defaults get numeric names like "1", "2" from parseParams;
+// these are excluded from the declared set so they don't block named overrides.
+func rejectUnknownNamedParams(declared []paramPair, overrides []paramPair) error {
+	declaredNames := make(map[string]struct{})
+	for _, p := range declared {
+		if p.Name != "" && !isPositionalName(p.Name) {
+			declaredNames[p.Name] = struct{}{}
+		}
+	}
+	if len(declaredNames) == 0 {
+		return nil // all positional or no defaults — accept everything
+	}
+
+	var unknown []string
+	for _, p := range overrides {
+		if p.Name == "" || isPositionalName(p.Name) {
+			continue
+		}
+		if _, ok := declaredNames[p.Name]; !ok {
+			unknown = append(unknown, p.Name)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+
+	accepted := make([]string, 0, len(declaredNames))
+	for name := range declaredNames {
+		accepted = append(accepted, name)
+	}
+	sort.Strings(accepted)
+
+	return fmt.Errorf(
+		"unknown parameter(s): %s; accepted parameters are: %s",
+		quotedNames(unknown),
+		strings.Join(accepted, ", "),
+	)
+}
+
+// isPositionalName returns true if the name is a numeric index assigned to
+// positional params (e.g. "1", "2", "3").
+func isPositionalName(name string) bool {
+	_, err := strconv.Atoi(name)
+	return err == nil
+}
+
+func quotedNames(names []string) string {
+	sort.Strings(names)
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = fmt.Sprintf("%q", n)
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // parseParams parses and processes the parameters for the DAG.

@@ -324,8 +324,9 @@ func validateInlineDefault(def core.ParamDef, compiledPattern *regexp.Regexp) er
 
 func compileInlineParamSchema(defs []core.ParamDef) (*compiledInlineParamSchema, error) {
 	root := &jsonschema.Schema{
-		Type:       "object",
-		Properties: map[string]*jsonschema.Schema{},
+		Type:                 "object",
+		Properties:           map[string]*jsonschema.Schema{},
+		AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
 	}
 	properties := map[string]*jsonschema.Schema{}
 	order := make([]string, 0, len(defs))
