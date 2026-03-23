@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	osexec "os/exec"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
+
+const queueAgeWarningThreshold = 2 * time.Minute
 
 var (
 	errProcessorClosed = errors.New("processor closed")
@@ -395,9 +398,26 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		return false
 	}
 
+	// Log a warning if the item has been queued for too long.
+	if schedTime, err := time.Parse(time.RFC3339, status.ScheduleTime); err == nil {
+		if queueAge := time.Since(schedTime); queueAge > queueAgeWarningThreshold {
+			logger.Warn(ctx, "Queued item has been waiting for dispatch",
+				tag.DAG(runRef.Name),
+				slog.Duration("queue_age", queueAge),
+			)
+		}
+	}
+
 	incInflight()
 	defer decInflight()
 
+	// For distributed execution, dispatch synchronously inside the retry loop
+	// so transient "no available workers" errors are retried with backoff.
+	if p.dagExecutor.IsDistributed(dag) {
+		return p.dispatchAndWaitForStartup(ctx, queueName, runRef, dag, runID, status)
+	}
+
+	// For local execution, launch in a goroutine and poll for startup.
 	execErrCh := make(chan error, 1)
 	go func() {
 		defer p.wakeUp()
@@ -416,6 +436,88 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		launchedAt: time.Now(),
 		execErrCh:  execErrCh,
 	})
+}
+
+// dispatchAndWaitForStartup handles distributed DAG execution by retrying
+// dispatch within the backoff loop. This ensures transient "no available workers"
+// errors are retried rather than immediately failing.
+func (p *QueueProcessor) dispatchAndWaitForStartup(
+	ctx context.Context,
+	queueName string,
+	runRef exec.DAGRunRef,
+	dag *core.DAG,
+	runID string,
+	dagStatus *exec.DAGRunStatus,
+) bool {
+	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
+	policy.MaxInterval = p.backoffConfig.MaxInterval
+	policy.MaxRetries = p.backoffConfig.MaxRetries
+
+	launchedAt := time.Now()
+	var started bool
+	dispatched := false
+
+	operation := func(ctx context.Context) error {
+		if err := p.checkContextAndQuit(ctx); err != nil {
+			return err
+		}
+
+		// If not yet dispatched (or last dispatch was a transient failure), try dispatch.
+		if !dispatched {
+			err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY,
+				runID, dagStatus, dagStatus.TriggerType, dagStatus.ScheduleTime)
+			if err != nil {
+				// Permanent dispatch error (e.g. selector mismatch): stop retrying.
+				if errors.Is(err, backoff.ErrPermanent) {
+					logger.Error(ctx, "Permanent dispatch failure", tag.Error(err))
+					return backoff.PermanentError(err)
+				}
+				// Transient dispatch error (e.g. no available workers): retry.
+				logger.Warn(ctx, "Transient dispatch failure, will retry", tag.Error(err))
+				return err
+			}
+			dispatched = true
+		}
+
+		// Dispatch succeeded, now poll for startup.
+		isAlive, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
+		if err != nil {
+			logger.Warn(ctx, "Failed to check run liveness", tag.Error(err))
+		} else if isAlive {
+			started = true
+			return nil
+		}
+		if p.inStartupGracePeriod(launchedAt) {
+			return errNotStarted
+		}
+
+		// After grace period, check status for completion.
+		attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
+		if err != nil {
+			logger.Debug(ctx, "Failed to read attempt, keep checking")
+			return err
+		}
+
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return err
+		}
+
+		if status.Status != core.Queued && status.Status != core.Running {
+			logger.Info(ctx, "DAG execution started or finished", tag.Status(status.Status.String()))
+			started = true
+			return nil
+		}
+
+		return errNotStarted
+	}
+
+	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
+		logger.Error(ctx, "Failed to dispatch DAG after retries", tag.Error(err))
+	}
+
+	defer p.wakeUp()
+	return started
 }
 
 func (p *QueueProcessor) wakeUp() {

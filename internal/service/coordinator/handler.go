@@ -242,7 +242,7 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 	if len(req.Task.WorkerSelector) > 0 {
 		return nil, status.Error(codes.FailedPrecondition, "no workers match the required selector")
 	}
-	return nil, status.Error(codes.FailedPrecondition, "no available workers")
+	return nil, status.Error(codes.Unavailable, "no available workers")
 }
 
 // matchesSelector checks if worker labels match all required selector labels

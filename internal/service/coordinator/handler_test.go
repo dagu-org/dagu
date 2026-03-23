@@ -338,7 +338,7 @@ func TestHandler_Poll(t *testing.T) {
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
-		require.Equal(t, codes.FailedPrecondition, st.Code())
+		require.Equal(t, codes.Unavailable, st.Code())
 		require.Contains(t, st.Message(), "no available workers")
 	})
 
