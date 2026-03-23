@@ -530,6 +530,16 @@ func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentit
 	return mgr
 }
 
+func (a *API) ensureSessionLoop(mgr *SessionManager, provider llm.Provider, cfg sessionRuntimeConfig) error {
+	if mgr == nil {
+		return errors.New("session manager is required")
+	}
+	if provider == nil {
+		return errors.New("LLM provider is required")
+	}
+	return mgr.ensureLoop(provider, cfg.modelID, cfg.resolvedModel)
+}
+
 func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName string, enabledSkills []string, soul *Soul) string {
 	return GenerateSystemPrompt(SystemPromptParams{
 		Env:             a.environment,
@@ -1253,6 +1263,15 @@ func (a *API) CompactSessionIfNeeded(ctx context.Context, sessionID string, user
 		newMgr.queuedChatMessages = append(newMgr.queuedChatMessages, queuedChatMessages...)
 		newMgr.flushingQueuedChat = flushingQueuedChat
 		newMgr.mu.Unlock()
+	}
+	if err := a.ensureSessionLoop(newMgr, provider, runtimeCfg); err != nil {
+		a.sessions.Delete(newID)
+		if a.store != nil {
+			if delErr := a.store.DeleteSession(ctx, newID); delErr != nil && !errors.Is(delErr, ErrSessionNotFound) {
+				a.logger.Warn("Failed to roll back compacted session after loop init error", "session_id", newID, "error", delErr)
+			}
+		}
+		return "", false, err
 	}
 
 	_ = mgr.Cancel(ctx)

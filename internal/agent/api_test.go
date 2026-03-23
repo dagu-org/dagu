@@ -1166,8 +1166,27 @@ func TestAPI_CompactSessionIfNeeded_CreatesSummarySession(t *testing.T) {
 	mgrVal, ok := api.sessions.Load(newSessionID)
 	require.True(t, ok)
 	mgr := mgrVal.(*SessionManager)
+	t.Cleanup(func() {
+		_ = mgr.Cancel(context.Background())
+	})
 	assert.Equal(t, "briefing", mgr.dagName)
 	assert.True(t, mgr.safeMode)
+	require.NotNil(t, mgr.loop)
+
+	skillCount := len(mgr.enabledSkills)
+	var skillSummaries []SkillSummary
+	if skillCount > 0 && skillCount <= SkillListThreshold {
+		skillSummaries = LoadSkillSummaries(context.Background(), mgr.skillStore, mgr.enabledSkills)
+	}
+	expectedPrompt := GenerateSystemPrompt(SystemPromptParams{
+		Env:             mgr.environment,
+		Memory:          mgr.loadMemory(),
+		Role:            mgr.user.Role,
+		AvailableSkills: skillSummaries,
+		SkillCount:      skillCount,
+		Soul:            mgr.soul,
+	})
+	assert.Equal(t, expectedPrompt, mgr.loop.systemPrompt)
 
 	detail, err := api.GetSessionDetail(context.Background(), newSessionID, user.UserID)
 	require.NoError(t, err)
