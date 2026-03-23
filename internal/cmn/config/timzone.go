@@ -18,7 +18,7 @@ import (
 //
 // If cfg.TZ is empty, it uses the system local timezone: cfg.Location is set to time.Local,
 // cfg.TzOffsetInSec is set to the current local offset in seconds, and cfg.TZ is populated with
-// "UTC" or "UTC±H" where H is the offset in hours (e.g., "UTC+2" or "UTC-5").
+// the IANA zone name (e.g. "Asia/Tokyo") or a POSIX fallback (e.g. "UTC-5") when unavailable.
 //
 // Returns an error only when loading a specified timezone or setting the TZ environment variable fails.
 func setTimezone(cfg *Core) error {
@@ -37,18 +37,23 @@ func setTimezone(cfg *Core) error {
 	}
 
 	// Use local timezone when TZ is not specified
-	var tz string
-	_, tzOffsetInSec := time.Now().Zone()
-
-	if tzOffsetInSec != 0 {
-		tz = fmt.Sprintf("UTC%+d", tzOffsetInSec/3600)
-	} else {
-		tz = "UTC"
-	}
-
 	cfg.Location = time.Local
-	cfg.TZ = tz
-	cfg.TzOffsetInSec = tzOffsetInSec
+	_, cfg.TzOffsetInSec = time.Now().Zone()
+
+	// Prefer the IANA zone name (e.g. "Asia/Tokyo") so that child
+	// processes see a correct TZ value.  time.Local.String() returns the
+	// IANA name on most platforms; fall back to a POSIX-style string only
+	// when it is unavailable.  Note: POSIX TZ signs are inverted relative
+	// to ISO 8601 (east-of-UTC is negative), so we negate the offset.
+	name := time.Local.String()
+	if name == "Local" || name == "" {
+		if cfg.TzOffsetInSec != 0 {
+			name = fmt.Sprintf("UTC%+d", -cfg.TzOffsetInSec/3600)
+		} else {
+			name = "UTC"
+		}
+	}
+	cfg.TZ = name
 
 	return nil
 }

@@ -5,6 +5,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,8 +62,13 @@ func TestSetTimezone(t *testing.T) {
 		err := setTimezone(g)
 		require.NoError(t, err)
 
-		// Should set TZ to UTC or UTC+X format
 		assert.NotEmpty(t, g.TZ)
 		assert.NotNil(t, g.Location)
+
+		// The TZ value must be loadable so child processes get correct local time.
+		if g.TZ != "UTC" {
+			_, loadErr := time.LoadLocation(g.TZ)
+			assert.NoError(t, loadErr, "cfg.TZ %q should be a valid timezone", g.TZ)
+		}
 	})
 }
