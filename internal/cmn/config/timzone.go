@@ -18,7 +18,9 @@ import (
 //
 // If cfg.TZ is empty, it uses the system local timezone: cfg.Location is set to time.Local,
 // cfg.TzOffsetInSec is set to the current local offset in seconds, and cfg.TZ is populated with
-// "UTC" or "UTC±H" where H is the offset in hours (e.g., "UTC+2" or "UTC-5").
+// the legacy display string "UTC" or "UTC±H" where H is the offset in hours (e.g. "UTC+2"
+// or "UTC-5"). This value is for configuration/UI display and is not required to be a
+// loadable IANA timezone.
 //
 // Returns an error only when loading a specified timezone or setting the TZ environment variable fails.
 func setTimezone(cfg *Core) error {
@@ -36,14 +38,11 @@ func setTimezone(cfg *Core) error {
 		return nil
 	}
 
-	// Use local timezone when TZ is not specified
-	var tz string
+	// Use local timezone when TZ is not specified.
 	_, tzOffsetInSec := time.Now().Zone()
-
+	tz := "UTC"
 	if tzOffsetInSec != 0 {
 		tz = fmt.Sprintf("UTC%+d", tzOffsetInSec/3600)
-	} else {
-		tz = "UTC"
 	}
 
 	cfg.Location = time.Local

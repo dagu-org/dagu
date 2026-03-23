@@ -310,6 +310,13 @@ func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
 	if err := setTimezone(&cfg.Core); err != nil {
 		return fmt.Errorf("failed to set timezone: %w", err)
 	}
+	if def.TZ != "" {
+		// Only propagate an explicit timezone configuration to child
+		// processes. The implicit local-time cfg.TZ value is a legacy
+		// display string and must not overwrite an inherited TZ env var.
+		baseEnv.variables = withEnvOverrides(baseEnv.variables, fmt.Sprintf("TZ=%s", cfg.Core.TZ))
+		cfg.Core.BaseEnv = baseEnv
+	}
 
 	return nil
 }
@@ -328,9 +335,6 @@ func (l *ConfigLoader) finalizeBaseEnv(cfg *Config) {
 	}
 	if cfg.Core.DefaultShell != "" {
 		overrides = append(overrides, fmt.Sprintf("SHELL=%s", cfg.Core.DefaultShell))
-	}
-	if cfg.Core.TZ != "" {
-		overrides = append(overrides, fmt.Sprintf("TZ=%s", cfg.Core.TZ))
 	}
 
 	cfg.Core.BaseEnv.variables = withEnvOverrides(cfg.Core.BaseEnv.variables, overrides...)

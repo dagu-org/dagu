@@ -29,6 +29,44 @@ func testLoadWithError(t *testing.T, opts ...ConfigLoaderOption) error {
 	return err
 }
 
+func preserveTZEnv(t *testing.T) {
+	t.Helper()
+
+	oldTZ, hadTZ := os.LookupEnv("TZ")
+	t.Cleanup(func() {
+		if hadTZ {
+			if err := os.Setenv("TZ", oldTZ); err != nil {
+				t.Fatalf("restore TZ: %v", err)
+			}
+			return
+		}
+		if err := os.Unsetenv("TZ"); err != nil {
+			t.Fatalf("unset TZ: %v", err)
+		}
+	})
+}
+
+func envValue(env []string, key string) (string, bool) {
+	prefix := key + "="
+	for _, entry := range env {
+		if after, ok := strings.CutPrefix(entry, prefix); ok {
+			return after, true
+		}
+	}
+	return "", false
+}
+
+func envKeyCount(env []string, key string) int {
+	prefix := key + "="
+	count := 0
+	for _, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			count++
+		}
+	}
+	return count
+}
+
 func TestLoad_Env(t *testing.T) {
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
@@ -328,6 +366,8 @@ func TestLoad_BaseEnvIncludesConfigDerivedOverrides(t *testing.T) {
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "config.yaml")
 	executablePath := filepath.Join(tempDir, "bin", "dagu")
+	preserveTZEnv(t)
+	require.NoError(t, os.Setenv("TZ", "America/Los_Angeles"))
 	err := os.WriteFile(configFile, fmt.Appendf(nil, `
 default_shell: /bin/sh
 tz: UTC
@@ -344,6 +384,45 @@ paths:
 	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_EXECUTABLE=%s", executablePath))
 	require.Contains(t, baseEnv, "SHELL=/bin/sh")
 	require.Contains(t, baseEnv, "TZ=UTC")
+	require.NotContains(t, baseEnv, "TZ=America/Los_Angeles")
+	require.Equal(t, 1, envKeyCount(baseEnv, "TZ"))
+}
+
+func TestLoad_BaseEnvPreservesInheritedTZWhenTimezoneConfigUnset(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	preserveTZEnv(t)
+	require.NoError(t, os.Setenv("TZ", "America/Los_Angeles"))
+	require.NoError(t, os.WriteFile(configFile, []byte("# minimal config"), 0o600))
+
+	cfg := testLoad(t, WithConfigFile(configFile), WithAppHomeDir(tempDir))
+	baseEnv := cfg.Core.BaseEnv.AsSlice()
+
+	tzValue, ok := envValue(baseEnv, "TZ")
+	require.True(t, ok)
+	require.Equal(t, "America/Los_Angeles", tzValue)
+	require.Equal(t, 1, envKeyCount(baseEnv, "TZ"))
+	require.NotEmpty(t, cfg.Core.TZ)
+}
+
+func TestLoad_BaseEnvDoesNotInjectSyntheticTZWhenTimezoneConfigUnset(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	preserveTZEnv(t)
+	require.NoError(t, os.Unsetenv("TZ"))
+	require.NoError(t, os.WriteFile(configFile, []byte("# minimal config"), 0o600))
+
+	cfg := testLoad(t, WithConfigFile(configFile), WithAppHomeDir(tempDir))
+	baseEnv := cfg.Core.BaseEnv.AsSlice()
+
+	_, ok := envValue(baseEnv, "TZ")
+	require.False(t, ok)
+
+	expectedTZ := "UTC"
+	if cfg.Core.TzOffsetInSec != 0 {
+		expectedTZ = fmt.Sprintf("UTC%+d", cfg.Core.TzOffsetInSec/3600)
+	}
+	require.Equal(t, expectedTZ, cfg.Core.TZ)
 }
 
 func TestLoad_YAML(t *testing.T) {

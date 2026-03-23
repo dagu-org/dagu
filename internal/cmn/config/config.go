@@ -149,7 +149,7 @@ type MonitoringConfig struct {
 type Core struct {
 	Debug         bool
 	LogFormat     string // "json" or "text"
-	TZ            string // e.g., "UTC", "America/New_York"
+	TZ            string // e.g., "UTC", "UTC+9", "America/New_York"
 	TzOffsetInSec int
 	Location      *time.Location
 	DefaultShell  string // Platform default if empty
