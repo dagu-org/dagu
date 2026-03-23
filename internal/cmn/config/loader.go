@@ -58,6 +58,7 @@ const (
 type ConfigLoader struct {
 	v                 *viper.Viper
 	configFile        string
+	notices           []string
 	warnings          []string
 	additionalBaseEnv []string
 	appHomeDir        string
@@ -184,11 +185,11 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		l.additionalBaseEnv = append(l.additionalBaseEnv, fmt.Sprintf("DAGU_HOME=%s", fileutil.ResolvePathOrBlank(l.appHomeDir)))
 	}
 
-	warnings, err := l.setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
+	notices, err := l.setupViper(xdgConfig, homeDir, l.configFile, l.appHomeDir)
 	if err != nil {
 		return nil, err
 	}
-	l.warnings = append(l.warnings, warnings...)
+	l.notices = append(l.notices, notices...)
 
 	if err := l.v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -225,6 +226,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 
 	cfg.Paths.ConfigFileUsed = configFileUsed
 	l.finalizeBaseEnv(cfg)
+	cfg.Notices = l.notices
 	cfg.Warnings = l.warnings
 
 	return cfg, nil
@@ -1399,7 +1401,7 @@ func (l *ConfigLoader) setupViper(xdgConfig XDGConfig, homeDir, configFile, appH
 	l.bindEnvironmentVariables()
 	l.setViperDefaultValues(paths)
 
-	return paths.Warnings, nil
+	return paths.Notices, nil
 }
 
 func (l *ConfigLoader) setViperDefaultValues(paths Paths) {

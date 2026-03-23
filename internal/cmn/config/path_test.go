@@ -71,7 +71,7 @@ func TestResolver(t *testing.T) {
 			LogsDir:         filepath.Join(legacyPath, "logs"),
 			AdminLogsDir:    filepath.Join(legacyPath, "logs", "admin"),
 			BaseConfigFile:  filepath.Join(legacyPath, "base.yaml"),
-			Warnings:        []string{"Warning: Dagu legacy directory (" + legacyPath + ") structure detected. This is deprecated."},
+			Notices:         []string{config.ExistingHomeDirNoticePrefix + legacyPath + "."},
 		}, paths)
 	})
 	t.Run("XDGCONFIGHOME", func(t *testing.T) {

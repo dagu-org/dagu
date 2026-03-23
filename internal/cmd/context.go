@@ -177,8 +177,11 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx = logger.WithLogger(ctx, logger.NewLogger(opts...))
 
 	// Log any warnings collected during configuration loading
-	for _, w := range cfg.Warnings {
-		logger.Warn(ctx, w)
+	for _, notice := range cfg.Notices {
+		logger.Info(ctx, notice)
+	}
+	for _, warning := range cfg.Warnings {
+		logger.Warn(ctx, warning)
 	}
 
 	// For shared-nothing workers, skip creating file-based stores

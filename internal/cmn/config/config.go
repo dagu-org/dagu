@@ -29,6 +29,7 @@ type Config struct {
 	Tunnel          TunnelConfig
 	Bots            BotsConfig
 	License         LicenseConfig
+	Notices         []string
 	Warnings        []string
 }
 

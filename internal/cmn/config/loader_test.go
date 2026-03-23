@@ -18,6 +18,7 @@ import (
 
 func testLoad(t *testing.T, opts ...ConfigLoaderOption) *Config {
 	t.Helper()
+	opts = append([]ConfigLoaderOption{WithAppHomeDir(t.TempDir())}, opts...)
 	cfg, err := NewConfigLoader(viper.New(), opts...).Load()
 	require.NoError(t, err)
 	return cfg
@@ -25,6 +26,7 @@ func testLoad(t *testing.T, opts ...ConfigLoaderOption) *Config {
 
 func testLoadWithError(t *testing.T, opts ...ConfigLoaderOption) error {
 	t.Helper()
+	opts = append([]ConfigLoaderOption{WithAppHomeDir(t.TempDir())}, opts...)
 	_, err := NewConfigLoader(viper.New(), opts...).Load()
 	return err
 }

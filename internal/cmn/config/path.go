@@ -28,8 +28,8 @@ type Paths struct {
 	AdminLogsDir string
 	// BaseConfigFile is the full path to the base configuration file.
 	BaseConfigFile string
-	// Warnings collects any warnings encountered during path resolution.
-	Warnings []string
+	// Notices collects any non-fatal informational messages encountered during path resolution.
+	Notices []string
 }
 
 // XDGConfig contains the standard XDG directories used as a fallback.
@@ -41,13 +41,17 @@ type XDGConfig struct {
 // resolverLock ensures ResolvePaths is thread-safe.
 var resolverLock sync.Mutex
 
+// ExistingHomeDirNoticePrefix identifies the informational message emitted when an
+// existing unified Dagu home directory is detected at the default ~/.dagu path.
+const ExistingHomeDirNoticePrefix = "Using existing Dagu home directory at "
+
 // ResolvePaths determines application paths based on the provided application home environment variable,
 // a legacy path, and an XDGConfig. It chooses the configuration directory based on these inputs.
 //
 // Resolution logic:
 //  1. If the environment variable (appHomeEnv) is set, use its value and assume unified directory structure.
 //     The path is converted to an absolute path, and if different, the environment variable is updated.
-//  2. Else, if the legacyPath exists on disk, use it and emit a warning to update configuration paths.
+//  2. Else, if the legacyPath exists on disk, use it and emit a non-fatal notice.
 //  3. Otherwise, fall back to XDG-compliant defaults.
 func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) (Paths, error) {
 	resolverLock.Lock()
@@ -69,11 +73,11 @@ func ResolvePaths(appHomeEnv, legacyPath string, xdg XDGConfig) (Paths, error) {
 			}
 		}
 		return setUnifiedPaths(absConfigDir), nil
-	// If the legacy path exists, warn and use it.
+	// If the legacy path exists, keep using it and emit a notice.
 	case legacyPath != "" && fileutil.FileExists(legacyPath):
 		paths := setUnifiedPaths(legacyPath)
-		warning := fmt.Sprintf("Warning: Dagu legacy directory (%s) structure detected. This is deprecated.", legacyPath)
-		paths.Warnings = append(paths.Warnings, warning)
+		notice := fmt.Sprintf("%s%s.", ExistingHomeDirNoticePrefix, legacyPath)
+		paths.Notices = append(paths.Notices, notice)
 		return paths, nil
 	// Fallback to default XDG-based paths.
 	default:
