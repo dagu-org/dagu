@@ -33,14 +33,16 @@ const (
 )
 
 type fixtureConfig struct {
-	workerMode           workerMode
-	workerCount          int
-	workerLabels         map[string]string
-	logPersistence       bool
-	dagsDir              string
-	baseConfigPath       string
-	workerBaseConfigPath string // Override worker's base config path (for testing embedded base config)
-	procConfig           *procConfig
+	workerMode              workerMode
+	workerCount             int
+	workerLabels            map[string]string
+	logPersistence          bool
+	dagsDir                 string
+	baseConfigPath          string
+	workerBaseConfigPath    string // Override worker's base config path (for testing embedded base config)
+	procConfig              *procConfig
+	staleHeartbeatThreshold time.Duration
+	staleLeaseThreshold     time.Duration
 }
 
 type procConfig struct {
@@ -86,6 +88,13 @@ func withProcConfig(heartbeatInterval, heartbeatSyncInterval, staleThreshold tim
 			heartbeatSyncInterval: heartbeatSyncInterval,
 			staleThreshold:        staleThreshold,
 		}
+	}
+}
+
+func withStaleThresholds(heartbeat, lease time.Duration) fixtureOption {
+	return func(c *fixtureConfig) {
+		c.staleHeartbeatThreshold = heartbeat
+		c.staleLeaseThreshold = lease
 	}
 }
 
@@ -139,6 +148,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 		coordOpts = append(coordOpts, test.WithConfigMutator(func(c *config.Config) {
 			c.Paths.BaseConfig = cfg.baseConfigPath
 		}))
+	}
+	if cfg.staleHeartbeatThreshold > 0 || cfg.staleLeaseThreshold > 0 {
+		coordOpts = append(coordOpts, test.WithStaleThresholds(cfg.staleHeartbeatThreshold, cfg.staleLeaseThreshold))
 	}
 
 	coord := test.SetupCoordinator(t, coordOpts...)

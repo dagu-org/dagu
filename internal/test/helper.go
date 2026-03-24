@@ -64,8 +64,10 @@ type Options struct {
 	ServerOptions        []frontend.ServerOption
 	UseBuiltExecutable   bool // UseBuiltExecutable builds the current ./cmd binary for subprocess-based tests
 	// Coordinator handler options for shared-nothing worker tests
-	WithStatusPersistence bool // Enable status persistence via DAGRunStore
-	WithLogPersistence    bool // Enable log persistence to filesystem
+	WithStatusPersistence   bool          // Enable status persistence via DAGRunStore
+	WithLogPersistence      bool          // Enable log persistence to filesystem
+	StaleHeartbeatThreshold time.Duration // Override for handler's stale heartbeat threshold
+	StaleLeaseThreshold     time.Duration // Override for handler's stale lease threshold
 }
 
 // WithCaptureLoggingOutput creates a logging capture option
@@ -122,6 +124,15 @@ func WithLogPersistence() HelperOption {
 func WithServerOptions(serverOpts ...frontend.ServerOption) HelperOption {
 	return func(opts *Options) {
 		opts.ServerOptions = append(opts.ServerOptions, serverOpts...)
+	}
+}
+
+// WithStaleThresholds overrides the stale heartbeat and lease thresholds on the
+// coordinator handler. Useful for tests that need faster zombie detection.
+func WithStaleThresholds(heartbeat, lease time.Duration) HelperOption {
+	return func(opts *Options) {
+		opts.StaleHeartbeatThreshold = heartbeat
+		opts.StaleLeaseThreshold = lease
 	}
 }
 

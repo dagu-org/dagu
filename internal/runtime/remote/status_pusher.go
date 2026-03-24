@@ -6,6 +6,7 @@ package remote
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
@@ -29,6 +30,7 @@ func NewStatusPusher(client coordinator.Client, workerID string) *StatusPusher {
 
 // Push sends a status update to the coordinator
 func (p *StatusPusher) Push(ctx context.Context, status exec.DAGRunStatus) error {
+	status.LeaseAt = time.Now().UnixMilli()
 	protoStatus, err := convert.DAGRunStatusToProto(&status)
 	if err != nil {
 		return fmt.Errorf("failed to convert status to proto: %w", err)

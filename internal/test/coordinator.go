@@ -72,6 +72,12 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	if options.WithLogPersistence {
 		cfg.LogDir = helper.Config.Paths.LogDir
 	}
+	if options.StaleHeartbeatThreshold > 0 {
+		cfg.StaleHeartbeatThreshold = options.StaleHeartbeatThreshold
+	}
+	if options.StaleLeaseThreshold > 0 {
+		cfg.StaleLeaseThreshold = options.StaleLeaseThreshold
+	}
 
 	// Create handler with config
 	handler := coordinator.NewHandler(cfg)

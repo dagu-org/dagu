@@ -42,6 +42,11 @@ type heartbeatInfo struct {
 // defaultStaleHeartbeatThreshold is the default duration after which a worker's heartbeat is considered stale.
 const defaultStaleHeartbeatThreshold = 30 * time.Second
 
+// defaultStaleLeaseThreshold is the default duration after which a distributed
+// run's lease is considered stale. Set to 3× the typical status push interval
+// to tolerate transient delays.
+const defaultStaleLeaseThreshold = 90 * time.Second
+
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
 
@@ -65,6 +70,9 @@ type Handler struct {
 	// Stale heartbeat threshold - configurable
 	staleHeartbeatThreshold time.Duration
 
+	// Stale lease threshold - configurable
+	staleLeaseThreshold time.Duration
+
 	// Zombie detector shutdown synchronization
 	zombieDetectorMu      sync.Mutex
 	zombieDetectorStarted bool
@@ -84,12 +92,19 @@ type HandlerConfig struct {
 	// StaleHeartbeatThreshold is the duration after which a worker's heartbeat
 	// is considered stale. Defaults to 30 seconds if not set.
 	StaleHeartbeatThreshold time.Duration
+
+	// StaleLeaseThreshold is the duration after which a distributed run's
+	// lease is considered stale (worker stopped pushing status). Defaults to 90 seconds.
+	StaleLeaseThreshold time.Duration
 }
 
 // applyDefaults sets default values for optional fields.
 func (c *HandlerConfig) applyDefaults() {
 	if c.StaleHeartbeatThreshold == 0 {
 		c.StaleHeartbeatThreshold = defaultStaleHeartbeatThreshold
+	}
+	if c.StaleLeaseThreshold == 0 {
+		c.StaleLeaseThreshold = defaultStaleLeaseThreshold
 	}
 }
 
@@ -104,6 +119,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 		dagRunStore:             cfg.DAGRunStore,
 		logDir:                  cfg.LogDir,
 		staleHeartbeatThreshold: cfg.StaleHeartbeatThreshold,
+		staleLeaseThreshold:     cfg.StaleLeaseThreshold,
 	}
 }
 
@@ -546,6 +562,11 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 		return nil, status.Error(codes.Internal, "failed to get/open attempt: "+err.Error())
 	}
 
+	// Acquire per-run mutex to serialize with markRunFailed
+	runMu := h.getRunMutex(dagRunStatus.DAGRunID)
+	runMu.Lock()
+	defer runMu.Unlock()
+
 	// Write the status
 	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
 		return nil, status.Error(codes.Internal, "failed to write status: "+err.Error())
@@ -857,14 +878,15 @@ func (h *Handler) WaitZombieDetector() {
 
 // detectAndCleanupZombies checks for stale workers and marks their tasks as failed.
 func (h *Handler) detectAndCleanupZombies(ctx context.Context) {
-	// Collect stale workers under lock, then process outside lock to avoid
-	// holding the mutex during blocking I/O operations.
+	// Pass 1: heartbeat-based detection — catches crashed workers quickly.
 	staleWorkers := h.collectAndRemoveStaleHeartbeats()
-
-	// Process stale workers outside the lock
 	for _, info := range staleWorkers {
 		h.markWorkerTasksFailed(ctx, info)
 	}
+
+	// Pass 2: lease-based detection — catches distributed runs whose workers
+	// stopped reporting status, including after coordinator restarts.
+	h.detectStaleLeases(ctx)
 }
 
 // collectAndRemoveStaleHeartbeats finds and removes stale heartbeats from the map.
@@ -895,6 +917,43 @@ func (h *Handler) markWorkerTasksFailed(ctx context.Context, info *heartbeatInfo
 	for _, task := range info.stats.RunningTasks {
 		reason := fmt.Sprintf("worker %s became unresponsive", info.workerID)
 		h.markRunFailed(ctx, task.DagName, task.DagRunId, reason)
+	}
+}
+
+// detectStaleLeases scans all persisted active runs and marks any distributed
+// run with a stale lease as FAILED. This covers scenarios that heartbeat-based
+// detection misses: coordinator restarts (in-memory heartbeats lost), tasks
+// lost between heartbeats, and multi-coordinator shuffling.
+func (h *Handler) detectStaleLeases(ctx context.Context) {
+	if h.dagRunStore == nil {
+		return
+	}
+
+	activeStatuses := []core.Status{core.Running, core.Queued, core.Waiting}
+	statuses, err := h.dagRunStore.ListStatuses(ctx,
+		exec.WithStatuses(activeStatuses),
+		exec.WithoutLimit(),
+	)
+	if err != nil {
+		logger.Error(ctx, "Failed to list active statuses for lease check", tag.Error(err))
+		return
+	}
+
+	for _, st := range statuses {
+		// Only check distributed runs (non-empty, non-local WorkerID)
+		if st.WorkerID == "" {
+			continue
+		}
+
+		// Skip runs that have no lease (e.g. local runs or runs created before this feature)
+		if st.LeaseAt == 0 {
+			continue
+		}
+
+		if !exec.IsLeaseActive(st, h.staleLeaseThreshold) {
+			reason := fmt.Sprintf("lease expired: worker %s stopped reporting status", st.WorkerID)
+			h.markRunFailed(ctx, st.Name, st.DAGRunID, reason)
+		}
 	}
 }
 

@@ -23,6 +23,10 @@ import (
 
 const queueAgeWarningThreshold = 2 * time.Minute
 
+// defaultLeaseStaleThreshold is the duration after which a distributed run's
+// lease is considered stale for queue concurrency counting purposes.
+const defaultLeaseStaleThreshold = 90 * time.Second
+
 var (
 	errProcessorClosed = errors.New("processor closed")
 	errNotStarted      = errors.New("execution not started")
@@ -278,11 +282,14 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 
 	defer p.wakeUp()
 
-	aliveCount, err := p.procStore.CountAlive(ctx, queueName)
+	localAliveCount, err := p.procStore.CountAlive(ctx, queueName)
 	if err != nil {
 		logger.Error(ctx, "Failed to count alive processes", tag.Error(err), tag.Queue(queueName))
 		return
 	}
+
+	distributedAliveCount := p.countActiveDistributedRuns(ctx, queueName)
+	aliveCount := localAliveCount + distributedAliveCount
 
 	maxConcurrency := q.getMaxConcurrency()
 	inflightCount := q.getInflight()
@@ -634,6 +641,35 @@ func isPreStartExecutionFailure(err error) bool {
 
 	var exitErr *osexec.ExitError
 	return !errors.As(err, &exitErr)
+}
+
+// countActiveDistributedRuns counts distributed runs (non-empty WorkerID) that
+// belong to the given queue/proc-group and have a fresh lease. These runs are
+// invisible to the local procStore but must count against queue concurrency.
+func (p *QueueProcessor) countActiveDistributedRuns(ctx context.Context, queueName string) int {
+	activeStatuses := []core.Status{core.Running}
+	statuses, err := p.dagRunStore.ListStatuses(ctx,
+		exec.WithStatuses(activeStatuses),
+		exec.WithoutLimit(),
+	)
+	if err != nil {
+		logger.Error(ctx, "Failed to list statuses for distributed run count", tag.Error(err))
+		return 0
+	}
+
+	count := 0
+	for _, st := range statuses {
+		if st.WorkerID == "" {
+			continue
+		}
+		if st.ProcGroup != queueName {
+			continue
+		}
+		if exec.IsLeaseActive(st, defaultLeaseStaleThreshold) {
+			count++
+		}
+	}
+	return count
 }
 
 // checkContextAndQuit returns a permanent error if context is done or processor is closed.
