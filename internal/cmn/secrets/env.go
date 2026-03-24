@@ -12,6 +12,13 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 )
 
+// PresolvedEnvPrefix is the env var prefix used to transport pre-resolved
+// env-provider secret values from the parent process to the subprocess.
+// The parent looks up the original env var and passes it as
+// _DAGU_PRESOLVED_SECRET_<KEY>=<value> so the subprocess can resolve
+// env secrets without needing the original variable in the whitelist.
+const PresolvedEnvPrefix = "_DAGU_PRESOLVED_SECRET_"
+
 func init() {
 	registerResolver("env", func(_ []string) Resolver {
 		return &envResolver{}
@@ -51,6 +58,11 @@ func (r *envResolver) Resolve(ctx context.Context, ref core.SecretRef) (string, 
 		}
 	}
 
+	// Check for value pre-resolved by parent process.
+	if value, exists := os.LookupEnv(PresolvedEnvPrefix + ref.Key); exists {
+		return value, nil
+	}
+
 	// Fall back to global OS environment
 	value, exists := os.LookupEnv(ref.Key)
 	if !exists {
@@ -67,6 +79,11 @@ func (r *envResolver) CheckAccessibility(ctx context.Context, ref core.SecretRef
 		if _, exists := scope.Get(ref.Key); exists {
 			return nil
 		}
+	}
+
+	// Check for value pre-resolved by parent process.
+	if _, exists := os.LookupEnv(PresolvedEnvPrefix + ref.Key); exists {
+		return nil
 	}
 
 	// Fall back to global OS environment

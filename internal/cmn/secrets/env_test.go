@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -182,6 +183,59 @@ func TestEnvResolver_CheckAccessibility(t *testing.T) {
 
 		err := resolver.CheckAccessibility(ctx, ref)
 		require.NoError(t, err, "empty variables should be considered accessible")
+	})
+}
+
+func TestEnvResolver_PresolvedPrefix(t *testing.T) {
+	ctx := context.Background()
+	registry := NewRegistry("/tmp")
+	resolver := registry.Get("env")
+	require.NotNil(t, resolver)
+
+	t.Run("ResolveFromPresolved", func(t *testing.T) {
+		// The original var is NOT set, only the presolved transport var
+		t.Setenv("_DAGU_PRESOLVED_SECRET_SMTP_PASS", "from-parent")
+
+		ref := core.SecretRef{
+			Name:     "SMTP_PASSWORD",
+			Provider: "env",
+			Key:      "SMTP_PASS",
+		}
+
+		value, err := resolver.Resolve(ctx, ref)
+		require.NoError(t, err)
+		assert.Equal(t, "from-parent", value)
+	})
+
+	t.Run("CheckAccessibilityFromPresolved", func(t *testing.T) {
+		t.Setenv("_DAGU_PRESOLVED_SECRET_CHECK_VAR", "val")
+
+		ref := core.SecretRef{
+			Name:     "SECRET",
+			Provider: "env",
+			Key:      "CHECK_VAR",
+		}
+
+		err := resolver.CheckAccessibility(ctx, ref)
+		require.NoError(t, err)
+	})
+
+	t.Run("ScopeWinsOverPresolved", func(t *testing.T) {
+		// If the scope has the value, it should take precedence
+		t.Setenv("_DAGU_PRESOLVED_SECRET_MY_KEY", "presolved-value")
+
+		scope := eval.NewEnvScope(nil, false).WithEntry("MY_KEY", "scope-value", eval.EnvSourceDAGEnv)
+		scopeCtx := eval.WithEnvScope(ctx, scope)
+
+		ref := core.SecretRef{
+			Name:     "SECRET",
+			Provider: "env",
+			Key:      "MY_KEY",
+		}
+
+		value, err := resolver.Resolve(scopeCtx, ref)
+		require.NoError(t, err)
+		assert.Equal(t, "scope-value", value)
 	})
 }
 
