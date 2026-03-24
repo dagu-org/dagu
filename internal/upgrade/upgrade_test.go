@@ -576,9 +576,7 @@ func TestGetCachedUpdateInfo(t *testing.T) {
 		store := &mockCacheStore{cache: cache}
 
 		result := GetCachedUpdateInfo(store)
-		if result == nil {
-			t.Fatal("GetCachedUpdateInfo() should return cache")
-		}
+		require.NotNil(t, result, "GetCachedUpdateInfo() should return cache")
 		if result.LatestVersion != cache.LatestVersion {
 			t.Errorf("GetCachedUpdateInfo().LatestVersion = %q, want %q", result.LatestVersion, cache.LatestVersion)
 		}
