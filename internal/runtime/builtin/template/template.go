@@ -14,6 +14,8 @@ import (
 	"strings"
 	"text/template"
 
+	sprig "github.com/go-task/slim-sprig/v3"
+
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -138,16 +140,71 @@ func validateTemplate(step core.Step) error {
 	return nil
 }
 
+// blockedFuncs are removed even from the hermetic set as defense-in-depth.
+// If a future slim-sprig release adds these to HermeticTxtFuncMap, we still
+// block them from template steps.
+var blockedFuncs = []string{
+	// Environment variable access
+	"env", "expandenv",
+	// Network I/O
+	"getHostByName",
+	// Non-deterministic time
+	"now", "date", "dateInZone", "date_in_zone",
+	"dateModify", "date_modify", "mustDateModify", "must_date_modify",
+	"ago", "duration", "durationRound",
+	"unixEpoch", "toDate", "mustToDate",
+	"htmlDate", "htmlDateInZone",
+	// Crypto key generation
+	"genPrivateKey", "derivePassword",
+	"buildCustomCert", "genCA",
+	"genSelfSignedCert", "genSignedCert",
+	// Non-deterministic random
+	"randBytes", "randString", "randNumeric",
+	"randAlphaNum", "randAlpha", "randAscii", "randInt",
+	"uuidv4",
+}
+
 // funcMap provides template functions for pipeline-compatible usage.
+// Built from the hermetic slim-sprig base with Dagu-specific overrides.
 // Functions that accept a pipeline value take it as the last argument.
-var funcMap = template.FuncMap{
-	"split": func(sep, s string) []string {
+var funcMap = buildFuncMap()
+
+func buildFuncMap() template.FuncMap {
+	// Start from the hermetic (no env/network/random) slim-sprig set.
+	m := sprig.HermeticTxtFuncMap()
+
+	// Defense-in-depth: remove any functions that should never be
+	// available in template steps.
+	for _, name := range blockedFuncs {
+		delete(m, name)
+	}
+
+	// Dagu-specific overrides. These preserve pipeline-compatible argument
+	// order (pipeline value as last arg) and existing behavior. Each
+	// override is intentional — slim-sprig defines overlapping names with
+	// different arg order or semantics.
+
+	// split: sprig uses split(s, sep); Dagu uses split(sep, s) for pipelines.
+	m["split"] = func(sep, s string) []string {
 		return strings.Split(s, sep)
-	},
-	"join": func(sep string, elems []string) string {
-		return strings.Join(elems, sep)
-	},
-	"count": func(v any) (int, error) {
+	}
+	// join: Dagu accepts []string; also accept []any for interop with
+	// sprig functions like list/uniq/sortAlpha that return []any.
+	m["join"] = func(sep string, v any) string {
+		switch elems := v.(type) {
+		case []string:
+			return strings.Join(elems, sep)
+		case []any:
+			strs := make([]string, len(elems))
+			for i, e := range elems {
+				strs[i] = fmt.Sprintf("%v", e)
+			}
+			return strings.Join(strs, sep)
+		default:
+			return fmt.Sprintf("%v", v)
+		}
+	}
+	m["count"] = func(v any) (int, error) {
 		rv := reflect.ValueOf(v)
 		switch rv.Kind() {
 		case reflect.Slice, reflect.Map, reflect.Array:
@@ -157,11 +214,12 @@ var funcMap = template.FuncMap{
 		default:
 			return 0, fmt.Errorf("count: unsupported type %T", v)
 		}
-	},
-	"add": func(b, a int) int {
+	}
+	// add: sprig uses add(a, b any); Dagu uses add(b, a int) for pipelines.
+	m["add"] = func(b, a int) int {
 		return a + b
-	},
-	"empty": func(v any) bool {
+	}
+	m["empty"] = func(v any) bool {
 		if v == nil {
 			return true
 		}
@@ -174,17 +232,17 @@ var funcMap = template.FuncMap{
 		default:
 			return rv.IsZero()
 		}
-	},
-	"upper": func(s string) string {
+	}
+	m["upper"] = func(s string) string {
 		return strings.ToUpper(s)
-	},
-	"lower": func(s string) string {
+	}
+	m["lower"] = func(s string) string {
 		return strings.ToLower(s)
-	},
-	"trim": func(s string) string {
+	}
+	m["trim"] = func(s string) string {
 		return strings.TrimSpace(s)
-	},
-	"default": func(def, val any) any {
+	}
+	m["default"] = func(def, val any) any {
 		if val == nil {
 			return def
 		}
@@ -204,7 +262,9 @@ var funcMap = template.FuncMap{
 			}
 		}
 		return val
-	},
+	}
+
+	return m
 }
 
 func init() {

@@ -353,3 +353,235 @@ func TestFuncMap_EmptyNil(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "true", stdout.String())
 }
+
+func TestSlimSprig_Get(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ get .app "owner" }}`,
+		data: map[string]any{
+			"app": map[string]any{"name": "test"},
+		},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "", stdout.String())
+}
+
+func TestSlimSprig_Dig(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ dig "a" "b" "fallback" .data }}`,
+		data: map[string]any{
+			"data": map[string]any{
+				"a": map[string]any{"b": "found"},
+			},
+		},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "found", stdout.String())
+}
+
+func TestSlimSprig_Replace(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ "hello world" | replace "world" "dagu" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "hello dagu", stdout.String())
+}
+
+func TestSlimSprig_ListUniqSortAlpha(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ list "c" "a" "b" "a" | uniq | sortAlpha | join "," }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "a,b,c", stdout.String())
+}
+
+func TestSlimSprig_Has(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ list "a" "b" | has "a" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true", stdout.String())
+}
+
+func TestSlimSprig_Contains(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ contains "ell" "hello" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true", stdout.String())
+}
+
+func TestSlimSprig_HasPrefixSuffix(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ hasPrefix "hel" "hello" }},{{ hasSuffix "llo" "hello" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true,true", stdout.String())
+}
+
+func TestSlimSprig_Dict(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ $d := dict "key" "value" }}{{ get $d "key" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "value", stdout.String())
+}
+
+func TestSlimSprig_ToString(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ 42 | toString }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "42", stdout.String())
+}
+
+func TestSlimSprig_BlockedFunctions(t *testing.T) {
+	t.Parallel()
+
+	// Verify blocked function names are not in the funcMap.
+	for _, name := range blockedFuncs {
+		_, exists := funcMap[name]
+		assert.False(t, exists, "blocked function %q should not be in funcMap", name)
+	}
+}
+
+func TestSlimSprig_BlockedFunctionErrors(t *testing.T) {
+	t.Parallel()
+
+	blockedTemplates := []string{
+		`{{ env "HOME" }}`,
+		`{{ expandenv "$HOME" }}`,
+		`{{ now }}`,
+		`{{ randAlphaNum 10 }}`,
+	}
+
+	for _, script := range blockedTemplates {
+		var stdout bytes.Buffer
+		e := &templateExec{
+			stdout: &stdout,
+			stderr: os.Stderr,
+			script: script,
+			data:   map[string]any{},
+		}
+		err := e.Run(context.Background())
+		assert.Error(t, err, "script %q should fail", script)
+	}
+}
+
+func TestSlimSprig_OverlapSplitPipeline(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ "a,b,c" | split "," | join ";" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "a;b;c", stdout.String())
+}
+
+func TestSlimSprig_OverlapAddPipeline(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ 5 | add 3 }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "8", stdout.String())
+}
+
+func TestSlimSprig_CrossLibraryPipeline(t *testing.T) {
+	t.Parallel()
+
+	// list (sprig) → join (Dagu override accepting []any)
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ list "x" "y" "z" | join "-" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "x-y-z", stdout.String())
+}
