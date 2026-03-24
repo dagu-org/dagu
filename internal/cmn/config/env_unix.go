@@ -36,6 +36,12 @@ func init() {
 		"XDG_CONFIG_HOME", // User config (usually ~/.config)
 		"XDG_DATA_HOME",   // User data (usually ~/.local/share)
 		"XDG_CACHE_HOME",  // User cache (usually ~/.cache)
+
+		// Docker daemon connection (used by Docker SDK's client.FromEnv)
+		"DOCKER_HOST",        // Docker daemon address
+		"DOCKER_TLS_VERIFY",  // Enable TLS verification
+		"DOCKER_CERT_PATH",   // Path to TLS certificates
+		"DOCKER_API_VERSION", // Pin Docker API version
 	} {
 		defaultWhitelist[key] = true
 	}

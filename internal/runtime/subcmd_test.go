@@ -40,6 +40,48 @@ func TestNewSubCmdBuilder(t *testing.T) {
 	require.NotNil(t, builder)
 }
 
+func TestSubCmdBuilderEnvIncludesDockerVars(t *testing.T) {
+	t.Parallel()
+
+	baseEnv := []string{
+		"PATH=/usr/bin",
+		"DOCKER_HOST=tcp://remote:2375",
+		"DOCKER_TLS_VERIFY=1",
+		"DOCKER_CERT_PATH=/certs",
+		"DOCKER_API_VERSION=1.41",
+	}
+
+	cfg := &config.Config{
+		Paths: config.PathsConfig{
+			Executable:     "/path/to/dagu",
+			ConfigFileUsed: "/path/to/config.yaml",
+		},
+		Core: config.Core{
+			BaseEnv: config.NewBaseEnv(baseEnv),
+		},
+	}
+
+	builder := runtime.NewSubCmdBuilder(cfg)
+	dag := &core.DAG{Location: "/tmp/test.yaml"}
+	spec := builder.Start(dag, runtime.StartOptions{})
+
+	envMap := make(map[string]string)
+	for _, e := range spec.Env {
+		if k, v, ok := strings.Cut(e, "="); ok {
+			envMap[k] = v
+		}
+	}
+
+	assert.Equal(t, "tcp://remote:2375", envMap["DOCKER_HOST"])
+	assert.Equal(t, "1", envMap["DOCKER_TLS_VERIFY"])
+	assert.Equal(t, "/certs", envMap["DOCKER_CERT_PATH"])
+	assert.Equal(t, "1.41", envMap["DOCKER_API_VERSION"])
+
+	// DOCKER_AUTH_CONFIG should not be present (it was never in baseEnv).
+	_, found := envMap["DOCKER_AUTH_CONFIG"]
+	assert.False(t, found, "DOCKER_AUTH_CONFIG must not appear in subprocess env")
+}
+
 func TestRunRetryWithBuiltExecutable(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 
