@@ -9,6 +9,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -296,11 +297,24 @@ func (d *Data) StepInfo() eval.StepInfo {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	return eval.StepInfo{
+	info := eval.StepInfo{
 		Stdout:   d.inner.State.Stdout,
 		Stderr:   d.inner.State.Stderr,
 		ExitCode: strconv.Itoa(d.inner.State.ExitCode),
 	}
+
+	// Populate captured output if the step has output: configured and the value was stored
+	if outputKey := d.inner.Step.Output; outputKey != "" && d.inner.State.OutputVariables != nil {
+		if raw, ok := d.inner.State.OutputVariables.Load(outputKey); ok {
+			if strVal, ok := raw.(string); ok {
+				if _, v, found := strings.Cut(strVal, "="); found {
+					info.Output = &v
+				}
+			}
+		}
+	}
+
+	return info
 }
 
 func (d *Data) ContinueOn() core.ContinueOn {
