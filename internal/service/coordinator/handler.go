@@ -42,10 +42,13 @@ type heartbeatInfo struct {
 // defaultStaleHeartbeatThreshold is the default duration after which a worker's heartbeat is considered stale.
 const defaultStaleHeartbeatThreshold = 30 * time.Second
 
-// defaultStaleLeaseThreshold is the default duration after which a distributed
-// run's lease is considered stale. Set to 3× the typical status push interval
-// to tolerate transient delays.
-const defaultStaleLeaseThreshold = 90 * time.Second
+// defaultStaleLeaseThreshold is the shared default duration after which a
+// distributed run's lease is considered stale.
+const defaultStaleLeaseThreshold = exec.DefaultStaleLeaseThreshold
+
+// defaultLeaseRefreshWriteInterval is the maximum interval between persisted
+// heartbeat-driven lease refreshes for a running distributed task.
+const defaultLeaseRefreshWriteInterval = 5 * time.Second
 
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
@@ -472,20 +475,132 @@ func (h *Handler) Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatReq
 		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
 	}
 
+	receivedAt := time.Now()
+
 	h.mu.Lock()
 	h.heartbeats[req.WorkerId] = &heartbeatInfo{
 		workerID:        req.WorkerId,
 		labels:          req.Labels,
 		stats:           req.Stats,
-		lastHeartbeatAt: time.Now(),
+		lastHeartbeatAt: receivedAt,
 	}
 	h.mu.Unlock()
+
+	h.refreshLeasesFromHeartbeat(ctx, req.WorkerId, req.Stats, receivedAt)
 
 	cancelledRuns := h.getCancelledRunsForWorker(ctx, req.Stats)
 
 	return &coordinatorv1.HeartbeatResponse{
 		CancelledRuns: cancelledRuns,
 	}, nil
+}
+
+func (h *Handler) refreshLeasesFromHeartbeat(ctx context.Context, workerID string, stats *coordinatorv1.WorkerStats, observedAt time.Time) {
+	if h.dagRunStore == nil || stats == nil || len(stats.RunningTasks) == 0 {
+		return
+	}
+
+	for _, task := range stats.RunningTasks {
+		h.refreshLeaseForRunningTask(ctx, workerID, task, observedAt)
+	}
+}
+
+func (h *Handler) refreshLeaseForRunningTask(ctx context.Context, workerID string, task *coordinatorv1.RunningTask, observedAt time.Time) {
+	if task == nil {
+		return
+	}
+
+	attempt, err := h.getOrOpenAttemptForRunningTask(ctx, task)
+	if err != nil {
+		logger.Warn(ctx, "Failed to resolve running task for lease refresh",
+			tag.RunID(task.DagRunId),
+			tag.WorkerID(workerID),
+			tag.Error(err),
+		)
+		return
+	}
+
+	runMu := h.getRunMutex(task.DagRunId)
+	runMu.Lock()
+	defer runMu.Unlock()
+
+	runStatus, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read status for heartbeat lease refresh",
+			tag.RunID(task.DagRunId),
+			tag.WorkerID(workerID),
+			tag.Error(err),
+		)
+		return
+	}
+
+	if runStatus.Status != core.Running || runStatus.WorkerID == "" {
+		return
+	}
+	if runStatus.WorkerID != workerID {
+		return
+	}
+	if task.AttemptKey != "" && runStatus.AttemptKey != task.AttemptKey {
+		return
+	}
+	if h.shouldThrottleLeaseRefresh(runStatus, observedAt) {
+		return
+	}
+
+	runStatus.LeaseAt = observedAt.UnixMilli()
+	if err := attempt.Write(ctx, *runStatus); err != nil {
+		logger.Warn(ctx, "Failed to persist heartbeat lease refresh",
+			tag.RunID(task.DagRunId),
+			tag.WorkerID(workerID),
+			tag.Error(err),
+		)
+	}
+}
+
+func (h *Handler) getOrOpenAttemptForRunningTask(ctx context.Context, task *coordinatorv1.RunningTask) (exec.DAGRunAttempt, error) {
+	if task == nil {
+		return nil, fmt.Errorf("running task is nil")
+	}
+
+	isSubDAG := task.RootDagRunId != "" && task.RootDagRunId != task.DagRunId
+	if isSubDAG {
+		if task.RootDagRunName == "" {
+			return nil, fmt.Errorf("missing root dag run name for sub-dag %s", task.DagRunId)
+		}
+		return h.getOrOpenSubAttempt(ctx, exec.DAGRunRef{
+			Name: task.RootDagRunName,
+			ID:   task.RootDagRunId,
+		}, task.DagRunId)
+	}
+
+	return h.getOrOpenAttempt(ctx, task.DagName, task.DagRunId)
+}
+
+func (h *Handler) shouldThrottleLeaseRefresh(status *exec.DAGRunStatus, observedAt time.Time) bool {
+	if status == nil || status.LeaseAt == 0 {
+		return false
+	}
+
+	lastLease := time.UnixMilli(status.LeaseAt)
+	if lastLease.After(observedAt) {
+		return false
+	}
+
+	return observedAt.Sub(lastLease) < h.leaseRefreshWriteInterval()
+}
+
+func (h *Handler) leaseRefreshWriteInterval() time.Duration {
+	interval := defaultLeaseRefreshWriteInterval
+	if h.staleLeaseThreshold > 0 {
+		halfThreshold := h.staleLeaseThreshold / 2
+		if halfThreshold > 0 && halfThreshold < interval {
+			interval = halfThreshold
+		}
+	}
+	if interval < time.Second {
+		return time.Second
+	}
+	return interval
 }
 
 // getCancelledRunsForWorker checks which of the worker's running tasks have been cancelled.
@@ -545,6 +660,9 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 
 	// Transform worker-local log paths to coordinator paths (shared-nothing mode)
 	h.transformLogPaths(dagRunStatus)
+
+	// Stamp the lease at coordinator receipt time to avoid worker/coordinator clock skew.
+	dagRunStatus.LeaseAt = time.Now().UnixMilli()
 
 	// Get or create an open attempt for this dag run
 	// Check if this is a sub-DAG (has root that differs from self)
@@ -929,7 +1047,7 @@ func (h *Handler) detectStaleLeases(ctx context.Context) {
 		return
 	}
 
-	activeStatuses := []core.Status{core.Running, core.Queued, core.Waiting}
+	activeStatuses := []core.Status{core.Running}
 	statuses, err := h.dagRunStore.ListStatuses(ctx,
 		exec.WithStatuses(activeStatuses),
 		exec.WithoutLimit(),

@@ -94,8 +94,52 @@ func (m *mockDAGRunStore) RecentAttempts(_ context.Context, _ string, _ int) []e
 func (m *mockDAGRunStore) LatestAttempt(_ context.Context, _ string) (exec.DAGRunAttempt, error) {
 	return nil, exec.ErrDAGRunIDNotFound
 }
-func (m *mockDAGRunStore) ListStatuses(_ context.Context, _ ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
-	return nil, nil // Empty list is valid
+func (m *mockDAGRunStore) ListStatuses(_ context.Context, opts ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
+	var options exec.ListDAGRunStatusesOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	statusFilter := make(map[core.Status]struct{}, len(options.Statuses))
+	for _, st := range options.Statuses {
+		statusFilter[st] = struct{}{}
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var statuses []*exec.DAGRunStatus
+	appendStatus := func(status *exec.DAGRunStatus) {
+		if status == nil {
+			return
+		}
+		if len(statusFilter) > 0 {
+			if _, ok := statusFilter[status.Status]; !ok {
+				return
+			}
+		}
+		if options.DAGRunID != "" && status.DAGRunID != options.DAGRunID {
+			return
+		}
+		if options.ExactName != "" && status.Name != options.ExactName {
+			return
+		}
+		if options.Name != "" && status.Name != options.Name {
+			return
+		}
+
+		cloned := *status
+		statuses = append(statuses, &cloned)
+	}
+
+	for _, attempt := range m.attempts {
+		appendStatus(attempt.status)
+	}
+	for _, attempt := range m.subAttempts {
+		appendStatus(attempt.status)
+	}
+
+	return statuses, nil
 }
 func (m *mockDAGRunStore) CompareAndSwapLatestAttemptStatus(
 	_ context.Context,
@@ -145,7 +189,14 @@ type mockDAGRunAttempt struct {
 	mu                     sync.Mutex
 }
 
-func (m *mockDAGRunAttempt) ID() string { return "test-attempt" }
+func (m *mockDAGRunAttempt) ID() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.status != nil && m.status.AttemptID != "" {
+		return m.status.AttemptID
+	}
+	return "test-attempt"
+}
 func (m *mockDAGRunAttempt) Open(_ context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -171,8 +222,8 @@ func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, e
 	if m.status == nil {
 		return nil, exec.ErrNoStatusData
 	}
-	// Return a copy to avoid pointer races
-	return new(*m.status), nil
+	cloned := *m.status
+	return &cloned, nil
 }
 func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
 func (m *mockDAGRunAttempt) SetDAG(_ *core.DAG)                           {}
@@ -477,6 +528,151 @@ func TestHandler_Heartbeat(t *testing.T) {
 		require.Equal(t, int32(10), worker.TotalPollers)
 		require.Equal(t, int32(3), worker.BusyPollers)
 		require.Greater(t, worker.LastHeartbeatAt, int64(0))
+	})
+
+	t.Run("HeartbeatRefreshesLeaseForRunningRootTask", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store, StaleLeaseThreshold: 10 * time.Second})
+		ctx := context.Background()
+
+		initialLease := time.Now().Add(-10 * time.Second).UnixMilli()
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "root-attempt-key",
+			Status:     core.Running,
+			WorkerID:   "worker1",
+			LeaseAt:    initialLease,
+		})
+
+		_, err := h.Heartbeat(ctx, &coordinatorv1.HeartbeatRequest{
+			WorkerId: "worker1",
+			Stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{DagRunId: "run-123", DagName: "test-dag", AttemptKey: "root-attempt-key"},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.True(t, attempt.WasWritten())
+		assert.Greater(t, status.LeaseAt, initialLease)
+	})
+
+	t.Run("HeartbeatRefreshesLeaseForRunningSubDAG", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store, StaleLeaseThreshold: 10 * time.Second})
+		ctx := context.Background()
+
+		initialLease := time.Now().Add(-10 * time.Second).UnixMilli()
+		rootRef := exec.DAGRunRef{Name: "root-dag", ID: "root-123"}
+		attempt := store.addSubAttempt(rootRef, "sub-456", &exec.DAGRunStatus{
+			Name:       "sub-dag",
+			DAGRunID:   "sub-456",
+			AttemptID:  "attempt-2",
+			AttemptKey: "sub-attempt-key",
+			Status:     core.Running,
+			WorkerID:   "worker1",
+			LeaseAt:    initialLease,
+		})
+
+		_, err := h.Heartbeat(ctx, &coordinatorv1.HeartbeatRequest{
+			WorkerId: "worker1",
+			Stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{
+						DagRunId:       "sub-456",
+						DagName:        "sub-dag",
+						RootDagRunName: "root-dag",
+						RootDagRunId:   "root-123",
+						AttemptKey:     "sub-attempt-key",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.True(t, attempt.WasWritten())
+		assert.Greater(t, status.LeaseAt, initialLease)
+	})
+
+	t.Run("HeartbeatSkipsLeaseRefreshOnAttemptKeyMismatch", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store, StaleLeaseThreshold: 10 * time.Second})
+		ctx := context.Background()
+
+		initialLease := time.Now().Add(-10 * time.Second).UnixMilli()
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "current-attempt-key",
+			Status:     core.Running,
+			WorkerID:   "worker1",
+			LeaseAt:    initialLease,
+		})
+
+		_, err := h.Heartbeat(ctx, &coordinatorv1.HeartbeatRequest{
+			WorkerId: "worker1",
+			Stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{DagRunId: "run-123", DagName: "test-dag", AttemptKey: "stale-attempt-key"},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, initialLease, status.LeaseAt)
+		assert.False(t, attempt.WasWritten())
+	})
+
+	t.Run("HeartbeatSkipsLeaseRefreshOnWorkerMismatch", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store, StaleLeaseThreshold: 10 * time.Second})
+		ctx := context.Background()
+
+		initialLease := time.Now().Add(-10 * time.Second).UnixMilli()
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:      "test-dag",
+			DAGRunID:  "run-123",
+			AttemptID: "attempt-1",
+			Status:    core.Running,
+			WorkerID:  "worker-a",
+			LeaseAt:   initialLease,
+		})
+
+		_, err := h.Heartbeat(ctx, &coordinatorv1.HeartbeatRequest{
+			WorkerId: "worker-b",
+			Stats: &coordinatorv1.WorkerStats{
+				RunningTasks: []*coordinatorv1.RunningTask{
+					{DagRunId: "run-123", DagName: "test-dag"},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, initialLease, status.LeaseAt)
+		assert.False(t, attempt.WasWritten())
 	})
 
 	t.Run("StaleHeartbeatCleanup", func(t *testing.T) {
@@ -878,6 +1074,55 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		s, _ := attempt.ReadStatus(ctx)
 		require.Equal(t, core.Failed, s.Status)
 	})
+
+	t.Run("DetectStaleLeasesOnlyFailsRunningDistributedRuns", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:             store,
+			StaleLeaseThreshold:     time.Second,
+			StaleHeartbeatThreshold: time.Second,
+		})
+		ctx := context.Background()
+
+		staleLease := time.Now().Add(-5 * time.Second).UnixMilli()
+		runningAttempt := store.addAttempt(exec.DAGRunRef{Name: "running-dag", ID: "run-1"}, &exec.DAGRunStatus{
+			Name:     "running-dag",
+			DAGRunID: "run-1",
+			Status:   core.Running,
+			WorkerID: "worker1",
+			LeaseAt:  staleLease,
+		})
+		waitingAttempt := store.addAttempt(exec.DAGRunRef{Name: "waiting-dag", ID: "run-2"}, &exec.DAGRunStatus{
+			Name:     "waiting-dag",
+			DAGRunID: "run-2",
+			Status:   core.Waiting,
+			WorkerID: "worker1",
+			LeaseAt:  staleLease,
+		})
+		queuedAttempt := store.addAttempt(exec.DAGRunRef{Name: "queued-dag", ID: "run-3"}, &exec.DAGRunStatus{
+			Name:     "queued-dag",
+			DAGRunID: "run-3",
+			Status:   core.Queued,
+			WorkerID: "worker1",
+			LeaseAt:  staleLease,
+		})
+
+		h.detectStaleLeases(ctx)
+
+		runningStatus, err := runningAttempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, runningStatus.Status)
+
+		waitingStatus, err := waitingAttempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Waiting, waitingStatus.Status)
+
+		queuedStatus, err := queuedAttempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Queued, queuedStatus.Status)
+	})
 }
 
 func TestHandler_ReportStatus(t *testing.T) {
@@ -914,6 +1159,37 @@ func TestHandler_ReportStatus(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		require.True(t, resp.Accepted)
+	})
+
+	t.Run("CoordinatorStampsLeaseAtOnReportStatus", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+		})
+
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:     "test-dag",
+			DAGRunID: "run-123",
+			Status:   core.Running,
+			LeaseAt:  1,
+		})
+		require.NoError(t, convErr)
+
+		_, err := h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{Status: protoStatus})
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Greater(t, status.LeaseAt, int64(1))
+		assert.WithinDuration(t, time.Now(), time.UnixMilli(status.LeaseAt), 2*time.Second)
 	})
 
 	t.Run("MissingStatusReturnsError", func(t *testing.T) {

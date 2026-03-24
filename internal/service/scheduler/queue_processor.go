@@ -23,10 +23,6 @@ import (
 
 const queueAgeWarningThreshold = 2 * time.Minute
 
-// defaultLeaseStaleThreshold is the duration after which a distributed run's
-// lease is considered stale for queue concurrency counting purposes.
-const defaultLeaseStaleThreshold = 90 * time.Second
-
 var (
 	errProcessorClosed = errors.New("processor closed")
 	errNotStarted      = errors.New("execution not started")
@@ -57,18 +53,19 @@ type startupWaitState struct {
 
 // QueueProcessor is responsible for processing queued DAG runs.
 type QueueProcessor struct {
-	queueStore    exec.QueueStore
-	dagRunStore   exec.DAGRunStore
-	procStore     exec.ProcStore
-	dagExecutor   *DAGExecutor
-	queues        sync.Map // map[string]*queue
-	wakeUpCh      chan struct{}
-	quit          chan struct{}
-	wg            sync.WaitGroup
-	stopOnce      sync.Once
-	prevTime      time.Time
-	lock          sync.Mutex
-	backoffConfig BackoffConfig
+	queueStore          exec.QueueStore
+	dagRunStore         exec.DAGRunStore
+	procStore           exec.ProcStore
+	dagExecutor         *DAGExecutor
+	queues              sync.Map // map[string]*queue
+	wakeUpCh            chan struct{}
+	quit                chan struct{}
+	wg                  sync.WaitGroup
+	stopOnce            sync.Once
+	prevTime            time.Time
+	lock                sync.Mutex
+	backoffConfig       BackoffConfig
+	leaseStaleThreshold time.Duration
 }
 
 type queue struct {
@@ -107,6 +104,14 @@ func WithBackoffConfig(cfg BackoffConfig) QueueProcessorOption {
 	}
 }
 
+// WithLeaseStaleThreshold overrides the distributed lease stale threshold used
+// for queue concurrency accounting.
+func WithLeaseStaleThreshold(threshold time.Duration) QueueProcessorOption {
+	return func(p *QueueProcessor) {
+		p.leaseStaleThreshold = threshold
+	}
+}
+
 // NewQueueProcessor creates a new QueueProcessor.
 func NewQueueProcessor(
 	queueStore exec.QueueStore,
@@ -117,14 +122,15 @@ func NewQueueProcessor(
 	opts ...QueueProcessorOption,
 ) *QueueProcessor {
 	p := &QueueProcessor{
-		queueStore:    queueStore,
-		dagRunStore:   dagRunStore,
-		procStore:     procStore,
-		dagExecutor:   dagExecutor,
-		wakeUpCh:      make(chan struct{}, 1),
-		quit:          make(chan struct{}),
-		prevTime:      time.Now(),
-		backoffConfig: DefaultBackoffConfig(),
+		queueStore:          queueStore,
+		dagRunStore:         dagRunStore,
+		procStore:           procStore,
+		dagExecutor:         dagExecutor,
+		wakeUpCh:            make(chan struct{}, 1),
+		quit:                make(chan struct{}),
+		prevTime:            time.Now(),
+		backoffConfig:       DefaultBackoffConfig(),
+		leaseStaleThreshold: exec.DefaultStaleLeaseThreshold,
 	}
 
 	for _, opt := range opts {
@@ -658,14 +664,22 @@ func (p *QueueProcessor) countActiveDistributedRuns(ctx context.Context, queueNa
 	}
 
 	count := 0
+	staleThreshold := p.leaseStaleThreshold
+	if staleThreshold <= 0 {
+		staleThreshold = exec.DefaultStaleLeaseThreshold
+	}
 	for _, st := range statuses {
 		if st.WorkerID == "" {
 			continue
 		}
-		if st.ProcGroup != queueName {
+		groupName := st.ProcGroup
+		if groupName == "" {
+			groupName = st.Name
+		}
+		if groupName != queueName {
 			continue
 		}
-		if exec.IsLeaseActive(st, defaultLeaseStaleThreshold) {
+		if exec.IsLeaseActive(st, staleThreshold) {
 			count++
 		}
 	}

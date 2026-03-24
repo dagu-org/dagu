@@ -94,10 +94,13 @@ func (f *queueFixture) enqueueRuns(n int) *queueFixture {
 	return f
 }
 
-func (f *queueFixture) withProcessor(cfg config.Queues) *queueFixture {
+func (f *queueFixture) withProcessor(cfg config.Queues, opts ...QueueProcessorOption) *queueFixture {
+	options := append([]QueueProcessorOption{
+		WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
+	}, opts...)
 	f.processor = NewQueueProcessor(f.queueStore, f.dagRunStore, f.procStore,
 		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}}), config.ExecutionModeLocal, ""),
-		cfg, WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
+		cfg, options...,
 	)
 	return f
 }
@@ -206,6 +209,32 @@ func TestQueueProcessor_ConcurrencyLimit(t *testing.T) {
 	items, err := f.queueStore.List(f.ctx, "conc-dag")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(items), 2, "Concurrency limit should prevent processing all at once")
+}
+
+func TestQueueProcessor_CountsFreshDistributedRunsAgainstQueueConcurrency(t *testing.T) {
+	f := newQueueFixture(t).withDAG("distributed-conc-dag", 1).
+		withProcessor(config.Queues{}, WithLeaseStaleThreshold(5*time.Second)).
+		simulateQueue(1, false)
+
+	runningAttempt, err := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), "running-run", exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+	require.NoError(t, runningAttempt.Open(f.ctx))
+	runningStatus := exec.InitialStatus(f.dag)
+	runningStatus.Status = core.Running
+	runningStatus.DAGRunID = "running-run"
+	runningStatus.WorkerID = "worker-1"
+	runningStatus.LeaseAt = time.Now().UnixMilli()
+	require.NoError(t, runningAttempt.Write(f.ctx, runningStatus))
+	require.NoError(t, runningAttempt.Close(f.ctx))
+
+	f.enqueueRuns(1)
+
+	f.processor.ProcessQueueItems(f.ctx, "distributed-conc-dag")
+
+	items, err := f.queueStore.List(f.ctx, "distributed-conc-dag")
+	require.NoError(t, err)
+	require.Len(t, items, 1, "fresh distributed running status should consume the only queue slot")
+	assert.Contains(t, f.logs(), "Max concurrency reached")
 }
 
 func TestQueueProcessor_GlobalQueueIgnoresDAGMaxActiveRuns(t *testing.T) {

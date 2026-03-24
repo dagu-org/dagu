@@ -43,6 +43,7 @@ type fixtureConfig struct {
 	procConfig              *procConfig
 	staleHeartbeatThreshold time.Duration
 	staleLeaseThreshold     time.Duration
+	zombieDetectionInterval time.Duration
 }
 
 type procConfig struct {
@@ -98,6 +99,12 @@ func withStaleThresholds(heartbeat, lease time.Duration) fixtureOption {
 	}
 }
 
+func withZombieDetectionInterval(interval time.Duration) fixtureOption {
+	return func(c *fixtureConfig) {
+		c.zombieDetectionInterval = interval
+	}
+}
+
 type testFixture struct {
 	t                 *testing.T
 	coord             *test.Coordinator
@@ -133,6 +140,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 			c.Proc.HeartbeatInterval = cfg.procConfig.heartbeatInterval
 			c.Proc.HeartbeatSyncInterval = cfg.procConfig.heartbeatSyncInterval
 			c.Proc.StaleThreshold = cfg.procConfig.staleThreshold
+		}
+		if cfg.zombieDetectionInterval > 0 {
+			c.Scheduler.ZombieDetectionInterval = cfg.zombieDetectionInterval
 		}
 	}))
 	if cfg.logPersistence {

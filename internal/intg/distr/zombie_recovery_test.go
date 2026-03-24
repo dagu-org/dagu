@@ -4,21 +4,28 @@
 package distr_test
 
 import (
-	"context"
+	"bytes"
+	"os"
+	osexec "os/exec"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestDistributedRun_WorkerCrash_MarkedFailed verifies that when a worker
-// crashes (stops sending heartbeats and status updates), the coordinator's
-// zombie detector marks the distributed run as FAILED.
+const (
+	testStaleHeartbeatThreshold = 2 * time.Second
+	testStaleLeaseThreshold     = 3 * time.Second
+	testZombieDetectorInterval  = 500 * time.Millisecond
+)
+
+// TestDistributedRun_WorkerCrash_MarkedFailed verifies that a hard-killed worker
+// is treated as a crash and the coordinator's zombie detector marks the run FAILED.
 func TestDistributedRun_WorkerCrash_MarkedFailed(t *testing.T) {
-	// Use short thresholds to speed up zombie detection in the test.
 	f := newTestFixture(t, `
 type: graph
 name: zombie-crash-test
@@ -28,7 +35,45 @@ steps:
   - name: long-step
     command: sleep 300
 `,
-		withStaleThresholds(2*time.Second, 3*time.Second),
+		withWorkerCount(0),
+		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
+		withZombieDetectionInterval(testZombieDetectorInterval),
+	)
+	defer f.cleanup()
+
+	workerCmd, _ := startWorkerProcess(t, f, "crash-worker", "test=true")
+
+	require.NoError(t, f.enqueue())
+	f.waitForQueued()
+	f.startScheduler(30 * time.Second)
+
+	status := f.waitForStatus(core.Running, 15*time.Second)
+	require.Equal(t, core.Running, status.Status)
+	require.Greater(t, status.LeaseAt, int64(0))
+	require.Equal(t, "crash-worker", status.WorkerID)
+
+	require.NoError(t, cmdutil.KillProcessGroup(workerCmd, os.Kill))
+
+	finalStatus := f.waitForStatus(core.Failed, 20*time.Second)
+	assert.Equal(t, core.Failed, finalStatus.Status)
+	assert.Contains(t, finalStatus.Error, "worker")
+}
+
+// TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive verifies that a
+// long-running quiet step remains RUNNING past the lease threshold because
+// coordinator-owned heartbeat refreshes keep the lease fresh.
+func TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive(t *testing.T) {
+	f := newTestFixture(t, `
+type: graph
+name: quiet-heartbeat-test
+worker_selector:
+  test: "true"
+steps:
+  - name: long-step
+    command: sleep 8
+`,
+		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
+		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
 	defer f.cleanup()
 
@@ -36,52 +81,25 @@ steps:
 	f.waitForQueued()
 	f.startScheduler(30 * time.Second)
 
-	// Wait for the run to reach Running.
-	var dagRunID string
-	require.Eventually(t, func() bool {
-		status, err := f.latestStatus()
-		if err != nil {
-			return false
-		}
-		if status.Status == core.Running {
-			dagRunID = status.DAGRunID
-			return true
-		}
-		return false
-	}, 15*time.Second, 200*time.Millisecond, "run should reach Running")
-	require.NotEmpty(t, dagRunID)
+	status := f.waitForStatus(core.Running, 15*time.Second)
+	require.Greater(t, status.LeaseAt, int64(0))
+	initialLease := status.LeaseAt
 
-	// Verify the status has a LeaseAt timestamp from the worker.
+	time.Sleep(4 * time.Second)
+
 	status, err := f.latestStatus()
 	require.NoError(t, err)
-	assert.Greater(t, status.LeaseAt, int64(0), "running status should have LeaseAt set")
+	require.Equal(t, core.Running, status.Status)
+	assert.Greater(t, status.LeaseAt, initialLease)
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(status.LeaseAt), 2*time.Second)
 
-	// Stop all workers to simulate a crash.
-	for _, w := range f.workers {
-		require.NoError(t, w.Stop(f.coord.Context))
-	}
-
-	// Start the zombie detector with a short interval.
-	zombieCtx, zombieCancel := context.WithCancel(f.coord.Context)
-	defer zombieCancel()
-	f.coord.Handler().StartZombieDetector(zombieCtx, 1*time.Second)
-
-	// The run should transition to Failed within the stale threshold + detection interval.
-	finalStatus := f.waitForStatus(core.Failed, 20*time.Second)
-	assert.Equal(t, core.Failed, finalStatus.Status)
-	assert.Contains(t, finalStatus.Error, "worker")
-
-	zombieCancel()
-	f.coord.Handler().WaitZombieDetector()
+	finalStatus := f.waitForStatus(core.Succeeded, 15*time.Second)
+	assert.Equal(t, core.Succeeded, finalStatus.Status)
 }
 
 // TestDistributedRun_QueueConcurrency_ActiveRunCounted verifies that a running
-// distributed run (tracked via lease) counts against queue concurrency so a
-// second enqueued DAG does not start until the first finishes.
+// distributed run with fresh heartbeats continues to block the next queued item.
 func TestDistributedRun_QueueConcurrency_ActiveRunCounted(t *testing.T) {
-	// We create two separate fixtures sharing the same coordinator would be complex.
-	// Instead, we use one fixture with a queue concurrency of 1 and observe that
-	// the queue processor correctly counts the distributed run.
 	f := newTestFixture(t, `
 type: graph
 name: queue-concurrency-test
@@ -89,31 +107,92 @@ queue: concurrency-q
 worker_selector:
   test: "true"
 steps:
-  - name: quick-step
-    command: echo "done"
+  - name: long-step
+    command: sleep 8
 `,
-		withStaleThresholds(2*time.Second, 3*time.Second),
+		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
+		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
 	defer f.cleanup()
 
 	require.NoError(t, f.enqueue())
-	f.waitForQueued()
+	require.NoError(t, f.enqueue())
+
+	require.Eventually(t, func() bool {
+		count, err := f.coord.QueueStore.Len(f.coord.Context, "concurrency-q")
+		return err == nil && count == 2
+	}, 5*time.Second, 100*time.Millisecond, "both runs should be queued before scheduling starts")
+
 	f.startScheduler(30 * time.Second)
 
-	// Wait for the run to succeed.
-	status := f.waitForStatus(core.Succeeded, 20*time.Second)
-	require.Equal(t, core.Succeeded, status.Status)
+	require.Eventually(t, func() bool {
+		statuses, err := f.coord.DAGRunStore.ListStatuses(
+			f.coord.Context,
+			exec.WithExactName("queue-concurrency-test"),
+			exec.WithoutLimit(),
+		)
+		if err != nil || len(statuses) < 2 {
+			return false
+		}
 
-	// Verify LeaseAt was set during execution.
-	// For a completed run, LeaseAt should have been set at some point.
-	// The final status may or may not have LeaseAt depending on whether the
-	// terminal push included it, but the important thing is it was used during execution.
-	assert.NotEmpty(t, status.WorkerID, "distributed run should have WorkerID set")
+		var running, queued int
+		for _, st := range statuses {
+			switch st.Status {
+			case core.Running:
+				running++
+			case core.Queued:
+				queued++
+			}
+		}
+
+		return running == 1 && queued == 1
+	}, 15*time.Second, 100*time.Millisecond, "one run should start and one should remain queued")
+
+	time.Sleep(4 * time.Second)
+
+	statuses, err := f.coord.DAGRunStore.ListStatuses(
+		f.coord.Context,
+		exec.WithExactName("queue-concurrency-test"),
+		exec.WithoutLimit(),
+	)
+	require.NoError(t, err)
+
+	var running, queued int
+	for _, st := range statuses {
+		switch st.Status {
+		case core.Running:
+			running++
+		case core.Queued:
+			queued++
+		}
+	}
+
+	assert.Equal(t, 1, running, "fresh distributed lease should keep the first run counted as active")
+	assert.Equal(t, 1, queued, "second run should remain queued while the first run is active")
+
+	require.Eventually(t, func() bool {
+		statuses, err := f.coord.DAGRunStore.ListStatuses(
+			f.coord.Context,
+			exec.WithExactName("queue-concurrency-test"),
+			exec.WithoutLimit(),
+		)
+		if err != nil || len(statuses) < 2 {
+			return false
+		}
+
+		succeeded := 0
+		for _, st := range statuses {
+			if st.Status == core.Succeeded {
+				succeeded++
+			}
+		}
+		return succeeded == 2
+	}, 30*time.Second, 200*time.Millisecond, "both queued runs should eventually complete")
 }
 
 // TestDistributedRun_StatusAndQueueConsistency verifies that after a
 // distributed run completes, both the DAG run status and queue state are
-// consistent: run shows Succeeded, queue has runningCount=0.
+// consistent: run shows Succeeded, queue has no active entries.
 func TestDistributedRun_StatusAndQueueConsistency(t *testing.T) {
 	f := newTestFixture(t, `
 type: graph
@@ -135,7 +214,6 @@ steps:
 	status := f.waitForStatus(core.Succeeded, 20*time.Second)
 	require.Equal(t, core.Succeeded, status.Status)
 
-	// Verify no active runs remain in the DAGRunStore with fresh leases.
 	activeStatuses, err := f.coord.DAGRunStore.ListStatuses(f.coord.Context,
 		exec.WithStatuses([]core.Status{core.Running}),
 		exec.WithoutLimit(),
@@ -150,9 +228,9 @@ steps:
 	}
 }
 
-// TestDistributedRun_LeaseStamped verifies that every status push from a
-// distributed worker includes a fresh LeaseAt timestamp.
-func TestDistributedRun_LeaseStamped(t *testing.T) {
+// TestDistributedRun_CoordinatorStampsLeaseAt verifies that distributed status
+// reports end up with a recent coordinator-owned LeaseAt timestamp.
+func TestDistributedRun_CoordinatorStampsLeaseAt(t *testing.T) {
 	f := newTestFixture(t, `
 type: graph
 name: lease-stamp-test
@@ -169,15 +247,54 @@ steps:
 	f.waitForQueued()
 	f.startScheduler(30 * time.Second)
 
-	// Wait for the run to complete.
 	status := f.waitForStatus(core.Succeeded, 20*time.Second)
 	require.Equal(t, core.Succeeded, status.Status)
-
-	// The final status should have LeaseAt set by the worker's StatusPusher.
 	assert.Greater(t, status.LeaseAt, int64(0), "final status should have LeaseAt set")
-
-	// LeaseAt should be a recent timestamp (within the last minute).
-	leaseTime := time.UnixMilli(status.LeaseAt)
-	assert.WithinDuration(t, time.Now(), leaseTime, 60*time.Second,
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(status.LeaseAt), 60*time.Second,
 		"LeaseAt should be a recent timestamp")
+}
+
+func startWorkerProcess(t *testing.T, f *testFixture, workerID, labels string) (*osexec.Cmd, *bytes.Buffer) {
+	t.Helper()
+
+	args := []string{
+		"worker",
+		"--config", f.coord.Config.Paths.ConfigFileUsed,
+		"--worker.id", workerID,
+		"--worker.health-port=0",
+		"--worker.coordinators", f.coord.Address(),
+	}
+	if labels != "" {
+		args = append(args, "--worker.labels", labels)
+	}
+
+	cmd := osexec.Command(f.coord.Config.Paths.Executable, args...)
+	cmdutil.SetupCommand(cmd)
+	cmd.Env = append([]string{}, f.coord.ChildEnv...)
+
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &output
+
+	require.NoError(t, cmd.Start())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = cmd.Wait()
+	}()
+
+	t.Cleanup(func() {
+		if cmd.Process != nil && (cmd.ProcessState == nil || !cmd.ProcessState.Exited()) {
+			_ = cmdutil.KillProcessGroup(cmd, os.Kill)
+		}
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Logf("worker process %s did not exit within 5 seconds", workerID)
+		}
+	})
+
+	f.waitForWorkerRegistration(workerID, 10*time.Second)
+
+	return cmd, &output
 }

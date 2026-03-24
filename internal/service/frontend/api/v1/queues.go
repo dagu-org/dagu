@@ -17,9 +17,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
-// leaseStaleThreshold for queue API distributed run detection.
-const leaseStaleThreshold = 90 * time.Second
-
 // ListQueues implements api.StrictServerInterface.
 func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
 	// Map to track queues and their DAG runs
@@ -99,7 +96,7 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 			if _, alreadyCounted := localRunningIDs[st.DAGRunID]; alreadyCounted {
 				continue
 			}
-			if !exec.IsLeaseActive(st, leaseStaleThreshold) {
+			if !exec.IsLeaseActive(st, a.effectiveLeaseStaleThreshold()) {
 				continue
 			}
 			groupName := st.ProcGroup
@@ -250,7 +247,7 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 				if groupName != queueName {
 					continue
 				}
-				if !exec.IsLeaseActive(st, leaseStaleThreshold) {
+				if !exec.IsLeaseActive(st, a.effectiveLeaseStaleThreshold()) {
 					continue
 				}
 				allRunning = append(allRunning, toDAGRunSummary(*st))
@@ -407,7 +404,7 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 			if groupName != queueName {
 				continue
 			}
-			if !exec.IsLeaseActive(st, leaseStaleThreshold) {
+			if !exec.IsLeaseActive(st, a.effectiveLeaseStaleThreshold()) {
 				continue
 			}
 			running = append(running, toDAGRunSummary(*st))
@@ -449,4 +446,11 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 		Running: running,
 		Queued:  queued,
 	}, nil
+}
+
+func (a *API) effectiveLeaseStaleThreshold() time.Duration {
+	if a.leaseStaleThreshold > 0 {
+		return a.leaseStaleThreshold
+	}
+	return exec.DefaultStaleLeaseThreshold
 }
