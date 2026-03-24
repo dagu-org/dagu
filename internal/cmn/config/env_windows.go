@@ -29,6 +29,12 @@ func init() {
 		"PATH",         // System path
 		"PSMODULEPATH", // PowerShell specific
 		"HOME",         // Used by Go, Git, and ported tools
+
+		// Docker daemon connection (used by Docker SDK's client.FromEnv)
+		"DOCKER_HOST",        // Docker daemon address
+		"DOCKER_TLS_VERIFY",  // Enable TLS verification
+		"DOCKER_CERT_PATH",   // Path to TLS certificates
+		"DOCKER_API_VERSION", // Pin Docker API version
 	} {
 		defaultWhitelist[key] = true
 	}

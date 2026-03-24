@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1482,4 +1483,14 @@ func TestWrapCommandWithShell(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestDockerClientRespectsDockerHostEnv(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "tcp://test-host:2375")
+
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	require.NoError(t, err)
+	defer cli.Close()
+
+	assert.Equal(t, "tcp://test-host:2375", cli.DaemonHost())
 }

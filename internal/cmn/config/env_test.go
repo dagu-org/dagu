@@ -4,7 +4,6 @@
 package config_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -13,21 +12,25 @@ import (
 )
 
 func TestLoadBaseEnv(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name     string
 		expected bool
 	}{
 		{"TEST_VAR_BASE_ENV", false},
 		{"DAGU_TEST_BASE_ENV", true},
+
+		// Docker daemon connection vars must pass through.
+		{"DOCKER_HOST", true},
+		{"DOCKER_TLS_VERIFY", true},
+		{"DOCKER_CERT_PATH", true},
+		{"DOCKER_API_VERSION", true},
+
+		// Docker credentials must NOT leak through the global env.
+		{"DOCKER_AUTH_CONFIG", false},
 	}
 
 	for _, tc := range testCases {
-		os.Setenv(tc.name, "value")
-		t.Cleanup(func() {
-			os.Unsetenv(tc.name)
-		})
+		t.Setenv(tc.name, "value")
 	}
 
 	baseEnv := config.LoadBaseEnv()
