@@ -278,6 +278,177 @@ steps:
 	})
 }
 
+func TestStepScopedOutputAccess(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		yaml           string
+		expectedStatus core.Status
+		expectedOutput map[string]any
+	}{
+		{
+			name: "BasicOutputAccess",
+			yaml: `
+type: graph
+steps:
+  - id: extract_title
+    output: RESULT
+    script: |
+      printf 'Quarterly Revenue'
+
+  - id: extract_summary
+    output: RESULT
+    script: |
+      printf 'Revenue grew 18 percent year over year.'
+
+  - id: report
+    depends: [extract_title, extract_summary]
+    script: |
+      printf 'Title: %s\nSummary: %s' "${extract_title.output}" "${extract_summary.output}"
+    output: REPORT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"REPORT": "Title: Quarterly Revenue\nSummary: Revenue grew 18 percent year over year.",
+			},
+		},
+		{
+			name: "EmptyOutputResolvesToEmptyString",
+			yaml: `
+type: graph
+steps:
+  - id: empty_step
+    output: RESULT
+    script: |
+      printf ''
+
+  - id: consumer
+    depends: [empty_step]
+    script: |
+      printf 'got:[%s]' "${empty_step.output}"
+    output: CONSUMED
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"CONSUMED": "got:[]",
+			},
+		},
+		{
+			name: "OutputVsStdout",
+			yaml: `
+type: graph
+steps:
+  - id: producer
+    output: CAPTURED
+    script: |
+      printf 'captured value'
+
+  - id: consumer
+    depends: [producer]
+    script: |
+      printf 'output=%s\nstdout=%s' "${producer.output}" "${producer.stdout}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"CAPTURED": "captured value",
+				"RESULT": []test.Contains{
+					test.Contains("output=captured value"),
+					test.Contains("stdout="),
+					test.Contains(".out"), // stdout is a file path
+				},
+			},
+		},
+		{
+			name: "OutputWithoutCapture",
+			yaml: `
+type: graph
+steps:
+  - id: no_output
+    script: |
+      printf 'hello'
+
+  - id: consumer
+    depends: [no_output]
+    script: |
+      printf 'ref=${no_output.output}'
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"RESULT": "ref=${no_output.output}",
+			},
+		},
+		{
+			name: "OutputPrecedenceOverJSONPath",
+			yaml: `
+type: graph
+steps:
+  - id: check
+    output: check
+    script: |
+      printf '{"output":"from-json"}'
+
+  - id: consumer
+    depends: [check]
+    script: |
+      printf 'value=%s' "${check.output}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"check":  `{"output":"from-json"}`,
+				"RESULT": `value={"output":"from-json"}`,
+			},
+		},
+		{
+			name: "OutputSlicing",
+			yaml: `
+type: graph
+steps:
+  - id: producer
+    output: DATA
+    script: |
+      printf 'hello world'
+
+  - id: consumer
+    depends: [producer]
+    script: |
+      printf 'sliced=%s' "${producer.output:0:5}"
+    output: RESULT
+`,
+			expectedStatus: core.Succeeded,
+			expectedOutput: map[string]any{
+				"DATA":   "hello world",
+				"RESULT": "sliced=hello",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			th := test.Setup(t)
+			testDAG := th.DAG(t, tc.yaml)
+
+			agent := testDAG.Agent()
+			err := agent.Run(agent.Context)
+
+			if tc.expectedStatus == core.Succeeded {
+				require.NoError(t, err)
+			}
+
+			testDAG.AssertLatestStatus(t, tc.expectedStatus)
+
+			if tc.expectedOutput != nil {
+				testDAG.AssertOutputs(t, tc.expectedOutput)
+			}
+		})
+	}
+}
+
 func TestStepIDErrorCases(t *testing.T) {
 	t.Parallel()
 

@@ -18,6 +18,7 @@ type StepInfo struct {
 	Stdout   string
 	Stderr   string
 	ExitCode string
+	Output   *string // nil = no output: configured; non-nil = captured value (may be "")
 }
 
 // resolveStepProperty extracts a step's property value with optional slicing.
@@ -53,6 +54,12 @@ func resolveStepProperty(ctx context.Context, stepName, path string, stepMap map
 		value = stepInfo.Stderr
 	case ".exitCode", ".exit_code":
 		value = stepInfo.ExitCode
+	case ".output":
+		if stepInfo.Output == nil {
+			logger.Debug(ctx, "Step has no output configured", tag.Step(stepName))
+			return "", false
+		}
+		value = *stepInfo.Output
 	default:
 		return "", false
 	}
