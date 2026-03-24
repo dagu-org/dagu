@@ -251,4 +251,176 @@ steps:
 			"RESULT": "Anonymous (Admin)",
 		})
 	})
+
+	t.Run("SlimSprigStringFunctions", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render
+    type: template
+    config:
+      data:
+        name: "  My Service  "
+    script: '{{ .name | trim | lower | replace " " "-" }}'
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "my-service",
+		})
+	})
+
+	t.Run("SlimSprigSafeMapAccess", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render
+    type: template
+    config:
+      data:
+        app:
+          name: MyApp
+    script: |
+      name={{ get .app "name" | default "unknown" }}
+      owner={{ get .app "owner" | default "unknown" }}
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": []test.Contains{
+				test.Contains("name=MyApp"),
+				test.Contains("owner=unknown"),
+			},
+		})
+	})
+
+	t.Run("SlimSprigListOperations", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render
+    type: template
+    config:
+      data:
+        domains:
+          - api.example.com
+          - api.example.com
+          - app.example.com
+    script: '{{ .domains | uniq | sortAlpha | join "," }}'
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": "api.example.com,app.example.com",
+		})
+	})
+
+	t.Run("SlimSprigFullExample", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render-config
+    type: template
+    script: |
+      app={{ .app.name | lower | replace " " "-" }}
+      owner={{ get .app "owner" | default "unknown" }}
+      domains={{ get .app "domains" | default (list "localhost") | uniq | sortAlpha | join "," }}
+    config:
+      data:
+        app:
+          name: My Service
+          domains:
+            - api.example.com
+            - api.example.com
+            - app.example.com
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": []test.Contains{
+				test.Contains("app=my-service"),
+				test.Contains("owner=unknown"),
+				test.Contains("domains=api.example.com,app.example.com"),
+			},
+		})
+	})
+
+	t.Run("SlimSprigBlockedFunctions", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render
+    type: template
+    config:
+      data: {}
+    script: '{{ env "HOME" }}'
+`)
+		agent := dag.Agent()
+		agent.RunCheckErr(t, "error")
+
+		dag.AssertLatestStatus(t, core.Failed)
+	})
+
+	t.Run("SlimSprigMissingKeyBoundary", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render
+    type: template
+    config:
+      data:
+        app:
+          name: test
+    script: '{{ .nonexistent }}'
+`)
+		agent := dag.Agent()
+		agent.RunCheckErr(t, "execution error")
+
+		dag.AssertLatestStatus(t, core.Failed)
+	})
+
+	t.Run("SlimSprigOverlapBehavior", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.Setup(t)
+		dag := th.DAG(t, `steps:
+  - name: render
+    type: template
+    config:
+      data:
+        csv: "a,b,c"
+    script: |
+      items={{ .csv | split "," | join ";" }}
+      sum={{ 5 | add 3 }}
+    output: RESULT
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		dag.AssertLatestStatus(t, core.Succeeded)
+		dag.AssertOutputs(t, map[string]any{
+			"RESULT": []test.Contains{
+				test.Contains("items=a;b;c"),
+				test.Contains("sum=8"),
+			},
+		})
+	})
 }

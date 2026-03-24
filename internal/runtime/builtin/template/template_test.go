@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -352,4 +353,444 @@ func TestFuncMap_EmptyNil(t *testing.T) {
 	err := e.Run(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "true", stdout.String())
+}
+
+func TestSlimSprig_Get(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ get .app "owner" }}`,
+		data: map[string]any{
+			"app": map[string]any{"name": "test"},
+		},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "", stdout.String())
+}
+
+func TestSlimSprig_Dig(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ dig "a" "b" "fallback" .data }}`,
+		data: map[string]any{
+			"data": map[string]any{
+				"a": map[string]any{"b": "found"},
+			},
+		},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "found", stdout.String())
+}
+
+func TestSlimSprig_Replace(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ "hello world" | replace "world" "dagu" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "hello dagu", stdout.String())
+}
+
+func TestSlimSprig_ListUniqSortAlpha(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ list "c" "a" "b" "a" | uniq | sortAlpha | join "," }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "a,b,c", stdout.String())
+}
+
+func TestSlimSprig_Has(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ list "a" "b" | has "a" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true", stdout.String())
+}
+
+func TestSlimSprig_Contains(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ contains "ell" "hello" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true", stdout.String())
+}
+
+func TestSlimSprig_HasPrefixSuffix(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ hasPrefix "hel" "hello" }},{{ hasSuffix "llo" "hello" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true,true", stdout.String())
+}
+
+func TestSlimSprig_Dict(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ $d := dict "key" "value" }}{{ get $d "key" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "value", stdout.String())
+}
+
+func TestSlimSprig_ToString(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ 42 | toString }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "42", stdout.String())
+}
+
+func TestSlimSprig_BlockedFunctions(t *testing.T) {
+	t.Parallel()
+
+	// Verify blocked function names are not in the funcMap.
+	for _, name := range blockedFuncs {
+		_, exists := funcMap[name]
+		assert.False(t, exists, "blocked function %q should not be in funcMap", name)
+	}
+}
+
+func TestSlimSprig_BlockedFunctionErrors(t *testing.T) {
+	t.Parallel()
+
+	blockedTemplates := []string{
+		`{{ env "HOME" }}`,
+		`{{ expandenv "$HOME" }}`,
+		`{{ now }}`,
+		`{{ randAlphaNum 10 }}`,
+	}
+
+	for _, script := range blockedTemplates {
+		var stdout bytes.Buffer
+		e := &templateExec{
+			stdout: &stdout,
+			stderr: os.Stderr,
+			script: script,
+			data:   map[string]any{},
+		}
+		err := e.Run(context.Background())
+		assert.Error(t, err, "script %q should fail", script)
+	}
+}
+
+func TestSlimSprig_OverlapSplitPipeline(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ "a,b,c" | split "," | join ";" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "a;b;c", stdout.String())
+}
+
+func TestSlimSprig_OverlapAddPipeline(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ 5 | add 3 }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "8", stdout.String())
+}
+
+func TestFuncMap_JoinGenericSlices(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		sep      string
+		input    any
+		expected string
+	}{
+		{
+			name:     "typed int slice",
+			sep:      ",",
+			input:    []int{80, 443},
+			expected: "80,443",
+		},
+		{
+			name:     "string array",
+			sep:      "-",
+			input:    [2]string{"a", "b"},
+			expected: "a-b",
+		},
+		{
+			name:     "nil input",
+			sep:      ",",
+			input:    nil,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fn := funcMap["join"].(func(string, any) string)
+			result := fn(tt.sep, tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFuncMap_SnapshotAllowedFunctions(t *testing.T) {
+	t.Parallel()
+
+	m := buildFuncMap()
+
+	var got []string
+	for name := range m {
+		got = append(got, name)
+	}
+	sort.Strings(got)
+
+	// This list is the complete set of functions exposed by buildFuncMap().
+	// If a slim-sprig upgrade adds new functions, this test will fail,
+	// forcing a deliberate review before they become available in templates.
+	expected := []string{
+		"add",
+		"add1",
+		"adler32sum",
+		"all",
+		"any",
+		"append",
+		"atoi",
+		"b32dec",
+		"b32enc",
+		"b64dec",
+		"b64enc",
+		"base",
+		"biggest",
+		"cat",
+		"ceil",
+		"chunk",
+		"clean",
+		"coalesce",
+		"compact",
+		"concat",
+		"contains",
+		"count",
+		"deepEqual",
+		"default",
+		"dict",
+		"dig",
+		"dir",
+		"div",
+		"empty",
+		"ext",
+		"fail",
+		"first",
+		"float64",
+		"floor",
+		"fromJson",
+		"get",
+		"has",
+		"hasKey",
+		"hasPrefix",
+		"hasSuffix",
+		"hello",
+		"indent",
+		"initial",
+		"int",
+		"int64",
+		"isAbs",
+		"join",
+		"keys",
+		"kindIs",
+		"kindOf",
+		"last",
+		"list",
+		"lower",
+		"max",
+		"maxf",
+		"min",
+		"minf",
+		"mod",
+		"mul",
+		"mustAppend",
+		"mustChunk",
+		"mustCompact",
+		"mustFirst",
+		"mustFromJson",
+		"mustHas",
+		"mustInitial",
+		"mustLast",
+		"mustPrepend",
+		"mustPush",
+		"mustRegexFind",
+		"mustRegexFindAll",
+		"mustRegexMatch",
+		"mustRegexReplaceAll",
+		"mustRegexReplaceAllLiteral",
+		"mustRegexSplit",
+		"mustRest",
+		"mustReverse",
+		"mustSlice",
+		"mustToJson",
+		"mustToPrettyJson",
+		"mustToRawJson",
+		"mustUniq",
+		"mustWithout",
+		"nindent",
+		"omit",
+		"osBase",
+		"osClean",
+		"osDir",
+		"osExt",
+		"osIsAbs",
+		"pick",
+		"pluck",
+		"plural",
+		"prepend",
+		"push",
+		"quote",
+		"regexFind",
+		"regexFindAll",
+		"regexMatch",
+		"regexQuoteMeta",
+		"regexReplaceAll",
+		"regexReplaceAllLiteral",
+		"regexSplit",
+		"repeat",
+		"replace",
+		"rest",
+		"reverse",
+		"round",
+		"seq",
+		"set",
+		"sha1sum",
+		"sha256sum",
+		"slice",
+		"sortAlpha",
+		"split",
+		"splitList",
+		"splitn",
+		"squote",
+		"sub",
+		"substr",
+		"ternary",
+		"title",
+		"toDecimal",
+		"toJson",
+		"toPrettyJson",
+		"toRawJson",
+		"toString",
+		"toStrings",
+		"trim",
+		"trimAll",
+		"trimPrefix",
+		"trimSuffix",
+		"trimall",
+		"trunc",
+		"tuple",
+		"typeIs",
+		"typeIsLike",
+		"typeOf",
+		"uniq",
+		"unset",
+		"until",
+		"untilStep",
+		"upper",
+		"urlJoin",
+		"urlParse",
+		"values",
+		"without",
+	}
+
+	assert.Equal(t, expected, got,
+		"buildFuncMap() returned unexpected functions; review new entries before updating this list")
+}
+
+func TestSlimSprig_CrossLibraryPipeline(t *testing.T) {
+	t.Parallel()
+
+	// list (sprig) → join (Dagu override accepting []any)
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ list "x" "y" "z" | join "-" }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "x-y-z", stdout.String())
 }
