@@ -21,4 +21,5 @@ import (
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/sql/drivers/postgres"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/sql/drivers/sqlite"
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin/ssh"
+	_ "github.com/dagu-org/dagu/internal/runtime/builtin/template"
 )

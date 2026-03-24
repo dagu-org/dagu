@@ -18,6 +18,11 @@ type Options struct {
 	// in variable values from being interpreted when the script executes.
 	DeferShellVars bool
 
+	// NoExpansion skips all expansion and returns the input unchanged.
+	// Used by executors like template that treat the script body as a
+	// literal template, not a shell expression.
+	NoExpansion bool
+
 	Variables []map[string]string // Ordered variable maps for expansion
 	StepMap   map[string]StepInfo // Step info map for step reference expansion
 }
@@ -84,6 +89,14 @@ func WithoutDollarEscape() Option {
 func WithOSExpansion() Option {
 	return func(opts *Options) {
 		opts.ExpandOS = true
+	}
+}
+
+// WithNoExpansion skips all expansion phases and returns the input unchanged.
+// Used by executors that treat the script body as a literal template.
+func WithNoExpansion() Option {
+	return func(opts *Options) {
+		opts.NoExpansion = true
 	}
 }
 

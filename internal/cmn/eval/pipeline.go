@@ -24,6 +24,9 @@ type pipeline struct {
 
 // execute runs all enabled phases in order on the input string.
 func (p *pipeline) execute(ctx context.Context, input string, opts *Options) (string, error) {
+	if opts.NoExpansion {
+		return input, nil
+	}
 	value := input
 	if opts.EscapeDollar {
 		ctx, value = withDollarEscapes(ctx, input)
