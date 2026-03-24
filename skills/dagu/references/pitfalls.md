@@ -70,18 +70,15 @@ Missed runs are skipped unless `catchup_window:` is set.
 
 Complex types become `fmt.Sprintf("%v")` output. Pass structured data as JSON strings.
 
-## 17. env: cannot reference params: values
+## 17. env: CAN reference params: values
 
-`env:` is evaluated before `params:` are resolved. `env: - X: "${my_param}/foo"` silently resolves `${my_param}` to empty. **Workaround:** compute derived values in a shell step instead:
+`env:` is evaluated after `params:`, so `${param_name}` works directly in env values:
 
 ```yaml
 params:
   base: /tmp
-
-steps:
-  - id: setup
-    command: echo "${base}/output"
-    output: FULL_PATH
+env:
+  - FULL_PATH: "${base}/output"
 ```
 
 ## 18. Built-in jq executor cannot read files
