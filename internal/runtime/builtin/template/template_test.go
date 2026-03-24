@@ -1,0 +1,355 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package template
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestTemplateExec_BasicStdout(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: "Hello, World!",
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, World!", stdout.String())
+}
+
+func TestTemplateExec_DataVariables(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: "Hello, {{ .name }}! You have {{ .count }} items.",
+		data: map[string]any{
+			"name":  "Alice",
+			"count": 42,
+		},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, Alice! You have 42 items.", stdout.String())
+}
+
+func TestTemplateExec_OutputToFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	outFile := filepath.Join(tmpDir, "output.txt")
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout:     &stdout,
+		stderr:     os.Stderr,
+		script:     "File content: {{ .msg }}",
+		data:       map[string]any{"msg": "hello"},
+		outputFile: outFile,
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+
+	// stdout should be empty when writing to file
+	assert.Empty(t, stdout.String())
+
+	// file should contain the rendered content
+	content, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+	assert.Equal(t, "File content: hello", string(content))
+}
+
+func TestTemplateExec_OutputToFileCreatesSubdirs(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	outFile := filepath.Join(tmpDir, "sub", "dir", "output.txt")
+
+	e := &templateExec{
+		stdout:     &bytes.Buffer{},
+		stderr:     os.Stderr,
+		script:     "nested",
+		data:       map[string]any{},
+		outputFile: outFile,
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+	assert.Equal(t, "nested", string(content))
+}
+
+func TestTemplateExec_MissingKeyError(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: "{{ .undefined_key }}",
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "execution error")
+}
+
+func TestTemplateExec_InvalidSyntax(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: "{{ .foo",
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse error")
+}
+
+func TestTemplateExec_EmptyDataLiterals(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: "Just literal text, no variables.",
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "Just literal text, no variables.", stdout.String())
+}
+
+func TestFuncMap_Split(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ range .items | split "," }}[{{ . }}]{{ end }}`,
+		data:   map[string]any{"items": "a,b,c"},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "[a][b][c]", stdout.String())
+}
+
+func TestFuncMap_Join(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .items | join ", " }}`,
+		data:   map[string]any{"items": []string{"a", "b", "c"}},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "a, b, c", stdout.String())
+}
+
+func TestFuncMap_Count(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .items | count }}`,
+		data:   map[string]any{"items": []string{"a", "b", "c"}},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "3", stdout.String())
+}
+
+func TestFuncMap_Add(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ 5 | add 3 }}`,
+		data:   map[string]any{},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "8", stdout.String())
+}
+
+func TestFuncMap_Empty(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `empty={{ .val | empty }},notempty={{ .other | empty }}`,
+		data:   map[string]any{"val": "", "other": "hello"},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "empty=true,notempty=false", stdout.String())
+}
+
+func TestFuncMap_Upper(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .val | upper }}`,
+		data:   map[string]any{"val": "hello"},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "HELLO", stdout.String())
+}
+
+func TestFuncMap_Lower(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .val | lower }}`,
+		data:   map[string]any{"val": "HELLO"},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "hello", stdout.String())
+}
+
+func TestFuncMap_Trim(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `[{{ .val | trim }}]`,
+		data:   map[string]any{"val": "  hello  "},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "[hello]", stdout.String())
+}
+
+func TestFuncMap_Default_WithEmptyValue(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .val | default "N/A" }}`,
+		data:   map[string]any{"val": ""},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "N/A", stdout.String())
+}
+
+func TestFuncMap_Default_WithNonEmptyValue(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .val | default "N/A" }}`,
+		data:   map[string]any{"val": "present"},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "present", stdout.String())
+}
+
+func TestFuncMap_PipelineChaining(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .val | split "\n" | count }}`,
+		data:   map[string]any{"val": "a\nb\nc"},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "3", stdout.String())
+}
+
+func TestFuncMap_EmptySlice(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .items | empty }}`,
+		data:   map[string]any{"items": []string{}},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true", stdout.String())
+}
+
+func TestFuncMap_EmptyNil(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	e := &templateExec{
+		stdout: &stdout,
+		stderr: os.Stderr,
+		script: `{{ .val | empty }}`,
+		data:   map[string]any{"val": nil},
+	}
+
+	err := e.Run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "true", stdout.String())
+}
