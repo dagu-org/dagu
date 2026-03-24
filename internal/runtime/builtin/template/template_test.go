@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -567,6 +568,214 @@ func TestSlimSprig_OverlapAddPipeline(t *testing.T) {
 	err := e.Run(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "8", stdout.String())
+}
+
+func TestFuncMap_JoinGenericSlices(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		sep      string
+		input    any
+		expected string
+	}{
+		{
+			name:     "typed int slice",
+			sep:      ",",
+			input:    []int{80, 443},
+			expected: "80,443",
+		},
+		{
+			name:     "string array",
+			sep:      "-",
+			input:    [2]string{"a", "b"},
+			expected: "a-b",
+		},
+		{
+			name:     "nil input",
+			sep:      ",",
+			input:    nil,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fn := funcMap["join"].(func(string, any) string)
+			result := fn(tt.sep, tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFuncMap_SnapshotAllowedFunctions(t *testing.T) {
+	t.Parallel()
+
+	m := buildFuncMap()
+
+	var got []string
+	for name := range m {
+		got = append(got, name)
+	}
+	sort.Strings(got)
+
+	// This list is the complete set of functions exposed by buildFuncMap().
+	// If a slim-sprig upgrade adds new functions, this test will fail,
+	// forcing a deliberate review before they become available in templates.
+	expected := []string{
+		"add",
+		"add1",
+		"adler32sum",
+		"all",
+		"any",
+		"append",
+		"atoi",
+		"b32dec",
+		"b32enc",
+		"b64dec",
+		"b64enc",
+		"base",
+		"biggest",
+		"cat",
+		"ceil",
+		"chunk",
+		"clean",
+		"coalesce",
+		"compact",
+		"concat",
+		"contains",
+		"count",
+		"deepEqual",
+		"default",
+		"dict",
+		"dig",
+		"dir",
+		"div",
+		"empty",
+		"ext",
+		"fail",
+		"first",
+		"float64",
+		"floor",
+		"fromJson",
+		"get",
+		"has",
+		"hasKey",
+		"hasPrefix",
+		"hasSuffix",
+		"hello",
+		"indent",
+		"initial",
+		"int",
+		"int64",
+		"isAbs",
+		"join",
+		"keys",
+		"kindIs",
+		"kindOf",
+		"last",
+		"list",
+		"lower",
+		"max",
+		"maxf",
+		"min",
+		"minf",
+		"mod",
+		"mul",
+		"mustAppend",
+		"mustChunk",
+		"mustCompact",
+		"mustFirst",
+		"mustFromJson",
+		"mustHas",
+		"mustInitial",
+		"mustLast",
+		"mustPrepend",
+		"mustPush",
+		"mustRegexFind",
+		"mustRegexFindAll",
+		"mustRegexMatch",
+		"mustRegexReplaceAll",
+		"mustRegexReplaceAllLiteral",
+		"mustRegexSplit",
+		"mustRest",
+		"mustReverse",
+		"mustSlice",
+		"mustToJson",
+		"mustToPrettyJson",
+		"mustToRawJson",
+		"mustUniq",
+		"mustWithout",
+		"nindent",
+		"omit",
+		"osBase",
+		"osClean",
+		"osDir",
+		"osExt",
+		"osIsAbs",
+		"pick",
+		"pluck",
+		"plural",
+		"prepend",
+		"push",
+		"quote",
+		"regexFind",
+		"regexFindAll",
+		"regexMatch",
+		"regexQuoteMeta",
+		"regexReplaceAll",
+		"regexReplaceAllLiteral",
+		"regexSplit",
+		"repeat",
+		"replace",
+		"rest",
+		"reverse",
+		"round",
+		"seq",
+		"set",
+		"sha1sum",
+		"sha256sum",
+		"slice",
+		"sortAlpha",
+		"split",
+		"splitList",
+		"splitn",
+		"squote",
+		"sub",
+		"substr",
+		"ternary",
+		"title",
+		"toDecimal",
+		"toJson",
+		"toPrettyJson",
+		"toRawJson",
+		"toString",
+		"toStrings",
+		"trim",
+		"trimAll",
+		"trimPrefix",
+		"trimSuffix",
+		"trimall",
+		"trunc",
+		"tuple",
+		"typeIs",
+		"typeIsLike",
+		"typeOf",
+		"uniq",
+		"unset",
+		"until",
+		"untilStep",
+		"upper",
+		"urlJoin",
+		"urlParse",
+		"values",
+		"without",
+	}
+
+	assert.Equal(t, expected, got,
+		"buildFuncMap() returned unexpected functions; review new entries before updating this list")
 }
 
 func TestSlimSprig_CrossLibraryPipeline(t *testing.T) {

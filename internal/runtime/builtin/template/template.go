@@ -191,17 +191,28 @@ func buildFuncMap() template.FuncMap {
 	// join: Dagu accepts []string; also accept []any for interop with
 	// sprig functions like list/uniq/sortAlpha that return []any.
 	m["join"] = func(sep string, v any) string {
+		if v == nil {
+			return ""
+		}
 		switch elems := v.(type) {
 		case []string:
 			return strings.Join(elems, sep)
 		case []any:
 			strs := make([]string, len(elems))
 			for i, e := range elems {
-				strs[i] = fmt.Sprintf("%v", e)
+				strs[i] = fmt.Sprint(e)
 			}
 			return strings.Join(strs, sep)
 		default:
-			return fmt.Sprintf("%v", v)
+			rv := reflect.ValueOf(v)
+			if rv.IsValid() && (rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array) {
+				strs := make([]string, rv.Len())
+				for i := range strs {
+					strs[i] = fmt.Sprint(rv.Index(i).Interface())
+				}
+				return strings.Join(strs, sep)
+			}
+			return fmt.Sprint(v)
 		}
 	}
 	m["count"] = func(v any) (int, error) {
