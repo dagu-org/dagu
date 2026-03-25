@@ -183,7 +183,11 @@ func (l *dirLock) TryLock() error {
 	}
 
 	// Write a unique ownership token into the lock directory
-	token := fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixNano())
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		hostname = "unknown-host"
+	}
+	token := fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().UnixNano())
 	tokenPath := filepath.Join(l.lockPath, "owner")
 	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
 		_ = os.RemoveAll(l.lockPath)

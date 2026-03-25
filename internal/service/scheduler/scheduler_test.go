@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -454,10 +455,10 @@ func TestScheduler_SelfFencesOnOwnershipLoss(t *testing.T) {
 	errCh := startSchedulerAsync(t, sc, ctx)
 
 	// Simulate lock theft: remove the lock dir and recreate it with a different token
-	lockDir := th.Config.Paths.DataDir + "/scheduler/locks/.dagu_lock"
+	lockDir := filepath.Join(th.Config.Paths.DataDir, "scheduler", "locks", ".dagu_lock")
 	require.NoError(t, os.RemoveAll(lockDir))
 	require.NoError(t, os.MkdirAll(lockDir, 0700))
-	require.NoError(t, os.WriteFile(lockDir+"/owner", []byte("stolen-token"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(lockDir, "owner"), []byte("stolen-token"), 0600))
 
 	// The heartbeat runs every 7s; the scheduler should self-fence and stop
 	require.Eventually(t, func() bool {
@@ -465,7 +466,7 @@ func TestScheduler_SelfFencesOnOwnershipLoss(t *testing.T) {
 	}, 15*time.Second, 100*time.Millisecond, "scheduler should self-fence and stop after lock theft")
 
 	// The replacement lock directory must still exist (not deleted by the old scheduler)
-	data, err := os.ReadFile(lockDir + "/owner")
+	data, err := os.ReadFile(filepath.Join(lockDir, "owner"))
 	require.NoError(t, err)
 	require.Equal(t, "stolen-token", string(data))
 

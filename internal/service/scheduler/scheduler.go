@@ -537,8 +537,9 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 		case <-ticker.C:
 			if err := s.dirLock.Heartbeat(ctx); err != nil {
 				logger.Error(ctx, "Heartbeat failed, scheduler self-fencing", tag.Error(err))
-				// Mark lock as not held so releaseDirLock skips Unlock
-				// (avoids removing a replacement lock owned by another process).
+				// Self-fencing protocol: clear lockHeld BEFORE calling Stop().
+				// This makes releaseDirLock skip Unlock, so a scheduler that just
+				// lost ownership cannot remove a replacement lock acquired by another process.
 				s.lockHeld.Store(false)
 				s.Stop(ctx)
 				return
