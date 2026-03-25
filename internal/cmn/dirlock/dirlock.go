@@ -156,6 +156,10 @@ func (l *dirLock) TryLock() error {
 	if err == nil {
 		// Lock exists, check if it's stale
 		if l.isStaleInfo(info) {
+			// This is detection-based, not prevention-based: two contenders may
+			// both observe a stale lock and one RemoveAll can race with the
+			// other's new lock creation. The fence token lets us detect ownership
+			// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
 			// Remove stale lock
 			if err := os.RemoveAll(l.lockPath); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("failed to remove stale lock: %w", err)
