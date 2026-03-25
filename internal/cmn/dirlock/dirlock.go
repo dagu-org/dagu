@@ -80,11 +80,12 @@ type LockInfo struct {
 
 // dirLock implements the DirLock interface
 type dirLock struct {
-	targetDir string
-	lockPath  string
-	opts      *LockOptions
-	isHeld    bool
-	mu        sync.Mutex
+	targetDir  string
+	lockPath   string
+	opts       *LockOptions
+	isHeld     bool
+	fenceToken string // unique token written at acquire time
+	mu         sync.Mutex
 }
 
 var _ DirLock = (*dirLock)(nil)
@@ -120,6 +121,18 @@ func (l *dirLock) Heartbeat(_ context.Context) error {
 		return ErrNotLocked
 	}
 
+	// Verify we still own the lock by checking the fence token
+	tokenPath := filepath.Join(l.lockPath, "owner")
+	data, err := os.ReadFile(tokenPath) //nolint:gosec // path is constructed from lock directory, not user input
+	if err != nil {
+		l.isHeld = false
+		return fmt.Errorf("%w: failed to read lock token: %v", ErrLockNotHeld, err)
+	}
+	if string(data) != l.fenceToken {
+		l.isHeld = false
+		return fmt.Errorf("%w: token mismatch (lock was acquired by another process)", ErrLockNotHeld)
+	}
+
 	// Touch the lock directory to update its modification time
 	now := time.Now()
 	if err := os.Chtimes(l.lockPath, now, now); err != nil {
@@ -143,6 +156,10 @@ func (l *dirLock) TryLock() error {
 	if err == nil {
 		// Lock exists, check if it's stale
 		if l.isStaleInfo(info) {
+			// This is detection-based, not prevention-based: two contenders may
+			// both observe a stale lock and one RemoveAll can race with the
+			// other's new lock creation. The fence token lets us detect ownership
+			// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
 			// Remove stale lock
 			if err := os.RemoveAll(l.lockPath); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("failed to remove stale lock: %w", err)
@@ -169,6 +186,18 @@ func (l *dirLock) TryLock() error {
 		return fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
+	// Write a unique ownership token into the lock directory
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		hostname = "unknown-host"
+	}
+	token := fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().UnixNano())
+	tokenPath := filepath.Join(l.lockPath, "owner")
+	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
+		_ = os.RemoveAll(l.lockPath)
+		return fmt.Errorf("failed to write lock token: %w", err)
+	}
+	l.fenceToken = token
 	l.isHeld = true
 	return nil
 }
@@ -213,7 +242,20 @@ func (l *dirLock) Unlock() error {
 		return nil
 	}
 
-	// Remove the lock directory
+	// Verify we still own the lock before removing
+	tokenPath := filepath.Join(l.lockPath, "owner")
+	data, err := os.ReadFile(tokenPath) //nolint:gosec // path is constructed from lock directory, not user input
+	if err != nil {
+		l.isHeld = false
+		return fmt.Errorf("%w: failed to read lock token: %v", ErrLockNotHeld, err)
+	}
+	if string(data) != l.fenceToken {
+		// Lock was taken by another process — do NOT remove it
+		l.isHeld = false
+		return fmt.Errorf("%w: token mismatch (lock was acquired by another process)", ErrLockNotHeld)
+	}
+
+	// We still own the lock — safe to remove.
 	if err := os.RemoveAll(l.lockPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove lock directory: %w", err)
 	}
@@ -222,21 +264,14 @@ func (l *dirLock) Unlock() error {
 	return nil
 }
 
-// IsLocked checks if directory is currently locked
+// IsLocked checks if directory is currently locked.
+// This is an observe-only operation; stale locks are only cleaned up by TryLock.
 func (l *dirLock) IsLocked() bool {
 	info, err := os.Stat(l.lockPath)
 	if err != nil {
 		return false
 	}
-
-	// Check if lock is stale
-	if l.isStaleInfo(info) {
-		// Clean up stale lock
-		_ = os.RemoveAll(l.lockPath)
-		return false
-	}
-
-	return true
+	return !l.isStaleInfo(info)
 }
 
 // IsHeldByMe checks if this instance holds the lock
@@ -248,14 +283,13 @@ func (l *dirLock) IsHeldByMe() bool {
 		return false
 	}
 
-	// Check if the lock directory still exists
-	_, err := os.Stat(l.lockPath)
-	if os.IsNotExist(err) {
-		// Lock was removed externally
+	// Verify the fence token still matches
+	tokenPath := filepath.Join(l.lockPath, "owner")
+	data, err := os.ReadFile(tokenPath) //nolint:gosec // path is constructed from lock directory, not user input
+	if err != nil || string(data) != l.fenceToken {
 		l.isHeld = false
 		return false
 	}
-
 	return true
 }
 

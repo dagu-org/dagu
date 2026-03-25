@@ -66,6 +66,16 @@ func (a *fakeTelegramAPI) textCount() int {
 	return a.messageCount
 }
 
+func assertTypingStops(t *testing.T, api *fakeTelegramAPI, msg string) int {
+	t.Helper()
+
+	stoppedAt := api.typingCount()
+	assert.Never(t, func() bool {
+		return api.typingCount() > stoppedAt
+	}, 50*time.Millisecond, 5*time.Millisecond, msg)
+	return stoppedAt
+}
+
 type fakeTelegramAgentService struct {
 	mu                 sync.Mutex
 	nextSessionID      int
@@ -354,13 +364,11 @@ func TestBot_ProcessStreamResponse_RefreshesTypingWhileWorking(t *testing.T) {
 		return api.typingCount() >= 2
 	}, time.Second, 10*time.Millisecond)
 
-	beforeStop := api.typingCount()
 	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		SessionState: &agent.SessionState{Working: false},
 	})
 
-	time.Sleep(40 * time.Millisecond)
-	assert.Equal(t, beforeStop, api.typingCount(), "typing loop should stop once working=false arrives")
+	assertTypingStops(t, api, "typing loop should stop once working=false arrives")
 }
 
 func TestBot_ProcessStreamResponse_StopsTypingOnAssistantMessage(t *testing.T) {
@@ -380,15 +388,13 @@ func TestBot_ProcessStreamResponse_StopsTypingOnAssistantMessage(t *testing.T) {
 		return api.typingCount() >= 1
 	}, time.Second, 10*time.Millisecond)
 
-	beforeStop := api.typingCount()
 	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		Messages: []agent.Message{
 			{Type: agent.MessageTypeAssistant, SequenceID: 1, Content: "done"},
 		},
 	})
 
-	time.Sleep(40 * time.Millisecond)
-	assert.Equal(t, beforeStop, api.typingCount(), "assistant output should stop typing immediately")
+	assertTypingStops(t, api, "assistant output should stop typing immediately")
 	assert.Equal(t, 1, api.textCount())
 }
 
@@ -417,9 +423,7 @@ func TestBot_ProcessStreamResponse_RestartsTypingWhenWorkContinues(t *testing.T)
 		},
 	})
 
-	beforeRestart := api.typingCount()
-	time.Sleep(40 * time.Millisecond)
-	assert.Equal(t, beforeRestart, api.typingCount(), "assistant output should stop the current typing loop")
+	beforeRestart := assertTypingStops(t, api, "assistant output should stop the current typing loop")
 
 	bot.processStreamResponse(context.Background(), cs, 123, agent.StreamResponse{
 		SessionState: &agent.SessionState{Working: true},
