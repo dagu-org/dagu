@@ -419,6 +419,105 @@ func TestHeartbeat(t *testing.T) {
 	})
 }
 
+func TestFenceToken_LostOwnerDoesNotDeleteReplacementLock(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockPath := filepath.Join(tmpDir, ".dagu_lock")
+
+	lockA := New(tmpDir, nil)
+	require.NoError(t, lockA.TryLock())
+
+	// Simulate lock theft: remove lockA's lock, then lockB acquires
+	require.NoError(t, os.RemoveAll(lockPath))
+
+	lockB := New(tmpDir, nil)
+	require.NoError(t, lockB.TryLock())
+
+	// lockA's heartbeat must detect the token mismatch
+	err := lockA.Heartbeat(context.Background())
+	require.ErrorIs(t, err, ErrLockNotHeld)
+
+	// lockA's Unlock must NOT remove lockB's lock directory.
+	// Since Heartbeat already cleared isHeld, Unlock returns nil (no-op).
+	err = lockA.Unlock()
+	require.NoError(t, err)
+
+	// Lock directory must still exist with lockB's token
+	_, statErr := os.Stat(lockPath)
+	require.NoError(t, statErr, "lock directory should still exist")
+
+	// lockB should still be healthy
+	require.NoError(t, lockB.Heartbeat(context.Background()))
+	require.NoError(t, lockB.Unlock())
+
+	_, statErr = os.Stat(lockPath)
+	require.True(t, os.IsNotExist(statErr), "lock directory should be removed after lockB unlocks")
+}
+
+func TestFenceToken_UnlockDetectsTokenMismatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockPath := filepath.Join(tmpDir, ".dagu_lock")
+
+	lockA := New(tmpDir, nil)
+	require.NoError(t, lockA.TryLock())
+
+	// Simulate lock theft without calling Heartbeat first
+	require.NoError(t, os.RemoveAll(lockPath))
+	lockB := New(tmpDir, nil)
+	require.NoError(t, lockB.TryLock())
+
+	// lockA calls Unlock directly (isHeld is still true) — must detect token mismatch
+	err := lockA.Unlock()
+	require.ErrorIs(t, err, ErrLockNotHeld)
+
+	// lockB's lock must still be intact
+	_, statErr := os.Stat(lockPath)
+	require.NoError(t, statErr)
+
+	require.NoError(t, lockB.Unlock())
+}
+
+func TestFenceToken_IsHeldByMeDetectsStolenLock(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockPath := filepath.Join(tmpDir, ".dagu_lock")
+
+	lockA := New(tmpDir, nil)
+	require.NoError(t, lockA.TryLock())
+	require.True(t, lockA.IsHeldByMe())
+
+	// Simulate lock theft
+	require.NoError(t, os.RemoveAll(lockPath))
+	lockB := New(tmpDir, nil)
+	require.NoError(t, lockB.TryLock())
+
+	require.False(t, lockA.IsHeldByMe())
+	require.True(t, lockB.IsHeldByMe())
+
+	require.NoError(t, lockB.Unlock())
+}
+
+func TestIsLocked_NoLongerRemovesStaleLocks(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockPath := filepath.Join(tmpDir, ".dagu_lock")
+
+	lockA := New(tmpDir, &LockOptions{StaleThreshold: 1 * time.Second})
+	require.NoError(t, lockA.TryLock())
+
+	// Backdate the lock directory to exceed the stale threshold
+	pastTime := time.Now().Add(-60 * time.Second)
+	require.NoError(t, os.Chtimes(lockPath, pastTime, pastTime))
+
+	// IsLocked should report false (stale) but NOT remove the directory
+	require.False(t, lockA.IsLocked())
+
+	_, statErr := os.Stat(lockPath)
+	require.NoError(t, statErr, "IsLocked must not remove the lock directory")
+
+	// TryLock from a new instance should still clean stale locks and succeed
+	lockB := New(tmpDir, &LockOptions{StaleThreshold: 1 * time.Second})
+	require.NoError(t, lockB.TryLock())
+	require.NoError(t, lockB.Unlock())
+}
+
 func TestEdgeCases(t *testing.T) {
 	t.Run("NonExistentDirectory", func(t *testing.T) {
 		nonExistentDir := filepath.Join(t.TempDir(), "non-existent")
