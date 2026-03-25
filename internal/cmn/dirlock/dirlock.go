@@ -237,13 +237,17 @@ func (l *dirLock) Unlock() error {
 	// Verify we still own the lock before removing
 	tokenPath := filepath.Join(l.lockPath, "owner")
 	data, err := os.ReadFile(tokenPath) //nolint:gosec // path is constructed from lock directory, not user input
-	if err == nil && string(data) != l.fenceToken {
+	if err != nil {
+		l.isHeld = false
+		return fmt.Errorf("%w: failed to read lock token: %v", ErrLockNotHeld, err)
+	}
+	if string(data) != l.fenceToken {
 		// Lock was taken by another process — do NOT remove it
 		l.isHeld = false
-		return ErrLockNotHeld
+		return fmt.Errorf("%w: token mismatch (lock was acquired by another process)", ErrLockNotHeld)
 	}
 
-	// We own it (or the token file is gone) — safe to remove
+	// We still own the lock — safe to remove.
 	if err := os.RemoveAll(l.lockPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove lock directory: %w", err)
 	}

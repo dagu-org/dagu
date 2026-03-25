@@ -476,6 +476,25 @@ func TestFenceToken_UnlockDetectsTokenMismatch(t *testing.T) {
 	require.NoError(t, lockB.Unlock())
 }
 
+func TestFenceToken_UnlockDoesNotDeleteOwnerlessReplacementLock(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockPath := filepath.Join(tmpDir, ".dagu_lock")
+
+	lockA := New(tmpDir, nil)
+	require.NoError(t, lockA.TryLock())
+
+	// Model the replacement lock in the window after recreating the directory
+	// but before writing the owner token file.
+	require.NoError(t, os.RemoveAll(lockPath))
+	require.NoError(t, os.Mkdir(lockPath, 0700))
+
+	err := lockA.Unlock()
+	require.ErrorIs(t, err, ErrLockNotHeld)
+
+	_, statErr := os.Stat(lockPath)
+	require.NoError(t, statErr, "ownerless replacement lock directory must not be removed")
+}
+
 func TestFenceToken_IsHeldByMeDetectsStolenLock(t *testing.T) {
 	tmpDir := t.TempDir()
 	lockPath := filepath.Join(tmpDir, ".dagu_lock")
