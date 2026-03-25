@@ -29,6 +29,31 @@ func newStartupTestProcessor(dagRunStore exec.DAGRunStore, procStore exec.ProcSt
 	}
 }
 
+type mockLeaseStore struct {
+	getFunc         func(context.Context, string) (*exec.DAGRunLease, error)
+	listByQueueFunc func(context.Context, string) ([]exec.DAGRunLease, error)
+}
+
+func (m *mockLeaseStore) Upsert(context.Context, exec.DAGRunLease) error { return nil }
+func (m *mockLeaseStore) Touch(context.Context, string, time.Time) error { return nil }
+func (m *mockLeaseStore) Delete(context.Context, string) error           { return nil }
+
+func (m *mockLeaseStore) Get(ctx context.Context, attemptKey string) (*exec.DAGRunLease, error) {
+	if m.getFunc != nil {
+		return m.getFunc(ctx, attemptKey)
+	}
+	return nil, exec.ErrDAGRunLeaseNotFound
+}
+
+func (m *mockLeaseStore) ListByQueue(ctx context.Context, queueName string) ([]exec.DAGRunLease, error) {
+	if m.listByQueueFunc != nil {
+		return m.listByQueueFunc(ctx, queueName)
+	}
+	return nil, nil
+}
+
+func (m *mockLeaseStore) ListAll(context.Context) ([]exec.DAGRunLease, error) { return nil, nil }
+
 func TestQueueProcessor_CheckStartupStatus_WithinGraceSkipsAttemptLookup(t *testing.T) {
 	dagRunStore := &mockDAGRunStore{}
 	procStore := &mockProcStore{}
@@ -103,7 +128,7 @@ func TestQueueProcessor_CheckStartupStatus_AfterGraceFallsBackToStatus(t *testin
 		wantErr   error
 	}{
 		{name: "Queued", status: core.Queued, wantStart: false, wantErr: errNotStarted},
-		{name: "Running", status: core.Running, wantStart: false, wantErr: errNotStarted},
+		{name: "Running", status: core.Running, wantStart: true},
 		{name: "NotStarted", status: core.NotStarted, wantStart: true},
 		{name: "Succeeded", status: core.Succeeded, wantStart: true},
 	}
@@ -140,6 +165,41 @@ func TestQueueProcessor_CheckStartupStatus_AfterGraceFallsBackToStatus(t *testin
 			procStore.AssertExpectations(t)
 		})
 	}
+}
+
+func TestQueueProcessor_CheckStartupStatus_AfterGracePropagatesLeaseLookupError(t *testing.T) {
+	dagRunStore := &mockDAGRunStore{}
+	procStore := &mockProcStore{}
+	leaseStore := &mockLeaseStore{
+		getFunc: func(context.Context, string) (*exec.DAGRunLease, error) {
+			return nil, errors.New("lease store unavailable")
+		},
+	}
+	runRef := exec.NewDAGRunRef("test-dag", "run-1")
+	attempt := &exec.MockDAGRunAttempt{
+		Status: &exec.DAGRunStatus{
+			Status:    core.Queued,
+			AttemptID: "attempt-1",
+		},
+	}
+
+	procStore.On("IsRunAlive", mock.Anything, "test-queue", runRef).Return(false, nil).Once()
+	dagRunStore.On("FindAttempt", mock.Anything, runRef).Return(attempt, nil).Once()
+
+	p := newStartupTestProcessor(dagRunStore, procStore, BackoffConfig{
+		StartupGracePeriod: 50 * time.Millisecond,
+	})
+	p.dagRunLeaseStore = leaseStore
+
+	started, err := p.checkStartupStatus(context.Background(), "test-queue", runRef, startupWaitState{
+		launchedAt: time.Now().Add(-time.Second),
+		execErrCh:  make(chan error, 1),
+	})
+
+	require.False(t, started)
+	require.EqualError(t, err, "lease store unavailable")
+	dagRunStore.AssertExpectations(t)
+	procStore.AssertExpectations(t)
 }
 
 func TestIsPreStartExecutionFailure(t *testing.T) {

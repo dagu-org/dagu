@@ -500,6 +500,7 @@ func TestSummaryFromIndexEntry(t *testing.T) {
 		ScheduleTime:     "2024-01-15T11:55:00Z",
 		TriggerType:      core.TriggerType(1),
 		CreatedAt:        1705320000000,
+		LeaseAt:          1705320030000,
 	}
 
 	summary := summaryFromIndexEntry(entry)
@@ -517,6 +518,7 @@ func TestSummaryFromIndexEntry(t *testing.T) {
 	assert.Equal(t, entry.ScheduleTime, summary.ScheduleTime)
 	assert.Equal(t, entry.TriggerType, summary.TriggerType)
 	assert.Equal(t, entry.CreatedAt, summary.CreatedAt)
+	assert.Equal(t, entry.LeaseAt, summary.LeaseAt)
 }
 
 func TestListDAGRunsInRange_IndexPath(t *testing.T) {

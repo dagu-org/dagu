@@ -13,6 +13,7 @@ import (
 	"path"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
@@ -45,37 +46,39 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore           exec.DAGStore
-	dagRunStore        exec.DAGRunStore
-	dagRunMgr          runtime.Manager
-	queueStore         exec.QueueStore
-	procStore          exec.ProcStore
-	remoteNodeResolver *remotenode.Resolver
-	remoteNodeStore    remotenode.Store
-	apiBasePath        string
-	logEncodingCharset string
-	config             *config.Config
-	metricsRegistry    *prometheus.Registry
-	coordinatorCli     coordinator.Client
-	serviceRegistry    exec.ServiceRegistry
-	subCmdBuilder      *runtime.SubCmdBuilder
-	resourceService    *resource.Service
-	authService        AuthService
-	auditService       *audit.Service
-	syncService        SyncService
-	tunnelService      *tunnel.Service
-	defaultExecMode    config.ExecutionMode
-	dagWritesDisabled  bool // True when git sync read-only mode is active
-	agentConfigStore   agent.ConfigStore
-	agentModelStore    agent.ModelStore
-	agentMemoryStore   agent.MemoryStore
-	agentSkillStore    agent.SkillStore
-	agentSoulStore     agent.SoulStore
-	agentAPI           *agent.API
-	docStore           agent.DocStore
-	baseConfigStore    baseconfig.Store
-	licenseManager     *license.Manager
-	workspaceStore     workspace.Store
+	dagStore            exec.DAGStore
+	dagRunStore         exec.DAGRunStore
+	dagRunMgr           runtime.Manager
+	queueStore          exec.QueueStore
+	procStore           exec.ProcStore
+	dagRunLeaseStore    exec.DAGRunLeaseStore
+	remoteNodeResolver  *remotenode.Resolver
+	remoteNodeStore     remotenode.Store
+	apiBasePath         string
+	logEncodingCharset  string
+	config              *config.Config
+	metricsRegistry     *prometheus.Registry
+	coordinatorCli      coordinator.Client
+	serviceRegistry     exec.ServiceRegistry
+	subCmdBuilder       *runtime.SubCmdBuilder
+	resourceService     *resource.Service
+	authService         AuthService
+	auditService        *audit.Service
+	syncService         SyncService
+	tunnelService       *tunnel.Service
+	defaultExecMode     config.ExecutionMode
+	dagWritesDisabled   bool // True when git sync read-only mode is active
+	agentConfigStore    agent.ConfigStore
+	agentModelStore     agent.ModelStore
+	agentMemoryStore    agent.MemoryStore
+	agentSkillStore     agent.SkillStore
+	agentSoulStore      agent.SoulStore
+	agentAPI            *agent.API
+	docStore            agent.DocStore
+	baseConfigStore     baseconfig.Store
+	licenseManager      *license.Manager
+	workspaceStore      workspace.Store
+	leaseStaleThreshold time.Duration
 }
 
 // AuthService defines the interface for authentication operations.
@@ -221,6 +224,21 @@ func WithWorkspaceStore(s workspace.Store) APIOption {
 	}
 }
 
+// WithDAGRunLeaseStore sets the shared distributed run lease store.
+func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) APIOption {
+	return func(a *API) {
+		a.dagRunLeaseStore = store
+	}
+}
+
+// WithLeaseStaleThreshold overrides the distributed lease stale threshold used
+// by queue endpoints when listing running distributed DAG runs.
+func WithLeaseStaleThreshold(threshold time.Duration) APIOption {
+	return func(a *API) {
+		a.leaseStaleThreshold = threshold
+	}
+}
+
 // WithAgentAPI returns an APIOption that sets the API's agent API instance.
 func WithAgentAPI(a *agent.API) APIOption {
 	return func(api *API) {
@@ -246,20 +264,21 @@ func New(
 	opts ...APIOption,
 ) *API {
 	a := &API{
-		dagStore:           dr,
-		dagRunStore:        drs,
-		queueStore:         qs,
-		procStore:          ps,
-		dagRunMgr:          drm,
-		logEncodingCharset: cfg.UI.LogEncodingCharset,
-		subCmdBuilder:      runtime.NewSubCmdBuilder(cfg),
-		apiBasePath:        cfg.Server.APIBasePath,
-		config:             cfg,
-		coordinatorCli:     cc,
-		serviceRegistry:    sr,
-		metricsRegistry:    mr,
-		resourceService:    rs,
-		defaultExecMode:    cfg.DefaultExecMode,
+		dagStore:            dr,
+		dagRunStore:         drs,
+		queueStore:          qs,
+		procStore:           ps,
+		dagRunMgr:           drm,
+		logEncodingCharset:  cfg.UI.LogEncodingCharset,
+		subCmdBuilder:       runtime.NewSubCmdBuilder(cfg),
+		apiBasePath:         cfg.Server.APIBasePath,
+		config:              cfg,
+		coordinatorCli:      cc,
+		serviceRegistry:     sr,
+		metricsRegistry:     mr,
+		resourceService:     rs,
+		defaultExecMode:     cfg.DefaultExecMode,
+		leaseStaleThreshold: exec.DefaultStaleLeaseThreshold,
 	}
 
 	for _, opt := range opts {

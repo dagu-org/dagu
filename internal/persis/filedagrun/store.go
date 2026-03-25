@@ -288,6 +288,7 @@ func (store *Store) resolveStatus(
 			StartedAt:            formatUnixToRFC3339(s.StartedAtUnix),
 			FinishedAt:           formatUnixToRFC3339(s.FinishedAtUnix),
 			WorkerID:             s.WorkerID,
+			LeaseAt:              s.LeaseAt,
 			Params:               s.Params,
 			QueuedAt:             s.QueuedAt,
 			ScheduleTime:         s.ScheduleTime,

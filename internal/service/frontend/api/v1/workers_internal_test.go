@@ -53,12 +53,28 @@ func (s *stubCoordinatorClient) Heartbeat(context.Context, *coordinatorv1.Heartb
 	return nil, nil
 }
 
+func (s *stubCoordinatorClient) AckTaskClaimTo(context.Context, exec.HostInfo, *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
+	return &coordinatorv1.AckTaskClaimResponse{Accepted: true}, nil
+}
+
+func (s *stubCoordinatorClient) RunHeartbeatTo(context.Context, exec.HostInfo, *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+	return &coordinatorv1.RunHeartbeatResponse{}, nil
+}
+
 func (s *stubCoordinatorClient) ReportStatus(context.Context, *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 	return nil, nil
 }
 
+func (s *stubCoordinatorClient) ReportStatusTo(ctx context.Context, _ exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	return s.ReportStatus(ctx, req)
+}
+
 func (s *stubCoordinatorClient) StreamLogs(context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (s *stubCoordinatorClient) StreamLogsTo(ctx context.Context, _ exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	return s.StreamLogs(ctx)
 }
 
 func (s *stubCoordinatorClient) Metrics() coordinator.Metrics {

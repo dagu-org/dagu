@@ -33,14 +33,17 @@ const (
 )
 
 type fixtureConfig struct {
-	workerMode           workerMode
-	workerCount          int
-	workerLabels         map[string]string
-	logPersistence       bool
-	dagsDir              string
-	baseConfigPath       string
-	workerBaseConfigPath string // Override worker's base config path (for testing embedded base config)
-	procConfig           *procConfig
+	workerMode              workerMode
+	workerCount             int
+	workerLabels            map[string]string
+	logPersistence          bool
+	dagsDir                 string
+	baseConfigPath          string
+	workerBaseConfigPath    string // Override worker's base config path (for testing embedded base config)
+	procConfig              *procConfig
+	staleHeartbeatThreshold time.Duration
+	staleLeaseThreshold     time.Duration
+	zombieDetectionInterval time.Duration
 }
 
 type procConfig struct {
@@ -89,6 +92,19 @@ func withProcConfig(heartbeatInterval, heartbeatSyncInterval, staleThreshold tim
 	}
 }
 
+func withStaleThresholds(heartbeat, lease time.Duration) fixtureOption {
+	return func(c *fixtureConfig) {
+		c.staleHeartbeatThreshold = heartbeat
+		c.staleLeaseThreshold = lease
+	}
+}
+
+func withZombieDetectionInterval(interval time.Duration) fixtureOption {
+	return func(c *fixtureConfig) {
+		c.zombieDetectionInterval = interval
+	}
+}
+
 type testFixture struct {
 	t                 *testing.T
 	coord             *test.Coordinator
@@ -125,6 +141,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 			c.Proc.HeartbeatSyncInterval = cfg.procConfig.heartbeatSyncInterval
 			c.Proc.StaleThreshold = cfg.procConfig.staleThreshold
 		}
+		if cfg.zombieDetectionInterval > 0 {
+			c.Scheduler.ZombieDetectionInterval = cfg.zombieDetectionInterval
+		}
 	}))
 	if cfg.logPersistence {
 		coordOpts = append(coordOpts, test.WithLogPersistence())
@@ -139,6 +158,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 		coordOpts = append(coordOpts, test.WithConfigMutator(func(c *config.Config) {
 			c.Paths.BaseConfig = cfg.baseConfigPath
 		}))
+	}
+	if cfg.staleHeartbeatThreshold > 0 || cfg.staleLeaseThreshold > 0 {
+		coordOpts = append(coordOpts, test.WithStaleThresholds(cfg.staleHeartbeatThreshold, cfg.staleLeaseThreshold))
 	}
 
 	coord := test.SetupCoordinator(t, coordOpts...)
@@ -260,6 +282,7 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		nil,
 	)
 	require.NoError(f.t, err)
+	schedulerInst.SetDAGRunLeaseStore(f.coord.DAGRunLeaseStore)
 
 	startupTimeout := timeout
 	if startupTimeout <= 0 {

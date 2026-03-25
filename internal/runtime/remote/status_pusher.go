@@ -17,13 +17,19 @@ import (
 type StatusPusher struct {
 	client   coordinator.Client
 	workerID string
+	owner    exec.HostInfo
 }
 
 // NewStatusPusher creates a new StatusPusher
-func NewStatusPusher(client coordinator.Client, workerID string) *StatusPusher {
+func NewStatusPusher(client coordinator.Client, workerID string, owner ...exec.HostInfo) *StatusPusher {
+	var target exec.HostInfo
+	if len(owner) > 0 {
+		target = owner[0]
+	}
 	return &StatusPusher{
 		client:   client,
 		workerID: workerID,
+		owner:    target,
 	}
 }
 
@@ -34,11 +40,17 @@ func (p *StatusPusher) Push(ctx context.Context, status exec.DAGRunStatus) error
 		return fmt.Errorf("failed to convert status to proto: %w", err)
 	}
 	req := &coordinatorv1.ReportStatusRequest{
-		WorkerId: p.workerID,
-		Status:   protoStatus,
+		WorkerId:           p.workerID,
+		Status:             protoStatus,
+		OwnerCoordinatorId: p.owner.ID,
 	}
 
-	resp, err := p.client.ReportStatus(ctx, req)
+	var resp *coordinatorv1.ReportStatusResponse
+	if p.owner.Host != "" {
+		resp, err = p.client.ReportStatusTo(ctx, p.owner, req)
+	} else {
+		resp, err = p.client.ReportStatus(ctx, req)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to report status: %w", err)
 	}

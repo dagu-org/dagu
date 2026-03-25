@@ -458,12 +458,28 @@ func (m *mockCoordinatorCli) Heartbeat(ctx context.Context, req *coordinatorv1.H
 	return &coordinatorv1.HeartbeatResponse{}, nil
 }
 
+func (m *mockCoordinatorCli) AckTaskClaimTo(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
+	return &coordinatorv1.AckTaskClaimResponse{Accepted: true}, nil
+}
+
+func (m *mockCoordinatorCli) RunHeartbeatTo(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+	return &coordinatorv1.RunHeartbeatResponse{}, nil
+}
+
 func (m *mockCoordinatorCli) ReportStatus(_ context.Context, _ *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 }
 
+func (m *mockCoordinatorCli) ReportStatusTo(ctx context.Context, _ exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	return m.ReportStatus(ctx, req)
+}
+
 func (m *mockCoordinatorCli) StreamLogs(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 	return nil, nil
+}
+
+func (m *mockCoordinatorCli) StreamLogsTo(ctx context.Context, _ exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	return m.StreamLogs(ctx)
 }
 
 func (m *mockCoordinatorCli) GetDAGRunStatus(_ context.Context, _, _ string, _ *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {

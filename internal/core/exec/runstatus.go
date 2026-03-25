@@ -17,6 +17,10 @@ import (
 const (
 	canonicalAbortHandlerName = "onAbort"
 	legacyAbortHandlerName    = "onCancel"
+	// DefaultStaleLeaseThreshold is the shared default for considering a
+	// distributed run lease stale when the coordinator has not observed recent
+	// liveness for that run.
+	DefaultStaleLeaseThreshold = 30 * time.Second
 )
 
 // InitialStatus creates an initial Status object for the given DAG
@@ -108,6 +112,20 @@ type DAGRunStatus struct {
 	PendingStepRetries   []PendingStepRetry `json:"pendingStepRetries"`
 	Preconditions        []*core.Condition  `json:"preconditions,omitempty"`
 	Tags                 []string           `json:"tags,omitempty"`
+	LeaseAt              int64              `json:"leaseAt,omitempty"` // Unix millis; stamped by coordinator on observed run liveness
+}
+
+// IsLeaseActive reports whether the run's lease is fresh (i.e. a worker is
+// still actively executing and the coordinator has observed recent liveness).
+// A zero LeaseAt is treated as stale.
+func IsLeaseActive(status *DAGRunStatus, staleThreshold time.Duration) bool {
+	if status == nil || status.LeaseAt == 0 {
+		return false
+	}
+	if staleThreshold <= 0 {
+		staleThreshold = DefaultStaleLeaseThreshold
+	}
+	return time.Since(time.UnixMilli(status.LeaseAt)) < staleThreshold
 }
 
 // DAGRun returns a reference to the dag-run associated with this status

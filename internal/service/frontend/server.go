@@ -157,6 +157,16 @@ func WithTunnelService(ts *tunnel.Service) ServerOption {
 	}
 }
 
+// WithAPIOption appends an API option that will be applied when the server
+// constructs the v1 API handler.
+func WithAPIOption(opt apiv1.APIOption) ServerOption {
+	return func(s *Server) {
+		if opt != nil {
+			s.tunnelAPIOpts = append(s.tunnelAPIOpts, opt)
+		}
+	}
+}
+
 // NewServer constructs a Server from the provided configuration, stores, and services.
 // Returns an error if initialization fails (e.g., when builtin auth fails to initialize).
 func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs exec.DAGRunStore, qs exec.QueueStore, ps exec.ProcStore, drm runtime.Manager, cc coordinator.Client, sr exec.ServiceRegistry, mr *prometheus.Registry, collector *telemetry.Collector, rs *resource.Service, opts ...ServerOption) (*Server, error) {

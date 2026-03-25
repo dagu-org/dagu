@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -72,6 +73,15 @@ func (p *Poller) Run(ctx context.Context) {
 					tag.PollerIndex(p.index),
 					tag.RunID(task.DagRunId))
 
+				if err := p.ackTaskClaim(ctx, task); err != nil {
+					logger.Error(ctx, "Failed to acknowledge claimed task",
+						tag.WorkerID(p.workerID),
+						tag.PollerIndex(p.index),
+						tag.RunID(task.DagRunId),
+						tag.Error(err))
+					continue
+				}
+
 				// Execute the task using the TaskHandler
 				err := p.handler.Handle(ctx, task)
 				if err != nil {
@@ -94,6 +104,35 @@ func (p *Poller) Run(ctx context.Context) {
 			// Continue polling for the next task
 		}
 	}
+}
+
+func (p *Poller) ackTaskClaim(ctx context.Context, task *coordinatorv1.Task) error {
+	if task == nil || task.ClaimToken == "" {
+		return nil
+	}
+
+	owner, err := taskOwner(task)
+	if err != nil {
+		return err
+	}
+	if owner.Host == "" {
+		return fmt.Errorf("claimed task is missing owner coordinator metadata")
+	}
+
+	resp, err := p.coordinatorCli.AckTaskClaimTo(ctx, owner, &coordinatorv1.AckTaskClaimRequest{
+		WorkerId:   p.workerID,
+		ClaimToken: task.ClaimToken,
+	})
+	if err != nil {
+		return err
+	}
+	if resp == nil {
+		return fmt.Errorf("received nil ack response")
+	}
+	if !resp.Accepted {
+		return fmt.Errorf("task claim rejected: %s", resp.Error)
+	}
+	return nil
 }
 
 // pollForTask polls the coordinator for a task with retry on failure

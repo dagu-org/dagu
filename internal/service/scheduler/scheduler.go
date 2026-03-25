@@ -217,6 +217,15 @@ func (s *Scheduler) SetClock(clock Clock) {
 	}
 }
 
+// SetDAGRunLeaseStore configures the shared distributed lease store used for
+// queue capacity accounting.
+func (s *Scheduler) SetDAGRunLeaseStore(store exec.DAGRunLeaseStore) {
+	if s == nil || s.queueProcessor == nil {
+		return
+	}
+	s.queueProcessor.dagRunLeaseStore = store
+}
+
 // SetRestartFunc overrides the planner's restart function for testing purposes.
 // This must be called before Start().
 func (s *Scheduler) SetRestartFunc(fn RestartFunc) {
