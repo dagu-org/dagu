@@ -111,17 +111,21 @@ func (h *remoteTaskHandler) Handle(ctx context.Context, task *coordinatorv1.Task
 func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1.Task, queuedRun bool) error {
 	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	owner, err := taskOwner(task)
+	if err != nil {
+		return fmt.Errorf("invalid task owner coordinator metadata: %w", err)
+	}
 
 	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
-		h.reportTaskLoadFailure(ctx, task, root, parent, err)
+		h.reportTaskLoadFailure(ctx, task, root, parent, owner, err)
 		return fmt.Errorf("failed to load DAG: %w", err)
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, ownerForTask(task))
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil, taskExtraEnvs(task))
 }
@@ -129,6 +133,10 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
 	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 	parent := exec.DAGRunRef{Name: task.ParentDagRunName, ID: task.ParentDagRunId}
+	owner, err := taskOwner(task)
+	if err != nil {
+		return fmt.Errorf("invalid task owner coordinator metadata: %w", err)
+	}
 
 	if task.PreviousStatus == nil {
 		return fmt.Errorf("retry requires previous_status in task for shared-nothing mode")
@@ -144,14 +152,14 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 
 	dag, cleanup, err := h.loadDAG(ctx, task)
 	if err != nil {
-		h.reportTaskLoadFailure(ctx, task, root, parent, err)
+		h.reportTaskLoadFailure(ctx, task, root, parent, owner, err)
 		return fmt.Errorf("failed to load DAG: %w", err)
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, ownerForTask(task))
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
 	triggerType := exec.PreservedQueueTriggerType(status)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
@@ -161,8 +169,8 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	}, taskExtraEnvs(task))
 }
 
-func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, loadErr error) {
-	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID, ownerForTask(task))
+func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, owner exec.HostInfo, loadErr error) {
+	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID, owner)
 	finishedAt := stringutil.FormatTime(time.Now())
 	logger.Warn(ctx, "Failed to load DAG on worker",
 		tag.Target(task.Target),
@@ -235,17 +243,6 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 		target,
 	)
 	return statusPusher, logStreamer
-}
-
-func ownerForTask(task *coordinatorv1.Task) exec.HostInfo {
-	if task == nil {
-		return exec.HostInfo{}
-	}
-	return exec.HostInfo{
-		ID:   task.OwnerCoordinatorId,
-		Host: task.OwnerCoordinatorHost,
-		Port: int(task.OwnerCoordinatorPort),
-	}
 }
 
 // agentStores creates the agent config, model, and memory stores from the config paths.

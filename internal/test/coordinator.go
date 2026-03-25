@@ -41,7 +41,7 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	// current source tree's binary instead of .local/bin.
 	opts = append(opts, WithBuiltExecutable())
 
-	// Parse options to access coordinator-specific settings
+	// Parse options to access coordinator-specific settings.
 	var options Options
 	for _, opt := range opts {
 		opt(&options)
@@ -73,11 +73,11 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	if options.WithLogPersistence {
 		cfg.LogDir = helper.Config.Paths.LogDir
 	}
-	if options.StaleHeartbeatThreshold > 0 {
-		cfg.StaleHeartbeatThreshold = options.StaleHeartbeatThreshold
+	if helper.StaleHeartbeatThreshold > 0 {
+		cfg.StaleHeartbeatThreshold = helper.StaleHeartbeatThreshold
 	}
-	if options.StaleLeaseThreshold > 0 {
-		cfg.StaleLeaseThreshold = options.StaleLeaseThreshold
+	if helper.StaleLeaseThreshold > 0 {
+		cfg.StaleLeaseThreshold = helper.StaleLeaseThreshold
 	}
 	cfg.Owner = exec.CoordinatorEndpoint{ID: "test-coordinator", Host: "127.0.0.1", Port: port}
 	cfg.DispatchTaskStore = helper.DispatchTaskStore

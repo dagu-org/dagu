@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
@@ -29,38 +30,65 @@ func (s *DAGRunLeaseStore) leasePath(attemptKey string) string {
 	return filepath.Join(s.leasesDir(), encodeKey(attemptKey)+".json")
 }
 
-func (s *DAGRunLeaseStore) Upsert(_ context.Context, lease exec.DAGRunLease) error {
+func (s *DAGRunLeaseStore) leaseLock(attemptKey string) dirlock.DirLock {
+	return dirlock.New(filepath.Join(s.baseDir, "locks", encodeKey(attemptKey)), &dirlock.LockOptions{
+		StaleThreshold: 5 * time.Second,
+		RetryInterval:  5 * time.Millisecond,
+	})
+}
+
+func (s *DAGRunLeaseStore) withLeaseLock(ctx context.Context, attemptKey string, fn func() error) error {
+	lockCtx := ctx
+	if lockCtx == nil {
+		lockCtx = context.Background()
+	}
+	lock := s.leaseLock(attemptKey)
+	if err := lock.Lock(lockCtx); err != nil {
+		return fmt.Errorf("lock lease %q: %w", attemptKey, err)
+	}
+	defer func() { _ = lock.Unlock() }()
+	return fn()
+}
+
+func (s *DAGRunLeaseStore) Upsert(ctx context.Context, lease exec.DAGRunLease) error {
 	if lease.AttemptKey == "" {
 		return fmt.Errorf("attempt key is required")
 	}
-	if lease.ClaimedAt == 0 {
-		now := time.Now().UTC().UnixMilli()
-		lease.ClaimedAt = now
-		if lease.LastHeartbeatAt == 0 {
-			lease.LastHeartbeatAt = now
+
+	return s.withLeaseLock(ctx, lease.AttemptKey, func() error {
+		if lease.ClaimedAt == 0 {
+			now := time.Now().UTC().UnixMilli()
+			lease.ClaimedAt = now
+			if lease.LastHeartbeatAt == 0 {
+				lease.LastHeartbeatAt = now
+			}
 		}
-	}
-	if lease.LastHeartbeatAt == 0 {
-		lease.LastHeartbeatAt = time.Now().UTC().UnixMilli()
-	}
-	return writeJSONAtomic(s.leasePath(lease.AttemptKey), lease)
+		if lease.LastHeartbeatAt == 0 {
+			lease.LastHeartbeatAt = time.Now().UTC().UnixMilli()
+		}
+		return writeJSONAtomic(s.leasePath(lease.AttemptKey), lease)
+	})
 }
 
-func (s *DAGRunLeaseStore) Touch(_ context.Context, attemptKey string, observedAt time.Time) error {
-	lease, err := s.Get(context.Background(), attemptKey)
-	if err != nil {
+func (s *DAGRunLeaseStore) Touch(ctx context.Context, attemptKey string, observedAt time.Time) error {
+	return s.withLeaseLock(ctx, attemptKey, func() error {
+		lease, err := s.Get(ctx, attemptKey)
+		if err != nil {
+			return err
+		}
+		lease.LastHeartbeatAt = observedAt.UTC().UnixMilli()
+		return writeJSONAtomic(s.leasePath(attemptKey), lease)
+	})
+}
+
+func (s *DAGRunLeaseStore) Delete(ctx context.Context, attemptKey string) error {
+	return s.withLeaseLock(ctx, attemptKey, func() error {
+		err := os.Remove(s.leasePath(attemptKey))
+		if err == nil || os.IsNotExist(err) {
+			return nil
+		}
 		return err
-	}
-	lease.LastHeartbeatAt = observedAt.UTC().UnixMilli()
-	return writeJSONAtomic(s.leasePath(attemptKey), lease)
-}
-
-func (s *DAGRunLeaseStore) Delete(_ context.Context, attemptKey string) error {
-	err := os.Remove(s.leasePath(attemptKey))
-	if err == nil || os.IsNotExist(err) {
-		return nil
-	}
-	return err
+	})
 }
 
 func (s *DAGRunLeaseStore) Get(_ context.Context, attemptKey string) (*exec.DAGRunLease, error) {

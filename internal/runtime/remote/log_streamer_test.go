@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -23,6 +24,7 @@ import (
 type logStreamerMockClient struct {
 	coordinator.Client // Embed to satisfy interface (unused methods will panic)
 	streamLogsFunc     func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
+	streamLogsToFunc   func(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
 }
 
 func (m *logStreamerMockClient) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
@@ -30,6 +32,13 @@ func (m *logStreamerMockClient) StreamLogs(ctx context.Context) (coordinatorv1.C
 		return m.streamLogsFunc(ctx)
 	}
 	return nil, errors.New("StreamLogs not configured")
+}
+
+func (m *logStreamerMockClient) StreamLogsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	if m.streamLogsToFunc != nil {
+		return m.streamLogsToFunc(ctx, owner)
+	}
+	return m.StreamLogs(ctx)
 }
 
 // mockStreamLogsClient implements coordinatorv1.CoordinatorService_StreamLogsClient
@@ -56,17 +65,18 @@ func (m *mockStreamLogsClient) Send(chunk *coordinatorv1.LogChunk) error {
 
 	// Deep copy chunk to capture the data at this moment
 	chunkCopy := &coordinatorv1.LogChunk{
-		WorkerId:       chunk.WorkerId,
-		DagRunId:       chunk.DagRunId,
-		DagName:        chunk.DagName,
-		StepName:       chunk.StepName,
-		StreamType:     chunk.StreamType,
-		Data:           append([]byte(nil), chunk.Data...),
-		Sequence:       chunk.Sequence,
-		IsFinal:        chunk.IsFinal,
-		RootDagRunName: chunk.RootDagRunName,
-		RootDagRunId:   chunk.RootDagRunId,
-		AttemptId:      chunk.AttemptId,
+		WorkerId:           chunk.WorkerId,
+		DagRunId:           chunk.DagRunId,
+		DagName:            chunk.DagName,
+		StepName:           chunk.StepName,
+		StreamType:         chunk.StreamType,
+		Data:               append([]byte(nil), chunk.Data...),
+		Sequence:           chunk.Sequence,
+		IsFinal:            chunk.IsFinal,
+		RootDagRunName:     chunk.RootDagRunName,
+		RootDagRunId:       chunk.RootDagRunId,
+		AttemptId:          chunk.AttemptId,
+		OwnerCoordinatorId: chunk.OwnerCoordinatorId,
 	}
 	m.sentChunks = append(m.sentChunks, chunkCopy)
 	return nil
@@ -131,6 +141,48 @@ func TestNewLogStreamer(t *testing.T) {
 	assert.Equal(t, "test-dag", streamer.dagName)
 	assert.Equal(t, "attempt-1", streamer.attemptID)
 	assert.Equal(t, rootRef, streamer.rootRef)
+}
+
+func TestLogStreamer_FinalChunksIncludeOwnerCoordinatorID(t *testing.T) {
+	t.Parallel()
+
+	stepStream := &mockStreamLogsClient{}
+	stepClient := &logStreamerMockClient{
+		streamLogsFunc: func(context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+			return stepStream, nil
+		},
+	}
+	owner := exec.HostInfo{ID: "coord-1", Host: "127.0.0.1", Port: 4321}
+	streamer := NewLogStreamer(stepClient, "worker-1", "run-123", "test-dag", "attempt-1", exec.DAGRunRef{}, owner)
+
+	stepWriter := streamer.NewStepWriter(context.Background(), "step", exec.StreamTypeStdout)
+	_, err := stepWriter.Write([]byte("hello"))
+	require.NoError(t, err)
+	require.NoError(t, stepWriter.Close())
+
+	for _, chunk := range stepStream.getSentChunks() {
+		assert.Equal(t, owner.ID, chunk.OwnerCoordinatorId)
+	}
+
+	schedulerStream := &mockStreamLogsClient{}
+	schedulerClient := &logStreamerMockClient{
+		streamLogsFunc: func(context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+			return schedulerStream, nil
+		},
+	}
+	schedulerStreamer := NewLogStreamer(schedulerClient, "worker-1", "run-123", "test-dag", "attempt-1", exec.DAGRunRef{}, owner)
+	localFile, err := os.CreateTemp(t.TempDir(), "scheduler-*.log")
+	require.NoError(t, err)
+	defer func() { _ = localFile.Close() }()
+
+	schedulerWriter := schedulerStreamer.NewSchedulerLogWriter(context.Background(), localFile)
+	_, err = schedulerWriter.Write([]byte("scheduler line"))
+	require.NoError(t, err)
+	require.NoError(t, schedulerWriter.Close())
+
+	for _, chunk := range schedulerStream.getSentChunks() {
+		assert.Equal(t, owner.ID, chunk.OwnerCoordinatorId)
+	}
 }
 
 func TestSetAttemptID(t *testing.T) {

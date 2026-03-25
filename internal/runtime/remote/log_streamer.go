@@ -319,16 +319,17 @@ func (w *stepLogWriter) Close() error {
 		// Use peek value for sequence - only increment after successful Send
 		nextSeq := w.sequence + 1
 		finalChunk := &coordinatorv1.LogChunk{
-			WorkerId:       w.streamer.workerID,
-			DagRunId:       w.streamer.dagRunID,
-			DagName:        w.streamer.dagName,
-			StepName:       w.stepName,
-			StreamType:     toProtoStreamType(w.streamType),
-			IsFinal:        true,
-			Sequence:       nextSeq,
-			RootDagRunName: w.streamer.rootRef.Name,
-			RootDagRunId:   w.streamer.rootRef.ID,
-			AttemptId:      w.streamer.getAttemptID(),
+			WorkerId:           w.streamer.workerID,
+			DagRunId:           w.streamer.dagRunID,
+			DagName:            w.streamer.dagName,
+			StepName:           w.stepName,
+			StreamType:         toProtoStreamType(w.streamType),
+			IsFinal:            true,
+			Sequence:           nextSeq,
+			RootDagRunName:     w.streamer.rootRef.Name,
+			RootDagRunId:       w.streamer.rootRef.ID,
+			AttemptId:          w.streamer.getAttemptID(),
+			OwnerCoordinatorId: w.streamer.owner.ID,
 		}
 		if err := w.stream.Send(finalChunk); err != nil {
 			logger.Error(w.ctx, "Failed to send final log chunk", tag.Error(err))
@@ -482,16 +483,17 @@ func (w *schedulerLogWriter) Close() error {
 	if w.stream != nil {
 		nextSeq := w.sequence + 1
 		finalChunk := &coordinatorv1.LogChunk{
-			WorkerId:       w.streamer.workerID,
-			DagRunId:       w.streamer.dagRunID,
-			DagName:        w.streamer.dagName,
-			StepName:       "scheduler",
-			StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
-			IsFinal:        true,
-			Sequence:       nextSeq,
-			RootDagRunName: w.streamer.rootRef.Name,
-			RootDagRunId:   w.streamer.rootRef.ID,
-			AttemptId:      w.streamer.getAttemptID(),
+			WorkerId:           w.streamer.workerID,
+			DagRunId:           w.streamer.dagRunID,
+			DagName:            w.streamer.dagName,
+			StepName:           "scheduler",
+			StreamType:         coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			IsFinal:            true,
+			Sequence:           nextSeq,
+			RootDagRunName:     w.streamer.rootRef.Name,
+			RootDagRunId:       w.streamer.rootRef.ID,
+			AttemptId:          w.streamer.getAttemptID(),
+			OwnerCoordinatorId: w.streamer.owner.ID,
 		}
 		_ = w.stream.Send(finalChunk)  // Ignore error - best effort
 		_, _ = w.stream.CloseAndRecv() // Ignore error - best effort

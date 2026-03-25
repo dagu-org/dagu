@@ -61,19 +61,25 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, secondClaim)
 
-	time.Sleep(80 * time.Millisecond)
-
-	reclaimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
-		WorkerID:     "worker-2",
-		PollerID:     "poller-2",
-		Labels:       map[string]string{"type": "cpu"},
-		Owner:        exec.CoordinatorEndpoint{ID: "coord-b"},
-		ClaimTimeout: 50 * time.Millisecond,
-	})
-	require.NoError(t, err)
+	var reclaimed *exec.ClaimedDispatchTask
+	require.Eventually(t, func() bool {
+		var claimErr error
+		reclaimed, claimErr = store.ClaimNext(ctx, exec.DispatchTaskClaim{
+			WorkerID:     "worker-2",
+			PollerID:     "poller-2",
+			Labels:       map[string]string{"type": "cpu"},
+			Owner:        exec.CoordinatorEndpoint{ID: "coord-b"},
+			ClaimTimeout: 50 * time.Millisecond,
+		})
+		require.NoError(t, claimErr)
+		return reclaimed != nil
+	}, time.Second, 10*time.Millisecond)
 	require.NotNil(t, reclaimed)
 	assert.Equal(t, "run-b", reclaimed.Task.DagRunId)
 	assert.Equal(t, "coord-b", reclaimed.Task.OwnerCoordinatorId)
+
+	_, err = store.GetClaim(ctx, claimed.ClaimToken)
+	assert.ErrorIs(t, err, exec.ErrDispatchTaskNotFound)
 
 	// GPU task remains claimable only by matching workers.
 	gpuClaim, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
@@ -215,4 +221,40 @@ func TestDAGRunLeaseStore_UpsertTouchListAndDelete(t *testing.T) {
 	require.NoError(t, store.Delete(ctx, "attempt-key-1"))
 	_, err = store.Get(ctx, "attempt-key-1")
 	assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+}
+
+func TestDAGRunLeaseStore_ConcurrentTouchPreservesLatestHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewDAGRunLeaseStore(filepath.Join(t.TempDir(), "distributed"))
+
+	require.NoError(t, store.Upsert(ctx, exec.DAGRunLease{
+		AttemptKey:      "attempt-key-concurrent",
+		DAGRun:          exec.NewDAGRunRef("dag-a", "run-1"),
+		Root:            exec.NewDAGRunRef("dag-a", "run-1"),
+		AttemptID:       "attempt-1",
+		QueueName:       "queue-a",
+		WorkerID:        "worker-1",
+		LastHeartbeatAt: time.Now().Add(-time.Minute).UTC().UnixMilli(),
+	}))
+
+	latest := time.Now().Add(time.Second).UTC()
+	var wg sync.WaitGroup
+	errCh := make(chan error, 3)
+	for range 3 {
+		wg.Go(func() {
+			errCh <- store.Touch(ctx, "attempt-key-concurrent", latest)
+		})
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+
+	lease, err := store.Get(ctx, "attempt-key-concurrent")
+	require.NoError(t, err)
+	require.NotNil(t, lease)
+	assert.Equal(t, latest.UnixMilli(), lease.LastHeartbeatAt)
 }

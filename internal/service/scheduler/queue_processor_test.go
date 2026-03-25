@@ -6,6 +6,7 @@ package scheduler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -224,7 +225,7 @@ func TestQueueProcessor_CountsFreshDistributedRunsAgainstQueueConcurrency(t *tes
 	require.NoError(t, err)
 	require.NoError(t, runningAttempt.Open(f.ctx))
 	runningStatus := exec.InitialStatus(f.dag)
-	runningStatus.Status = core.Running
+	runningStatus.Status = core.Queued
 	runningStatus.DAGRunID = "running-run"
 	runningStatus.AttemptID = runningAttempt.ID()
 	runningStatus.WorkerID = "worker-1"
@@ -246,8 +247,28 @@ func TestQueueProcessor_CountsFreshDistributedRunsAgainstQueueConcurrency(t *tes
 
 	items, err := f.queueStore.List(f.ctx, "distributed-conc-dag")
 	require.NoError(t, err)
-	require.Len(t, items, 1, "fresh distributed running status should consume the only queue slot")
+	require.Len(t, items, 1, "fresh distributed lease should consume the only queue slot")
 	assert.Contains(t, f.logs(), "Max concurrency reached")
+}
+
+func TestQueueProcessor_ProcessQueueItems_FailsClosedOnLeaseCountError(t *testing.T) {
+	f := newQueueFixture(t).withDAG("distributed-count-error-dag", 1).
+		withProcessor(config.Queues{}).
+		simulateQueue(1, false)
+
+	f.enqueueRuns(1)
+	f.processor.dagRunLeaseStore = &mockLeaseStore{
+		listByQueueFunc: func(context.Context, string) ([]exec.DAGRunLease, error) {
+			return nil, errors.New("lease store unavailable")
+		},
+	}
+
+	f.processor.ProcessQueueItems(f.ctx, "distributed-count-error-dag")
+
+	items, err := f.queueStore.List(f.ctx, "distributed-count-error-dag")
+	require.NoError(t, err)
+	require.Len(t, items, 1, "queue should remain untouched when distributed lease counting fails")
+	assert.Contains(t, f.logs(), "Failed to count distributed leases")
 }
 
 func TestQueueProcessor_CheckStartupStatusTreatsRunningStatusAsStarted(t *testing.T) {

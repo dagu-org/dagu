@@ -149,7 +149,7 @@ func (s *DispatchTaskStore) GetClaim(_ context.Context, claimToken string) (*exe
 		}
 		return nil, err
 	}
-	if record.Task == nil {
+	if record.Task == nil || record.ClaimToken == "" || record.ClaimToken != claimToken || record.ClaimedAt == 0 {
 		return nil, exec.ErrDispatchTaskNotFound
 	}
 

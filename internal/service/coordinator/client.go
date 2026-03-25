@@ -316,6 +316,16 @@ func (cli *clientImpl) callMember(ctx context.Context, member exec.HostInfo, cal
 	return nil
 }
 
+func (cli *clientImpl) callMemberWithTimeout(ctx context.Context, member exec.HostInfo, callback func(context.Context, *client) error) error {
+	if cli.config.RequestTimeout <= 0 {
+		return cli.callMember(ctx, member, callback)
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, cli.config.RequestTimeout)
+	defer cancel()
+	return cli.callMember(callCtx, member, callback)
+}
+
 func (cli *clientImpl) isHealthy(ctx context.Context, member exec.HostInfo) error {
 	// Get or create client for this coordinator
 	client, err := cli.getOrCreateClient(member)
@@ -594,7 +604,7 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 
 func (cli *clientImpl) AckTaskClaimTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
 	var resp *coordinatorv1.AckTaskClaimResponse
-	err := cli.callMember(ctx, owner, func(ctx context.Context, client *client) error {
+	err := cli.callMemberWithTimeout(ctx, owner, func(ctx context.Context, client *client) error {
 		var callErr error
 		resp, callErr = client.client.AckTaskClaim(ctx, req)
 		if callErr != nil {
@@ -607,7 +617,7 @@ func (cli *clientImpl) AckTaskClaimTo(ctx context.Context, owner exec.HostInfo, 
 
 func (cli *clientImpl) RunHeartbeatTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
 	var resp *coordinatorv1.RunHeartbeatResponse
-	err := cli.callMember(ctx, owner, func(ctx context.Context, client *client) error {
+	err := cli.callMemberWithTimeout(ctx, owner, func(ctx context.Context, client *client) error {
 		var callErr error
 		resp, callErr = client.client.RunHeartbeat(ctx, req)
 		if callErr != nil {
@@ -639,7 +649,7 @@ func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.Repo
 
 func (cli *clientImpl) ReportStatusTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 	var resp *coordinatorv1.ReportStatusResponse
-	err := cli.callMember(ctx, owner, func(ctx context.Context, client *client) error {
+	err := cli.callMemberWithTimeout(ctx, owner, func(ctx context.Context, client *client) error {
 		var callErr error
 		resp, callErr = client.client.ReportStatus(ctx, req)
 		if callErr != nil {

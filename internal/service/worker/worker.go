@@ -248,6 +248,10 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 	if attemptKey == "" {
 		attemptKey = fmt.Sprintf("%s:%s", task.DagRunId, pollerID)
 	}
+	owner, err := taskOwner(task)
+	if err != nil {
+		return err
+	}
 
 	// Create a cancellable context for this task
 	taskCtx, cancel := context.WithCancel(ctx)
@@ -266,7 +270,7 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 			ParentDagRunId:   task.ParentDagRunId,
 			AttemptKey:       attemptKey,
 		},
-		owner:                ownerForRunningTask(task),
+		owner:                owner,
 		lastOwnerHeartbeatAt: time.Now().UTC(),
 	}
 	t.worker.pollerTasks[pollerID] = attemptKey
@@ -274,7 +278,7 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 	t.worker.pollersMu.Unlock()
 
 	// Execute the task with cancellable context
-	err := t.handler.Handle(taskCtx, task)
+	err = t.handler.Handle(taskCtx, task)
 
 	// Remove from running tasks and cancel registry
 	t.worker.pollersMu.Lock()
@@ -494,17 +498,6 @@ func (w *Worker) processCancellations(ctx context.Context, cancelledRuns []*coor
 				tag.AttemptKey(run.AttemptKey))
 			cancelFunc()
 		}
-	}
-}
-
-func ownerForRunningTask(task *coordinatorv1.Task) exec.HostInfo {
-	if task == nil {
-		return exec.HostInfo{}
-	}
-	return exec.HostInfo{
-		ID:   task.OwnerCoordinatorId,
-		Host: task.OwnerCoordinatorHost,
-		Port: int(task.OwnerCoordinatorPort),
 	}
 }
 

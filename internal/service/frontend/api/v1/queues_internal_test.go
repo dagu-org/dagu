@@ -29,8 +29,8 @@ func TestListQueueItemsRunningFiltersDistributedRunsByLeaseFreshness(t *testing.
 	leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
 	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 
-	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "fresh-run", time.Now().Add(-time.Second))
-	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "stale-run", time.Now().Add(-10*time.Second))
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "fresh-run", "lease-q", time.Now().Add(-time.Second))
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "stale-run", "lease-q", time.Now().Add(-10*time.Second))
 
 	a := &API{
 		dagRunStore:         dagRunStore,
@@ -56,6 +56,40 @@ func TestListQueueItemsRunningFiltersDistributedRunsByLeaseFreshness(t *testing.
 	assert.Equal(t, openapiv1.StatusRunning, listResp.Items[0].Status)
 }
 
+func TestListQueueItemsRunningFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
+	leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
+	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
+
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "fallback-q", "fresh-run", "", time.Now().Add(-time.Second))
+
+	a := &API{
+		dagRunStore:         dagRunStore,
+		dagRunLeaseStore:    leaseStore,
+		procStore:           procStore,
+		config:              &config.Config{},
+		leaseStaleThreshold: 5 * time.Second,
+	}
+
+	itemType := openapiv1.ListQueueItemsParamsTypeRunning
+	resp, err := a.ListQueueItems(ctx, openapiv1.ListQueueItemsRequestObject{
+		Name: "fallback-q",
+		Params: openapiv1.ListQueueItemsParams{
+			Type: &itemType,
+		},
+	})
+	require.NoError(t, err)
+
+	listResp, ok := resp.(openapiv1.ListQueueItems200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, listResp.Items, 1)
+	assert.Equal(t, "fresh-run", listResp.Items[0].DagRunId)
+}
+
 func createDistributedQueueRun(
 	t *testing.T,
 	ctx context.Context,
@@ -63,6 +97,7 @@ func createDistributedQueueRun(
 	leaseStore exec.DAGRunLeaseStore,
 	name string,
 	dagRunID string,
+	leaseQueueName string,
 	lastHeartbeatAt time.Time,
 ) {
 	t.Helper()
@@ -96,7 +131,7 @@ func createDistributedQueueRun(
 		DAGRun:          exec.NewDAGRunRef(name, dagRunID),
 		Root:            exec.NewDAGRunRef(name, dagRunID),
 		AttemptID:       attempt.ID(),
-		QueueName:       name,
+		QueueName:       leaseQueueName,
 		WorkerID:        "worker-1",
 		LastHeartbeatAt: lastHeartbeatAt.UTC().UnixMilli(),
 	}))

@@ -6,6 +6,7 @@ package distr_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	osexec "os/exec"
 	"testing"
@@ -226,12 +227,22 @@ steps:
 	)
 	require.NoError(t, err)
 
+	var offendingStatus string
 	for _, st := range activeStatuses {
 		if st.Name == "consistency-test" {
-			t.Errorf("found active run for consistency-test after completion: status=%s dagRunID=%s",
-				st.Status, st.DAGRunID)
+			offendingStatus = fmt.Sprintf("status=%s dagRunID=%s", st.Status, st.DAGRunID)
+			break
 		}
 	}
+	assert.Emptyf(t, offendingStatus,
+		"found active run for consistency-test after completion: %s",
+		offendingStatus,
+	)
+
+	require.Eventually(t, func() bool {
+		queueLen, err := f.coord.QueueStore.Len(f.coord.Context, "consistency-q")
+		return err == nil && queueLen == 0
+	}, 5*time.Second, 100*time.Millisecond, "queue should have no remaining entries after completion")
 }
 
 // TestDistributedRun_CoordinatorOwnsSharedLease verifies that distributed runs

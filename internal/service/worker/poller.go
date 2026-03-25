@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
@@ -112,13 +111,12 @@ func (p *Poller) ackTaskClaim(ctx context.Context, task *coordinatorv1.Task) err
 		return nil
 	}
 
-	owner := exec.HostInfo{
-		ID:   task.OwnerCoordinatorId,
-		Host: task.OwnerCoordinatorHost,
-		Port: int(task.OwnerCoordinatorPort),
+	owner, err := taskOwner(task)
+	if err != nil {
+		return err
 	}
 	if owner.Host == "" {
-		return fmt.Errorf("claimed task is missing owner coordinator host")
+		return fmt.Errorf("claimed task is missing owner coordinator metadata")
 	}
 
 	resp, err := p.coordinatorCli.AckTaskClaimTo(ctx, owner, &coordinatorv1.AckTaskClaimRequest{

@@ -404,9 +404,6 @@ func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName s
 		if _, ok := excludeRunIDs[lease.DAGRun.ID]; ok {
 			continue
 		}
-		if queueName != "" && lease.QueueName != queueName {
-			continue
-		}
 		summary, ok := a.runningSummaryFromLease(ctx, lease)
 		if !ok {
 			continue
@@ -414,6 +411,9 @@ func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName s
 		groupName := lease.QueueName
 		if groupName == "" {
 			groupName = summary.Name
+		}
+		if queueName != "" && groupName != queueName {
+			continue
 		}
 		result[groupName] = append(result[groupName], summary)
 	}

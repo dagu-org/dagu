@@ -4,6 +4,7 @@
 package filedistributed
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -66,5 +67,6 @@ func sortedFiles(dir string) ([]string, error) {
 }
 
 func encodeKey(input string) string {
-	return hex.EncodeToString([]byte(input))
+	sum := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(sum[:])
 }

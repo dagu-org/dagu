@@ -52,6 +52,57 @@ func TestSanitizeTaskLoadError(t *testing.T) {
 	})
 }
 
+func TestTaskOwner(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RejectsPartialMetadata", func(t *testing.T) {
+		t.Parallel()
+
+		owner, err := taskOwner(&coordinatorv1.Task{
+			OwnerCoordinatorId: "coord-1",
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, exec.HostInfo{}, owner)
+	})
+
+	t.Run("AcceptsCompleteMetadata", func(t *testing.T) {
+		t.Parallel()
+
+		owner, err := taskOwner(&coordinatorv1.Task{
+			OwnerCoordinatorId:   "coord-1",
+			OwnerCoordinatorHost: "127.0.0.1",
+			OwnerCoordinatorPort: 4321,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, exec.HostInfo{ID: "coord-1", Host: "127.0.0.1", Port: 4321}, owner)
+	})
+}
+
+func TestPollerAckTaskClaimRejectsPartialOwnerMetadata(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	client := newMockRemoteCoordinatorClient()
+	client.AckTaskClaimFunc = func(context.Context, exec.HostInfo, *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
+		called = true
+		return &coordinatorv1.AckTaskClaimResponse{Accepted: true}, nil
+	}
+
+	poller := NewPoller("worker-1", client, nil, 0, nil)
+	err := poller.ackTaskClaim(context.Background(), &coordinatorv1.Task{
+		ClaimToken:           "claim-1",
+		OwnerCoordinatorHost: "127.0.0.1",
+		OwnerCoordinatorPort: 4321,
+		OwnerCoordinatorId:   "",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "incomplete owner coordinator metadata")
+	assert.False(t, called)
+}
+
 type mockStreamLogsClient struct {
 	chunks   []*coordinatorv1.LogChunk
 	mu       sync.Mutex

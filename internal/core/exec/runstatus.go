@@ -122,6 +122,9 @@ func IsLeaseActive(status *DAGRunStatus, staleThreshold time.Duration) bool {
 	if status == nil || status.LeaseAt == 0 {
 		return false
 	}
+	if staleThreshold <= 0 {
+		staleThreshold = DefaultStaleLeaseThreshold
+	}
 	return time.Since(time.UnixMilli(status.LeaseAt)) < staleThreshold
 }
 

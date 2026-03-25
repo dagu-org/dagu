@@ -6,6 +6,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	osexec "os/exec"
 	"sync"
@@ -302,7 +303,11 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		return
 	}
 
-	distributedAliveCount := p.countActiveDistributedRuns(ctx, queueName)
+	distributedAliveCount, err := p.countActiveDistributedRuns(ctx, queueName)
+	if err != nil {
+		logger.Error(ctx, "Failed to count distributed leases", tag.Error(err), tag.Queue(queueName))
+		return
+	}
 	aliveCount := localAliveCount + distributedAliveCount
 
 	maxConcurrency := q.getMaxConcurrency()
@@ -615,6 +620,9 @@ func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName strin
 	if p.inStartupGracePeriod(waitState.launchedAt) {
 		return false, errNotStarted
 	}
+	if err != nil {
+		return false, err
+	}
 
 	return false, errNotStarted
 }
@@ -649,15 +657,14 @@ func isPreStartExecutionFailure(err error) bool {
 // countActiveDistributedRuns counts distributed runs (non-empty WorkerID) that
 // belong to the given queue/proc-group and have a fresh lease. These runs are
 // invisible to the local procStore but must count against queue concurrency.
-func (p *QueueProcessor) countActiveDistributedRuns(ctx context.Context, queueName string) int {
+func (p *QueueProcessor) countActiveDistributedRuns(ctx context.Context, queueName string) (int, error) {
 	if p.dagRunLeaseStore == nil {
-		return 0
+		return 0, nil
 	}
 
 	leases, err := p.dagRunLeaseStore.ListByQueue(ctx, queueName)
 	if err != nil {
-		logger.Error(ctx, "Failed to list distributed leases for queue count", tag.Error(err))
-		return 0
+		return 0, fmt.Errorf("list distributed leases for queue %q: %w", queueName, err)
 	}
 
 	count := 0
@@ -668,7 +675,7 @@ func (p *QueueProcessor) countActiveDistributedRuns(ctx context.Context, queueNa
 			count++
 		}
 	}
-	return count
+	return count, nil
 }
 
 func (p *QueueProcessor) hasFreshDistributedLease(
