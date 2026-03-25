@@ -103,7 +103,7 @@ func TestQueueProcessor_CheckStartupStatus_AfterGraceFallsBackToStatus(t *testin
 		wantErr   error
 	}{
 		{name: "Queued", status: core.Queued, wantStart: false, wantErr: errNotStarted},
-		{name: "Running", status: core.Running, wantStart: false, wantErr: errNotStarted},
+		{name: "Running", status: core.Running, wantStart: true},
 		{name: "NotStarted", status: core.NotStarted, wantStart: true},
 		{name: "Succeeded", status: core.Succeeded, wantStart: true},
 	}

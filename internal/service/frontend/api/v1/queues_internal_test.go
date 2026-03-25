@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/filedistributed"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,13 +26,15 @@ func TestListQueueItemsRunningFiltersDistributedRunsByLeaseFreshness(t *testing.
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
+	leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
 	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 
-	createDistributedQueueRun(t, ctx, dagRunStore, "lease-q", "fresh-run", time.Now().Add(-time.Second))
-	createDistributedQueueRun(t, ctx, dagRunStore, "lease-q", "stale-run", time.Now().Add(-10*time.Second))
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "fresh-run", time.Now().Add(-time.Second))
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "stale-run", time.Now().Add(-10*time.Second))
 
 	a := &API{
 		dagRunStore:         dagRunStore,
+		dagRunLeaseStore:    leaseStore,
 		procStore:           procStore,
 		config:              &config.Config{},
 		leaseStaleThreshold: 5 * time.Second,
@@ -57,9 +60,10 @@ func createDistributedQueueRun(
 	t *testing.T,
 	ctx context.Context,
 	store exec.DAGRunStore,
+	leaseStore exec.DAGRunLeaseStore,
 	name string,
 	dagRunID string,
-	leaseAt time.Time,
+	lastHeartbeatAt time.Time,
 ) {
 	t.Helper()
 
@@ -80,11 +84,20 @@ func createDistributedQueueRun(
 	status := exec.InitialStatus(dag)
 	status.Status = core.Running
 	status.DAGRunID = dagRunID
+	status.AttemptID = attempt.ID()
 	status.ProcGroup = name
 	status.WorkerID = "worker-1"
 	status.StartedAt = time.Now().UTC().Format(time.RFC3339)
 	status.CreatedAt = time.Now().UnixMilli()
-	status.LeaseAt = leaseAt.UnixMilli()
 
 	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, leaseStore.Upsert(ctx, exec.DAGRunLease{
+		AttemptKey:      exec.GenerateAttemptKey(name, dagRunID, name, dagRunID, attempt.ID()),
+		DAGRun:          exec.NewDAGRunRef(name, dagRunID),
+		Root:            exec.NewDAGRunRef(name, dagRunID),
+		AttemptID:       attempt.ID(),
+		QueueName:       name,
+		WorkerID:        "worker-1",
+		LastHeartbeatAt: lastHeartbeatAt.UTC().UnixMilli(),
+	}))
 }

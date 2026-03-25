@@ -370,9 +370,10 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		task := &coordinatorv1.Task{}
 		status := &exec.DAGRunStatus{
-			Name:     "test-dag",
-			DAGRunID: "run-123",
-			Status:   core.Running,
+			Name:      "test-dag",
+			DAGRunID:  "run-123",
+			ProcGroup: "shared-queue",
+			Status:    core.Running,
 			Nodes: []*exec.Node{
 				{Step: core.Step{Name: "step1"}, Status: core.NodeSucceeded},
 				{Step: core.Step{Name: "step2"}, Status: core.NodeFailed},
@@ -390,6 +391,7 @@ func TestTaskOption_Functions(t *testing.T) {
 		assert.Equal(t, "run-123", s.DAGRunID)
 		assert.Equal(t, core.Running, s.Status)
 		assert.Len(t, s.Nodes, 2)
+		assert.Equal(t, "shared-queue", task.QueueName)
 	})
 
 	t.Run("WithPreviousStatusNil", func(t *testing.T) {

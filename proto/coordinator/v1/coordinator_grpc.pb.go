@@ -26,6 +26,8 @@ const (
 	CoordinatorService_Dispatch_FullMethodName        = "/coordinator.v1.CoordinatorService/Dispatch"
 	CoordinatorService_GetWorkers_FullMethodName      = "/coordinator.v1.CoordinatorService/GetWorkers"
 	CoordinatorService_Heartbeat_FullMethodName       = "/coordinator.v1.CoordinatorService/Heartbeat"
+	CoordinatorService_AckTaskClaim_FullMethodName    = "/coordinator.v1.CoordinatorService/AckTaskClaim"
+	CoordinatorService_RunHeartbeat_FullMethodName    = "/coordinator.v1.CoordinatorService/RunHeartbeat"
 	CoordinatorService_ReportStatus_FullMethodName    = "/coordinator.v1.CoordinatorService/ReportStatus"
 	CoordinatorService_StreamLogs_FullMethodName      = "/coordinator.v1.CoordinatorService/StreamLogs"
 	CoordinatorService_GetDAGRunStatus_FullMethodName = "/coordinator.v1.CoordinatorService/GetDAGRunStatus"
@@ -46,6 +48,11 @@ type CoordinatorServiceClient interface {
 	GetWorkers(ctx context.Context, in *GetWorkersRequest, opts ...grpc.CallOption) (*GetWorkersResponse, error)
 	// Heartbeat is called by workers to report their status.
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
+	// AckTaskClaim is called by workers after accepting a claimed task.
+	AckTaskClaim(ctx context.Context, in *AckTaskClaimRequest, opts ...grpc.CallOption) (*AckTaskClaimResponse, error)
+	// RunHeartbeat is called by workers to refresh leases for tasks owned by a
+	// specific coordinator instance.
+	RunHeartbeat(ctx context.Context, in *RunHeartbeatRequest, opts ...grpc.CallOption) (*RunHeartbeatResponse, error)
 	// ReportStatus is called by workers to push DAG run status updates.
 	// Used in shared-nothing architecture where workers don't have filesystem access.
 	ReportStatus(ctx context.Context, in *ReportStatusRequest, opts ...grpc.CallOption) (*ReportStatusResponse, error)
@@ -109,6 +116,26 @@ func (c *coordinatorServiceClient) Heartbeat(ctx context.Context, in *HeartbeatR
 	return out, nil
 }
 
+func (c *coordinatorServiceClient) AckTaskClaim(ctx context.Context, in *AckTaskClaimRequest, opts ...grpc.CallOption) (*AckTaskClaimResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AckTaskClaimResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_AckTaskClaim_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *coordinatorServiceClient) RunHeartbeat(ctx context.Context, in *RunHeartbeatRequest, opts ...grpc.CallOption) (*RunHeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunHeartbeatResponse)
+	err := c.cc.Invoke(ctx, CoordinatorService_RunHeartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *coordinatorServiceClient) ReportStatus(ctx context.Context, in *ReportStatusRequest, opts ...grpc.CallOption) (*ReportStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ReportStatusResponse)
@@ -166,6 +193,11 @@ type CoordinatorServiceServer interface {
 	GetWorkers(context.Context, *GetWorkersRequest) (*GetWorkersResponse, error)
 	// Heartbeat is called by workers to report their status.
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
+	// AckTaskClaim is called by workers after accepting a claimed task.
+	AckTaskClaim(context.Context, *AckTaskClaimRequest) (*AckTaskClaimResponse, error)
+	// RunHeartbeat is called by workers to refresh leases for tasks owned by a
+	// specific coordinator instance.
+	RunHeartbeat(context.Context, *RunHeartbeatRequest) (*RunHeartbeatResponse, error)
 	// ReportStatus is called by workers to push DAG run status updates.
 	// Used in shared-nothing architecture where workers don't have filesystem access.
 	ReportStatus(context.Context, *ReportStatusRequest) (*ReportStatusResponse, error)
@@ -200,6 +232,12 @@ func (UnimplementedCoordinatorServiceServer) GetWorkers(context.Context, *GetWor
 }
 func (UnimplementedCoordinatorServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) AckTaskClaim(context.Context, *AckTaskClaimRequest) (*AckTaskClaimResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AckTaskClaim not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) RunHeartbeat(context.Context, *RunHeartbeatRequest) (*RunHeartbeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RunHeartbeat not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) ReportStatus(context.Context, *ReportStatusRequest) (*ReportStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReportStatus not implemented")
@@ -306,6 +344,42 @@ func _CoordinatorService_Heartbeat_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CoordinatorService_AckTaskClaim_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AckTaskClaimRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).AckTaskClaim(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_AckTaskClaim_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).AckTaskClaim(ctx, req.(*AckTaskClaimRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CoordinatorService_RunHeartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunHeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CoordinatorServiceServer).RunHeartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CoordinatorService_RunHeartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CoordinatorServiceServer).RunHeartbeat(ctx, req.(*RunHeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CoordinatorService_ReportStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReportStatusRequest)
 	if err := dec(in); err != nil {
@@ -389,6 +463,14 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Heartbeat",
 			Handler:    _CoordinatorService_Heartbeat_Handler,
+		},
+		{
+			MethodName: "AckTaskClaim",
+			Handler:    _CoordinatorService_AckTaskClaim_Handler,
+		},
+		{
+			MethodName: "RunHeartbeat",
+			Handler:    _CoordinatorService_RunHeartbeat_Handler,
 		},
 		{
 			MethodName: "ReportStatus",

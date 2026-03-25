@@ -36,6 +36,7 @@ type LogStreamer struct {
 	dagName   string
 	attemptID string
 	rootRef   exec.DAGRunRef
+	owner     exec.HostInfo
 	mu        sync.RWMutex
 }
 
@@ -47,7 +48,12 @@ func NewLogStreamer(
 	dagName string,
 	attemptID string,
 	rootRef exec.DAGRunRef,
+	owner ...exec.HostInfo,
 ) *LogStreamer {
+	var target exec.HostInfo
+	if len(owner) > 0 {
+		target = owner[0]
+	}
 	return &LogStreamer{
 		client:    client,
 		workerID:  workerID,
@@ -55,6 +61,7 @@ func NewLogStreamer(
 		dagName:   dagName,
 		attemptID: attemptID,
 		rootRef:   rootRef,
+		owner:     target,
 	}
 }
 
@@ -70,6 +77,13 @@ func (s *LogStreamer) getAttemptID() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.attemptID
+}
+
+func (s *LogStreamer) openStream(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	if s.owner.Host != "" {
+		return s.client.StreamLogsTo(ctx, s.owner)
+	}
+	return s.client.StreamLogs(ctx)
 }
 
 // NewStepWriter creates a writer that streams to coordinator
@@ -114,7 +128,7 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 	}
 
 	// Create a stream to the coordinator
-	stream, err := s.client.StreamLogs(ctx)
+	stream, err := s.openStream(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create log stream: %w", err)
 	}
@@ -134,16 +148,17 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 
 		sequence++
 		chunk := &coordinatorv1.LogChunk{
-			WorkerId:       s.workerID,
-			DagRunId:       s.dagRunID,
-			DagName:        s.dagName,
-			StepName:       "scheduler",
-			StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
-			Data:           chunkData,
-			Sequence:       sequence,
-			RootDagRunName: s.rootRef.Name,
-			RootDagRunId:   s.rootRef.ID,
-			AttemptId:      s.getAttemptID(),
+			WorkerId:           s.workerID,
+			DagRunId:           s.dagRunID,
+			DagName:            s.dagName,
+			StepName:           "scheduler",
+			StreamType:         coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			Data:               chunkData,
+			Sequence:           sequence,
+			RootDagRunName:     s.rootRef.Name,
+			RootDagRunId:       s.rootRef.ID,
+			AttemptId:          s.getAttemptID(),
+			OwnerCoordinatorId: s.owner.ID,
 		}
 
 		if err := stream.Send(chunk); err != nil {
@@ -153,16 +168,17 @@ func (s *LogStreamer) StreamSchedulerLog(ctx context.Context, logFilePath string
 
 	// Send final marker
 	finalChunk := &coordinatorv1.LogChunk{
-		WorkerId:       s.workerID,
-		DagRunId:       s.dagRunID,
-		DagName:        s.dagName,
-		StepName:       "scheduler",
-		StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
-		IsFinal:        true,
-		Sequence:       sequence + 1,
-		RootDagRunName: s.rootRef.Name,
-		RootDagRunId:   s.rootRef.ID,
-		AttemptId:      s.getAttemptID(),
+		WorkerId:           s.workerID,
+		DagRunId:           s.dagRunID,
+		DagName:            s.dagName,
+		StepName:           "scheduler",
+		StreamType:         coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+		IsFinal:            true,
+		Sequence:           sequence + 1,
+		RootDagRunName:     s.rootRef.Name,
+		RootDagRunId:       s.rootRef.ID,
+		AttemptId:          s.getAttemptID(),
+		OwnerCoordinatorId: s.owner.ID,
 	}
 
 	if err := stream.Send(finalChunk); err != nil {
@@ -230,7 +246,7 @@ func (w *stepLogWriter) flush() error {
 	// Initialize stream if needed
 	if w.stream == nil {
 		var err error
-		w.stream, err = w.streamer.client.StreamLogs(w.ctx)
+		w.stream, err = w.streamer.openStream(w.ctx)
 		if err != nil {
 			// Mark as permanently failed to prevent tight retry loop
 			w.streamInitFailed = true
@@ -258,16 +274,17 @@ func (w *stepLogWriter) flush() error {
 		// Use peek value for sequence - only increment after successful Send
 		nextSeq := w.sequence + 1
 		chunk := &coordinatorv1.LogChunk{
-			WorkerId:       w.streamer.workerID,
-			DagRunId:       w.streamer.dagRunID,
-			DagName:        w.streamer.dagName,
-			StepName:       w.stepName,
-			StreamType:     toProtoStreamType(w.streamType),
-			Data:           chunkData,
-			Sequence:       nextSeq,
-			RootDagRunName: w.streamer.rootRef.Name,
-			RootDagRunId:   w.streamer.rootRef.ID,
-			AttemptId:      w.streamer.getAttemptID(),
+			WorkerId:           w.streamer.workerID,
+			DagRunId:           w.streamer.dagRunID,
+			DagName:            w.streamer.dagName,
+			StepName:           w.stepName,
+			StreamType:         toProtoStreamType(w.streamType),
+			Data:               chunkData,
+			Sequence:           nextSeq,
+			RootDagRunName:     w.streamer.rootRef.Name,
+			RootDagRunId:       w.streamer.rootRef.ID,
+			AttemptId:          w.streamer.getAttemptID(),
+			OwnerCoordinatorId: w.streamer.owner.ID,
 		}
 
 		if err := w.stream.Send(chunk); err != nil {
@@ -405,7 +422,7 @@ func (w *schedulerLogWriter) flush() error {
 	// Initialize stream if needed
 	if w.stream == nil {
 		var err error
-		w.stream, err = w.streamer.client.StreamLogs(w.ctx)
+		w.stream, err = w.streamer.openStream(w.ctx)
 		if err != nil {
 			w.streamInitFailed = true
 			w.buffer = w.buffer[:0]
@@ -426,16 +443,17 @@ func (w *schedulerLogWriter) flush() error {
 
 		nextSeq := w.sequence + 1
 		chunk := &coordinatorv1.LogChunk{
-			WorkerId:       w.streamer.workerID,
-			DagRunId:       w.streamer.dagRunID,
-			DagName:        w.streamer.dagName,
-			StepName:       "scheduler",
-			StreamType:     coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
-			Data:           chunkData,
-			Sequence:       nextSeq,
-			RootDagRunName: w.streamer.rootRef.Name,
-			RootDagRunId:   w.streamer.rootRef.ID,
-			AttemptId:      w.streamer.getAttemptID(),
+			WorkerId:           w.streamer.workerID,
+			DagRunId:           w.streamer.dagRunID,
+			DagName:            w.streamer.dagName,
+			StepName:           "scheduler",
+			StreamType:         coordinatorv1.LogStreamType_LOG_STREAM_TYPE_SCHEDULER,
+			Data:               chunkData,
+			Sequence:           nextSeq,
+			RootDagRunName:     w.streamer.rootRef.Name,
+			RootDagRunId:       w.streamer.rootRef.ID,
+			AttemptId:          w.streamer.getAttemptID(),
+			OwnerCoordinatorId: w.streamer.owner.ID,
 		}
 
 		if err := w.stream.Send(chunk); err != nil {

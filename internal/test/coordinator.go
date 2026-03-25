@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -78,6 +79,10 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	if options.StaleLeaseThreshold > 0 {
 		cfg.StaleLeaseThreshold = options.StaleLeaseThreshold
 	}
+	cfg.Owner = exec.CoordinatorEndpoint{ID: "test-coordinator", Host: "127.0.0.1", Port: port}
+	cfg.DispatchTaskStore = helper.DispatchTaskStore
+	cfg.WorkerHeartbeatStore = helper.WorkerHeartbeatStore
+	cfg.DAGRunLeaseStore = helper.DAGRunLeaseStore
 
 	// Create handler with config
 	handler := coordinator.NewHandler(cfg)

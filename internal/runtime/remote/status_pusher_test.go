@@ -51,8 +51,24 @@ func (m *mockCoordinatorClient) Heartbeat(_ context.Context, _ *coordinatorv1.He
 	panic("Heartbeat not implemented in mock")
 }
 
+func (m *mockCoordinatorClient) AckTaskClaimTo(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
+	panic("AckTaskClaimTo not implemented in mock")
+}
+
+func (m *mockCoordinatorClient) RunHeartbeatTo(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+	panic("RunHeartbeatTo not implemented in mock")
+}
+
 func (m *mockCoordinatorClient) StreamLogs(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 	panic("StreamLogs not implemented in mock")
+}
+
+func (m *mockCoordinatorClient) ReportStatusTo(ctx context.Context, _ exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	return m.ReportStatus(ctx, req)
+}
+
+func (m *mockCoordinatorClient) StreamLogsTo(ctx context.Context, _ exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	return m.StreamLogs(ctx)
 }
 
 func (m *mockCoordinatorClient) Metrics() coordinator.Metrics {

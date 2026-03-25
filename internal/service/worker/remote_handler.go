@@ -121,7 +121,7 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, ownerForTask(task))
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil, taskExtraEnvs(task))
 }
@@ -151,7 +151,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root)
+	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, ownerForTask(task))
 	triggerType := exec.PreservedQueueTriggerType(status)
 
 	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
@@ -162,7 +162,7 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 }
 
 func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, loadErr error) {
-	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
+	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID, ownerForTask(task))
 	finishedAt := stringutil.FormatTime(time.Now())
 	logger.Warn(ctx, "Failed to load DAG on worker",
 		tag.Target(task.Target),
@@ -219,8 +219,12 @@ func taskExtraEnvs(task *coordinatorv1.Task) []string {
 }
 
 // createRemoteHandlers creates the status pusher and log streamer for remote execution.
-func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef) (*remote.StatusPusher, *remote.LogStreamer) {
-	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID)
+func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef, owner ...exec.HostInfo) (*remote.StatusPusher, *remote.LogStreamer) {
+	var target exec.HostInfo
+	if len(owner) > 0 {
+		target = owner[0]
+	}
+	statusPusher := remote.NewStatusPusher(h.coordinatorClient, h.workerID, target)
 	logStreamer := remote.NewLogStreamer(
 		h.coordinatorClient,
 		h.workerID,
@@ -228,8 +232,20 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 		dagName,
 		"", // attemptID will be set by agent after attempt creation
 		root,
+		target,
 	)
 	return statusPusher, logStreamer
+}
+
+func ownerForTask(task *coordinatorv1.Task) exec.HostInfo {
+	if task == nil {
+		return exec.HostInfo{}
+	}
+	return exec.HostInfo{
+		ID:   task.OwnerCoordinatorId,
+		Host: task.OwnerCoordinatorHost,
+		Port: int(task.OwnerCoordinatorPort),
+	}
 }
 
 // agentStores creates the agent config, model, and memory stores from the config paths.

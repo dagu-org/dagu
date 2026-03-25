@@ -119,8 +119,12 @@ func (m *mockStreamLogsClient) RecvMsg(any) error {
 }
 
 type mockRemoteCoordinatorClient struct {
+	AckTaskClaimFunc    func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error)
+	RunHeartbeatFunc    func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error)
 	ReportStatusFunc    func(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+	ReportStatusToFunc  func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
 	StreamLogsFunc      func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
+	StreamLogsToFunc    func(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
 	GetDAGRunStatusFunc func(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
 	DispatchFunc        func(ctx context.Context, task *coordinatorv1.Task) error
 	PollFunc            func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
@@ -155,11 +159,39 @@ func (m *mockRemoteCoordinatorClient) ReportStatus(ctx context.Context, req *coo
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 }
 
+func (m *mockRemoteCoordinatorClient) AckTaskClaimTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
+	if m.AckTaskClaimFunc != nil {
+		return m.AckTaskClaimFunc(ctx, owner, req)
+	}
+	return &coordinatorv1.AckTaskClaimResponse{Accepted: true}, nil
+}
+
+func (m *mockRemoteCoordinatorClient) RunHeartbeatTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+	if m.RunHeartbeatFunc != nil {
+		return m.RunHeartbeatFunc(ctx, owner, req)
+	}
+	return &coordinatorv1.RunHeartbeatResponse{}, nil
+}
+
+func (m *mockRemoteCoordinatorClient) ReportStatusTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	if m.ReportStatusToFunc != nil {
+		return m.ReportStatusToFunc(ctx, owner, req)
+	}
+	return m.ReportStatus(ctx, req)
+}
+
 func (m *mockRemoteCoordinatorClient) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 	if m.StreamLogsFunc != nil {
 		return m.StreamLogsFunc(ctx)
 	}
 	return newMockStreamLogsClient(), nil
+}
+
+func (m *mockRemoteCoordinatorClient) StreamLogsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	if m.StreamLogsToFunc != nil {
+		return m.StreamLogsToFunc(ctx, owner)
+	}
+	return m.StreamLogs(ctx)
 }
 
 func (m *mockRemoteCoordinatorClient) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {

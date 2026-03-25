@@ -56,6 +56,7 @@ type QueueProcessor struct {
 	queueStore          exec.QueueStore
 	dagRunStore         exec.DAGRunStore
 	procStore           exec.ProcStore
+	dagRunLeaseStore    exec.DAGRunLeaseStore
 	dagExecutor         *DAGExecutor
 	queues              sync.Map // map[string]*queue
 	wakeUpCh            chan struct{}
@@ -109,6 +110,13 @@ func WithBackoffConfig(cfg BackoffConfig) QueueProcessorOption {
 func WithLeaseStaleThreshold(threshold time.Duration) QueueProcessorOption {
 	return func(p *QueueProcessor) {
 		p.leaseStaleThreshold = threshold
+	}
+}
+
+// WithDAGRunLeaseStore sets the shared distributed run lease store.
+func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) QueueProcessorOption {
+	return func(p *QueueProcessor) {
+		p.dagRunLeaseStore = store
 	}
 }
 
@@ -493,36 +501,11 @@ func (p *QueueProcessor) dispatchAndWaitForStartup(
 		}
 
 		// Dispatch succeeded, now poll for startup.
-		isAlive, err := p.procStore.IsRunAlive(ctx, queueName, runRef)
-		if err != nil {
-			logger.Warn(ctx, "Failed to check run liveness", tag.Error(err))
-		} else if isAlive {
-			started = true
-			return nil
-		}
-		if p.inStartupGracePeriod(launchedAt) {
-			return errNotStarted
-		}
-
-		// After grace period, check status for completion.
-		attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
-		if err != nil {
-			logger.Debug(ctx, "Failed to read attempt, keep checking")
-			return err
-		}
-
-		status, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			return err
-		}
-
-		if status.Status != core.Queued && status.Status != core.Running {
-			logger.Info(ctx, "DAG execution started or finished", tag.Status(status.Status.String()))
-			started = true
-			return nil
-		}
-
-		return errNotStarted
+		var err error
+		started, err = p.checkStartupStatus(ctx, queueName, runRef, startupWaitState{
+			launchedAt: launchedAt,
+		})
+		return err
 	}
 
 	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
@@ -599,7 +582,7 @@ func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName strin
 		logger.Info(ctx, "DAG run has started (heartbeat detected)")
 		return true, nil
 	}
-	if p.inStartupGracePeriod(waitState.launchedAt) {
+	if p.inStartupGracePeriod(waitState.launchedAt) && p.dagRunLeaseStore == nil {
 		return false, errNotStarted
 	}
 
@@ -614,9 +597,23 @@ func (p *QueueProcessor) checkStartupStatus(ctx context.Context, queueName strin
 		return false, err
 	}
 
-	if status.Status != core.Queued && status.Status != core.Running {
-		logger.Info(ctx, "DAG execution started or finished", tag.Status(status.Status.String()))
+	if status.Status != core.Queued {
+		logger.Info(ctx, "DAG execution has started or finished", tag.Status(status.Status.String()))
 		return true, nil
+	}
+	started, err := p.hasFreshDistributedLease(ctx, queueName, runRef, attempt, status)
+	if err != nil {
+		logger.Warn(ctx, "Failed to check distributed run lease",
+			tag.Error(err),
+			tag.Queue(queueName),
+			tag.RunID(runRef.ID),
+		)
+	} else if started {
+		logger.Info(ctx, "DAG run has started (distributed lease detected)")
+		return true, nil
+	}
+	if p.inStartupGracePeriod(waitState.launchedAt) {
+		return false, errNotStarted
 	}
 
 	return false, errNotStarted
@@ -653,37 +650,78 @@ func isPreStartExecutionFailure(err error) bool {
 // belong to the given queue/proc-group and have a fresh lease. These runs are
 // invisible to the local procStore but must count against queue concurrency.
 func (p *QueueProcessor) countActiveDistributedRuns(ctx context.Context, queueName string) int {
-	activeStatuses := []core.Status{core.Running}
-	statuses, err := p.dagRunStore.ListStatuses(ctx,
-		exec.WithStatuses(activeStatuses),
-		exec.WithoutLimit(),
-	)
+	if p.dagRunLeaseStore == nil {
+		return 0
+	}
+
+	leases, err := p.dagRunLeaseStore.ListByQueue(ctx, queueName)
 	if err != nil {
-		logger.Error(ctx, "Failed to list statuses for distributed run count", tag.Error(err))
+		logger.Error(ctx, "Failed to list distributed leases for queue count", tag.Error(err))
 		return 0
 	}
 
 	count := 0
-	staleThreshold := p.leaseStaleThreshold
-	if staleThreshold <= 0 {
-		staleThreshold = exec.DefaultStaleLeaseThreshold
-	}
-	for _, st := range statuses {
-		if st.WorkerID == "" {
-			continue
-		}
-		groupName := st.ProcGroup
-		if groupName == "" {
-			groupName = st.Name
-		}
-		if groupName != queueName {
-			continue
-		}
-		if exec.IsLeaseActive(st, staleThreshold) {
+	staleThreshold := p.leaseStaleThresholdOrDefault()
+	now := time.Now().UTC()
+	for _, lease := range leases {
+		if lease.IsFresh(now, staleThreshold) {
 			count++
 		}
 	}
 	return count
+}
+
+func (p *QueueProcessor) hasFreshDistributedLease(
+	ctx context.Context,
+	queueName string,
+	runRef exec.DAGRunRef,
+	attempt exec.DAGRunAttempt,
+	status *exec.DAGRunStatus,
+) (bool, error) {
+	if p.dagRunLeaseStore == nil || status == nil {
+		return false, nil
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" && attempt != nil {
+		attemptID = attempt.ID()
+	}
+	attemptKey := status.AttemptKey
+	if attemptKey == "" && attemptID != "" {
+		attemptKey = exec.GenerateAttemptKey(runRef.Name, runRef.ID, runRef.Name, runRef.ID, attemptID)
+	}
+	if attemptKey == "" {
+		return false, nil
+	}
+
+	lease, err := p.dagRunLeaseStore.Get(ctx, attemptKey)
+	if err != nil {
+		if errors.Is(err, exec.ErrDAGRunLeaseNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if lease == nil {
+		return false, nil
+	}
+	if lease.DAGRun != runRef {
+		return false, nil
+	}
+	if queueName != "" && lease.QueueName != "" && lease.QueueName != queueName {
+		return false, nil
+	}
+	if attemptID != "" && lease.AttemptID != "" && lease.AttemptID != attemptID {
+		return false, nil
+	}
+
+	return lease.IsFresh(time.Now().UTC(), p.leaseStaleThresholdOrDefault()), nil
+}
+
+func (p *QueueProcessor) leaseStaleThresholdOrDefault() time.Duration {
+	if p.leaseStaleThreshold <= 0 {
+		return exec.DefaultStaleLeaseThreshold
+	}
+	return p.leaseStaleThreshold
 }
 
 // checkContextAndQuit returns a permanent error if context is done or processor is closed.

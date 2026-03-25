@@ -81,32 +81,11 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		}
 	}
 
-	// 2b. Get distributed running DAG runs (lease-based, not tracked by procStore)
-	distributedStatuses, err := a.dagRunStore.ListStatuses(ctx,
-		exec.WithStatuses([]core.Status{core.Running}),
-		exec.WithoutLimit(),
-	)
-	if err != nil {
-		logger.Warn(ctx, "Failed to list distributed running statuses", tag.Error(err))
-	} else {
-		for _, st := range distributedStatuses {
-			if st.WorkerID == "" {
-				continue // local run — already counted via procStore
-			}
-			if _, alreadyCounted := localRunningIDs[st.DAGRunID]; alreadyCounted {
-				continue
-			}
-			if !exec.IsLeaseActive(st, a.effectiveLeaseStaleThreshold()) {
-				continue
-			}
-			groupName := st.ProcGroup
-			if groupName == "" {
-				groupName = st.Name
-			}
-			queue := getOrCreateQueue(queueMap, groupName, a.config)
-			queue.running = append(queue.running, toDAGRunSummary(*st))
-			totalRunning++
-		}
+	// 2b. Get distributed running DAG runs from the active lease store.
+	for queueName, summaries := range a.activeDistributedRunningSummaries(ctx, "", localRunningIDs) {
+		queue := getOrCreateQueue(queueMap, queueName, a.config)
+		queue.running = append(queue.running, summaries...)
+		totalRunning += len(summaries)
 	}
 
 	// 3. Get queued COUNTS only (NOT full items) using QueueList + Len
@@ -225,33 +204,8 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 			localRunIDs[dagRun.ID] = struct{}{}
 		}
 
-		// Add distributed running items with fresh leases
-		distributedStatuses, listErr := a.dagRunStore.ListStatuses(ctx,
-			exec.WithStatuses([]core.Status{core.Running}),
-			exec.WithoutLimit(),
-		)
-		if listErr != nil {
-			logger.Warn(ctx, "Failed to list distributed running statuses", tag.Error(listErr))
-		} else {
-			for _, st := range distributedStatuses {
-				if st.WorkerID == "" {
-					continue
-				}
-				if _, ok := localRunIDs[st.DAGRunID]; ok {
-					continue
-				}
-				groupName := st.ProcGroup
-				if groupName == "" {
-					groupName = st.Name
-				}
-				if groupName != queueName {
-					continue
-				}
-				if !exec.IsLeaseActive(st, a.effectiveLeaseStaleThreshold()) {
-					continue
-				}
-				allRunning = append(allRunning, toDAGRunSummary(*st))
-			}
+		for _, summaries := range a.activeDistributedRunningSummaries(ctx, queueName, localRunIDs) {
+			allRunning = append(allRunning, summaries...)
 		}
 
 		total = len(allRunning)
@@ -382,33 +336,8 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 		localRunIDs[dagRun.ID] = struct{}{}
 	}
 
-	// Add distributed running items with fresh leases
-	distributedStatuses, listErr := a.dagRunStore.ListStatuses(ctx,
-		exec.WithStatuses([]core.Status{core.Running}),
-		exec.WithoutLimit(),
-	)
-	if listErr != nil {
-		logger.Warn(ctx, "Failed to list distributed running statuses", tag.Error(listErr))
-	} else {
-		for _, st := range distributedStatuses {
-			if st.WorkerID == "" {
-				continue
-			}
-			if _, ok := localRunIDs[st.DAGRunID]; ok {
-				continue
-			}
-			groupName := st.ProcGroup
-			if groupName == "" {
-				groupName = st.Name
-			}
-			if groupName != queueName {
-				continue
-			}
-			if !exec.IsLeaseActive(st, a.effectiveLeaseStaleThreshold()) {
-				continue
-			}
-			running = append(running, toDAGRunSummary(*st))
-		}
+	for _, summaries := range a.activeDistributedRunningSummaries(ctx, queueName, localRunIDs) {
+		running = append(running, summaries...)
 	}
 
 	// Get queued items
@@ -453,4 +382,64 @@ func (a *API) effectiveLeaseStaleThreshold() time.Duration {
 		return a.leaseStaleThreshold
 	}
 	return exec.DefaultStaleLeaseThreshold
+}
+
+func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName string, excludeRunIDs map[string]struct{}) map[string][]api.DAGRunSummary {
+	result := make(map[string][]api.DAGRunSummary)
+	if a.dagRunLeaseStore == nil {
+		return result
+	}
+
+	leases, err := a.dagRunLeaseStore.ListAll(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to list distributed running leases", tag.Error(err))
+		return result
+	}
+
+	now := time.Now().UTC()
+	for _, lease := range leases {
+		if !lease.IsFresh(now, a.effectiveLeaseStaleThreshold()) {
+			continue
+		}
+		if _, ok := excludeRunIDs[lease.DAGRun.ID]; ok {
+			continue
+		}
+		if queueName != "" && lease.QueueName != queueName {
+			continue
+		}
+		summary, ok := a.runningSummaryFromLease(ctx, lease)
+		if !ok {
+			continue
+		}
+		groupName := lease.QueueName
+		if groupName == "" {
+			groupName = summary.Name
+		}
+		result[groupName] = append(result[groupName], summary)
+	}
+
+	return result
+}
+
+func (a *API) runningSummaryFromLease(ctx context.Context, lease exec.DAGRunLease) (api.DAGRunSummary, bool) {
+	attempt, err := a.dagRunStore.FindAttempt(ctx, lease.DAGRun)
+	if err != nil {
+		return api.DAGRunSummary{}, false
+	}
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return api.DAGRunSummary{}, false
+	}
+	if status.AttemptID != lease.AttemptID {
+		return api.DAGRunSummary{}, false
+	}
+	switch status.Status {
+	case core.Running, core.NotStarted:
+		return toDAGRunSummary(*status), true
+	case core.Failed, core.Aborted, core.Succeeded, core.Queued,
+		core.PartiallySucceeded, core.Waiting, core.Rejected:
+		return api.DAGRunSummary{}, false
+	}
+
+	return api.DAGRunSummary{}, false
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/filedistributed"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
 	runtimepkg "github.com/dagu-org/dagu/internal/runtime"
@@ -246,21 +247,28 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	procStore := newProcStore(cfg)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
+	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
+	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
+	workerHeartbeatStore := filedistributed.NewWorkerHeartbeatStore(distributedDir)
+	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 
 	drm := runtimepkg.NewManager(runStore, procStore, cfg)
 
 	helper := Helper{
-		Context:         ctx,
-		Config:          cfg,
-		ChildEnv:        cfg.Core.BaseEnv.AsSlice(),
-		DAGRunMgr:       drm,
-		DAGStore:        dagStore,
-		DAGRunStore:     runStore,
-		ProcStore:       procStore,
-		QueueStore:      queueStore,
-		ServiceRegistry: serviceMonitor,
-		SubCmdBuilder:   runtimepkg.NewSubCmdBuilder(cfg),
-		ServerOptions:   options.ServerOptions,
+		Context:              ctx,
+		Config:               cfg,
+		ChildEnv:             cfg.Core.BaseEnv.AsSlice(),
+		DAGRunMgr:            drm,
+		DAGStore:             dagStore,
+		DAGRunStore:          runStore,
+		ProcStore:            procStore,
+		QueueStore:           queueStore,
+		ServiceRegistry:      serviceMonitor,
+		DispatchTaskStore:    dispatchTaskStore,
+		WorkerHeartbeatStore: workerHeartbeatStore,
+		DAGRunLeaseStore:     dagRunLeaseStore,
+		SubCmdBuilder:        runtimepkg.NewSubCmdBuilder(cfg),
+		ServerOptions:        options.ServerOptions,
 
 		tmpDir: tmpDir,
 	}
@@ -446,19 +454,22 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 
 // Helper provides test utilities and configuration
 type Helper struct {
-	Context         context.Context
-	Cancel          context.CancelFunc
-	Config          *config.Config
-	ChildEnv        []string
-	LoggingOutput   *SyncBuffer
-	DAGStore        exec1.DAGStore
-	DAGRunStore     exec1.DAGRunStore
-	DAGRunMgr       runtimepkg.Manager
-	ProcStore       exec1.ProcStore
-	QueueStore      exec1.QueueStore
-	ServiceRegistry exec1.ServiceRegistry
-	SubCmdBuilder   *runtimepkg.SubCmdBuilder
-	ServerOptions   []frontend.ServerOption
+	Context              context.Context
+	Cancel               context.CancelFunc
+	Config               *config.Config
+	ChildEnv             []string
+	LoggingOutput        *SyncBuffer
+	DAGStore             exec1.DAGStore
+	DAGRunStore          exec1.DAGRunStore
+	DAGRunMgr            runtimepkg.Manager
+	ProcStore            exec1.ProcStore
+	QueueStore           exec1.QueueStore
+	ServiceRegistry      exec1.ServiceRegistry
+	DispatchTaskStore    exec1.DispatchTaskStore
+	WorkerHeartbeatStore exec1.WorkerHeartbeatStore
+	DAGRunLeaseStore     exec1.DAGRunLeaseStore
+	SubCmdBuilder        *runtimepkg.SubCmdBuilder
+	ServerOptions        []frontend.ServerOption
 
 	tmpDir string
 }

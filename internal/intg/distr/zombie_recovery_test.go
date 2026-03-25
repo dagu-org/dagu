@@ -5,6 +5,7 @@ package distr_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	osexec "os/exec"
 	"testing"
@@ -49,8 +50,10 @@ steps:
 
 	status := f.waitForStatus(core.Running, 15*time.Second)
 	require.Equal(t, core.Running, status.Status)
-	require.Greater(t, status.LeaseAt, int64(0))
+	require.NotEmpty(t, status.AttemptKey)
 	require.Equal(t, "crash-worker", status.WorkerID)
+	lease := waitForLease(t, f, status.AttemptKey, 5*time.Second)
+	require.Equal(t, "crash-worker", lease.WorkerID)
 
 	require.NoError(t, cmdutil.KillProcessGroup(workerCmd, os.Kill))
 
@@ -82,16 +85,17 @@ steps:
 	f.startScheduler(30 * time.Second)
 
 	status := f.waitForStatus(core.Running, 15*time.Second)
-	require.Greater(t, status.LeaseAt, int64(0))
-	initialLease := status.LeaseAt
+	require.NotEmpty(t, status.AttemptKey)
+	initialLease := waitForLease(t, f, status.AttemptKey, 5*time.Second).LastHeartbeatAt
 
 	time.Sleep(4 * time.Second)
 
 	status, err := f.latestStatus()
 	require.NoError(t, err)
 	require.Equal(t, core.Running, status.Status)
-	assert.Greater(t, status.LeaseAt, initialLease)
-	assert.WithinDuration(t, time.Now(), time.UnixMilli(status.LeaseAt), 2*time.Second)
+	lease := waitForLease(t, f, status.AttemptKey, 5*time.Second)
+	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), 2*time.Second)
 
 	finalStatus := f.waitForStatus(core.Succeeded, 15*time.Second)
 	assert.Equal(t, core.Succeeded, finalStatus.Status)
@@ -142,6 +146,7 @@ steps:
 				running++
 			case core.Queued:
 				queued++
+			case core.NotStarted, core.Failed, core.Aborted, core.Succeeded, core.PartiallySucceeded, core.Waiting, core.Rejected:
 			}
 		}
 
@@ -164,6 +169,7 @@ steps:
 			running++
 		case core.Queued:
 			queued++
+		case core.NotStarted, core.Failed, core.Aborted, core.Succeeded, core.PartiallySucceeded, core.Waiting, core.Rejected:
 		}
 	}
 
@@ -228,9 +234,9 @@ steps:
 	}
 }
 
-// TestDistributedRun_CoordinatorStampsLeaseAt verifies that distributed status
-// reports end up with a recent coordinator-owned LeaseAt timestamp.
-func TestDistributedRun_CoordinatorStampsLeaseAt(t *testing.T) {
+// TestDistributedRun_CoordinatorOwnsSharedLease verifies that distributed runs
+// create a shared lease while active and remove it after completion.
+func TestDistributedRun_CoordinatorOwnsSharedLease(t *testing.T) {
 	f := newTestFixture(t, `
 type: graph
 name: lease-stamp-test
@@ -238,7 +244,7 @@ worker_selector:
   test: "true"
 steps:
   - name: step1
-    command: echo "lease-test"
+    command: sleep 3
 `,
 	)
 	defer f.cleanup()
@@ -247,11 +253,26 @@ steps:
 	f.waitForQueued()
 	f.startScheduler(30 * time.Second)
 
-	status := f.waitForStatus(core.Succeeded, 20*time.Second)
-	require.Equal(t, core.Succeeded, status.Status)
-	assert.Greater(t, status.LeaseAt, int64(0), "final status should have LeaseAt set")
-	assert.WithinDuration(t, time.Now(), time.UnixMilli(status.LeaseAt), 60*time.Second,
-		"LeaseAt should be a recent timestamp")
+	status := f.waitForStatus(core.Running, 20*time.Second)
+	require.Equal(t, core.Running, status.Status)
+	require.NotEmpty(t, status.AttemptKey)
+
+	lease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
+	require.NoError(t, err)
+	require.NotNil(t, lease)
+	assert.Equal(t, status.AttemptKey, lease.AttemptKey)
+	assert.Equal(t, status.AttemptID, lease.AttemptID)
+	assert.Equal(t, "worker-1", lease.WorkerID)
+	assert.Equal(t, "test-coordinator", lease.Owner.ID)
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), 5*time.Second)
+
+	finalStatus := f.waitForStatus(core.Succeeded, 20*time.Second)
+	require.Equal(t, core.Succeeded, finalStatus.Status)
+
+	require.Eventually(t, func() bool {
+		_, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
+		return errors.Is(err, exec.ErrDAGRunLeaseNotFound)
+	}, 10*time.Second, 100*time.Millisecond, "shared lease should be removed after completion")
 }
 
 func startWorkerProcess(t *testing.T, f *testFixture, workerID, labels string) (*osexec.Cmd, *bytes.Buffer) {
@@ -297,4 +318,20 @@ func startWorkerProcess(t *testing.T, f *testFixture, workerID, labels string) (
 	f.waitForWorkerRegistration(workerID, 10*time.Second)
 
 	return cmd, &output
+}
+
+func waitForLease(t *testing.T, f *testFixture, attemptKey string, timeout time.Duration) exec.DAGRunLease {
+	t.Helper()
+
+	var lease *exec.DAGRunLease
+	require.Eventually(t, func() bool {
+		current, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, attemptKey)
+		if err != nil {
+			return false
+		}
+		lease = current
+		return lease != nil
+	}, timeout, 100*time.Millisecond, "lease %s should exist", attemptKey)
+
+	return *lease
 }

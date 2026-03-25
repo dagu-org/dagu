@@ -282,6 +282,7 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		nil,
 	)
 	require.NoError(f.t, err)
+	schedulerInst.SetDAGRunLeaseStore(f.coord.DAGRunLeaseStore)
 
 	startupTimeout := timeout
 	if startupTimeout <= 0 {

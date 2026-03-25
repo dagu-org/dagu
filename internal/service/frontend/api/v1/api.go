@@ -51,6 +51,7 @@ type API struct {
 	dagRunMgr           runtime.Manager
 	queueStore          exec.QueueStore
 	procStore           exec.ProcStore
+	dagRunLeaseStore    exec.DAGRunLeaseStore
 	remoteNodeResolver  *remotenode.Resolver
 	remoteNodeStore     remotenode.Store
 	apiBasePath         string
@@ -220,6 +221,13 @@ func WithRemoteNodeStore(s remotenode.Store) APIOption {
 func WithWorkspaceStore(s workspace.Store) APIOption {
 	return func(a *API) {
 		a.workspaceStore = s
+	}
+}
+
+// WithDAGRunLeaseStore sets the shared distributed run lease store.
+func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) APIOption {
+	return func(a *API) {
+		a.dagRunLeaseStore = store
 	}
 }
 
