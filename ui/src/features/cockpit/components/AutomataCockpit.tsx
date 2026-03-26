@@ -178,26 +178,6 @@ function sortAutomata(
   });
 }
 
-function SummaryCard({
-  label,
-  value,
-  description,
-}: {
-  label: string;
-  value: number;
-  description: string;
-}): React.ReactElement {
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-2 text-3xl font-semibold">{value}</div>
-      <div className="mt-1 text-sm text-muted-foreground">{description}</div>
-    </div>
-  );
-}
-
 export function AutomataCockpit({
   selectedWorkspace,
 }: {
@@ -327,35 +307,17 @@ export function AutomataCockpit({
         </Button>
       </div>
 
-      <div
-        className={cn(
-          'grid gap-3 md:grid-cols-2',
-          selectedWorkspace ? 'xl:grid-cols-6' : 'xl:grid-cols-5'
-        )}
-      >
-        {STATE_ORDER.map((state) => (
-          <SummaryCard
-            key={state}
-            label={STATE_META[state].label}
-            value={stateBuckets[state].length}
-            description={STATE_META[state].description}
-          />
-        ))}
-        {selectedWorkspace ? (
-          <SummaryCard
-            label="Workspace Active"
-            value={workspaceAutomataCount}
-            description="Automata with tagged runs in this workspace."
-          />
-        ) : null}
-      </div>
-
       {selectedWorkspace ? (
         <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
           Workspace activity is derived from Automata-triggered DAG runs tagged with
           <span className="mx-1 font-mono text-foreground">{workspaceTag}</span>
           on
           <span className="mx-1 font-mono text-foreground">{remoteNode}</span>.
+          {workspaceAutomataCount > 0 ? (
+            <span className="ml-1">
+              {workspaceAutomataCount} Automata have workspace-tagged activity.
+            </span>
+          ) : null}
         </div>
       ) : (
         <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
