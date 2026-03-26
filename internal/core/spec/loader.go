@@ -229,36 +229,73 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 		return nil, core.ErrorList{err}
 	}
 
+	raw, err := unmarshalData(data)
+	if err != nil {
+		if opts.Has(BuildFlagAllowBuildErrors) {
+			return &core.DAG{
+				Name:        opts.Name,
+				BuildErrors: []error{err},
+			}, nil
+		}
+		return nil, core.ErrorList{err}
+	}
+
+	def, err := decode(raw)
+	if err != nil {
+		if opts.Has(BuildFlagAllowBuildErrors) {
+			return &core.DAG{
+				Name:        opts.Name,
+				BuildErrors: []error{err},
+			}, nil
+		}
+		return nil, core.ErrorList{err}
+	}
+
 	buildCtx := BuildContext{ctx: ctx, opts: opts}
-	dags, err := loadDAGsFromData(buildCtx, data, "", baseDef)
-	if err == nil && len(dags) > 0 {
-		dag := dags[0]
-		dag.YamlData = data
-		if len(baseRaw) > 0 {
-			dag.BaseConfigData = baseRaw
-		}
-		if dag.WorkingDir == "" {
-			wd, err := getDefaultWorkingDir()
-			if err != nil {
-				return nil, core.ErrorList{fmt.Errorf("failed to determine working directory: %w", err)}
+
+	var dest *core.DAG
+	if baseDef != nil {
+		dest, err = buildBaseDAG(buildCtx, baseDef)
+		if err != nil {
+			if opts.Has(BuildFlagAllowBuildErrors) {
+				return &core.DAG{
+					Name:        opts.Name,
+					BuildErrors: []error{err},
+				}, nil
 			}
-			dag.WorkingDir = wd
-		} else {
-			dag.WorkingDirExplicit = true
+			return nil, core.ErrorList{err}
 		}
-		core.InitializeDefaults(dag)
-		return dag, nil
+	} else {
+		dest = new(core.DAG)
 	}
-	if err == nil {
-		err = fmt.Errorf("no DAGs found in YAML data")
+
+	dag, err := def.build(buildCtx)
+	if err != nil {
+		if opts.Has(BuildFlagAllowBuildErrors) {
+			return &core.DAG{
+				Name:        opts.Name,
+				BuildErrors: []error{err},
+			}, nil
+		}
+		return nil, core.ErrorList{err}
 	}
-	if opts.Has(BuildFlagAllowBuildErrors) {
-		return &core.DAG{
-			Name:        opts.Name,
-			BuildErrors: []error{err},
-		}, nil
+
+	if err := merge(dest, dag); err != nil {
+		if opts.Has(BuildFlagAllowBuildErrors) {
+			return &core.DAG{
+				Name:        opts.Name,
+				BuildErrors: []error{err},
+			}, nil
+		}
+		return nil, core.ErrorList{err}
 	}
-	return nil, core.ErrorList{err}
+
+	dest.YamlData = data
+	if len(baseRaw) > 0 {
+		dest.BaseConfigData = baseRaw
+	}
+
+	return dest, nil
 }
 
 // LoadBaseConfig loads the global configuration from the given file.

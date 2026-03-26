@@ -690,6 +690,36 @@ func TestLoadYAML(t *testing.T) {
 	}
 }
 
+func TestLoadYAMLWithOpts_PreservesLegacyContract(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DoesNotInitializeDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(`
+name: test-dag
+steps:
+  - name: step1
+    command: echo hello
+`), spec.BuildOpts{})
+		require.NoError(t, err)
+		assert.Equal(t, core.LogOutputMode(""), dag.LogOutput)
+	})
+
+	t.Run("DoesNotSynthesizeWorkingDirWithoutContext", func(t *testing.T) {
+		t.Parallel()
+
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(`
+steps:
+  - name: step1
+    command: echo hello
+`), spec.BuildOpts{})
+		require.NoError(t, err)
+		assert.Empty(t, dag.WorkingDir)
+		assert.False(t, dag.WorkingDirExplicit)
+	})
+}
+
 func TestLoadYAMLWithNameOption(t *testing.T) {
 	t.Parallel()
 	const testDAG = `
