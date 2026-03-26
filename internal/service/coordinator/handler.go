@@ -1197,8 +1197,19 @@ func (h *Handler) isLeaseInactive(ctx context.Context, attemptKey string) bool {
 	if h.dagRunLeaseStore == nil || attemptKey == "" {
 		return false
 	}
-	_, err := h.dagRunLeaseStore.Get(ctx, attemptKey)
-	return errors.Is(err, exec.ErrDAGRunLeaseNotFound)
+	lease, err := h.dagRunLeaseStore.Get(ctx, attemptKey)
+	switch {
+	case err == nil:
+		return !lease.IsFresh(time.Now().UTC(), h.staleLeaseThreshold)
+	case errors.Is(err, exec.ErrDAGRunLeaseNotFound):
+		return true
+	default:
+		logger.Warn(ctx, "Failed to read distributed lease for status validation",
+			tag.AttemptKey(attemptKey),
+			tag.Error(err),
+		)
+		return false
+	}
 }
 
 func (h *Handler) logRejectedRemoteStatusUpdate(
@@ -1703,33 +1714,155 @@ func (h *Handler) detectStaleLeases(ctx context.Context) {
 		reason := staleDistributedLeaseReason(lease.WorkerID)
 		h.markLeaseRunFailed(ctx, lease, reason)
 	}
+
+	h.detectOrphanedDistributedStatuses(ctx, now)
 }
 
 func staleDistributedLeaseReason(workerID string) string {
-	return fmt.Sprintf(
-		"distributed run lease expired: worker %s accepted the task claim but stopped reporting to the owner coordinator",
-		workerID,
+	return exec.DistributedLeaseExpiredReason(workerID)
+}
+
+func (h *Handler) detectOrphanedDistributedStatuses(ctx context.Context, now time.Time) {
+	statuses, err := h.dagRunStore.ListStatuses(ctx,
+		exec.WithStatuses([]core.Status{core.Running, core.NotStarted}),
+		exec.WithoutLimit(),
 	)
+	if err != nil {
+		logger.Error(ctx, "Failed to list distributed statuses for orphaned lease check", tag.Error(err))
+		return
+	}
+
+	for _, status := range statuses {
+		if status == nil || !exec.IsRemoteWorkerID(status.WorkerID) {
+			continue
+		}
+
+		attemptID, err := h.resolveAttemptIDForStatus(ctx, status)
+		if err != nil {
+			logger.Error(ctx, "Failed to resolve distributed attempt for orphaned lease check",
+				tag.DAG(status.Name),
+				tag.RunID(status.DAGRunID),
+				tag.Error(err),
+			)
+			continue
+		}
+
+		attemptKey := exec.AttemptKeyForStatus(status, attemptID)
+		var lease *exec.DAGRunLease
+		if attemptKey != "" {
+			lease, err = h.dagRunLeaseStore.Get(ctx, attemptKey)
+			switch {
+			case err == nil:
+			case errors.Is(err, exec.ErrDAGRunLeaseNotFound):
+				lease = nil
+			default:
+				logger.Error(ctx, "Failed to read distributed lease for orphaned status check",
+					tag.AttemptKey(attemptKey),
+					tag.Error(err),
+				)
+				continue
+			}
+		}
+
+		if exec.LeaseMatchesStatus(lease, status, attemptID, now, h.staleLeaseThreshold) {
+			continue
+		}
+
+		h.markStatusLeaseRunFailed(ctx, status, attemptID, attemptKey, staleDistributedLeaseReason(status.WorkerID))
+	}
 }
 
 // markLeaseRunFailed marks a stale distributed attempt failed if and only if it
 // is still the latest attempt for the DAG run and still active.
 func (h *Handler) markLeaseRunFailed(ctx context.Context, lease exec.DAGRunLease, reason string) {
+	h.failDistributedAttemptIfCurrent(
+		ctx,
+		lease.DAGRun,
+		lease.AttemptID,
+		lease.AttemptKey,
+		reason,
+		core.Running,
+		core.NotStarted,
+		core.Queued,
+	)
+}
+
+func (h *Handler) markStatusLeaseRunFailed(
+	ctx context.Context,
+	status *exec.DAGRunStatus,
+	attemptID string,
+	attemptKey string,
+	reason string,
+) {
+	if status == nil {
+		return
+	}
+	h.failDistributedAttemptIfCurrent(
+		ctx,
+		status.DAGRun(),
+		attemptID,
+		attemptKey,
+		reason,
+		status.Status,
+	)
+}
+
+func (h *Handler) resolveAttemptIDForStatus(ctx context.Context, status *exec.DAGRunStatus) (string, error) {
+	if status == nil {
+		return "", nil
+	}
+	if status.AttemptID != "" {
+		return status.AttemptID, nil
+	}
+
 	storeCtx := context.WithoutCancel(ctx)
+	if !status.Root.Zero() {
+		attempt, err := h.dagRunStore.FindSubAttempt(storeCtx, status.Root, status.DAGRunID)
+		if err != nil {
+			return "", err
+		}
+		return attempt.ID(), nil
+	}
+
+	attempt, err := h.dagRunStore.FindAttempt(storeCtx, status.DAGRun())
+	if err != nil {
+		return "", err
+	}
+	return attempt.ID(), nil
+}
+
+func (h *Handler) failDistributedAttemptIfCurrent(
+	ctx context.Context,
+	dagRun exec.DAGRunRef,
+	attemptID string,
+	attemptKey string,
+	reason string,
+	expectedStatuses ...core.Status,
+) {
+	storeCtx := context.WithoutCancel(ctx)
+	if attemptID == "" {
+		logger.Error(ctx, "Skipping distributed stale-run repair due to missing attempt ID",
+			tag.DAG(dagRun.Name),
+			tag.RunID(dagRun.ID),
+		)
+		return
+	}
 
 	mutate := func(status *exec.DAGRunStatus) error {
-		finishedAt := stringutil.FormatTime(time.Now())
+		finishedAt := time.Now()
+		finishedAtStr := stringutil.FormatTime(finishedAt)
 		status.Status = core.Failed
-		status.FinishedAt = finishedAt
+		status.FinishedAt = finishedAtStr
 		status.Error = reason
 		for i, node := range status.Nodes {
+			if node == nil {
+				continue
+			}
 			switch node.Status {
 			case core.NodeRunning, core.NodeNotStarted, core.NodeRetrying, core.NodeWaiting:
 				status.Nodes[i].Status = core.NodeFailed
-				status.Nodes[i].FinishedAt = finishedAt
+				status.Nodes[i].FinishedAt = finishedAtStr
 				status.Nodes[i].Error = reason
-			case core.NodeFailed, core.NodeAborted, core.NodeSucceeded,
-				core.NodeSkipped, core.NodePartiallySucceeded, core.NodeRejected:
 			}
 		}
 		return nil
@@ -1741,52 +1874,61 @@ func (h *Handler) markLeaseRunFailed(ctx context.Context, lease exec.DAGRunLease
 		err     error
 	)
 
-	for _, expectedStatus := range []core.Status{core.Running, core.NotStarted, core.Queued} {
+	for _, expectedStatus := range expectedStatuses {
 		status, swapped, err = h.dagRunStore.CompareAndSwapLatestAttemptStatus(
 			storeCtx,
-			lease.DAGRun,
-			lease.AttemptID,
+			dagRun,
+			attemptID,
 			expectedStatus,
 			mutate,
 		)
 		if err != nil {
 			logger.Error(ctx, "Failed to fail stale distributed run",
-				tag.RunID(lease.DAGRun.ID),
+				tag.RunID(dagRun.ID),
 				slog.String("expected_status", expectedStatus.String()),
 				tag.Error(err),
 			)
 			return
 		}
-		if swapped || status == nil || status.AttemptID != lease.AttemptID || status.Status == expectedStatus {
+		if swapped || status == nil || status.AttemptID != attemptID || status.Status == expectedStatus {
 			break
 		}
 	}
 
-	if status != nil && (status.AttemptID != lease.AttemptID || !status.Status.IsActive() && status.Status != core.NotStarted) {
-		if err := h.dagRunLeaseStore.Delete(storeCtx, lease.AttemptKey); err != nil {
-			logger.Warn(ctx, "Failed to delete superseded distributed lease",
-				tag.RunID(lease.DAGRun.ID),
-				tag.Error(err),
-			)
-		}
+	if status != nil && (status.AttemptID != attemptID || !status.Status.IsActive() && status.Status != core.NotStarted) {
+		h.deleteDistributedLease(ctx, storeCtx, dagRun, attemptKey, "Failed to delete superseded distributed lease")
 		return
 	}
 	if !swapped {
 		return
 	}
 
-	if err := h.dagRunLeaseStore.Delete(storeCtx, lease.AttemptKey); err != nil {
-		logger.Warn(ctx, "Failed to delete stale distributed lease after failure",
-			tag.RunID(lease.DAGRun.ID),
+	h.deleteDistributedLease(ctx, storeCtx, dagRun, attemptKey, "Failed to delete stale distributed lease after failure")
+
+	logger.Warn(ctx, "Marked stale distributed run as FAILED",
+		tag.DAG(dagRun.Name),
+		tag.RunID(dagRun.ID),
+		slog.String("reason", reason),
+	)
+}
+
+func (h *Handler) deleteDistributedLease(
+	ctx context.Context,
+	storeCtx context.Context,
+	dagRun exec.DAGRunRef,
+	attemptKey string,
+	message string,
+) {
+	if h.dagRunLeaseStore == nil || attemptKey == "" {
+		return
+	}
+	if err := h.dagRunLeaseStore.Delete(storeCtx, attemptKey); err != nil &&
+		!errors.Is(err, exec.ErrDAGRunLeaseNotFound) {
+		logger.Warn(ctx, message,
+			tag.RunID(dagRun.ID),
 			tag.Error(err),
 		)
 	}
-
-	logger.Warn(ctx, "Marked stale distributed run as FAILED",
-		tag.DAG(lease.DAGRun.Name),
-		tag.RunID(lease.DAGRun.ID),
-		slog.String("reason", reason),
-	)
 }
 
 // markRunFailed is kept for compatibility with older tests and non-lease based

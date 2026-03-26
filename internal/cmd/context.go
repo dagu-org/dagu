@@ -233,13 +233,19 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		return nil, fmt.Errorf("failed to validate proc directory %s: %w", cfg.Paths.ProcDir, err)
 	}
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
-	drm := runtime.NewManager(drs, ps, cfg)
+	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
+	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
+	drm := runtime.NewManager(
+		drs,
+		ps,
+		cfg,
+		runtime.WithDAGRunLeaseStore(dagRunLeaseStore),
+		runtime.WithLeaseStaleThreshold(exec.DefaultStaleLeaseThreshold),
+	)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
-	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
 	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
 	workerHeartbeatStore := filedistributed.NewWorkerHeartbeatStore(distributedDir)
-	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 
 	// Initialize license manager for server commands
 	var licMgr *license.Manager
@@ -437,7 +443,13 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		filedagrun.WithLocation(c.Config.Core.Location),
 		filedagrun.WithHistoryFileCache(statusCache),
 	)
-	schedulerRunMgr := runtime.NewManager(schedulerRunStore, c.ProcStore, c.Config)
+	schedulerRunMgr := runtime.NewManager(
+		schedulerRunStore,
+		c.ProcStore,
+		c.Config,
+		runtime.WithDAGRunLeaseStore(c.DAGRunLeaseStore),
+		runtime.WithLeaseStaleThreshold(exec.DefaultStaleLeaseThreshold),
+	)
 
 	sched, err := scheduler.New(c.Config, m, schedulerRunMgr, schedulerRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 	if err != nil {

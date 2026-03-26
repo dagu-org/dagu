@@ -6,6 +6,7 @@ package exec
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -141,4 +142,88 @@ type DAGRunLeaseStore interface {
 	Get(ctx context.Context, attemptKey string) (*DAGRunLease, error)
 	ListByQueue(ctx context.Context, queueName string) ([]DAGRunLease, error)
 	ListAll(ctx context.Context) ([]DAGRunLease, error)
+}
+
+// IsRemoteWorkerID reports whether the status originated from a distributed
+// worker instead of the local process runtime.
+func IsRemoteWorkerID(workerID string) bool {
+	return workerID != "" && workerID != "local"
+}
+
+// AttemptKeyForStatus resolves the authoritative attempt key for a persisted
+// status. When older statuses omit AttemptKey, it is regenerated from the
+// stored DAG-run identity and attempt ID.
+func AttemptKeyForStatus(status *DAGRunStatus, fallbackAttemptID string) string {
+	if status == nil {
+		return ""
+	}
+	if status.AttemptKey != "" {
+		return status.AttemptKey
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" {
+		attemptID = fallbackAttemptID
+	}
+	if attemptID == "" {
+		return ""
+	}
+
+	root := status.Root
+	if root.Zero() {
+		root = status.DAGRun()
+	}
+
+	return GenerateAttemptKey(root.Name, root.ID, status.Name, status.DAGRunID, attemptID)
+}
+
+// LeaseMatchesStatus reports whether the lease still authoritatively belongs to
+// the exact distributed attempt represented by the persisted status.
+func LeaseMatchesStatus(
+	lease *DAGRunLease,
+	status *DAGRunStatus,
+	fallbackAttemptID string,
+	now time.Time,
+	staleThreshold time.Duration,
+) bool {
+	if lease == nil || status == nil {
+		return false
+	}
+	if !lease.IsFresh(now, staleThreshold) {
+		return false
+	}
+
+	attemptKey := AttemptKeyForStatus(status, fallbackAttemptID)
+	if attemptKey != "" && lease.AttemptKey != attemptKey {
+		return false
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" {
+		attemptID = fallbackAttemptID
+	}
+	if attemptID != "" && lease.AttemptID != "" && lease.AttemptID != attemptID {
+		return false
+	}
+
+	if status.DAGRunID != "" && lease.DAGRun != status.DAGRun() {
+		return false
+	}
+	if !status.Root.Zero() && !lease.Root.Zero() && lease.Root != status.Root {
+		return false
+	}
+	if status.WorkerID != "" && lease.WorkerID != "" && lease.WorkerID != status.WorkerID {
+		return false
+	}
+
+	return true
+}
+
+// DistributedLeaseExpiredReason is the canonical failure reason for a
+// distributed attempt that lost authoritative worker ownership.
+func DistributedLeaseExpiredReason(workerID string) string {
+	return fmt.Sprintf(
+		"distributed run lease expired: worker %s accepted the task claim but stopped reporting to the owner coordinator",
+		workerID,
+	)
 }

@@ -271,7 +271,7 @@ steps:
 		require.Equal(t, core.Running, saved.Status)
 		require.Equal(t, core.NodeRunning, saved.Nodes[0].Status)
 	})
-	t.Run("GetSavedStatusDoesNotRepairDistributedRun", func(t *testing.T) {
+	t.Run("GetSavedStatusRepairsDistributedRunWhenLeaseMissing", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: sleep 1
@@ -287,14 +287,18 @@ steps:
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
 		runningStatus.WorkerID = "worker-1"
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
 
 		saved, err := th.DAGRunMgr.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
-		require.Equal(t, core.Running, saved.Status)
+		require.Equal(t, core.Failed, saved.Status)
 		require.Equal(t, "worker-1", saved.WorkerID)
+		require.Equal(t, exec.DistributedLeaseExpiredReason("worker-1"), saved.Error)
+		require.Equal(t, core.NodeFailed, saved.Nodes[0].Status)
 	})
 	t.Run("GetLatestStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
@@ -305,15 +309,28 @@ steps:
 		dagRunID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
+		ref := exec.NewDAGRunRef(dag.Name, dagRunID)
 
 		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
 		runningStatus.WorkerID = "worker-1"
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
+		leaseHeartbeatAt := time.Now().UTC().UnixMilli()
+		require.NoError(t, th.DAGRunLeaseStore.Upsert(ctx, exec.DAGRunLease{
+			AttemptKey:      runningStatus.AttemptKey,
+			DAGRun:          ref,
+			Root:            ref,
+			AttemptID:       runningStatus.AttemptID,
+			WorkerID:        runningStatus.WorkerID,
+			LastHeartbeatAt: leaseHeartbeatAt,
+			ClaimedAt:       leaseHeartbeatAt,
+		}))
 
 		stopSocket := startStatusSocketServer(t, ctx, dag.DAG, dagRunID, transform.NewStatusBuilder(dag.DAG).Create(
 			dagRunID, core.Failed, 0, time.Now(),
@@ -334,15 +351,28 @@ steps:
 		dagRunID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
 		ctx := th.Context
+		ref := exec.NewDAGRunRef(dag.Name, dagRunID)
 
 		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
 		runningStatus.WorkerID = "worker-1"
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
+		leaseHeartbeatAt := time.Now().UTC().UnixMilli()
+		require.NoError(t, th.DAGRunLeaseStore.Upsert(ctx, exec.DAGRunLease{
+			AttemptKey:      runningStatus.AttemptKey,
+			DAGRun:          ref,
+			Root:            ref,
+			AttemptID:       runningStatus.AttemptID,
+			WorkerID:        runningStatus.WorkerID,
+			LastHeartbeatAt: leaseHeartbeatAt,
+			ClaimedAt:       leaseHeartbeatAt,
+		}))
 
 		stopSocket := startStatusSocketServer(t, ctx, dag.DAG, dagRunID, transform.NewStatusBuilder(dag.DAG).Create(
 			dagRunID, core.Failed, 0, time.Now(),
@@ -353,6 +383,33 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, core.Running, current.Status)
 		require.Equal(t, "worker-1", current.WorkerID)
+	})
+	t.Run("GetLatestStatusRepairsDistributedRunWhenLeaseMissing", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
+		runningStatus.WorkerID = "worker-1"
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Failed, latest.Status)
+		require.Equal(t, exec.DistributedLeaseExpiredReason("worker-1"), latest.Error)
+		require.Equal(t, core.NodeFailed, latest.Nodes[0].Status)
 	})
 }
 

@@ -5,6 +5,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
@@ -23,23 +24,53 @@ import (
 
 const staleLocalRunStartupGrace = 2 * time.Second
 
-// New creates a new Manager instance.
-// The Manager is used to interact with the DAG.
-func NewManager(drs exec.DAGRunStore, ps exec.ProcStore, cfg *config.Config) Manager {
-	return Manager{
-		dagRunStore:   drs,
-		procStore:     ps,
-		subCmdBuilder: NewSubCmdBuilder(cfg),
+// ManagerOption configures runtime manager behavior.
+type ManagerOption func(*Manager)
+
+// WithDAGRunLeaseStore enables distributed stale-run reconciliation against the
+// shared run lease store.
+func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) ManagerOption {
+	return func(m *Manager) {
+		m.dagRunLeaseStore = store
 	}
+}
+
+// WithLeaseStaleThreshold overrides the freshness window for distributed run leases.
+func WithLeaseStaleThreshold(threshold time.Duration) ManagerOption {
+	return func(m *Manager) {
+		m.staleLeaseThreshold = threshold
+	}
+}
+
+// NewManager creates a new Manager instance.
+// The Manager is used to interact with the DAG.
+func NewManager(drs exec.DAGRunStore, ps exec.ProcStore, cfg *config.Config, opts ...ManagerOption) Manager {
+	manager := Manager{
+		dagRunStore:         drs,
+		procStore:           ps,
+		staleLeaseThreshold: exec.DefaultStaleLeaseThreshold,
+		subCmdBuilder:       NewSubCmdBuilder(cfg),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&manager)
+		}
+	}
+	if manager.staleLeaseThreshold <= 0 {
+		manager.staleLeaseThreshold = exec.DefaultStaleLeaseThreshold
+	}
+	return manager
 }
 
 // Manager provides methods to interact with DAGs, including starting, stopping,
 // restarting, and retrieving status information. It communicates with the DAG
 // through a socket interface and manages dag-run data.
 type Manager struct {
-	dagRunStore   exec.DAGRunStore // Store interface for persisting run data
-	procStore     exec.ProcStore   // Store interface for process management
-	subCmdBuilder *SubCmdBuilder   // Command builder for constructing command specs
+	dagRunStore         exec.DAGRunStore      // Store interface for persisting run data
+	procStore           exec.ProcStore        // Store interface for process management
+	dagRunLeaseStore    exec.DAGRunLeaseStore // Store interface for distributed run liveness
+	staleLeaseThreshold time.Duration
+	subCmdBuilder       *SubCmdBuilder // Command builder for constructing command specs
 }
 
 // Stop stops running DAG-runs and can cancel an explicit failed DAG-run that is
@@ -220,7 +251,7 @@ func (m *Manager) GetCurrentStatus(ctx context.Context, dag *core.DAG, dagRunID 
 }
 
 // GetSavedStatus retrieves the saved status of a dag-run by its core.DAGRun reference.
-// For stale local runs, it repairs the persisted status before returning it.
+// For stale local or distributed runs, it repairs the persisted status before returning it.
 func (m *Manager) GetSavedStatus(ctx context.Context, dagRun exec.DAGRunRef) (*exec.DAGRunStatus, error) {
 	attempt, err := m.dagRunStore.FindAttempt(ctx, dagRun)
 	if err != nil {
@@ -231,15 +262,13 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun exec.DAGRunRef) (*e
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if st.Status == core.Running && dagRun.ID == st.DAGRunID {
+	if dagRun.ID == st.DAGRunID {
+		var dag *core.DAG
 		dag, dagErr := attempt.ReadDAG(ctx)
-		if dagErr != nil {
+		if dagErr != nil && st.Status == core.Running && isLocalWorkerID(st.WorkerID) {
 			logger.Error(ctx, "Failed to read DAG for stale status check", tag.Error(dagErr))
-		} else if repaired, repairErr := m.repairStaleLocalRunIfDead(ctx, attempt, dag, st); repairErr != nil {
-			logger.Error(ctx, "Failed to repair stale running status", tag.Error(repairErr))
-		} else {
-			st = repaired
 		}
+		st = m.resolvePersistedStatus(ctx, dag, attempt, st, true)
 	}
 
 	return st, nil
@@ -261,10 +290,7 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// If the DAG is running, query current local status or repair stale local state.
-	if st.Status == core.Running {
-		st = m.resolveRunningStatus(ctx, dag, attempt, st, true)
-	}
+	st = m.resolvePersistedStatus(ctx, dag, attempt, st, true)
 
 	return st, nil
 }
@@ -305,6 +331,33 @@ func isLocalWorkerID(workerID string) bool {
 	return workerID == "" || workerID == "local"
 }
 
+func (m *Manager) resolvePersistedStatus(
+	ctx context.Context,
+	dag *core.DAG,
+	attempt exec.DAGRunAttempt,
+	status *exec.DAGRunStatus,
+	isRoot bool,
+) *exec.DAGRunStatus {
+	if status == nil {
+		return nil
+	}
+
+	if exec.IsRemoteWorkerID(status.WorkerID) && (status.Status == core.Running || status.Status == core.NotStarted) {
+		repaired, err := m.repairStaleDistributedRunIfLeaseInactive(ctx, attempt, status)
+		if err != nil {
+			logger.Error(ctx, "Failed to repair stale distributed status", tag.Error(err))
+			return status
+		}
+		return repaired
+	}
+
+	if status.Status == core.Running {
+		return m.resolveRunningStatus(ctx, dag, attempt, status, isRoot)
+	}
+
+	return status
+}
+
 func (m *Manager) findAttemptForProcEntry(ctx context.Context, entry exec.ProcEntry) (exec.DAGRunAttempt, error) {
 	if entry.IsRoot() {
 		return m.dagRunStore.FindAttempt(ctx, entry.DAGRun())
@@ -337,6 +390,83 @@ func (m *Manager) resolveRunningStatus(
 		return status
 	}
 	return repaired
+}
+
+func (m *Manager) repairStaleDistributedRunIfLeaseInactive(
+	ctx context.Context,
+	attempt exec.DAGRunAttempt,
+	status *exec.DAGRunStatus,
+) (*exec.DAGRunStatus, error) {
+	if status == nil || !exec.IsRemoteWorkerID(status.WorkerID) {
+		return status, nil
+	}
+	if status.Status != core.Running && status.Status != core.NotStarted {
+		return status, nil
+	}
+	if m.dagRunLeaseStore == nil {
+		return status, nil
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" && attempt != nil {
+		attemptID = attempt.ID()
+	}
+	if attemptID == "" {
+		return nil, fmt.Errorf("missing attempt ID for distributed stale-run repair")
+	}
+
+	attemptKey := exec.AttemptKeyForStatus(status, attemptID)
+	now := time.Now().UTC()
+	if attemptKey != "" {
+		lease, err := m.dagRunLeaseStore.Get(ctx, attemptKey)
+		switch {
+		case err == nil && exec.LeaseMatchesStatus(lease, status, attemptID, now, m.staleLeaseThreshold):
+			return status, nil
+		case err == nil:
+		case errors.Is(err, exec.ErrDAGRunLeaseNotFound):
+		default:
+			return nil, fmt.Errorf("read distributed run lease: %w", err)
+		}
+	}
+
+	reason := exec.DistributedLeaseExpiredReason(status.WorkerID)
+	repaired, swapped, err := m.dagRunStore.CompareAndSwapLatestAttemptStatus(
+		context.WithoutCancel(ctx),
+		status.DAGRun(),
+		attemptID,
+		status.Status,
+		func(current *exec.DAGRunStatus) error {
+			markActiveStatusFailed(current, reason, time.Now())
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("compare-and-fail stale distributed run: %w", err)
+	}
+	if !swapped {
+		if repaired != nil {
+			return repaired, nil
+		}
+		return status, nil
+	}
+
+	if attemptKey != "" {
+		if err := m.dagRunLeaseStore.Delete(context.WithoutCancel(ctx), attemptKey); err != nil &&
+			!errors.Is(err, exec.ErrDAGRunLeaseNotFound) {
+			logger.Warn(ctx, "Failed to delete stale distributed lease after runtime repair",
+				tag.RunID(status.DAGRunID),
+				tag.Error(err),
+			)
+		}
+	}
+
+	logger.Warn(ctx, "Marked stale distributed run as FAILED",
+		tag.DAG(status.Name),
+		tag.RunID(status.DAGRunID),
+		slog.String("worker_id", status.WorkerID),
+		slog.String("reason", reason),
+	)
+	return repaired, nil
 }
 
 // GetLatestStatus retrieves the latest status of a DAG.
@@ -372,16 +502,15 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGR
 		return ret, nil
 	}
 
-	// If the DAG is running, query the current status
-	if st.Status == core.Running {
+	if st.Status == core.Running && isLocalWorkerID(st.WorkerID) {
 		runDAG, err := attempt.ReadDAG(ctx)
 		if err != nil {
 			logger.Debug(ctx, "Failed to read DAG for current status lookup", tag.Error(err))
 		} else {
 			dag = runDAG
 		}
-		st = m.resolveRunningStatus(ctx, dag, attempt, st, st.Parent.Zero())
 	}
+	st = m.resolvePersistedStatus(ctx, dag, attempt, st, st.Parent.Zero())
 
 	return *st, nil
 }

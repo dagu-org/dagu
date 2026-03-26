@@ -1455,6 +1455,40 @@ func TestHandler_ZombieDetection(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("DetectStaleLeasesFailsOrphanedDistributedStatusWithoutLease", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(t.TempDir(), "distributed"))
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:         store,
+			DAGRunLeaseStore:    leaseStore,
+			StaleLeaseThreshold: time.Second,
+		})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-lease"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-lease",
+			AttemptID:  "attempt-1",
+			AttemptKey: "lease-key-1",
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+			Nodes: []*exec.Node{
+				{Status: core.NodeRunning},
+			},
+		})
+
+		h.detectStaleLeases(ctx)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+	})
 }
 
 func TestHandler_ReportStatus(t *testing.T) {

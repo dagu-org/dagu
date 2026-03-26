@@ -252,7 +252,13 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	workerHeartbeatStore := filedistributed.NewWorkerHeartbeatStore(distributedDir)
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 
-	drm := runtimepkg.NewManager(runStore, procStore, cfg)
+	drm := runtimepkg.NewManager(
+		runStore,
+		procStore,
+		cfg,
+		runtimepkg.WithDAGRunLeaseStore(dagRunLeaseStore),
+		runtimepkg.WithLeaseStaleThreshold(exec1.DefaultStaleLeaseThreshold),
+	)
 
 	helper := Helper{
 		Context:                 ctx,
