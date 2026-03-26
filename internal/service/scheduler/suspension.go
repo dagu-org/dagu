@@ -14,9 +14,10 @@ func isSchedulerManagedTriggerType(triggerType core.TriggerType) bool {
 	switch triggerType {
 	case core.TriggerTypeScheduler, core.TriggerTypeCatchUp, core.TriggerTypeRetry:
 		return true
-	default:
+	case core.TriggerTypeUnknown, core.TriggerTypeManual, core.TriggerTypeWebhook, core.TriggerTypeSubDAG:
 		return false
 	}
+	return false
 }
 
 func suspendFlagName(status *exec.DAGRunStatus, dag *core.DAG) string {
