@@ -8,7 +8,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,41 @@ import (
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
+
+func runBuiltCLICommand(th test.Command, extraEnv []string, args ...string) ([]byte, error) {
+	cmd := osexec.Command(th.Config.Paths.Executable, test.WithConfigFlag(args, th.Config)...)
+	cmd.Env = append(append([]string{}, th.ChildEnv...), extraEnv...)
+	return cmd.CombinedOutput()
+}
+
+func runBuiltCLI(t *testing.T, th test.Command, extraEnv []string, args ...string) string {
+	t.Helper()
+
+	output, err := runBuiltCLICommand(th, extraEnv, args...)
+	require.NoError(t, err, "output: %s", string(output))
+	return string(output)
+}
+
+func statusOutputValue(t *testing.T, status *exec.DAGRunStatus, key string) string {
+	t.Helper()
+
+	require.NotNil(t, status)
+	for _, node := range status.Nodes {
+		if node.OutputVariables == nil {
+			continue
+		}
+		value, ok := node.OutputVariables.Load(key)
+		if ok {
+			result, ok := value.(string)
+			require.True(t, ok, "output %q has unexpected type %T", key, value)
+			result = strings.TrimPrefix(result, key+"=")
+			return result
+		}
+	}
+
+	t.Fatalf("output %q not found in DAG-run status", key)
+	return ""
+}
 
 func TestStartCommand(t *testing.T) {
 	th := test.SetupCommand(t)
@@ -72,6 +109,26 @@ steps:
 			th.RunCommand(t, cmd.Start(), tc)
 		})
 	}
+}
+
+func TestStartCommand_BuiltExecutablePreservesExplicitEnv(t *testing.T) {
+	th := test.SetupCommand(t, test.WithBuiltExecutable())
+
+	dag := th.DAG(t, `name: built-start-explicit-env
+env:
+  - EXPORTED_SECRET: ${CMD_START_EXPLICIT_ENV}
+steps:
+  - name: "capture"
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${CMD_START_EXPLICIT_ENV:-}"
+    output: RESULT
+`)
+
+	runBuiltCLI(t, th, []string{"CMD_START_EXPLICIT_ENV=from-host"}, "start", dag.Location)
+
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, status.Status)
+	require.Equal(t, "from-host|from-host", statusOutputValue(t, &status, "RESULT"))
 }
 
 func TestCmdStart_BackwardCompatibility(t *testing.T) {

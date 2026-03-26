@@ -8,11 +8,16 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagu-org/dagu/internal/proto/convert"
 	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -28,10 +33,14 @@ var _ TaskHandler = (*taskHandler)(nil)
 func NewTaskHandler(cfg *config.Config) TaskHandler {
 	return &taskHandler{
 		subCmdBuilder: runtime.NewSubCmdBuilder(cfg),
+		baseConfig:    cfg.Paths.BaseConfig,
 	}
 }
 
-type taskHandler struct{ subCmdBuilder *runtime.SubCmdBuilder }
+type taskHandler struct {
+	subCmdBuilder *runtime.SubCmdBuilder
+	baseConfig    string
+}
 
 // Handle runs the task using the dagrun.Manager.
 func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
@@ -57,12 +66,13 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 		}
 	}()
 
+	originalTarget := task.Target
 	task.Target = tempFile
 
 	logger.Info(ctx, "Created temporary DAG file",
 		tag.File(tempFile))
 
-	spec, err := e.buildCommandSpec(task)
+	spec, err := e.buildCommandSpec(ctx, task, originalTarget)
 	if err != nil {
 		return err
 	}
@@ -84,13 +94,21 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 	return nil
 }
 
-func (e *taskHandler) buildCommandSpec(task *coordinatorv1.Task) (runtime.CmdSpec, error) {
+func (e *taskHandler) buildCommandSpec(ctx context.Context, task *coordinatorv1.Task, originalTarget string) (runtime.CmdSpec, error) {
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
-		return e.subCmdBuilder.TaskStart(task, nil), nil
+		hints, err := e.subprocessHints(ctx, task, originalTarget)
+		if err != nil {
+			return runtime.CmdSpec{}, err
+		}
+		return e.subCmdBuilder.TaskStart(task, hints.secrets, hints.env), nil
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		return e.subCmdBuilder.TaskRetry(task, nil), nil
+		hints, err := e.subprocessHints(ctx, task, originalTarget)
+		if err != nil {
+			return runtime.CmdSpec{}, err
+		}
+		return e.subCmdBuilder.TaskRetry(task, hints.secrets, hints.env), nil
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return runtime.CmdSpec{}, fmt.Errorf("operation not specified")
@@ -98,4 +116,77 @@ func (e *taskHandler) buildCommandSpec(task *coordinatorv1.Task) (runtime.CmdSpe
 	default:
 		return runtime.CmdSpec{}, fmt.Errorf("unknown operation: %v", task.Operation)
 	}
+}
+
+type subprocessHintSet struct {
+	secrets []core.SecretRef
+	env     []string
+}
+
+func (e *taskHandler) subprocessHints(ctx context.Context, task *coordinatorv1.Task, originalTarget string) (*subprocessHintSet, error) {
+	dagName := task.RootDagRunName
+	if dagName == "" {
+		dagName = dagNameHint(originalTarget)
+	}
+
+	var loadOpts []spec.LoadOption
+	if dagName != "" {
+		loadOpts = append(loadOpts, spec.WithName(dagName))
+	}
+	if task.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent([]byte(task.BaseConfig)))
+	} else if e.baseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfig(e.baseConfig))
+	}
+
+	dag, err := spec.Load(ctx, task.Target, loadOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load DAG for subprocess hints: %w", err)
+	}
+
+	params, err := retryParams(task, dag)
+	if err != nil {
+		return nil, err
+	}
+	if task.Operation == coordinatorv1.Operation_OPERATION_START {
+		params = task.Params
+	}
+
+	env, err := spec.ResolveEnv(ctx, dag, params, spec.ResolveEnvOptions{
+		BaseConfig: e.baseConfig,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve DAG env for subprocess: %w", err)
+	}
+
+	return &subprocessHintSet{
+		secrets: dag.Secrets,
+		env:     env,
+	}, nil
+}
+
+func dagNameHint(target string) string {
+	name := strings.TrimSpace(target)
+	if name == "" {
+		return ""
+	}
+	base := filepath.Base(name)
+	ext := filepath.Ext(base)
+	if ext == ".yaml" || ext == ".yml" {
+		return strings.TrimSuffix(base, ext)
+	}
+	return base
+}
+
+func retryParams(task *coordinatorv1.Task, dag *core.DAG) (any, error) {
+	if task.Operation != coordinatorv1.Operation_OPERATION_RETRY || task.PreviousStatus == nil {
+		return nil, nil
+	}
+
+	status, err := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode previous task status: %w", err)
+	}
+
+	return spec.QuoteRuntimeParams(status.ParamsList, dag.ParamDefs), nil
 }

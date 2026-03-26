@@ -19,7 +19,7 @@ import (
 )
 
 func TestDAGExecutor(t *testing.T) {
-	th := test.Setup(t)
+	th := test.Setup(t, test.WithBuiltExecutable())
 
 	testDAG := th.DAG(t, `
 steps:

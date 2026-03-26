@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/cmn/buildenv"
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/secrets"
@@ -121,6 +122,10 @@ func preResolveEnvSecrets(refs []core.SecretRef) []string {
 	return extra
 }
 
+func preResolveBuildEnv(env []string) []string {
+	return buildenv.Encode(env)
+}
+
 // Start creates a start command spec.
 func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	args := []string{"start"}
@@ -162,7 +167,7 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		Env:        b.env(append(preResolveEnvSecrets(dag.Secrets), preResolveBuildEnv(dag.Env)...)...),
 	}
 }
 
@@ -202,7 +207,7 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(),
+		Env:        b.env(preResolveBuildEnv(dag.Env)...),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -244,7 +249,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		Env:        b.env(append(preResolveEnvSecrets(dag.Secrets), preResolveBuildEnv(dag.Env)...)...),
 	}
 }
 
@@ -264,16 +269,17 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		Env:        b.env(append(preResolveEnvSecrets(dag.Secrets), preResolveBuildEnv(dag.Env)...)...),
 	}
 }
 
 // TaskStart creates a start command spec for coordinator tasks.
 // secretHints optionally provides secret refs for pre-resolving env-provider
-// secrets. Pass nil if the DAG has not been loaded yet in the caller.
-func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.SecretRef) CmdSpec {
+// secrets. envHints optionally provides resolved DAG/base-config env entries
+// for pre-resolving rebuild-time env values in the child process.
+func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string) CmdSpec {
 	args := []string{"start", "-q"}
-	env := b.env(preResolveEnvSecrets(secretHints)...)
+	env := b.env(append(preResolveEnvSecrets(secretHints), preResolveBuildEnv(envHints)...)...)
 
 	// Add hierarchy flags for sub DAGs
 	if task.RootDagRunId != "" {
@@ -323,10 +329,11 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.S
 
 // TaskRetry creates a retry command spec for coordinator tasks.
 // secretHints optionally provides secret refs for pre-resolving env-provider
-// secrets. Pass nil if the DAG has not been loaded yet in the caller.
-func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.SecretRef) CmdSpec {
+// secrets. envHints optionally provides resolved DAG/base-config env entries
+// for pre-resolving rebuild-time env values in the child process.
+func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
-	env := b.env(preResolveEnvSecrets(secretHints)...)
+	env := b.env(append(preResolveEnvSecrets(secretHints), preResolveBuildEnv(envHints)...)...)
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))

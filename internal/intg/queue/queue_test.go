@@ -6,16 +6,53 @@ package queue_test
 import (
 	"fmt"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func runBuiltQueueCLI(t *testing.T, f *fixture, extraEnv []string, args ...string) string {
+	t.Helper()
+
+	cmd := osexec.Command(f.th.Config.Paths.Executable, test.WithConfigFlag(args, f.th.Config)...)
+	cmd.Env = append(append([]string{}, f.th.ChildEnv...), extraEnv...)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "output: %s", string(output))
+	return string(output)
+}
+
+func queueStatusOutputValue(t *testing.T, status *exec.DAGRunStatus, key string) string {
+	t.Helper()
+
+	require.NotNil(t, status)
+	for _, node := range status.Nodes {
+		if node.OutputVariables == nil {
+			continue
+		}
+		value, ok := node.OutputVariables.Load(key)
+		if ok {
+			result, ok := value.(string)
+			require.True(t, ok, "output %q has unexpected type %T", key, value)
+			result = strings.TrimPrefix(result, key+"=")
+			return result
+		}
+	}
+
+	t.Fatalf("output %q not found in DAG-run status", key)
+	return ""
+}
 
 func TestBasicProcessing(t *testing.T) {
 	f := newFixture(t, `
@@ -154,6 +191,74 @@ steps:
 	require.NoError(t, err)
 	assert.Equal(t, f.dag.Name, data.Name)
 	assert.Equal(t, runID, data.ID)
+}
+
+func TestExplicitEnvParityAcrossDirectStartAndQueueRetry(t *testing.T) {
+	const rawVar = "QUEUE_EXPLICIT_ENV_SECRET"
+
+	prevValue, hadPrev := os.LookupEnv(rawVar)
+	require.NoError(t, os.Setenv(rawVar, "from-host"))
+	t.Cleanup(func() {
+		if hadPrev {
+			_ = os.Setenv(rawVar, prevValue)
+			return
+		}
+		_ = os.Unsetenv(rawVar)
+	})
+
+	f := newFixture(t, fmt.Sprintf(`
+name: queue-explicit-env
+queue: queue-explicit-env
+env:
+  - EXPORTED_SECRET: ${%s}
+steps:
+  - name: capture
+    command: printf '%%s|%%s' "$EXPORTED_SECRET" "${%s:-}"
+    output: RESULT
+`, rawVar, rawVar), WithQueue("queue-explicit-env"), WithGlobalQueue("queue-explicit-env", 1))
+
+	runBuiltQueueCLI(t, f, []string{rawVar + "=from-host"}, "start", f.dag.Location)
+
+	directStatus, err := f.th.DAGRunMgr.GetLatestStatus(f.th.Context, f.dag)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, directStatus.Status)
+	directOutput := queueStatusOutputValue(t, &directStatus, "RESULT")
+	directParts := strings.SplitN(directOutput, "|", 2)
+	require.Len(t, directParts, 2)
+	require.Equal(t, "from-host", directParts[0])
+	require.Equal(t, "from-host", directParts[1])
+
+	queuedRunID := "queued-explicit-env-run"
+	runBuiltQueueCLI(t, f, []string{rawVar + "=from-host"}, "enqueue", "--run-id", queuedRunID, f.dag.Location)
+	f.runIDs = append(f.runIDs, queuedRunID)
+
+	queueProcessor := scheduler.NewQueueProcessor(
+		f.th.QueueStore,
+		f.th.DAGRunStore,
+		f.th.ProcStore,
+		scheduler.NewDAGExecutor(
+			coordinator.New(f.th.ServiceRegistry, coordinator.DefaultConfig()),
+			f.th.SubCmdBuilder,
+			f.th.Config.DefaultExecMode,
+			f.th.Config.Paths.BaseConfig,
+		),
+		config.Queues{
+			Enabled: true,
+			Config: []config.QueueConfig{
+				{Name: "queue-explicit-env", MaxActiveRuns: 1},
+			},
+		},
+	)
+	queueProcessor.ProcessQueueItems(f.th.Context, "queue-explicit-env")
+
+	f.WaitForStatus(queuedRunID, core.Succeeded, 10*time.Second)
+
+	queuedStatus := f.MustStatus(queuedRunID)
+	queuedOutput := queueStatusOutputValue(t, queuedStatus, "RESULT")
+	queuedParts := strings.SplitN(queuedOutput, "|", 2)
+	require.Len(t, queuedParts, 2)
+	require.Equal(t, directParts[0], queuedParts[0])
+	require.Empty(t, queuedParts[1])
 }
 
 func TestSchedulerRetryScanner(t *testing.T) {

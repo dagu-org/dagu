@@ -7,12 +7,16 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -62,6 +66,27 @@ func sendRawRequestStatus(
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = resp.Body.Close() })
 	return resp.StatusCode
+}
+
+func apiStatusOutputValue(t *testing.T, status *exec.DAGRunStatus, key string) string {
+	t.Helper()
+
+	require.NotNil(t, status)
+	for _, node := range status.Nodes {
+		if node.OutputVariables == nil {
+			continue
+		}
+		value, ok := node.OutputVariables.Load(key)
+		if ok {
+			result, ok := value.(string)
+			require.True(t, ok, "output %q has unexpected type %T", key, value)
+			result = strings.TrimPrefix(result, key+"=")
+			return result
+		}
+	}
+
+	t.Fatalf("output %q not found in DAG-run status", key)
+	return ""
 }
 
 func TestDAGWritesDisabledInReadOnlyMode(t *testing.T) {
@@ -563,5 +588,121 @@ steps:
 			s := dagRun.DagRunDetails.Status
 			return s == api.Status(core.Queued) || s == api.Status(core.Running) || s == api.Status(core.Succeeded)
 		}, 5*time.Second, 250*time.Millisecond, "expected DAG-run to reach queued state")
+	})
+
+	t.Run("StartPreservesExplicitEnvFromFilteredChild", func(t *testing.T) {
+		t.Setenv("API_START_EXPLICIT_ENV", "from-host")
+
+		spec := `
+env:
+  - EXPORTED_SECRET: ${API_START_EXPLICIT_ENV}
+steps:
+  - name: capture
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${API_START_EXPLICIT_ENV:-}"
+    output: RESULT
+`
+		dagName := "api_start_explicit_env"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{}).
+			ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.NotEmpty(t, body.DagRunId)
+
+		ref := exec.NewDAGRunRef(dagName, body.DagRunId)
+		require.Eventually(t, func() bool {
+			attempt, err := server.DAGRunStore.FindAttempt(server.Context, ref)
+			if err != nil {
+				return false
+			}
+			status, err := attempt.ReadStatus(server.Context)
+			if err != nil {
+				return false
+			}
+			return status.Status == core.Succeeded
+		}, 10*time.Second, 200*time.Millisecond)
+
+		attempt, err := server.DAGRunStore.FindAttempt(server.Context, ref)
+		require.NoError(t, err)
+		status, err := attempt.ReadStatus(server.Context)
+		require.NoError(t, err)
+		require.Equal(t, "from-host|", apiStatusOutputValue(t, status, "RESULT"))
+	})
+
+	t.Run("EnqueuePersistsExplicitEnvForFilteredChild", func(t *testing.T) {
+		t.Setenv("API_ENQUEUE_EXPLICIT_ENV", "from-host")
+
+		spec := `
+queue: api_enqueue_explicit_env
+env:
+  - EXPORTED_SECRET: ${API_ENQUEUE_EXPLICIT_ENV}
+steps:
+  - name: capture
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${API_ENQUEUE_EXPLICIT_ENV:-}"
+    output: RESULT
+`
+		dagName := "api_enqueue_explicit_env"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/enqueue", api.EnqueueDAGDAGRunJSONRequestBody{}).
+			ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.EnqueueDAGDAGRun200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.NotEmpty(t, body.DagRunId)
+
+		attempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, body.DagRunId))
+		require.NoError(t, err)
+
+		status, err := attempt.ReadStatus(server.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Queued, status.Status)
+
+		queueProcessor := scheduler.NewQueueProcessor(
+			server.QueueStore,
+			server.DAGRunStore,
+			server.ProcStore,
+			scheduler.NewDAGExecutor(
+				coordinator.New(server.ServiceRegistry, coordinator.DefaultConfig()),
+				server.SubCmdBuilder,
+				server.Config.DefaultExecMode,
+				server.Config.Paths.BaseConfig,
+			),
+			config.Queues{
+				Enabled: true,
+				Config: []config.QueueConfig{
+					{Name: dagName, MaxActiveRuns: 1},
+				},
+			},
+		)
+		queueProcessor.ProcessQueueItems(server.Context, dagName)
+
+		require.Eventually(t, func() bool {
+			latestAttempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, body.DagRunId))
+			if err != nil {
+				return false
+			}
+			latestStatus, err := latestAttempt.ReadStatus(server.Context)
+			if err != nil {
+				return false
+			}
+			return latestStatus.Status == core.Succeeded
+		}, 10*time.Second, 200*time.Millisecond)
+
+		latestAttempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, body.DagRunId))
+		require.NoError(t, err)
+		latestStatus, err := latestAttempt.ReadStatus(server.Context)
+		require.NoError(t, err)
+		require.Equal(t, "from-host|", apiStatusOutputValue(t, latestStatus, "RESULT"))
 	})
 }

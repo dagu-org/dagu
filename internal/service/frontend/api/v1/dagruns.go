@@ -1812,7 +1812,17 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 
 	// Local retry path: launch the retry subprocess asynchronously so the API
 	// returns immediately instead of blocking until the DAG run completes.
-	spec := a.subCmdBuilder.Retry(dag, request.Body.DagRunId, stepName)
+	prevStatus, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error reading status: %w", err)
+	}
+
+	prepared, err := a.prepareRetryDAGForSubprocess(ctx, dag, prevStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error preparing DAG retry env: %w", err)
+	}
+
+	spec := a.subCmdBuilder.Retry(prepared, request.Body.DagRunId, stepName)
 	if err := runtime.Start(ctx, spec); err != nil {
 		return nil, fmt.Errorf("error retrying DAG: %w", err)
 	}
@@ -2325,7 +2335,17 @@ func (a *API) resumeDAGRun(ctx context.Context, ref exec.DAGRunRef, dagRunID str
 		return fmt.Errorf("read DAG: %w", err)
 	}
 
-	retrySpec := a.subCmdBuilder.Retry(dag, dagRunID, "")
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("read status: %w", err)
+	}
+
+	prepared, err := a.prepareRetryDAGForSubprocess(ctx, dag, status)
+	if err != nil {
+		return fmt.Errorf("prepare DAG retry env: %w", err)
+	}
+
+	retrySpec := a.subCmdBuilder.Retry(prepared, dagRunID, "")
 	return runtime.Start(ctx, retrySpec)
 }
 
@@ -2340,8 +2360,35 @@ func (a *API) resumeSubDAGRun(ctx context.Context, rootRef exec.DAGRunRef, subDA
 		return fmt.Errorf("read sub-DAG: %w", err)
 	}
 
-	retrySpec := a.subCmdBuilder.Retry(dag, subDAGRunID, "")
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("read sub-DAG status: %w", err)
+	}
+
+	prepared, err := a.prepareRetryDAGForSubprocess(ctx, dag, status)
+	if err != nil {
+		return fmt.Errorf("prepare sub-DAG retry env: %w", err)
+	}
+
+	retrySpec := a.subCmdBuilder.Retry(prepared, subDAGRunID, "")
 	return runtime.Start(ctx, retrySpec)
+}
+
+func (a *API) prepareRetryDAGForSubprocess(ctx context.Context, dag *core.DAG, status *exec.DAGRunStatus) (*core.DAG, error) {
+	if dag == nil || status == nil {
+		return dag, nil
+	}
+
+	env, err := spec.ResolveEnv(ctx, dag, spec.QuoteRuntimeParams(status.ParamsList, dag.ParamDefs), spec.ResolveEnvOptions{
+		BaseConfig: a.config.Paths.BaseConfig,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	prepared := dag.Clone()
+	prepared.Env = env
+	return prepared, nil
 }
 
 func (a *API) logStepApproval(ctx context.Context, dagName, dagRunID, subDAGRunID, stepName string, resumed bool) {

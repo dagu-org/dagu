@@ -218,10 +218,9 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*core.DAG, 
 
 // LoadYAMLWithOpts loads the core.DAG configuration from YAML data.
 func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.DAG, error) {
-	raw, err := unmarshalData(data)
+	baseDef, baseRaw, err := loadBaseDefinition(opts)
 	if err != nil {
 		if opts.Has(BuildFlagAllowBuildErrors) {
-			// Return a minimal core.DAG with the error recorded
 			return &core.DAG{
 				Name:        opts.Name,
 				BuildErrors: []error{err},
@@ -230,19 +229,36 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 		return nil, core.ErrorList{err}
 	}
 
-	def, err := decode(raw)
-	if err != nil {
-		if opts.Has(BuildFlagAllowBuildErrors) {
-			// Return a minimal core.DAG with the error recorded
-			return &core.DAG{
-				Name:        opts.Name,
-				BuildErrors: []error{err},
-			}, nil
+	buildCtx := BuildContext{ctx: ctx, opts: opts}
+	dags, err := loadDAGsFromData(buildCtx, data, "", baseDef)
+	if err == nil && len(dags) > 0 {
+		dag := dags[0]
+		dag.YamlData = data
+		if len(baseRaw) > 0 {
+			dag.BaseConfigData = baseRaw
 		}
-		return nil, core.ErrorList{err}
+		if dag.WorkingDir == "" {
+			wd, err := getDefaultWorkingDir()
+			if err != nil {
+				return nil, core.ErrorList{fmt.Errorf("failed to determine working directory: %w", err)}
+			}
+			dag.WorkingDir = wd
+		} else {
+			dag.WorkingDirExplicit = true
+		}
+		core.InitializeDefaults(dag)
+		return dag, nil
 	}
-
-	return def.build(BuildContext{ctx: ctx, opts: opts})
+	if err == nil {
+		err = fmt.Errorf("no DAGs found in YAML data")
+	}
+	if opts.Has(BuildFlagAllowBuildErrors) {
+		return &core.DAG{
+			Name:        opts.Name,
+			BuildErrors: []error{err},
+		}, nil
+	}
+	return nil, core.ErrorList{err}
 }
 
 // LoadBaseConfig loads the global configuration from the given file.
@@ -391,6 +407,10 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.
 		return nil, fmt.Errorf("failed to read file %q", filePath)
 	}
 
+	return loadDAGsFromData(ctx, dat, filePath, baseDef)
+}
+
+func loadDAGsFromData(ctx BuildContext, dat []byte, filePath string, baseDef *dag) ([]*core.DAG, error) {
 	var dags []*core.DAG
 	decoder := yaml.NewDecoder(bytes.NewReader(dat))
 
@@ -433,6 +453,47 @@ func loadDAGsFromFile(ctx BuildContext, filePath string, baseDef *dag) ([]*core.
 	}
 
 	return dags, nil
+}
+
+func loadBaseDefinition(opts BuildOpts) (*dag, []byte, error) {
+	if opts.Has(BuildFlagOnlyMetadata) {
+		return nil, nil, nil
+	}
+
+	if len(opts.BaseConfigContent) > 0 {
+		raw, err := unmarshalData(opts.BaseConfigContent)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to unmarshal embedded base config: %w", err)
+		}
+		baseDef, err := decode(raw)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to decode embedded base config: %w", err)
+		}
+		return baseDef, opts.BaseConfigContent, nil
+	}
+
+	if opts.Base == "" {
+		return nil, nil, nil
+	}
+
+	baseRaw, err := os.ReadFile(opts.Base) //nolint:gosec
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("failed to read base config: %w", err)
+	}
+
+	raw, err := unmarshalData(baseRaw)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal base config: %w", err)
+	}
+	baseDef, err := decode(raw)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode base config: %w", err)
+	}
+
+	return baseDef, baseRaw, nil
 }
 
 // processDAGDocument processes a single DAG document from the YAML file.
