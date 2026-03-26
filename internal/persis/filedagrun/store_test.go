@@ -867,7 +867,7 @@ func TestResolveStatus_StandardPath_NoAttempt(t *testing.T) {
 	assert.Nil(t, status, "should return nil when no attempts exist")
 }
 
-func TestListStatuses_WithAllTimeBypassesDefaultTodayWindow(t *testing.T) {
+func TestListStatuses_WithAllHistoryBypassesDefaultTodayWindow(t *testing.T) {
 	th := setupTestStore(t)
 
 	oldTs := time.Now().UTC().Add(-48 * time.Hour)
@@ -883,7 +883,7 @@ func TestListStatuses_WithAllTimeBypassesDefaultTodayWindow(t *testing.T) {
 	statuses, err = th.Store.ListStatuses(th.Context,
 		exec.WithStatuses([]core.Status{core.Running}),
 		exec.WithoutLimit(),
-		exec.WithAllTime(),
+		exec.WithAllHistory(),
 	)
 	require.NoError(t, err)
 	require.Len(t, statuses, 1)

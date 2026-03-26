@@ -1801,7 +1801,7 @@ func (h *Handler) backfillActiveDistributedRuns(ctx context.Context) {
 	statuses, err := h.dagRunStore.ListStatuses(ctx,
 		exec.WithStatuses([]core.Status{core.Running, core.NotStarted}),
 		exec.WithoutLimit(),
-		exec.WithAllTime(),
+		exec.WithAllHistory(),
 	)
 	if err != nil {
 		logger.Error(ctx, "Failed to list distributed statuses for active-run backfill", tag.Error(err))
