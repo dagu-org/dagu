@@ -371,11 +371,12 @@ var _ coordinator.Client = (*mockCoordinatorCli)(nil)
 
 // mockCoordinatorCli is a mock implementation of coordinator.Client
 type mockCoordinatorCli struct {
-	PollFunc      func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
-	DispatchFunc  func(ctx context.Context, task *coordinatorv1.Task) error
-	MetricsFunc   func() coordinator.Metrics
-	CleanupFunc   func(ctx context.Context) error
-	HeartbeatFunc func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
+	PollFunc         func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
+	DispatchFunc     func(ctx context.Context, task *coordinatorv1.Task) error
+	MetricsFunc      func() coordinator.Metrics
+	CleanupFunc      func(ctx context.Context) error
+	HeartbeatFunc    func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
+	RunHeartbeatFunc func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error)
 
 	// Internal state tracking
 	mu               sync.Mutex
@@ -462,7 +463,14 @@ func (m *mockCoordinatorCli) AckTaskClaimTo(_ context.Context, _ exec.HostInfo, 
 	return &coordinatorv1.AckTaskClaimResponse{Accepted: true}, nil
 }
 
-func (m *mockCoordinatorCli) RunHeartbeatTo(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+func (m *mockCoordinatorCli) RunHeartbeatTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+	m.mu.Lock()
+	runHeartbeatFunc := m.RunHeartbeatFunc
+	m.mu.Unlock()
+
+	if runHeartbeatFunc != nil {
+		return runHeartbeatFunc(ctx, owner, req)
+	}
 	return &coordinatorv1.RunHeartbeatResponse{}, nil
 }
 

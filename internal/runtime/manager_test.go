@@ -271,7 +271,7 @@ steps:
 		require.Equal(t, core.Running, saved.Status)
 		require.Equal(t, core.NodeRunning, saved.Nodes[0].Status)
 	})
-	t.Run("GetSavedStatusDoesNotRepairDistributedRun", func(t *testing.T) {
+	t.Run("GetSavedStatusDoesNotRepairDistributedRunWhenLeaseMissing", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
     command: sleep 1
@@ -287,6 +287,8 @@ steps:
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
 		runningStatus.WorkerID = "worker-1"
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
@@ -295,6 +297,8 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, core.Running, saved.Status)
 		require.Equal(t, "worker-1", saved.WorkerID)
+		require.Empty(t, saved.Error)
+		require.Equal(t, core.NodeRunning, saved.Nodes[0].Status)
 	})
 	t.Run("GetLatestStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
@@ -311,10 +315,11 @@ steps:
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
 		runningStatus.WorkerID = "worker-1"
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
-
 		stopSocket := startStatusSocketServer(t, ctx, dag.DAG, dagRunID, transform.NewStatusBuilder(dag.DAG).Create(
 			dagRunID, core.Failed, 0, time.Now(),
 		))
@@ -340,10 +345,11 @@ steps:
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
 		runningStatus.WorkerID = "worker-1"
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
-
 		stopSocket := startStatusSocketServer(t, ctx, dag.DAG, dagRunID, transform.NewStatusBuilder(dag.DAG).Create(
 			dagRunID, core.Failed, 0, time.Now(),
 		))
@@ -353,6 +359,34 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, core.Running, current.Status)
 		require.Equal(t, "worker-1", current.WorkerID)
+	})
+	t.Run("GetLatestStatusDoesNotRepairDistributedRunWhenLeaseMissing", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: sleep 1
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = "attempt-1"
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
+		runningStatus.WorkerID = "worker-1"
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, latest.Status)
+		require.Equal(t, "worker-1", latest.WorkerID)
+		require.Empty(t, latest.Error)
+		require.Equal(t, core.NodeRunning, latest.Nodes[0].Status)
 	})
 }
 

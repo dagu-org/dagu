@@ -5,11 +5,13 @@ package filedistributed
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -146,6 +148,74 @@ func TestDispatchTaskStore_ConcurrentClaimIsExclusive(t *testing.T) {
 	assert.Equal(t, 1, claimedCount)
 }
 
+func TestDispatchTaskStore_CountOutstandingByQueueAndAttempt(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewDispatchTaskStore(filepath.Join(t.TempDir(), "distributed"))
+
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-a",
+		Target:     "dag-a",
+		QueueName:  "queue-a",
+		AttemptId:  "attempt-a",
+		AttemptKey: "attempt-key-a",
+		WorkerSelector: map[string]string{
+			"type": "queue-a",
+		},
+	}))
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-b",
+		Target:     "dag-b",
+		QueueName:  "queue-b",
+		AttemptId:  "attempt-b",
+		AttemptKey: "attempt-key-b",
+		WorkerSelector: map[string]string{
+			"type": "queue-b",
+		},
+	}))
+
+	count, err := store.CountOutstandingByQueue(ctx, "queue-a", time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	count, err = store.CountOutstandingByQueue(ctx, "", time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	hasOutstanding, err := store.HasOutstandingAttempt(ctx, "attempt-key-a", time.Second)
+	require.NoError(t, err)
+	assert.True(t, hasOutstanding)
+
+	hasOutstanding, err = store.HasOutstandingAttempt(ctx, "missing-attempt", time.Second)
+	require.NoError(t, err)
+	assert.False(t, hasOutstanding)
+
+	claimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-1",
+		PollerID:     "poller-1",
+		Labels:       map[string]string{"type": "queue-a"},
+		Owner:        exec.CoordinatorEndpoint{ID: "coord-a"},
+		ClaimTimeout: time.Second,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+
+	count, err = store.CountOutstandingByQueue(ctx, "queue-a", time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count, "claimed reservations must still count against queue admission")
+
+	require.NoError(t, store.DeleteClaim(ctx, claimed.ClaimToken))
+
+	count, err = store.CountOutstandingByQueue(ctx, "queue-a", time.Second)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+
+	hasOutstanding, err = store.HasOutstandingAttempt(ctx, "attempt-key-a", time.Second)
+	require.NoError(t, err)
+	assert.False(t, hasOutstanding)
+}
+
 func TestWorkerHeartbeatStore_UpsertListAndDeleteStale(t *testing.T) {
 	t.Parallel()
 
@@ -221,6 +291,73 @@ func TestDAGRunLeaseStore_UpsertTouchListAndDelete(t *testing.T) {
 	require.NoError(t, store.Delete(ctx, "attempt-key-1"))
 	_, err = store.Get(ctx, "attempt-key-1")
 	assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+}
+
+func TestActiveDistributedRunStore_UpsertListGetAndDelete(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewActiveDistributedRunStore(filepath.Join(t.TempDir(), "distributed"))
+
+	require.NoError(t, store.Upsert(ctx, exec.ActiveDistributedRun{
+		AttemptKey: "attempt-key-1",
+		DAGRun:     exec.NewDAGRunRef("dag-a", "run-1"),
+		Root:       exec.NewDAGRunRef("dag-a", "run-1"),
+		AttemptID:  "attempt-1",
+		WorkerID:   "worker-1",
+		Status:     core.Running,
+	}))
+	require.NoError(t, store.Upsert(ctx, exec.ActiveDistributedRun{
+		AttemptKey: "attempt-key-2",
+		DAGRun:     exec.NewDAGRunRef("dag-b", "run-2"),
+		Root:       exec.NewDAGRunRef("dag-b", "run-2"),
+		AttemptID:  "attempt-2",
+		WorkerID:   "worker-2",
+		Status:     core.NotStarted,
+	}))
+
+	record, err := store.Get(ctx, "attempt-key-1")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, "attempt-1", record.AttemptID)
+	assert.Equal(t, "worker-1", record.WorkerID)
+	assert.NotZero(t, record.UpdatedAt)
+
+	records, err := store.ListAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+
+	require.NoError(t, store.Delete(ctx, "attempt-key-1"))
+
+	_, err = store.Get(ctx, "attempt-key-1")
+	assert.ErrorIs(t, err, exec.ErrActiveRunNotFound)
+
+	records, err = store.ListAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, "attempt-key-2", records[0].AttemptKey)
+}
+
+func TestActiveDistributedRunStore_ListAllSkipsCorruptedEntries(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewActiveDistributedRunStore(filepath.Join(t.TempDir(), "distributed"))
+
+	require.NoError(t, store.Upsert(ctx, exec.ActiveDistributedRun{
+		AttemptKey: "attempt-key-1",
+		DAGRun:     exec.NewDAGRunRef("dag-a", "run-1"),
+		Root:       exec.NewDAGRunRef("dag-a", "run-1"),
+		AttemptID:  "attempt-1",
+		WorkerID:   "worker-1",
+		Status:     core.Running,
+	}))
+	require.NoError(t, os.WriteFile(store.activeRunPath("corrupted-attempt"), []byte("{bad json"), 0o644))
+
+	records, err := store.ListAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, "attempt-key-1", records[0].AttemptKey)
 }
 
 func TestDAGRunLeaseStore_ConcurrentTouchPreservesLatestHeartbeat(t *testing.T) {

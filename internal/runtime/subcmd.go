@@ -290,6 +290,9 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.S
 	}
 
 	args = append(args, fmt.Sprintf("--run-id=%s", task.DagRunId))
+	if task.AttemptId != "" {
+		args = append(args, fmt.Sprintf("--attempt-id=%s", task.AttemptId))
+	}
 
 	// Override derived name since temp files lack 'name:' field
 	if task.RootDagRunName != "" {
@@ -334,6 +337,9 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.S
 func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
 	env := b.env(append(preResolveEnvSecrets(secretHints), preResolveBuildEnv(envHints)...)...)
+	if task.AttemptId != "" {
+		args = append(args, fmt.Sprintf("--attempt-id=%s", task.AttemptId))
+	}
 
 	if task.Step != "" {
 		args = append(args, fmt.Sprintf("--step=%s", task.Step))

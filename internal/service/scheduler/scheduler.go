@@ -111,14 +111,6 @@ func newScheduler(
 	subCmdBuilder := runtime.NewSubCmdBuilder(cfg)
 	dagExecutor := NewDAGExecutor(coordinatorCli, subCmdBuilder, cfg.DefaultExecMode, cfg.Paths.BaseConfig)
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
-	processor := NewQueueProcessor(
-		queueStore,
-		dagRunStore,
-		procStore,
-		dagExecutor,
-		cfg.Queues,
-	)
-	defaultClock := Clock(time.Now)
 
 	// Resolve IsSuspended once at construction time and wire the event channel.
 	eventCh := make(chan DAGChangeEvent)
@@ -127,6 +119,15 @@ func newScheduler(
 		isSuspended = impl.dagStore.IsSuspended
 		impl.setEvents(eventCh)
 	}
+	processor := NewQueueProcessor(
+		queueStore,
+		dagRunStore,
+		procStore,
+		dagExecutor,
+		cfg.Queues,
+		WithIsSuspended(isSuspended),
+	)
+	defaultClock := Clock(time.Now)
 
 	// Build catchup-enqueue callbacks when queues are enabled.
 	queuesEnabled := cfg.Queues.Enabled
@@ -224,6 +225,15 @@ func (s *Scheduler) SetDAGRunLeaseStore(store exec.DAGRunLeaseStore) {
 		return
 	}
 	s.queueProcessor.dagRunLeaseStore = store
+}
+
+// SetDispatchTaskStore configures the shared distributed dispatch reservation
+// store used for queue admission and restart-safe deduplication.
+func (s *Scheduler) SetDispatchTaskStore(store exec.DispatchTaskStore) {
+	if s == nil || s.queueProcessor == nil {
+		return
+	}
+	s.queueProcessor.dispatchTaskStore = store
 }
 
 // SetRestartFunc overrides the planner's restart function for testing purposes.

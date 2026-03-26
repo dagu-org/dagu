@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -48,6 +49,8 @@ type Worker struct {
 	// For global PostgreSQL connection pool (shared-nothing mode)
 	poolManager  *sql.GlobalPoolManager
 	healthServer *healthcheck.Server
+
+	afterTaskAckHook func(context.Context, *coordinatorv1.Task) bool
 }
 
 type runningTaskState struct {
@@ -56,9 +59,20 @@ type runningTaskState struct {
 	lastOwnerHeartbeatAt time.Time
 }
 
+var errTaskClaimRejectedBeforeExecution = errors.New("task claim rejected before execution")
+
 // SetHandler sets a custom task executor for testing or custom execution logic
 func (w *Worker) SetHandler(executor TaskHandler) {
 	w.handler = executor
+}
+
+// SetAfterTaskAckHook installs a hook that runs after a task claim has been
+// acknowledged but before the worker registers or executes the task. Returning
+// true abandons execution for that claimed task. This is intended for tests.
+func (w *Worker) SetAfterTaskAckHook(hook func(context.Context, *coordinatorv1.Task) bool) {
+	w.pollersMu.Lock()
+	defer w.pollersMu.Unlock()
+	w.afterTaskAckHook = hook
 }
 
 // NewWorker creates a new worker instance.
@@ -240,8 +254,26 @@ type trackingHandler struct {
 	handler     TaskHandler
 }
 
+func (w *Worker) shouldAbandonTaskAfterAck(ctx context.Context, task *coordinatorv1.Task) bool {
+	w.pollersMu.Lock()
+	hook := w.afterTaskAckHook
+	w.pollersMu.Unlock()
+
+	return hook != nil && hook(ctx, task)
+}
+
 // Handle tracks task state and delegates to the inner executor
 func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
+	if t.worker.shouldAbandonTaskAfterAck(ctx, task) {
+		logger.Warn(ctx, "Abandoning claimed task before execution",
+			tag.WorkerID(t.worker.id),
+			tag.RunID(task.DagRunId))
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return context.Canceled
+	}
+
 	pollerID := fmt.Sprintf("poller-%d", t.pollerIndex)
 	attemptKey := task.AttemptKey
 	if attemptKey == "" {
@@ -256,37 +288,84 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 	taskCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Mark task as running and register cancel function
+	runningTask := &coordinatorv1.RunningTask{
+		DagRunId:         task.DagRunId,
+		DagName:          task.Target,
+		StartedAt:        time.Now().Unix(),
+		RootDagRunName:   task.RootDagRunName,
+		RootDagRunId:     task.RootDagRunId,
+		ParentDagRunName: task.ParentDagRunName,
+		ParentDagRunId:   task.ParentDagRunId,
+		AttemptKey:       attemptKey,
+	}
+
+	if task.AttemptKey != "" && owner.Host != "" {
+		cancelled, heartbeatErr := t.worker.validateClaimedTask(taskCtx, owner, runningTask)
+		if heartbeatErr != nil {
+			logger.Warn(taskCtx, "Failed to validate claimed task with owner coordinator before execution",
+				tag.WorkerID(t.worker.id),
+				tag.RunID(task.DagRunId),
+				tag.AttemptKey(attemptKey),
+				tag.Error(heartbeatErr),
+			)
+		} else if cancelled {
+			logger.Warn(taskCtx, "Owner coordinator rejected claimed task before execution",
+				tag.WorkerID(t.worker.id),
+				tag.RunID(task.DagRunId),
+				tag.AttemptKey(attemptKey),
+			)
+			return errTaskClaimRejectedBeforeExecution
+		}
+	}
+
+	// Register the task only after preflight validation has accepted it or
+	// failed softly. This keeps rejected claims from consuming worker capacity.
 	t.worker.pollersMu.Lock()
 	t.worker.runningTasks[attemptKey] = &runningTaskState{
-		task: &coordinatorv1.RunningTask{
-			DagRunId:         task.DagRunId,
-			DagName:          task.Target,
-			StartedAt:        time.Now().Unix(),
-			RootDagRunName:   task.RootDagRunName,
-			RootDagRunId:     task.RootDagRunId,
-			ParentDagRunName: task.ParentDagRunName,
-			ParentDagRunId:   task.ParentDagRunId,
-			AttemptKey:       attemptKey,
-		},
+		task:                 runningTask,
 		owner:                owner,
 		lastOwnerHeartbeatAt: time.Now().UTC(),
 	}
 	t.worker.pollerTasks[pollerID] = attemptKey
 	t.worker.cancelFuncs[attemptKey] = cancel
 	t.worker.pollersMu.Unlock()
+	defer func() {
+		t.worker.pollersMu.Lock()
+		delete(t.worker.runningTasks, attemptKey)
+		delete(t.worker.pollerTasks, pollerID)
+		delete(t.worker.cancelFuncs, attemptKey)
+		t.worker.pollersMu.Unlock()
+	}()
 
 	// Execute the task with cancellable context
-	err = t.handler.Handle(taskCtx, task)
+	return t.handler.Handle(taskCtx, task)
+}
 
-	// Remove from running tasks and cancel registry
-	t.worker.pollersMu.Lock()
-	delete(t.worker.runningTasks, attemptKey)
-	delete(t.worker.pollerTasks, pollerID)
-	delete(t.worker.cancelFuncs, attemptKey)
-	t.worker.pollersMu.Unlock()
+func (w *Worker) validateClaimedTask(ctx context.Context, owner exec.HostInfo, task *coordinatorv1.RunningTask) (bool, error) {
+	if task == nil || task.AttemptKey == "" || owner.Host == "" {
+		return false, nil
+	}
 
-	return err
+	callCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	resp, err := w.coordinatorCli.RunHeartbeatTo(callCtx, owner, &coordinatorv1.RunHeartbeatRequest{
+		WorkerId:           w.id,
+		OwnerCoordinatorId: owner.ID,
+		RunningTasks:       []*coordinatorv1.RunningTask{task},
+	})
+	cancel()
+	if err != nil {
+		return false, err
+	}
+	if resp == nil || len(resp.CancelledRuns) == 0 {
+		return false, nil
+	}
+
+	for _, cancelled := range resp.CancelledRuns {
+		if cancelled != nil && cancelled.AttemptKey == task.AttemptKey {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // sendHeartbeats sends periodic heartbeats to the coordinator

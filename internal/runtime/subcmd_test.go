@@ -677,14 +677,16 @@ func TestTaskStart(t *testing.T) {
 	t.Run("BasicTaskStart", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
-			DagRunId: "task-run-id",
-			Target:   "/path/to/task.yaml",
+			DagRunId:  "task-run-id",
+			AttemptId: "attempt-1",
+			Target:    "/path/to/task.yaml",
 		}
 		spec := builder.TaskStart(task, nil, nil)
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
 		assert.Contains(t, spec.Args, "start")
 		assert.Contains(t, spec.Args, "--run-id=task-run-id")
+		assert.Contains(t, spec.Args, "--attempt-id=attempt-1")
 
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
@@ -713,9 +715,10 @@ func TestTaskStart(t *testing.T) {
 	t.Run("TaskStartWithParams", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
-			DagRunId: "task-run-id",
-			Target:   "/path/to/task.yaml",
-			Params:   "env=production",
+			DagRunId:  "task-run-id",
+			AttemptId: "attempt-1",
+			Target:    "/path/to/task.yaml",
+			Params:    "env=production",
 		}
 		spec := builder.TaskStart(task, nil, nil)
 
@@ -760,9 +763,10 @@ func TestTaskStart(t *testing.T) {
 	t.Run("TaskStartWithTags", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
-			DagRunId: "task-run-id",
-			Target:   "/path/to/task.yaml",
-			Tags:     "env=prod,team=backend",
+			DagRunId:  "task-run-id",
+			AttemptId: "attempt-1",
+			Target:    "/path/to/task.yaml",
+			Tags:      "env=prod,team=backend",
 		}
 		spec := builder.TaskStart(task, nil, nil)
 
@@ -773,6 +777,7 @@ func TestTaskStart(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
 			DagRunId:     "task-run-id",
+			AttemptId:    "attempt-1",
 			Target:       "/path/to/task.yaml",
 			ScheduleTime: "2026-03-13T10:00:00Z",
 		}
@@ -785,6 +790,7 @@ func TestTaskStart(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
 			DagRunId:          "task-run-id",
+			AttemptId:         "attempt-1",
 			Target:            "/path/to/task.yaml",
 			ExternalStepRetry: true,
 		}
@@ -796,8 +802,9 @@ func TestTaskStart(t *testing.T) {
 	t.Run("TaskStartWithoutTags", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
-			DagRunId: "task-run-id",
-			Target:   "/path/to/task.yaml",
+			DagRunId:  "task-run-id",
+			AttemptId: "attempt-1",
+			Target:    "/path/to/task.yaml",
 		}
 		spec := builder.TaskStart(task, nil, nil)
 
@@ -815,8 +822,9 @@ func TestTaskStart(t *testing.T) {
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
 		task := &coordinatorv1.Task{
-			DagRunId: "task-run-id",
-			Target:   "/path/to/task.yaml",
+			DagRunId:  "task-run-id",
+			AttemptId: "attempt-1",
+			Target:    "/path/to/task.yaml",
 		}
 		spec := builderNoFile.TaskStart(task, nil, nil)
 
@@ -843,6 +851,7 @@ func TestTaskRetry(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
 			DagRunId:       "retry-run-id",
+			AttemptId:      "attempt-2",
 			Target:         "/path/to/task.yaml",
 			RootDagRunName: "root-dag",
 		}
@@ -851,6 +860,7 @@ func TestTaskRetry(t *testing.T) {
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
 		assert.Contains(t, spec.Args, "retry")
 		assert.Contains(t, spec.Args, "--run-id=retry-run-id")
+		assert.Contains(t, spec.Args, "--attempt-id=attempt-2")
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "root-dag")
@@ -860,9 +870,10 @@ func TestTaskRetry(t *testing.T) {
 	t.Run("TaskRetryWithStep", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
-			DagRunId: "retry-run-id",
-			Target:   "/path/to/task.yaml",
-			Step:     "failed-step",
+			DagRunId:  "retry-run-id",
+			AttemptId: "attempt-2",
+			Target:    "/path/to/task.yaml",
+			Step:      "failed-step",
 		}
 		spec := builder.TaskRetry(task, nil, nil)
 
@@ -873,6 +884,7 @@ func TestTaskRetry(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
 			DagRunId:          "retry-run-id",
+			AttemptId:         "attempt-2",
 			Target:            "/path/to/task.yaml",
 			RootDagRunName:    "root-dag",
 			ExternalStepRetry: true,
@@ -893,8 +905,9 @@ func TestTaskRetry(t *testing.T) {
 		}
 		builderNoFile := runtime.NewSubCmdBuilder(cfgNoFile)
 		task := &coordinatorv1.Task{
-			DagRunId: "retry-run-id",
-			Target:   "/path/to/task.yaml",
+			DagRunId:  "retry-run-id",
+			AttemptId: "attempt-2",
+			Target:    "/path/to/task.yaml",
 		}
 		spec := builderNoFile.TaskRetry(task, nil, nil)
 
