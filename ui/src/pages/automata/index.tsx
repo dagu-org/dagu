@@ -185,7 +185,7 @@ function DAGNameMultiSelect({
     }
   }, [isOpen]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!isOpen) {
       return;
     }
@@ -195,11 +195,24 @@ function DAGNameMultiSelect({
       if (!rect) {
         return;
       }
+      const viewportPadding = 16;
+      const availableWidth = Math.max(
+        320,
+        window.innerWidth - viewportPadding * 2
+      );
+      const desiredWidth = Math.max(rect.width, 520);
+      const width = Math.min(desiredWidth, availableWidth);
+      const left = Math.min(
+        Math.max(viewportPadding, rect.left),
+        window.innerWidth - viewportPadding - width
+      );
       setDropdownStyle({
         position: 'fixed',
         top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
+        left: `${left}px`,
+        width: `${width}px`,
+        minWidth: `${Math.min(520, availableWidth)}px`,
+        maxWidth: `${availableWidth}px`,
         zIndex: 60,
       });
     }
@@ -288,18 +301,22 @@ function DAGNameMultiSelect({
                         type="button"
                         onClick={() => toggleSelection(dag.fileName)}
                         className={cn(
-                          'flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-accent',
+                          'flex w-full items-start justify-between gap-3 rounded px-3 py-2 text-left text-sm hover:bg-accent',
                           selected && 'bg-accent'
                         )}
                       >
-                        <span className="truncate">
-                          {dag.fileName}
-                          {dag.name && dag.name !== dag.fileName
-                            ? ` (${dag.name})`
-                            : ''}
+                        <span className="min-w-0 flex-1">
+                          <span className="block whitespace-normal break-words font-mono text-xs">
+                            {dag.fileName}
+                          </span>
+                          {dag.name && dag.name !== dag.fileName ? (
+                            <span className="mt-0.5 block whitespace-normal break-words text-xs text-muted-foreground">
+                              {dag.name}
+                            </span>
+                          ) : null}
                         </span>
                         {selected ? (
-                          <span className="text-primary">Selected</span>
+                          <span className="shrink-0 text-primary">Selected</span>
                         ) : null}
                       </button>
                     );
