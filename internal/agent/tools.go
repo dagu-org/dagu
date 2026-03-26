@@ -14,6 +14,11 @@ func CreateTools(cfg ToolConfig) []*AgentTool {
 	regs := RegisteredTools()
 	tools := make([]*AgentTool, 0, len(regs))
 	for _, reg := range regs {
+		if cfg.AllowedTools != nil {
+			if _, ok := cfg.AllowedTools[reg.Name]; !ok {
+				continue
+			}
+		}
 		if tool := reg.Factory(cfg); tool != nil {
 			tools = append(tools, tool)
 		}

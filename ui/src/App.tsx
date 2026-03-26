@@ -36,6 +36,7 @@ import SkillEditorPage from './pages/agent-skills/SkillEditorPage';
 import AgentSoulsPage from './pages/agent-souls';
 import SoulEditorPage from './pages/agent-souls/SoulEditorPage';
 import APIKeysPage from './pages/api-keys';
+import AutomataPage from './pages/automata';
 import AuditLogsPage from './pages/audit-logs';
 import BaseConfigPage from './pages/base-config';
 import DAGRuns from './pages/dag-runs';
@@ -251,6 +252,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/search/" element={<Search />} />
                                         <Route path="/docs/*" element={<DocsPage />} />
                                         <Route path="/queues" element={<Queues />} />
+                                        <Route path="/automata" element={<AutomataPage />} />
+                                        <Route path="/automata/:name" element={<AutomataPage />} />
                                         <Route path="/dag-runs" element={<DAGRuns />} />
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
                                         <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />

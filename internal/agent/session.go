@@ -66,6 +66,9 @@ type SessionManager struct {
 	webSearch          *llm.WebSearchRequest
 	remoteNodeResolver RemoteNodeResolver
 	promptWaitInterval time.Duration
+	allowedTools       []string
+	systemPromptExtra  string
+	automataRuntime    AutomataRuntime
 }
 
 // SessionSnapshot is a point-in-time copy of the session state.
@@ -120,6 +123,12 @@ type SessionManagerConfig struct {
 	// PromptWaitInterval overrides the heartbeat interval used while waiting
 	// for a user prompt response. Zero uses loopHeartbeatInterval.
 	PromptWaitInterval time.Duration
+	// AllowedTools restricts the tools available to this session. Nil = all tools.
+	AllowedTools []string
+	// SystemPromptExtra appends runtime-specific instructions to the generated system prompt.
+	SystemPromptExtra string
+	// AutomataRuntime exposes scheduler-owned workflow controls for Automata sessions.
+	AutomataRuntime AutomataRuntime
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -201,6 +210,9 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		webSearch:          cfg.WebSearch,
 		remoteNodeResolver: cfg.RemoteNodeResolver,
 		promptWaitInterval: promptWaitInterval,
+		allowedTools:       append([]string(nil), cfg.AllowedTools...),
+		systemPromptExtra:  cfg.SystemPromptExtra,
+		automataRuntime:    cfg.AutomataRuntime,
 	}
 }
 
@@ -770,33 +782,15 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 
 // createLoop creates a new Loop instance with the current configuration.
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
-	memory := sm.loadMemory()
-	allowedSkills := ToSkillSet(sm.enabledSkills)
-	skillCount := len(sm.enabledSkills)
-	var skillSummaries []SkillSummary
-	if skillCount > 0 && skillCount <= SkillListThreshold {
-		skillSummaries = LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
-	}
+	tools, systemPrompt, allowedSkills := sm.buildRuntimeArtifacts()
 	return NewLoop(LoopConfig{
-		Provider: provider,
-		Model:    model,
-		History:  history,
-		Tools: CreateTools(ToolConfig{
-			DAGsDir:            sm.environment.DAGsDir,
-			SkillStore:         sm.skillStore,
-			AllowedSkills:      allowedSkills,
-			RemoteNodeResolver: sm.remoteNodeResolver,
-		}),
-		RecordMessage: sm.createRecordMessageFunc(),
-		Logger:        sm.logger,
-		SystemPrompt: GenerateSystemPrompt(SystemPromptParams{
-			Env:             sm.environment,
-			Memory:          memory,
-			Role:            sm.user.Role,
-			AvailableSkills: skillSummaries,
-			SkillCount:      skillCount,
-			Soul:            sm.soul,
-		}),
+		Provider:         provider,
+		Model:            model,
+		History:          history,
+		Tools:            tools,
+		RecordMessage:    sm.createRecordMessageFunc(),
+		Logger:           sm.logger,
+		SystemPrompt:     systemPrompt,
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
 		OnWorking:        sm.SetWorking,
@@ -812,7 +806,63 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		SkillStore:       sm.skillStore,
 		AllowedSkills:    allowedSkills,
 		WebSearch:        sm.webSearch,
+		AutomataRuntime:  sm.automataRuntime,
 	})
+}
+
+func (sm *SessionManager) buildRuntimeArtifacts() ([]*AgentTool, string, map[string]struct{}) {
+	memory := sm.loadMemory()
+	allowedSkills := ToSkillSet(sm.enabledSkills)
+	allowedTools := ToSkillSet(sm.allowedTools)
+	skillCount := len(sm.enabledSkills)
+	var skillSummaries []SkillSummary
+	if skillCount > 0 && skillCount <= SkillListThreshold {
+		skillSummaries = LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
+	}
+	tools := CreateTools(ToolConfig{
+		DAGsDir:            sm.environment.DAGsDir,
+		AllowedTools:       allowedTools,
+		SkillStore:         sm.skillStore,
+		AllowedSkills:      allowedSkills,
+		RemoteNodeResolver: sm.remoteNodeResolver,
+		AutomataRuntime:    sm.automataRuntime,
+	})
+	systemPrompt := GenerateSystemPrompt(SystemPromptParams{
+		Env:             sm.environment,
+		Memory:          memory,
+		Role:            sm.user.Role,
+		AvailableSkills: skillSummaries,
+		SkillCount:      skillCount,
+		Soul:            sm.soul,
+		Extra:           sm.systemPromptExtra,
+	})
+	return tools, systemPrompt, allowedSkills
+}
+
+// ApplyRuntimeOptions updates runtime-scoped session settings that should be
+// used the next time a loop is created for this session.
+func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
+	if opts == nil {
+		return
+	}
+
+	sm.mu.Lock()
+	sm.allowedTools = append([]string(nil), opts.AllowedTools...)
+	sm.systemPromptExtra = opts.SystemPromptExtra
+	sm.automataRuntime = opts.AutomataRuntime
+	if opts.EnabledSkills != nil {
+		sm.enabledSkills = append([]string(nil), opts.EnabledSkills...)
+	}
+	if opts.Soul != nil || opts.AllowClearSoul {
+		sm.soul = opts.Soul
+	}
+	loop := sm.loop
+	sm.mu.Unlock()
+
+	if loop != nil {
+		tools, systemPrompt, allowedSkills := sm.buildRuntimeArtifacts()
+		loop.UpdateRuntime(tools, systemPrompt, allowedSkills, sm.automataRuntime)
+	}
 }
 
 // loadMemory loads memory content from the memory store.

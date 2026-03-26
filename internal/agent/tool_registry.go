@@ -24,6 +24,9 @@ type ToolRegistration struct {
 type ToolConfig struct {
 	// DAGsDir is the directory containing DAG definition files.
 	DAGsDir string
+	// AllowedTools restricts which tool names can be constructed.
+	// Nil means all registered tools are allowed.
+	AllowedTools map[string]struct{}
 	// SkillStore provides access to skill data for the use_skill tool.
 	// Nil means skills are not available.
 	SkillStore SkillStore
@@ -33,6 +36,9 @@ type ToolConfig struct {
 	// RemoteNodeResolver provides access to remote nodes for remote_agent tools.
 	// Nil means remote node tools are not available.
 	RemoteNodeResolver RemoteNodeResolver
+	// AutomataRuntime provides Automata-specific workflow control tools.
+	// Nil means Automata tools are not available.
+	AutomataRuntime AutomataRuntime
 }
 
 // toolRegistry holds all registered tools. Populated by init() calls.

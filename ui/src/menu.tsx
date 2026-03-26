@@ -527,6 +527,14 @@ export const mainListItems = React.forwardRef<
               customColor={customColor}
             />
             <NavItem
+              to="/automata"
+              text="Automata"
+              icon={<Bot size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
+            <NavItem
               to="/search"
               text="Search"
               icon={<Search size={18} />}

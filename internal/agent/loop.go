@@ -83,6 +83,8 @@ type LoopConfig struct {
 	AllowedSkills map[string]struct{}
 	// WebSearch configures provider-native web search for requests.
 	WebSearch *llm.WebSearchRequest
+	// AutomataRuntime exposes workflow control methods for restricted Automata sessions.
+	AutomataRuntime AutomataRuntime
 	// OnTurnComplete is called after a queued message batch is successfully
 	// processed (processLLMRequest returned nil). For single-shot callers
 	// like the agent-step executor this is the signal to cancel the loop.
@@ -117,6 +119,7 @@ type Loop struct {
 	skillStore         SkillStore
 	allowedSkills      map[string]struct{}
 	webSearch          *llm.WebSearchRequest
+	automataRuntime    AutomataRuntime
 	onTurnComplete     func()
 	activeTurn         bool
 	interruptRequested bool
@@ -152,6 +155,7 @@ func NewLoop(config LoopConfig) *Loop {
 		skillStore:       config.SkillStore,
 		allowedSkills:    config.AllowedSkills,
 		webSearch:        config.WebSearch,
+		automataRuntime:  config.AutomataRuntime,
 		onTurnComplete:   config.OnTurnComplete,
 	}
 }
@@ -178,6 +182,21 @@ func (l *Loop) AppendExternalHistory(message llm.Message) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.history = append(l.history, message)
+}
+
+// UpdateRuntime swaps runtime-scoped loop settings for subsequent turns.
+func (l *Loop) UpdateRuntime(
+	tools []*AgentTool,
+	systemPrompt string,
+	allowedSkills map[string]struct{},
+	automataRuntime AutomataRuntime,
+) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.tools = tools
+	l.systemPrompt = systemPrompt
+	l.allowedSkills = allowedSkills
+	l.automataRuntime = automataRuntime
 }
 
 // SetSafeMode updates the safe mode setting for this loop.
@@ -491,6 +510,7 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 		SafeMode:         safeMode,
 		Role:             user.Role,
 		Delegate:         delegate,
+		AutomataRuntime:  l.automataRuntime,
 	}, input)
 
 	l.hooks.RunAfterToolExec(ctx, info, result)
@@ -514,7 +534,14 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 			l.onHeartbeat()
 		}
 
-		executed := l.executeToolCalls(ctx, toolCalls)
+		executed, paused := l.executeToolCalls(ctx, toolCalls)
+		if paused {
+			if executed < len(toolCalls) {
+				l.recordCancelledToolResults(ctx, toolCalls[executed:])
+			}
+			l.setWorking(false)
+			return nil
+		}
 		if executed < len(toolCalls) {
 			l.recordCancelledToolResults(ctx, toolCalls[executed:])
 			l.setWorking(false)
@@ -553,17 +580,20 @@ func (l *Loop) handleToolCalls(ctx context.Context, toolCalls []llm.ToolCall) er
 
 // executeToolCalls runs all tool calls sequentially.
 // The delegate tool handles its own parallelism internally.
-func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall) int {
+func (l *Loop) executeToolCalls(ctx context.Context, toolCalls []llm.ToolCall) (int, bool) {
 	l.setWorking(true)
 	for i, tc := range toolCalls {
 		l.logger.Debug("executing tool", "name", tc.Function.Name, "id", tc.ID)
 		result := l.executeTool(ctx, tc)
 		l.recordToolResult(ctx, tc, result)
+		if result.InterruptTurn {
+			return i + 1, true
+		}
 		if l.hasInterruptRequested() {
-			return i + 1
+			return i + 1, false
 		}
 	}
-	return len(toolCalls)
+	return len(toolCalls), false
 }
 
 // recordToolResult adds a tool result to history and records it.

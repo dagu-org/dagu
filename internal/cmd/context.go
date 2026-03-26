@@ -18,6 +18,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/automata"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -43,6 +44,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
+	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/filewatermark"
 	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -444,7 +446,74 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, err
 	}
 	sched.SetDAGRunLeaseStore(c.DAGRunLeaseStore)
+	if automataService, err := c.newSchedulerAutomataService(dr, schedulerRunStore); err != nil {
+		logger.Warn(c.Context, "Failed to initialize automata service for scheduler", tag.Error(err))
+	} else {
+		sched.SetAutomataService(automataService)
+	}
 	return sched, nil
+}
+
+func (c *Context) newSchedulerAutomataService(dagStore exec.DAGStore, dagRunStore exec.DAGRunStore) (*automata.Service, error) {
+	agentConfigStore, err := fileagentconfig.New(c.Config.Paths.DataDir)
+	if err != nil {
+		return nil, err
+	}
+	modelStore, err := fileagentmodel.New(filepath.Join(c.Config.Paths.DataDir, "agent", "models"))
+	if err != nil {
+		return nil, err
+	}
+	skillStore, err := fileagentskill.New(filepath.Join(c.Config.Paths.DAGsDir, "skills"))
+	if err != nil {
+		return nil, err
+	}
+	soulStore, err := fileagentsoul.New(c.Context, filepath.Join(c.Config.Paths.DAGsDir, "souls"))
+	if err != nil {
+		return nil, err
+	}
+	sessionStore, err := filesession.New(c.Config.Paths.SessionsDir, filesession.WithMaxPerUser(c.Config.Server.Session.MaxPerUser))
+	if err != nil {
+		return nil, err
+	}
+	memoryStore, err := filememory.New(c.Config.Paths.DAGsDir)
+	if err != nil {
+		return nil, err
+	}
+	referencesDir := fileagentskill.SeedReferences(
+		filepath.Join(c.Config.Paths.DataDir, "agent", "references"),
+	)
+	agentAPI := agent.NewAPI(agent.APIConfig{
+		ConfigStore:  agentConfigStore,
+		ModelStore:   modelStore,
+		SkillStore:   skillStore,
+		SoulStore:    soulStore,
+		WorkingDir:   c.Config.Paths.DAGsDir,
+		Logger:       slog.Default(),
+		SessionStore: sessionStore,
+		DAGStore:     dagStore,
+		MemoryStore:  memoryStore,
+		Environment: agent.EnvironmentInfo{
+			DAGsDir:        c.Config.Paths.DAGsDir,
+			DocsDir:        c.Config.Paths.DocsDir,
+			LogDir:         c.Config.Paths.LogDir,
+			DataDir:        c.Config.Paths.DataDir,
+			ConfigFile:     c.Config.Paths.ConfigFileUsed,
+			WorkingDir:     c.Config.Paths.DAGsDir,
+			BaseConfigFile: c.Config.Paths.BaseConfig,
+			ReferencesDir:  referencesDir,
+		},
+	})
+	agentAPI.StartCleanup(c.Context)
+	return automata.New(
+		c.Config,
+		dagStore,
+		dagRunStore,
+		automata.WithSessionStore(sessionStore),
+		automata.WithAgentAPI(agentAPI),
+		automata.WithSoulStore(soulStore),
+		automata.WithSubCmdBuilder(runtime.NewSubCmdBuilder(c.Config)),
+		automata.WithLogger(slog.Default()),
+	), nil
 }
 
 // StringParam retrieves a string parameter from the command line flags.

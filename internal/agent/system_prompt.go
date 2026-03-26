@@ -66,6 +66,7 @@ type SystemPromptParams struct {
 	AvailableSkills []SkillSummary
 	SkillCount      int
 	Soul            *Soul
+	Extra           string
 }
 
 // GenerateSystemPrompt renders the system prompt template with the given parameters.
@@ -77,6 +78,7 @@ func GenerateSystemPrompt(p SystemPromptParams) string {
 	availableSkills := p.AvailableSkills
 	skillCount := p.SkillCount
 	soul := p.Soul
+	extra := strings.TrimSpace(p.Extra)
 	var buf bytes.Buffer
 	var rawSoulContent string
 	if soul != nil {
@@ -103,6 +105,9 @@ func GenerateSystemPrompt(p SystemPromptParams) string {
 	result := buf.String()
 	if rawSoulContent != "" {
 		result = strings.Replace(result, soulPlaceholder, rawSoulContent, 1)
+	}
+	if extra != "" {
+		result += "\n\n" + extra
 	}
 	return result
 }

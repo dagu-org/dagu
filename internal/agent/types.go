@@ -296,12 +296,52 @@ type ToolOut struct {
 	Content string
 	// IsError indicates whether the tool execution failed.
 	IsError bool
+	// InterruptTurn stops the current assistant turn after recording the tool result.
+	// This is used by Automata tools that hand control back to the scheduler.
+	InterruptTurn bool
 	// DelegateIDs references the sub-sessions created by the delegate tool.
 	DelegateIDs []string
 	// AuditDetails contains extra audit details set by the tool at runtime.
 	// These are merged with DetailExtractor output in the audit hook;
 	// AuditDetails takes precedence on key collisions.
 	AuditDetails map[string]any
+}
+
+// AutomataAllowedDAG describes a DAG that an Automata session is allowed to run.
+type AutomataAllowedDAG struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+}
+
+// AutomataRunDAGInput contains the arguments for launching an allowed DAG.
+type AutomataRunDAGInput struct {
+	DAGName string `json:"dag_name"`
+	Params  string `json:"params,omitempty"`
+}
+
+// AutomataRunDAGResult is returned after an Automata launches a DAG.
+type AutomataRunDAGResult struct {
+	DAGName  string `json:"dag_name"`
+	DAGRunID string `json:"dag_run_id"`
+}
+
+// AutomataHumanPrompt describes a persisted human-input request owned by Automata.
+type AutomataHumanPrompt struct {
+	Question            string             `json:"question"`
+	Options             []UserPromptOption `json:"options,omitempty"`
+	AllowFreeText       bool               `json:"allow_free_text,omitempty"`
+	FreeTextPlaceholder string             `json:"free_text_placeholder,omitempty"`
+}
+
+// AutomataRuntime exposes scheduler-owned workflow controls to restricted Automata sessions.
+type AutomataRuntime interface {
+	ListAllowedDAGs(ctx context.Context) ([]AutomataAllowedDAG, error)
+	RunAllowedDAG(ctx context.Context, input AutomataRunDAGInput) (AutomataRunDAGResult, error)
+	RetryCurrentRun(ctx context.Context) (AutomataRunDAGResult, error)
+	SetStage(ctx context.Context, stage, note string) error
+	RequestHumanInput(ctx context.Context, prompt AutomataHumanPrompt) error
+	Finish(ctx context.Context, summary string) error
 }
 
 // ToolFunc is the function signature for tool execution.
@@ -391,6 +431,8 @@ type ToolContext struct {
 	Role auth.Role
 	// Delegate provides sub-agent spawning capability. Nil when not available.
 	Delegate *DelegateContext
+	// AutomataRuntime exposes workflow controls for restricted Automata sessions.
+	AutomataRuntime AutomataRuntime
 }
 
 // AuditInfo configures how a tool's executions appear in audit logs.

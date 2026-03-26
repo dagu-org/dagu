@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/automata"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -79,6 +80,7 @@ type API struct {
 	licenseManager      *license.Manager
 	workspaceStore      workspace.Store
 	leaseStaleThreshold time.Duration
+	automataService     *automata.Service
 }
 
 // AuthService defines the interface for authentication operations.
@@ -246,6 +248,13 @@ func WithAgentAPI(a *agent.API) APIOption {
 	}
 }
 
+// WithAutomataService returns an APIOption that sets the Automata service instance.
+func WithAutomataService(service *automata.Service) APIOption {
+	return func(api *API) {
+		api.automataService = service
+	}
+}
+
 // New constructs an API configured with the provided stores, runtime manager,
 // configuration, coordinator client, service registry, Prometheus registry,
 // and resource service. It builds the remote node map and base path, then
@@ -322,6 +331,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		r.Use(frontendauth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodeResolver, a.apiBasePath))
 		r.Use(WebhookRawBodyMiddleware())
+		a.configureAutomataRoutes(r)
 
 		middlewares := []api.StrictMiddlewareFunc{validateDAGFileNameMiddleware}
 		options := api.StrictHTTPServerOptions{

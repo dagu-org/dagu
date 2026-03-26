@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/automata"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -54,6 +55,7 @@ type Scheduler struct {
 	startupCancel       context.CancelFunc
 	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
+	automataService     *automata.Service
 }
 
 type schedulerHooks struct {
@@ -215,6 +217,11 @@ func (s *Scheduler) SetClock(clock Clock) {
 	if s.retryScanner != nil {
 		s.retryScanner.clock = clock
 	}
+}
+
+// SetAutomataService configures the Automata controller owned by the scheduler leader.
+func (s *Scheduler) SetAutomataService(service *automata.Service) {
+	s.automataService = service
 }
 
 // SetDAGRunLeaseStore configures the shared distributed lease store used for
@@ -483,6 +490,12 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	wg.Go(func() {
 		s.entryReader.Start(ctx)
 	})
+
+	if s.automataService != nil {
+		wg.Go(func() {
+			s.automataService.Run(ctx)
+		})
+	}
 
 	logger.Info(ctx, "Scheduler started")
 	cleanupOnFailure = false

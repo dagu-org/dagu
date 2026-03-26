@@ -137,6 +137,17 @@ type sessionRuntimeConfig struct {
 	outputCostPer1M float64
 }
 
+// SessionRuntimeOptions applies runtime-scoped overrides when a session is
+// created or reactivated for a specific workflow controller.
+type SessionRuntimeOptions struct {
+	AllowedTools      []string
+	SystemPromptExtra string
+	EnabledSkills     []string
+	Soul              *Soul
+	AllowClearSoul    bool
+	AutomataRuntime   AutomataRuntime
+}
+
 // NewAPI creates a new API instance.
 func NewAPI(cfg APIConfig) *API {
 	logger := cfg.Logger
@@ -806,17 +817,23 @@ func (a *API) getStoredSession(ctx context.Context, id, userID string) (*Session
 
 // getOrReactivateSession retrieves an active session or reactivates it from storage.
 func (a *API) getOrReactivateSession(ctx context.Context, id string, user UserIdentity) (*SessionManager, bool) {
+	return a.getOrReactivateSessionWithRuntime(ctx, id, user, nil)
+}
+
+func (a *API) getOrReactivateSessionWithRuntime(ctx context.Context, id string, user UserIdentity, runtimeOpts *SessionRuntimeOptions) (*SessionManager, bool) {
 	// Check active sessions first
 	if mgr, ok := a.getActiveSession(id, user.UserID); ok {
+		mgr.UpdateUserContext(user)
+		mgr.ApplyRuntimeOptions(runtimeOpts)
 		return mgr, true
 	}
 
 	// Try to reactivate from store
-	return a.reactivateSession(ctx, id, user)
+	return a.reactivateSession(ctx, id, user, runtimeOpts)
 }
 
 // reactivateSession restores a session from storage and makes it active.
-func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentity) (*SessionManager, bool) {
+func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentity, runtimeOpts *SessionRuntimeOptions) (*SessionManager, bool) {
 	if a.store == nil {
 		return nil, false
 	}
@@ -859,6 +876,23 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		}
 	}
 
+	enabledSkills := a.loadEnabledSkills(ctx)
+	if runtimeOpts != nil && runtimeOpts.EnabledSkills != nil {
+		enabledSkills = append([]string(nil), runtimeOpts.EnabledSkills...)
+	}
+	soul := a.loadSelectedSoul(ctx)
+	if runtimeOpts != nil && (runtimeOpts.Soul != nil || runtimeOpts.AllowClearSoul) {
+		soul = runtimeOpts.Soul
+	}
+	var allowedTools []string
+	var systemPromptExtra string
+	var automataRuntime AutomataRuntime
+	if runtimeOpts != nil {
+		allowedTools = append([]string(nil), runtimeOpts.AllowedTools...)
+		systemPromptExtra = runtimeOpts.SystemPromptExtra
+		automataRuntime = runtimeOpts.AutomataRuntime
+	}
+
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:                 id,
 		User:               user,
@@ -877,14 +911,20 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		OutputCostPer1M:    outputCost,
 		MemoryStore:        a.memoryStore,
 		SkillStore:         a.skillStore,
-		EnabledSkills:      a.loadEnabledSkills(ctx),
+		EnabledSkills:      enabledSkills,
 		DAGName:            sess.DAGName,
 		SessionStore:       a.store,
-		Soul:               a.loadSelectedSoul(ctx),
+		Soul:               soul,
 		WebSearch:          a.loadWebSearch(ctx),
 		RemoteNodeResolver: a.remoteNodeResolver,
 		Delegates:          delegates,
+		AllowedTools:       allowedTools,
+		SystemPromptExtra:  systemPromptExtra,
+		AutomataRuntime:    automataRuntime,
 	})
+	if runtimeOpts != nil {
+		mgr.ApplyRuntimeOptions(runtimeOpts)
+	}
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
 
@@ -1117,13 +1157,34 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 // This is used by chat bridges that need a conversation container before the
 // next live user message, such as notification-seeded bot sessions.
 func (a *API) CreateEmptySession(ctx context.Context, user UserIdentity, dagName string, safeMode bool) (string, error) {
+	return a.CreateEmptySessionWithRuntime(ctx, user, dagName, safeMode, nil)
+}
+
+// CreateEmptySessionWithRuntime creates a durable session with runtime-scoped
+// overrides such as tool restrictions and extra system prompt content.
+func (a *API) CreateEmptySessionWithRuntime(
+	ctx context.Context,
+	user UserIdentity,
+	dagName string,
+	safeMode bool,
+	runtimeOpts *SessionRuntimeOptions,
+) (string, error) {
 	cfg, err := a.defaultSessionRuntime(ctx, dagName, safeMode)
 	if err != nil {
 		return "", err
 	}
+	if runtimeOpts != nil {
+		if runtimeOpts.EnabledSkills != nil {
+			cfg.enabledSkills = append([]string(nil), runtimeOpts.EnabledSkills...)
+		}
+		if runtimeOpts.Soul != nil || runtimeOpts.AllowClearSoul {
+			cfg.soul = runtimeOpts.Soul
+		}
+	}
 
 	id := uuid.New().String()
-	a.newManagedSession(ctx, id, user, cfg, time.Now())
+	mgr := a.newManagedSession(ctx, id, user, cfg, time.Now())
+	mgr.ApplyRuntimeOptions(runtimeOpts)
 	return id, nil
 }
 
@@ -1323,11 +1384,24 @@ func (a *API) prepareSessionRuntime(ctx context.Context, mgr *SessionManager, us
 // start immediately, while working sessions merge the text into a queued
 // safe-boundary interrupt turn.
 func (a *API) EnqueueChatMessage(ctx context.Context, sessionID string, user UserIdentity, req ChatRequest) (ChatQueueResult, error) {
-	mgr, ok := a.getOrReactivateSession(ctx, sessionID, user)
+	return a.EnqueueChatMessageWithRuntime(ctx, sessionID, user, req, nil)
+}
+
+// EnqueueChatMessageWithRuntime accepts bot chat input and applies runtime-scoped
+// overrides before starting or reactivating the session loop.
+func (a *API) EnqueueChatMessageWithRuntime(
+	ctx context.Context,
+	sessionID string,
+	user UserIdentity,
+	req ChatRequest,
+	runtimeOpts *SessionRuntimeOptions,
+) (ChatQueueResult, error) {
+	mgr, ok := a.getOrReactivateSessionWithRuntime(ctx, sessionID, user, runtimeOpts)
 	if !ok {
 		return ChatQueueResult{}, ErrSessionNotFound
 	}
 
+	mgr.ApplyRuntimeOptions(runtimeOpts)
 	provider, model, resolvedModel, err := a.prepareSessionRuntime(ctx, mgr, user, req)
 	if err != nil {
 		return ChatQueueResult{}, err
@@ -1346,10 +1420,11 @@ func (a *API) EnqueueChatMessage(ctx context.Context, sessionID string, user Use
 	if err != nil {
 		return ChatQueueResult{}, err
 	}
-	targetMgr, ok := a.getOrReactivateSession(ctx, targetSessionID, user)
+	targetMgr, ok := a.getOrReactivateSessionWithRuntime(ctx, targetSessionID, user, runtimeOpts)
 	if !ok {
 		return ChatQueueResult{}, ErrSessionNotFound
 	}
+	targetMgr.ApplyRuntimeOptions(runtimeOpts)
 	provider, model, resolvedModel, err = a.prepareSessionRuntime(ctx, targetMgr, user, req)
 	if err != nil {
 		return ChatQueueResult{}, err
