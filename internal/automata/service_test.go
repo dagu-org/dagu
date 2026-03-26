@@ -102,6 +102,89 @@ allowedDAGs:
 	require.Equal(t, "Complete the assigned software work", detail.Definition.Goal)
 }
 
+func TestServicePutSpecRejectsUnknownTopLevelField(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+bogus: true
+stages:
+  - name: research
+    allowed_dags:
+      names:
+        - build-app
+`
+
+	err := svc.PutSpec(ctx, "software-dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `unknown field "bogus"`)
+}
+
+func TestServicePutSpecRejectsUnknownStageField(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+stages:
+  - name: research
+    bogus: true
+    allowed_dags:
+      names:
+        - build-app
+`
+
+	err := svc.PutSpec(ctx, "software-dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `unknown field "bogus"`)
+}
+
+func TestServicePutSpecRejectsUnknownAllowedDAGsField(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+stages:
+  - name: research
+    allowed_dags:
+      names:
+        - build-app
+      bogus:
+        - nope
+`
+
+	err := svc.PutSpec(ctx, "software-dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `unknown field "bogus"`)
+}
+
+func TestServicePutSpecRejectsUnknownAgentField(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+stages:
+  - name: research
+    allowed_dags:
+      names:
+        - build-app
+agent:
+  safeMode: true
+  bogus: true
+`
+
+	err := svc.PutSpec(ctx, "software-dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `unknown field "bogus"`)
+}
+
 func TestServiceOverrideStagePersistsDeclaredStage(t *testing.T) {
 	t.Parallel()
 

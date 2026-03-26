@@ -1,0 +1,9 @@
+Totally agree. The "LLM as CPU" anti-pattern is real.
+
+It works even better when reasoning and execution are step types in the same workflow. Step 1 is an LLM call that decides what to do. Steps 2, 3, 4 are shell commands, SQL queries, API calls. Step 5 brings the LLM back for edge cases. Deterministic steps cost nothing and behave the same every time.
+
+On agent drift - the fix isn't more memory, it's scoping. Each run starts clean with only the context it actually needs.
+
+The interesting part is tool-calling. Instead of calling a Python function, the LLM invokes an entire workflow with typed inputs and structured outputs. It picks which workflow and what parameters, but execution is fully deterministic.
+
+This is basically the approach I took building Dagu (dagu.sh). The architecture you're describing maps really well to how I think about it too.

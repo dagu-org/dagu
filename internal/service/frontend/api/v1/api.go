@@ -331,7 +331,6 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 		r.Use(frontendauth.Middleware(authOptions))
 		r.Use(WithRemoteNode(a.remoteNodeResolver, a.apiBasePath))
 		r.Use(WebhookRawBodyMiddleware())
-		a.configureAutomataRoutes(r)
 
 		middlewares := []api.StrictMiddlewareFunc{validateDAGFileNameMiddleware}
 		options := api.StrictHTTPServerOptions{

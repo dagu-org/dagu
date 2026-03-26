@@ -16,6 +16,7 @@ interface Props {
   onDeleteWorkspace: (id: string) => void;
   onSelectTemplate: (fileName: string) => void;
   onTemplateSelectorOpenChange?: (isOpen: boolean) => void;
+  showTemplateSelector?: boolean;
 }
 
 export function CockpitToolbar({
@@ -27,6 +28,7 @@ export function CockpitToolbar({
   onDeleteWorkspace,
   onSelectTemplate,
   onTemplateSelectorOpenChange,
+  showTemplateSelector = true,
 }: Props): React.ReactElement {
   const canWrite = useCanWrite();
   return (
@@ -39,18 +41,22 @@ export function CockpitToolbar({
         onDelete={onDeleteWorkspace}
         canWrite={canWrite}
       />
-      <TemplateSelector
-        selectedTemplate={selectedTemplate}
-        selectedWorkspace={selectedWorkspace}
-        onSelect={onSelectTemplate}
-        onOpenChange={onTemplateSelectorOpenChange}
-      />
-      <DAGPreviewModal
-        fileName={selectedTemplate}
-        isOpen={!!selectedTemplate}
-        selectedWorkspace={selectedWorkspace}
-        onClose={() => onSelectTemplate('')}
-      />
+      {showTemplateSelector ? (
+        <>
+          <TemplateSelector
+            selectedTemplate={selectedTemplate}
+            selectedWorkspace={selectedWorkspace}
+            onSelect={onSelectTemplate}
+            onOpenChange={onTemplateSelectorOpenChange}
+          />
+          <DAGPreviewModal
+            fileName={selectedTemplate}
+            isOpen={!!selectedTemplate}
+            selectedWorkspace={selectedWorkspace}
+            onClose={() => onSelectTemplate('')}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

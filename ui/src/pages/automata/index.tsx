@@ -1,9 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
-import useSWR from 'swr';
 
-import { Status } from '@/api/v1/schema';
+import { Status, type components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,95 +10,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { DAGRunDetailsModal } from '@/features/dag-runs/components/dag-run-details';
 import { DAGDetailsModal } from '@/features/dags/components/dag-details';
-import fetchJson from '@/lib/fetchJson';
+import { useClient, useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/ui/LoadingIndicator';
 import StatusChip from '@/ui/StatusChip';
 
-declare const getConfig: () => { apiURL: string };
-
-type AutomataSummary = {
-  name: string;
-  description?: string;
-  goal: string;
-  instruction?: string;
-  state: string;
-  stage?: string;
-  disabled?: boolean;
-  lastUpdatedAt?: string;
-  currentRun?: {
-    name: string;
-    dagRunId: string;
-    status: string;
-  };
-};
-
-type AutomataDetail = {
-  definition: {
-    name: string;
-    description?: string;
-    goal: string;
-    stages: {
-      name: string;
-      allowedDAGs?: {
-        names?: string[];
-        tags?: string[];
-      };
-    }[];
-    disabled?: boolean;
-  };
-  state: {
-    state: string;
-    instruction?: string;
-    currentStage?: string;
-    waitingReason?: string;
-    pendingStageTransition?: {
-      requestedStage: string;
-      note?: string;
-      requestedBy?: string;
-      createdAt?: string;
-    };
-    pendingPrompt?: {
-      id: string;
-      question: string;
-      options?: { id: string; label: string; description?: string }[];
-      allowFreeText?: boolean;
-      freeTextPlaceholder?: string;
-    };
-    sessionId?: string;
-    currentRunRef?: { name: string; id: string };
-    lastSummary?: string;
-    lastError?: string;
-  };
-  allowedDags: {
-    name: string;
-    description?: string;
-    tags?: string[];
-  }[];
-  currentRun?: {
-    name: string;
-    dagRunId: string;
-    status: string;
-  };
-  recentRuns?: {
-    name: string;
-    dagRunId: string;
-    status: string;
-    startedAt?: string;
-    finishedAt?: string;
-    error?: string;
-  }[];
-  messages?: {
-    id: string;
-    type: string;
-    content?: string;
-    created_at?: string;
-    user_prompt?: {
-      question: string;
-    };
-    tool_results?: { content: string; is_error?: boolean }[];
-  }[];
-};
+type AutomataDetail = components['schemas']['AutomataDetailResponse'];
 
 const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
 const DEFAULT_STAGE_NAMES = ['research', 'plan', 'implement', 'review'];
@@ -335,34 +251,6 @@ function DAGNameMultiSelect({
   );
 }
 
-async function sendJSON(
-  path: string,
-  method: string,
-  body?: unknown
-): Promise<void> {
-  const token = localStorage.getItem('dagu_auth_token');
-  const response = await fetch(`${getConfig().apiURL}${path}`, {
-    method,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!response.ok) {
-    let message = response.statusText;
-    try {
-      const data = await response.json();
-      message = data?.message || message;
-    } catch {
-      // keep status text
-    }
-    throw new Error(message);
-  }
-}
-
 function quoteYAML(value: string): string {
   return JSON.stringify(value.trim());
 }
@@ -481,6 +369,7 @@ function dagRunStatusToStatus(status: string): Status | undefined {
 
 function AutomataPage(): React.ReactElement {
   const appBar = React.useContext(AppBarContext);
+  const client = useClient();
   const navigate = useNavigate();
   const { name } = useParams();
 
@@ -519,27 +408,24 @@ function AutomataPage(): React.ReactElement {
     appBar.setTitle('Automata');
   }, [appBar]);
 
-  const listQuery = useSWR<{ automata: AutomataSummary[] }>(
-    '/automata',
-    fetchJson,
+  const listQuery = useQuery('/automata', {}, { refreshInterval: 15000 });
+
+  const dagListQuery = useQuery(
+    '/dags',
+    {
+      params: {
+        query: {
+          perPage: 500,
+          remoteNode: appBar.selectedRemoteNode || undefined,
+        },
+      },
+    },
     { refreshInterval: 15000 }
   );
 
-  const dagListQuery = useSWR<{
-    dags: { fileName: string; dag: { name: string } }[];
-  }>(
-    `/dags?perPage=500${
-      appBar.selectedRemoteNode
-        ? `&remoteNode=${encodeURIComponent(appBar.selectedRemoteNode)}`
-        : ''
-    }`,
-    fetchJson,
-    { refreshInterval: 15000 }
-  );
-
-  const detailQuery = useSWR<AutomataDetail>(
-    name ? `/automata/${encodeURIComponent(name)}` : null,
-    fetchJson,
+  const detailQuery = useQuery(
+    '/automata/{name}',
+    name ? { params: { path: { name } } } : null,
     {
       refreshInterval: (data) =>
         data?.state?.state === 'running' ||
@@ -550,9 +436,9 @@ function AutomataPage(): React.ReactElement {
     }
   );
 
-  const specQuery = useSWR<{ spec: string }>(
-    name ? `/automata/${encodeURIComponent(name)}/spec` : null,
-    fetchJson,
+  const specQuery = useQuery(
+    '/automata/{name}/spec',
+    name ? { params: { path: { name } } } : null,
     { refreshInterval: 15000 }
   );
 
@@ -689,17 +575,19 @@ function AutomataPage(): React.ReactElement {
     setIsCreating(true);
 
     try {
-      await sendJSON(
-        `/automata/${encodeURIComponent(automataName)}/spec`,
-        'PUT',
-        {
+      const { error: apiError } = await client.PUT('/automata/{name}/spec', {
+        params: { path: { name: automataName } },
+        body: {
           spec: buildAutomataSpec({
             description: createDescription,
             goal: createGoal,
             stages: createStages,
           }),
-        }
-      );
+        },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to create automata');
+      }
       await listQuery.mutate();
       setShowCreateDialog(false);
       resetCreateForm();
@@ -738,9 +626,11 @@ function AutomataPage(): React.ReactElement {
     if (!name) return;
     setError('');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/start`, 'POST', {
-        instruction: instructionDraft,
+      const { error: apiError } = await client.POST('/automata/{name}/start', {
+        params: { path: { name } },
+        body: { instruction: instructionDraft || undefined },
       });
+      if (apiError) throw new Error(apiError.message || 'Failed to start automata');
       void detailQuery.mutate();
       void listQuery.mutate();
     } catch (err) {
@@ -752,10 +642,14 @@ function AutomataPage(): React.ReactElement {
     if (!name || !stageOverride) return;
     setError('');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/stage`, 'POST', {
-        stage: stageOverride,
-        note: stageNote,
+      const { error: apiError } = await client.POST('/automata/{name}/stage', {
+        params: { path: { name } },
+        body: {
+          stage: stageOverride,
+          note: stageNote || undefined,
+        },
       });
+      if (apiError) throw new Error(apiError.message || 'Failed to update stage');
       setStageNote('');
       void detailQuery.mutate();
       void listQuery.mutate();
@@ -771,11 +665,16 @@ function AutomataPage(): React.ReactElement {
     if (!name || !detail?.state?.pendingPrompt) return;
     setError('');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/response`, 'POST', {
-        promptId: detail.state.pendingPrompt.id,
-        selectedOptionIds,
-        freeTextResponse: freeText,
+      const { error: apiError } = await client.POST('/automata/{name}/response', {
+        params: { path: { name } },
+        body: {
+          promptId: detail.state.pendingPrompt.id,
+          selectedOptionIds:
+            selectedOptionIds.length > 0 ? selectedOptionIds : undefined,
+          freeTextResponse: freeText || undefined,
+        },
       });
+      if (apiError) throw new Error(apiError.message || 'Failed to respond');
       setSelectedOptions([]);
       setFreeTextResponse('');
       void detailQuery.mutate();
@@ -797,9 +696,12 @@ function AutomataPage(): React.ReactElement {
     if (!name || !operatorMessageDraft.trim()) return;
     setError('');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/message`, 'POST', {
-        message: operatorMessageDraft,
+      const { error: apiError } = await client.POST('/automata/{name}/message', {
+        params: { path: { name } },
+        body: { message: operatorMessageDraft },
       });
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to send operator message');
       setOperatorMessageDraft('');
       void detailQuery.mutate();
       void listQuery.mutate();
@@ -815,10 +717,19 @@ function AutomataPage(): React.ReactElement {
     setError('');
     const paused = detail.state.state === 'paused';
     try {
-      await sendJSON(
-        `/automata/${encodeURIComponent(name)}/${paused ? 'resume' : 'pause'}`,
-        'POST'
-      );
+      const response = paused
+        ? await client.POST('/automata/{name}/resume', {
+            params: { path: { name } },
+          })
+        : await client.POST('/automata/{name}/pause', {
+            params: { path: { name } },
+          });
+      if (response.error) {
+        throw new Error(
+          response.error.message ||
+            (paused ? 'Failed to resume automata' : 'Failed to pause automata')
+        );
+      }
       void detailQuery.mutate();
       void listQuery.mutate();
     } catch (err) {
@@ -844,9 +755,11 @@ function AutomataPage(): React.ReactElement {
     setError('');
     setManagementBusy('rename');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/rename`, 'POST', {
-        newName: trimmed,
+      const { error: apiError } = await client.POST('/automata/{name}/rename', {
+        params: { path: { name } },
+        body: { newName: trimmed },
       });
+      if (apiError) throw new Error(apiError.message || 'Failed to rename automata');
       await listQuery.mutate();
       navigate(`/automata/${encodeURIComponent(trimmed)}`);
     } catch (err) {
@@ -868,9 +781,15 @@ function AutomataPage(): React.ReactElement {
     setError('');
     setManagementBusy('duplicate');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/duplicate`, 'POST', {
-        newName: trimmed,
-      });
+      const { error: apiError } = await client.POST(
+        '/automata/{name}/duplicate',
+        {
+          params: { path: { name } },
+          body: { newName: trimmed },
+        }
+      );
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to duplicate automata');
       await listQuery.mutate();
       navigate(`/automata/${encodeURIComponent(trimmed)}`);
     } catch (err) {
@@ -894,7 +813,11 @@ function AutomataPage(): React.ReactElement {
     setError('');
     setManagementBusy('reset');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/reset`, 'POST');
+      const { error: apiError } = await client.POST('/automata/{name}/reset', {
+        params: { path: { name } },
+      });
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to reset automata state');
       await Promise.all([detailQuery.mutate(), listQuery.mutate()]);
     } catch (err) {
       setError(
@@ -917,7 +840,11 @@ function AutomataPage(): React.ReactElement {
     setError('');
     setManagementBusy('delete');
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}`, 'DELETE');
+      const { error: apiError } = await client.DELETE('/automata/{name}', {
+        params: { path: { name } },
+      });
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to delete automata');
       await listQuery.mutate();
       navigate('/automata');
     } catch (err) {
@@ -932,9 +859,11 @@ function AutomataPage(): React.ReactElement {
     setSpecError('');
     setIsSavingSpec(true);
     try {
-      await sendJSON(`/automata/${encodeURIComponent(name)}/spec`, 'PUT', {
-        spec: specDraft,
+      const { error: apiError } = await client.PUT('/automata/{name}/spec', {
+        params: { path: { name } },
+        body: { spec: specDraft },
       });
+      if (apiError) throw new Error(apiError.message || 'Failed to save spec');
       await Promise.all([
         detailQuery.mutate(),
         listQuery.mutate(),
@@ -1294,9 +1223,9 @@ function AutomataPage(): React.ReactElement {
                       >
                         <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                           <span>{message.type}</span>
-                          {message.created_at ? (
+                          {message.createdAt ? (
                             <span className="normal-case tracking-normal">
-                              {new Date(message.created_at).toLocaleString()}
+                              {new Date(message.createdAt).toLocaleString()}
                             </span>
                           ) : null}
                         </div>
@@ -1305,14 +1234,14 @@ function AutomataPage(): React.ReactElement {
                             {message.content}
                           </div>
                         ) : null}
-                        {message.user_prompt?.question ? (
+                        {message.userPrompt?.question ? (
                           <div className="whitespace-pre-wrap break-words">
-                            {message.user_prompt.question}
+                            {message.userPrompt.question}
                           </div>
                         ) : null}
-                        {message.tool_results?.length ? (
+                        {message.toolResults?.length ? (
                           <div className="mt-2 space-y-1">
-                            {message.tool_results.map((result, index) => (
+                            {message.toolResults.map((result, index) => (
                               <div
                                 key={index}
                                 className="rounded bg-muted p-2 text-xs whitespace-pre-wrap break-words"
@@ -1568,18 +1497,16 @@ function AutomataPage(): React.ReactElement {
                             );
                           }
                         )}
-                        {detail.state.pendingPrompt.allowFreeText ? (
-                          <Textarea
-                            value={freeTextResponse}
-                            onChange={(e) =>
-                              setFreeTextResponse(e.target.value)
-                            }
-                            placeholder={
-                              detail.state.pendingPrompt.freeTextPlaceholder ||
-                              'Enter response'
-                            }
-                          />
-                        ) : null}
+                        <Textarea
+                          value={freeTextResponse}
+                          onChange={(e) =>
+                            setFreeTextResponse(e.target.value)
+                          }
+                          placeholder={
+                            detail.state.pendingPrompt.freeTextPlaceholder ||
+                            'Add an optional note or free-text response'
+                          }
+                        />
                         <Button onClick={onRespond}>Submit Response</Button>
                       </>
                     )}
@@ -1743,9 +1670,9 @@ function AutomataPage(): React.ReactElement {
                         >
                           <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                             <span>{message.type}</span>
-                            {message.created_at ? (
+                            {message.createdAt ? (
                               <span className="normal-case tracking-normal">
-                                {new Date(message.created_at).toLocaleString()}
+                                {new Date(message.createdAt).toLocaleString()}
                               </span>
                             ) : null}
                           </div>
@@ -1754,14 +1681,14 @@ function AutomataPage(): React.ReactElement {
                               {message.content}
                             </div>
                           ) : null}
-                          {message.user_prompt?.question ? (
+                          {message.userPrompt?.question ? (
                             <div className="whitespace-pre-wrap break-words">
-                              {message.user_prompt.question}
+                              {message.userPrompt.question}
                             </div>
                           ) : null}
-                          {message.tool_results?.length ? (
+                          {message.toolResults?.length ? (
                             <div className="mt-2 space-y-1">
-                              {message.tool_results.map((result, index) => (
+                              {message.toolResults.map((result, index) => (
                                 <div
                                   key={index}
                                   className="rounded bg-muted p-2 text-xs whitespace-pre-wrap break-words"

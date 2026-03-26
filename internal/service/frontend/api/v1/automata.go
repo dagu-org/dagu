@@ -4,303 +4,693 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"io"
 	"net/http"
 	"os"
 
-	apiv1 "github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/automata"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/audit"
-	"github.com/go-chi/chi/v5"
 )
 
-func (a *API) configureAutomataRoutes(r chi.Router) {
+func (a *API) ListAutomata(ctx context.Context, _ api.ListAutomataRequestObject) (api.ListAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	items, err := a.automataService.List(ctx)
+	if err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	resp := make([]api.AutomataSummary, 0, len(items))
+	for _, item := range items {
+		resp = append(resp, toAPIAutomataSummary(item))
+	}
+	return api.ListAutomata200JSONResponse{Automata: resp}, nil
+}
+
+func (a *API) GetAutomata(ctx context.Context, request api.GetAutomataRequestObject) (api.GetAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	item, err := a.automataService.Detail(ctx, string(request.Name))
+	if err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	return api.GetAutomata200JSONResponse(toAPIAutomataDetail(item)), nil
+}
+
+func (a *API) GetAutomataSpec(ctx context.Context, request api.GetAutomataSpecRequestObject) (api.GetAutomataSpecResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	spec, err := a.automataService.GetSpec(ctx, string(request.Name))
+	if err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	return api.GetAutomataSpec200JSONResponse{Spec: spec}, nil
+}
+
+func (a *API) PutAutomataSpec(ctx context.Context, request api.PutAutomataSpecRequestObject) (api.PutAutomataSpecResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	if err := a.automataService.PutSpec(ctx, name, request.Body.Spec); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "spec_upsert", map[string]any{"name": name})
+	return api.PutAutomataSpec204Response{}, nil
+}
+
+func (a *API) DeleteAutomata(ctx context.Context, request api.DeleteAutomataRequestObject) (api.DeleteAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	name := string(request.Name)
+	if err := a.automataService.Delete(ctx, name); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "delete", map[string]any{"name": name})
+	return api.DeleteAutomata204Response{}, nil
+}
+
+func (a *API) RenameAutomata(ctx context.Context, request api.RenameAutomataRequestObject) (api.RenameAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	body := automata.RenameRequest{
+		NewName:     request.Body.NewName,
+		RequestedBy: a.currentUsername(ctx),
+	}
+	if err := a.automataService.Rename(ctx, name, body); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "rename", map[string]any{
+		"name":     name,
+		"new_name": body.NewName,
+	})
+	return api.RenameAutomata204Response{}, nil
+}
+
+func (a *API) DuplicateAutomata(ctx context.Context, request api.DuplicateAutomataRequestObject) (api.DuplicateAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	body := automata.DuplicateRequest{NewName: request.Body.NewName}
+	if err := a.automataService.Duplicate(ctx, name, body); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "duplicate", map[string]any{
+		"name":     name,
+		"new_name": body.NewName,
+	})
+	return api.DuplicateAutomata204Response{}, nil
+}
+
+func (a *API) ResetAutomata(ctx context.Context, request api.ResetAutomataRequestObject) (api.ResetAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	name := string(request.Name)
+	if err := a.automataService.ResetState(ctx, name); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "reset", map[string]any{"name": name})
+	return api.ResetAutomata204Response{}, nil
+}
+
+func (a *API) StartAutomata(ctx context.Context, request api.StartAutomataRequestObject) (api.StartAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	name := string(request.Name)
+	body := automata.StartRequest{
+		RequestedBy: a.currentUsername(ctx),
+	}
+	if request.Body != nil && request.Body.Instruction != nil {
+		body.Instruction = *request.Body.Instruction
+	}
+	if err := a.automataService.RequestStart(ctx, name, body); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "start", map[string]any{
+		"name":        name,
+		"instruction": body.Instruction,
+	})
+	return api.StartAutomata204Response{}, nil
+}
+
+func (a *API) PauseAutomata(ctx context.Context, request api.PauseAutomataRequestObject) (api.PauseAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	name := string(request.Name)
+	if err := a.automataService.Pause(ctx, name, a.currentUsername(ctx)); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "pause", map[string]any{"name": name})
+	return api.PauseAutomata204Response{}, nil
+}
+
+func (a *API) ResumeAutomata(ctx context.Context, request api.ResumeAutomataRequestObject) (api.ResumeAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	name := string(request.Name)
+	if err := a.automataService.Resume(ctx, name, a.currentUsername(ctx)); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "resume", map[string]any{"name": name})
+	return api.ResumeAutomata204Response{}, nil
+}
+
+func (a *API) OverrideAutomataStage(ctx context.Context, request api.OverrideAutomataStageRequestObject) (api.OverrideAutomataStageResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	body := automata.StageOverrideRequest{
+		Stage:       request.Body.Stage,
+		RequestedBy: a.currentUsername(ctx),
+		Note:        valueOf(request.Body.Note),
+	}
+	if err := a.automataService.OverrideStage(ctx, name, body); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "stage_override", map[string]any{
+		"name":  name,
+		"stage": body.Stage,
+	})
+	return api.OverrideAutomataStage204Response{}, nil
+}
+
+func (a *API) MessageAutomata(ctx context.Context, request api.MessageAutomataRequestObject) (api.MessageAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	body := automata.OperatorMessageRequest{
+		Message:     request.Body.Message,
+		RequestedBy: a.currentUsername(ctx),
+	}
+	if err := a.automataService.SubmitOperatorMessage(ctx, name, body); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "message", map[string]any{"name": name})
+	return api.MessageAutomata204Response{}, nil
+}
+
+func (a *API) RespondAutomata(ctx context.Context, request api.RespondAutomataRequestObject) (api.RespondAutomataResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	body := automata.HumanResponseRequest{
+		PromptID:          request.Body.PromptId,
+		SelectedOptionIDs: append([]string(nil), valueOf(request.Body.SelectedOptionIds)...),
+		FreeTextResponse:  valueOf(request.Body.FreeTextResponse),
+	}
+	if err := a.automataService.SubmitHumanResponse(ctx, name, body); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "respond", map[string]any{
+		"name":      name,
+		"prompt_id": body.PromptID,
+	})
+	return api.RespondAutomata204Response{}, nil
+}
+
+func (a *API) requireAutomataService() error {
 	if a.automataService == nil {
-		return
+		return &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    "Automata service is not available",
+			HTTPStatus: http.StatusServiceUnavailable,
+		}
 	}
-	r.Route("/automata", func(r chi.Router) {
-		r.Get("/", a.handleListAutomata)
-		r.Get("/{name}", a.handleGetAutomata)
-		r.Get("/{name}/spec", a.handleGetAutomataSpec)
-		r.Put("/{name}/spec", a.handlePutAutomataSpec)
-		r.Post("/{name}/rename", a.handleRenameAutomata)
-		r.Post("/{name}/duplicate", a.handleDuplicateAutomata)
-		r.Delete("/{name}", a.handleDeleteAutomata)
-		r.Post("/{name}/reset", a.handleResetAutomata)
-		r.Post("/{name}/start", a.handleStartAutomata)
-		r.Post("/{name}/pause", a.handlePauseAutomata)
-		r.Post("/{name}/resume", a.handleResumeAutomata)
-		r.Post("/{name}/message", a.handleMessageAutomata)
-		r.Post("/{name}/stage", a.handleOverrideAutomataStage)
-		r.Post("/{name}/response", a.handleRespondAutomata)
-	})
+	return nil
 }
 
-func (a *API) handleListAutomata(w http.ResponseWriter, r *http.Request) {
-	items, err := a.automataService.List(r.Context())
-	if err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusInternalServerError, apiv1.ErrorCodeInternalError, err))
-		return
+func (a *API) currentUsername(ctx context.Context) string {
+	user, ok := auth.UserFromContext(ctx)
+	if !ok || user == nil {
+		return ""
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"automata": items})
+	return user.Username
 }
 
-func (a *API) handleGetAutomata(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
-	item, err := a.automataService.Detail(r.Context(), name)
-	if err != nil {
-		writeAutomataError(w, err)
-		return
+func toAutomataAPIError(err error) error {
+	if err == nil {
+		return nil
 	}
-	writeJSON(w, http.StatusOK, item)
-}
-
-func (a *API) handleGetAutomataSpec(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
-	spec, err := a.automataService.GetSpec(r.Context(), name)
-	if err != nil {
-		writeAutomataError(w, err)
-		return
+	var apiErr *Error
+	if errors.As(err, &apiErr) {
+		return err
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"spec": spec})
-}
-
-func (a *API) handlePutAutomataSpec(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireDAGWrite(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	var body struct {
-		Spec string `json:"spec"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	if err := a.automataService.PutSpec(r.Context(), name, body.Spec); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "spec_upsert", map[string]any{"name": name})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleDeleteAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireDAGWrite(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	if err := a.automataService.Delete(r.Context(), name); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "delete", map[string]any{"name": name})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleRenameAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireDAGWrite(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	var body automata.RenameRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
-		body.RequestedBy = user.Username
-	}
-	if err := a.automataService.Rename(r.Context(), name, body); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "rename", map[string]any{
-		"name":     name,
-		"new_name": body.NewName,
-	})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleDuplicateAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireDAGWrite(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	var body automata.DuplicateRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	if err := a.automataService.Duplicate(r.Context(), name, body); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "duplicate", map[string]any{
-		"name":     name,
-		"new_name": body.NewName,
-	})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleResetAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireExecute(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	if err := a.automataService.ResetState(r.Context(), name); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "reset", map[string]any{"name": name})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleStartAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireExecute(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	var body automata.StartRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	userName := ""
-	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
-		userName = user.Username
-	}
-	body.RequestedBy = userName
-	if err := a.automataService.RequestStart(r.Context(), name, body); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "start", map[string]any{"name": name, "instruction": body.Instruction})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handlePauseAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireExecute(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	userName := ""
-	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
-		userName = user.Username
-	}
-	if err := a.automataService.Pause(r.Context(), name, userName); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "pause", map[string]any{"name": name})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleResumeAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireExecute(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	userName := ""
-	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
-		userName = user.Username
-	}
-	if err := a.automataService.Resume(r.Context(), name, userName); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "resume", map[string]any{"name": name})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleOverrideAutomataStage(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireExecute(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	var body automata.StageOverrideRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
-		body.RequestedBy = user.Username
-	}
-	if err := a.automataService.OverrideStage(r.Context(), name, body); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "stage_override", map[string]any{"name": name, "stage": body.Stage})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleMessageAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireExecute(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	var body automata.OperatorMessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
-		body.RequestedBy = user.Username
-	}
-	if err := a.automataService.SubmitOperatorMessage(r.Context(), name, body); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "message", map[string]any{"name": name})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (a *API) handleRespondAutomata(w http.ResponseWriter, r *http.Request) {
-	if err := a.requireExecute(r.Context()); err != nil {
-		WriteErrorResponse(w, err)
-		return
-	}
-	name := chi.URLParam(r, "name")
-	var body automata.HumanResponseRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
-		return
-	}
-	if err := a.automataService.SubmitHumanResponse(r.Context(), name, body); err != nil {
-		writeAutomataError(w, err)
-		return
-	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "respond", map[string]any{"name": name, "prompt_id": body.PromptID})
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
-}
-
-func writeAutomataError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, exec.ErrDAGNotFound):
-		WriteErrorResponse(w, NewAPIError(http.StatusNotFound, apiv1.ErrorCodeNotFound, err))
-	case errors.Is(err, os.ErrNotExist):
-		WriteErrorResponse(w, NewAPIError(http.StatusNotFound, apiv1.ErrorCodeNotFound, err))
+	case errors.Is(err, exec.ErrDAGNotFound), errors.Is(err, os.ErrNotExist):
+		return &Error{
+			Code:       api.ErrorCodeNotFound,
+			Message:    err.Error(),
+			HTTPStatus: http.StatusNotFound,
+		}
 	default:
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
+		return &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+			HTTPStatus: http.StatusBadRequest,
+		}
 	}
+}
+
+func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
+	return api.AutomataSummary{
+		CurrentRun:    toAPIAutomataRunSummary(item.CurrentRun),
+		Description:   ptrOf(item.Description),
+		Disabled:      ptrOf(item.Disabled),
+		Goal:          item.Goal,
+		Instruction:   ptrOf(item.Instruction),
+		LastUpdatedAt: ptrOf(item.LastUpdatedAt),
+		Name:          item.Name,
+		Stage:         ptrOf(item.Stage),
+		State:         api.AutomataLifecycleState(item.State),
+	}
+}
+
+func toAPIAutomataDetail(item *automata.Detail) api.AutomataDetailResponse {
+	if item == nil {
+		return api.AutomataDetailResponse{
+			AllowedDags: []api.AutomataAllowedDAGInfo{},
+		}
+	}
+	resp := api.AutomataDetailResponse{
+		AllowedDags: toAPIAutomataAllowedDAGInfos(item.AllowedDAGs),
+		CurrentRun:  toAPIAutomataRunSummary(item.CurrentRun),
+		Definition:  toAPIAutomataDefinition(item.Definition),
+		State:       toAPIAutomataState(item.State),
+	}
+	if len(item.RecentRuns) > 0 {
+		runs := make([]api.AutomataRunSummary, 0, len(item.RecentRuns))
+		for _, run := range item.RecentRuns {
+			apiRun := toAPIAutomataRunSummary(&run)
+			if apiRun != nil {
+				runs = append(runs, *apiRun)
+			}
+		}
+		resp.RecentRuns = &runs
+	}
+	if len(item.Messages) > 0 {
+		msgs := toAPIAgentMessages(item.Messages)
+		resp.Messages = &msgs
+	}
+	return resp
+}
+
+func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
+	if def == nil {
+		return api.AutomataDefinition{}
+	}
+	resp := api.AutomataDefinition{
+		Description: ptrOf(def.Description),
+		Disabled:    ptrOf(def.Disabled),
+		Goal:        def.Goal,
+		Name:        def.Name,
+		Stages:      toAPIAutomataStages(def.Stages),
+	}
+	if agentConfig := toAPIAutomataAgentConfig(def.Agent); agentConfig != nil {
+		resp.Agent = agentConfig
+	}
+	return resp
+}
+
+func toAPIAutomataAgentConfig(cfg automata.AgentConfig) *api.AutomataAgentConfig {
+	resp := &api.AutomataAgentConfig{
+		Model:    ptrOf(cfg.Model),
+		SafeMode: refOf(cfg.SafeMode),
+		Soul:     ptrOf(cfg.Soul),
+	}
+	if len(cfg.EnabledSkills) > 0 {
+		skills := append([]string(nil), cfg.EnabledSkills...)
+		resp.EnabledSkills = &skills
+	}
+	if resp.Model == nil && resp.SafeMode == nil && resp.Soul == nil && resp.EnabledSkills == nil {
+		return nil
+	}
+	return resp
+}
+
+func toAPIAutomataStages(stages []automata.StageDefinition) []api.AutomataStageDefinition {
+	if len(stages) == 0 {
+		return []api.AutomataStageDefinition{}
+	}
+	resp := make([]api.AutomataStageDefinition, 0, len(stages))
+	for _, stage := range stages {
+		resp = append(resp, api.AutomataStageDefinition{
+			AllowedDAGs: toAPIAutomataAllowedDAGs(stage.AllowedDAGs),
+			Name:        stage.Name,
+		})
+	}
+	return resp
+}
+
+func toAPIAutomataAllowedDAGs(allowed automata.AllowedDAGs) *api.AutomataAllowedDAGs {
+	resp := &api.AutomataAllowedDAGs{}
+	if len(allowed.Names) > 0 {
+		names := append([]string(nil), allowed.Names...)
+		resp.Names = &names
+	}
+	if len(allowed.Tags) > 0 {
+		tags := append([]string(nil), allowed.Tags...)
+		resp.Tags = &tags
+	}
+	if resp.Names == nil && resp.Tags == nil {
+		return nil
+	}
+	return resp
+}
+
+func toAPIAutomataAllowedDAGInfos(items []automata.AllowedDAGInfo) []api.AutomataAllowedDAGInfo {
+	if len(items) == 0 {
+		return []api.AutomataAllowedDAGInfo{}
+	}
+	resp := make([]api.AutomataAllowedDAGInfo, 0, len(items))
+	for _, item := range items {
+		apiItem := api.AutomataAllowedDAGInfo{
+			Description: ptrOf(item.Description),
+			Name:        item.Name,
+		}
+		if len(item.Tags) > 0 {
+			tags := append([]string(nil), item.Tags...)
+			apiItem.Tags = &tags
+		}
+		resp = append(resp, apiItem)
+	}
+	return resp
+}
+
+func toAPIAutomataState(state *automata.State) api.AutomataState {
+	if state == nil {
+		return api.AutomataState{}
+	}
+	resp := api.AutomataState{
+		CurrentCycleId:       ptrOf(state.CurrentCycleID),
+		CurrentRunRef:        toAPIAutomataRunRef(state.CurrentRunRef),
+		CurrentStage:         ptrOf(state.CurrentStage),
+		FinishedAt:           ptrOf(state.FinishedAt),
+		Instruction:          ptrOf(state.Instruction),
+		InstructionUpdatedAt: ptrOf(state.InstructionUpdatedAt),
+		InstructionUpdatedBy: ptrOf(state.InstructionUpdatedBy),
+		LastError:            ptrOf(state.LastError),
+		LastRunRef:           toAPIAutomataRunRef(state.LastRunRef),
+		LastScheduleMinute:   ptrOf(state.LastScheduleMinute),
+		LastSummary:          ptrOf(state.LastSummary),
+		LastTriggeredAt:      ptrOf(state.LastTriggeredAt),
+		LastUpdatedAt:        ptrOf(state.LastUpdatedAt),
+		PausedAt:             ptrOf(state.PausedAt),
+		PausedBy:             ptrOf(state.PausedBy),
+		PendingPrompt:        toAPIAutomataPrompt(state.PendingPrompt),
+		PendingResponse:      toAPIAutomataPromptResponse(state.PendingResponse),
+		PendingStageTransition: toAPIAutomataPendingStageTransition(
+			state.PendingStageTransition,
+		),
+		SessionId:        ptrOf(state.SessionID),
+		StageChangedAt:   ptrOf(state.StageChangedAt),
+		StageChangedBy:   ptrOf(state.StageChangedBy),
+		StageNote:        ptrOf(state.StageNote),
+		StartRequestedAt: ptrOf(state.StartRequestedAt),
+		State:            api.AutomataLifecycleState(state.State),
+		WaitingReason:    toAPIAutomataWaitingReason(state.WaitingReason),
+	}
+	if len(state.PendingTurnMessages) > 0 {
+		messages := toAPIAutomataPendingTurnMessages(state.PendingTurnMessages)
+		resp.PendingTurnMessages = &messages
+	}
+	return resp
+}
+
+func toAPIAutomataWaitingReason(reason automata.WaitingReason) *api.AutomataWaitingReason {
+	if reason == "" {
+		return nil
+	}
+	apiReason := api.AutomataWaitingReason(reason)
+	return &apiReason
+}
+
+func toAPIAutomataPrompt(prompt *automata.Prompt) *api.AutomataPrompt {
+	if prompt == nil {
+		return nil
+	}
+	resp := &api.AutomataPrompt{
+		AllowFreeText:       refOf(prompt.AllowFreeText),
+		CreatedAt:           prompt.CreatedAt,
+		FreeTextPlaceholder: ptrOf(prompt.FreeTextPlaceholder),
+		Id:                  prompt.ID,
+		Question:            prompt.Question,
+	}
+	if len(prompt.Options) > 0 {
+		options := toAPIAgentUserPromptOptions(prompt.Options)
+		resp.Options = &options
+	}
+	return resp
+}
+
+func toAPIAutomataPromptResponse(response *automata.PromptResponse) *api.AutomataPromptResponse {
+	if response == nil {
+		return nil
+	}
+	resp := &api.AutomataPromptResponse{
+		FreeTextResponse: ptrOf(response.FreeTextResponse),
+		PromptId:         response.PromptID,
+		RespondedAt:      response.RespondedAt,
+	}
+	if len(response.SelectedOptionIDs) > 0 {
+		selected := append([]string(nil), response.SelectedOptionIDs...)
+		resp.SelectedOptionIds = &selected
+	}
+	return resp
+}
+
+func toAPIAutomataPendingStageTransition(
+	transition *automata.PendingStageTransition,
+) *api.AutomataPendingStageTransition {
+	if transition == nil {
+		return nil
+	}
+	return &api.AutomataPendingStageTransition{
+		CreatedAt:      transition.CreatedAt,
+		Note:           ptrOf(transition.Note),
+		RequestedBy:    ptrOf(transition.RequestedBy),
+		RequestedStage: transition.RequestedStage,
+	}
+}
+
+func toAPIAutomataPendingTurnMessages(
+	messages []automata.PendingTurnMessage,
+) []api.AutomataPendingTurnMessage {
+	resp := make([]api.AutomataPendingTurnMessage, 0, len(messages))
+	for _, message := range messages {
+		resp = append(resp, api.AutomataPendingTurnMessage{
+			CreatedAt: message.CreatedAt,
+			Id:        message.ID,
+			Kind:      message.Kind,
+			Message:   message.Message,
+		})
+	}
+	return resp
+}
+
+func toAPIAutomataRunRef(ref *exec.DAGRunRef) *api.AutomataRunRef {
+	if ref == nil {
+		return nil
+	}
+	return &api.AutomataRunRef{
+		Id:   ref.ID,
+		Name: ref.Name,
+	}
+}
+
+func toAPIAutomataRunSummary(run *automata.RunSummary) *api.AutomataRunSummary {
+	if run == nil {
+		return nil
+	}
+	resp := &api.AutomataRunSummary{
+		CreatedAt:  ptrOf(run.CreatedAt),
+		DagRunId:   run.DAGRunID,
+		Error:      ptrOf(run.Error),
+		FinishedAt: ptrOf(run.FinishedAt),
+		Name:       run.Name,
+		StartedAt:  ptrOf(run.StartedAt),
+		Status:     api.StatusLabel(run.Status),
+		TriggerType: func() *api.TriggerType {
+			if run.TriggerType == "" {
+				return nil
+			}
+			triggerType := api.TriggerType(run.TriggerType)
+			return &triggerType
+		}(),
+	}
+	return resp
+}
+
+func toAPIAgentMessages(messages []agent.Message) []api.AgentMessage {
+	resp := make([]api.AgentMessage, 0, len(messages))
+	for _, message := range messages {
+		resp = append(resp, toAPIAgentMessage(message))
+	}
+	return resp
+}
+
+func toAPIAgentMessage(message agent.Message) api.AgentMessage {
+	resp := api.AgentMessage{
+		Content:    ptrOf(message.Content),
+		Cost:       message.Cost,
+		CreatedAt:  message.CreatedAt,
+		Id:         message.ID,
+		SequenceId: message.SequenceID,
+		SessionId:  message.SessionID,
+		Type:       api.AgentMessageType(message.Type),
+	}
+	if len(message.DelegateIDs) > 0 {
+		delegateIDs := append([]string(nil), message.DelegateIDs...)
+		resp.DelegateIds = &delegateIDs
+	}
+	if len(message.ToolCalls) > 0 {
+		toolCalls := make([]api.AgentToolCall, 0, len(message.ToolCalls))
+		for _, call := range message.ToolCalls {
+			toolCalls = append(toolCalls, api.AgentToolCall{
+				Function: api.AgentToolCallFunction{
+					Arguments: call.Function.Arguments,
+					Name:      call.Function.Name,
+				},
+				Id:   call.ID,
+				Type: call.Type,
+			})
+		}
+		resp.ToolCalls = &toolCalls
+	}
+	if len(message.ToolResults) > 0 {
+		toolResults := make([]api.AgentToolResult, 0, len(message.ToolResults))
+		for _, result := range message.ToolResults {
+			toolResults = append(toolResults, api.AgentToolResult{
+				Content:    result.Content,
+				IsError:    refOf(result.IsError),
+				ToolCallId: result.ToolCallID,
+			})
+		}
+		resp.ToolResults = &toolResults
+	}
+	if message.Usage != nil {
+		resp.Usage = &api.AgentTokenUsage{
+			CompletionTokens: refOf(message.Usage.CompletionTokens),
+			PromptTokens:     refOf(message.Usage.PromptTokens),
+			TotalTokens:      refOf(message.Usage.TotalTokens),
+		}
+	}
+	if message.UIAction != nil {
+		resp.UiAction = &api.AgentUIAction{
+			Path: ptrOf(message.UIAction.Path),
+			Type: string(message.UIAction.Type),
+		}
+	}
+	if message.UserPrompt != nil {
+		resp.UserPrompt = toAPIAgentUserPrompt(message.UserPrompt)
+	}
+	return resp
+}
+
+func toAPIAgentUserPrompt(prompt *agent.UserPrompt) *api.AgentUserPrompt {
+	if prompt == nil {
+		return nil
+	}
+	resp := &api.AgentUserPrompt{
+		AllowFreeText:       prompt.AllowFreeText,
+		Command:             ptrOf(prompt.Command),
+		FreeTextPlaceholder: ptrOf(prompt.FreeTextPlaceholder),
+		MultiSelect:         prompt.MultiSelect,
+		PromptId:            prompt.PromptID,
+		Question:            prompt.Question,
+		WorkingDir:          ptrOf(prompt.WorkingDir),
+	}
+	if prompt.PromptType != "" {
+		promptType := api.AgentUserPromptPromptType(prompt.PromptType)
+		resp.PromptType = &promptType
+	}
+	if len(prompt.Options) > 0 {
+		options := toAPIAgentUserPromptOptions(prompt.Options)
+		resp.Options = &options
+	}
+	return resp
+}
+
+func toAPIAgentUserPromptOptions(options []agent.UserPromptOption) []api.AgentUserPromptOption {
+	resp := make([]api.AgentUserPromptOption, 0, len(options))
+	for _, option := range options {
+		resp = append(resp, api.AgentUserPromptOption{
+			Description: ptrOf(option.Description),
+			Id:          option.ID,
+			Label:       option.Label,
+		})
+	}
+	return resp
+}
+
+func refOf[T any](v T) *T {
+	return &v
 }

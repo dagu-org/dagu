@@ -29,7 +29,6 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/google/uuid"
-	"gopkg.in/yaml.v3"
 )
 
 var automataNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
@@ -201,8 +200,8 @@ func (s *Service) loadDefinitionFile(ctx context.Context, path string) (*Definit
 		return nil, err
 	}
 	var def Definition
-	if err := yaml.Unmarshal(data, &def); err != nil {
-		return nil, fmt.Errorf("parse yaml: %w", err)
+	if err := parseDefinitionYAML(data, &def); err != nil {
+		return nil, err
 	}
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	def.Name = name
@@ -322,8 +321,8 @@ func (s *Service) PutSpec(ctx context.Context, name, spec string) error {
 		return err
 	}
 	var def Definition
-	if err := yaml.Unmarshal([]byte(spec), &def); err != nil {
-		return fmt.Errorf("parse yaml: %w", err)
+	if err := parseDefinitionYAML([]byte(spec), &def); err != nil {
+		return err
 	}
 	def.Name = name
 	if err := s.validateDefinition(ctx, &def); err != nil {

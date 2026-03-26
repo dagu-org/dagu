@@ -113,6 +113,12 @@ func (s *Service) reconcileDefinition(ctx context.Context, def *Definition) erro
 		return s.flushPendingTurnMessages(ctx, def, state)
 	}
 
+	if flushed, err := s.flushQueuedSessionTurn(ctx, def.Name, state); err != nil {
+		return err
+	} else if flushed {
+		return s.saveState(ctx, def.Name, state)
+	}
+
 	return nil
 }
 
@@ -214,7 +220,7 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 		state.SessionID = sessionID
 	}
 
-	_, err = s.agentAPI.EnqueueChatMessageWithRuntime(ctx, state.SessionID, user, agent.ChatRequest{
+	result, err := s.agentAPI.EnqueueChatMessageWithRuntime(ctx, state.SessionID, user, agent.ChatRequest{
 		Message:  message,
 		Model:    def.Agent.Model,
 		SafeMode: def.Agent.SafeMode,
@@ -227,7 +233,7 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 				return s.saveState(ctx, def.Name, state)
 			}
 			state.SessionID = sessionID
-			_, err = s.agentAPI.EnqueueChatMessageWithRuntime(ctx, state.SessionID, user, agent.ChatRequest{
+			result, err = s.agentAPI.EnqueueChatMessageWithRuntime(ctx, state.SessionID, user, agent.ChatRequest{
 				Message:  message,
 				Model:    def.Agent.Model,
 				SafeMode: def.Agent.SafeMode,
@@ -238,6 +244,15 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 		state.LastError = err.Error()
 		return s.saveState(ctx, def.Name, state)
 	}
+	if result.SessionID != "" {
+		state.SessionID = result.SessionID
+	}
+	if result.Queued {
+		if _, flushErr := s.flushQueuedSessionTurn(ctx, def.Name, state); flushErr != nil {
+			state.LastError = flushErr.Error()
+			return s.saveState(ctx, def.Name, state)
+		}
+	}
 
 	state.State = StateRunning
 	state.PendingTurnMessages = nil
@@ -245,6 +260,28 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 	state.LastTriggeredAt = s.clock()
 	state.WaitingReason = WaitingReasonNone
 	return s.saveState(ctx, def.Name, state)
+}
+
+func (s *Service) flushQueuedSessionTurn(ctx context.Context, name string, state *State) (bool, error) {
+	if s.agentAPI == nil || state == nil || state.SessionID == "" {
+		return false, nil
+	}
+	result, err := s.agentAPI.FlushQueuedChatMessage(ctx, state.SessionID, s.systemUser(name))
+	if err != nil {
+		return false, err
+	}
+	changed := false
+	if result.SessionID != "" && result.SessionID != state.SessionID {
+		state.SessionID = result.SessionID
+		changed = true
+	}
+	if result.Started {
+		state.LastTriggeredAt = s.clock()
+		state.State = StateRunning
+		state.WaitingReason = WaitingReasonNone
+		changed = true
+	}
+	return changed, nil
 }
 
 func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *State) (*agent.SessionRuntimeOptions, error) {

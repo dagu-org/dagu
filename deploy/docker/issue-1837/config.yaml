@@ -1,0 +1,7 @@
+default_execution_mode: distributed
+
+queues:
+  enabled: true
+  config:
+    - name: "issue-1837"
+      max_concurrency: 1

@@ -1,0 +1,18 @@
+name: issue-1837-queue-stuck-02
+type: graph
+queue: issue-1837
+working_dir: ${DAG_RUN_WORK_DIR}
+schedule: "*/2 * * * *"
+steps:
+  - id: step_1
+    command: echo "Job 02 - Step 1 - Starting workflow"
+
+  - id: step_2
+    depends: [step_1]
+    script: |
+      echo "Job 02 - Step 2 - Processing data"
+      sleep 15
+
+  - id: step_3
+    depends: [step_2]
+    command: echo "Job 02 - Step 3 - Workflow complete"

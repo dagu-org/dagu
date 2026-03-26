@@ -1,0 +1,147 @@
+name: dagu-issue-1837
+
+x-dagu-env: &dagu-env
+  DAGU_HOME: /var/lib/dagu
+  DAGU_DATA_DIR: /var/lib/dagu/data
+  DAGU_LOG_DIR: /var/lib/dagu/logs
+  DAGU_DAGS_DIR: /var/lib/dagu/dags
+  DAGU_DEFAULT_EXECUTION_MODE: distributed
+  DAGU_TZ: UTC
+  DAGU_DEBUG: "true"
+  DAGU_AUTH_MODE: basic
+  DAGU_AUTH_BASIC_USERNAME: admin
+  DAGU_AUTH_BASIC_PASSWORD: debug-password
+
+x-dagu-volumes: &dagu-volumes
+  - ./issue-1837/data:/var/lib/dagu/data
+  - ./issue-1837/logs:/var/lib/dagu/logs
+  - ./issue-1837/dags:/var/lib/dagu/dags
+  - ./issue-1837/config.yaml:/etc/dagu/config.yaml:ro
+
+x-dagu-service: &dagu-service
+  image: ${DAGU_IMAGE:-ghcr.io/dagu-org/dagu:2.3.6}
+  init: true
+  environment: *dagu-env
+  volumes: *dagu-volumes
+
+x-dagu-worker-env: &dagu-worker-env
+  DAGU_HOME: /var/lib/dagu
+  DAGU_DATA_DIR: /var/lib/dagu/data
+  DAGU_LOG_DIR: /var/lib/dagu/logs
+  DAGU_DAGS_DIR: /var/lib/dagu/dags
+  DAGU_DEFAULT_EXECUTION_MODE: distributed
+  DAGU_TZ: UTC
+  DAGU_DEBUG: "true"
+  DAGU_WORKER_COORDINATORS: coordinator-1:50055,coordinator-2:50055,coordinator-3:50055
+
+x-dagu-worker-volumes: &dagu-worker-volumes
+  - ./issue-1837/config.yaml:/etc/dagu/config.yaml:ro
+
+x-dagu-worker-service: &dagu-worker-service
+  image: ${DAGU_IMAGE:-ghcr.io/dagu-org/dagu:2.3.6}
+  init: true
+  environment: *dagu-worker-env
+  volumes: *dagu-worker-volumes
+
+services:
+  ui:
+    <<: *dagu-service
+    hostname: ui
+    command: ["dagu", "server", "--config", "/etc/dagu/config.yaml"]
+    environment:
+      <<: *dagu-env
+      DAGU_HOST: 0.0.0.0
+      DAGU_PORT: 8080
+    depends_on:
+      - scheduler-1
+      - scheduler-2
+      - scheduler-3
+      - coordinator-1
+      - coordinator-2
+      - coordinator-3
+    ports:
+      - "8888:8080"
+
+  scheduler-1:
+    <<: *dagu-service
+    hostname: scheduler-1
+    command: ["dagu", "scheduler", "--config", "/etc/dagu/config.yaml"]
+
+  scheduler-2:
+    <<: *dagu-service
+    hostname: scheduler-2
+    command: ["dagu", "scheduler", "--config", "/etc/dagu/config.yaml"]
+
+  scheduler-3:
+    <<: *dagu-service
+    hostname: scheduler-3
+    command: ["dagu", "scheduler", "--config", "/etc/dagu/config.yaml"]
+
+  coordinator-1:
+    <<: *dagu-service
+    hostname: coordinator-1
+    command: ["dagu", "coordinator", "--config", "/etc/dagu/config.yaml"]
+    environment:
+      <<: *dagu-env
+      DAGU_COORDINATOR_HOST: 0.0.0.0
+      DAGU_COORDINATOR_ADVERTISE: coordinator-1
+    depends_on:
+      - scheduler-1
+      - scheduler-2
+      - scheduler-3
+
+  coordinator-2:
+    <<: *dagu-service
+    hostname: coordinator-2
+    command: ["dagu", "coordinator", "--config", "/etc/dagu/config.yaml"]
+    environment:
+      <<: *dagu-env
+      DAGU_COORDINATOR_HOST: 0.0.0.0
+      DAGU_COORDINATOR_ADVERTISE: coordinator-2
+    depends_on:
+      - scheduler-1
+      - scheduler-2
+      - scheduler-3
+
+  coordinator-3:
+    <<: *dagu-service
+    hostname: coordinator-3
+    command: ["dagu", "coordinator", "--config", "/etc/dagu/config.yaml"]
+    environment:
+      <<: *dagu-env
+      DAGU_COORDINATOR_HOST: 0.0.0.0
+      DAGU_COORDINATOR_ADVERTISE: coordinator-3
+    depends_on:
+      - scheduler-1
+      - scheduler-2
+      - scheduler-3
+
+  worker-1:
+    <<: *dagu-worker-service
+    hostname: worker-1
+    command: ["dagu", "worker", "--config", "/etc/dagu/config.yaml"]
+    environment:
+      <<: *dagu-worker-env
+      DAGU_WORKER_ID: worker-1
+    depends_on:
+      - coordinator-1
+      - coordinator-2
+      - coordinator-3
+      - scheduler-1
+      - scheduler-2
+      - scheduler-3
+
+  worker-2:
+    <<: *dagu-worker-service
+    hostname: worker-2
+    command: ["dagu", "worker", "--config", "/etc/dagu/config.yaml"]
+    environment:
+      <<: *dagu-worker-env
+      DAGU_WORKER_ID: worker-2
+    depends_on:
+      - coordinator-1
+      - coordinator-2
+      - coordinator-3
+      - scheduler-1
+      - scheduler-2
+      - scheduler-3
