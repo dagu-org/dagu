@@ -590,7 +590,12 @@ func dispatchErrorCode(err error) codes.Code {
 }
 
 func (h *Handler) markPreparedAttemptDispatchFailed(ctx context.Context, task *coordinatorv1.Task, prepared *preparedDispatchAttempt, dispatchErr error) {
-	if prepared == nil || !prepared.newlyCreated || prepared.attempt == nil {
+	if prepared == nil || prepared.attempt == nil {
+		return
+	}
+	defer h.releasePreparedDispatchAttempt(context.WithoutCancel(ctx), task.GetDagRunId(), prepared.attempt)
+
+	if !prepared.newlyCreated {
 		return
 	}
 
@@ -626,6 +631,26 @@ func (h *Handler) markPreparedAttemptDispatchFailed(ctx context.Context, task *c
 		tag.AttemptKey(task.AttemptKey),
 		tag.Error(dispatchErr),
 	)
+}
+
+func (h *Handler) releasePreparedDispatchAttempt(ctx context.Context, dagRunID string, attempt exec.DAGRunAttempt) {
+	if attempt == nil {
+		return
+	}
+
+	h.attemptsMu.Lock()
+	if cachedAttempt, ok := h.openAttempts[dagRunID]; ok && cachedAttempt.ID() == attempt.ID() {
+		delete(h.openAttempts, dagRunID)
+	}
+	h.attemptsMu.Unlock()
+
+	if err := attempt.Close(ctx); err != nil {
+		logger.Warn(ctx, "Failed to close prepared attempt after dispatch handoff failure",
+			tag.RunID(dagRunID),
+			tag.AttemptID(attempt.ID()),
+			tag.Error(err),
+		)
+	}
 }
 
 // GetWorkers returns the list of currently connected workers
@@ -1124,16 +1149,13 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 		return nil, status.Error(codes.Internal, "failed to resolve latest attempt: "+err.Error())
 	}
 
-	accepted, noop, rejectReason := h.remoteStatusDecision(ctx, latestStatus, dagRunStatus)
+	accepted, rejectReason := h.remoteStatusDecision(ctx, latestStatus, dagRunStatus)
 	if !accepted {
 		h.logRejectedRemoteStatusUpdate(ctx, req.WorkerId, dagRunStatus, latestStatus, rejectReason)
 		return &coordinatorv1.ReportStatusResponse{
 			Accepted: false,
 			Error:    rejectReason,
 		}, nil
-	}
-	if noop {
-		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 	}
 
 	attempt, err := h.replaceOpenAttempt(ctx, dagRunStatus.DAGRunID, latestAttempt, latestStatus.AttemptID)
@@ -1184,23 +1206,23 @@ func sameAttemptStatus(current, incoming *exec.DAGRunStatus) bool {
 	return current.AttemptKey != "" && current.AttemptKey == incoming.AttemptKey
 }
 
-func (h *Handler) remoteStatusDecision(ctx context.Context, latest, incoming *exec.DAGRunStatus) (accepted bool, noop bool, rejectionReason string) {
+func (h *Handler) remoteStatusDecision(ctx context.Context, latest, incoming *exec.DAGRunStatus) (accepted bool, rejectionReason string) {
 	if latest == nil || incoming == nil {
-		return false, false, remoteAttemptRejectedLeaseInactive
+		return false, remoteAttemptRejectedLeaseInactive
 	}
 	if !sameAttemptStatus(latest, incoming) {
-		return false, false, remoteAttemptRejectedSuperseded
+		return false, remoteAttemptRejectedSuperseded
 	}
 	if !isTerminalRunStatus(latest.Status) {
-		return true, false, ""
-	}
-	if latest.Status == incoming.Status {
-		return true, true, ""
+		return true, ""
 	}
 	if h.isLeaseInactive(ctx, latest.AttemptKey) && (incoming.Status.IsActive() || incoming.Status == core.NotStarted) {
-		return false, false, remoteAttemptRejectedLeaseInactive
+		return false, remoteAttemptRejectedLeaseInactive
 	}
-	return false, false, remoteAttemptRejectedTerminal
+	if latest.Status == incoming.Status {
+		return true, ""
+	}
+	return false, remoteAttemptRejectedTerminal
 }
 
 func (h *Handler) isLeaseInactive(ctx context.Context, attemptKey string) bool {
@@ -1783,7 +1805,6 @@ func (h *Handler) detectStaleLeases(ctx context.Context) {
 
 	if h.activeDistributedRunStore != nil {
 		h.detectIndexedDistributedStatuses(ctx, now)
-		return
 	}
 
 	h.detectOrphanedDistributedStatuses(ctx, now)

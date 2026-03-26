@@ -231,15 +231,15 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun exec.DAGRunRef) (*e
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if dagRun.ID == st.DAGRunID {
+	if dagRun.ID == st.DAGRunID && st.Status == core.Running {
 		var dag *core.DAG
-		dag, dagErr := attempt.ReadDAG(ctx)
-		if dagErr != nil && st.Status == core.Running && isLocalWorkerID(st.WorkerID) {
-			logger.Error(ctx, "Failed to read DAG for stale status check", tag.Error(dagErr))
+		if isLocalWorkerID(st.WorkerID) {
+			dag, err = attempt.ReadDAG(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to read DAG for stale status check", tag.Error(err))
+			}
 		}
-		if st.Status == core.Running {
-			st = m.resolveRunningStatus(ctx, dag, attempt, st, true)
-		}
+		st = m.resolveRunningStatus(ctx, dag, attempt, st, true)
 	}
 
 	return st, nil

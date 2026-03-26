@@ -194,6 +194,12 @@ func AttemptKeyForStatus(status *DAGRunStatus, fallbackAttemptID string) string 
 
 	root := status.Root
 	if root.Zero() {
+		// Older root-run snapshots may omit Root entirely, but legacy sub-DAG
+		// snapshots can also be missing Root/AttemptKey. Reconstructing a
+		// self-rooted key is only safe when the status has no parent.
+		if !status.Parent.Zero() {
+			return ""
+		}
 		root = status.DAGRun()
 	}
 

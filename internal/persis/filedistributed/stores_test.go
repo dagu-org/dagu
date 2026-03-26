@@ -5,6 +5,7 @@ package filedistributed
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -159,6 +160,9 @@ func TestDispatchTaskStore_CountOutstandingByQueueAndAttempt(t *testing.T) {
 		QueueName:  "queue-a",
 		AttemptId:  "attempt-a",
 		AttemptKey: "attempt-key-a",
+		WorkerSelector: map[string]string{
+			"type": "queue-a",
+		},
 	}))
 	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
 		DagRunId:   "run-b",
@@ -166,6 +170,9 @@ func TestDispatchTaskStore_CountOutstandingByQueueAndAttempt(t *testing.T) {
 		QueueName:  "queue-b",
 		AttemptId:  "attempt-b",
 		AttemptKey: "attempt-key-b",
+		WorkerSelector: map[string]string{
+			"type": "queue-b",
+		},
 	}))
 
 	count, err := store.CountOutstandingByQueue(ctx, "queue-a", time.Second)
@@ -187,6 +194,7 @@ func TestDispatchTaskStore_CountOutstandingByQueueAndAttempt(t *testing.T) {
 	claimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
 		WorkerID:     "worker-1",
 		PollerID:     "poller-1",
+		Labels:       map[string]string{"type": "queue-a"},
 		Owner:        exec.CoordinatorEndpoint{ID: "coord-a"},
 		ClaimTimeout: time.Second,
 	})
@@ -328,6 +336,28 @@ func TestActiveDistributedRunStore_UpsertListGetAndDelete(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, records, 1)
 	assert.Equal(t, "attempt-key-2", records[0].AttemptKey)
+}
+
+func TestActiveDistributedRunStore_ListAllSkipsCorruptedEntries(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewActiveDistributedRunStore(filepath.Join(t.TempDir(), "distributed"))
+
+	require.NoError(t, store.Upsert(ctx, exec.ActiveDistributedRun{
+		AttemptKey: "attempt-key-1",
+		DAGRun:     exec.NewDAGRunRef("dag-a", "run-1"),
+		Root:       exec.NewDAGRunRef("dag-a", "run-1"),
+		AttemptID:  "attempt-1",
+		WorkerID:   "worker-1",
+		Status:     core.Running,
+	}))
+	require.NoError(t, os.WriteFile(store.activeRunPath("corrupted-attempt"), []byte("{bad json"), 0o644))
+
+	records, err := store.ListAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, "attempt-key-1", records[0].AttemptKey)
 }
 
 func TestDAGRunLeaseStore_ConcurrentTouchPreservesLatestHeartbeat(t *testing.T) {

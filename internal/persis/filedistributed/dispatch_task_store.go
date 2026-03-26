@@ -172,25 +172,27 @@ func (s *DispatchTaskStore) DeleteClaim(_ context.Context, claimToken string) er
 }
 
 func (s *DispatchTaskStore) CountOutstandingByQueue(_ context.Context, queueName string, claimTimeout time.Duration) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if err := s.recycleExpiredClaims(claimTimeout); err != nil {
+	paths, err := s.snapshotOutstandingPaths(claimTimeout)
+	if err != nil {
 		return 0, err
 	}
 
 	count := 0
-	if err := s.scanOutstandingLocked(func(record *dispatchTaskFile) (bool, error) {
+	for _, path := range paths {
+		record, readErr := s.readTaskFile(path)
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return 0, readErr
+		}
 		if record == nil || record.Task == nil {
-			return false, nil
+			continue
 		}
 		if queueName != "" && record.Task.QueueName != queueName {
-			return false, nil
+			continue
 		}
 		count++
-		return false, nil
-	}); err != nil {
-		return 0, err
 	}
 
 	return count, nil
@@ -201,28 +203,28 @@ func (s *DispatchTaskStore) HasOutstandingAttempt(_ context.Context, attemptKey 
 		return false, nil
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if err := s.recycleExpiredClaims(claimTimeout); err != nil {
+	paths, err := s.snapshotOutstandingPaths(claimTimeout)
+	if err != nil {
 		return false, err
 	}
 
-	found := false
-	if err := s.scanOutstandingLocked(func(record *dispatchTaskFile) (bool, error) {
+	for _, path := range paths {
+		record, readErr := s.readTaskFile(path)
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return false, readErr
+		}
 		if record == nil || record.Task == nil {
-			return false, nil
+			continue
 		}
 		if record.Task.AttemptKey == attemptKey {
-			found = true
 			return true, nil
 		}
-		return false, nil
-	}); err != nil {
-		return false, err
 	}
 
-	return found, nil
+	return false, nil
 }
 
 func (s *DispatchTaskStore) recycleExpiredClaims(claimTimeout time.Duration) error {
@@ -285,30 +287,27 @@ func (s *DispatchTaskStore) recycleExpiredClaims(claimTimeout time.Duration) err
 	return nil
 }
 
-func (s *DispatchTaskStore) scanOutstandingLocked(match func(*dispatchTaskFile) (bool, error)) error {
+func (s *DispatchTaskStore) snapshotOutstandingPaths(claimTimeout time.Duration) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.recycleExpiredClaims(claimTimeout); err != nil {
+		return nil, err
+	}
+
+	return s.listOutstandingPathsLocked()
+}
+
+func (s *DispatchTaskStore) listOutstandingPathsLocked() ([]string, error) {
+	var paths []string
 	for _, dir := range []string{s.pendingDir(), s.claimsDir()} {
 		files, err := sortedFiles(dir)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		for _, path := range files {
-			record, readErr := s.readTaskFile(path)
-			if readErr != nil {
-				if os.IsNotExist(readErr) {
-					continue
-				}
-				return readErr
-			}
-			stop, err := match(record)
-			if err != nil {
-				return err
-			}
-			if stop {
-				return nil
-			}
-		}
+		paths = append(paths, files...)
 	}
-	return nil
+	return paths, nil
 }
 
 func (s *DispatchTaskStore) readTaskFile(path string) (*dispatchTaskFile, error) {

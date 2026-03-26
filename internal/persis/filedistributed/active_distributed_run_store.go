@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
@@ -87,10 +89,13 @@ func (s *ActiveDistributedRunStore) Get(_ context.Context, attemptKey string) (*
 	return &record, nil
 }
 
-func (s *ActiveDistributedRunStore) ListAll(_ context.Context) ([]exec.ActiveDistributedRun, error) {
+func (s *ActiveDistributedRunStore) ListAll(ctx context.Context) ([]exec.ActiveDistributedRun, error) {
 	files, err := sortedFiles(s.activeRunsDir())
 	if err != nil {
 		return nil, err
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
 	records := make([]exec.ActiveDistributedRun, 0, len(files))
@@ -100,7 +105,11 @@ func (s *ActiveDistributedRunStore) ListAll(_ context.Context) ([]exec.ActiveDis
 			if os.IsNotExist(err) {
 				continue
 			}
-			return nil, err
+			logger.Warn(ctx, "Skipping corrupted active distributed run entry",
+				tag.File(path),
+				tag.Error(err),
+			)
+			continue
 		}
 		if record.AttemptKey == "" {
 			continue
