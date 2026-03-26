@@ -41,7 +41,7 @@ type AllowedDAGs struct {
 
 type StageDefinition struct {
 	Name        string      `json:"name" yaml:"name"`
-	AllowedDAGs AllowedDAGs `json:"allowedDAGs,omitempty" yaml:"allowedDAGs,omitempty"`
+	AllowedDAGs AllowedDAGs `json:"allowedDAGs,omitempty" yaml:"allowed_dags,omitempty"`
 }
 
 type AgentConfig struct {
@@ -101,11 +101,11 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 type Definition struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Purpose     string            `json:"purpose" yaml:"purpose"`
+	Purpose     string            `json:"purpose,omitempty" yaml:"purpose,omitempty"`
 	Goal        string            `json:"goal" yaml:"goal"`
 	Stages      []StageDefinition `json:"stages" yaml:"stages"`
 	Schedule    ScheduleList      `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	AllowedDAGs AllowedDAGs       `json:"allowedDAGs" yaml:"allowedDAGs"`
+	AllowedDAGs AllowedDAGs       `json:"allowedDAGs" yaml:"allowed_dags"`
 	Agent       AgentConfig       `json:"agent,omitempty" yaml:"agent,omitempty"`
 	Disabled    bool              `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
@@ -251,16 +251,37 @@ func nextCycleID() string {
 	return uuid.NewString()
 }
 
+func (s *StageDefinition) UnmarshalYAML(value *yaml.Node) error {
+	type rawStageDefinition struct {
+		Name             string      `yaml:"name"`
+		AllowedDAGs      AllowedDAGs `yaml:"allowedDAGs,omitempty"`
+		AllowedDAGsSnake AllowedDAGs `yaml:"allowed_dags,omitempty"`
+	}
+
+	var raw rawStageDefinition
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	s.Name = raw.Name
+	s.AllowedDAGs = raw.AllowedDAGsSnake
+	if len(s.AllowedDAGs.Names) == 0 && len(s.AllowedDAGs.Tags) == 0 {
+		s.AllowedDAGs = raw.AllowedDAGs
+	}
+	return nil
+}
+
 func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	type rawDefinition struct {
-		Description string       `yaml:"description,omitempty"`
-		Purpose     string       `yaml:"purpose"`
-		Goal        string       `yaml:"goal"`
-		Stages      yaml.Node    `yaml:"stages"`
-		Schedule    ScheduleList `yaml:"schedule,omitempty"`
-		AllowedDAGs AllowedDAGs  `yaml:"allowedDAGs"`
-		Agent       AgentConfig  `yaml:"agent,omitempty"`
-		Disabled    bool         `yaml:"disabled,omitempty"`
+		Description      string       `yaml:"description,omitempty"`
+		Purpose          string       `yaml:"purpose"`
+		Goal             string       `yaml:"goal"`
+		Stages           yaml.Node    `yaml:"stages"`
+		Schedule         ScheduleList `yaml:"schedule,omitempty"`
+		AllowedDAGs      AllowedDAGs  `yaml:"allowedDAGs"`
+		AllowedDAGsSnake AllowedDAGs  `yaml:"allowed_dags"`
+		Agent            AgentConfig  `yaml:"agent,omitempty"`
+		Disabled         bool         `yaml:"disabled,omitempty"`
 	}
 
 	var raw rawDefinition
@@ -269,10 +290,14 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	d.Description = raw.Description
-	d.Purpose = raw.Purpose
-	d.Goal = raw.Goal
+	d.Purpose = strings.TrimSpace(raw.Purpose)
+	d.Goal = strings.TrimSpace(raw.Goal)
+	d.normalizeGoal()
 	d.Schedule = raw.Schedule
-	d.AllowedDAGs = raw.AllowedDAGs
+	d.AllowedDAGs = raw.AllowedDAGsSnake
+	if len(d.AllowedDAGs.Names) == 0 && len(d.AllowedDAGs.Tags) == 0 {
+		d.AllowedDAGs = raw.AllowedDAGs
+	}
 	d.Agent = raw.Agent
 	d.Disabled = raw.Disabled
 	d.legacyStringStages = false
@@ -310,6 +335,20 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	d.legacyStringStages = sawScalar
 	d.Stages = stages
 	return nil
+}
+
+func (d *Definition) normalizeGoal() {
+	if d == nil {
+		return
+	}
+	d.Purpose = strings.TrimSpace(d.Purpose)
+	d.Goal = strings.TrimSpace(d.Goal)
+	switch {
+	case d.Goal == "" && d.Purpose != "":
+		d.Goal = d.Purpose
+	case d.Goal != "" && d.Purpose == "":
+		d.Purpose = d.Goal
+	}
 }
 
 func (d *Definition) StageNames() []string {

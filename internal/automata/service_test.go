@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/stretchr/testify/require"
 )
 
@@ -78,6 +79,27 @@ func TestServiceDetailUsesCurrentStageAllowedDAGs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "implement", detail.State.CurrentStage)
 	require.Equal(t, []string{"run-tests"}, allowedDAGNames(detail.AllowedDAGs))
+}
+
+func TestServicePutSpecAcceptsLegacyPurposeAsGoalAlias(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Legacy automata
+purpose: Complete the assigned software work
+stages:
+  - research
+allowedDAGs:
+  names:
+    - build-app
+`
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", spec))
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, "Complete the assigned software work", detail.Definition.Goal)
 }
 
 func TestServiceOverrideStagePersistsDeclaredStage(t *testing.T) {
@@ -361,6 +383,52 @@ func TestServiceSubmitOperatorMessageQueuesMessage(t *testing.T) {
 	require.Contains(t, detail.State.PendingTurnMessages[1].Message, "Focus on the regression first.")
 }
 
+func TestServiceSubmitOperatorMessageWhileBlockedAppendsToSession(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	ref := exec.NewDAGRunRef("build-app", "run-1")
+	state.State = StateRunning
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-1"
+	state.CurrentRunRef = &ref
+
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	err = svc.SubmitOperatorMessage(ctx, "software-dev", OperatorMessageRequest{
+		RequestedBy: "tester",
+		Message:     "Focus on the regression first.",
+	})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.Len(t, detail.Messages, 1)
+	require.Equal(t, agent.MessageTypeUser, detail.Messages[0].Type)
+	require.Contains(t, detail.Messages[0].Content, "Focus on the regression first.")
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[0].Kind)
+	require.NotContains(t, detail.State.PendingTurnMessages[0].Message, "Focus on the regression first.")
+	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "latest user message")
+}
+
 func TestServicePauseAndResumeTask(t *testing.T) {
 	t.Parallel()
 
@@ -393,6 +461,39 @@ func TestServicePauseAndResumeTask(t *testing.T) {
 	require.True(t, detail.State.PausedAt.IsZero())
 	require.Len(t, detail.State.PendingTurnMessages, 1)
 	require.Equal(t, "kickoff", detail.State.PendingTurnMessages[0].Kind)
+}
+
+func TestServicePausePreservesActiveChildRun(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpec("build-app")))
+	require.NoError(t, svc.RequestStart(ctx, "software-dev", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle the current assigned task.",
+	}))
+
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	ref := exec.NewDAGRunRef("build-app", "run-1")
+	state.CurrentRunRef = &ref
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	err = svc.Pause(ctx, "software-dev", "tester")
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, StatePaused, detail.State.State)
+	require.Equal(t, "tester", detail.State.PausedBy)
+	require.Equal(t, fixedTime, detail.State.PausedAt)
+	require.NotNil(t, detail.State.CurrentRunRef)
+	require.Equal(t, "build-app", detail.State.CurrentRunRef.Name)
+	require.Equal(t, "run-1", detail.State.CurrentRunRef.ID)
 }
 
 func TestServiceResumePausedAutomataQueuesResumeMessage(t *testing.T) {
@@ -644,15 +745,61 @@ func newTestService(t *testing.T) (*Service, time.Time) {
 	return svc, fixedTime
 }
 
+func newTestServiceWithSessionStore(t *testing.T) (*Service, time.Time) {
+	t.Helper()
+
+	root := t.TempDir()
+	dagsDir := filepath.Join(root, "dags")
+	dataDir := filepath.Join(root, "data")
+	runsDir := filepath.Join(root, "runs")
+	sessionDir := filepath.Join(root, "sessions")
+
+	require.NoError(t, os.MkdirAll(dagsDir, 0o750))
+	require.NoError(t, os.MkdirAll(dataDir, 0o750))
+	require.NoError(t, os.MkdirAll(runsDir, 0o750))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dagsDir, "build-app.yaml"),
+		[]byte(testDAGYAML("build-app")),
+		0o600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dagsDir, "run-tests.yaml"),
+		[]byte(testDAGYAML("run-tests")),
+		0o600,
+	))
+
+	sessionStore, err := filesession.New(sessionDir)
+	require.NoError(t, err)
+
+	cfg := &config.Config{
+		Core: config.Core{
+			Location: time.UTC,
+		},
+		Paths: config.PathsConfig{
+			DAGsDir:    dagsDir,
+			DataDir:    dataDir,
+			DAGRunsDir: runsDir,
+		},
+	}
+	fixedTime := time.Date(2026, time.March, 26, 10, 0, 0, 0, time.UTC)
+	svc := New(
+		cfg,
+		filedag.New(dagsDir, filedag.WithSkipExamples(true)),
+		filedagrun.New(runsDir),
+		WithClock(func() time.Time { return fixedTime }),
+		WithSessionStore(sessionStore),
+	)
+	return svc, fixedTime
+}
+
 func automataSpec(allowedDAG string) string {
 	return `description: Software development automata
-purpose: Ship one development task
 goal: Complete the assigned software work
 stages:
   - research
   - plan
   - implement
-allowedDAGs:
+allowed_dags:
   names:
     - ` + allowedDAG + `
 `
@@ -660,14 +807,13 @@ allowedDAGs:
 
 func automataSpecWithSchedule(allowedDAG, schedule string) string {
 	return `description: Software development automata
-purpose: Ship one development task
 goal: Complete the assigned software work
 schedule: "` + schedule + `"
 stages:
   - research
   - plan
   - implement
-allowedDAGs:
+allowed_dags:
   names:
     - ` + allowedDAG + `
 `
@@ -675,16 +821,15 @@ allowedDAGs:
 
 func automataSpecPerStage() string {
 	return `description: Software development automata
-purpose: Ship one development task
 goal: Complete the assigned software work
 stages:
   - name: research
-    allowedDAGs:
+    allowed_dags:
       names:
         - build-app
   - name: plan
   - name: implement
-    allowedDAGs:
+    allowed_dags:
       names:
         - run-tests
 `

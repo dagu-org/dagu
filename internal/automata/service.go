@@ -25,6 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/google/uuid"
@@ -211,11 +212,9 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	if def == nil {
 		return errors.New("definition is required")
 	}
+	def.normalizeGoal()
 	if err := validateName(def.Name); err != nil {
 		return err
-	}
-	if strings.TrimSpace(def.Purpose) == "" {
-		return errors.New("purpose is required")
 	}
 	if strings.TrimSpace(def.Goal) == "" {
 		return errors.New("goal is required")
@@ -224,14 +223,14 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 		return errors.New("at least one stage is required")
 	}
 	if !def.legacyStringStages && hasAllowedDAGs(def.AllowedDAGs) {
-		return errors.New("top-level allowedDAGs is only supported for legacy string stages")
+		return errors.New("top-level allowed_dags is only supported for legacy string stages")
 	}
 	if def.legacyStringStages {
 		if err := s.normalizeAllowedDAGs(ctx, &def.AllowedDAGs); err != nil {
 			return err
 		}
 		if !hasAllowedDAGs(def.AllowedDAGs) {
-			return errors.New("allowedDAGs.names or allowedDAGs.tags is required")
+			return errors.New("allowed_dags.names or allowed_dags.tags is required")
 		}
 	}
 
@@ -576,11 +575,6 @@ func (s *Service) Pause(ctx context.Context, name, requestedBy string) error {
 	if state.State != StateRunning && state.State != StateWaiting {
 		return errors.New("only active automata can be paused")
 	}
-	if state.CurrentRunRef != nil {
-		if err := s.requestChildRunCancel(ctx, state.CurrentRunRef); err != nil {
-			return err
-		}
-	}
 	state.State = StatePaused
 	state.WaitingReason = WaitingReasonNone
 	state.PausedAt = s.clock()
@@ -697,12 +691,58 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 	if state.PendingPrompt != nil {
 		return errors.New("respond to the pending prompt before sending a general operator message")
 	}
-	queueTurnMessage(state, "operator_message", buildOperatorMessage(req.RequestedBy, message), s.clock())
+	operatorMessage := buildOperatorMessage(req.RequestedBy, message)
+	turnMessage := operatorMessage
+	if state.CurrentRunRef != nil || state.State == StatePaused {
+		if err := s.appendOperatorMessageToSession(ctx, name, state, operatorMessage); err != nil {
+			s.logger.Warn("failed to append queued operator message to automata session",
+				"automata", name,
+				"session_id", state.SessionID,
+				"error", err,
+			)
+		} else {
+			turnMessage = buildOperatorWakeMessage()
+		}
+	}
+	queueTurnMessage(state, "operator_message", turnMessage, s.clock())
 	if state.State != StatePaused && state.CurrentRunRef == nil {
 		state.State = StateRunning
 		state.WaitingReason = WaitingReasonNone
 	}
 	return s.saveState(ctx, name, state)
+}
+
+func (s *Service) appendOperatorMessageToSession(ctx context.Context, name string, state *State, content string) error {
+	if state == nil || state.SessionID == "" {
+		return errors.New("session is not initialized")
+	}
+	msg := agent.Message{
+		ID:        uuid.NewString(),
+		SessionID: state.SessionID,
+		Type:      agent.MessageTypeUser,
+		Content:   content,
+		CreatedAt: s.clock(),
+		LLMData: &llm.Message{
+			Role:    llm.RoleUser,
+			Content: content,
+		},
+	}
+	if s.agentAPI != nil {
+		if _, err := s.agentAPI.AppendExternalMessage(ctx, state.SessionID, s.systemUser(name), msg); err == nil {
+			return nil
+		} else if !errors.Is(err, agent.ErrSessionNotFound) {
+			return err
+		}
+	}
+	if s.sessionStore == nil {
+		return errors.New("session store is not configured")
+	}
+	seqID, err := s.sessionStore.GetLatestSequenceID(ctx, state.SessionID)
+	if err != nil {
+		return err
+	}
+	msg.SequenceID = seqID + 1
+	return s.sessionStore.AddMessage(ctx, state.SessionID, &msg)
 }
 
 func (s *Service) systemUser(name string) agent.UserIdentity {
@@ -739,7 +779,7 @@ func (s *Service) normalizeAllowedDAGs(ctx context.Context, allowed *AllowedDAGs
 	for i, name := range allowed.Names {
 		allowed.Names[i] = strings.TrimSpace(name)
 		if allowed.Names[i] == "" {
-			return errors.New("allowedDAGs.names contains an empty entry")
+			return errors.New("allowed_dags.names contains an empty entry")
 		}
 		if _, err := s.dagStore.GetMetadata(ctx, allowed.Names[i]); err != nil {
 			return fmt.Errorf("allowed DAG %q not found: %w", allowed.Names[i], err)
@@ -748,7 +788,7 @@ func (s *Service) normalizeAllowedDAGs(ctx context.Context, allowed *AllowedDAGs
 	for i, tag := range allowed.Tags {
 		allowed.Tags[i] = strings.TrimSpace(tag)
 		if allowed.Tags[i] == "" {
-			return errors.New("allowedDAGs.tags contains an empty entry")
+			return errors.New("allowed_dags.tags contains an empty entry")
 		}
 	}
 	return nil
@@ -917,4 +957,8 @@ func buildOperatorMessage(requestedBy, message string) string {
 		return "Operator update:\n" + message
 	}
 	return fmt.Sprintf("Operator update from %s:\n%s", requestedBy, message)
+}
+
+func buildOperatorWakeMessage() string {
+	return "A new operator update was appended to the session while execution was blocked. Review the latest user message(s) and continue the task when you can act again."
 }

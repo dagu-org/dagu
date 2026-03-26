@@ -1,30 +1,26 @@
 import React from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import useSWR from 'swr';
 
+import { Status } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { DAGRunDetailsModal } from '@/features/dag-runs/components/dag-run-details';
+import { DAGDetailsModal } from '@/features/dags/components/dag-details';
 import fetchJson from '@/lib/fetchJson';
 import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/ui/LoadingIndicator';
+import StatusChip from '@/ui/StatusChip';
 
 declare const getConfig: () => { apiURL: string };
 
 type AutomataSummary = {
   name: string;
   description?: string;
-  purpose: string;
   goal: string;
   instruction?: string;
   state: string;
@@ -42,7 +38,6 @@ type AutomataDetail = {
   definition: {
     name: string;
     description?: string;
-    purpose: string;
     goal: string;
     stages: {
       name: string;
@@ -145,8 +140,13 @@ function DAGNameMultiSelect({
 }): React.ReactElement {
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>(
+    {}
+  );
 
   const selectedNameSet = React.useMemo(
     () => new Set(selectedNames),
@@ -168,8 +168,8 @@ function DAGNameMultiSelect({
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent): void {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        !containerRef.current?.contains(event.target as Node) &&
+        !dropdownRef.current?.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -185,6 +185,34 @@ function DAGNameMultiSelect({
     }
   }, [isOpen]);
 
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function updateDropdownPosition(): void {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 60,
+      });
+    }
+
+    updateDropdownPosition();
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [isOpen]);
+
   const toggleSelection = (fileName: string) => {
     if (selectedNameSet.has(fileName)) {
       onChange(selectedNames.filter((name) => name !== fileName));
@@ -194,7 +222,7 @@ function DAGNameMultiSelect({
   };
 
   return (
-    <div className="relative space-y-2" ref={dropdownRef}>
+    <div className="space-y-2" ref={containerRef}>
       <div className="flex flex-wrap gap-1">
         {selectedNames.length ? (
           selectedNames.map((dagName) => (
@@ -223,6 +251,7 @@ function DAGNameMultiSelect({
       </div>
 
       <Button
+        ref={triggerRef}
         type="button"
         variant="outline"
         size="sm"
@@ -232,52 +261,59 @@ function DAGNameMultiSelect({
         Select DAGs
       </Button>
 
-      {isOpen ? (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
-          <div className="border-b p-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search DAGs..."
-              className="w-full rounded border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
-          <div className="max-h-56 overflow-y-auto p-1">
-            {filteredDAGs.length ? (
-              filteredDAGs.map((dag) => {
-                const selected = selectedNameSet.has(dag.fileName);
-                return (
-                  <button
-                    key={dag.fileName}
-                    type="button"
-                    onClick={() => toggleSelection(dag.fileName)}
-                    className={cn(
-                      'flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-accent',
-                      selected && 'bg-accent'
-                    )}
-                  >
-                    <span className="truncate">
-                      {dag.fileName}
-                      {dag.name && dag.name !== dag.fileName
-                        ? ` (${dag.name})`
-                        : ''}
-                    </span>
-                    {selected ? (
-                      <span className="text-primary">Selected</span>
-                    ) : null}
-                  </button>
-                );
-              })
-            ) : (
-              <div className="px-3 py-2 text-sm text-muted-foreground">
-                {searchQuery ? 'No DAGs found.' : 'No DAGs available.'}
+      {isOpen && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              ref={dropdownRef}
+              style={dropdownStyle}
+              className="rounded-md border bg-popover shadow-lg"
+            >
+              <div className="border-b p-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search DAGs..."
+                  className="w-full rounded border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
               </div>
-            )}
-          </div>
-        </div>
-      ) : null}
+              <div className="max-h-56 overflow-y-auto p-1">
+                {filteredDAGs.length ? (
+                  filteredDAGs.map((dag) => {
+                    const selected = selectedNameSet.has(dag.fileName);
+                    return (
+                      <button
+                        key={dag.fileName}
+                        type="button"
+                        onClick={() => toggleSelection(dag.fileName)}
+                        className={cn(
+                          'flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-accent',
+                          selected && 'bg-accent'
+                        )}
+                      >
+                        <span className="truncate">
+                          {dag.fileName}
+                          {dag.name && dag.name !== dag.fileName
+                            ? ` (${dag.name})`
+                            : ''}
+                        </span>
+                        {selected ? (
+                          <span className="text-primary">Selected</span>
+                        ) : null}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    {searchQuery ? 'No DAGs found.' : 'No DAGs available.'}
+                  </div>
+                )}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
@@ -316,13 +352,11 @@ function quoteYAML(value: string): string {
 
 function buildAutomataSpec(input: {
   description: string;
-  purpose: string;
   goal: string;
   stages: StageDraft[];
 }): string {
   const lines = [
     `description: ${quoteYAML(input.description || 'Automata workflow')}`,
-    `purpose: ${quoteYAML(input.purpose)}`,
     `goal: ${quoteYAML(input.goal)}`,
     '',
     'stages:',
@@ -335,7 +369,7 @@ function buildAutomataSpec(input: {
     );
     lines.push(`  - name: ${quoteYAML(stageName)}`);
     if (allowedDAGNames.length) {
-      lines.push('    allowedDAGs:');
+      lines.push('    allowed_dags:');
       lines.push('      names:');
       allowedDAGNames.forEach((dagName) => {
         lines.push(`        - ${quoteYAML(dagName)}`);
@@ -353,7 +387,6 @@ function buildAutomataSpec(input: {
 
 function validateAutomataCreateForm(input: {
   name: string;
-  purpose: string;
   goal: string;
   stages: StageDraft[];
 }): string | null {
@@ -363,9 +396,6 @@ function validateAutomataCreateForm(input: {
   }
   if (!AUTOMATA_NAME_PATTERN.test(name)) {
     return 'Automata name must start with a letter or number and use only letters, numbers, underscores, dots, and hyphens.';
-  }
-  if (!input.purpose.trim()) {
-    return 'Purpose is required.';
   }
   if (!input.goal.trim()) {
     return 'Goal is required.';
@@ -407,6 +437,31 @@ function statusClass(state: string): string {
   }
 }
 
+function dagRunStatusToStatus(status: string): Status | undefined {
+  switch (status) {
+    case 'not_started':
+      return Status.NotStarted;
+    case 'running':
+      return Status.Running;
+    case 'failed':
+      return Status.Failed;
+    case 'aborted':
+      return Status.Aborted;
+    case 'succeeded':
+      return Status.Success;
+    case 'queued':
+      return Status.Queued;
+    case 'partially_succeeded':
+      return Status.PartialSuccess;
+    case 'waiting':
+      return Status.Waiting;
+    case 'rejected':
+      return Status.Rejected;
+    default:
+      return undefined;
+  }
+}
+
 function AutomataPage(): React.ReactElement {
   const appBar = React.useContext(AppBarContext);
   const navigate = useNavigate();
@@ -415,7 +470,6 @@ function AutomataPage(): React.ReactElement {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [createName, setCreateName] = React.useState('');
   const [createDescription, setCreateDescription] = React.useState('');
-  const [createPurpose, setCreatePurpose] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
   const [createStages, setCreateStages] = React.useState<StageDraft[]>(
     createDefaultStageDrafts()
@@ -435,6 +489,11 @@ function AutomataPage(): React.ReactElement {
   const [specDraft, setSpecDraft] = React.useState('');
   const [specError, setSpecError] = React.useState('');
   const [isSavingSpec, setIsSavingSpec] = React.useState(false);
+  const [selectedDAGRun, setSelectedDAGRun] = React.useState<{
+    name: string;
+    dagRunId: string;
+  } | null>(null);
+  const [selectedDAG, setSelectedDAG] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     appBar.setTitle('Automata');
@@ -488,6 +547,32 @@ function AutomataPage(): React.ReactElement {
     () => detail?.definition.stages.map((stage) => stage.name) || [],
     [detail?.definition.stages]
   );
+  const mergedRuns = React.useMemo(() => {
+    if (!detail) {
+      return [];
+    }
+    const seen = new Set<string>();
+    const items: Array<
+      NonNullable<AutomataDetail['recentRuns']>[number] & { isCurrent?: boolean }
+    > = [];
+    if (detail.currentRun) {
+      const key = `${detail.currentRun.name}:${detail.currentRun.dagRunId}`;
+      seen.add(key);
+      items.push({
+        ...detail.currentRun,
+        isCurrent: true,
+      });
+    }
+    for (const run of detail.recentRuns || []) {
+      const key = `${run.name}:${run.dagRunId}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      items.push(run);
+    }
+    return items;
+  }, [detail]);
   const lifecycleState = detail?.state?.state ?? '';
   const canStartTask =
     lifecycleState === 'idle' || lifecycleState === 'finished';
@@ -526,6 +611,11 @@ function AutomataPage(): React.ReactElement {
   }, [name]);
 
   React.useEffect(() => {
+    setSelectedDAGRun(null);
+    setSelectedDAG(null);
+  }, [name, showCreateDialog]);
+
+  React.useEffect(() => {
     if (!isEditingSpec) {
       setSpecDraft(specQuery.data?.spec || '');
     }
@@ -544,7 +634,6 @@ function AutomataPage(): React.ReactElement {
   const resetCreateForm = () => {
     setCreateName('');
     setCreateDescription('');
-    setCreatePurpose('');
     setCreateGoal('');
     setCreateStages(createDefaultStageDrafts());
     setCreateError('');
@@ -567,7 +656,6 @@ function AutomataPage(): React.ReactElement {
   const onCreate = async () => {
     const validationError = validateAutomataCreateForm({
       name: createName,
-      purpose: createPurpose,
       goal: createGoal,
       stages: createStages,
     });
@@ -587,7 +675,6 @@ function AutomataPage(): React.ReactElement {
         {
           spec: buildAutomataSpec({
             description: createDescription,
-            purpose: createPurpose,
             goal: createGoal,
             stages: createStages,
           }),
@@ -748,184 +835,6 @@ function AutomataPage(): React.ReactElement {
 
   return (
     <>
-      <Dialog
-        open={showCreateDialog}
-        onOpenChange={(open) => {
-          if (open) {
-            setShowCreateDialog(true);
-            return;
-          }
-          closeCreateDialog();
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Create Automata</DialogTitle>
-            <DialogDescription>
-              Define the Automata goal, stages, and initial allowlisted DAGs.
-              You can refine the raw spec after creation.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="automata-name">Name</Label>
-              <Input
-                id="automata-name"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder="software-dev"
-                autoFocus
-                disabled={isCreating}
-              />
-              <div className="text-xs text-muted-foreground">
-                Must start with a letter or number. Use letters, numbers,
-                underscores, dots, and hyphens only.
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="automata-description">Description</Label>
-              <Input
-                id="automata-description"
-                value={createDescription}
-                onChange={(e) => setCreateDescription(e.target.value)}
-                placeholder="Automates one software delivery workflow"
-                disabled={isCreating}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="automata-purpose">Purpose</Label>
-              <Textarea
-                id="automata-purpose"
-                value={createPurpose}
-                onChange={(e) => setCreatePurpose(e.target.value)}
-                placeholder="Drive one task from discovery through delivery"
-                disabled={isCreating}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="automata-goal">Goal</Label>
-              <Textarea
-                id="automata-goal"
-                value={createGoal}
-                onChange={(e) => setCreateGoal(e.target.value)}
-                placeholder="Complete the assigned task and leave it ready for review"
-                disabled={isCreating}
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <Label>Stages</Label>
-                  <div className="text-xs text-muted-foreground">
-                    Each stage has its own allowlisted DAG set.
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addCreateStage}
-                  disabled={isCreating}
-                >
-                  Add Stage
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                {createStages.map((stage, index) => (
-                  <div key={stage.id} className="rounded-lg border p-3">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="text-sm font-medium">
-                        Stage {index + 1}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeCreateStage(stage.id)}
-                        disabled={isCreating || createStages.length === 1}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
-                      <div className="grid gap-2">
-                        <Label htmlFor={`automata-stage-name-${stage.id}`}>
-                          Stage Name
-                        </Label>
-                        <Input
-                          id={`automata-stage-name-${stage.id}`}
-                          value={stage.name}
-                          onChange={(e) =>
-                            updateCreateStage(stage.id, (current) => ({
-                              ...current,
-                              name: e.target.value,
-                            }))
-                          }
-                          placeholder="research"
-                          disabled={isCreating}
-                        />
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Label>DAG Selection</Label>
-                        <DAGNameMultiSelect
-                          availableDAGs={availableDAGOptions}
-                          selectedNames={stage.allowedDAGNames}
-                          onChange={(names) =>
-                            updateCreateStage(stage.id, (current) => ({
-                              ...current,
-                              allowedDAGNames: names,
-                            }))
-                          }
-                          disabled={isCreating}
-                        />
-                        <div className="text-xs text-muted-foreground">
-                          Select the DAGs this Automata can run while it is in
-                          the {stage.name.trim() || `stage ${index + 1}`} stage.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="text-xs text-muted-foreground">
-                {dagListQuery.isLoading
-                  ? 'Loading DAGs for selection...'
-                  : 'The dropdown only lists DAGs already available on this node.'}
-              </div>
-            </div>
-
-            {createError ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {createError}
-              </div>
-            ) : null}
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={closeCreateDialog}
-              disabled={isCreating}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={onCreate} disabled={isCreating}>
-              {isCreating ? 'Creating...' : 'Create Automata'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
         <section className="rounded-xl border bg-card">
           <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
@@ -953,9 +862,10 @@ function AutomataPage(): React.ReactElement {
               {(listQuery.data?.automata || []).map((item) => (
                 <button
                   key={item.name}
-                  onClick={() =>
-                    navigate(`/automata/${encodeURIComponent(item.name)}`)
-                  }
+                  onClick={() => {
+                    setShowCreateDialog(false);
+                    navigate(`/automata/${encodeURIComponent(item.name)}`);
+                  }}
                   className={`mb-2 w-full rounded-lg border p-3 text-left transition ${
                     name === item.name
                       ? 'border-primary bg-primary/5'
@@ -966,7 +876,7 @@ function AutomataPage(): React.ReactElement {
                     <div>
                       <div className="font-medium">{item.name}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {item.instruction || item.purpose}
+                        {item.instruction || item.goal}
                       </div>
                     </div>
                     <span
@@ -978,7 +888,12 @@ function AutomataPage(): React.ReactElement {
                   <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                     <span>Stage: {item.stage || 'n/a'}</span>
                     {item.currentRun ? (
-                      <span>{item.currentRun.status}</span>
+                      <StatusChip
+                        status={dagRunStatusToStatus(item.currentRun.status)}
+                        size="xs"
+                      >
+                        {item.currentRun.status}
+                      </StatusChip>
                     ) : null}
                   </div>
                 </button>
@@ -988,7 +903,179 @@ function AutomataPage(): React.ReactElement {
         </section>
 
         <section className="rounded-xl border bg-card">
-          {!name ? (
+          {showCreateDialog ? (
+            <div className="space-y-6 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-semibold">Create Automata</h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Define the Automata goal, stages, and per-stage DAG
+                    allowlists. You can still refine the raw spec after
+                    creation.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={closeCreateDialog}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="automata-name">Name</Label>
+                  <Input
+                    id="automata-name"
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="software-dev"
+                    autoFocus
+                    disabled={isCreating}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Must start with a letter or number. Use letters, numbers,
+                    underscores, dots, and hyphens only.
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="automata-description">Description</Label>
+                  <Input
+                    id="automata-description"
+                    value={createDescription}
+                    onChange={(e) => setCreateDescription(e.target.value)}
+                    placeholder="Automates one software delivery workflow"
+                    disabled={isCreating}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="automata-goal">Goal</Label>
+                  <Textarea
+                    id="automata-goal"
+                    value={createGoal}
+                    onChange={(e) => setCreateGoal(e.target.value)}
+                    placeholder="Complete the assigned task and leave it ready for review"
+                    disabled={isCreating}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label>Stages</Label>
+                      <div className="text-xs text-muted-foreground">
+                        Each stage has its own allowlisted DAG set.
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addCreateStage}
+                      disabled={isCreating}
+                    >
+                      Add Stage
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {createStages.map((stage, index) => (
+                      <div key={stage.id} className="rounded-lg border p-3">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div className="text-sm font-medium">
+                            Stage {index + 1}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeCreateStage(stage.id)}
+                            disabled={isCreating || createStages.length === 1}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+                          <div className="grid gap-2">
+                            <Label htmlFor={`automata-stage-name-${stage.id}`}>
+                              Stage Name
+                            </Label>
+                            <Input
+                              id={`automata-stage-name-${stage.id}`}
+                              value={stage.name}
+                              onChange={(e) =>
+                                updateCreateStage(stage.id, (current) => ({
+                                  ...current,
+                                  name: e.target.value,
+                                }))
+                              }
+                              placeholder="research"
+                              disabled={isCreating}
+                            />
+                          </div>
+
+                          <div className="grid gap-2">
+                            <Label>DAG Selection</Label>
+                            <DAGNameMultiSelect
+                              availableDAGs={availableDAGOptions}
+                              selectedNames={stage.allowedDAGNames}
+                              onChange={(names) =>
+                                updateCreateStage(stage.id, (current) => ({
+                                  ...current,
+                                  allowedDAGNames: names,
+                                }))
+                              }
+                              disabled={isCreating}
+                            />
+                            <div className="text-xs text-muted-foreground">
+                              Select the DAGs this Automata can run while it is
+                              in the {stage.name.trim() || `stage ${index + 1}`}{' '}
+                              stage.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    {dagListQuery.isLoading
+                      ? 'Loading DAGs for selection...'
+                      : 'The dropdown only lists DAGs already available on this node.'}
+                  </div>
+                </div>
+
+                {createError ? (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {createError}
+                  </div>
+                ) : null}
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={closeCreateDialog}
+                    disabled={isCreating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={onCreate}
+                    disabled={isCreating}
+                  >
+                    {isCreating ? 'Creating...' : 'Create Automata'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : !name ? (
             <div className="space-y-4 p-8 text-sm text-muted-foreground">
               <div>
                 Select an Automata to inspect its state, stage, transcript, and
@@ -1096,10 +1183,6 @@ function AutomataPage(): React.ReactElement {
                 <div className="rounded-lg border p-4">
                   <h2 className="mb-2 text-sm font-semibold">Mission</h2>
                   <div className="space-y-2 text-sm">
-                    <p>
-                      <span className="font-medium">Purpose:</span>{' '}
-                      {detail.definition.purpose}
-                    </p>
                     <p>
                       <span className="font-medium">Goal:</span>{' '}
                       {detail.definition.goal}
@@ -1209,8 +1292,10 @@ function AutomataPage(): React.ReactElement {
                           ? 'Respond to the pending prompt before sending a general operator message.'
                           : canSendOperatorMessage
                             ? detail.state.state === 'paused'
-                              ? 'This queues a user message, but the Automata will stay paused until you resume it.'
-                              : 'This queues a user message into the active Automata task.'
+                              ? 'This records your message now, but the Automata will stay paused until you resume it.'
+                              : detail.state.currentRunRef
+                                ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
+                                : 'This queues a user message into the active Automata task.'
                             : 'Operator messages are only accepted while the Automata has an active task.'}
                       </div>
                       <Button
@@ -1357,7 +1442,12 @@ function AutomataPage(): React.ReactElement {
                   <div className="space-y-2 text-sm">
                     {detail.allowedDags.length ? (
                       detail.allowedDags.map((dag) => (
-                        <div key={dag.name} className="rounded-md border p-2">
+                        <button
+                          key={dag.name}
+                          type="button"
+                          onClick={() => setSelectedDAG(dag.name)}
+                          className="w-full rounded-md border p-2 text-left transition hover:bg-muted/50"
+                        >
                           <div className="font-medium">{dag.name}</div>
                           {dag.description ? (
                             <div className="text-xs text-muted-foreground">
@@ -1369,7 +1459,7 @@ function AutomataPage(): React.ReactElement {
                               {dag.tags.join(', ')}
                             </div>
                           ) : null}
-                        </div>
+                        </button>
                       ))
                     ) : (
                       <div className="rounded-md border border-dashed p-3 text-muted-foreground">
@@ -1406,8 +1496,17 @@ function AutomataPage(): React.ReactElement {
                             ) : null}
                           </div>
                           {allowedNames.length ? (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              DAGs: {allowedNames.join(', ')}
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {allowedNames.map((dagName) => (
+                                <button
+                                  key={dagName}
+                                  type="button"
+                                  onClick={() => setSelectedDAG(dagName)}
+                                  className="rounded bg-muted px-2 py-0.5 text-xs text-foreground transition hover:bg-accent"
+                                >
+                                  {dagName}
+                                </button>
+                              ))}
                             </div>
                           ) : null}
                           {allowedTags.length ? (
@@ -1425,58 +1524,55 @@ function AutomataPage(): React.ReactElement {
                     })}
                   </div>
                 </div>
-
-                <div className="rounded-lg border p-4 lg:col-span-2">
-                  <h2 className="mb-3 text-sm font-semibold">Current Run</h2>
-                  {detail.currentRun ? (
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="font-medium">DAG:</span>{' '}
-                        {detail.currentRun.name}
-                      </div>
-                      <div>
-                        <span className="font-medium">Run ID:</span>{' '}
-                        {detail.currentRun.dagRunId}
-                      </div>
-                      <div>
-                        <span className="font-medium">Status:</span>{' '}
-                        {detail.currentRun.status}
-                      </div>
-                      <Link
-                        className="text-primary underline underline-offset-2"
-                        to={`/dag-runs/${encodeURIComponent(detail.currentRun.name)}/${encodeURIComponent(detail.currentRun.dagRunId)}`}
-                      >
-                        Open DAG run
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No active child DAG run.
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="rounded-lg border p-4">
                 <h2 className="mb-3 text-sm font-semibold">Recent Runs</h2>
                 <div className="space-y-2">
-                  {(detail.recentRuns || []).map((run) => (
-                    <div
-                      key={`${run.name}:${run.dagRunId}`}
-                      className="grid gap-1 rounded-md border p-2 text-sm lg:grid-cols-[1fr_160px_140px]"
-                    >
-                      <div>
-                        <div className="font-medium">{run.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {run.dagRunId}
+                  {mergedRuns.length ? (
+                    mergedRuns.map((run) => (
+                      <button
+                        key={`${run.name}:${run.dagRunId}`}
+                        type="button"
+                        onClick={() =>
+                          setSelectedDAGRun({
+                            name: run.name,
+                            dagRunId: run.dagRunId,
+                          })
+                        }
+                        className="grid w-full gap-2 rounded-md border p-2 text-left text-sm transition hover:bg-muted/50 lg:grid-cols-[1fr_180px_160px]"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium">{run.name}</div>
+                            {run.isCurrent ? (
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                current
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {run.dagRunId}
+                          </div>
                         </div>
-                      </div>
-                      <div>{run.status}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {run.finishedAt || run.startedAt || ''}
-                      </div>
+                        <div>
+                          <StatusChip
+                            status={dagRunStatusToStatus(run.status)}
+                            size="xs"
+                          >
+                            {run.status}
+                          </StatusChip>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {run.finishedAt || run.startedAt || ''}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                      No child DAG runs yet.
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -1599,6 +1695,21 @@ function AutomataPage(): React.ReactElement {
           )}
         </section>
       </div>
+      {selectedDAGRun ? (
+        <DAGRunDetailsModal
+          name={selectedDAGRun.name}
+          dagRunId={selectedDAGRun.dagRunId}
+          isOpen={!!selectedDAGRun}
+          onClose={() => setSelectedDAGRun(null)}
+        />
+      ) : null}
+      {selectedDAG ? (
+        <DAGDetailsModal
+          fileName={selectedDAG}
+          isOpen={!!selectedDAG}
+          onClose={() => setSelectedDAG(null)}
+        />
+      ) : null}
     </>
   );
 }

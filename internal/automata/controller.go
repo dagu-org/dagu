@@ -277,7 +277,6 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed []AllowedDAGInfo) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "You are controlling Automata %q.\n", def.Name)
-	fmt.Fprintf(&sb, "Purpose: %s\n", def.Purpose)
 	fmt.Fprintf(&sb, "Goal: %s\n", def.Goal)
 	if instruction := strings.TrimSpace(state.Instruction); instruction != "" {
 		fmt.Fprintf(&sb, "Current instruction: %s\n", instruction)
