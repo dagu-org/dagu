@@ -102,6 +102,7 @@ type ListDAGRunStatusesOptions struct {
 	Limit     int
 	Tags      []string // Filter by DAG tags (AND logic - all tags must match)
 	Unlimited bool
+	AllTime   bool
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
@@ -168,6 +169,14 @@ func WithLimit(limit int) ListDAGRunStatusesOption {
 func WithoutLimit() ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.Unlimited = true
+	}
+}
+
+// WithAllTime disables the default implicit "today only" time window when no
+// explicit range is supplied.
+func WithAllTime() ListDAGRunStatusesOption {
+	return func(o *ListDAGRunStatusesOptions) {
+		o.AllTime = true
 	}
 }
 

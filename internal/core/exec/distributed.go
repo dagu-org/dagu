@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
 var (
 	ErrDispatchTaskNotFound = errors.New("dispatch task claim not found")
 	ErrDAGRunLeaseNotFound  = errors.New("dag-run lease not found")
+	ErrActiveRunNotFound    = errors.New("active distributed run not found")
 )
 
 // CoordinatorEndpoint identifies a coordinator instance that owns a
@@ -142,6 +144,27 @@ type DAGRunLeaseStore interface {
 	Get(ctx context.Context, attemptKey string) (*DAGRunLease, error)
 	ListByQueue(ctx context.Context, queueName string) ([]DAGRunLease, error)
 	ListAll(ctx context.Context) ([]DAGRunLease, error)
+}
+
+// ActiveDistributedRun is the durable active-set record for a remote attempt
+// that is still expected to own execution authority.
+type ActiveDistributedRun struct {
+	AttemptKey string      `json:"attemptKey"`
+	DAGRun     DAGRunRef   `json:"dagRun"`
+	Root       DAGRunRef   `json:"root,omitzero"`
+	AttemptID  string      `json:"attemptId"`
+	WorkerID   string      `json:"workerId"`
+	Status     core.Status `json:"status"`
+	UpdatedAt  int64       `json:"updatedAt"`
+}
+
+// ActiveDistributedRunStore persists the coordinator-owned active distributed
+// attempt index used by the zombie detector.
+type ActiveDistributedRunStore interface {
+	Upsert(ctx context.Context, record ActiveDistributedRun) error
+	Delete(ctx context.Context, attemptKey string) error
+	Get(ctx context.Context, attemptKey string) (*ActiveDistributedRun, error)
+	ListAll(ctx context.Context) ([]ActiveDistributedRun, error)
 }
 
 // IsRemoteWorkerID reports whether the status originated from a distributed

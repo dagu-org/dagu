@@ -27,7 +27,7 @@ import (
 func TestWorkerStart(t *testing.T) {
 	t.Run("StartAndStop", func(t *testing.T) {
 		// Setup test environment
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		th := test.Setup(t)
 
 		// Create worker
@@ -66,7 +66,7 @@ func TestWorkerStart(t *testing.T) {
 
 	t.Run("MultiplePollers", func(t *testing.T) {
 		// Setup test environment
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		th := test.Setup(t)
 
 		maxActiveRuns := 3
@@ -131,7 +131,7 @@ func TestWorkerStart(t *testing.T) {
 func TestWorkerTaskExecution(t *testing.T) {
 	t.Run("ExecuteDispatchedTask", func(t *testing.T) {
 		// Setup test environment
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		th := test.Setup(t)
 
 		// Create task
@@ -202,7 +202,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 
 	t.Run("HandleTaskExecutionError", func(t *testing.T) {
 		// Setup test environment
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		th := test.Setup(t)
 
 		// Create task
@@ -257,7 +257,7 @@ func TestWorkerTaskExecution(t *testing.T) {
 func TestWorkerWithLabels(t *testing.T) {
 	t.Run("WorkerWithSelectorLabels", func(t *testing.T) {
 		// Setup test environment
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		th := test.Setup(t)
 
 		// Create task that requires specific labels
@@ -329,7 +329,7 @@ func TestWorkerWithLabels(t *testing.T) {
 func TestWorkerHeartbeat(t *testing.T) {
 	t.Run("SendsHeartbeats", func(t *testing.T) {
 		// Setup test environment
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		th := test.Setup(t)
 
 		// Create worker

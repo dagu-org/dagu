@@ -126,8 +126,9 @@ func prepareListOptions(opts []exec.ListDAGRunStatusesOption) (exec.ListDAGRunSt
 		opt(&options)
 	}
 
-	// Set default time range if not specified
-	if options.From.IsZero() && options.To.IsZero() {
+	// Set default time range if not specified. Internal reconciliation paths can
+	// opt out when they need to scan historical rows explicitly.
+	if !options.AllTime && options.From.IsZero() && options.To.IsZero() {
 		options.From = exec.NewUTC(time.Now().Truncate(24 * time.Hour))
 	}
 

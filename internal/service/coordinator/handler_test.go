@@ -333,6 +333,23 @@ func (m *mockDAGRunAttempt) WasClosed() bool {
 	return m.closed
 }
 
+func createStoredAttemptStatus(
+	t *testing.T,
+	store exec.DAGRunStore,
+	ts time.Time,
+	dagName string,
+	dagRunID string,
+	runStatus exec.DAGRunStatus,
+) {
+	t.Helper()
+
+	attempt, err := store.CreateAttempt(context.Background(), &core.DAG{Name: dagName}, ts, dagRunID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+	require.NoError(t, attempt.Open(context.Background()))
+	require.NoError(t, attempt.Write(context.Background(), runStatus))
+	require.NoError(t, attempt.Close(context.Background()))
+}
+
 func TestHandler_Poll(t *testing.T) {
 	t.Parallel()
 
@@ -1489,6 +1506,97 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
 		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
 	})
+
+	t.Run("BackfillActiveDistributedRunsRepairsHistoricalOrphanedRemoteStatus", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		baseDir := t.TempDir()
+		store := filedagrun.New(filepath.Join(baseDir, "dag-runs"))
+		leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(baseDir, "distributed"))
+		activeStore := filedistributed.NewActiveDistributedRunStore(filepath.Join(baseDir, "distributed"))
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			StaleLeaseThreshold:       time.Second,
+		})
+
+		attemptKey := exec.GenerateAttemptKey("lease-dag", "run-old", "lease-dag", "run-old", "attempt-1")
+		createStoredAttemptStatus(t, store, time.Now().UTC().Add(-48*time.Hour), "lease-dag", "run-old", exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-old",
+			AttemptID:  "attempt-1",
+			AttemptKey: attemptKey,
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+			Nodes: []*exec.Node{
+				{Status: core.NodeRunning},
+			},
+		})
+
+		h.backfillActiveDistributedRuns(ctx)
+
+		attempt, err := store.FindAttempt(ctx, exec.DAGRunRef{Name: "lease-dag", ID: "run-old"})
+		require.NoError(t, err)
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+
+		records, err := activeStore.ListAll(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, records)
+	})
+
+	t.Run("DetectIndexedDistributedStatusesFailsActiveEntryWhenLeaseMissing", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			StaleLeaseThreshold:       time.Second,
+		})
+
+		ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-lease"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-lease",
+			AttemptID:  "attempt-1",
+			AttemptKey: "lease-key-1",
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+			Nodes: []*exec.Node{
+				{Status: core.NodeRunning},
+			},
+		})
+		require.NoError(t, activeStore.Upsert(ctx, exec.ActiveDistributedRun{
+			AttemptKey: "lease-key-1",
+			DAGRun:     ref,
+			Root:       ref,
+			AttemptID:  "attempt-1",
+			WorkerID:   "worker-1",
+			Status:     core.Running,
+		}))
+
+		h.detectStaleLeases(ctx)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+
+		records, err := activeStore.ListAll(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, records)
+	})
 }
 
 func TestHandler_ReportStatus(t *testing.T) {
@@ -2001,6 +2109,78 @@ func TestHandler_ReportStatus(t *testing.T) {
 		lease, err := leaseStore.Get(ctx, "attempt-key-1")
 		require.NoError(t, err)
 		assert.Equal(t, "queue-a", lease.QueueName)
+	})
+
+	t.Run("ReportStatusSyncsActiveDistributedRunIndex", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			Owner:                     exec.CoordinatorEndpoint{ID: "coord-a", Host: "127.0.0.1", Port: 1234},
+		})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.NotStarted,
+			WorkerID:   "worker-1",
+		})
+
+		runningProto, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+		})
+		require.NoError(t, convErr)
+
+		resp, err := h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{
+			Status:             runningProto,
+			OwnerCoordinatorId: "coord-a",
+			WorkerId:           "worker-1",
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Accepted)
+
+		record, err := activeStore.Get(ctx, "attempt-key-1")
+		require.NoError(t, err)
+		require.NotNil(t, record)
+		assert.Equal(t, "attempt-1", record.AttemptID)
+		assert.Equal(t, "worker-1", record.WorkerID)
+		assert.Equal(t, core.Running, record.Status)
+
+		succeededProto, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Succeeded,
+			WorkerID:   "worker-1",
+		})
+		require.NoError(t, convErr)
+
+		resp, err = h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{
+			Status:             succeededProto,
+			OwnerCoordinatorId: "coord-a",
+			WorkerId:           "worker-1",
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Accepted)
+
+		_, err = activeStore.Get(ctx, "attempt-key-1")
+		assert.ErrorIs(t, err, exec.ErrActiveRunNotFound)
 	})
 
 	t.Run("AckTaskClaimCreatesLeaseAndDeletesClaim", func(t *testing.T) {

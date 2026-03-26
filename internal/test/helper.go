@@ -251,26 +251,28 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
 	workerHeartbeatStore := filedistributed.NewWorkerHeartbeatStore(distributedDir)
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
+	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)
 
 	drm := runtimepkg.NewManager(runStore, procStore, cfg)
 
 	helper := Helper{
-		Context:                 ctx,
-		Config:                  cfg,
-		ChildEnv:                cfg.Core.BaseEnv.AsSlice(),
-		DAGRunMgr:               drm,
-		DAGStore:                dagStore,
-		DAGRunStore:             runStore,
-		ProcStore:               procStore,
-		QueueStore:              queueStore,
-		ServiceRegistry:         serviceMonitor,
-		DispatchTaskStore:       dispatchTaskStore,
-		WorkerHeartbeatStore:    workerHeartbeatStore,
-		DAGRunLeaseStore:        dagRunLeaseStore,
-		SubCmdBuilder:           runtimepkg.NewSubCmdBuilder(cfg),
-		ServerOptions:           options.ServerOptions,
-		StaleHeartbeatThreshold: options.StaleHeartbeatThreshold,
-		StaleLeaseThreshold:     options.StaleLeaseThreshold,
+		Context:                   ctx,
+		Config:                    cfg,
+		ChildEnv:                  cfg.Core.BaseEnv.AsSlice(),
+		DAGRunMgr:                 drm,
+		DAGStore:                  dagStore,
+		DAGRunStore:               runStore,
+		ProcStore:                 procStore,
+		QueueStore:                queueStore,
+		ServiceRegistry:           serviceMonitor,
+		DispatchTaskStore:         dispatchTaskStore,
+		WorkerHeartbeatStore:      workerHeartbeatStore,
+		DAGRunLeaseStore:          dagRunLeaseStore,
+		ActiveDistributedRunStore: activeDistributedRunStore,
+		SubCmdBuilder:             runtimepkg.NewSubCmdBuilder(cfg),
+		ServerOptions:             options.ServerOptions,
+		StaleHeartbeatThreshold:   options.StaleHeartbeatThreshold,
+		StaleLeaseThreshold:       options.StaleLeaseThreshold,
 
 		tmpDir: tmpDir,
 	}
@@ -456,24 +458,25 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 
 // Helper provides test utilities and configuration
 type Helper struct {
-	Context                 context.Context
-	Cancel                  context.CancelFunc
-	Config                  *config.Config
-	ChildEnv                []string
-	LoggingOutput           *SyncBuffer
-	DAGStore                exec1.DAGStore
-	DAGRunStore             exec1.DAGRunStore
-	DAGRunMgr               runtimepkg.Manager
-	ProcStore               exec1.ProcStore
-	QueueStore              exec1.QueueStore
-	ServiceRegistry         exec1.ServiceRegistry
-	DispatchTaskStore       exec1.DispatchTaskStore
-	WorkerHeartbeatStore    exec1.WorkerHeartbeatStore
-	DAGRunLeaseStore        exec1.DAGRunLeaseStore
-	SubCmdBuilder           *runtimepkg.SubCmdBuilder
-	ServerOptions           []frontend.ServerOption
-	StaleHeartbeatThreshold time.Duration
-	StaleLeaseThreshold     time.Duration
+	Context                   context.Context
+	Cancel                    context.CancelFunc
+	Config                    *config.Config
+	ChildEnv                  []string
+	LoggingOutput             *SyncBuffer
+	DAGStore                  exec1.DAGStore
+	DAGRunStore               exec1.DAGRunStore
+	DAGRunMgr                 runtimepkg.Manager
+	ProcStore                 exec1.ProcStore
+	QueueStore                exec1.QueueStore
+	ServiceRegistry           exec1.ServiceRegistry
+	DispatchTaskStore         exec1.DispatchTaskStore
+	WorkerHeartbeatStore      exec1.WorkerHeartbeatStore
+	DAGRunLeaseStore          exec1.DAGRunLeaseStore
+	ActiveDistributedRunStore exec1.ActiveDistributedRunStore
+	SubCmdBuilder             *runtimepkg.SubCmdBuilder
+	ServerOptions             []frontend.ServerOption
+	StaleHeartbeatThreshold   time.Duration
+	StaleLeaseThreshold       time.Duration
 
 	tmpDir string
 }

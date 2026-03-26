@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
@@ -282,6 +283,51 @@ func TestDAGRunLeaseStore_UpsertTouchListAndDelete(t *testing.T) {
 	require.NoError(t, store.Delete(ctx, "attempt-key-1"))
 	_, err = store.Get(ctx, "attempt-key-1")
 	assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+}
+
+func TestActiveDistributedRunStore_UpsertListGetAndDelete(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewActiveDistributedRunStore(filepath.Join(t.TempDir(), "distributed"))
+
+	require.NoError(t, store.Upsert(ctx, exec.ActiveDistributedRun{
+		AttemptKey: "attempt-key-1",
+		DAGRun:     exec.NewDAGRunRef("dag-a", "run-1"),
+		Root:       exec.NewDAGRunRef("dag-a", "run-1"),
+		AttemptID:  "attempt-1",
+		WorkerID:   "worker-1",
+		Status:     core.Running,
+	}))
+	require.NoError(t, store.Upsert(ctx, exec.ActiveDistributedRun{
+		AttemptKey: "attempt-key-2",
+		DAGRun:     exec.NewDAGRunRef("dag-b", "run-2"),
+		Root:       exec.NewDAGRunRef("dag-b", "run-2"),
+		AttemptID:  "attempt-2",
+		WorkerID:   "worker-2",
+		Status:     core.NotStarted,
+	}))
+
+	record, err := store.Get(ctx, "attempt-key-1")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, "attempt-1", record.AttemptID)
+	assert.Equal(t, "worker-1", record.WorkerID)
+	assert.NotZero(t, record.UpdatedAt)
+
+	records, err := store.ListAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+
+	require.NoError(t, store.Delete(ctx, "attempt-key-1"))
+
+	_, err = store.Get(ctx, "attempt-key-1")
+	assert.ErrorIs(t, err, exec.ErrActiveRunNotFound)
+
+	records, err = store.ListAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, "attempt-key-2", records[0].AttemptKey)
 }
 
 func TestDAGRunLeaseStore_ConcurrentTouchPreservesLatestHeartbeat(t *testing.T) {
