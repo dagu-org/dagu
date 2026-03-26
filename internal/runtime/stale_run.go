@@ -91,6 +91,8 @@ func markActiveStatusFailed(status *exec.DAGRunStatus, reason string, finishedAt
 			node.Status = core.NodeFailed
 			node.FinishedAt = finishedAtFormatted
 			node.Error = reason
+		case core.NodeFailed, core.NodeAborted, core.NodeSucceeded, core.NodeSkipped, core.NodePartiallySucceeded, core.NodeRejected:
+			// Leave terminal nodes unchanged when failing the enclosing run.
 		}
 	}
 }

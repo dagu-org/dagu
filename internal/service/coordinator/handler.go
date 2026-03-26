@@ -494,10 +494,7 @@ func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAtt
 		Tags:         tags,
 		ScheduleTime: scheduleTime,
 	}
-	if err := attempt.Write(ctx, initialStatus); err != nil {
-		return err
-	}
-	return nil
+	return attempt.Write(ctx, initialStatus)
 }
 
 func (h *Handler) prepareAttemptForDispatch(ctx context.Context, task *coordinatorv1.Task) (*preparedDispatchAttempt, error) {
@@ -1863,6 +1860,8 @@ func (h *Handler) failDistributedAttemptIfCurrent(
 				status.Nodes[i].Status = core.NodeFailed
 				status.Nodes[i].FinishedAt = finishedAtStr
 				status.Nodes[i].Error = reason
+			case core.NodeFailed, core.NodeAborted, core.NodeSucceeded, core.NodeSkipped, core.NodePartiallySucceeded, core.NodeRejected:
+				// Keep terminal node results intact when the run is failed due to lease loss.
 			}
 		}
 		return nil
