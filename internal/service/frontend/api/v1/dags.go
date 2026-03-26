@@ -420,6 +420,8 @@ func (a *API) readHistoryData(_ context.Context, dag *core.DAG, statusList []exe
 	statusLen := len(statusList)
 	nodeData := make(map[string][]core.NodeStatus)
 	handlerData := make(map[string][]core.NodeStatus)
+	originalIndex := make(map[string]int)
+	nextOriginalIndex := 0
 
 	addStatus := func(data map[string][]core.NodeStatus, idx int, name string, status core.NodeStatus) {
 		if _, exists := data[name]; !exists {
@@ -430,6 +432,10 @@ func (a *API) readHistoryData(_ context.Context, dag *core.DAG, statusList []exe
 
 	for idx, st := range statusList {
 		for _, node := range st.Nodes {
+			if _, ok := originalIndex[node.Step.Name]; !ok {
+				originalIndex[node.Step.Name] = nextOriginalIndex
+				nextOriginalIndex++
+			}
 			addStatus(nodeData, idx, node.Step.Name, node.Status)
 		}
 		// Key handlers by their type (onSuccess, onFailure, etc.) not step name
@@ -445,6 +451,10 @@ func (a *API) readHistoryData(_ context.Context, dag *core.DAG, statusList []exe
 		}
 		for _, h := range handlerPairs {
 			if h.node != nil {
+				if _, ok := originalIndex[h.handlerType.String()]; !ok {
+					originalIndex[h.handlerType.String()] = nextOriginalIndex
+					nextOriginalIndex++
+				}
 				addStatus(handlerData, idx, h.handlerType.String(), h.node.Status)
 			}
 		}
@@ -467,57 +477,63 @@ func (a *API) readHistoryData(_ context.Context, dag *core.DAG, statusList []exe
 	if dag != nil {
 		stepIndex = make(map[string]int)
 		if dag.Type == core.TypeGraph {
-			inDegree := make(map[string]int)
-			adj := make(map[string][]string)
-
-			for _, step := range dag.Steps {
-				inDegree[step.Name] = 0
-			}
-			for _, step := range dag.Steps {
-				for _, dep := range step.Depends {
-					adj[dep] = append(adj[dep], step.Name)
-					inDegree[step.Name]++
+			if len(dag.BuildErrors) > 0 {
+				for i, step := range dag.Steps {
+					stepIndex[step.Name] = i
 				}
-			}
+			} else {
+				inDegree := make(map[string]int)
+				adj := make(map[string][]string)
 
-			var queue []string
-			for _, step := range dag.Steps {
-				if inDegree[step.Name] == 0 {
-					queue = append(queue, step.Name)
+				for _, step := range dag.Steps {
+					inDegree[step.Name] = 0
 				}
-			}
-
-			origIdx := make(map[string]int)
-			for i, s := range dag.Steps {
-				origIdx[s.Name] = i
-			}
-
-			var topoOrder []string
-			for len(queue) > 0 {
-				sort.Slice(queue, func(i, j int) bool {
-					return origIdx[queue[i]] < origIdx[queue[j]]
-				})
-				u := queue[0]
-				queue = queue[1:]
-				topoOrder = append(topoOrder, u)
-
-				for _, v := range adj[u] {
-					inDegree[v]--
-					if inDegree[v] == 0 {
-						queue = append(queue, v)
+				for _, step := range dag.Steps {
+					for _, dep := range step.Depends {
+						adj[dep] = append(adj[dep], step.Name)
+						inDegree[step.Name]++
 					}
 				}
-			}
 
-			for i, name := range topoOrder {
-				stepIndex[name] = i
-			}
+				var queue []string
+				for _, step := range dag.Steps {
+					if inDegree[step.Name] == 0 {
+						queue = append(queue, step.Name)
+					}
+				}
 
-			// Assign any unreached steps an index offset
-			offset := len(topoOrder)
-			for i, s := range dag.Steps {
-				if _, ok := stepIndex[s.Name]; !ok {
-					stepIndex[s.Name] = offset + i
+				origIdx := make(map[string]int)
+				for i, s := range dag.Steps {
+					origIdx[s.Name] = i
+				}
+
+				var topoOrder []string
+				for len(queue) > 0 {
+					sort.Slice(queue, func(i, j int) bool {
+						return origIdx[queue[i]] < origIdx[queue[j]]
+					})
+					u := queue[0]
+					queue = queue[1:]
+					topoOrder = append(topoOrder, u)
+
+					for _, v := range adj[u] {
+						inDegree[v]--
+						if inDegree[v] == 0 {
+							queue = append(queue, v)
+						}
+					}
+				}
+
+				for i, name := range topoOrder {
+					stepIndex[name] = i
+				}
+
+				// Assign any unreached steps an index offset
+				offset := len(topoOrder)
+				for i, s := range dag.Steps {
+					if _, ok := stepIndex[s.Name]; !ok {
+						stepIndex[s.Name] = offset + i
+					}
 				}
 			}
 		} else {
@@ -540,6 +556,18 @@ func (a *API) readHistoryData(_ context.Context, dag *core.DAG, statusList []exe
 			if okJ {
 				return false
 			}
+		}
+
+		origI, okOrigI := originalIndex[grid[i].Name]
+		origJ, okOrigJ := originalIndex[grid[j].Name]
+		if okOrigI && okOrigJ {
+			return origI < origJ
+		}
+		if okOrigI {
+			return true
+		}
+		if okOrigJ {
+			return false
 		}
 		return grid[i].Name < grid[j].Name
 	})
