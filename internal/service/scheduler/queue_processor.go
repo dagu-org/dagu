@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -28,6 +29,8 @@ var (
 	errProcessorClosed = errors.New("processor closed")
 	errNotStarted      = errors.New("execution not started")
 )
+
+const suspendedQueueDropReason = "dag schedule suspended before dispatch"
 
 // BackoffConfig holds configuration for exponential backoff retry logic.
 type BackoffConfig struct {
@@ -60,6 +63,7 @@ type QueueProcessor struct {
 	dagRunLeaseStore    exec.DAGRunLeaseStore
 	dispatchTaskStore   exec.DispatchTaskStore
 	dagExecutor         *DAGExecutor
+	isSuspended         IsSuspendedFunc
 	queues              sync.Map // map[string]*queue
 	wakeUpCh            chan struct{}
 	quit                chan struct{}
@@ -129,6 +133,13 @@ func WithDispatchTaskStore(store exec.DispatchTaskStore) QueueProcessorOption {
 	}
 }
 
+// WithIsSuspended sets the suspend-flag checker used by the queue processor.
+func WithIsSuspended(isSuspended IsSuspendedFunc) QueueProcessorOption {
+	return func(p *QueueProcessor) {
+		p.isSuspended = isSuspended
+	}
+}
+
 // NewQueueProcessor creates a new QueueProcessor.
 func NewQueueProcessor(
 	queueStore exec.QueueStore,
@@ -148,6 +159,7 @@ func NewQueueProcessor(
 		prevTime:            time.Now(),
 		backoffConfig:       DefaultBackoffConfig(),
 		leaseStaleThreshold: exec.DefaultStaleLeaseThreshold,
+		isSuspended:         func(context.Context, string) bool { return false },
 	}
 
 	for _, opt := range opts {
@@ -445,6 +457,13 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		return false
 	}
 
+	if isSchedulerManagedTriggerType(status.TriggerType) && isSuspendedDAG(ctx, p.isSuspended, status, dag) {
+		if err := p.dropSuspendedQueuedRun(ctx, queueName, runRef, attempt.ID(), status); err != nil {
+			logger.Error(ctx, "Failed to drop suspended queued DAG run", tag.Error(err))
+		}
+		return false
+	}
+
 	// Log a warning if the item has been queued for too long.
 	if schedTime, err := time.Parse(time.RFC3339, status.ScheduleTime); err == nil {
 		if queueAge := time.Since(schedTime); queueAge > queueAgeWarningThreshold {
@@ -483,6 +502,59 @@ func (p *QueueProcessor) processDAG(ctx context.Context, item exec.QueuedItemDat
 		launchedAt: time.Now(),
 		execErrCh:  execErrCh,
 	})
+}
+
+func (p *QueueProcessor) dropSuspendedQueuedRun(
+	ctx context.Context,
+	queueName string,
+	runRef exec.DAGRunRef,
+	attemptID string,
+	status *exec.DAGRunStatus,
+) error {
+	finishedAt := stringutil.FormatTime(time.Now().UTC())
+	currentStatus, swapped, err := p.dagRunStore.CompareAndSwapLatestAttemptStatus(
+		ctx,
+		runRef,
+		attemptID,
+		core.Queued,
+		func(latest *exec.DAGRunStatus) error {
+			latest.Status = core.Aborted
+			latest.FinishedAt = finishedAt
+			latest.Error = suspendedQueueDropReason
+			latest.WorkerID = ""
+			latest.PID = 0
+			latest.LeaseAt = 0
+			return nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("abort suspended queued DAG run: %w", err)
+	}
+
+	if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, runRef); err != nil && !errors.Is(err, exec.ErrQueueItemNotFound) {
+		return fmt.Errorf("dequeue suspended queued DAG run: %w", err)
+	}
+
+	if swapped {
+		logger.Info(ctx, "Dropped queued scheduler-managed run for suspended DAG",
+			tag.Status(core.Aborted.String()),
+			slog.String("trigger_type", status.TriggerType.String()),
+		)
+		return nil
+	}
+
+	logger.Info(ctx, "Removed stale queued scheduler-managed run for suspended DAG",
+		slog.String("trigger_type", status.TriggerType.String()),
+		slog.String("current_status", currentStatusString(currentStatus)),
+	)
+	return nil
+}
+
+func currentStatusString(status *exec.DAGRunStatus) string {
+	if status == nil {
+		return "unknown"
+	}
+	return status.Status.String()
 }
 
 // dispatchAndWaitForStartup handles distributed DAG execution by retrying

@@ -111,14 +111,6 @@ func newScheduler(
 	subCmdBuilder := runtime.NewSubCmdBuilder(cfg)
 	dagExecutor := NewDAGExecutor(coordinatorCli, subCmdBuilder, cfg.DefaultExecMode, cfg.Paths.BaseConfig)
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
-	processor := NewQueueProcessor(
-		queueStore,
-		dagRunStore,
-		procStore,
-		dagExecutor,
-		cfg.Queues,
-	)
-	defaultClock := Clock(time.Now)
 
 	// Resolve IsSuspended once at construction time and wire the event channel.
 	eventCh := make(chan DAGChangeEvent)
@@ -127,6 +119,15 @@ func newScheduler(
 		isSuspended = impl.dagStore.IsSuspended
 		impl.setEvents(eventCh)
 	}
+	processor := NewQueueProcessor(
+		queueStore,
+		dagRunStore,
+		procStore,
+		dagExecutor,
+		cfg.Queues,
+		WithIsSuspended(isSuspended),
+	)
+	defaultClock := Clock(time.Now)
 
 	// Build catchup-enqueue callbacks when queues are enabled.
 	queuesEnabled := cfg.Queues.Enabled

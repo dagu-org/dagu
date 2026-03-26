@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -131,12 +132,22 @@ func (f *queueFixture) enqueueWithPriority(runID string, priority exec.QueuePrio
 	f.enqueueToQueue(f.dag.Name, runID, priority)
 }
 
+func (f *queueFixture) enqueueRunWithTrigger(runID string, triggerType core.TriggerType) {
+	f.enqueueToQueueWithTrigger(f.dag.Name, runID, exec.QueuePriorityHigh, triggerType)
+}
+
 func (f *queueFixture) enqueueToQueue(queueName, runID string, priority exec.QueuePriority) {
+	f.enqueueToQueueWithTrigger(queueName, runID, priority, core.TriggerTypeUnknown)
+}
+
+func (f *queueFixture) enqueueToQueueWithTrigger(queueName, runID string, priority exec.QueuePriority, triggerType core.TriggerType) {
 	run, err := f.dagRunStore.CreateAttempt(f.ctx, f.dag, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
 	require.NoError(f.t, err)
 	require.NoError(f.t, run.Open(f.ctx))
 	st := exec.InitialStatus(f.dag)
 	st.Status, st.DAGRunID = core.Queued, runID
+	st.AttemptID = run.ID()
+	st.TriggerType = triggerType
 	require.NoError(f.t, run.Write(f.ctx, st))
 	require.NoError(f.t, run.Close(f.ctx))
 	require.NoError(f.t, f.queueStore.Enqueue(f.ctx, queueName, priority, exec.NewDAGRunRef(f.dag.Name, runID)))
@@ -355,6 +366,87 @@ func TestQueueProcessor_SelectRunnableQueueItemsSkipsOutstandingReservations(t *
 	selectedRef, err := runnable[0].Data()
 	require.NoError(t, err)
 	assert.Equal(t, "run-2", selectedRef.ID)
+}
+
+func TestQueueProcessor_SuspendedSchedulerManagedQueuedRunsAreAbortedAndDequeued(t *testing.T) {
+	triggers := []core.TriggerType{
+		core.TriggerTypeScheduler,
+		core.TriggerTypeCatchUp,
+		core.TriggerTypeRetry,
+	}
+
+	for _, trigger := range triggers {
+		t.Run(trigger.String(), func(t *testing.T) {
+			dagName := "suspended-" + trigger.String() + "-dag"
+			f := newQueueFixture(t).
+				withDAG(dagName, 1).
+				withProcessor(config.Queues{}, WithIsSuspended(func(_ context.Context, name string) bool {
+					return name == dagName
+				})).
+				simulateQueue(1, false)
+
+			f.enqueueRunWithTrigger("run-1", trigger)
+
+			f.processor.ProcessQueueItems(f.ctx, dagName)
+
+			items, err := f.queueStore.List(f.ctx, dagName)
+			require.NoError(t, err)
+			require.Len(t, items, 0)
+
+			attempt, err := f.dagRunStore.FindAttempt(f.ctx, exec.NewDAGRunRef(dagName, "run-1"))
+			require.NoError(t, err)
+			status, err := attempt.ReadStatus(f.ctx)
+			require.NoError(t, err)
+			assert.Equal(t, core.Aborted, status.Status)
+			assert.Equal(t, suspendedQueueDropReason, status.Error)
+			assert.NotEmpty(t, status.FinishedAt)
+			assert.Equal(t, trigger, status.TriggerType)
+		})
+	}
+}
+
+func TestQueueProcessor_SuspendedManualQueuedRunStillDispatches(t *testing.T) {
+	dagName := "suspended-manual-dag"
+	f := newQueueFixture(t).withDAG(dagName, 1)
+	f.enqueueRunWithTrigger("run-1", core.TriggerTypeManual)
+
+	items, err := f.queueStore.List(f.ctx, dagName)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+
+	runRef := exec.NewDAGRunRef(dagName, "run-1")
+	procStore := &mockProcStore{}
+	procStore.On("IsRunAlive", mock.Anything, dagName, runRef).Return(false, nil).Once()
+	procStore.On("IsRunAlive", mock.Anything, dagName, runRef).Return(true, nil).Once()
+	dispatcher := &mockDispatcher{}
+
+	processor := &QueueProcessor{
+		queueStore:  f.queueStore,
+		dagRunStore: f.dagRunStore,
+		procStore:   procStore,
+		dagExecutor: NewDAGExecutor(dispatcher, nil, config.ExecutionModeDistributed, ""),
+		isSuspended: func(_ context.Context, name string) bool { return name == dagName },
+		quit:        make(chan struct{}),
+		wakeUpCh:    make(chan struct{}, 1),
+		backoffConfig: BackoffConfig{
+			InitialInterval:    10 * time.Millisecond,
+			MaxInterval:        50 * time.Millisecond,
+			MaxRetries:         2,
+			StartupGracePeriod: time.Second,
+		},
+	}
+
+	dispatched := processor.processDAG(f.ctx, items[0], dagName, func() {}, func() {})
+	require.True(t, dispatched)
+	assert.Equal(t, int32(1), dispatcher.callCount.Load())
+
+	attempt, err := f.dagRunStore.FindAttempt(f.ctx, runRef)
+	require.NoError(t, err)
+	status, err := attempt.ReadStatus(f.ctx)
+	require.NoError(t, err)
+	assert.Equal(t, core.Queued, status.Status)
+
+	procStore.AssertExpectations(t)
 }
 
 type mockDispatchTaskStore struct {
