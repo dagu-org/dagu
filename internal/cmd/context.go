@@ -446,7 +446,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, err
 	}
 	sched.SetDAGRunLeaseStore(c.DAGRunLeaseStore)
-	if automataService, err := c.newSchedulerAutomataService(dr, schedulerRunStore); err != nil {
+	if automataService, err := c.newSchedulerAutomataService(dr, schedulerRunStore, schedulerRunMgr, coordinatorCli); err != nil {
 		logger.Warn(c.Context, "Failed to initialize automata service for scheduler", tag.Error(err))
 	} else {
 		sched.SetAutomataService(automataService)
@@ -454,7 +454,12 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	return sched, nil
 }
 
-func (c *Context) newSchedulerAutomataService(dagStore exec.DAGStore, dagRunStore exec.DAGRunStore) (*automata.Service, error) {
+func (c *Context) newSchedulerAutomataService(
+	dagStore exec.DAGStore,
+	dagRunStore exec.DAGRunStore,
+	dagRunMgr runtime.Manager,
+	coordinatorCli coordinator.Client,
+) (*automata.Service, error) {
 	agentConfigStore, err := fileagentconfig.New(c.Config.Paths.DataDir)
 	if err != nil {
 		return nil, err
@@ -509,8 +514,10 @@ func (c *Context) newSchedulerAutomataService(dagStore exec.DAGStore, dagRunStor
 		dagStore,
 		dagRunStore,
 		automata.WithSessionStore(sessionStore),
+		automata.WithDAGRunController(&dagRunMgr),
 		automata.WithAgentAPI(agentAPI),
 		automata.WithSoulStore(soulStore),
+		automata.WithCoordinatorClient(coordinatorCli),
 		automata.WithSubCmdBuilder(runtime.NewSubCmdBuilder(c.Config)),
 		automata.WithLogger(slog.Default()),
 	), nil

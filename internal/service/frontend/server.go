@@ -377,6 +377,8 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		cfg,
 		dr,
 		drs,
+		automata.WithDAGRunController(&drm),
+		automata.WithCoordinatorClient(cc),
 		automata.WithSessionStore(automataSessionStore),
 		automata.WithLogger(slog.Default()),
 	)

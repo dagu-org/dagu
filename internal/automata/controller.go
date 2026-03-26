@@ -76,26 +76,24 @@ func (s *Service) reconcileDefinition(ctx context.Context, def *Definition) erro
 	if def.Disabled {
 		return nil
 	}
+	if state.State == StatePaused {
+		return s.reconcilePausedDefinition(ctx, def, state)
+	}
 
 	if state.PendingPrompt != nil && state.PendingResponse != nil {
 		message := s.buildHumanResponseMessage(state.PendingPrompt, state.PendingResponse)
+		queueTurnMessage(state, "human_response", message, s.clock())
 		state.PendingPrompt = nil
 		state.PendingResponse = nil
+		state.State = StateRunning
 		state.WaitingReason = WaitingReasonNone
-		return s.startTurn(ctx, def, state, message)
+		if err := s.saveState(ctx, def.Name, state); err != nil {
+			return err
+		}
 	}
 
 	if state.CurrentRunRef != nil {
 		return s.reconcileCurrentRun(ctx, def, state)
-	}
-
-	if state.State == StateRunning {
-		detail, err := s.agentAPI.GetSessionDetail(ctx, state.SessionID, s.systemUser(def.Name).UserID)
-		if err == nil && detail != nil && detail.SessionState != nil && detail.SessionState.Working {
-			return nil
-		}
-		state.State = StateIdle
-		return s.saveState(ctx, def.Name, state)
 	}
 
 	if state.PendingPrompt != nil {
@@ -107,41 +105,27 @@ func (s *Service) reconcileDefinition(ctx context.Context, def *Definition) erro
 		return nil
 	}
 
-	if !state.StartRequestedAt.IsZero() {
-		return s.startTurn(ctx, def, state, s.buildKickoffMessage(def, state))
+	if state.State != StateRunning {
+		return nil
 	}
 
-	if s.shouldStartScheduled(def, state) {
-		return s.startTurn(ctx, def, state, s.buildKickoffMessage(def, state))
+	if len(state.PendingTurnMessages) > 0 {
+		return s.flushPendingTurnMessages(ctx, def, state)
 	}
 
 	return nil
 }
 
-func (s *Service) shouldStartScheduled(def *Definition, state *State) bool {
-	if len(def.Schedule) == 0 || state.State != StateIdle {
-		return false
+func (s *Service) reconcilePausedDefinition(ctx context.Context, def *Definition, state *State) error {
+	if s.agentAPI == nil || state.SessionID == "" {
+		return nil
 	}
-	loc := s.cfg.Core.Location
-	if loc == nil {
-		loc = time.Local
+	err := s.agentAPI.CancelSession(ctx, state.SessionID, s.systemUser(def.Name).UserID)
+	if err == nil || errors.Is(err, agent.ErrSessionNotFound) {
+		return nil
 	}
-	now := s.clock().In(loc)
-	minute := now.Truncate(time.Minute)
-	if !state.LastScheduleMinute.IsZero() && !minute.After(state.LastScheduleMinute) {
-		return false
-	}
-	prev := minute.Add(-time.Minute)
-	for _, sched := range def.Schedule {
-		if sched.Parsed == nil {
-			continue
-		}
-		if sched.Parsed.Next(prev) == minute {
-			state.LastScheduleMinute = minute
-			return true
-		}
-	}
-	return false
+	s.logger.Warn("automata pause cancel failed", "automata", def.Name, "error", err)
+	return nil
 }
 
 func (s *Service) reconcileCurrentRun(ctx context.Context, def *Definition, state *State) error {
@@ -157,10 +141,18 @@ func (s *Service) reconcileCurrentRun(ctx context.Context, def *Definition, stat
 	}
 	if len(statuses) == 0 {
 		state.LastError = fmt.Sprintf("child DAG run %s not found", state.CurrentRunRef.String())
+		state.LastRunRef = state.CurrentRunRef
 		state.CurrentRunRef = nil
-		state.State = StateIdle
+		state.State = StateRunning
 		state.WaitingReason = WaitingReasonNone
-		return s.saveState(ctx, def.Name, state)
+		queueTurnMessage(state, "child_run_missing", fmt.Sprintf(
+			"Tracked child DAG run %s could not be found. Investigate the missing run and decide the next action.",
+			state.LastRunRef.String(),
+		), s.clock())
+		if err := s.saveState(ctx, def.Name, state); err != nil {
+			return err
+		}
+		return s.flushPendingTurnMessages(ctx, def, state)
 	}
 	status := statuses[0]
 	if status.Status.IsWaiting() {
@@ -190,7 +182,19 @@ func (s *Service) reconcileCurrentRun(ctx context.Context, def *Definition, stat
 	} else {
 		state.LastError = ""
 	}
-	return s.startTurn(ctx, def, state, s.buildRunCompletionMessage(status))
+	queueTurnMessage(state, "child_run_complete", s.buildRunCompletionMessage(status), s.clock())
+	if err := s.saveState(ctx, def.Name, state); err != nil {
+		return err
+	}
+	return s.flushPendingTurnMessages(ctx, def, state)
+}
+
+func (s *Service) flushPendingTurnMessages(ctx context.Context, def *Definition, state *State) error {
+	if len(state.PendingTurnMessages) == 0 {
+		return nil
+	}
+	message := buildPendingTurnMessageText(state.PendingTurnMessages)
+	return s.startTurn(ctx, def, state, message)
 }
 
 func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, message string) error {
@@ -236,6 +240,7 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 	}
 
 	state.State = StateRunning
+	state.PendingTurnMessages = nil
 	state.StartRequestedAt = time.Time{}
 	state.LastTriggeredAt = s.clock()
 	state.WaitingReason = WaitingReasonNone
@@ -274,6 +279,11 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	fmt.Fprintf(&sb, "You are controlling Automata %q.\n", def.Name)
 	fmt.Fprintf(&sb, "Purpose: %s\n", def.Purpose)
 	fmt.Fprintf(&sb, "Goal: %s\n", def.Goal)
+	if instruction := strings.TrimSpace(state.Instruction); instruction != "" {
+		fmt.Fprintf(&sb, "Current instruction: %s\n", instruction)
+	} else {
+		sb.WriteString("Current instruction: none provided yet.\n")
+	}
 	if def.Description != "" {
 		fmt.Fprintf(&sb, "Description: %s\n", def.Description)
 	}
@@ -303,8 +313,27 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 
 func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
 	return fmt.Sprintf(
-		"Continue Automata %q. Current stage: %q. Decide the next best action toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
+		"Continue Automata %q. Current instruction: %q. Current stage: %q. Decide the next best action toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
 		def.Name,
+		state.Instruction,
+		state.CurrentStage,
+	)
+}
+
+func (s *Service) buildResumeMessage(def *Definition, state *State, requestedBy string) string {
+	if requestedBy == "" {
+		return fmt.Sprintf(
+			"Automata %q was resumed. Current instruction: %q. Current stage: %q. Continue the active task from the latest context.",
+			def.Name,
+			state.Instruction,
+			state.CurrentStage,
+		)
+	}
+	return fmt.Sprintf(
+		"Automata %q was resumed by %s. Current instruction: %q. Current stage: %q. Continue the active task from the latest context.",
+		def.Name,
+		requestedBy,
+		state.Instruction,
 		state.CurrentStage,
 	)
 }
@@ -352,6 +381,12 @@ func (r *controllerRuntime) ListAllowedDAGs(ctx context.Context) ([]agent.Automa
 }
 
 func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.AutomataRunDAGInput) (agent.AutomataRunDAGResult, error) {
+	if r.state.CurrentRunRef != nil {
+		return agent.AutomataRunDAGResult{}, fmt.Errorf("a child DAG run is already active")
+	}
+	if r.state.PendingPrompt != nil {
+		return agent.AutomataRunDAGResult{}, fmt.Errorf("cannot start a child DAG while waiting for human input")
+	}
 	allowed, err := r.service.resolveAllowedDAGs(ctx, r.def)
 	if err != nil {
 		return agent.AutomataRunDAGResult{}, err
@@ -417,6 +452,12 @@ func (r *controllerRuntime) RequestHumanInput(ctx context.Context, prompt agent.
 	if strings.TrimSpace(prompt.Question) == "" {
 		return fmt.Errorf("question is required")
 	}
+	if r.state.CurrentRunRef != nil {
+		return fmt.Errorf("cannot request human input while a child DAG run is active")
+	}
+	if r.state.PendingPrompt != nil {
+		return fmt.Errorf("automata is already waiting for human input")
+	}
 	r.state.PendingPrompt = &Prompt{
 		ID:                  uuid.NewString(),
 		Question:            prompt.Question,
@@ -432,10 +473,14 @@ func (r *controllerRuntime) RequestHumanInput(ctx context.Context, prompt agent.
 }
 
 func (r *controllerRuntime) Finish(ctx context.Context, summary string) error {
+	if r.state.CurrentRunRef != nil {
+		return fmt.Errorf("cannot finish automata while a child DAG run is active")
+	}
 	r.state.State = StateFinished
 	r.state.WaitingReason = WaitingReasonNone
 	r.state.PendingPrompt = nil
 	r.state.PendingResponse = nil
+	r.state.PendingTurnMessages = nil
 	r.state.CurrentRunRef = nil
 	r.state.FinishedAt = r.service.clock()
 	r.state.LastSummary = summary
@@ -457,4 +502,18 @@ func summarizeRunStatus(status *exec.DAGRunStatus) string {
 		return status.Status.String()
 	}
 	return strings.Join(parts, "; ")
+}
+
+func buildPendingTurnMessageText(messages []PendingTurnMessage) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for i, message := range messages {
+		if i > 0 {
+			sb.WriteString("\n\n")
+		}
+		sb.WriteString(message.Message)
+	}
+	return sb.String()
 }

@@ -23,8 +23,11 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
 
@@ -42,6 +45,8 @@ type Service struct {
 	stateDir       string
 	dagStore       exec.DAGStore
 	dagRunStore    exec.DAGRunStore
+	dagRunCtrl     dagRunController
+	coordinatorCli coordinatorCanceler
 	sessionStore   agent.SessionStore
 	agentAPI       *agent.API
 	soulStore      agent.SoulStore
@@ -53,6 +58,14 @@ type Service struct {
 }
 
 type Option func(*Service)
+
+type dagRunController interface {
+	Stop(ctx context.Context, dag *core.DAG, dagRunID string) error
+}
+
+type coordinatorCanceler interface {
+	RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error
+}
 
 func WithAgentAPI(api *agent.API) Option {
 	return func(s *Service) {
@@ -69,6 +82,18 @@ func WithSoulStore(store agent.SoulStore) Option {
 func WithSessionStore(store agent.SessionStore) Option {
 	return func(s *Service) {
 		s.sessionStore = store
+	}
+}
+
+func WithDAGRunController(ctrl dagRunController) Option {
+	return func(s *Service) {
+		s.dagRunCtrl = ctrl
+	}
+}
+
+func WithCoordinatorClient(cli coordinator.Client) Option {
+	return func(s *Service) {
+		s.coordinatorCli = cli
 	}
 }
 
@@ -348,6 +373,7 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			Description:   def.Description,
 			Purpose:       def.Purpose,
 			Goal:          def.Goal,
+			Instruction:   state.Instruction,
 			State:         state.State,
 			Stage:         state.CurrentStage,
 			Disabled:      def.Disabled,
@@ -491,13 +517,76 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 	if err != nil {
 		return err
 	}
-	state.StartRequestedAt = s.clock()
-	if req.RequestedBy != "" {
-		state.StageChangedBy = req.RequestedBy
+	if state.State == StateRunning || state.State == StateWaiting || state.State == StatePaused {
+		return errors.New("automata already has an active task")
 	}
-	if state.State == StateFinished {
-		state.State = StateIdle
-		state.FinishedAt = time.Time{}
+	instruction := strings.TrimSpace(req.Instruction)
+	if instruction == "" {
+		instruction = strings.TrimSpace(state.Instruction)
+	}
+	if instruction == "" {
+		return errors.New("instruction is required before starting automata")
+	}
+	resetTaskState(state)
+	state.State = StateRunning
+	state.Instruction = instruction
+	state.InstructionUpdatedAt = s.clock()
+	state.InstructionUpdatedBy = req.RequestedBy
+	state.StartRequestedAt = s.clock()
+	queueTurnMessage(state, "kickoff", s.buildKickoffMessage(def, state), s.clock())
+	return s.saveState(ctx, name, state)
+}
+
+func (s *Service) Pause(ctx context.Context, name, requestedBy string) error {
+	def, err := s.GetDefinition(ctx, name)
+	if err != nil {
+		return err
+	}
+	state, err := s.ensureState(ctx, def)
+	if err != nil {
+		return err
+	}
+	if state.State == StatePaused {
+		return errors.New("automata is already paused")
+	}
+	if state.State != StateRunning && state.State != StateWaiting {
+		return errors.New("only active automata can be paused")
+	}
+	if state.CurrentRunRef != nil {
+		if err := s.requestChildRunCancel(ctx, state.CurrentRunRef); err != nil {
+			return err
+		}
+	}
+	state.State = StatePaused
+	state.WaitingReason = WaitingReasonNone
+	state.PausedAt = s.clock()
+	state.PausedBy = requestedBy
+	return s.saveState(ctx, name, state)
+}
+
+func (s *Service) Resume(ctx context.Context, name, requestedBy string) error {
+	def, err := s.GetDefinition(ctx, name)
+	if err != nil {
+		return err
+	}
+	state, err := s.ensureState(ctx, def)
+	if err != nil {
+		return err
+	}
+	if state.State != StatePaused {
+		return errors.New("automata is not paused")
+	}
+	state.PausedAt = time.Time{}
+	state.PausedBy = ""
+	if state.PendingPrompt != nil {
+		state.State = StateWaiting
+		state.WaitingReason = WaitingReasonHuman
+		return s.saveState(ctx, name, state)
+	}
+	state.State = StateRunning
+	state.WaitingReason = WaitingReasonNone
+	if state.CurrentRunRef == nil && len(state.PendingTurnMessages) == 0 {
+		queueTurnMessage(state, "resume", s.buildResumeMessage(def, state, requestedBy), s.clock())
 	}
 	return s.saveState(ctx, name, state)
 }
@@ -536,14 +625,49 @@ func (s *Service) SubmitHumanResponse(ctx context.Context, name string, req Huma
 	if req.PromptID == "" || req.PromptID != state.PendingPrompt.ID {
 		return errors.New("prompt ID does not match the pending prompt")
 	}
-	state.PendingResponse = &PromptResponse{
+	response := &PromptResponse{
 		PromptID:          req.PromptID,
 		SelectedOptionIDs: append([]string(nil), req.SelectedOptionIDs...),
 		FreeTextResponse:  req.FreeTextResponse,
 		RespondedAt:       s.clock(),
 	}
-	state.State = StateRunning
-	state.WaitingReason = WaitingReasonNone
+	paused := state.State == StatePaused
+	queueTurnMessage(state, "human_response", s.buildHumanResponseMessage(state.PendingPrompt, response), s.clock())
+	state.PendingPrompt = nil
+	state.PendingResponse = nil
+	if paused {
+		state.WaitingReason = WaitingReasonNone
+	} else {
+		state.State = StateRunning
+		state.WaitingReason = WaitingReasonNone
+	}
+	return s.saveState(ctx, name, state)
+}
+
+func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req OperatorMessageRequest) error {
+	def, err := s.GetDefinition(ctx, name)
+	if err != nil {
+		return err
+	}
+	state, err := s.ensureState(ctx, def)
+	if err != nil {
+		return err
+	}
+	message := strings.TrimSpace(req.Message)
+	if message == "" {
+		return errors.New("message is required")
+	}
+	if state.State != StateRunning && state.State != StateWaiting && state.State != StatePaused {
+		return errors.New("automata is not running an active task")
+	}
+	if state.PendingPrompt != nil {
+		return errors.New("respond to the pending prompt before sending a general operator message")
+	}
+	queueTurnMessage(state, "operator_message", buildOperatorMessage(req.RequestedBy, message), s.clock())
+	if state.State != StatePaused && state.CurrentRunRef == nil {
+		state.State = StateRunning
+		state.WaitingReason = WaitingReasonNone
+	}
 	return s.saveState(ctx, name, state)
 }
 
@@ -553,4 +677,83 @@ func (s *Service) systemUser(name string) agent.UserIdentity {
 		Username: "automata/" + name,
 		Role:     auth.RoleAdmin,
 	}
+}
+
+func resetTaskState(state *State) {
+	if state == nil {
+		return
+	}
+	state.WaitingReason = WaitingReasonNone
+	state.PendingPrompt = nil
+	state.PendingResponse = nil
+	state.PendingTurnMessages = nil
+	state.CurrentRunRef = nil
+	state.LastRunRef = nil
+	state.CurrentCycleID = ""
+	state.PausedAt = time.Time{}
+	state.PausedBy = ""
+	state.FinishedAt = time.Time{}
+	state.LastSummary = ""
+	state.LastError = ""
+}
+
+func (s *Service) requestChildRunCancel(ctx context.Context, ref *exec.DAGRunRef) error {
+	if ref == nil {
+		return nil
+	}
+	status, _ := s.lookupRunStatus(ctx, ref)
+	if status != nil && status.WorkerID != "" && s.coordinatorCli != nil {
+		return s.coordinatorCli.RequestCancel(ctx, ref.Name, ref.ID, nil)
+	}
+	if s.dagRunCtrl != nil {
+		dag, err := s.dagStore.GetDetails(ctx, ref.Name)
+		if err != nil {
+			return err
+		}
+		return s.dagRunCtrl.Stop(ctx, dag, ref.ID)
+	}
+	attempt, err := s.dagRunStore.FindAttempt(ctx, *ref)
+	if err == nil {
+		return attempt.Abort(ctx)
+	}
+	return errors.New("dag run control is not configured")
+}
+
+func (s *Service) lookupRunStatus(ctx context.Context, ref *exec.DAGRunRef) (*exec.DAGRunStatus, error) {
+	if ref == nil {
+		return nil, nil
+	}
+	statuses, err := s.dagRunStore.ListStatuses(
+		ctx,
+		exec.WithFrom(exec.NewUTC(time.Unix(0, 0))),
+		exec.WithExactName(ref.Name),
+		exec.WithDAGRunID(ref.ID),
+		exec.WithLimit(1),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(statuses) == 0 {
+		return nil, nil
+	}
+	return statuses[0], nil
+}
+
+func queueTurnMessage(state *State, kind, message string, now time.Time) {
+	if state == nil || strings.TrimSpace(message) == "" {
+		return
+	}
+	state.PendingTurnMessages = append(state.PendingTurnMessages, PendingTurnMessage{
+		ID:        uuid.NewString(),
+		Kind:      kind,
+		Message:   message,
+		CreatedAt: now,
+	})
+}
+
+func buildOperatorMessage(requestedBy, message string) string {
+	if requestedBy == "" {
+		return "Operator update:\n" + message
+	}
+	return fmt.Sprintf("Operator update from %s:\n%s", requestedBy, message)
 }

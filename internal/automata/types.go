@@ -22,6 +22,7 @@ const (
 	StateIdle     LifecycleState = "idle"
 	StateRunning  LifecycleState = "running"
 	StateWaiting  LifecycleState = "waiting"
+	StatePaused   LifecycleState = "paused"
 	StateFinished LifecycleState = "finished"
 )
 
@@ -120,26 +121,39 @@ type PromptResponse struct {
 	RespondedAt       time.Time `json:"respondedAt"`
 }
 
+type PendingTurnMessage struct {
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`
+	Message   string    `json:"message"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 type State struct {
-	State              LifecycleState  `json:"state"`
-	CurrentStage       string          `json:"currentStage,omitempty"`
-	StageChangedAt     time.Time       `json:"stageChangedAt,omitempty"`
-	StageChangedBy     string          `json:"stageChangedBy,omitempty"`
-	StageNote          string          `json:"stageNote,omitempty"`
-	SessionID          string          `json:"sessionId,omitempty"`
-	CurrentRunRef      *exec.DAGRunRef `json:"currentRunRef,omitempty"`
-	LastRunRef         *exec.DAGRunRef `json:"lastRunRef,omitempty"`
-	CurrentCycleID     string          `json:"currentCycleId,omitempty"`
-	WaitingReason      WaitingReason   `json:"waitingReason,omitempty"`
-	PendingPrompt      *Prompt         `json:"pendingPrompt,omitempty"`
-	PendingResponse    *PromptResponse `json:"pendingResponse,omitempty"`
-	StartRequestedAt   time.Time       `json:"startRequestedAt,omitempty"`
-	LastTriggeredAt    time.Time       `json:"lastTriggeredAt,omitempty"`
-	LastScheduleMinute time.Time       `json:"lastScheduleMinute,omitempty"`
-	LastUpdatedAt      time.Time       `json:"lastUpdatedAt,omitempty"`
-	FinishedAt         time.Time       `json:"finishedAt,omitempty"`
-	LastSummary        string          `json:"lastSummary,omitempty"`
-	LastError          string          `json:"lastError,omitempty"`
+	State                LifecycleState       `json:"state"`
+	Instruction          string               `json:"instruction,omitempty"`
+	InstructionUpdatedAt time.Time            `json:"instructionUpdatedAt,omitempty"`
+	InstructionUpdatedBy string               `json:"instructionUpdatedBy,omitempty"`
+	CurrentStage         string               `json:"currentStage,omitempty"`
+	StageChangedAt       time.Time            `json:"stageChangedAt,omitempty"`
+	StageChangedBy       string               `json:"stageChangedBy,omitempty"`
+	StageNote            string               `json:"stageNote,omitempty"`
+	SessionID            string               `json:"sessionId,omitempty"`
+	CurrentRunRef        *exec.DAGRunRef      `json:"currentRunRef,omitempty"`
+	LastRunRef           *exec.DAGRunRef      `json:"lastRunRef,omitempty"`
+	CurrentCycleID       string               `json:"currentCycleId,omitempty"`
+	WaitingReason        WaitingReason        `json:"waitingReason,omitempty"`
+	PendingPrompt        *Prompt              `json:"pendingPrompt,omitempty"`
+	PendingResponse      *PromptResponse      `json:"pendingResponse,omitempty"`
+	PendingTurnMessages  []PendingTurnMessage `json:"pendingTurnMessages,omitempty"`
+	StartRequestedAt     time.Time            `json:"startRequestedAt,omitempty"`
+	LastTriggeredAt      time.Time            `json:"lastTriggeredAt,omitempty"`
+	LastScheduleMinute   time.Time            `json:"lastScheduleMinute,omitempty"`
+	LastUpdatedAt        time.Time            `json:"lastUpdatedAt,omitempty"`
+	PausedAt             time.Time            `json:"pausedAt,omitempty"`
+	PausedBy             string               `json:"pausedBy,omitempty"`
+	FinishedAt           time.Time            `json:"finishedAt,omitempty"`
+	LastSummary          string               `json:"lastSummary,omitempty"`
+	LastError            string               `json:"lastError,omitempty"`
 }
 
 type AllowedDAGInfo struct {
@@ -164,6 +178,7 @@ type Summary struct {
 	Description   string         `json:"description,omitempty"`
 	Purpose       string         `json:"purpose"`
 	Goal          string         `json:"goal"`
+	Instruction   string         `json:"instruction,omitempty"`
 	State         LifecycleState `json:"state"`
 	Stage         string         `json:"stage,omitempty"`
 	Disabled      bool           `json:"disabled,omitempty"`
@@ -182,6 +197,7 @@ type Detail struct {
 
 type StartRequest struct {
 	RequestedBy string `json:"requestedBy,omitempty"`
+	Instruction string `json:"instruction,omitempty"`
 }
 
 type StageOverrideRequest struct {
@@ -194,6 +210,11 @@ type HumanResponseRequest struct {
 	PromptID          string   `json:"promptId"`
 	SelectedOptionIDs []string `json:"selectedOptionIds,omitempty"`
 	FreeTextResponse  string   `json:"freeTextResponse,omitempty"`
+}
+
+type OperatorMessageRequest struct {
+	Message     string `json:"message"`
+	RequestedBy string `json:"requestedBy,omitempty"`
 }
 
 func newInitialState(def *Definition) *State {

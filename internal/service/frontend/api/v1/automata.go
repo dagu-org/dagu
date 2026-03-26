@@ -6,6 +6,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 
@@ -28,6 +29,9 @@ func (a *API) configureAutomataRoutes(r chi.Router) {
 		r.Put("/{name}/spec", a.handlePutAutomataSpec)
 		r.Delete("/{name}", a.handleDeleteAutomata)
 		r.Post("/{name}/start", a.handleStartAutomata)
+		r.Post("/{name}/pause", a.handlePauseAutomata)
+		r.Post("/{name}/resume", a.handleResumeAutomata)
+		r.Post("/{name}/message", a.handleMessageAutomata)
 		r.Post("/{name}/stage", a.handleOverrideAutomataStage)
 		r.Post("/{name}/response", a.handleRespondAutomata)
 	})
@@ -103,15 +107,57 @@ func (a *API) handleStartAutomata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := chi.URLParam(r, "name")
+	var body automata.StartRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
+		return
+	}
 	userName := ""
 	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
 		userName = user.Username
 	}
-	if err := a.automataService.RequestStart(r.Context(), name, automata.StartRequest{RequestedBy: userName}); err != nil {
+	body.RequestedBy = userName
+	if err := a.automataService.RequestStart(r.Context(), name, body); err != nil {
 		writeAutomataError(w, err)
 		return
 	}
-	a.logAudit(r.Context(), audit.CategoryAutomata, "start", map[string]any{"name": name})
+	a.logAudit(r.Context(), audit.CategoryAutomata, "start", map[string]any{"name": name, "instruction": body.Instruction})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) handlePauseAutomata(w http.ResponseWriter, r *http.Request) {
+	if err := a.requireExecute(r.Context()); err != nil {
+		WriteErrorResponse(w, err)
+		return
+	}
+	name := chi.URLParam(r, "name")
+	userName := ""
+	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
+		userName = user.Username
+	}
+	if err := a.automataService.Pause(r.Context(), name, userName); err != nil {
+		writeAutomataError(w, err)
+		return
+	}
+	a.logAudit(r.Context(), audit.CategoryAutomata, "pause", map[string]any{"name": name})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) handleResumeAutomata(w http.ResponseWriter, r *http.Request) {
+	if err := a.requireExecute(r.Context()); err != nil {
+		WriteErrorResponse(w, err)
+		return
+	}
+	name := chi.URLParam(r, "name")
+	userName := ""
+	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
+		userName = user.Username
+	}
+	if err := a.automataService.Resume(r.Context(), name, userName); err != nil {
+		writeAutomataError(w, err)
+		return
+	}
+	a.logAudit(r.Context(), audit.CategoryAutomata, "resume", map[string]any{"name": name})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -130,10 +176,32 @@ func (a *API) handleOverrideAutomataStage(w http.ResponseWriter, r *http.Request
 		body.RequestedBy = user.Username
 	}
 	if err := a.automataService.OverrideStage(r.Context(), name, body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
+		writeAutomataError(w, err)
 		return
 	}
 	a.logAudit(r.Context(), audit.CategoryAutomata, "stage_override", map[string]any{"name": name, "stage": body.Stage})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) handleMessageAutomata(w http.ResponseWriter, r *http.Request) {
+	if err := a.requireExecute(r.Context()); err != nil {
+		WriteErrorResponse(w, err)
+		return
+	}
+	name := chi.URLParam(r, "name")
+	var body automata.OperatorMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
+		return
+	}
+	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
+		body.RequestedBy = user.Username
+	}
+	if err := a.automataService.SubmitOperatorMessage(r.Context(), name, body); err != nil {
+		writeAutomataError(w, err)
+		return
+	}
+	a.logAudit(r.Context(), audit.CategoryAutomata, "message", map[string]any{"name": name})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -149,7 +217,7 @@ func (a *API) handleRespondAutomata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.automataService.SubmitHumanResponse(r.Context(), name, body); err != nil {
-		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
+		writeAutomataError(w, err)
 		return
 	}
 	a.logAudit(r.Context(), audit.CategoryAutomata, "respond", map[string]any{"name": name, "prompt_id": body.PromptID})
