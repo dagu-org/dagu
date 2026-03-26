@@ -1364,9 +1364,16 @@ func (h *Handler) detectStaleLeases(ctx context.Context) {
 		if lease.IsFresh(now, h.staleLeaseThreshold) {
 			continue
 		}
-		reason := fmt.Sprintf("run lease expired: worker %s stopped reporting to owner coordinator", lease.WorkerID)
+		reason := staleDistributedLeaseReason(lease.WorkerID)
 		h.markLeaseRunFailed(ctx, lease, reason)
 	}
+}
+
+func staleDistributedLeaseReason(workerID string) string {
+	return fmt.Sprintf(
+		"distributed run lease expired: worker %s accepted the task claim but stopped reporting to the owner coordinator",
+		workerID,
+	)
 }
 
 // markLeaseRunFailed marks a stale distributed attempt failed if and only if it
@@ -1392,34 +1399,30 @@ func (h *Handler) markLeaseRunFailed(ctx context.Context, lease exec.DAGRunLease
 		return nil
 	}
 
-	status, swapped, err := h.dagRunStore.CompareAndSwapLatestAttemptStatus(
-		storeCtx,
-		lease.DAGRun,
-		lease.AttemptID,
-		core.Running,
-		mutate,
+	var (
+		status  *exec.DAGRunStatus
+		swapped bool
+		err     error
 	)
-	if err != nil {
-		logger.Error(ctx, "Failed to fail stale distributed run",
-			tag.RunID(lease.DAGRun.ID),
-			tag.Error(err),
-		)
-		return
-	}
-	if !swapped && status != nil && status.AttemptID == lease.AttemptID && status.Status == core.NotStarted {
+
+	for _, expectedStatus := range []core.Status{core.Running, core.NotStarted, core.Queued} {
 		status, swapped, err = h.dagRunStore.CompareAndSwapLatestAttemptStatus(
 			storeCtx,
 			lease.DAGRun,
 			lease.AttemptID,
-			core.NotStarted,
+			expectedStatus,
 			mutate,
 		)
 		if err != nil {
-			logger.Error(ctx, "Failed to fail stale not-started distributed run",
+			logger.Error(ctx, "Failed to fail stale distributed run",
 				tag.RunID(lease.DAGRun.ID),
+				slog.String("expected_status", expectedStatus.String()),
 				tag.Error(err),
 			)
 			return
+		}
+		if swapped || status == nil || status.AttemptID != lease.AttemptID || status.Status == expectedStatus {
+			break
 		}
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,6 +191,15 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 }
 
 func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[string]string, workerBaseConfigPath string) *worker.Worker {
+	return f.setupSharedNothingWorkerWithAfterAckHook(workerID, labels, workerBaseConfigPath, nil)
+}
+
+func (f *testFixture) setupSharedNothingWorkerWithAfterAckHook(
+	workerID string,
+	labels map[string]string,
+	workerBaseConfigPath string,
+	afterAckHook func(context.Context, *coordinatorv1.Task) bool,
+) *worker.Worker {
 	f.t.Helper()
 
 	workerConfig := f.coord.Config
@@ -216,15 +226,29 @@ func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[strin
 
 	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewRemoteTaskHandler(handlerCfg))
+	if afterAckHook != nil {
+		w.SetAfterTaskAckHook(afterAckHook)
+	}
 
 	return f.startWorker(w, workerID)
 }
 
 func (f *testFixture) setupSharedFSWorker(workerID string, labels map[string]string) *worker.Worker {
+	return f.setupSharedFSWorkerWithAfterAckHook(workerID, labels, nil)
+}
+
+func (f *testFixture) setupSharedFSWorkerWithAfterAckHook(
+	workerID string,
+	labels map[string]string,
+	afterAckHook func(context.Context, *coordinatorv1.Task) bool,
+) *worker.Worker {
 	f.t.Helper()
 
 	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewTaskHandler(f.coord.Config))
+	if afterAckHook != nil {
+		w.SetAfterTaskAckHook(afterAckHook)
+	}
 
 	return f.startWorker(w, workerID)
 }

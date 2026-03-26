@@ -49,6 +49,8 @@ type Worker struct {
 	// For global PostgreSQL connection pool (shared-nothing mode)
 	poolManager  *sql.GlobalPoolManager
 	healthServer *healthcheck.Server
+
+	afterTaskAckHook func(context.Context, *coordinatorv1.Task) bool
 }
 
 type runningTaskState struct {
@@ -60,6 +62,15 @@ type runningTaskState struct {
 // SetHandler sets a custom task executor for testing or custom execution logic
 func (w *Worker) SetHandler(executor TaskHandler) {
 	w.handler = executor
+}
+
+// SetAfterTaskAckHook installs a hook that runs after a task claim has been
+// acknowledged but before the worker registers or executes the task. Returning
+// true abandons execution for that claimed task. This is intended for tests.
+func (w *Worker) SetAfterTaskAckHook(hook func(context.Context, *coordinatorv1.Task) bool) {
+	w.pollersMu.Lock()
+	defer w.pollersMu.Unlock()
+	w.afterTaskAckHook = hook
 }
 
 // NewWorker creates a new worker instance.
@@ -241,8 +252,26 @@ type trackingHandler struct {
 	handler     TaskHandler
 }
 
+func (w *Worker) shouldAbandonTaskAfterAck(ctx context.Context, task *coordinatorv1.Task) bool {
+	w.pollersMu.Lock()
+	hook := w.afterTaskAckHook
+	w.pollersMu.Unlock()
+
+	return hook != nil && hook(ctx, task)
+}
+
 // Handle tracks task state and delegates to the inner executor
 func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
+	if t.worker.shouldAbandonTaskAfterAck(ctx, task) {
+		logger.Warn(ctx, "Abandoning claimed task before execution",
+			tag.WorkerID(t.worker.id),
+			tag.RunID(task.DagRunId))
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return context.Canceled
+	}
+
 	pollerID := fmt.Sprintf("poller-%d", t.pollerIndex)
 	attemptKey := task.AttemptKey
 	if attemptKey == "" {
