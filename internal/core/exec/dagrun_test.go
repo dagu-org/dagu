@@ -26,6 +26,7 @@ func TestListDAGRunStatusesOptions(t *testing.T) {
 	exec.WithExactName("test-dag")(&opts)
 	exec.WithName("partial-name")(&opts)
 	exec.WithDAGRunID("run-123")(&opts)
+	exec.WithAllHistory()(&opts)
 
 	// Verify options were set correctly
 	assert.Equal(t, from, opts.From)
@@ -34,6 +35,7 @@ func TestListDAGRunStatusesOptions(t *testing.T) {
 	assert.Equal(t, "test-dag", opts.ExactName)
 	assert.Equal(t, "partial-name", opts.Name)
 	assert.Equal(t, "run-123", opts.DAGRunID)
+	assert.True(t, opts.AllHistory)
 }
 
 func TestNewDAGRunAttemptOptions(t *testing.T) {

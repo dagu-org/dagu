@@ -60,7 +60,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, triggerTypeFlag, scheduleTimeFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, attemptIDFlag, triggerTypeFlag, scheduleTimeFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -93,6 +93,10 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	workerID := getWorkerID(ctx)
+	attemptID, err := requireWorkerAttemptID(ctx, workerID)
+	if err != nil {
+		return err
+	}
 
 	triggerType, err := parseTriggerTypeParam(ctx)
 	if err != nil {
@@ -194,7 +198,7 @@ func runStart(ctx *Context, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse parent dag-run reference: %w", err)
 		}
-		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent, workerID, triggerType, scheduleTime)
+		return handleSubDAGRun(ctx, dag, dagRunID, params, root, parent, workerID, attemptID, triggerType, scheduleTime)
 	}
 
 	if fromRunID != "" {
@@ -206,13 +210,13 @@ func runStart(ctx *Context, args []string) error {
 		logger.Info(ctx, "Executing root dag-run", slog.String("params", params))
 	}
 
-	return tryExecuteDAG(ctx, dag, dagRunID, root, workerID, triggerType, scheduleTime)
+	return tryExecuteDAG(ctx, dag, dagRunID, root, workerID, attemptID, triggerType, scheduleTime)
 }
 
 var errProcAcquisitionFailed = errors.New("failed to acquire process handle")
 
 // tryExecuteDAG acquires a process handle and executes the DAG.
-func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRunRef, workerID string, triggerType core.TriggerType, scheduleTime string) error {
+func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRunRef, workerID, attemptID string, triggerType core.TriggerType, scheduleTime string) error {
 	// Check for dispatch to coordinator for distributed execution.
 	// Skip if already running on a worker (workerID != "local").
 	if workerID == "local" {
@@ -220,6 +224,10 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 		if core.ShouldDispatchToCoordinator(dag, coordinatorCli != nil, ctx.Config.DefaultExecMode) {
 			return dispatchToCoordinatorAndWait(ctx, dag, dagRunID, scheduleTime, coordinatorCli)
 		}
+	}
+
+	if workerID != "local" && ctx.DAGRunStore == nil {
+		return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, attemptID, triggerType, scheduleTime, nil)
 	}
 
 	return withPreparedLocalExecution(
@@ -231,10 +239,17 @@ func tryExecuteDAG(ctx *Context, dag *core.DAG, dagRunID string, root exec.DAGRu
 		triggerType,
 		scheduleTime,
 		func(execCtx context.Context) (exec.DAGRunAttempt, error) {
+			if workerID != "local" {
+				attempt, _, err := resolveWorkerPreparedAttempt(execCtx, ctx.DAGRunStore, dag.Name, dagRunID, root, attemptID)
+				if err != nil {
+					return nil, err
+				}
+				return attempt, nil
+			}
 			return ctx.DAGRunStore.CreateAttempt(execCtx, dag, time.Now(), dagRunID, exec.NewDAGRunAttemptOptions{})
 		},
 		func(preparedAttempt exec.DAGRunAttempt) error {
-			return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, triggerType, scheduleTime, preparedAttempt)
+			return executeDAGRun(ctx, dag, exec.DAGRunRef{}, dagRunID, root, workerID, attemptID, triggerType, scheduleTime, preparedAttempt)
 		},
 	)
 }
@@ -347,7 +362,7 @@ func determineRootDAGRun(isSubDAGRun bool, rootDAGRun string, dag *core.DAG, dag
 }
 
 // handleSubDAGRun processes a sub dag-run, checking for previous runs.
-func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root exec.DAGRunRef, parent exec.DAGRunRef, workerID string, triggerType core.TriggerType, scheduleTime string) error {
+func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string, root exec.DAGRunRef, parent exec.DAGRunRef, workerID, attemptID string, triggerType core.TriggerType, scheduleTime string) error {
 	logger.Info(ctx, "Executing sub dag-run",
 		slog.String("params", params),
 		slog.Any("root", root),
@@ -361,7 +376,28 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 
 	// For distributed execution, the coordinator already created the sub-attempt record.
 	if workerID != "local" {
-		return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType, scheduleTime, nil)
+		if ctx.DAGRunStore == nil {
+			return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, attemptID, triggerType, scheduleTime, nil)
+		}
+		return withPreparedLocalExecution(
+			ctx,
+			dag,
+			dagRunID,
+			root,
+			parent,
+			triggerType,
+			scheduleTime,
+			func(execCtx context.Context) (exec.DAGRunAttempt, error) {
+				attempt, _, err := resolveWorkerPreparedAttempt(execCtx, ctx.DAGRunStore, dag.Name, dagRunID, root, attemptID)
+				if err != nil {
+					return nil, err
+				}
+				return attempt, nil
+			},
+			func(preparedAttempt exec.DAGRunAttempt) error {
+				return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, attemptID, triggerType, scheduleTime, preparedAttempt)
+			},
+		)
 	}
 
 	logger.Debug(ctx, "Checking for previous sub dag-run with the dag-run ID")
@@ -382,7 +418,7 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 				})
 			},
 			func(preparedAttempt exec.DAGRunAttempt) error {
-				return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, triggerType, scheduleTime, preparedAttempt)
+				return executeDAGRun(ctx, dag, parent, dagRunID, root, workerID, attemptID, triggerType, scheduleTime, preparedAttempt)
 			},
 		)
 	}
@@ -414,13 +450,13 @@ func handleSubDAGRun(ctx *Context, dag *core.DAG, dagRunID string, params string
 			})
 		},
 		func(preparedAttempt exec.DAGRunAttempt) error {
-			return executeRetry(ctx, dag, status, root, "", workerID, preparedAttempt)
+			return executeRetry(ctx, dag, status, root, "", workerID, attemptID, preparedAttempt)
 		},
 	)
 }
 
 // executeDAGRun initializes execution state for a DAG run and invokes the shared agent executor.
-func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID string, root exec.DAGRunRef, workerID string, triggerType core.TriggerType, scheduleTime string, preparedAttempt exec.DAGRunAttempt) error {
+func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID string, root exec.DAGRunRef, workerID, attemptID string, triggerType core.TriggerType, scheduleTime string, preparedAttempt exec.DAGRunAttempt) error {
 	logFile, err := ctx.OpenLogFile(d, dagRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", d.Name, err)
@@ -455,6 +491,7 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 			ParentDAGRun:            parent,
 			ProgressDisplay:         shouldEnableProgress(ctx),
 			WorkerID:                workerID,
+			AttemptID:               attemptID,
 			QueuedRun:               queuedRun,
 			PreparedAttempt:         preparedAttempt,
 			DAGRunStore:             ctx.DAGRunStore,

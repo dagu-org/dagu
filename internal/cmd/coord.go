@@ -101,6 +101,7 @@ func runCoordinator(ctx *Context, _ []string) error {
 		ctx.DispatchTaskStore,
 		ctx.WorkerHeartbeatStore,
 		ctx.DAGRunLeaseStore,
+		ctx.ActiveDistributedRunStore,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
@@ -138,6 +139,7 @@ func newCoordinator(
 	dispatchTaskStore exec.DispatchTaskStore,
 	workerHeartbeatStore exec.WorkerHeartbeatStore,
 	dagRunLeaseStore exec.DAGRunLeaseStore,
+	activeDistributedRunStore exec.ActiveDistributedRunStore,
 ) (*coordinator.Service, *coordinator.Handler, error) {
 	// Generate instance ID
 	hostname, err := os.Hostname()
@@ -217,12 +219,13 @@ func newCoordinator(
 
 	// Create handler with DAGRunStore for status persistence and LogDir for log streaming
 	handler := coordinator.NewHandler(coordinator.HandlerConfig{
-		DAGRunStore:          dagRunStore,
-		LogDir:               cfg.Paths.LogDir,
-		Owner:                exec.CoordinatorEndpoint{ID: instanceID, Host: advertiseAddr, Port: cfg.Coordinator.Port},
-		DispatchTaskStore:    dispatchTaskStore,
-		WorkerHeartbeatStore: workerHeartbeatStore,
-		DAGRunLeaseStore:     dagRunLeaseStore,
+		DAGRunStore:               dagRunStore,
+		LogDir:                    cfg.Paths.LogDir,
+		Owner:                     exec.CoordinatorEndpoint{ID: instanceID, Host: advertiseAddr, Port: cfg.Coordinator.Port},
+		DispatchTaskStore:         dispatchTaskStore,
+		WorkerHeartbeatStore:      workerHeartbeatStore,
+		DAGRunLeaseStore:          dagRunLeaseStore,
+		ActiveDistributedRunStore: activeDistributedRunStore,
 	})
 
 	// Create and return service with advertise address for service registry

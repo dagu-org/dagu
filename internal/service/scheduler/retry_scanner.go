@@ -142,6 +142,14 @@ func (s *RetryScanner) processFailedRunFromSummary(
 	if !listed.Parent.Zero() {
 		return nil
 	}
+	if isSuspendedDAG(ctx, s.isSuspended, listed, nil) {
+		logger.Debug(ctx, "Retry scanner skipped DAG run",
+			tag.DAG(listed.Name),
+			tag.RunID(listed.DAGRunID),
+			slog.String("skip_reason", "dag_suspended"),
+		)
+		return nil
+	}
 
 	decision := s.evaluateRetryDecision(ctx, listed, metadata, now)
 	if !decision.enqueue {
@@ -204,6 +212,14 @@ func (s *RetryScanner) processFailedRunLegacy(
 	dagSnapshot, err := attempt.ReadDAG(ctx)
 	if err != nil {
 		return err
+	}
+	if isSuspendedDAG(ctx, s.isSuspended, latestStatus, dagSnapshot) {
+		logger.Debug(ctx, "Retry scanner skipped DAG run",
+			tag.DAG(latestStatus.Name),
+			tag.RunID(latestStatus.DAGRunID),
+			slog.String("skip_reason", "dag_suspended"),
+		)
+		return nil
 	}
 
 	metadata, ok := retryMetadataFromDAG(dagSnapshot)

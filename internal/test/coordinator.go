@@ -83,6 +83,7 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	cfg.DispatchTaskStore = helper.DispatchTaskStore
 	cfg.WorkerHeartbeatStore = helper.WorkerHeartbeatStore
 	cfg.DAGRunLeaseStore = helper.DAGRunLeaseStore
+	cfg.ActiveDistributedRunStore = helper.ActiveDistributedRunStore
 
 	// Create handler with config
 	handler := coordinator.NewHandler(cfg)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filedistributed"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -26,9 +27,11 @@ import (
 
 // mockDAGRunStore is a test implementation of execution.DAGRunStore
 type mockDAGRunStore struct {
-	attempts    map[string]*mockDAGRunAttempt
-	subAttempts map[string]*mockDAGRunAttempt // key: rootID:subID
-	mu          sync.Mutex
+	attempts            map[string]*mockDAGRunAttempt
+	subAttempts         map[string]*mockDAGRunAttempt // key: rootID:subID
+	createAttemptErr    error
+	createSubAttemptErr error
+	mu                  sync.Mutex
 }
 
 func newMockDAGRunStore() *mockDAGRunStore {
@@ -84,6 +87,9 @@ func (m *mockDAGRunStore) FindAttempt(_ context.Context, dagRun exec.DAGRunRef) 
 func (m *mockDAGRunStore) CreateAttempt(_ context.Context, dag *core.DAG, _ time.Time, dagRunID string, _ exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.createAttemptErr != nil {
+		return nil, m.createAttemptErr
+	}
 	attempt := &mockDAGRunAttempt{
 		status: &exec.DAGRunStatus{Name: dag.Name, DAGRunID: dagRunID},
 	}
@@ -181,6 +187,9 @@ func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef exec.DAGRunR
 func (m *mockDAGRunStore) CreateSubAttempt(_ context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.createSubAttemptErr != nil {
+		return nil, m.createSubAttemptErr
+	}
 	key := rootRef.ID + ":" + subDAGRunID
 	attempt := &mockDAGRunAttempt{
 		status: &exec.DAGRunStatus{},
@@ -203,6 +212,9 @@ type mockDAGRunAttempt struct {
 	closed                 bool
 	written                bool
 	aborting               bool
+	openError              error
+	readStatusError        error
+	writeError             error
 	stepMessages           map[string][]exec.LLMMessage // stepName -> messages
 	writeStepMessagesError error                        // injected error for WriteStepMessages
 	mu                     sync.Mutex
@@ -219,12 +231,18 @@ func (m *mockDAGRunAttempt) ID() string {
 func (m *mockDAGRunAttempt) Open(_ context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.openError != nil {
+		return m.openError
+	}
 	m.opened = true
 	return nil
 }
 func (m *mockDAGRunAttempt) Write(_ context.Context, s exec.DAGRunStatus) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.writeError != nil {
+		return m.writeError
+	}
 	m.status = &s
 	m.written = true
 	return nil
@@ -238,6 +256,9 @@ func (m *mockDAGRunAttempt) Close(_ context.Context) error {
 func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.readStatusError != nil {
+		return nil, m.readStatusError
+	}
 	if m.status == nil {
 		return nil, exec.ErrNoStatusData
 	}
@@ -310,6 +331,23 @@ func (m *mockDAGRunAttempt) WasClosed() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.closed
+}
+
+func createStoredAttemptStatus(
+	t *testing.T,
+	store exec.DAGRunStore,
+	ts time.Time,
+	dagName string,
+	dagRunID string,
+	runStatus exec.DAGRunStatus,
+) {
+	t.Helper()
+
+	attempt, err := store.CreateAttempt(context.Background(), &core.DAG{Name: dagName}, ts, dagRunID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+	require.NoError(t, attempt.Open(context.Background()))
+	require.NoError(t, attempt.Write(context.Background(), runStatus))
+	require.NoError(t, attempt.Close(context.Background()))
 }
 
 func TestHandler_Poll(t *testing.T) {
@@ -418,7 +456,7 @@ func TestHandler_Poll(t *testing.T) {
 		h := NewHandler(HandlerConfig{})
 		attempt := &mockDAGRunAttempt{}
 
-		h.writeInitialStatus(
+		err := h.writeInitialStatus(
 			context.Background(),
 			attempt,
 			"test-dag",
@@ -428,10 +466,137 @@ func TestHandler_Poll(t *testing.T) {
 			exec.DAGRunRef{},
 			nil,
 		)
+		require.NoError(t, err)
 
 		status, err := attempt.ReadStatus(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, "2026-03-13T10:00:00Z", status.ScheduleTime)
+	})
+
+	t.Run("DispatchFailsWhenAttemptPreparationFails", func(t *testing.T) {
+		t.Parallel()
+		core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{Command: true})
+
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		dispatchStore := filedistributed.NewDispatchTaskStore(baseDir)
+		heartbeatStore := filedistributed.NewWorkerHeartbeatStore(baseDir)
+		require.NoError(t, heartbeatStore.Upsert(context.Background(), exec.WorkerHeartbeatRecord{
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+		}))
+
+		store := newMockDAGRunStore()
+		store.createAttemptErr = errors.New("prepare failed")
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:          store,
+			DispatchTaskStore:    dispatchStore,
+			WorkerHeartbeatStore: heartbeatStore,
+		})
+
+		_, err := h.Dispatch(context.Background(), &coordinatorv1.DispatchRequest{
+			Task: &coordinatorv1.Task{
+				DagRunId:   "run-123",
+				Target:     "test-dag",
+				Definition: "name: test-dag\nsteps:\n  - name: step1\n    type: command\n    command: echo hello",
+				QueueName:  "test-queue",
+			},
+		})
+		require.Error(t, err)
+
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.Internal, st.Code())
+		require.Contains(t, st.Message(), "failed to prepare attempt")
+
+		count, countErr := dispatchStore.CountOutstandingByQueue(context.Background(), "test-queue", time.Second)
+		require.NoError(t, countErr)
+		assert.Zero(t, count)
+	})
+
+	t.Run("DispatchMarksNewAttemptFailedWhenEnqueueFails", func(t *testing.T) {
+		t.Parallel()
+		core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{Command: true})
+
+		heartbeatStore := filedistributed.NewWorkerHeartbeatStore(filepath.Join(t.TempDir(), "distributed"))
+		require.NoError(t, heartbeatStore.Upsert(context.Background(), exec.WorkerHeartbeatRecord{
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+		}))
+
+		store := filedagrun.New(filepath.Join(t.TempDir(), "dag-runs"))
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:          store,
+			DispatchTaskStore:    &failingDispatchTaskStore{enqueueErr: errors.New("disk full")},
+			WorkerHeartbeatStore: heartbeatStore,
+		})
+
+		_, err := h.Dispatch(context.Background(), &coordinatorv1.DispatchRequest{
+			Task: &coordinatorv1.Task{
+				DagRunId:   "run-123",
+				Target:     "test-dag",
+				Definition: "name: test-dag\nsteps:\n  - name: step1\n    type: command\n    command: echo hello",
+				QueueName:  "test-queue",
+			},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to enqueue task")
+
+		attempt, findErr := store.FindAttempt(context.Background(), exec.DAGRunRef{Name: "test-dag", ID: "run-123"})
+		require.NoError(t, findErr)
+		runStatus, readErr := attempt.ReadStatus(context.Background())
+		require.NoError(t, readErr)
+		require.Equal(t, core.Failed, runStatus.Status)
+		require.Contains(t, runStatus.Error, "failed to hand off distributed task")
+
+		h.attemptsMu.RLock()
+		require.Empty(t, h.openAttempts)
+		h.attemptsMu.RUnlock()
+	})
+
+	t.Run("DispatchLeavesReusedQueuedAttemptQueuedWhenEnqueueFails", func(t *testing.T) {
+		t.Parallel()
+		core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{Command: true})
+
+		heartbeatStore := filedistributed.NewWorkerHeartbeatStore(filepath.Join(t.TempDir(), "distributed"))
+		require.NoError(t, heartbeatStore.Upsert(context.Background(), exec.WorkerHeartbeatRecord{
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+		}))
+
+		store := newMockDAGRunStore()
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:      "test-dag",
+			DAGRunID:  "run-123",
+			AttemptID: "attempt-existing",
+			Status:    core.Queued,
+		})
+
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:          store,
+			DispatchTaskStore:    &failingDispatchTaskStore{enqueueErr: errors.New("disk full")},
+			WorkerHeartbeatStore: heartbeatStore,
+		})
+
+		_, err := h.Dispatch(context.Background(), &coordinatorv1.DispatchRequest{
+			Task: &coordinatorv1.Task{
+				DagRunId:   "run-123",
+				Target:     "test-dag",
+				Definition: "name: test-dag\nsteps:\n  - name: step1\n    type: command\n    command: echo hello",
+				QueueName:  "test-queue",
+			},
+		})
+		require.Error(t, err)
+
+		runStatus, readErr := attempt.ReadStatus(context.Background())
+		require.NoError(t, readErr)
+		require.Equal(t, core.Queued, runStatus.Status)
+		assert.Equal(t, "attempt-existing", runStatus.AttemptID)
+		assert.True(t, attempt.WasClosed())
+
+		h.attemptsMu.RLock()
+		require.Empty(t, h.openAttempts)
+		h.attemptsMu.RUnlock()
 	})
 
 	t.Run("PollContextCancellation", func(t *testing.T) {
@@ -469,6 +634,34 @@ func TestHandler_Poll(t *testing.T) {
 			t.Fatal("Poll did not return after context cancellation")
 		}
 	})
+}
+
+type failingDispatchTaskStore struct {
+	enqueueErr error
+}
+
+func (s *failingDispatchTaskStore) Enqueue(context.Context, *coordinatorv1.Task) error {
+	return s.enqueueErr
+}
+
+func (s *failingDispatchTaskStore) ClaimNext(context.Context, exec.DispatchTaskClaim) (*exec.ClaimedDispatchTask, error) {
+	return nil, nil
+}
+
+func (s *failingDispatchTaskStore) GetClaim(context.Context, string) (*exec.ClaimedDispatchTask, error) {
+	return nil, exec.ErrDispatchTaskNotFound
+}
+
+func (s *failingDispatchTaskStore) DeleteClaim(context.Context, string) error {
+	return nil
+}
+
+func (s *failingDispatchTaskStore) CountOutstandingByQueue(context.Context, string, time.Duration) (int, error) {
+	return 0, nil
+}
+
+func (s *failingDispatchTaskStore) HasOutstandingAttempt(context.Context, string, time.Duration) (bool, error) {
+	return false, nil
 }
 
 func TestHandler_Heartbeat(t *testing.T) {
@@ -661,6 +854,28 @@ func TestHandler_Heartbeat(t *testing.T) {
 		require.NoError(t, err)
 		assert.Greater(t, lease.LastHeartbeatAt, initial.UnixMilli())
 		assert.Equal(t, initial.UnixMilli(), lease.ClaimedAt)
+	})
+
+	t.Run("RunHeartbeatCancelsTaskWhenLeaseMissing", func(t *testing.T) {
+		t.Parallel()
+
+		leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(t.TempDir(), "distributed"))
+		h := NewHandler(HandlerConfig{
+			DAGRunLeaseStore: leaseStore,
+			Owner:            exec.CoordinatorEndpoint{ID: "coord-a", Host: "127.0.0.1", Port: 1234},
+		})
+		ctx := context.Background()
+
+		resp, err := h.RunHeartbeat(ctx, &coordinatorv1.RunHeartbeatRequest{
+			WorkerId:           "worker-1",
+			OwnerCoordinatorId: "coord-a",
+			RunningTasks: []*coordinatorv1.RunningTask{
+				{AttemptKey: "missing-attempt-key", DagRunId: "run-123", DagName: "test-dag"},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.CancelledRuns, 1)
+		assert.Equal(t, "missing-attempt-key", resp.CancelledRuns[0].AttemptKey)
 	})
 
 	t.Run("RunHeartbeatRejectsNonOwnerCoordinator", func(t *testing.T) {
@@ -1201,7 +1416,73 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		assert.Equal(t, core.Queued, queuedStatus.Status)
 	})
 
-	t.Run("DetectStaleSharedLeaseFailsMatchingAttemptAndDeletesLease", func(t *testing.T) {
+	t.Run("DetectStaleSharedLeaseFailsLatestMatchingAttemptAndDeletesLease", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []struct {
+			name       string
+			status     core.Status
+			nodeStatus core.NodeStatus
+		}{
+			{name: "Running", status: core.Running, nodeStatus: core.NodeRunning},
+			{name: "NotStarted", status: core.NotStarted, nodeStatus: core.NodeNotStarted},
+			{name: "Queued", status: core.Queued, nodeStatus: core.NodeNotStarted},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				store := newMockDAGRunStore()
+				leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(t.TempDir(), "distributed"))
+				h := NewHandler(HandlerConfig{
+					DAGRunStore:         store,
+					DAGRunLeaseStore:    leaseStore,
+					StaleLeaseThreshold: time.Second,
+				})
+				ctx := context.Background()
+
+				ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-lease"}
+				attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+					Name:       "lease-dag",
+					DAGRunID:   "run-lease",
+					AttemptID:  "attempt-1",
+					AttemptKey: "lease-key-1",
+					Status:     tc.status,
+					WorkerID:   "worker-1",
+					Nodes: []*exec.Node{
+						{Status: tc.nodeStatus},
+					},
+				})
+
+				staleAt := time.Now().Add(-10 * time.Second).UTC()
+				require.NoError(t, leaseStore.Upsert(ctx, exec.DAGRunLease{
+					AttemptKey:      "lease-key-1",
+					DAGRun:          ref,
+					Root:            ref,
+					AttemptID:       "attempt-1",
+					QueueName:       "lease-dag",
+					WorkerID:        "worker-1",
+					LastHeartbeatAt: staleAt.UnixMilli(),
+					ClaimedAt:       staleAt.UnixMilli(),
+				}))
+
+				h.detectStaleLeases(ctx)
+
+				status, err := attempt.ReadStatus(ctx)
+				require.NoError(t, err)
+				assert.Equal(t, core.Failed, status.Status)
+				assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+				assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+				assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Nodes[0].Error)
+
+				_, err = leaseStore.Get(ctx, "lease-key-1")
+				assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+			})
+		}
+	})
+
+	t.Run("DetectStaleLeasesFailsOrphanedDistributedStatusWithoutLease", func(t *testing.T) {
 		t.Parallel()
 
 		store := newMockDAGRunStore()
@@ -1226,16 +1507,92 @@ func TestHandler_ZombieDetection(t *testing.T) {
 			},
 		})
 
-		staleAt := time.Now().Add(-10 * time.Second).UTC()
-		require.NoError(t, leaseStore.Upsert(ctx, exec.DAGRunLease{
-			AttemptKey:      "lease-key-1",
-			DAGRun:          ref,
-			Root:            ref,
-			AttemptID:       "attempt-1",
-			QueueName:       "lease-dag",
-			WorkerID:        "worker-1",
-			LastHeartbeatAt: staleAt.UnixMilli(),
-			ClaimedAt:       staleAt.UnixMilli(),
+		h.detectStaleLeases(ctx)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+	})
+
+	t.Run("BackfillActiveDistributedRunsRepairsHistoricalOrphanedRemoteStatus", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		baseDir := t.TempDir()
+		store := filedagrun.New(filepath.Join(baseDir, "dag-runs"))
+		leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(baseDir, "distributed"))
+		activeStore := filedistributed.NewActiveDistributedRunStore(filepath.Join(baseDir, "distributed"))
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			StaleLeaseThreshold:       time.Second,
+		})
+
+		attemptKey := exec.GenerateAttemptKey("lease-dag", "run-old", "lease-dag", "run-old", "attempt-1")
+		createStoredAttemptStatus(t, store, time.Now().UTC().Add(-48*time.Hour), "lease-dag", "run-old", exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-old",
+			AttemptID:  "attempt-1",
+			AttemptKey: attemptKey,
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+			Nodes: []*exec.Node{
+				{Status: core.NodeRunning},
+			},
+		})
+
+		h.backfillActiveDistributedRuns(ctx)
+
+		attempt, err := store.FindAttempt(ctx, exec.DAGRunRef{Name: "lease-dag", ID: "run-old"})
+		require.NoError(t, err)
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+
+		records, err := activeStore.ListAll(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, records)
+	})
+
+	t.Run("DetectIndexedDistributedStatusesFailsActiveEntryWhenLeaseMissing", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			StaleLeaseThreshold:       time.Second,
+		})
+
+		ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-lease"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-lease",
+			AttemptID:  "attempt-1",
+			AttemptKey: "lease-key-1",
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+			Nodes: []*exec.Node{
+				{Status: core.NodeRunning},
+			},
+		})
+		require.NoError(t, activeStore.Upsert(ctx, exec.ActiveDistributedRun{
+			AttemptKey: "lease-key-1",
+			DAGRun:     ref,
+			Root:       ref,
+			AttemptID:  "attempt-1",
+			WorkerID:   "worker-1",
+			Status:     core.Running,
 		}))
 
 		h.detectStaleLeases(ctx)
@@ -1243,10 +1600,52 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		status, err := attempt.ReadStatus(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+
+		records, err := activeStore.ListAll(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, records)
+	})
+
+	t.Run("DetectStaleLeasesFallsBackToStatusScanWhenActiveIndexMissesRun", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			StaleLeaseThreshold:       time.Second,
+		})
+
+		ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-missing-index"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-missing-index",
+			AttemptID:  "attempt-1",
+			AttemptKey: "lease-key-missing-index",
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+			Nodes: []*exec.Node{
+				{Status: core.NodeRunning},
+			},
+		})
+
+		h.detectStaleLeases(ctx)
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
 		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
 
-		_, err = leaseStore.Get(ctx, "lease-key-1")
-		assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+		records, err := activeStore.ListAll(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, records)
 	})
 }
 
@@ -1315,6 +1714,181 @@ func TestHandler_ReportStatus(t *testing.T) {
 		require.NoError(t, err)
 		assert.Greater(t, status.LeaseAt, int64(1))
 		assert.WithinDuration(t, time.Now(), time.UnixMilli(status.LeaseAt), 2*time.Second)
+	})
+
+	t.Run("RejectsLateStatusForLeaseCleanedAttempt", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(t.TempDir(), "distributed"))
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:      store,
+			DAGRunLeaseStore: leaseStore,
+			Owner:            exec.CoordinatorEndpoint{ID: "coord-a"},
+		})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Failed,
+		})
+
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Running,
+		})
+		require.NoError(t, convErr)
+
+		resp, err := h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{
+			Status:             protoStatus,
+			WorkerId:           "worker-1",
+			OwnerCoordinatorId: "coord-a",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.Accepted)
+		assert.Equal(t, remoteAttemptRejectedLeaseInactive, resp.Error)
+		assert.False(t, attempt.WasWritten())
+
+		current, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, current.Status)
+
+		_, err = leaseStore.Get(ctx, "attempt-key-1")
+		assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+	})
+
+	t.Run("RejectsSupersededAttemptStatus", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-2",
+			AttemptKey: "attempt-key-2",
+			Status:     core.Running,
+		})
+
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Running,
+		})
+		require.NoError(t, convErr)
+
+		resp, err := h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{Status: protoStatus})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.Accepted)
+		assert.Equal(t, remoteAttemptRejectedSuperseded, resp.Error)
+		assert.False(t, attempt.WasWritten())
+
+		current, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "attempt-2", current.AttemptID)
+		assert.Equal(t, "attempt-key-2", current.AttemptKey)
+	})
+
+	t.Run("AcceptsDuplicateTerminalStatusAndPersistsFollowUpData", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			Owner:                     exec.CoordinatorEndpoint{ID: "coord-a", Host: "127.0.0.1", Port: 1234},
+		})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			WorkerID:   "worker-1",
+			Status:     core.Failed,
+		})
+		require.NoError(t, leaseStore.Upsert(ctx, exec.DAGRunLease{
+			AttemptKey:      "attempt-key-1",
+			DAGRun:          ref,
+			Root:            ref,
+			AttemptID:       "attempt-1",
+			QueueName:       "queue-a",
+			WorkerID:        "worker-1",
+			ClaimedAt:       time.Now().UTC().UnixMilli(),
+			LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+		}))
+		require.NoError(t, activeStore.Upsert(ctx, exec.ActiveDistributedRun{
+			AttemptKey: "attempt-key-1",
+			DAGRun:     ref,
+			Root:       ref,
+			AttemptID:  "attempt-1",
+			WorkerID:   "worker-1",
+			Status:     core.Running,
+		}))
+
+		protoStatus, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			WorkerID:   "worker-1",
+			Status:     core.Failed,
+			Error:      "duplicate terminal payload",
+			Nodes: []*exec.Node{
+				{
+					Step:   core.Step{Name: "chat-step"},
+					Status: core.NodeFailed,
+					ChatMessages: []exec.LLMMessage{
+						{Role: exec.RoleAssistant, Content: "final summary"},
+					},
+				},
+			},
+		})
+		require.NoError(t, convErr)
+
+		resp, err := h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{
+			Status:             protoStatus,
+			OwnerCoordinatorId: "coord-a",
+			WorkerId:           "worker-1",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Accepted)
+		assert.True(t, attempt.WasWritten())
+
+		current, readErr := attempt.ReadStatus(ctx)
+		require.NoError(t, readErr)
+		assert.Equal(t, "duplicate terminal payload", current.Error)
+
+		messages := attempt.GetStepMessages("chat-step")
+		require.Len(t, messages, 1)
+		assert.Equal(t, "final summary", messages[0].Content)
+
+		_, err = leaseStore.Get(ctx, "attempt-key-1")
+		assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+
+		_, err = activeStore.Get(ctx, "attempt-key-1")
+		assert.ErrorIs(t, err, exec.ErrActiveRunNotFound)
 	})
 
 	t.Run("MissingStatusReturnsError", func(t *testing.T) {
@@ -1641,6 +2215,78 @@ func TestHandler_ReportStatus(t *testing.T) {
 		lease, err := leaseStore.Get(ctx, "attempt-key-1")
 		require.NoError(t, err)
 		assert.Equal(t, "queue-a", lease.QueueName)
+	})
+
+	t.Run("ReportStatusSyncsActiveDistributedRunIndex", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			Owner:                     exec.CoordinatorEndpoint{ID: "coord-a", Host: "127.0.0.1", Port: 1234},
+		})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.NotStarted,
+			WorkerID:   "worker-1",
+		})
+
+		runningProto, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+		})
+		require.NoError(t, convErr)
+
+		resp, err := h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{
+			Status:             runningProto,
+			OwnerCoordinatorId: "coord-a",
+			WorkerId:           "worker-1",
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Accepted)
+
+		record, err := activeStore.Get(ctx, "attempt-key-1")
+		require.NoError(t, err)
+		require.NotNil(t, record)
+		assert.Equal(t, "attempt-1", record.AttemptID)
+		assert.Equal(t, "worker-1", record.WorkerID)
+		assert.Equal(t, core.Running, record.Status)
+
+		succeededProto, convErr := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-123",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Succeeded,
+			WorkerID:   "worker-1",
+		})
+		require.NoError(t, convErr)
+
+		resp, err = h.ReportStatus(ctx, &coordinatorv1.ReportStatusRequest{
+			Status:             succeededProto,
+			OwnerCoordinatorId: "coord-a",
+			WorkerId:           "worker-1",
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Accepted)
+
+		_, err = activeStore.Get(ctx, "attempt-key-1")
+		assert.ErrorIs(t, err, exec.ErrActiveRunNotFound)
 	})
 
 	t.Run("AckTaskClaimCreatesLeaseAndDeletesClaim", func(t *testing.T) {
@@ -2169,6 +2815,60 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 
 		result := h.getCancelledRunsForWorker(ctx, stats)
 		assert.Empty(t, result)
+	})
+
+	t.Run("ReturnsCancelledRunsForSupersededAttempts", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-789"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-789",
+			AttemptID:  "attempt-2",
+			AttemptKey: "attempt-key-2",
+			Status:     core.Running,
+		})
+
+		stats := &coordinatorv1.WorkerStats{
+			RunningTasks: []*coordinatorv1.RunningTask{
+				{DagRunId: "run-789", DagName: "test-dag", AttemptKey: "attempt-key-1"},
+			},
+		}
+
+		result := h.getCancelledRunsForWorker(ctx, stats)
+		require.Len(t, result, 1)
+		assert.Equal(t, "attempt-key-1", result[0].AttemptKey)
+	})
+
+	t.Run("ReturnsCancelledRunsForTerminalAttempts", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-999"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-999",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Failed,
+		})
+
+		stats := &coordinatorv1.WorkerStats{
+			RunningTasks: []*coordinatorv1.RunningTask{
+				{DagRunId: "run-999", DagName: "test-dag", AttemptKey: "attempt-key-1"},
+			},
+		}
+
+		result := h.getCancelledRunsForWorker(ctx, stats)
+		require.Len(t, result, 1)
+		assert.Equal(t, "attempt-key-1", result[0].AttemptKey)
 	})
 }
 

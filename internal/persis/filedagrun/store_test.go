@@ -866,3 +866,26 @@ func TestResolveStatus_StandardPath_NoAttempt(t *testing.T) {
 	status := store.resolveStatus(ctx, dagRun, nil, nil, false)
 	assert.Nil(t, status, "should return nil when no attempts exist")
 }
+
+func TestListStatuses_WithAllHistoryBypassesDefaultTodayWindow(t *testing.T) {
+	th := setupTestStore(t)
+
+	oldTs := time.Now().UTC().Add(-48 * time.Hour)
+	th.CreateAttempt(t, oldTs, "old-run", core.Running)
+
+	statuses, err := th.Store.ListStatuses(th.Context,
+		exec.WithStatuses([]core.Status{core.Running}),
+		exec.WithoutLimit(),
+	)
+	require.NoError(t, err)
+	require.Empty(t, statuses)
+
+	statuses, err = th.Store.ListStatuses(th.Context,
+		exec.WithStatuses([]core.Status{core.Running}),
+		exec.WithoutLimit(),
+		exec.WithAllHistory(),
+	)
+	require.NoError(t, err)
+	require.Len(t, statuses, 1)
+	assert.Equal(t, "old-run", statuses[0].DAGRunID)
+}

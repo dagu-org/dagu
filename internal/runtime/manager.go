@@ -23,7 +23,7 @@ import (
 
 const staleLocalRunStartupGrace = 2 * time.Second
 
-// New creates a new Manager instance.
+// NewManager creates a new Manager instance.
 // The Manager is used to interact with the DAG.
 func NewManager(drs exec.DAGRunStore, ps exec.ProcStore, cfg *config.Config) Manager {
 	return Manager{
@@ -231,15 +231,15 @@ func (m *Manager) GetSavedStatus(ctx context.Context, dagRun exec.DAGRunRef) (*e
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	if st.Status == core.Running && dagRun.ID == st.DAGRunID {
-		dag, dagErr := attempt.ReadDAG(ctx)
-		if dagErr != nil {
-			logger.Error(ctx, "Failed to read DAG for stale status check", tag.Error(dagErr))
-		} else if repaired, repairErr := m.repairStaleLocalRunIfDead(ctx, attempt, dag, st); repairErr != nil {
-			logger.Error(ctx, "Failed to repair stale running status", tag.Error(repairErr))
-		} else {
-			st = repaired
+	if dagRun.ID == st.DAGRunID && st.Status == core.Running {
+		var dag *core.DAG
+		if isLocalWorkerID(st.WorkerID) {
+			dag, err = attempt.ReadDAG(ctx)
+			if err != nil {
+				logger.Error(ctx, "Failed to read DAG for stale status check", tag.Error(err))
+			}
 		}
+		st = m.resolveRunningStatus(ctx, dag, attempt, st, true)
 	}
 
 	return st, nil
@@ -261,7 +261,6 @@ func (m *Manager) getPersistedOrCurrentStatus(ctx context.Context, dag *core.DAG
 		return nil, fmt.Errorf("failed to read status: %w", err)
 	}
 
-	// If the DAG is running, query current local status or repair stale local state.
 	if st.Status == core.Running {
 		st = m.resolveRunningStatus(ctx, dag, attempt, st, true)
 	}
@@ -372,14 +371,15 @@ func (m *Manager) GetLatestStatus(ctx context.Context, dag *core.DAG) (exec.DAGR
 		return ret, nil
 	}
 
-	// If the DAG is running, query the current status
-	if st.Status == core.Running {
+	if st.Status == core.Running && isLocalWorkerID(st.WorkerID) {
 		runDAG, err := attempt.ReadDAG(ctx)
 		if err != nil {
 			logger.Debug(ctx, "Failed to read DAG for current status lookup", tag.Error(err))
 		} else {
 			dag = runDAG
 		}
+	}
+	if st.Status == core.Running {
 		st = m.resolveRunningStatus(ctx, dag, attempt, st, st.Parent.Zero())
 	}
 

@@ -149,6 +149,7 @@ func runStartAll(ctx *Context, _ []string) error {
 			ctx.DispatchTaskStore,
 			ctx.WorkerHeartbeatStore,
 			ctx.DAGRunLeaseStore,
+			ctx.ActiveDistributedRunStore,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to initialize coordinator: %w", err)

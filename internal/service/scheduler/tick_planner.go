@@ -339,7 +339,8 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 		// Check suspension.
 		// IsSuspended is keyed by filename stem (not dag.Name), matching the
 		// file-based suspension flag system in filedag/store.go.
-		if tp.cfg.IsSuspended(ctx, dagSuspendFlagName(entry.dag)) {
+		if isSuspendedDAG(ctx, tp.cfg.IsSuspended, nil, entry.dag) {
+			tp.dropSuspendedCatchupState(dagName, entry.dag, now)
 			continue
 		}
 
@@ -650,6 +651,17 @@ func (tp *TickPlanner) Advance(now time.Time) {
 	tp.lastPlanResult = nil
 }
 
+func (tp *TickPlanner) dropSuspendedCatchupState(dagName string, dag *core.DAG, now time.Time) {
+	if _, ok := tp.buffers[dagName]; ok {
+		delete(tp.buffers, dagName)
+		tp.advanceDAGWatermark(dagName, now)
+		return
+	}
+	if dag != nil && dag.CatchupWindow > 0 {
+		tp.advanceDAGWatermark(dagName, now)
+	}
+}
+
 // advanceDAGWatermark updates the per-DAG watermark to the given time
 // and marks the state as dirty. Caller must NOT hold tp.mu.
 func (tp *TickPlanner) advanceDAGWatermark(dagName string, scheduledTime time.Time) {
@@ -858,6 +870,19 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 		slog.String("scheduleType", run.ScheduleType.String()),
 		slog.String("scheduledTime", run.ScheduledTime.Format(time.RFC3339)),
 	)
+
+	if run.ScheduleType == ScheduleTypeStart &&
+		isSchedulerManagedTriggerType(run.TriggerType) &&
+		isSuspendedDAG(ctx, tp.cfg.IsSuspended, nil, run.DAG) {
+		logger.Info(ctx, "Skipping suspended scheduler-managed run dispatch",
+			tag.DAG(run.DAG.Name),
+			slog.String("trigger_type", run.TriggerType.String()),
+		)
+		if run.TriggerType == core.TriggerTypeCatchUp {
+			tp.advanceDAGWatermark(run.DAG.Name, run.ScheduledTime)
+		}
+		return
+	}
 
 	var err error
 	switch run.ScheduleType {
