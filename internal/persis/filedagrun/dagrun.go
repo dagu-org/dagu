@@ -60,6 +60,7 @@ type DAGRunSummary struct {
 	Name                 string
 	DagRunID             string
 	WorkerID             string
+	LeaseAt              int64
 	Params               string
 	QueuedAt             string
 	ScheduleTime         string

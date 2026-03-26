@@ -11,6 +11,10 @@ import (
 	"sync"
 )
 
+// internalSecretPrefix must match secrets.PresolvedEnvPrefix.
+// Duplicated here to avoid a circular import (eval <- secrets).
+const internalSecretPrefix = "_DAGU_PRESOLVED_SECRET_" //nolint:gosec // Not a credential; this is an env var prefix for transport.
+
 // EnvSource tracks where an environment variable came from (for debugging)
 type EnvSource string
 
@@ -53,6 +57,14 @@ func NewEnvScope(parent *EnvScope, includeOS bool) *EnvScope {
 	if includeOS {
 		for _, env := range os.Environ() {
 			if k, v, ok := strings.Cut(env, "="); ok {
+				// Skip internal transport vars for pre-resolved secrets.
+				// These are only consumed by the env secret resolver via
+				// direct os.LookupEnv; they must not appear in step environments.
+				// Must match secrets.PresolvedEnvPrefix (duplicated to avoid
+				// circular import: eval <- secrets).
+				if strings.HasPrefix(k, internalSecretPrefix) {
+					continue
+				}
 				e.entries[k] = EnvEntry{Key: k, Value: v, Source: EnvSourceOS}
 			}
 		}

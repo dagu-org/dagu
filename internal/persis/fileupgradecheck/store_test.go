@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dagu-org/dagu/internal/upgrade"
 )
 
@@ -78,9 +80,7 @@ func TestSaveAndLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
-	if loaded == nil {
-		t.Fatal("Load() returned nil after save")
-	}
+	require.NotNil(t, loaded, "Load() returned nil after save")
 	if loaded.LatestVersion != cache.LatestVersion {
 		t.Errorf("Load().LatestVersion = %q, want %q", loaded.LatestVersion, cache.LatestVersion)
 	}

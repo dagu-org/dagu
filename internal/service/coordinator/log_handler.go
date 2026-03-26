@@ -16,6 +16,8 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // flushThreshold is the number of bytes after which to flush a writer
@@ -23,7 +25,8 @@ const flushThreshold = 65536
 
 // logHandler handles log streaming from workers
 type logHandler struct {
-	logDir string
+	logDir  string
+	ownerID string
 
 	// Active writers: streamKey -> writer
 	writers   map[string]*logWriter
@@ -88,9 +91,14 @@ func (w *logWriter) close(ctx context.Context) {
 }
 
 // newLogHandler creates a new log handler
-func newLogHandler(logDir string) *logHandler {
+func newLogHandler(logDir string, ownerID ...string) *logHandler {
+	var expectedOwner string
+	if len(ownerID) > 0 {
+		expectedOwner = ownerID[0]
+	}
 	return &logHandler{
 		logDir:  logDir,
+		ownerID: expectedOwner,
 		writers: make(map[string]*logWriter),
 	}
 }
@@ -115,6 +123,10 @@ func (h *logHandler) handleStream(stream coordinatorv1.CoordinatorService_Stream
 		}
 
 		chunksReceived++
+
+		if h.ownerID != "" && chunk.OwnerCoordinatorId != h.ownerID {
+			return status.Error(codes.FailedPrecondition, "log chunk sent to non-owner coordinator")
+		}
 
 		// Handle final marker
 		if chunk.IsFinal {

@@ -217,6 +217,15 @@ func (s *Scheduler) SetClock(clock Clock) {
 	}
 }
 
+// SetDAGRunLeaseStore configures the shared distributed lease store used for
+// queue capacity accounting.
+func (s *Scheduler) SetDAGRunLeaseStore(store exec.DAGRunLeaseStore) {
+	if s == nil || s.queueProcessor == nil {
+		return
+	}
+	s.queueProcessor.dagRunLeaseStore = store
+}
+
 // SetRestartFunc overrides the planner's restart function for testing purposes.
 // This must be called before Start().
 func (s *Scheduler) SetRestartFunc(fn RestartFunc) {
@@ -536,7 +545,13 @@ func (s *Scheduler) startHeartbeat(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := s.dirLock.Heartbeat(ctx); err != nil {
-				logger.Error(ctx, "Failed to send heartbeat for scheduler lock", tag.Error(err))
+				logger.Error(ctx, "Heartbeat failed, scheduler self-fencing", tag.Error(err))
+				// Self-fencing protocol: clear lockHeld BEFORE calling Stop().
+				// This makes releaseDirLock skip Unlock, so a scheduler that just
+				// lost ownership cannot remove a replacement lock acquired by another process.
+				s.lockHeld.Store(false)
+				s.Stop(ctx)
+				return
 			}
 		}
 	}

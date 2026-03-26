@@ -761,6 +761,7 @@ func TestResolveStatus_FastPath(t *testing.T) {
 			ScheduleTime:   "2024-01-15T11:55:00Z",
 			TriggerType:    core.TriggerType(1),
 			CreatedAt:      1705320000000,
+			LeaseAt:        1705320030000,
 		},
 	}
 
@@ -777,6 +778,7 @@ func TestResolveStatus_FastPath(t *testing.T) {
 	assert.Equal(t, "2024-01-15T12:00:00Z", status.QueuedAt)
 	assert.Equal(t, "2024-01-15T11:55:00Z", status.ScheduleTime)
 	assert.Equal(t, int64(1705320000000), status.CreatedAt)
+	assert.Equal(t, int64(1705320030000), status.LeaseAt)
 }
 
 func TestResolveStatus_FastPath_StatusFilterReject(t *testing.T) {

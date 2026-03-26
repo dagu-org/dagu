@@ -87,10 +87,10 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 func (e *taskHandler) buildCommandSpec(task *coordinatorv1.Task) (runtime.CmdSpec, error) {
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
-		return e.subCmdBuilder.TaskStart(task), nil
+		return e.subCmdBuilder.TaskStart(task, nil), nil
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		return e.subCmdBuilder.TaskRetry(task), nil
+		return e.subCmdBuilder.TaskRetry(task, nil), nil
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return runtime.CmdSpec{}, fmt.Errorf("operation not specified")

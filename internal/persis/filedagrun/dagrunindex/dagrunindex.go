@@ -50,6 +50,7 @@ type Entry struct {
 	Tags                 []string
 	Name                 string
 	WorkerID             string
+	LeaseAt              int64
 	Params               string
 	QueuedAt             string
 	ScheduleTime         string
@@ -142,6 +143,7 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 			Tags:                 status.Tags,
 			Name:                 status.Name,
 			WorkerID:             status.WorkerID,
+			LeaseAt:              status.LeaseAt,
 			Params:               status.Params,
 			QueuedAt:             status.QueuedAt,
 			ScheduleTime:         status.ScheduleTime,

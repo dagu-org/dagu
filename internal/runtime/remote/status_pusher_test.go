@@ -24,7 +24,9 @@ var _ coordinator.Client = (*mockCoordinatorClient)(nil)
 // mockCoordinatorClient is a minimal mock for testing StatusPusher.
 // Only ReportStatus is used by StatusPusher; other methods panic if called.
 type mockCoordinatorClient struct {
-	reportStatusFunc func(context.Context, *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+	reportStatusFunc     func(context.Context, *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+	reportStatusToFunc   func(context.Context, exec.HostInfo, *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+	reportStatusToCalled bool
 }
 
 func (m *mockCoordinatorClient) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
@@ -51,8 +53,28 @@ func (m *mockCoordinatorClient) Heartbeat(_ context.Context, _ *coordinatorv1.He
 	panic("Heartbeat not implemented in mock")
 }
 
+func (m *mockCoordinatorClient) AckTaskClaimTo(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
+	panic("AckTaskClaimTo not implemented in mock")
+}
+
+func (m *mockCoordinatorClient) RunHeartbeatTo(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+	panic("RunHeartbeatTo not implemented in mock")
+}
+
 func (m *mockCoordinatorClient) StreamLogs(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 	panic("StreamLogs not implemented in mock")
+}
+
+func (m *mockCoordinatorClient) ReportStatusTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	m.reportStatusToCalled = true
+	if m.reportStatusToFunc != nil {
+		return m.reportStatusToFunc(ctx, owner, req)
+	}
+	return m.ReportStatus(ctx, req)
+}
+
+func (m *mockCoordinatorClient) StreamLogsTo(ctx context.Context, _ exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	return m.StreamLogs(ctx)
 }
 
 func (m *mockCoordinatorClient) Metrics() coordinator.Metrics {
@@ -255,5 +277,23 @@ func TestPush(t *testing.T) {
 		assert.False(t, s.Root.Zero())
 		assert.False(t, s.Parent.Zero())
 		assert.Len(t, s.Nodes, 1)
+	})
+
+	t.Run("OwnerScopedPushUsesReportStatusTo", func(t *testing.T) {
+		t.Parallel()
+
+		client := &mockCoordinatorClient{
+			reportStatusToFunc: func(_ context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+				assert.Equal(t, exec.HostInfo{ID: "coord-1", Host: "127.0.0.1", Port: 4321}, owner)
+				assert.Equal(t, "coord-1", req.OwnerCoordinatorId)
+				return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+			},
+		}
+
+		pusher := NewStatusPusher(client, "worker-1", exec.HostInfo{ID: "coord-1", Host: "127.0.0.1", Port: 4321})
+		err := pusher.Push(context.Background(), exec.DAGRunStatus{Name: "test-dag", DAGRunID: "run-owner"})
+
+		require.NoError(t, err)
+		assert.True(t, client.reportStatusToCalled)
 	})
 }

@@ -7,11 +7,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
@@ -48,7 +50,8 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 		}
 	}
 
-	// Process running DAG runs
+	// Process running DAG runs (local)
+	localRunningIDs := make(map[string]struct{})
 	for groupName, dagRuns := range runningByGroup {
 		var queue *queueInfo
 
@@ -73,8 +76,16 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 
 			runSummary := toDAGRunSummary(*runStatus)
 			queue.running = append(queue.running, runSummary)
+			localRunningIDs[dagRun.ID] = struct{}{}
 			totalRunning++
 		}
+	}
+
+	// 2b. Get distributed running DAG runs from the active lease store.
+	for queueName, summaries := range a.activeDistributedRunningSummaries(ctx, "", localRunningIDs) {
+		queue := getOrCreateQueue(queueMap, queueName, a.config)
+		queue.running = append(queue.running, summaries...)
+		totalRunning += len(summaries)
 	}
 
 	// 3. Get queued COUNTS only (NOT full items) using QueueList + Len
@@ -171,7 +182,7 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 	var total int
 
 	if itemType == api.ListQueueItemsParamsTypeRunning {
-		// Get running items from proc store
+		// Get running items from proc store (local runs)
 		runningByGroup, err := a.procStore.ListAllAlive(ctx)
 		if err != nil {
 			return nil, &Error{
@@ -181,19 +192,28 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 			}
 		}
 
-		runningRefs := runningByGroup[queueName]
-		total = len(runningRefs)
-
-		// Apply pagination
-		startIndex := min(pg.Offset(), total)
-		endIndex := min(pg.Offset()+pg.Limit(), total)
-		for _, dagRun := range runningRefs[startIndex:endIndex] {
+		// Collect all running summaries (local + distributed)
+		var allRunning []api.DAGRunSummary
+		localRunIDs := make(map[string]struct{})
+		for _, dagRun := range runningByGroup[queueName] {
 			summary, err := a.fetchDAGRunSummary(ctx, dagRun)
 			if err != nil {
 				continue
 			}
-			items = append(items, summary)
+			allRunning = append(allRunning, summary)
+			localRunIDs[dagRun.ID] = struct{}{}
 		}
+
+		for _, summaries := range a.activeDistributedRunningSummaries(ctx, queueName, localRunIDs) {
+			allRunning = append(allRunning, summaries...)
+		}
+
+		total = len(allRunning)
+
+		// Apply pagination
+		startIndex := min(pg.Offset(), total)
+		endIndex := min(pg.Offset()+pg.Limit(), total)
+		items = allRunning[startIndex:endIndex]
 
 		paginatedResult := exec.NewPaginatedResult(items, total, pg)
 		return api.ListQueueItems200JSONResponse{
@@ -295,13 +315,13 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 	running := make([]api.DAGRunSummary, 0)
 	queued := make([]api.DAGRunSummary, 0)
 
-	// Get running items from proc store
+	// Get running items from proc store (local runs)
 	runningByGroup, err := a.procStore.ListAllAlive(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list running processes: %w", err)
 	}
 
-	// Use fetchDAGRunSummary helper to avoid code duplication
+	localRunIDs := make(map[string]struct{})
 	for _, dagRun := range runningByGroup[queueName] {
 		summary, err := a.fetchDAGRunSummary(ctx, dagRun)
 		if err != nil {
@@ -313,6 +333,11 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 			continue
 		}
 		running = append(running, summary)
+		localRunIDs[dagRun.ID] = struct{}{}
+	}
+
+	for _, summaries := range a.activeDistributedRunningSummaries(ctx, queueName, localRunIDs) {
+		running = append(running, summaries...)
 	}
 
 	// Get queued items
@@ -350,4 +375,71 @@ func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, err
 		Running: running,
 		Queued:  queued,
 	}, nil
+}
+
+func (a *API) effectiveLeaseStaleThreshold() time.Duration {
+	if a.leaseStaleThreshold > 0 {
+		return a.leaseStaleThreshold
+	}
+	return exec.DefaultStaleLeaseThreshold
+}
+
+func (a *API) activeDistributedRunningSummaries(ctx context.Context, queueName string, excludeRunIDs map[string]struct{}) map[string][]api.DAGRunSummary {
+	result := make(map[string][]api.DAGRunSummary)
+	if a.dagRunLeaseStore == nil {
+		return result
+	}
+
+	leases, err := a.dagRunLeaseStore.ListAll(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to list distributed running leases", tag.Error(err))
+		return result
+	}
+
+	now := time.Now().UTC()
+	for _, lease := range leases {
+		if !lease.IsFresh(now, a.effectiveLeaseStaleThreshold()) {
+			continue
+		}
+		if _, ok := excludeRunIDs[lease.DAGRun.ID]; ok {
+			continue
+		}
+		summary, ok := a.runningSummaryFromLease(ctx, lease)
+		if !ok {
+			continue
+		}
+		groupName := lease.QueueName
+		if groupName == "" {
+			groupName = summary.Name
+		}
+		if queueName != "" && groupName != queueName {
+			continue
+		}
+		result[groupName] = append(result[groupName], summary)
+	}
+
+	return result
+}
+
+func (a *API) runningSummaryFromLease(ctx context.Context, lease exec.DAGRunLease) (api.DAGRunSummary, bool) {
+	attempt, err := a.dagRunStore.FindAttempt(ctx, lease.DAGRun)
+	if err != nil {
+		return api.DAGRunSummary{}, false
+	}
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return api.DAGRunSummary{}, false
+	}
+	if status.AttemptID != lease.AttemptID {
+		return api.DAGRunSummary{}, false
+	}
+	switch status.Status {
+	case core.Running, core.NotStarted:
+		return toDAGRunSummary(*status), true
+	case core.Failed, core.Aborted, core.Succeeded, core.Queued,
+		core.PartiallySucceeded, core.Waiting, core.Rejected:
+		return api.DAGRunSummary{}, false
+	}
+
+	return api.DAGRunSummary{}, false
 }

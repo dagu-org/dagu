@@ -93,7 +93,15 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
-	svc, _, err := newCoordinator(ctx, ctx.Config, ctx.ServiceRegistry, ctx.DAGRunStore)
+	svc, _, err := newCoordinator(
+		ctx,
+		ctx.Config,
+		ctx.ServiceRegistry,
+		ctx.DAGRunStore,
+		ctx.DispatchTaskStore,
+		ctx.WorkerHeartbeatStore,
+		ctx.DAGRunLeaseStore,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
@@ -122,7 +130,15 @@ func runCoordinator(ctx *Context, _ []string) error {
 // cfg.Core.Peer, it loads TLS credentials for the gRPC server. It binds a TCP listener
 // to cfg.Coordinator.Host:cfg.Coordinator.Port and returns an initialized coordinator.Service.
 // It returns an error if any part of setup (TLS loading, listener binding, etc.) fails.
-func newCoordinator(ctx context.Context, cfg *config.Config, registry exec.ServiceRegistry, dagRunStore exec.DAGRunStore) (*coordinator.Service, *coordinator.Handler, error) {
+func newCoordinator(
+	ctx context.Context,
+	cfg *config.Config,
+	registry exec.ServiceRegistry,
+	dagRunStore exec.DAGRunStore,
+	dispatchTaskStore exec.DispatchTaskStore,
+	workerHeartbeatStore exec.WorkerHeartbeatStore,
+	dagRunLeaseStore exec.DAGRunLeaseStore,
+) (*coordinator.Service, *coordinator.Handler, error) {
 	// Generate instance ID
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -201,8 +217,12 @@ func newCoordinator(ctx context.Context, cfg *config.Config, registry exec.Servi
 
 	// Create handler with DAGRunStore for status persistence and LogDir for log streaming
 	handler := coordinator.NewHandler(coordinator.HandlerConfig{
-		DAGRunStore: dagRunStore,
-		LogDir:      cfg.Paths.LogDir,
+		DAGRunStore:          dagRunStore,
+		LogDir:               cfg.Paths.LogDir,
+		Owner:                exec.CoordinatorEndpoint{ID: instanceID, Host: advertiseAddr, Port: cfg.Coordinator.Port},
+		DispatchTaskStore:    dispatchTaskStore,
+		WorkerHeartbeatStore: workerHeartbeatStore,
+		DAGRunLeaseStore:     dagRunLeaseStore,
 	})
 
 	// Create and return service with advertise address for service registry

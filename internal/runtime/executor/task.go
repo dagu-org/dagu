@@ -137,6 +137,9 @@ func ResolveBaseConfig(baseConfigData []byte, fallbackPath string) string {
 func WithPreviousStatus(status *exec.DAGRunStatus) TaskOption {
 	return func(task *coordinatorv1.Task) {
 		if status != nil {
+			if task.QueueName == "" && status.ProcGroup != "" {
+				task.QueueName = status.ProcGroup
+			}
 			protoStatus, err := convert.DAGRunStatusToProto(status)
 			if err != nil {
 				slog.Error("failed to convert previous status to proto", "error", err)

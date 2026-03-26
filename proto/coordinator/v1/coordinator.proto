@@ -19,6 +19,11 @@ service CoordinatorService {
   rpc GetWorkers (GetWorkersRequest) returns (GetWorkersResponse);
   // Heartbeat is called by workers to report their status.
   rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
+  // AckTaskClaim is called by workers after accepting a claimed task.
+  rpc AckTaskClaim (AckTaskClaimRequest) returns (AckTaskClaimResponse);
+  // RunHeartbeat is called by workers to refresh leases for tasks owned by a
+  // specific coordinator instance.
+  rpc RunHeartbeat (RunHeartbeatRequest) returns (RunHeartbeatResponse);
 
   // ReportStatus is called by workers to push DAG run status updates.
   // Used in shared-nothing architecture where workers don't have filesystem access.
@@ -89,6 +94,14 @@ message Task {
   string schedule_time = 18;
   // Enables parent-managed step retries for this task.
   bool external_step_retry = 19;
+  // Queue/proc-group name used for distributed queue capacity accounting.
+  string queue_name = 20;
+  // Coordinator instance that owns this task after claim.
+  string owner_coordinator_id = 21;
+  string owner_coordinator_host = 22;
+  int32 owner_coordinator_port = 23;
+  // Durable token identifying the shared task claim.
+  string claim_token = 24;
 }
 
 enum Operation {
@@ -143,6 +156,26 @@ message HeartbeatResponse {
   repeated CancelledRun cancelled_runs = 1;
 }
 
+message AckTaskClaimRequest {
+  string worker_id = 1;
+  string claim_token = 2;
+}
+
+message AckTaskClaimResponse {
+  bool accepted = 1;
+  string error = 2;
+}
+
+message RunHeartbeatRequest {
+  string worker_id = 1;
+  string owner_coordinator_id = 2;
+  repeated RunningTask running_tasks = 3;
+}
+
+message RunHeartbeatResponse {
+  repeated CancelledRun cancelled_runs = 1;
+}
+
 // Information about a cancelled DAG run.
 message CancelledRun {
   string attempt_key = 1; // Globally unique attempt identifier to cancel
@@ -171,6 +204,7 @@ message RunningTask {
 message ReportStatusRequest {
   string worker_id = 1;
   DAGRunStatusProto status = 2;
+  string owner_coordinator_id = 3;
 }
 
 // Response message for reporting DAG run status.
@@ -201,6 +235,8 @@ message LogChunk {
 
   // Attempt ID for the DAG run
   string attempt_id = 11;
+  // Owner coordinator used to validate owner-bound log writes.
+  string owner_coordinator_id = 12;
 }
 
 // Type of log stream.

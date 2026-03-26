@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -40,7 +41,7 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	// current source tree's binary instead of .local/bin.
 	opts = append(opts, WithBuiltExecutable())
 
-	// Parse options to access coordinator-specific settings
+	// Parse options to access coordinator-specific settings.
 	var options Options
 	for _, opt := range opts {
 		opt(&options)
@@ -72,6 +73,16 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	if options.WithLogPersistence {
 		cfg.LogDir = helper.Config.Paths.LogDir
 	}
+	if helper.StaleHeartbeatThreshold > 0 {
+		cfg.StaleHeartbeatThreshold = helper.StaleHeartbeatThreshold
+	}
+	if helper.StaleLeaseThreshold > 0 {
+		cfg.StaleLeaseThreshold = helper.StaleLeaseThreshold
+	}
+	cfg.Owner = exec.CoordinatorEndpoint{ID: "test-coordinator", Host: "127.0.0.1", Port: port}
+	cfg.DispatchTaskStore = helper.DispatchTaskStore
+	cfg.WorkerHeartbeatStore = helper.WorkerHeartbeatStore
+	cfg.DAGRunLeaseStore = helper.DAGRunLeaseStore
 
 	// Create handler with config
 	handler := coordinator.NewHandler(cfg)

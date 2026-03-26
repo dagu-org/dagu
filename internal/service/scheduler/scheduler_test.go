@@ -6,6 +6,8 @@ package scheduler_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -437,6 +439,43 @@ func TestScheduler_StartFailureCleansUpPartialStartup(t *testing.T) {
 	ctx := context.Background()
 	errCh2 := startSchedulerAsync(t, sc2, ctx)
 	defer stopSchedulerAndWait(t, sc2, errCh2, ctx)
+}
+
+func TestScheduler_SelfFencesOnOwnershipLoss(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+
+	th := test.SetupScheduler(t)
+	ctx := context.Background()
+
+	sc, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
+	require.NoError(t, err)
+	sc.SetClock(clock)
+
+	errCh := startSchedulerAsync(t, sc, ctx)
+
+	// Simulate lock theft: remove the lock dir and recreate it with a different token
+	lockDir := filepath.Join(th.Config.Paths.DataDir, "scheduler", "locks", ".dagu_lock")
+	require.NoError(t, os.RemoveAll(lockDir))
+	require.NoError(t, os.MkdirAll(lockDir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(lockDir, "owner"), []byte("stolen-token"), 0600))
+
+	// The heartbeat runs every 7s; the scheduler should self-fence and stop
+	require.Eventually(t, func() bool {
+		return !sc.IsRunning()
+	}, 15*time.Second, 100*time.Millisecond, "scheduler should self-fence and stop after lock theft")
+
+	// The replacement lock directory must still exist (not deleted by the old scheduler)
+	data, err := os.ReadFile(filepath.Join(lockDir, "owner"))
+	require.NoError(t, err)
+	require.Equal(t, "stolen-token", string(data))
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("scheduler Start() did not return after self-fencing")
+	}
 }
 
 func startSchedulerAsync(t *testing.T, sc *scheduler.Scheduler, ctx context.Context) chan error {

@@ -92,11 +92,14 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredSlackChannel(t *testing.T) {
 	}
 
 	require.True(t, monitor.notifyCompletion(context.Background(), status))
+	// Wait for the full flushPendingBatch cycle: PostMessage (increments attempts)
+	// followed by markBatchDelivered (sets delivered/seen state).
 	require.Eventually(t, func() bool {
-		return client.attemptsForChannel("COK") == 1 && client.attemptsForChannel("CFAIL") == 1
+		return client.attemptsForChannel("COK") == 1 &&
+			client.attemptsForChannel("CFAIL") == 1 &&
+			monitor.isSeen("COK", status) &&
+			!monitor.isSeen("CFAIL", status)
 	}, time.Second, 10*time.Millisecond)
-	assert.True(t, monitor.isSeen("COK", status))
-	assert.False(t, monitor.isSeen("CFAIL", status))
 
 	require.True(t, monitor.notifyCompletion(context.Background(), status))
 	require.Eventually(t, func() bool {

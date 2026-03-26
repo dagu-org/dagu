@@ -86,7 +86,11 @@ func TestTryLoadForDay_NoIndex_ActiveRun(t *testing.T) {
 	for _, de := range dirEntries {
 		if de.IsDir() {
 			attemptDir := filepath.Join(dayDir, de.Name(), "attempt_20240115_120000_001Z_abc123")
-			st := exec.DAGRunStatus{Status: core.Running, StartedAt: "2024-01-15T12:00:00Z"}
+			st := exec.DAGRunStatus{
+				Status:    core.Running,
+				StartedAt: "2024-01-15T12:00:00Z",
+				LeaseAt:   1705320030000,
+			}
 			data, err := json.Marshal(st)
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(attemptDir, "status.jsonl"), append(data, '\n'), 0600))
@@ -98,6 +102,16 @@ func TestTryLoadForDay_NoIndex_ActiveRun(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, entries, 10)
 	assert.False(t, fromIndex) // No index written because one run is active.
+
+	var runningEntry *Entry
+	for i := range entries {
+		if entries[i].Status == core.Running {
+			runningEntry = &entries[i]
+			break
+		}
+	}
+	require.NotNil(t, runningEntry)
+	assert.Equal(t, int64(1705320030000), runningEntry.LeaseAt)
 
 	// No index file should exist.
 	_, statErr := os.Stat(filepath.Join(dayDir, IndexFileName))

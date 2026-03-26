@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/stretchr/testify/require"
 )
 
 var _ CacheStore = (*mockCacheStore)(nil)
@@ -575,9 +576,7 @@ func TestGetCachedUpdateInfo(t *testing.T) {
 		store := &mockCacheStore{cache: cache}
 
 		result := GetCachedUpdateInfo(store)
-		if result == nil {
-			t.Fatal("GetCachedUpdateInfo() should return cache")
-		}
+		require.NotNil(t, result, "GetCachedUpdateInfo() should return cache")
 		if result.LatestVersion != cache.LatestVersion {
 			t.Errorf("GetCachedUpdateInfo().LatestVersion = %q, want %q", result.LatestVersion, cache.LatestVersion)
 		}
@@ -625,9 +624,7 @@ func TestCheckAndUpdateCacheWithValidCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CheckAndUpdateCache() error: %v", err)
 	}
-	if result == nil {
-		t.Fatal("CheckAndUpdateCache() should return cache")
-	}
+	require.NotNil(t, result, "CheckAndUpdateCache() should return cache")
 	if result.LatestVersion != cache.LatestVersion {
 		t.Errorf("CheckAndUpdateCache().LatestVersion = %q, want %q", result.LatestVersion, cache.LatestVersion)
 	}
@@ -1182,9 +1179,7 @@ func TestCanSelfUpgrade(t *testing.T) {
 
 func TestNewGitHubClient(t *testing.T) {
 	client := NewGitHubClient()
-	if client == nil {
-		t.Fatal("NewGitHubClient() returned nil")
-	}
+	require.NotNil(t, client, "NewGitHubClient() returned nil")
 	if client.client == nil {
 		t.Error("NewGitHubClient() returned client with nil http client")
 	}

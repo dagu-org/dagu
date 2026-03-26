@@ -759,6 +759,7 @@ func summaryFromIndexEntry(ie dagrunindex.Entry) *DAGRunSummary {
 		Name:                 ie.Name,
 		DagRunID:             ie.DagRunID,
 		WorkerID:             ie.WorkerID,
+		LeaseAt:              ie.LeaseAt,
 		Params:               ie.Params,
 		QueuedAt:             ie.QueuedAt,
 		ScheduleTime:         ie.ScheduleTime,

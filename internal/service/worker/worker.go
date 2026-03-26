@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/sql"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -34,7 +35,8 @@ type Worker struct {
 
 	// For tracking poller states and heartbeats
 	pollersMu    sync.Mutex
-	runningTasks map[string]*coordinatorv1.RunningTask // pollerID -> running task
+	runningTasks map[string]*runningTaskState // attemptKey -> running task
+	pollerTasks  map[string]string            // pollerID -> attemptKey
 
 	// For cancellation support (key is AttemptKey)
 	cancelFuncs map[string]context.CancelFunc
@@ -47,6 +49,12 @@ type Worker struct {
 	// For global PostgreSQL connection pool (shared-nothing mode)
 	poolManager  *sql.GlobalPoolManager
 	healthServer *healthcheck.Server
+}
+
+type runningTaskState struct {
+	task                 *coordinatorv1.RunningTask
+	owner                exec.HostInfo
+	lastOwnerHeartbeatAt time.Time
 }
 
 // SetHandler sets a custom task executor for testing or custom execution logic
@@ -77,7 +85,8 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		handler:        &taskHandler{subCmdBuilder: runtime.NewSubCmdBuilder(cfg)},
 		labels:         labels,
 		cfg:            cfg,
-		runningTasks:   make(map[string]*coordinatorv1.RunningTask),
+		runningTasks:   make(map[string]*runningTaskState),
+		pollerTasks:    make(map[string]string),
 		cancelFuncs:    make(map[string]context.CancelFunc),
 		healthServer:   healthcheck.NewServer("worker", healthPort),
 	}
@@ -156,6 +165,9 @@ func (w *Worker) Start(ctx context.Context) (err error) {
 	wg.Go(func() {
 		w.sendHeartbeats(internalCtx)
 	})
+	wg.Go(func() {
+		w.sendRunHeartbeats(internalCtx)
+	})
 
 	// Wait for all goroutines to complete, then signal done
 	go func() {
@@ -232,6 +244,14 @@ type trackingHandler struct {
 // Handle tracks task state and delegates to the inner executor
 func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) error {
 	pollerID := fmt.Sprintf("poller-%d", t.pollerIndex)
+	attemptKey := task.AttemptKey
+	if attemptKey == "" {
+		attemptKey = fmt.Sprintf("%s:%s", task.DagRunId, pollerID)
+	}
+	owner, err := taskOwner(task)
+	if err != nil {
+		return err
+	}
 
 	// Create a cancellable context for this task
 	taskCtx, cancel := context.WithCancel(ctx)
@@ -239,26 +259,32 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 
 	// Mark task as running and register cancel function
 	t.worker.pollersMu.Lock()
-	t.worker.runningTasks[pollerID] = &coordinatorv1.RunningTask{
-		DagRunId:         task.DagRunId,
-		DagName:          task.Target,
-		StartedAt:        time.Now().Unix(),
-		RootDagRunName:   task.RootDagRunName,
-		RootDagRunId:     task.RootDagRunId,
-		ParentDagRunName: task.ParentDagRunName,
-		ParentDagRunId:   task.ParentDagRunId,
-		AttemptKey:       task.AttemptKey,
+	t.worker.runningTasks[attemptKey] = &runningTaskState{
+		task: &coordinatorv1.RunningTask{
+			DagRunId:         task.DagRunId,
+			DagName:          task.Target,
+			StartedAt:        time.Now().Unix(),
+			RootDagRunName:   task.RootDagRunName,
+			RootDagRunId:     task.RootDagRunId,
+			ParentDagRunName: task.ParentDagRunName,
+			ParentDagRunId:   task.ParentDagRunId,
+			AttemptKey:       attemptKey,
+		},
+		owner:                owner,
+		lastOwnerHeartbeatAt: time.Now().UTC(),
 	}
-	t.worker.cancelFuncs[task.AttemptKey] = cancel
+	t.worker.pollerTasks[pollerID] = attemptKey
+	t.worker.cancelFuncs[attemptKey] = cancel
 	t.worker.pollersMu.Unlock()
 
 	// Execute the task with cancellable context
-	err := t.handler.Handle(taskCtx, task)
+	err = t.handler.Handle(taskCtx, task)
 
 	// Remove from running tasks and cancel registry
 	t.worker.pollersMu.Lock()
-	delete(t.worker.runningTasks, pollerID)
-	delete(t.worker.cancelFuncs, task.AttemptKey)
+	delete(t.worker.runningTasks, attemptKey)
+	delete(t.worker.pollerTasks, pollerID)
+	delete(t.worker.cancelFuncs, attemptKey)
 	t.worker.pollersMu.Unlock()
 
 	return err
@@ -320,6 +346,106 @@ func (w *Worker) sendHeartbeats(ctx context.Context) {
 	}
 }
 
+func (w *Worker) sendRunHeartbeats(ctx context.Context) {
+	const interval = 1 * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.sendOwnerRunHeartbeats(ctx)
+		}
+	}
+}
+
+func (w *Worker) sendOwnerRunHeartbeats(ctx context.Context) {
+	type ownerGroup struct {
+		owner exec.HostInfo
+		tasks []*coordinatorv1.RunningTask
+	}
+
+	w.pollersMu.Lock()
+	groups := make(map[string]*ownerGroup)
+	lastSeen := make(map[string]time.Time, len(w.runningTasks))
+	for attemptKey, state := range w.runningTasks {
+		if state == nil || state.task == nil || state.owner.Host == "" {
+			continue
+		}
+		key := fmt.Sprintf("%s|%s|%d", state.owner.ID, state.owner.Host, state.owner.Port)
+		group := groups[key]
+		if group == nil {
+			group = &ownerGroup{owner: state.owner}
+			groups[key] = group
+		}
+		group.tasks = append(group.tasks, state.task)
+		lastSeen[attemptKey] = state.lastOwnerHeartbeatAt
+	}
+	w.pollersMu.Unlock()
+
+	for _, group := range groups {
+		callCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		resp, err := w.coordinatorCli.RunHeartbeatTo(callCtx, group.owner, &coordinatorv1.RunHeartbeatRequest{
+			WorkerId:           w.id,
+			OwnerCoordinatorId: group.owner.ID,
+			RunningTasks:       group.tasks,
+		})
+		cancel()
+
+		if err != nil {
+			w.cancelTasksForOwnerTimeout(ctx, group.owner, group.tasks, lastSeen)
+			continue
+		}
+
+		w.markOwnerHeartbeatSuccess(group.tasks, time.Now().UTC())
+		if resp != nil && len(resp.CancelledRuns) > 0 {
+			w.processCancellations(ctx, resp.CancelledRuns)
+		}
+	}
+}
+
+func (w *Worker) markOwnerHeartbeatSuccess(tasks []*coordinatorv1.RunningTask, observedAt time.Time) {
+	w.pollersMu.Lock()
+	defer w.pollersMu.Unlock()
+
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		if state, ok := w.runningTasks[task.AttemptKey]; ok && state != nil {
+			state.lastOwnerHeartbeatAt = observedAt
+		}
+	}
+}
+
+func (w *Worker) cancelTasksForOwnerTimeout(ctx context.Context, owner exec.HostInfo, tasks []*coordinatorv1.RunningTask, lastSeen map[string]time.Time) {
+	const ownerHeartbeatTimeout = 15 * time.Second
+
+	now := time.Now().UTC()
+	var timedOut []*coordinatorv1.CancelledRun
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		if now.Sub(lastSeen[task.AttemptKey]) <= ownerHeartbeatTimeout {
+			continue
+		}
+		logger.Warn(ctx, "Owner coordinator unreachable; cancelling distributed run",
+			tag.WorkerID(w.id),
+			tag.AttemptKey(task.AttemptKey),
+			slog.String("owner-id", owner.ID),
+			tag.Host(owner.Host),
+			tag.Port(owner.Port),
+		)
+		timedOut = append(timedOut, &coordinatorv1.CancelledRun{AttemptKey: task.AttemptKey})
+	}
+	if len(timedOut) > 0 {
+		w.processCancellations(ctx, timedOut)
+	}
+}
+
 // sendHeartbeat sends a single heartbeat to the coordinator
 func (w *Worker) sendHeartbeat(ctx context.Context) error {
 	w.pollersMu.Lock()
@@ -328,7 +454,7 @@ func (w *Worker) sendHeartbeat(ctx context.Context) error {
 	busyCount := len(w.runningTasks)
 	runningTasks := make([]*coordinatorv1.RunningTask, 0, busyCount)
 	for _, task := range w.runningTasks {
-		runningTasks = append(runningTasks, task)
+		runningTasks = append(runningTasks, task.task)
 	}
 
 	w.pollersMu.Unlock()

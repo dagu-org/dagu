@@ -47,11 +47,23 @@ type Client interface {
 	// which may include cancellation directives
 	Heartbeat(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
 
+	// AckTaskClaim confirms a claimed task with its owner coordinator.
+	AckTaskClaimTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error)
+
+	// RunHeartbeat refreshes leases for tasks owned by a specific coordinator.
+	RunHeartbeatTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error)
+
 	// ReportStatus sends a status update to the coordinator (for shared-nothing workers)
 	ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
 
+	// ReportStatusTo sends a status update to a specific owner coordinator.
+	ReportStatusTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+
 	// StreamLogs returns a log streaming client for sending logs to the coordinator
 	StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
+
+	// StreamLogsTo opens a log stream to a specific owner coordinator.
+	StreamLogsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
 
 	// RequestCancel requests cancellation of a DAG run through the coordinator.
 	// Used in shared-nothing mode for sub-DAG cancellation.
@@ -285,6 +297,33 @@ func (cli *clientImpl) attemptCall(ctx context.Context, members []exec.HostInfo,
 	}
 
 	return lastErr
+}
+
+func (cli *clientImpl) callMember(ctx context.Context, member exec.HostInfo, callback func(context.Context, *client) error) error {
+	client, err := cli.getOrCreateClient(member)
+	if err != nil {
+		cli.recordFailure(err)
+		return err
+	}
+	if err := callback(ctx, client); err != nil {
+		cli.recordFailure(err)
+		if st, ok := status.FromError(err); ok && st.Code() == codes.Unavailable {
+			cli.removeClient(member)
+		}
+		return err
+	}
+	cli.recordSuccess(ctx)
+	return nil
+}
+
+func (cli *clientImpl) callMemberWithTimeout(ctx context.Context, member exec.HostInfo, callback func(context.Context, *client) error) error {
+	if cli.config.RequestTimeout <= 0 {
+		return cli.callMember(ctx, member, callback)
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, cli.config.RequestTimeout)
+	defer cancel()
+	return cli.callMember(callCtx, member, callback)
 }
 
 func (cli *clientImpl) isHealthy(ctx context.Context, member exec.HostInfo) error {
@@ -563,6 +602,32 @@ func (cli *clientImpl) Heartbeat(ctx context.Context, req *coordinatorv1.Heartbe
 	return resp, err
 }
 
+func (cli *clientImpl) AckTaskClaimTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error) {
+	var resp *coordinatorv1.AckTaskClaimResponse
+	err := cli.callMemberWithTimeout(ctx, owner, func(ctx context.Context, client *client) error {
+		var callErr error
+		resp, callErr = client.client.AckTaskClaim(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("ack task claim failed: %w", callErr)
+		}
+		return nil
+	})
+	return resp, err
+}
+
+func (cli *clientImpl) RunHeartbeatTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+	var resp *coordinatorv1.RunHeartbeatResponse
+	err := cli.callMemberWithTimeout(ctx, owner, func(ctx context.Context, client *client) error {
+		var callErr error
+		resp, callErr = client.client.RunHeartbeat(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("run heartbeat failed: %w", callErr)
+		}
+		return nil
+	})
+	return resp, err
+}
+
 // ReportStatus sends a status update to the coordinator
 func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 	members, err := cli.getCoordinatorMembers(ctx)
@@ -572,6 +637,19 @@ func (cli *clientImpl) ReportStatus(ctx context.Context, req *coordinatorv1.Repo
 
 	var resp *coordinatorv1.ReportStatusResponse
 	err = cli.attemptCall(ctx, members, func(ctx context.Context, _ exec.HostInfo, client *client) error {
+		var callErr error
+		resp, callErr = client.client.ReportStatus(ctx, req)
+		if callErr != nil {
+			return fmt.Errorf("report status failed: %w", callErr)
+		}
+		return nil
+	})
+	return resp, err
+}
+
+func (cli *clientImpl) ReportStatusTo(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	var resp *coordinatorv1.ReportStatusResponse
+	err := cli.callMemberWithTimeout(ctx, owner, func(ctx context.Context, client *client) error {
 		var callErr error
 		resp, callErr = client.client.ReportStatus(ctx, req)
 		if callErr != nil {
@@ -624,6 +702,22 @@ func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.Coordinato
 	}
 
 	return nil, fmt.Errorf("failed to create log stream: %w", lastErr)
+}
+
+func (cli *clientImpl) StreamLogsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+	var stream coordinatorv1.CoordinatorService_StreamLogsClient
+	err := cli.callMember(ctx, owner, func(ctx context.Context, client *client) error {
+		var callErr error
+		stream, callErr = client.client.StreamLogs(ctx)
+		if callErr != nil {
+			return fmt.Errorf("stream logs failed: %w", callErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return stream, nil
 }
 
 // GetDAGRunStatus retrieves the status of a DAG run from the coordinator
