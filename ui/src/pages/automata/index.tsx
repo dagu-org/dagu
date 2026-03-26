@@ -950,76 +950,77 @@ function AutomataPage(): React.ReactElement {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <section className="rounded-xl border bg-card">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+      <div className="-m-4 w-[calc(100%+2rem)] md:-m-6 md:h-[calc(100%+3rem)] md:w-[calc(100%+3rem)]">
+        <div className="grid min-h-full grid-cols-1 border-border md:h-full md:grid-cols-[360px_minmax(0,1fr)]">
+          <section className="border-b bg-background md:flex md:min-h-0 md:flex-col md:border-r md:border-b-0">
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3 md:px-6 md:py-4">
             <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
               Automata
             </h2>
             <Button size="sm" onClick={openCreateDialog}>
               Create
             </Button>
-          </div>
-          {listQuery.isLoading ? (
-            <LoadingIndicator />
-          ) : (
-            <div className="max-h-[calc(100vh-12rem)] overflow-y-auto p-2">
-              {(listQuery.data?.automata || []).length === 0 ? (
-                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  No Automata defined yet.
-                  <div className="mt-3">
-                    <Button size="sm" onClick={openCreateDialog}>
-                      Create Automata
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-              {(listQuery.data?.automata || []).map((item) => (
-                <button
-                  key={item.name}
-                  onClick={() => {
-                    setShowCreateDialog(false);
-                    navigate(`/automata/${encodeURIComponent(item.name)}`);
-                  }}
-                  className={`mb-2 w-full rounded-lg border p-3 text-left transition ${
-                    name === item.name
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-medium">{item.name}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.instruction || item.goal}
-                      </div>
-                    </div>
-                    <span
-                      className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusClass(item.state)}`}
-                    >
-                      {item.state}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Stage: {item.stage || 'n/a'}</span>
-                    {item.currentRun ? (
-                      <StatusChip
-                        status={dagRunStatusToStatus(item.currentRun.status)}
-                        size="xs"
-                      >
-                        {item.currentRun.status}
-                      </StatusChip>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
             </div>
-          )}
-        </section>
+            {listQuery.isLoading ? (
+              <LoadingIndicator />
+            ) : (
+              <div className="p-2 md:min-h-0 md:flex-1 md:overflow-y-auto md:pl-4 md:pr-2 md:pt-4 md:pb-6">
+                {(listQuery.data?.automata || []).length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    No Automata defined yet.
+                    <div className="mt-3">
+                      <Button size="sm" onClick={openCreateDialog}>
+                        Create Automata
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+                {(listQuery.data?.automata || []).map((item) => (
+                  <button
+                    key={item.name}
+                    onClick={() => {
+                      setShowCreateDialog(false);
+                      navigate(`/automata/${encodeURIComponent(item.name)}`);
+                    }}
+                    className={`mb-2 w-full rounded-lg border p-3 text-left transition ${
+                      name === item.name
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted/50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium">{item.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {item.instruction || item.goal}
+                        </div>
+                      </div>
+                      <span
+                        className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusClass(item.state)}`}
+                      >
+                        {item.state}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Stage: {item.stage || 'n/a'}</span>
+                      {item.currentRun ? (
+                        <StatusChip
+                          status={dagRunStatusToStatus(item.currentRun.status)}
+                          size="xs"
+                        >
+                          {item.currentRun.status}
+                        </StatusChip>
+                      ) : null}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
 
-        <section className="rounded-xl border bg-card">
-          {showCreateDialog ? (
-            <div className="space-y-6 p-4">
+          <section className="min-w-0 bg-background md:min-h-0 md:h-full">
+            {showCreateDialog ? (
+              <div className="space-y-6 overflow-x-hidden p-4 md:h-full md:overflow-auto md:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-2xl font-semibold">Create Automata</h1>
@@ -1191,7 +1192,7 @@ function AutomataPage(): React.ReactElement {
               </div>
             </div>
           ) : !name ? (
-            <div className="space-y-4 p-8 text-sm text-muted-foreground">
+            <div className="space-y-4 p-8 text-sm text-muted-foreground md:h-full md:overflow-auto md:p-6">
               <div>
                 Select an Automata to inspect its state, stage, transcript, and
                 recent DAG runs.
@@ -1203,7 +1204,7 @@ function AutomataPage(): React.ReactElement {
           ) : detailQuery.isLoading ? (
             <LoadingIndicator />
           ) : detail ? (
-            <div className="space-y-6 p-4">
+            <div className="space-y-6 overflow-x-hidden p-4 md:h-full md:overflow-auto md:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h1 className="text-2xl font-semibold">
@@ -1275,7 +1276,7 @@ function AutomataPage(): React.ReactElement {
                 </div>
               ) : null}
 
-              <div className="rounded-lg border p-4">
+              <div className="min-w-0 rounded-lg border p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold">Session Messages</h2>
                   {detail.state.sessionId ? (
@@ -1300,12 +1301,12 @@ function AutomataPage(): React.ReactElement {
                           ) : null}
                         </div>
                         {message.content ? (
-                          <div className="whitespace-pre-wrap">
+                          <div className="whitespace-pre-wrap break-words">
                             {message.content}
                           </div>
                         ) : null}
                         {message.user_prompt?.question ? (
-                          <div className="whitespace-pre-wrap">
+                          <div className="whitespace-pre-wrap break-words">
                             {message.user_prompt.question}
                           </div>
                         ) : null}
@@ -1314,7 +1315,7 @@ function AutomataPage(): React.ReactElement {
                             {message.tool_results.map((result, index) => (
                               <div
                                 key={index}
-                                className="rounded bg-muted p-2 text-xs whitespace-pre-wrap"
+                                className="rounded bg-muted p-2 text-xs whitespace-pre-wrap break-words"
                               >
                                 {result.content}
                               </div>
@@ -1332,7 +1333,7 @@ function AutomataPage(): React.ReactElement {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <h2 className="mb-2 text-sm font-semibold">Mission</h2>
                   <div className="space-y-2 text-sm">
                     <p>
@@ -1358,7 +1359,7 @@ function AutomataPage(): React.ReactElement {
                   </div>
                 </div>
 
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <h2 className="mb-3 text-sm font-semibold">
                     {detail.state.state === 'finished'
                       ? 'Start New Task'
@@ -1398,7 +1399,7 @@ function AutomataPage(): React.ReactElement {
                   </div>
                 </div>
 
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <h2 className="mb-3 text-sm font-semibold">Stage Override</h2>
                   <div className="space-y-3">
                     <select
@@ -1427,7 +1428,7 @@ function AutomataPage(): React.ReactElement {
                   </div>
                 </div>
 
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <h2 className="mb-3 text-sm font-semibold">
                     Operator Message
                   </h2>
@@ -1498,7 +1499,7 @@ function AutomataPage(): React.ReactElement {
                           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             Agent Note
                           </div>
-                          <div className="mt-1 whitespace-pre-wrap">
+                          <div className="mt-1 whitespace-pre-wrap break-words">
                             {detail.state.pendingStageTransition.note}
                           </div>
                         </div>
@@ -1587,7 +1588,7 @@ function AutomataPage(): React.ReactElement {
               ) : null}
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <h2 className="mb-3 text-sm font-semibold">
                     Current Stage DAGs
                   </h2>
@@ -1621,7 +1622,7 @@ function AutomataPage(): React.ReactElement {
                   </div>
                 </div>
 
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <h2 className="mb-3 text-sm font-semibold">
                     Stage DAG Mapping
                   </h2>
@@ -1678,7 +1679,7 @@ function AutomataPage(): React.ReactElement {
                 </div>
               </div>
 
-              <div className="rounded-lg border p-4">
+              <div className="min-w-0 rounded-lg border p-4">
                 <h2 className="mb-3 text-sm font-semibold">Recent Runs</h2>
                 <div className="space-y-2">
                   {mergedRuns.length ? (
@@ -1729,18 +1730,18 @@ function AutomataPage(): React.ReactElement {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <h2 className="mb-3 text-sm font-semibold">
                     Full Session Transcript
                   </h2>
                   {(detail.messages || []).length ? (
-                    <div className="max-h-[28rem] space-y-2 overflow-y-auto">
+                    <div className="max-h-[28rem] min-w-0 space-y-2 overflow-x-auto overflow-y-auto">
                       {(detail.messages || []).slice(-40).map((message) => (
                         <div
                           key={message.id}
-                          className="rounded-md border p-2 text-sm"
+                          className="min-w-0 rounded-md border p-2 text-sm"
                         >
-                          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                             <span>{message.type}</span>
                             {message.created_at ? (
                               <span className="normal-case tracking-normal">
@@ -1749,12 +1750,12 @@ function AutomataPage(): React.ReactElement {
                             ) : null}
                           </div>
                           {message.content ? (
-                            <div className="whitespace-pre-wrap">
+                            <div className="whitespace-pre-wrap break-words">
                               {message.content}
                             </div>
                           ) : null}
                           {message.user_prompt?.question ? (
-                            <div className="whitespace-pre-wrap">
+                            <div className="whitespace-pre-wrap break-words">
                               {message.user_prompt.question}
                             </div>
                           ) : null}
@@ -1763,7 +1764,7 @@ function AutomataPage(): React.ReactElement {
                               {message.tool_results.map((result, index) => (
                                 <div
                                   key={index}
-                                  className="rounded bg-muted p-2 text-xs whitespace-pre-wrap"
+                                  className="rounded bg-muted p-2 text-xs whitespace-pre-wrap break-words"
                                 >
                                   {result.content}
                                 </div>
@@ -1780,7 +1781,7 @@ function AutomataPage(): React.ReactElement {
                   )}
                 </div>
 
-                <div className="rounded-lg border p-4">
+                <div className="min-w-0 rounded-lg border p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <h2 className="text-sm font-semibold">Raw Spec</h2>
                     <div className="flex items-center gap-2">
@@ -1830,10 +1831,10 @@ function AutomataPage(): React.ReactElement {
                     <Textarea
                       value={specDraft}
                       onChange={(e) => setSpecDraft(e.target.value)}
-                      className="min-h-[28rem] font-mono text-xs"
+                      className="min-h-[28rem] w-full min-w-0 font-mono text-xs"
                     />
                   ) : (
-                    <pre className="max-h-[28rem] overflow-auto rounded-md bg-muted p-3 text-xs">
+                    <pre className="max-h-[28rem] max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs">
                       {specQuery.data?.spec || ''}
                     </pre>
                   )}
@@ -1841,11 +1842,12 @@ function AutomataPage(): React.ReactElement {
               </div>
             </div>
           ) : (
-            <div className="p-8 text-sm text-muted-foreground">
+            <div className="p-8 text-sm text-muted-foreground md:h-full md:overflow-auto md:p-6">
               Automata definition not found.
             </div>
           )}
         </section>
+        </div>
       </div>
       {selectedDAGRun ? (
         <DAGRunDetailsModal

@@ -502,6 +502,16 @@ export const mainListItems = React.forwardRef<
 
           <div className="space-y-0.5">
             <SectionLabel label="Workflows" isOpen={isOpen} customColor={customColor} />
+            {config.agentEnabled && (
+              <NavItem
+                to="/automata"
+                text="Automata"
+                icon={<Bot size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+            )}
             <NavItem
               to="/dags"
               text="Definitions"
@@ -522,14 +532,6 @@ export const mainListItems = React.forwardRef<
               to="/queues"
               text="Queues"
               icon={<Inbox size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/automata"
-              text="Automata"
-              icon={<Bot size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
