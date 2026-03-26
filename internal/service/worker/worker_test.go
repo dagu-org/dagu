@@ -5,6 +5,7 @@ package worker_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -580,6 +582,113 @@ func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *t
 }
 
 func TestWorkerCancellation(t *testing.T) {
+	t.Run("CancelClaimedTaskBeforeExecutionWhenOwnerRejectsAttempt", func(t *testing.T) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		var validationCalls atomic.Int32
+
+		mockCoordinatorCli.RunHeartbeatFunc = func(_ context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+			validationCalls.Add(1)
+			assert.Equal(t, "coord-a", owner.ID)
+			assert.Len(t, req.RunningTasks, 1)
+			return &coordinatorv1.RunHeartbeatResponse{
+				CancelledRuns: []*coordinatorv1.CancelledRun{
+					{AttemptKey: "attempt-key-1"},
+				},
+			}, nil
+		}
+
+		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, map[string]string{}, &config.Config{})
+
+		var executed atomic.Bool
+		w.SetHandler(&mockHandler{
+			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
+				executed.Store(true)
+				return nil
+			},
+		})
+
+		var dispatched atomic.Bool
+		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			if dispatched.Swap(true) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			return &coordinatorv1.Task{
+				DagRunId:             "run-123",
+				Target:               "test.yaml",
+				Definition:           "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				AttemptKey:           "attempt-key-1",
+				OwnerCoordinatorId:   "coord-a",
+				OwnerCoordinatorHost: "127.0.0.1",
+				OwnerCoordinatorPort: 1234,
+			}, nil
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go func() {
+			_ = w.Start(ctx)
+		}()
+
+		require.Eventually(t, func() bool {
+			return validationCalls.Load() > 0
+		}, 2*time.Second, 10*time.Millisecond)
+		assert.False(t, executed.Load(), "handler should not run after owner cancellation")
+
+		cancel()
+		_ = w.Stop(context.Background())
+	})
+
+	t.Run("OwnerValidationFailureDoesNotBlockExecution", func(t *testing.T) {
+		mockCoordinatorCli := newMockCoordinatorCli()
+		mockCoordinatorCli.RunHeartbeatFunc = func(_ context.Context, _ exec.HostInfo, _ *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
+			return nil, errors.New("owner unavailable")
+		}
+
+		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, map[string]string{}, &config.Config{})
+		executed := make(chan struct{}, 1)
+		w.SetHandler(&mockHandler{
+			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
+				executed <- struct{}{}
+				return nil
+			},
+		})
+
+		var dispatched atomic.Bool
+		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			if dispatched.Swap(true) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			return &coordinatorv1.Task{
+				DagRunId:             "run-456",
+				Target:               "test.yaml",
+				Definition:           "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				AttemptKey:           "attempt-key-2",
+				OwnerCoordinatorId:   "coord-a",
+				OwnerCoordinatorHost: "127.0.0.1",
+				OwnerCoordinatorPort: 1234,
+			}, nil
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go func() {
+			_ = w.Start(ctx)
+		}()
+
+		select {
+		case <-executed:
+		case <-time.After(2 * time.Second):
+			t.Fatal("task was not executed after transient owner validation failure")
+		}
+
+		cancel()
+		_ = w.Stop(context.Background())
+	})
+
 	t.Run("CancelRunningTaskViaCancellationDirective", func(t *testing.T) {
 		// Create a mock coordinator client that returns cancellation directives
 		cancelledRunID := "task-to-cancel"

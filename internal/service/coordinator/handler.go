@@ -52,6 +52,12 @@ const defaultStaleLeaseThreshold = exec.DefaultStaleLeaseThreshold
 // heartbeat-driven lease refreshes for a running distributed task.
 const defaultLeaseRefreshWriteInterval = 5 * time.Second
 
+const (
+	remoteAttemptRejectedLeaseInactive = "stale attempt: lease no longer active"
+	remoteAttemptRejectedSuperseded    = "stale attempt: superseded by newer attempt"
+	remoteAttemptRejectedTerminal      = "stale attempt: run already terminal"
+)
+
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
 
@@ -648,19 +654,24 @@ func (h *Handler) RunHeartbeat(ctx context.Context, req *coordinatorv1.RunHeartb
 		return nil, status.Error(codes.FailedPrecondition, "run heartbeat sent to non-owner coordinator")
 	}
 
+	cancelledRuns := make([]*coordinatorv1.CancelledRun, 0)
 	observedAt := time.Now().UTC()
 	for _, task := range req.RunningTasks {
 		if task == nil || task.AttemptKey == "" {
 			continue
 		}
-		if err := h.dagRunLeaseStore.Touch(ctx, task.AttemptKey, observedAt); err != nil && !errors.Is(err, exec.ErrDAGRunLeaseNotFound) {
+		if err := h.dagRunLeaseStore.Touch(ctx, task.AttemptKey, observedAt); err != nil {
+			if errors.Is(err, exec.ErrDAGRunLeaseNotFound) {
+				cancelledRuns = appendCancelledRunIfMissing(cancelledRuns, task.AttemptKey)
+				continue
+			}
 			return nil, status.Error(codes.Internal, "failed to refresh run lease: "+err.Error())
 		}
 	}
 
-	cancelledRuns := h.getCancelledRunsForWorker(ctx, &coordinatorv1.WorkerStats{
+	cancelledRuns = appendCancelledRuns(cancelledRuns, h.getCancelledRunsForWorker(ctx, &coordinatorv1.WorkerStats{
 		RunningTasks: req.RunningTasks,
-	})
+	}))
 	return &coordinatorv1.RunHeartbeatResponse{CancelledRuns: cancelledRuns}, nil
 }
 
@@ -864,6 +875,28 @@ func queueNameForStatus(status *exec.DAGRunStatus) string {
 	return status.ProcGroup
 }
 
+func appendCancelledRuns(dst []*coordinatorv1.CancelledRun, src []*coordinatorv1.CancelledRun) []*coordinatorv1.CancelledRun {
+	for _, cancelled := range src {
+		if cancelled == nil || cancelled.AttemptKey == "" {
+			continue
+		}
+		dst = appendCancelledRunIfMissing(dst, cancelled.AttemptKey)
+	}
+	return dst
+}
+
+func appendCancelledRunIfMissing(cancelledRuns []*coordinatorv1.CancelledRun, attemptKey string) []*coordinatorv1.CancelledRun {
+	if attemptKey == "" {
+		return cancelledRuns
+	}
+	for _, cancelled := range cancelledRuns {
+		if cancelled != nil && cancelled.AttemptKey == attemptKey {
+			return cancelledRuns
+		}
+	}
+	return append(cancelledRuns, &coordinatorv1.CancelledRun{AttemptKey: attemptKey})
+}
+
 // getCancelledRunsForWorker checks which of the worker's running tasks have been cancelled.
 func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordinatorv1.WorkerStats) []*coordinatorv1.CancelledRun {
 	if h.dagRunStore == nil || stats == nil || len(stats.RunningTasks) == 0 {
@@ -873,9 +906,7 @@ func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordina
 	var cancelledRuns []*coordinatorv1.CancelledRun
 	for _, task := range stats.RunningTasks {
 		if h.isTaskCancelled(ctx, task) {
-			cancelledRuns = append(cancelledRuns, &coordinatorv1.CancelledRun{
-				AttemptKey: task.AttemptKey,
-			})
+			cancelledRuns = appendCancelledRunIfMissing(cancelledRuns, task.AttemptKey)
 		}
 	}
 	return cancelledRuns
@@ -883,23 +914,40 @@ func (h *Handler) getCancelledRunsForWorker(ctx context.Context, stats *coordina
 
 // isTaskCancelled checks if a task has been marked for cancellation.
 func (h *Handler) isTaskCancelled(ctx context.Context, task *coordinatorv1.RunningTask) bool {
-	h.attemptsMu.RLock()
-	cachedAttempt, ok := h.openAttempts[task.DagRunId]
-	h.attemptsMu.RUnlock()
-
-	if ok {
-		aborting, err := cachedAttempt.IsAborting(ctx)
-		return err == nil && aborting
-	}
-
-	ref := exec.DAGRunRef{Name: task.DagName, ID: task.DagRunId}
-	attempt, err := h.dagRunStore.FindAttempt(ctx, ref)
-	if err != nil {
+	if task == nil {
 		return false
 	}
 
+	attempt, runStatus, err := h.resolveLatestAttemptForRunningTask(ctx, task)
+	if err != nil {
+		if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
+			return true
+		}
+		logger.Warn(ctx, "Failed to resolve latest attempt while checking cancellation",
+			tag.RunID(task.DagRunId),
+			tag.AttemptKey(task.AttemptKey),
+			tag.Error(err),
+		)
+		return false
+	}
+
+	if task.AttemptKey != "" && runStatus.AttemptKey != "" && runStatus.AttemptKey != task.AttemptKey {
+		return true
+	}
+	if isTerminalRunStatus(runStatus.Status) {
+		return true
+	}
+
 	aborting, err := attempt.IsAborting(ctx)
-	return err == nil && aborting
+	if err != nil {
+		logger.Warn(ctx, "Failed to check abort state while checking cancellation",
+			tag.RunID(task.DagRunId),
+			tag.AttemptKey(task.AttemptKey),
+			tag.Error(err),
+		)
+		return false
+	}
+	return aborting
 }
 
 // ReportStatus receives status updates from workers and persists them.
@@ -928,26 +976,39 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 		dagRunStatus.LeaseAt = time.Now().UnixMilli()
 	}
 
-	// Get or create an open attempt for this dag run
-	// Check if this is a sub-DAG (has root that differs from self)
-	var attempt exec.DAGRunAttempt
-	var err error
-
-	isSubDAG := dagRunStatus.Root.ID != "" && dagRunStatus.Root.ID != dagRunStatus.DAGRunID
-	if isSubDAG {
-		attempt, err = h.getOrOpenSubAttempt(ctx, dagRunStatus.Root, dagRunStatus.DAGRunID)
-	} else {
-		attempt, err = h.getOrOpenAttempt(ctx, dagRunStatus.Name, dagRunStatus.DAGRunID)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get/open attempt: "+err.Error())
-	}
-
 	// Acquire per-run mutex to serialize with markRunFailed
 	runMu := h.getRunMutex(dagRunStatus.DAGRunID)
 	runMu.Lock()
 	defer runMu.Unlock()
+
+	latestAttempt, latestStatus, err := h.resolveLatestAttempt(ctx, dagRunStatus.Name, dagRunStatus.DAGRunID, dagRunStatus.Root)
+	if err != nil {
+		if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
+			h.logRejectedRemoteStatusUpdate(ctx, req.WorkerId, dagRunStatus, nil, remoteAttemptRejectedLeaseInactive)
+			return &coordinatorv1.ReportStatusResponse{
+				Accepted: false,
+				Error:    remoteAttemptRejectedLeaseInactive,
+			}, nil
+		}
+		return nil, status.Error(codes.Internal, "failed to resolve latest attempt: "+err.Error())
+	}
+
+	accepted, noop, rejectReason := h.remoteStatusDecision(ctx, latestStatus, dagRunStatus)
+	if !accepted {
+		h.logRejectedRemoteStatusUpdate(ctx, req.WorkerId, dagRunStatus, latestStatus, rejectReason)
+		return &coordinatorv1.ReportStatusResponse{
+			Accepted: false,
+			Error:    rejectReason,
+		}, nil
+	}
+	if noop {
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	attempt, err := h.replaceOpenAttempt(ctx, dagRunStatus.DAGRunID, latestAttempt, latestStatus.AttemptID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get/open latest attempt: "+err.Error())
+	}
 
 	// Write the status
 	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
@@ -966,6 +1027,85 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	// code paths. Attempts are cleaned up during coordinator shutdown.
 
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+}
+
+func isTerminalRunStatus(status core.Status) bool {
+	return status != core.NotStarted && !status.IsActive()
+}
+
+func sameAttemptStatus(current, incoming *exec.DAGRunStatus) bool {
+	if current == nil || incoming == nil {
+		return false
+	}
+	if current.AttemptID == "" && current.AttemptKey == "" {
+		return true
+	}
+	if current.AttemptID != "" && incoming.AttemptID != "" && current.AttemptID != incoming.AttemptID {
+		return false
+	}
+	if current.AttemptKey != "" && incoming.AttemptKey != "" && current.AttemptKey != incoming.AttemptKey {
+		return false
+	}
+	if current.AttemptID != "" && incoming.AttemptID != "" {
+		return true
+	}
+	return current.AttemptKey != "" && current.AttemptKey == incoming.AttemptKey
+}
+
+func (h *Handler) remoteStatusDecision(ctx context.Context, latest, incoming *exec.DAGRunStatus) (accepted bool, noop bool, rejectionReason string) {
+	if latest == nil || incoming == nil {
+		return false, false, remoteAttemptRejectedLeaseInactive
+	}
+	if !sameAttemptStatus(latest, incoming) {
+		return false, false, remoteAttemptRejectedSuperseded
+	}
+	if !isTerminalRunStatus(latest.Status) {
+		return true, false, ""
+	}
+	if latest.Status == incoming.Status {
+		return true, true, ""
+	}
+	if h.isLeaseInactive(ctx, latest.AttemptKey) && (incoming.Status.IsActive() || incoming.Status == core.NotStarted) {
+		return false, false, remoteAttemptRejectedLeaseInactive
+	}
+	return false, false, remoteAttemptRejectedTerminal
+}
+
+func (h *Handler) isLeaseInactive(ctx context.Context, attemptKey string) bool {
+	if h.dagRunLeaseStore == nil || attemptKey == "" {
+		return false
+	}
+	_, err := h.dagRunLeaseStore.Get(ctx, attemptKey)
+	return errors.Is(err, exec.ErrDAGRunLeaseNotFound)
+}
+
+func (h *Handler) logRejectedRemoteStatusUpdate(
+	ctx context.Context,
+	workerID string,
+	incoming *exec.DAGRunStatus,
+	latest *exec.DAGRunStatus,
+	reason string,
+) {
+	attrs := []slog.Attr{
+		tag.WorkerID(workerID),
+		slog.String("reason", reason),
+	}
+	if incoming != nil {
+		attrs = append(attrs,
+			tag.RunID(incoming.DAGRunID),
+			tag.AttemptID(incoming.AttemptID),
+			tag.AttemptKey(incoming.AttemptKey),
+			slog.String("reported-status", incoming.Status.String()),
+		)
+	}
+	if latest != nil {
+		attrs = append(attrs,
+			slog.String("latest-attempt-id", latest.AttemptID),
+			slog.String("latest-attempt-key", latest.AttemptKey),
+			slog.String("latest-status", latest.Status.String()),
+		)
+	}
+	logger.Warn(ctx, "Rejected remote status update", attrs...)
 }
 
 // transformLogPaths rewrites worker-local log paths to coordinator paths.
@@ -1129,6 +1269,80 @@ func (h *Handler) getOrOpenAttempt(ctx context.Context, dagName, dagRunID string
 	return h.getOrOpenAttemptWithFinder(ctx, dagRunID, func() (exec.DAGRunAttempt, error) {
 		return h.dagRunStore.FindAttempt(ctx, ref)
 	})
+}
+
+func (h *Handler) resolveLatestAttempt(
+	ctx context.Context,
+	dagName, dagRunID string,
+	rootRef exec.DAGRunRef,
+) (exec.DAGRunAttempt, *exec.DAGRunStatus, error) {
+	if h.dagRunStore == nil {
+		return nil, nil, exec.ErrDAGRunIDNotFound
+	}
+
+	var (
+		attempt exec.DAGRunAttempt
+		err     error
+	)
+	if rootRef.ID != "" && rootRef.ID != dagRunID {
+		if rootRef.Name == "" {
+			return nil, nil, fmt.Errorf("missing root dag run name for sub-dag %s", dagRunID)
+		}
+		attempt, err = h.dagRunStore.FindSubAttempt(ctx, rootRef, dagRunID)
+	} else {
+		attempt, err = h.dagRunStore.FindAttempt(ctx, exec.DAGRunRef{Name: dagName, ID: dagRunID})
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	runStatus, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return attempt, runStatus, nil
+}
+
+func (h *Handler) resolveLatestAttemptForRunningTask(ctx context.Context, task *coordinatorv1.RunningTask) (exec.DAGRunAttempt, *exec.DAGRunStatus, error) {
+	rootRef := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	return h.resolveLatestAttempt(ctx, task.DagName, task.DagRunId, rootRef)
+}
+
+func (h *Handler) replaceOpenAttempt(
+	ctx context.Context,
+	cacheKey string,
+	latestAttempt exec.DAGRunAttempt,
+	expectedAttemptID string,
+) (exec.DAGRunAttempt, error) {
+	h.attemptsMu.Lock()
+	cachedAttempt, ok := h.openAttempts[cacheKey]
+	if ok && cachedAttempt.ID() == expectedAttemptID {
+		h.attemptsMu.Unlock()
+		return cachedAttempt, nil
+	}
+	if ok {
+		delete(h.openAttempts, cacheKey)
+	}
+	h.attemptsMu.Unlock()
+
+	if ok {
+		if err := cachedAttempt.Close(ctx); err != nil {
+			logger.Warn(ctx, "Failed to close stale cached attempt",
+				tag.RunID(cacheKey),
+				tag.AttemptID(cachedAttempt.ID()),
+				tag.Error(err),
+			)
+		}
+	}
+
+	if err := latestAttempt.Open(ctx); err != nil {
+		return nil, err
+	}
+
+	h.attemptsMu.Lock()
+	defer h.attemptsMu.Unlock()
+	h.openAttempts[cacheKey] = latestAttempt
+	return latestAttempt, nil
 }
 
 // getOrOpenSubAttempt retrieves an open sub-attempt from cache or opens a new one.

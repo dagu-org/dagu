@@ -286,25 +286,46 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 	taskCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	runningTask := &coordinatorv1.RunningTask{
+		DagRunId:         task.DagRunId,
+		DagName:          task.Target,
+		StartedAt:        time.Now().Unix(),
+		RootDagRunName:   task.RootDagRunName,
+		RootDagRunId:     task.RootDagRunId,
+		ParentDagRunName: task.ParentDagRunName,
+		ParentDagRunId:   task.ParentDagRunId,
+		AttemptKey:       attemptKey,
+	}
+
 	// Mark task as running and register cancel function
 	t.worker.pollersMu.Lock()
 	t.worker.runningTasks[attemptKey] = &runningTaskState{
-		task: &coordinatorv1.RunningTask{
-			DagRunId:         task.DagRunId,
-			DagName:          task.Target,
-			StartedAt:        time.Now().Unix(),
-			RootDagRunName:   task.RootDagRunName,
-			RootDagRunId:     task.RootDagRunId,
-			ParentDagRunName: task.ParentDagRunName,
-			ParentDagRunId:   task.ParentDagRunId,
-			AttemptKey:       attemptKey,
-		},
+		task:                 runningTask,
 		owner:                owner,
 		lastOwnerHeartbeatAt: time.Now().UTC(),
 	}
 	t.worker.pollerTasks[pollerID] = attemptKey
 	t.worker.cancelFuncs[attemptKey] = cancel
 	t.worker.pollersMu.Unlock()
+
+	if task.AttemptKey != "" && owner.Host != "" {
+		cancelled, heartbeatErr := t.worker.validateClaimedTask(taskCtx, owner, runningTask)
+		if heartbeatErr != nil {
+			logger.Warn(taskCtx, "Failed to validate claimed task with owner coordinator before execution",
+				tag.WorkerID(t.worker.id),
+				tag.RunID(task.DagRunId),
+				tag.AttemptKey(attemptKey),
+				tag.Error(heartbeatErr),
+			)
+		} else if cancelled {
+			logger.Warn(taskCtx, "Owner coordinator rejected claimed task before execution",
+				tag.WorkerID(t.worker.id),
+				tag.RunID(task.DagRunId),
+				tag.AttemptKey(attemptKey),
+			)
+			return context.Canceled
+		}
+	}
 
 	// Execute the task with cancellable context
 	err = t.handler.Handle(taskCtx, task)
@@ -317,6 +338,36 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 	t.worker.pollersMu.Unlock()
 
 	return err
+}
+
+func (w *Worker) validateClaimedTask(ctx context.Context, owner exec.HostInfo, task *coordinatorv1.RunningTask) (bool, error) {
+	if task == nil || task.AttemptKey == "" || owner.Host == "" {
+		return false, nil
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	resp, err := w.coordinatorCli.RunHeartbeatTo(callCtx, owner, &coordinatorv1.RunHeartbeatRequest{
+		WorkerId:           w.id,
+		OwnerCoordinatorId: owner.ID,
+		RunningTasks:       []*coordinatorv1.RunningTask{task},
+	})
+	cancel()
+	if err != nil {
+		return false, err
+	}
+
+	w.markOwnerHeartbeatSuccess([]*coordinatorv1.RunningTask{task}, time.Now().UTC())
+	if resp == nil || len(resp.CancelledRuns) == 0 {
+		return false, nil
+	}
+
+	w.processCancellations(ctx, resp.CancelledRuns)
+	for _, cancelled := range resp.CancelledRuns {
+		if cancelled != nil && cancelled.AttemptKey == task.AttemptKey {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // sendHeartbeats sends periodic heartbeats to the coordinator
