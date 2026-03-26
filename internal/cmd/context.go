@@ -235,13 +235,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
 	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
-	drm := runtime.NewManager(
-		drs,
-		ps,
-		cfg,
-		runtime.WithDAGRunLeaseStore(dagRunLeaseStore),
-		runtime.WithLeaseStaleThreshold(exec.DefaultStaleLeaseThreshold),
-	)
+	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
@@ -443,13 +437,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		filedagrun.WithLocation(c.Config.Core.Location),
 		filedagrun.WithHistoryFileCache(statusCache),
 	)
-	schedulerRunMgr := runtime.NewManager(
-		schedulerRunStore,
-		c.ProcStore,
-		c.Config,
-		runtime.WithDAGRunLeaseStore(c.DAGRunLeaseStore),
-		runtime.WithLeaseStaleThreshold(exec.DefaultStaleLeaseThreshold),
-	)
+	schedulerRunMgr := runtime.NewManager(schedulerRunStore, c.ProcStore, c.Config)
 
 	sched, err := scheduler.New(c.Config, m, schedulerRunMgr, schedulerRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 	if err != nil {

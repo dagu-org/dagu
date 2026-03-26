@@ -65,13 +65,7 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 	qs := filequeue.New(helper.Config.Paths.QueueDir)
 
 	// Create DAG run manager
-	drm := runtime.NewManager(
-		drs,
-		ps,
-		helper.Config,
-		runtime.WithDAGRunLeaseStore(helper.DAGRunLeaseStore),
-		runtime.WithLeaseStaleThreshold(exec.DefaultStaleLeaseThreshold),
-	)
+	drm := runtime.NewManager(drs, ps, helper.Config)
 
 	// Create entry reader
 	coordinatorCli := coordinator.New(helper.ServiceRegistry, coordinator.DefaultConfig())
