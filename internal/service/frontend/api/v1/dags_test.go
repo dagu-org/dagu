@@ -564,4 +564,57 @@ steps:
 			return s == api.Status(core.Queued) || s == api.Status(core.Running) || s == api.Status(core.Succeeded)
 		}, 5*time.Second, 250*time.Millisecond, "expected DAG-run to reach queued state")
 	})
+
+	t.Run("HistoryGridDataUsesExecutionOrder", func(t *testing.T) {
+		spec := `
+type: graph
+steps:
+  - name: c_leaf
+    command: echo c
+  - name: a_root
+    command: echo a
+  - name: b_mid
+    command: echo b
+    depends: [a_root]
+`
+		dagName := "test_history_execution_order"
+
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+		t.Cleanup(func() {
+			_ = server.Client().Delete("/api/v1/dags/" + dagName).Send(t)
+		})
+
+		resp := server.Client().Post("/api/v1/dags/"+dagName+"/start", api.ExecuteDAGJSONRequestBody{}).
+			ExpectStatus(http.StatusOK).Send(t)
+		var execResp api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &execResp)
+		require.NotEmpty(t, execResp.DagRunId)
+
+		require.Eventually(t, func() bool {
+			var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+			if !getJSONWhenAvailable(t, server, fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId), &dagRunStatus) {
+				return false
+			}
+			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+		}, 10*time.Second, 500*time.Millisecond, "expected DAG to complete")
+
+		resp = server.Client().Get("/api/v1/dags/" + dagName + "/dag-runs").
+			ExpectStatus(http.StatusOK).Send(t)
+		var history api.GetDAGDAGRunHistory200JSONResponse
+		resp.Unmarshal(t, &history)
+
+		pos := make(map[string]int, len(history.GridData))
+		for i, item := range history.GridData {
+			pos[item.Name] = i
+		}
+
+		require.Contains(t, pos, "c_leaf")
+		require.Contains(t, pos, "a_root")
+		require.Contains(t, pos, "b_mid")
+		require.Less(t, pos["c_leaf"], pos["a_root"])
+		require.Less(t, pos["a_root"], pos["b_mid"])
+	})
 }
