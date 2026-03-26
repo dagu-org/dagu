@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import fetchJson from '@/lib/fetchJson';
+import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/ui/LoadingIndicator';
 
 declare const getConfig: () => { apiURL: string };
@@ -43,7 +44,13 @@ type AutomataDetail = {
     description?: string;
     purpose: string;
     goal: string;
-    stages: string[];
+    stages: {
+      name: string;
+      allowedDAGs?: {
+        names?: string[];
+        tags?: string[];
+      };
+    }[];
     disabled?: boolean;
   };
   state: {
@@ -51,6 +58,12 @@ type AutomataDetail = {
     instruction?: string;
     currentStage?: string;
     waitingReason?: string;
+    pendingStageTransition?: {
+      requestedStage: string;
+      note?: string;
+      requestedBy?: string;
+      createdAt?: string;
+    };
     pendingPrompt?: {
       id: string;
       question: string;
@@ -94,9 +107,180 @@ type AutomataDetail = {
 };
 
 const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
-const DEFAULT_STAGE_LINES = ['research', 'plan', 'implement', 'review'].join(
-  '\n'
-);
+const DEFAULT_STAGE_NAMES = ['research', 'plan', 'implement', 'review'];
+
+type DAGOption = {
+  fileName: string;
+  name: string;
+};
+
+type StageDraft = {
+  id: string;
+  name: string;
+  allowedDAGNames: string[];
+};
+
+function makeDraftID(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function createDefaultStageDrafts(): StageDraft[] {
+  return DEFAULT_STAGE_NAMES.map((name) => ({
+    id: makeDraftID(),
+    name,
+    allowedDAGNames: [],
+  }));
+}
+
+function DAGNameMultiSelect({
+  availableDAGs,
+  selectedNames,
+  onChange,
+  disabled,
+}: {
+  availableDAGs: DAGOption[];
+  selectedNames: string[];
+  onChange: (names: string[]) => void;
+  disabled?: boolean;
+}): React.ReactElement {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const selectedNameSet = React.useMemo(
+    () => new Set(selectedNames),
+    [selectedNames]
+  );
+
+  const filteredDAGs = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return availableDAGs;
+    }
+    return availableDAGs.filter(
+      (dag) =>
+        dag.fileName.toLowerCase().includes(query) ||
+        dag.name.toLowerCase().includes(query)
+    );
+  }, [availableDAGs, searchQuery]);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent): void {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      inputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  const toggleSelection = (fileName: string) => {
+    if (selectedNameSet.has(fileName)) {
+      onChange(selectedNames.filter((name) => name !== fileName));
+      return;
+    }
+    onChange([...selectedNames, fileName]);
+  };
+
+  return (
+    <div className="relative space-y-2" ref={dropdownRef}>
+      <div className="flex flex-wrap gap-1">
+        {selectedNames.length ? (
+          selectedNames.map((dagName) => (
+            <span
+              key={dagName}
+              className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
+            >
+              <span className="max-w-[180px] truncate">{dagName}</span>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange(selectedNames.filter((name) => name !== dagName))
+                }
+                disabled={disabled}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                x
+              </button>
+            </span>
+          ))
+        ) : (
+          <div className="text-xs text-muted-foreground">
+            No DAGs selected for this stage.
+          </div>
+        )}
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setIsOpen((open) => !open)}
+        disabled={disabled}
+      >
+        Select DAGs
+      </Button>
+
+      {isOpen ? (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
+          <div className="border-b p-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search DAGs..."
+              className="w-full rounded border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {filteredDAGs.length ? (
+              filteredDAGs.map((dag) => {
+                const selected = selectedNameSet.has(dag.fileName);
+                return (
+                  <button
+                    key={dag.fileName}
+                    type="button"
+                    onClick={() => toggleSelection(dag.fileName)}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-accent',
+                      selected && 'bg-accent'
+                    )}
+                  >
+                    <span className="truncate">
+                      {dag.fileName}
+                      {dag.name && dag.name !== dag.fileName
+                        ? ` (${dag.name})`
+                        : ''}
+                    </span>
+                    {selected ? (
+                      <span className="text-primary">Selected</span>
+                    ) : null}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                {searchQuery ? 'No DAGs found.' : 'No DAGs available.'}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 async function sendJSON(
   path: string,
@@ -126,13 +310,6 @@ async function sendJSON(
   }
 }
 
-function parseLineList(value: string): string[] {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 function quoteYAML(value: string): string {
   return JSON.stringify(value.trim());
 }
@@ -141,35 +318,44 @@ function buildAutomataSpec(input: {
   description: string;
   purpose: string;
   goal: string;
-  stageLines: string;
-  allowedDAGLines: string;
+  stages: StageDraft[];
 }): string {
-  const stages = parseLineList(input.stageLines);
-  const allowedDAGs = parseLineList(input.allowedDAGLines);
-  return [
+  const lines = [
     `description: ${quoteYAML(input.description || 'Automata workflow')}`,
     `purpose: ${quoteYAML(input.purpose)}`,
     `goal: ${quoteYAML(input.goal)}`,
     '',
     'stages:',
-    ...stages.map((stage) => `  - ${quoteYAML(stage)}`),
-    '',
-    'allowedDAGs:',
-    '  names:',
-    ...allowedDAGs.map((dagName) => `    - ${quoteYAML(dagName)}`),
-    '',
-    'agent:',
-    '  safeMode: true',
-    '',
-  ].join('\n');
+  ];
+
+  input.stages.forEach((stage) => {
+    const stageName = stage.name.trim();
+    const allowedDAGNames = Array.from(
+      new Set(stage.allowedDAGNames.map((name) => name.trim()).filter(Boolean))
+    );
+    lines.push(`  - name: ${quoteYAML(stageName)}`);
+    if (allowedDAGNames.length) {
+      lines.push('    allowedDAGs:');
+      lines.push('      names:');
+      allowedDAGNames.forEach((dagName) => {
+        lines.push(`        - ${quoteYAML(dagName)}`);
+      });
+    }
+  });
+
+  lines.push('');
+  lines.push('agent:');
+  lines.push('  safeMode: true');
+  lines.push('');
+
+  return lines.join('\n');
 }
 
 function validateAutomataCreateForm(input: {
   name: string;
   purpose: string;
   goal: string;
-  stageLines: string;
-  allowedDAGLines: string;
+  stages: StageDraft[];
 }): string | null {
   const name = input.name.trim();
   if (!name) {
@@ -184,11 +370,24 @@ function validateAutomataCreateForm(input: {
   if (!input.goal.trim()) {
     return 'Goal is required.';
   }
-  if (parseLineList(input.stageLines).length === 0) {
+  if (input.stages.length === 0) {
     return 'At least one stage is required.';
   }
-  if (parseLineList(input.allowedDAGLines).length === 0) {
-    return 'At least one allowed DAG name is required.';
+  const seenStageNames = new Set<string>();
+  let totalAllowedDAGs = 0;
+  for (const stage of input.stages) {
+    const trimmedName = stage.name.trim();
+    if (!trimmedName) {
+      return 'Every stage needs a name.';
+    }
+    if (seenStageNames.has(trimmedName)) {
+      return `Duplicate stage name: ${trimmedName}`;
+    }
+    seenStageNames.add(trimmedName);
+    totalAllowedDAGs += stage.allowedDAGNames.length;
+  }
+  if (totalAllowedDAGs === 0) {
+    return 'Select at least one DAG across the stage list.';
   }
   return null;
 }
@@ -218,8 +417,9 @@ function AutomataPage(): React.ReactElement {
   const [createDescription, setCreateDescription] = React.useState('');
   const [createPurpose, setCreatePurpose] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
-  const [createStages, setCreateStages] = React.useState(DEFAULT_STAGE_LINES);
-  const [createAllowedDAGs, setCreateAllowedDAGs] = React.useState('');
+  const [createStages, setCreateStages] = React.useState<StageDraft[]>(
+    createDefaultStageDrafts()
+  );
   const [createError, setCreateError] = React.useState('');
   const [isCreating, setIsCreating] = React.useState(false);
 
@@ -246,6 +446,18 @@ function AutomataPage(): React.ReactElement {
     { refreshInterval: 15000 }
   );
 
+  const dagListQuery = useSWR<{
+    dags: { fileName: string; dag: { name: string } }[];
+  }>(
+    `/dags?perPage=500${
+      appBar.selectedRemoteNode
+        ? `&remoteNode=${encodeURIComponent(appBar.selectedRemoteNode)}`
+        : ''
+    }`,
+    fetchJson,
+    { refreshInterval: 15000 }
+  );
+
   const detailQuery = useSWR<AutomataDetail>(
     name ? `/automata/${encodeURIComponent(name)}` : null,
     fetchJson,
@@ -266,6 +478,16 @@ function AutomataPage(): React.ReactElement {
   );
 
   const detail = detailQuery.data;
+  const availableDAGOptions = React.useMemo<DAGOption[]>(() => {
+    return (dagListQuery.data?.dags || []).map((dag) => ({
+      fileName: dag.fileName,
+      name: dag.dag?.name || dag.fileName,
+    }));
+  }, [dagListQuery.data?.dags]);
+  const stageNames = React.useMemo(
+    () => detail?.definition.stages.map((stage) => stage.name) || [],
+    [detail?.definition.stages]
+  );
   const lifecycleState = detail?.state?.state ?? '';
   const canStartTask =
     lifecycleState === 'idle' || lifecycleState === 'finished';
@@ -282,14 +504,18 @@ function AutomataPage(): React.ReactElement {
   );
 
   React.useEffect(() => {
-    if (detail?.definition?.stages?.length && !stageOverride) {
-      const initialStage =
-        detail.state?.currentStage ?? detail.definition.stages[0] ?? '';
-      if (initialStage) {
-        setStageOverride(initialStage);
-      }
+    if (!stageNames.length) {
+      return;
     }
-  }, [detail?.definition?.stages, detail?.state?.currentStage, stageOverride]);
+    const currentStage = detail?.state?.currentStage;
+    if (currentStage && currentStage !== stageOverride) {
+      setStageOverride(currentStage);
+      return;
+    }
+    if (!stageOverride || !stageNames.includes(stageOverride)) {
+      setStageOverride(stageNames[0]);
+    }
+  }, [detail?.state?.currentStage, stageNames, stageOverride]);
 
   React.useEffect(() => {
     setInstructionDraft(detail?.state?.instruction || '');
@@ -306,6 +532,11 @@ function AutomataPage(): React.ReactElement {
   }, [isEditingSpec, specQuery.data?.spec]);
 
   React.useEffect(() => {
+    setSelectedOptions([]);
+    setFreeTextResponse('');
+  }, [detail?.state?.pendingPrompt?.id, name]);
+
+  React.useEffect(() => {
     setIsEditingSpec(false);
     setSpecError('');
   }, [name]);
@@ -315,8 +546,7 @@ function AutomataPage(): React.ReactElement {
     setCreateDescription('');
     setCreatePurpose('');
     setCreateGoal('');
-    setCreateStages(DEFAULT_STAGE_LINES);
-    setCreateAllowedDAGs('');
+    setCreateStages(createDefaultStageDrafts());
     setCreateError('');
     setIsCreating(false);
   };
@@ -339,8 +569,7 @@ function AutomataPage(): React.ReactElement {
       name: createName,
       purpose: createPurpose,
       goal: createGoal,
-      stageLines: createStages,
-      allowedDAGLines: createAllowedDAGs,
+      stages: createStages,
     });
     if (validationError) {
       setCreateError(validationError);
@@ -360,8 +589,7 @@ function AutomataPage(): React.ReactElement {
             description: createDescription,
             purpose: createPurpose,
             goal: createGoal,
-            stageLines: createStages,
-            allowedDAGLines: createAllowedDAGs,
+            stages: createStages,
           }),
         }
       );
@@ -375,6 +603,28 @@ function AutomataPage(): React.ReactElement {
       );
       setIsCreating(false);
     }
+  };
+
+  const updateCreateStage = (
+    stageID: string,
+    updater: (stage: StageDraft) => StageDraft
+  ) => {
+    setCreateStages((prev) =>
+      prev.map((stage) => (stage.id === stageID ? updater(stage) : stage))
+    );
+  };
+
+  const addCreateStage = () => {
+    setCreateStages((prev) => [
+      ...prev,
+      { id: makeDraftID(), name: '', allowedDAGNames: [] },
+    ]);
+  };
+
+  const removeCreateStage = (stageID: string) => {
+    setCreateStages((prev) =>
+      prev.length === 1 ? prev : prev.filter((stage) => stage.id !== stageID)
+    );
   };
 
   const onStart = async () => {
@@ -407,14 +657,17 @@ function AutomataPage(): React.ReactElement {
     }
   };
 
-  const onRespond = async () => {
+  const submitHumanResponse = async (
+    selectedOptionIds: string[],
+    freeText: string
+  ) => {
     if (!name || !detail?.state?.pendingPrompt) return;
     setError('');
     try {
       await sendJSON(`/automata/${encodeURIComponent(name)}/response`, 'POST', {
         promptId: detail.state.pendingPrompt.id,
-        selectedOptionIds: selectedOptions,
-        freeTextResponse,
+        selectedOptionIds,
+        freeTextResponse: freeText,
       });
       setSelectedOptions([]);
       setFreeTextResponse('');
@@ -423,6 +676,14 @@ function AutomataPage(): React.ReactElement {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to respond');
     }
+  };
+
+  const onRespond = async () => {
+    await submitHumanResponse(selectedOptions, freeTextResponse);
+  };
+
+  const onRespondStageTransition = async (decision: string) => {
+    await submitHumanResponse([decision], '');
   };
 
   const onSendOperatorMessage = async () => {
@@ -556,35 +817,89 @@ function AutomataPage(): React.ReactElement {
               />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="automata-stages">Stages</Label>
-                <Textarea
-                  id="automata-stages"
-                  value={createStages}
-                  onChange={(e) => setCreateStages(e.target.value)}
-                  className="min-h-40 font-mono text-sm"
-                  placeholder={'research\nplan\nimplement\nreview'}
-                  disabled={isCreating}
-                />
-                <div className="text-xs text-muted-foreground">
-                  One stage per line.
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <Label>Stages</Label>
+                  <div className="text-xs text-muted-foreground">
+                    Each stage has its own allowlisted DAG set.
+                  </div>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addCreateStage}
+                  disabled={isCreating}
+                >
+                  Add Stage
+                </Button>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="automata-dags">Allowed DAG Names</Label>
-                <Textarea
-                  id="automata-dags"
-                  value={createAllowedDAGs}
-                  onChange={(e) => setCreateAllowedDAGs(e.target.value)}
-                  className="min-h-40 font-mono text-sm"
-                  placeholder={'build-app\nrun-tests'}
-                  disabled={isCreating}
-                />
-                <div className="text-xs text-muted-foreground">
-                  One DAG name per line. Names must already exist.
-                </div>
+              <div className="space-y-3">
+                {createStages.map((stage, index) => (
+                  <div key={stage.id} className="rounded-lg border p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="text-sm font-medium">
+                        Stage {index + 1}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeCreateStage(stage.id)}
+                        disabled={isCreating || createStages.length === 1}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+                      <div className="grid gap-2">
+                        <Label htmlFor={`automata-stage-name-${stage.id}`}>
+                          Stage Name
+                        </Label>
+                        <Input
+                          id={`automata-stage-name-${stage.id}`}
+                          value={stage.name}
+                          onChange={(e) =>
+                            updateCreateStage(stage.id, (current) => ({
+                              ...current,
+                              name: e.target.value,
+                            }))
+                          }
+                          placeholder="research"
+                          disabled={isCreating}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>DAG Selection</Label>
+                        <DAGNameMultiSelect
+                          availableDAGs={availableDAGOptions}
+                          selectedNames={stage.allowedDAGNames}
+                          onChange={(names) =>
+                            updateCreateStage(stage.id, (current) => ({
+                              ...current,
+                              allowedDAGNames: names,
+                            }))
+                          }
+                          disabled={isCreating}
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Select the DAGs this Automata can run while it is in
+                          the {stage.name.trim() || `stage ${index + 1}`} stage.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                {dagListQuery.isLoading
+                  ? 'Loading DAGs for selection...'
+                  : 'The dropdown only lists DAGs already available on this node.'}
               </div>
             </div>
 
@@ -857,8 +1172,8 @@ function AutomataPage(): React.ReactElement {
                       onChange={(e) => setStageOverride(e.target.value)}
                     >
                       {detail.definition.stages.map((stage) => (
-                        <option key={stage} value={stage}>
-                          {stage}
+                        <option key={stage.name} value={stage.name}>
+                          {stage.name}
                         </option>
                       ))}
                     </select>
@@ -870,6 +1185,10 @@ function AutomataPage(): React.ReactElement {
                     <Button variant="outline" onClick={onOverrideStage}>
                       Update Stage
                     </Button>
+                    <div className="text-xs text-muted-foreground">
+                      This is an immediate operator override. Agent-requested
+                      stage changes go through approval.
+                    </div>
                   </div>
                 </div>
 
@@ -912,11 +1231,47 @@ function AutomataPage(): React.ReactElement {
               {detail.state.pendingPrompt ? (
                 <div className="rounded-lg border border-amber-400/40 bg-amber-50/50 p-4 dark:bg-amber-950/20">
                   <h2 className="mb-2 text-sm font-semibold">
-                    Waiting For Human Input
+                    {detail.state.pendingStageTransition
+                      ? 'Stage Change Approval'
+                      : 'Waiting For Human Input'}
                   </h2>
-                  <p className="mb-3 text-sm">
-                    {detail.state.pendingPrompt.question}
-                  </p>
+                  {detail.state.pendingStageTransition ? (
+                    <div className="mb-3 space-y-2 text-sm">
+                      <p>{detail.state.pendingPrompt.question}</p>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div className="rounded-md border bg-background/70 p-3">
+                          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Current Stage
+                          </div>
+                          <div className="mt-1 font-medium">
+                            {detail.state.currentStage || 'n/a'}
+                          </div>
+                        </div>
+                        <div className="rounded-md border bg-background/70 p-3">
+                          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Requested Stage
+                          </div>
+                          <div className="mt-1 font-medium">
+                            {detail.state.pendingStageTransition.requestedStage}
+                          </div>
+                        </div>
+                      </div>
+                      {detail.state.pendingStageTransition.note ? (
+                        <div className="rounded-md border bg-background/70 p-3">
+                          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Agent Note
+                          </div>
+                          <div className="mt-1 whitespace-pre-wrap">
+                            {detail.state.pendingStageTransition.note}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mb-3 text-sm">
+                      {detail.state.pendingPrompt.question}
+                    </p>
+                  )}
                   <div className="space-y-2">
                     {detail.state.state === 'paused' ? (
                       <div className="rounded-md border border-slate-300/60 bg-slate-100/70 px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
@@ -924,77 +1279,154 @@ function AutomataPage(): React.ReactElement {
                         paused until you resume it.
                       </div>
                     ) : null}
-                    {(detail.state.pendingPrompt.options || []).map(
-                      (option) => {
-                        const selected = selectedOptions.includes(option.id);
-                        return (
-                          <label
-                            key={option.id}
-                            className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={(e) => {
-                                setSelectedOptions((prev) =>
-                                  e.target.checked
-                                    ? [...prev, option.id]
-                                    : prev.filter((id) => id !== option.id)
-                                );
-                              }}
-                            />
-                            <span>
-                              <span className="font-medium">
-                                {option.label}
-                              </span>
-                              {option.description ? (
-                                <span className="block text-xs text-muted-foreground">
-                                  {option.description}
+                    {detail.state.pendingStageTransition ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => onRespondStageTransition('approve')}
+                        >
+                          Approve Stage Change
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => onRespondStageTransition('reject')}
+                        >
+                          Reject Stage Change
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        {(detail.state.pendingPrompt.options || []).map(
+                          (option) => {
+                            const selected = selectedOptions.includes(
+                              option.id
+                            );
+                            return (
+                              <label
+                                key={option.id}
+                                className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={(e) => {
+                                    setSelectedOptions((prev) =>
+                                      e.target.checked
+                                        ? [...prev, option.id]
+                                        : prev.filter((id) => id !== option.id)
+                                    );
+                                  }}
+                                />
+                                <span>
+                                  <span className="font-medium">
+                                    {option.label}
+                                  </span>
+                                  {option.description ? (
+                                    <span className="block text-xs text-muted-foreground">
+                                      {option.description}
+                                    </span>
+                                  ) : null}
                                 </span>
-                              ) : null}
-                            </span>
-                          </label>
-                        );
-                      }
+                              </label>
+                            );
+                          }
+                        )}
+                        {detail.state.pendingPrompt.allowFreeText ? (
+                          <Textarea
+                            value={freeTextResponse}
+                            onChange={(e) =>
+                              setFreeTextResponse(e.target.value)
+                            }
+                            placeholder={
+                              detail.state.pendingPrompt.freeTextPlaceholder ||
+                              'Enter response'
+                            }
+                          />
+                        ) : null}
+                        <Button onClick={onRespond}>Submit Response</Button>
+                      </>
                     )}
-                    {detail.state.pendingPrompt.allowFreeText ? (
-                      <Textarea
-                        value={freeTextResponse}
-                        onChange={(e) => setFreeTextResponse(e.target.value)}
-                        placeholder={
-                          detail.state.pendingPrompt.freeTextPlaceholder ||
-                          'Enter response'
-                        }
-                      />
-                    ) : null}
-                    <Button onClick={onRespond}>Submit Response</Button>
                   </div>
                 </div>
               ) : null}
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="rounded-lg border p-4">
-                  <h2 className="mb-3 text-sm font-semibold">Allowed DAGs</h2>
+                  <h2 className="mb-3 text-sm font-semibold">
+                    Current Stage DAGs
+                  </h2>
                   <div className="space-y-2 text-sm">
-                    {detail.allowedDags.map((dag) => (
-                      <div key={dag.name} className="rounded-md border p-2">
-                        <div className="font-medium">{dag.name}</div>
-                        {dag.description ? (
-                          <div className="text-xs text-muted-foreground">
-                            {dag.description}
-                          </div>
-                        ) : null}
-                        {dag.tags?.length ? (
-                          <div className="mt-1 text-[11px] text-muted-foreground">
-                            {dag.tags.join(', ')}
-                          </div>
-                        ) : null}
+                    {detail.allowedDags.length ? (
+                      detail.allowedDags.map((dag) => (
+                        <div key={dag.name} className="rounded-md border p-2">
+                          <div className="font-medium">{dag.name}</div>
+                          {dag.description ? (
+                            <div className="text-xs text-muted-foreground">
+                              {dag.description}
+                            </div>
+                          ) : null}
+                          {dag.tags?.length ? (
+                            <div className="mt-1 text-[11px] text-muted-foreground">
+                              {dag.tags.join(', ')}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-md border border-dashed p-3 text-muted-foreground">
+                        No DAGs are assigned to the current stage.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
 
                 <div className="rounded-lg border p-4">
+                  <h2 className="mb-3 text-sm font-semibold">
+                    Stage DAG Mapping
+                  </h2>
+                  <div className="space-y-3 text-sm">
+                    {detail.definition.stages.map((stage) => {
+                      const allowedNames = stage.allowedDAGs?.names || [];
+                      const allowedTags = stage.allowedDAGs?.tags || [];
+                      const isCurrentStage =
+                        stage.name === detail.state.currentStage;
+                      return (
+                        <div
+                          key={stage.name}
+                          className={cn(
+                            'rounded-md border p-3',
+                            isCurrentStage && 'border-primary bg-primary/5'
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="font-medium">{stage.name}</div>
+                            {isCurrentStage ? (
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                current
+                              </span>
+                            ) : null}
+                          </div>
+                          {allowedNames.length ? (
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              DAGs: {allowedNames.join(', ')}
+                            </div>
+                          ) : null}
+                          {allowedTags.length ? (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Tags: {allowedTags.join(', ')}
+                            </div>
+                          ) : null}
+                          {!allowedNames.length && !allowedTags.length ? (
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              No DAGs assigned to this stage.
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4 lg:col-span-2">
                   <h2 className="mb-3 text-sm font-semibold">Current Run</h2>
                   {detail.currentRun ? (
                     <div className="space-y-2 text-sm">

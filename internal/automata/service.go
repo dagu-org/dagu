@@ -34,6 +34,11 @@ import (
 var automataNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 
 const (
+	stageApprovalOptionApprove = "approve"
+	stageApprovalOptionReject  = "reject"
+)
+
+const (
 	definitionFilePerm = 0o600
 	stateFilePerm      = 0o600
 	dirPerm            = 0o750
@@ -218,9 +223,22 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	if len(def.Stages) == 0 {
 		return errors.New("at least one stage is required")
 	}
+	if !def.legacyStringStages && hasAllowedDAGs(def.AllowedDAGs) {
+		return errors.New("top-level allowedDAGs is only supported for legacy string stages")
+	}
+	if def.legacyStringStages {
+		if err := s.normalizeAllowedDAGs(ctx, &def.AllowedDAGs); err != nil {
+			return err
+		}
+		if !hasAllowedDAGs(def.AllowedDAGs) {
+			return errors.New("allowedDAGs.names or allowedDAGs.tags is required")
+		}
+	}
+
 	seenStages := make(map[string]struct{}, len(def.Stages))
-	for i, stage := range def.Stages {
-		stage = strings.TrimSpace(stage)
+	totalAllowed := 0
+	for i := range def.Stages {
+		stage := strings.TrimSpace(def.Stages[i].Name)
 		if stage == "" {
 			return fmt.Errorf("stage %d is empty", i+1)
 		}
@@ -228,26 +246,21 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 			return fmt.Errorf("duplicate stage %q", stage)
 		}
 		seenStages[stage] = struct{}{}
-		def.Stages[i] = stage
-	}
-	if len(def.AllowedDAGs.Names) == 0 && len(def.AllowedDAGs.Tags) == 0 {
-		return errors.New("allowedDAGs.names or allowedDAGs.tags is required")
-	}
-	for i, name := range def.AllowedDAGs.Names {
-		def.AllowedDAGs.Names[i] = strings.TrimSpace(name)
-		if def.AllowedDAGs.Names[i] == "" {
-			return errors.New("allowedDAGs.names contains an empty entry")
+		def.Stages[i].Name = stage
+		if def.legacyStringStages && !hasAllowedDAGs(def.Stages[i].AllowedDAGs) {
+			def.Stages[i].AllowedDAGs = cloneAllowedDAGs(def.AllowedDAGs)
 		}
-		if _, err := s.dagStore.GetMetadata(ctx, def.AllowedDAGs.Names[i]); err != nil {
-			return fmt.Errorf("allowed DAG %q not found: %w", def.AllowedDAGs.Names[i], err)
+		if err := s.normalizeAllowedDAGs(ctx, &def.Stages[i].AllowedDAGs); err != nil {
+			return fmt.Errorf("stage %q: %w", def.Stages[i].Name, err)
 		}
+		allowed, err := s.resolveAllowedDAGSet(ctx, def.Stages[i].AllowedDAGs)
+		if err != nil {
+			return fmt.Errorf("stage %q: %w", def.Stages[i].Name, err)
+		}
+		totalAllowed += len(allowed)
 	}
-	allowed, err := s.resolveAllowedDAGs(ctx, def)
-	if err != nil {
-		return err
-	}
-	if len(allowed) == 0 {
-		return errors.New("definition does not resolve to any allowed DAGs")
+	if totalAllowed == 0 {
+		return errors.New("definition does not resolve to any allowed DAGs across its stages")
 	}
 	return nil
 }
@@ -342,8 +355,8 @@ func (s *Service) ensureState(ctx context.Context, def *Definition) (*State, err
 		}
 		return state, nil
 	}
-	if state.CurrentStage == "" || !slices.Contains(def.Stages, state.CurrentStage) {
-		state.CurrentStage = def.Stages[0]
+	if state.CurrentStage == "" || !slices.Contains(def.StageNames(), state.CurrentStage) {
+		state.CurrentStage = def.Stages[0].Name
 		state.StageChangedAt = s.clock()
 		state.StageChangedBy = "system"
 		if err := s.saveState(ctx, def.Name, state); err != nil {
@@ -393,7 +406,7 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 	if err != nil {
 		return nil, err
 	}
-	allowed, err := s.resolveAllowedDAGs(ctx, def)
+	allowed, err := s.resolveAllowedDAGsForStage(ctx, def, state.CurrentStage)
 	if err != nil {
 		return nil, err
 	}
@@ -416,9 +429,20 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 	}, nil
 }
 
-func (s *Service) resolveAllowedDAGs(ctx context.Context, def *Definition) ([]AllowedDAGInfo, error) {
+func (s *Service) resolveAllowedDAGsForStage(ctx context.Context, def *Definition, stageName string) ([]AllowedDAGInfo, error) {
+	if def == nil {
+		return nil, errors.New("definition is required")
+	}
+	stage := def.StageByName(stageName)
+	if stage == nil {
+		return nil, nil
+	}
+	return s.resolveAllowedDAGSet(ctx, stage.AllowedDAGs)
+}
+
+func (s *Service) resolveAllowedDAGSet(ctx context.Context, allowed AllowedDAGs) ([]AllowedDAGInfo, error) {
 	seen := make(map[string]AllowedDAGInfo)
-	for _, name := range def.AllowedDAGs.Names {
+	for _, name := range allowed.Names {
 		dag, err := s.dagStore.GetMetadata(ctx, name)
 		if err != nil {
 			return nil, err
@@ -429,11 +453,11 @@ func (s *Service) resolveAllowedDAGs(ctx context.Context, def *Definition) ([]Al
 			Tags:        dag.Tags.Strings(),
 		}
 	}
-	if len(def.AllowedDAGs.Tags) > 0 {
+	if len(allowed.Tags) > 0 {
 		pg := exec.NewPaginator(1, math.MaxInt)
 		result, _, err := s.dagStore.List(ctx, exec.ListDAGsOptions{
 			Paginator: &pg,
-			Tags:      def.AllowedDAGs.Tags,
+			Tags:      allowed.Tags,
 		})
 		if err != nil {
 			return nil, err
@@ -596,7 +620,7 @@ func (s *Service) OverrideStage(ctx context.Context, name string, req StageOverr
 	if err != nil {
 		return err
 	}
-	if !slices.Contains(def.Stages, req.Stage) {
+	if !slices.Contains(def.StageNames(), req.Stage) {
 		return fmt.Errorf("unknown stage %q", req.Stage)
 	}
 	state, err := s.ensureState(ctx, def)
@@ -607,6 +631,13 @@ func (s *Service) OverrideStage(ctx context.Context, name string, req StageOverr
 	state.StageNote = req.Note
 	state.StageChangedAt = s.clock()
 	state.StageChangedBy = req.RequestedBy
+	state.PendingStageTransition = nil
+	state.PendingPrompt = nil
+	state.PendingResponse = nil
+	if state.State == StateWaiting {
+		state.State = StateRunning
+		state.WaitingReason = WaitingReasonNone
+	}
 	return s.saveState(ctx, name, state)
 }
 
@@ -624,6 +655,9 @@ func (s *Service) SubmitHumanResponse(ctx context.Context, name string, req Huma
 	}
 	if req.PromptID == "" || req.PromptID != state.PendingPrompt.ID {
 		return errors.New("prompt ID does not match the pending prompt")
+	}
+	if state.PendingStageTransition != nil {
+		return s.applyStageTransitionResponse(ctx, name, state, req)
 	}
 	response := &PromptResponse{
 		PromptID:          req.PromptID,
@@ -686,6 +720,7 @@ func resetTaskState(state *State) {
 	state.WaitingReason = WaitingReasonNone
 	state.PendingPrompt = nil
 	state.PendingResponse = nil
+	state.PendingStageTransition = nil
 	state.PendingTurnMessages = nil
 	state.CurrentRunRef = nil
 	state.LastRunRef = nil
@@ -695,6 +730,132 @@ func resetTaskState(state *State) {
 	state.FinishedAt = time.Time{}
 	state.LastSummary = ""
 	state.LastError = ""
+}
+
+func (s *Service) normalizeAllowedDAGs(ctx context.Context, allowed *AllowedDAGs) error {
+	if allowed == nil {
+		return nil
+	}
+	for i, name := range allowed.Names {
+		allowed.Names[i] = strings.TrimSpace(name)
+		if allowed.Names[i] == "" {
+			return errors.New("allowedDAGs.names contains an empty entry")
+		}
+		if _, err := s.dagStore.GetMetadata(ctx, allowed.Names[i]); err != nil {
+			return fmt.Errorf("allowed DAG %q not found: %w", allowed.Names[i], err)
+		}
+	}
+	for i, tag := range allowed.Tags {
+		allowed.Tags[i] = strings.TrimSpace(tag)
+		if allowed.Tags[i] == "" {
+			return errors.New("allowedDAGs.tags contains an empty entry")
+		}
+	}
+	return nil
+}
+
+func hasAllowedDAGs(allowed AllowedDAGs) bool {
+	return len(allowed.Names) > 0 || len(allowed.Tags) > 0
+}
+
+func cloneAllowedDAGs(allowed AllowedDAGs) AllowedDAGs {
+	return AllowedDAGs{
+		Names: append([]string(nil), allowed.Names...),
+		Tags:  append([]string(nil), allowed.Tags...),
+	}
+}
+
+func (s *Service) applyStageTransitionResponse(ctx context.Context, name string, state *State, req HumanResponseRequest) error {
+	decision, err := parseStageTransitionDecision(req.SelectedOptionIDs)
+	if err != nil {
+		return err
+	}
+	now := s.clock()
+	pending := state.PendingStageTransition
+	if pending == nil {
+		return errors.New("no pending stage transition")
+	}
+	if decision == stageApprovalOptionApprove {
+		state.CurrentStage = pending.RequestedStage
+		state.StageNote = pending.Note
+		state.StageChangedAt = now
+		state.StageChangedBy = "agent (approved)"
+		queueTurnMessage(state, "stage_transition_approved", buildStageTransitionApprovedMessage(pending), now)
+	} else {
+		queueTurnMessage(state, "stage_transition_rejected", buildStageTransitionRejectedMessage(state.CurrentStage, pending), now)
+	}
+	paused := state.State == StatePaused
+	state.PendingStageTransition = nil
+	state.PendingPrompt = nil
+	state.PendingResponse = nil
+	if paused {
+		state.WaitingReason = WaitingReasonNone
+	} else {
+		state.State = StateRunning
+		state.WaitingReason = WaitingReasonNone
+	}
+	return s.saveState(ctx, name, state)
+}
+
+func parseStageTransitionDecision(selected []string) (string, error) {
+	choices := make(map[string]struct{}, len(selected))
+	for _, item := range selected {
+		trimmed := strings.TrimSpace(item)
+		if trimmed != "" {
+			choices[trimmed] = struct{}{}
+		}
+	}
+	_, approve := choices[stageApprovalOptionApprove]
+	_, reject := choices[stageApprovalOptionReject]
+	switch {
+	case approve && reject:
+		return "", errors.New("select either approve or reject for the stage transition")
+	case approve:
+		return stageApprovalOptionApprove, nil
+	case reject:
+		return stageApprovalOptionReject, nil
+	default:
+		return "", errors.New("select approve or reject for the stage transition")
+	}
+}
+
+func buildStageTransitionApprovedMessage(pending *PendingStageTransition) string {
+	if pending == nil {
+		return "The requested stage transition was approved. Continue the automata."
+	}
+	if pending.Note == "" {
+		return fmt.Sprintf(
+			"The requested stage transition was approved. Current stage is now %q. Continue the automata.",
+			pending.RequestedStage,
+		)
+	}
+	return fmt.Sprintf(
+		"The requested stage transition was approved. Current stage is now %q.\nTransition note: %s\nContinue the automata.",
+		pending.RequestedStage,
+		pending.Note,
+	)
+}
+
+func buildStageTransitionRejectedMessage(currentStage string, pending *PendingStageTransition) string {
+	if pending == nil {
+		return fmt.Sprintf(
+			"The requested stage transition was rejected. Remain in stage %q and continue the automata.",
+			currentStage,
+		)
+	}
+	if pending.Note == "" {
+		return fmt.Sprintf(
+			"The requested stage transition to %q was rejected. Remain in stage %q and continue the automata.",
+			pending.RequestedStage,
+			currentStage,
+		)
+	}
+	return fmt.Sprintf(
+		"The requested stage transition to %q was rejected.\nRejected transition note: %s\nRemain in stage %q and continue the automata.",
+		pending.RequestedStage,
+		pending.Note,
+		currentStage,
+	)
 }
 
 func (s *Service) requestChildRunCancel(ctx context.Context, ref *exec.DAGRunRef) error {

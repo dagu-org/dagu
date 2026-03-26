@@ -56,6 +56,30 @@ func TestServiceListInitializesStateAndStage(t *testing.T) {
 	require.Equal(t, "build-app", detail.AllowedDAGs[0].Name)
 }
 
+func TestServiceDetailUsesCurrentStageAllowedDAGs(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpecPerStage()))
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, "research", detail.State.CurrentStage)
+	require.Equal(t, []string{"build-app"}, allowedDAGNames(detail.AllowedDAGs))
+
+	require.NoError(t, svc.OverrideStage(ctx, "software-dev", StageOverrideRequest{
+		Stage:       "implement",
+		RequestedBy: "tester",
+	}))
+
+	detail, err = svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, "implement", detail.State.CurrentStage)
+	require.Equal(t, []string{"run-tests"}, allowedDAGNames(detail.AllowedDAGs))
+}
+
 func TestServiceOverrideStagePersistsDeclaredStage(t *testing.T) {
 	t.Parallel()
 
@@ -91,6 +115,144 @@ func TestServiceOverrideStageRejectsUnknownStage(t *testing.T) {
 	err := svc.OverrideStage(ctx, "software-dev", StageOverrideRequest{Stage: "deploy"})
 	require.Error(t, err)
 	require.ErrorContains(t, err, `unknown stage "deploy"`)
+}
+
+func TestControllerRuntimeSetStageRequestsApproval(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpecPerStage()))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	err = rt.SetStage(ctx, "implement", "planning is complete")
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, "research", detail.State.CurrentStage)
+	require.Equal(t, StateWaiting, detail.State.State)
+	require.Equal(t, WaitingReasonHuman, detail.State.WaitingReason)
+	require.NotNil(t, detail.State.PendingPrompt)
+	require.NotNil(t, detail.State.PendingStageTransition)
+	require.Equal(t, "implement", detail.State.PendingStageTransition.RequestedStage)
+	require.Equal(t, "planning is complete", detail.State.PendingStageTransition.Note)
+	require.Equal(t, "agent", detail.State.PendingStageTransition.RequestedBy)
+	require.Equal(t, fixedTime, detail.State.PendingStageTransition.CreatedAt)
+	require.Len(t, detail.State.PendingPrompt.Options, 2)
+}
+
+func TestServiceSubmitHumanResponseApprovesStageTransition(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpecPerStage()))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	require.NoError(t, rt.SetStage(ctx, "implement", "ready to code"))
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.NotNil(t, detail.State.PendingPrompt)
+
+	err = svc.SubmitHumanResponse(ctx, "software-dev", HumanResponseRequest{
+		PromptID:          detail.State.PendingPrompt.ID,
+		SelectedOptionIDs: []string{stageApprovalOptionApprove},
+	})
+	require.NoError(t, err)
+
+	detail, err = svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, "implement", detail.State.CurrentStage)
+	require.Equal(t, "agent (approved)", detail.State.StageChangedBy)
+	require.Equal(t, "ready to code", detail.State.StageNote)
+	require.Equal(t, fixedTime, detail.State.StageChangedAt)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.Nil(t, detail.State.PendingPrompt)
+	require.Nil(t, detail.State.PendingStageTransition)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "stage_transition_approved", detail.State.PendingTurnMessages[0].Kind)
+	require.Equal(t, []string{"run-tests"}, allowedDAGNames(detail.AllowedDAGs))
+}
+
+func TestServiceSubmitHumanResponseRejectsStageTransition(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpecPerStage()))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	require.NoError(t, rt.SetStage(ctx, "implement", "ready to code"))
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.NotNil(t, detail.State.PendingPrompt)
+
+	err = svc.SubmitHumanResponse(ctx, "software-dev", HumanResponseRequest{
+		PromptID:          detail.State.PendingPrompt.ID,
+		SelectedOptionIDs: []string{stageApprovalOptionReject},
+	})
+	require.NoError(t, err)
+
+	detail, err = svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, "research", detail.State.CurrentStage)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.Nil(t, detail.State.PendingPrompt)
+	require.Nil(t, detail.State.PendingStageTransition)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "stage_transition_rejected", detail.State.PendingTurnMessages[0].Kind)
+	require.Equal(t, []string{"build-app"}, allowedDAGNames(detail.AllowedDAGs))
+}
+
+func TestServiceOverrideStageClearsPendingStageTransition(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpecPerStage()))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	require.NoError(t, rt.SetStage(ctx, "implement", "ready to code"))
+
+	err = svc.OverrideStage(ctx, "software-dev", StageOverrideRequest{
+		Stage:       "plan",
+		RequestedBy: "tester",
+		Note:        "manual correction",
+	})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, "plan", detail.State.CurrentStage)
+	require.Equal(t, "tester", detail.State.StageChangedBy)
+	require.Equal(t, "manual correction", detail.State.StageNote)
+	require.Equal(t, fixedTime, detail.State.StageChangedAt)
+	require.Nil(t, detail.State.PendingPrompt)
+	require.Nil(t, detail.State.PendingStageTransition)
+	require.Equal(t, StateRunning, detail.State.State)
 }
 
 func TestServiceRequestStartRequiresInstruction(t *testing.T) {
@@ -456,6 +618,11 @@ func newTestService(t *testing.T) (*Service, time.Time) {
 		[]byte(testDAGYAML("build-app")),
 		0o600,
 	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dagsDir, "run-tests.yaml"),
+		[]byte(testDAGYAML("run-tests")),
+		0o600,
+	))
 
 	cfg := &config.Config{
 		Core: config.Core{
@@ -504,6 +671,31 @@ allowedDAGs:
   names:
     - ` + allowedDAG + `
 `
+}
+
+func automataSpecPerStage() string {
+	return `description: Software development automata
+purpose: Ship one development task
+goal: Complete the assigned software work
+stages:
+  - name: research
+    allowedDAGs:
+      names:
+        - build-app
+  - name: plan
+  - name: implement
+    allowedDAGs:
+      names:
+        - run-tests
+`
+}
+
+func allowedDAGNames(items []AllowedDAGInfo) []string {
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		names = append(names, item.Name)
+	}
+	return names
 }
 
 func testDAGYAML(name string) string {
