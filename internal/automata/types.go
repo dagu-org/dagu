@@ -215,6 +215,15 @@ type StartRequest struct {
 	Instruction string `json:"instruction,omitempty"`
 }
 
+type RenameRequest struct {
+	NewName     string `json:"newName"`
+	RequestedBy string `json:"requestedBy,omitempty"`
+}
+
+type DuplicateRequest struct {
+	NewName string `json:"newName"`
+}
+
 type StageOverrideRequest struct {
 	Stage       string `json:"stage"`
 	RequestedBy string `json:"requestedBy,omitempty"`

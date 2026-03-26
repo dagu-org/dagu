@@ -73,6 +73,10 @@ type coordinatorCanceler interface {
 	RequestCancel(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error
 }
 
+type sessionUserReassigner interface {
+	ReassignSessionUser(ctx context.Context, sessionID, userID string) error
+}
+
 func WithAgentAPI(api *agent.API) Option {
 	return func(s *Service) {
 		s.agentAPI = api
@@ -335,11 +339,117 @@ func (s *Service) Delete(ctx context.Context, name string) error {
 	if err := validateName(name); err != nil {
 		return err
 	}
+	if err := s.cleanupRuntime(ctx, name, true); err != nil {
+		return err
+	}
 	if err := os.Remove(filepath.Clean(s.definitionPath(name))); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	_ = os.RemoveAll(filepath.Join(s.stateDir, name))
 	return nil
+}
+
+func (s *Service) Rename(ctx context.Context, name string, req RenameRequest) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	newName := strings.TrimSpace(req.NewName)
+	if err := validateName(newName); err != nil {
+		return err
+	}
+	if name == newName {
+		return errors.New("new automata name must be different")
+	}
+	if err := s.assertAutomataTargetAvailable(newName); err != nil {
+		return err
+	}
+
+	spec, err := s.GetSpec(ctx, name)
+	if err != nil {
+		return err
+	}
+	state, err := s.loadState(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	if err := fileutil.WriteFileAtomic(s.definitionPath(newName), []byte(spec), definitionFilePerm); err != nil {
+		return err
+	}
+
+	rollbackNewSpec := true
+	defer func() {
+		if rollbackNewSpec {
+			_ = os.Remove(filepath.Clean(s.definitionPath(newName)))
+		}
+	}()
+
+	if state != nil && state.SessionID != "" {
+		if err := s.cancelAutomataSession(ctx, name, state.SessionID); err != nil {
+			return err
+		}
+		if err := s.reassignSessionUser(ctx, state.SessionID, newName); err != nil {
+			return err
+		}
+	}
+
+	oldStateDir := filepath.Join(s.stateDir, name)
+	newStateDir := filepath.Join(s.stateDir, newName)
+	movedState := false
+	if _, err := os.Stat(oldStateDir); err == nil {
+		if err := os.Rename(oldStateDir, newStateDir); err != nil {
+			return err
+		}
+		movedState = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	if err := os.Remove(filepath.Clean(s.definitionPath(name))); err != nil {
+		if movedState {
+			_ = os.Rename(newStateDir, oldStateDir)
+		}
+		return err
+	}
+
+	rollbackNewSpec = false
+	return nil
+}
+
+func (s *Service) Duplicate(ctx context.Context, name string, req DuplicateRequest) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	newName := strings.TrimSpace(req.NewName)
+	if err := validateName(newName); err != nil {
+		return err
+	}
+	if name == newName {
+		return errors.New("duplicate automata name must be different")
+	}
+	spec, err := s.GetSpec(ctx, name)
+	if err != nil {
+		return err
+	}
+	if err := s.assertAutomataTargetAvailable(newName); err != nil {
+		return err
+	}
+	return s.PutSpec(ctx, newName, spec)
+}
+
+func (s *Service) ResetState(ctx context.Context, name string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	def, err := s.GetDefinition(ctx, name)
+	if err != nil {
+		return err
+	}
+	if err := s.cleanupRuntime(ctx, name, true); err != nil {
+		return err
+	}
+	state := newInitialState(def)
+	return s.saveState(ctx, name, state)
 }
 
 func (s *Service) ensureState(ctx context.Context, def *Definition) (*State, error) {
@@ -366,6 +476,77 @@ func (s *Service) ensureState(ctx context.Context, def *Definition) (*State, err
 		state.State = StateIdle
 	}
 	return state, nil
+}
+
+func (s *Service) cleanupRuntime(ctx context.Context, name string, deleteSession bool) error {
+	state, err := s.loadState(ctx, name)
+	if err != nil || state == nil {
+		return err
+	}
+	if err := s.cancelTrackedChildRun(ctx, state.CurrentRunRef); err != nil {
+		return err
+	}
+	if err := s.cancelAutomataSession(ctx, name, state.SessionID); err != nil {
+		return err
+	}
+	if deleteSession && state.SessionID != "" && s.sessionStore != nil {
+		if err := s.sessionStore.DeleteSession(ctx, state.SessionID); err != nil && !errors.Is(err, agent.ErrSessionNotFound) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) cancelTrackedChildRun(ctx context.Context, ref *exec.DAGRunRef) error {
+	if ref == nil {
+		return nil
+	}
+	status, err := s.lookupRunStatus(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if status == nil {
+		return nil
+	}
+	if !status.Status.IsActive() && !status.Status.IsWaiting() {
+		return nil
+	}
+	return s.requestChildRunCancel(ctx, ref)
+}
+
+func (s *Service) cancelAutomataSession(ctx context.Context, name, sessionID string) error {
+	if sessionID == "" || s.agentAPI == nil {
+		return nil
+	}
+	err := s.agentAPI.CancelSession(ctx, sessionID, s.systemUser(name).UserID)
+	if err == nil || errors.Is(err, agent.ErrSessionNotFound) {
+		return nil
+	}
+	return err
+}
+
+func (s *Service) reassignSessionUser(ctx context.Context, sessionID, newName string) error {
+	if sessionID == "" || s.sessionStore == nil {
+		return nil
+	}
+	if reassigner, ok := s.sessionStore.(sessionUserReassigner); ok {
+		return reassigner.ReassignSessionUser(ctx, sessionID, s.systemUser(newName).UserID)
+	}
+	return errors.New("session store does not support automata rename with transcript preservation")
+}
+
+func (s *Service) assertAutomataTargetAvailable(name string) error {
+	if _, err := os.Stat(filepath.Clean(s.definitionPath(name))); err == nil {
+		return fmt.Errorf("automata %q already exists", name)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(s.stateDir, name)); err == nil {
+		return fmt.Errorf("automata %q already has existing runtime state", name)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) List(ctx context.Context) ([]Summary, error) {

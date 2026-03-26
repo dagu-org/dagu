@@ -429,6 +429,118 @@ func TestServiceSubmitOperatorMessageWhileBlockedAppendsToSession(t *testing.T) 
 	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "latest user message")
 }
 
+func TestServiceDuplicateCreatesFreshIdleAutomata(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpec("build-app")))
+	require.NoError(t, svc.RequestStart(ctx, "software-dev", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle the current assigned task.",
+	}))
+
+	err := svc.Duplicate(ctx, "software-dev", DuplicateRequest{NewName: "software-dev-copy"})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software-dev-copy")
+	require.NoError(t, err)
+	require.Equal(t, StateIdle, detail.State.State)
+	require.Empty(t, detail.State.Instruction)
+	require.Equal(t, "research", detail.State.CurrentStage)
+	require.Empty(t, detail.Messages)
+}
+
+func TestServiceRenamePreservesStoredSession(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateRunning
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-rename"
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.sessionStore.AddMessage(ctx, state.SessionID, &agent.Message{
+		ID:         "msg-1",
+		SessionID:  state.SessionID,
+		Type:       agent.MessageTypeUser,
+		SequenceID: 1,
+		Content:    "Operator update from tester:\nFocus on the regression first.",
+		CreatedAt:  fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	err = svc.Rename(ctx, "software-dev", RenameRequest{NewName: "engineer-1"})
+	require.NoError(t, err)
+
+	_, err = svc.GetDefinition(ctx, "software-dev")
+	require.ErrorIs(t, err, exec.ErrDAGNotFound)
+
+	detail, err := svc.Detail(ctx, "engineer-1")
+	require.NoError(t, err)
+	require.Equal(t, "sess-rename", detail.State.SessionID)
+	require.Len(t, detail.Messages, 1)
+	require.Contains(t, detail.Messages[0].Content, "Focus on the regression first.")
+
+	sess, err := svc.sessionStore.GetSession(ctx, "sess-rename")
+	require.NoError(t, err)
+	require.Equal(t, svc.systemUser("engineer-1").UserID, sess.UserID)
+}
+
+func TestServiceResetStateClearsRuntimeAndSession(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StatePaused
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-reset"
+	state.CurrentStage = "implement"
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	err = svc.ResetState(ctx, "software-dev")
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, StateIdle, detail.State.State)
+	require.Empty(t, detail.State.Instruction)
+	require.Empty(t, detail.State.SessionID)
+	require.Equal(t, "research", detail.State.CurrentStage)
+	require.Empty(t, detail.Messages)
+
+	_, err = svc.sessionStore.GetSession(ctx, "sess-reset")
+	require.ErrorIs(t, err, agent.ErrSessionNotFound)
+}
+
 func TestServicePauseAndResumeTask(t *testing.T) {
 	t.Parallel()
 

@@ -27,7 +27,10 @@ func (a *API) configureAutomataRoutes(r chi.Router) {
 		r.Get("/{name}", a.handleGetAutomata)
 		r.Get("/{name}/spec", a.handleGetAutomataSpec)
 		r.Put("/{name}/spec", a.handlePutAutomataSpec)
+		r.Post("/{name}/rename", a.handleRenameAutomata)
+		r.Post("/{name}/duplicate", a.handleDuplicateAutomata)
 		r.Delete("/{name}", a.handleDeleteAutomata)
+		r.Post("/{name}/reset", a.handleResetAutomata)
 		r.Post("/{name}/start", a.handleStartAutomata)
 		r.Post("/{name}/pause", a.handlePauseAutomata)
 		r.Post("/{name}/resume", a.handleResumeAutomata)
@@ -98,6 +101,67 @@ func (a *API) handleDeleteAutomata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.logAudit(r.Context(), audit.CategoryAutomata, "delete", map[string]any{"name": name})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) handleRenameAutomata(w http.ResponseWriter, r *http.Request) {
+	if err := a.requireDAGWrite(r.Context()); err != nil {
+		WriteErrorResponse(w, err)
+		return
+	}
+	name := chi.URLParam(r, "name")
+	var body automata.RenameRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
+		return
+	}
+	if user, ok := auth.UserFromContext(r.Context()); ok && user != nil {
+		body.RequestedBy = user.Username
+	}
+	if err := a.automataService.Rename(r.Context(), name, body); err != nil {
+		writeAutomataError(w, err)
+		return
+	}
+	a.logAudit(r.Context(), audit.CategoryAutomata, "rename", map[string]any{
+		"name":     name,
+		"new_name": body.NewName,
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) handleDuplicateAutomata(w http.ResponseWriter, r *http.Request) {
+	if err := a.requireDAGWrite(r.Context()); err != nil {
+		WriteErrorResponse(w, err)
+		return
+	}
+	name := chi.URLParam(r, "name")
+	var body automata.DuplicateRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		WriteErrorResponse(w, NewAPIError(http.StatusBadRequest, apiv1.ErrorCodeBadRequest, err))
+		return
+	}
+	if err := a.automataService.Duplicate(r.Context(), name, body); err != nil {
+		writeAutomataError(w, err)
+		return
+	}
+	a.logAudit(r.Context(), audit.CategoryAutomata, "duplicate", map[string]any{
+		"name":     name,
+		"new_name": body.NewName,
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) handleResetAutomata(w http.ResponseWriter, r *http.Request) {
+	if err := a.requireExecute(r.Context()); err != nil {
+		WriteErrorResponse(w, err)
+		return
+	}
+	name := chi.URLParam(r, "name")
+	if err := a.automataService.ResetState(r.Context(), name); err != nil {
+		writeAutomataError(w, err)
+		return
+	}
+	a.logAudit(r.Context(), audit.CategoryAutomata, "reset", map[string]any{"name": name})
 	w.WriteHeader(http.StatusNoContent)
 }
 

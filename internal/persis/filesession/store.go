@@ -368,6 +368,58 @@ func (s *Store) UpdateSession(_ context.Context, sess *agent.Session) error {
 	return nil
 }
 
+// ReassignSessionUser moves a stored session under a different user ID while
+// preserving the session ID and message history.
+func (s *Store) ReassignSessionUser(_ context.Context, sessionID, newUserID string) error {
+	if sessionID == "" {
+		return agent.ErrInvalidSessionID
+	}
+	if newUserID == "" {
+		return agent.ErrInvalidUserID
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	filePath, exists := s.byID[sessionID]
+	if !exists {
+		return agent.ErrSessionNotFound
+	}
+
+	stored, err := s.loadSessionFromFile(filePath)
+	if err != nil {
+		return fmt.Errorf("filesession: failed to load existing session: %w", err)
+	}
+	if stored.UserID == newUserID {
+		return nil
+	}
+
+	newUserDir := s.userDirPath(newUserID)
+	if err := os.MkdirAll(newUserDir, sessionDirPermissions); err != nil {
+		return fmt.Errorf("filesession: failed to create user directory %s: %w", newUserDir, err)
+	}
+
+	oldUserID := stored.UserID
+	oldFilePath := filePath
+	newFilePath := s.sessionFilePath(newUserID, sessionID)
+	stored.UserID = newUserID
+
+	if err := s.writeSessionToFile(newFilePath, stored); err != nil {
+		return err
+	}
+	if err := os.Remove(oldFilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("filesession: failed to delete old session file: %w", err)
+	}
+
+	s.byID[sessionID] = newFilePath
+	s.removeSessionFromUserIndex(sessionID, oldUserID)
+	s.byUser[newUserID] = append(s.byUser[newUserID], sessionID)
+	s.sortUserSessions(oldUserID)
+	s.sortUserSessions(newUserID)
+
+	return nil
+}
+
 // DeleteSession removes a session and all its messages.
 func (s *Store) DeleteSession(_ context.Context, id string) error {
 	if id == "" {

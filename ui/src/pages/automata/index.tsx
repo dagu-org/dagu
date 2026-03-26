@@ -493,6 +493,9 @@ function AutomataPage(): React.ReactElement {
   );
   const [createError, setCreateError] = React.useState('');
   const [isCreating, setIsCreating] = React.useState(false);
+  const [managementBusy, setManagementBusy] = React.useState<string | null>(
+    null
+  );
 
   const [instructionDraft, setInstructionDraft] = React.useState('');
   const [operatorMessageDraft, setOperatorMessageDraft] = React.useState('');
@@ -829,6 +832,101 @@ function AutomataPage(): React.ReactElement {
     }
   };
 
+  const onRename = async () => {
+    if (!name || !detail || managementBusy) return;
+    const nextName = window.prompt(
+      'Enter the new Automata name.',
+      detail.definition.name
+    );
+    if (nextName == null) return;
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === detail.definition.name) return;
+    setError('');
+    setManagementBusy('rename');
+    try {
+      await sendJSON(`/automata/${encodeURIComponent(name)}/rename`, 'POST', {
+        newName: trimmed,
+      });
+      await listQuery.mutate();
+      navigate(`/automata/${encodeURIComponent(trimmed)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename automata');
+    } finally {
+      setManagementBusy(null);
+    }
+  };
+
+  const onDuplicate = async () => {
+    if (!name || !detail || managementBusy) return;
+    const nextName = window.prompt(
+      'Enter the new name for the duplicate Automata.',
+      `${detail.definition.name}-copy`
+    );
+    if (nextName == null) return;
+    const trimmed = nextName.trim();
+    if (!trimmed) return;
+    setError('');
+    setManagementBusy('duplicate');
+    try {
+      await sendJSON(`/automata/${encodeURIComponent(name)}/duplicate`, 'POST', {
+        newName: trimmed,
+      });
+      await listQuery.mutate();
+      navigate(`/automata/${encodeURIComponent(trimmed)}`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to duplicate automata'
+      );
+    } finally {
+      setManagementBusy(null);
+    }
+  };
+
+  const onResetState = async () => {
+    if (!name || managementBusy) return;
+    if (
+      !window.confirm(
+        'Reset this Automata state? This clears the active task, session transcript binding, and tracked runtime state.'
+      )
+    ) {
+      return;
+    }
+    setError('');
+    setManagementBusy('reset');
+    try {
+      await sendJSON(`/automata/${encodeURIComponent(name)}/reset`, 'POST');
+      await Promise.all([detailQuery.mutate(), listQuery.mutate()]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to reset automata state'
+      );
+    } finally {
+      setManagementBusy(null);
+    }
+  };
+
+  const onDelete = async () => {
+    if (!name || managementBusy) return;
+    if (
+      !window.confirm(
+        'Delete this Automata? This removes the definition and runtime state.'
+      )
+    ) {
+      return;
+    }
+    setError('');
+    setManagementBusy('delete');
+    try {
+      await sendJSON(`/automata/${encodeURIComponent(name)}`, 'DELETE');
+      await listQuery.mutate();
+      navigate('/automata');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete automata');
+    } finally {
+      setManagementBusy(null);
+    }
+  };
+
   const onSaveSpec = async () => {
     if (!name) return;
     setSpecError('');
@@ -1118,8 +1216,45 @@ function AutomataPage(): React.ReactElement {
                   ) : null}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onDuplicate}
+                    disabled={!!managementBusy}
+                  >
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onRename}
+                    disabled={!!managementBusy}
+                  >
+                    Rename
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onResetState}
+                    disabled={!!managementBusy}
+                  >
+                    Reset State
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onDelete}
+                    disabled={!!managementBusy}
+                  >
+                    Delete
+                  </Button>
                   {canPause || canResume ? (
-                    <Button variant="outline" size="sm" onClick={onPauseResume}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onPauseResume}
+                      disabled={!!managementBusy}
+                    >
                       {canResume ? 'Resume' : 'Pause'}
                     </Button>
                   ) : null}
