@@ -4533,6 +4533,7 @@ export interface components {
             name: string;
             description?: string;
             goal: string;
+            tags?: string[];
             stages: components["schemas"]["AutomataStageDefinition"][];
             agent?: components["schemas"]["AutomataAgentConfig"];
             disabled?: boolean;
@@ -4636,6 +4637,7 @@ export interface components {
             name: string;
             description?: string;
             goal: string;
+            tags?: string[];
             instruction?: string;
             state: components["schemas"]["AutomataLifecycleState"];
             stage?: string;

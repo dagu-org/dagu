@@ -216,6 +216,9 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 		return errors.New("definition is required")
 	}
 	def.normalizeGoal()
+	if err := normalizeTags(&def.Tags); err != nil {
+		return err
+	}
 	if err := validateName(def.Name); err != nil {
 		return err
 	}
@@ -565,6 +568,7 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			Description:   def.Description,
 			Purpose:       def.Purpose,
 			Goal:          def.Goal,
+			Tags:          append([]string(nil), def.Tags...),
 			Instruction:   state.Instruction,
 			State:         state.State,
 			Stage:         state.CurrentStage,
@@ -983,6 +987,18 @@ func cloneAllowedDAGs(allowed AllowedDAGs) AllowedDAGs {
 		Names: append([]string(nil), allowed.Names...),
 		Tags:  append([]string(nil), allowed.Tags...),
 	}
+}
+
+func normalizeTags(tags *[]string) error {
+	if tags == nil {
+		return nil
+	}
+	parsed := core.NewTags(*tags)
+	if err := core.ValidateTags(parsed); err != nil {
+		return fmt.Errorf("invalid tags: %w", err)
+	}
+	*tags = parsed.Strings()
+	return nil
 }
 
 func (s *Service) applyStageTransitionResponse(ctx context.Context, name string, state *State, req HumanResponseRequest) error {

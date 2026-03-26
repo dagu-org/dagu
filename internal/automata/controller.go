@@ -119,6 +119,15 @@ func (s *Service) reconcileDefinition(ctx context.Context, def *Definition) erro
 		return s.saveState(ctx, def.Name, state)
 	}
 
+	// A queued follow-up inside the backing chat session is not enough to keep
+	// the Automata in `running` once this reconcile pass failed to start it.
+	activity := s.inspectSessionActivity(ctx, def.Name, state)
+	if !activity.Working && !activity.HasPendingPrompt {
+		state.State = StateIdle
+		state.WaitingReason = WaitingReasonNone
+		return s.saveState(ctx, def.Name, state)
+	}
+
 	return nil
 }
 
@@ -282,6 +291,38 @@ func (s *Service) flushQueuedSessionTurn(ctx context.Context, name string, state
 		changed = true
 	}
 	return changed, nil
+}
+
+type sessionActivity struct {
+	Working          bool
+	HasPendingPrompt bool
+	HasQueuedInput   bool
+}
+
+func (s *Service) inspectSessionActivity(ctx context.Context, name string, state *State) sessionActivity {
+	if s.agentAPI == nil || state == nil || state.SessionID == "" {
+		return sessionActivity{}
+	}
+	detail, err := s.agentAPI.GetSessionDetail(ctx, state.SessionID, s.systemUser(name).UserID)
+	if err != nil {
+		if errors.Is(err, agent.ErrSessionNotFound) {
+			return sessionActivity{}
+		}
+		s.logger.Warn("failed to inspect automata session state",
+			"automata", name,
+			"session_id", state.SessionID,
+			"error", err,
+		)
+		return sessionActivity{Working: true}
+	}
+	if detail == nil || detail.SessionState == nil {
+		return sessionActivity{}
+	}
+	return sessionActivity{
+		Working:          detail.SessionState.Working,
+		HasPendingPrompt: detail.SessionState.HasPendingPrompt,
+		HasQueuedInput:   detail.SessionState.HasQueuedUserInput,
+	}
 }
 
 func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *State) (*agent.SessionRuntimeOptions, error) {
@@ -462,10 +503,14 @@ func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.Autom
 		r.state.CurrentCycleID = nextCycleID()
 	}
 	runID := fmt.Sprintf("automata-%d", r.service.clock().UnixNano())
-	tagText := strings.Join([]string{
+	tags := []string{
 		fmt.Sprintf("automata=%s", strings.ToLower(r.def.Name)),
 		fmt.Sprintf("automata_cycle=%s", r.state.CurrentCycleID),
-	}, ",")
+	}
+	if len(r.def.Tags) > 0 {
+		tags = append(tags, r.def.Tags...)
+	}
+	tagText := strings.Join(tags, ",")
 	spec := r.service.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
 		Quiet:       true,
 		DAGRunID:    runID,

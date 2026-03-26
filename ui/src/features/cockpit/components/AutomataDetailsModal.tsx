@@ -458,6 +458,21 @@ export function AutomataDetailsModal({
                         <span className="font-medium">Goal:</span>{' '}
                         {data.definition.goal || 'n/a'}
                       </p>
+                      {data.definition.tags?.length ? (
+                        <div>
+                          <span className="font-medium">Tags:</span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {data.definition.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                       <p>
                         <span className="font-medium">Instruction:</span>{' '}
                         {data.state.instruction || 'No active instruction'}

@@ -31,6 +31,17 @@ type StageDraft = {
   allowedDAGNames: string[];
 };
 
+function parseTagInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 function makeDraftID(): string {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -258,14 +269,23 @@ function quoteYAML(value: string): string {
 function buildAutomataSpec(input: {
   description: string;
   goal: string;
+  tags: string[];
   stages: StageDraft[];
 }): string {
   const lines = [
     `description: ${quoteYAML(input.description || 'Automata workflow')}`,
     `goal: ${quoteYAML(input.goal)}`,
-    '',
-    'stages:',
   ];
+
+  if (input.tags.length) {
+    lines.push('tags:');
+    input.tags.forEach((tag) => {
+      lines.push(`  - ${quoteYAML(tag)}`);
+    });
+  }
+
+  lines.push('');
+  lines.push('stages:');
 
   input.stages.forEach((stage) => {
     const stageName = stage.name.trim();
@@ -377,6 +397,7 @@ function AutomataPage(): React.ReactElement {
   const [createName, setCreateName] = React.useState('');
   const [createDescription, setCreateDescription] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
+  const [createTags, setCreateTags] = React.useState('');
   const [createStages, setCreateStages] = React.useState<StageDraft[]>(
     createDefaultStageDrafts()
   );
@@ -541,6 +562,7 @@ function AutomataPage(): React.ReactElement {
     setCreateName('');
     setCreateDescription('');
     setCreateGoal('');
+    setCreateTags('');
     setCreateStages(createDefaultStageDrafts());
     setCreateError('');
     setIsCreating(false);
@@ -581,6 +603,7 @@ function AutomataPage(): React.ReactElement {
           spec: buildAutomataSpec({
             description: createDescription,
             goal: createGoal,
+            tags: parseTagInput(createTags),
             stages: createStages,
           }),
         },
@@ -941,6 +964,18 @@ function AutomataPage(): React.ReactElement {
                         </StatusChip>
                       ) : null}
                     </div>
+                    {item.tags?.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {item.tags.map((tag) => (
+                          <span
+                            key={`${item.name}-${tag}`}
+                            className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -1006,6 +1041,29 @@ function AutomataPage(): React.ReactElement {
                     placeholder="Complete the assigned task and leave it ready for review"
                     disabled={isCreating}
                   />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="automata-tags">Tags</Label>
+                  <Textarea
+                    id="automata-tags"
+                    value={createTags}
+                    onChange={(e) => setCreateTags(e.target.value)}
+                    placeholder={'workspace=engineering, owner=team-ai'}
+                    disabled={isCreating}
+                    rows={2}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Optional. Use comma or newline separated tags such as
+                    <span className="mx-1 font-mono text-foreground">
+                      workspace=engineering
+                    </span>
+                    or
+                    <span className="mx-1 font-mono text-foreground">
+                      owner=team-ai
+                    </span>
+                    .
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -1269,6 +1327,21 @@ function AutomataPage(): React.ReactElement {
                       <span className="font-medium">Goal:</span>{' '}
                       {detail.definition.goal}
                     </p>
+                    {detail.definition.tags?.length ? (
+                      <div>
+                        <span className="font-medium">Tags:</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {detail.definition.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <p>
                       <span className="font-medium">Instruction:</span>{' '}
                       {detail.state.instruction || 'None yet'}

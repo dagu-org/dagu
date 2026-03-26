@@ -48,6 +48,9 @@ func validateDefinitionNode(node *yaml.Node) error {
 		"description": {},
 		"purpose":     {},
 		"goal":        {},
+		"tags": {
+			validate: validateStringListNode,
+		},
 		"stages": {
 			validate: validateStagesNode,
 		},

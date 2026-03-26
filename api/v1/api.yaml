@@ -10648,6 +10648,10 @@ components:
           type: string
         goal:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
         stages:
           type: array
           items:
@@ -10872,6 +10876,10 @@ components:
           type: string
         goal:
           type: string
+        tags:
+          type: array
+          items:
+            type: string
         instruction:
           type: string
         state:

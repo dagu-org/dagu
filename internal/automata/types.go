@@ -103,6 +103,7 @@ type Definition struct {
 	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Purpose     string            `json:"purpose,omitempty" yaml:"purpose,omitempty"`
 	Goal        string            `json:"goal" yaml:"goal"`
+	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Stages      []StageDefinition `json:"stages" yaml:"stages"`
 	Schedule    ScheduleList      `json:"schedule,omitempty" yaml:"schedule,omitempty"`
 	AllowedDAGs AllowedDAGs       `json:"allowedDAGs" yaml:"allowed_dags"`
@@ -193,6 +194,7 @@ type Summary struct {
 	Description   string         `json:"description,omitempty"`
 	Purpose       string         `json:"purpose"`
 	Goal          string         `json:"goal"`
+	Tags          []string       `json:"tags,omitempty"`
 	Instruction   string         `json:"instruction,omitempty"`
 	State         LifecycleState `json:"state"`
 	Stage         string         `json:"stage,omitempty"`
@@ -285,6 +287,7 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 		Description      string       `yaml:"description,omitempty"`
 		Purpose          string       `yaml:"purpose"`
 		Goal             string       `yaml:"goal"`
+		Tags             []string     `yaml:"tags"`
 		Stages           yaml.Node    `yaml:"stages"`
 		Schedule         ScheduleList `yaml:"schedule,omitempty"`
 		AllowedDAGs      AllowedDAGs  `yaml:"allowedDAGs"`
@@ -301,6 +304,7 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	d.Description = raw.Description
 	d.Purpose = strings.TrimSpace(raw.Purpose)
 	d.Goal = strings.TrimSpace(raw.Goal)
+	d.Tags = append([]string(nil), raw.Tags...)
 	d.normalizeGoal()
 	d.Schedule = raw.Schedule
 	d.AllowedDAGs = raw.AllowedDAGsSnake

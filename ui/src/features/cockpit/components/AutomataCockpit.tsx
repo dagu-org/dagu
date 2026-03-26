@@ -127,6 +127,14 @@ function formatTimestamp(value?: string): string {
   return parsed.fromNow();
 }
 
+function workspaceSelectionToTag(selectedWorkspace: string): string | undefined {
+  const safeName = selectedWorkspace
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .trim()
+    .toLowerCase();
+  return safeName ? `workspace=${safeName}` : undefined;
+}
+
 type WorkspaceActivity = {
   count: number;
   latestRun?: DAGRunSummary;
@@ -198,7 +206,7 @@ export function AutomataCockpit({
   });
 
   const workspaceTag = selectedWorkspace
-    ? `workspace=${selectedWorkspace}`
+    ? workspaceSelectionToTag(selectedWorkspace)
     : undefined;
   const {
     data: workspaceRunsData,
@@ -206,7 +214,7 @@ export function AutomataCockpit({
     mutate: retryWorkspaceRuns,
   } = useQuery(
     '/dag-runs',
-    selectedWorkspace
+    selectedWorkspace && workspaceTag
       ? {
           params: {
             query: {
@@ -224,8 +232,17 @@ export function AutomataCockpit({
   );
 
   const automata = React.useMemo(
-    () => automataData?.automata || [],
-    [automataData?.automata]
+    () =>
+      (automataData?.automata || []).filter((item) => {
+        if (selectedWorkspace && !workspaceTag) {
+          return false;
+        }
+        if (!workspaceTag) {
+          return true;
+        }
+        return item.tags?.includes(workspaceTag) ?? false;
+      }),
+    [automataData?.automata, selectedWorkspace, workspaceTag]
   );
 
   const workspaceActivity = React.useMemo(
@@ -298,7 +315,7 @@ export function AutomataCockpit({
           <Title>Automata Cockpit</Title>
           <p className="mt-1 text-sm text-muted-foreground">
             {selectedWorkspace
-              ? `Workspace ${selectedWorkspace} activity overlaid on current Automata lifecycle state.`
+              ? `Showing Automata tagged for workspace ${selectedWorkspace}, with workspace-tagged activity overlaid on their lifecycle state.`
               : 'Idle, running, waiting, paused, and finished Automata across the workspace environment.'}
           </p>
         </div>
@@ -309,9 +326,11 @@ export function AutomataCockpit({
 
       {selectedWorkspace ? (
         <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          Workspace activity is derived from Automata-triggered DAG runs tagged with
-          <span className="mx-1 font-mono text-foreground">{workspaceTag}</span>
-          on
+          Showing Automata tagged with
+          <span className="mx-1 font-mono text-foreground">
+            {workspaceTag || 'workspace=<invalid>'}
+          </span>
+          . Workspace activity is derived from Automata-triggered DAG runs carrying the same tag on
           <span className="mx-1 font-mono text-foreground">{remoteNode}</span>.
           {workspaceAutomataCount > 0 ? (
             <span className="ml-1">
@@ -331,7 +350,9 @@ export function AutomataCockpit({
         </div>
       ) : automata.length === 0 ? (
         <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
-          No Automata defined yet.
+          {selectedWorkspace
+            ? 'No Automata are tagged for the selected workspace.'
+            : 'No Automata defined yet.'}
         </div>
       ) : (
         <div className="grid min-h-0 gap-4 xl:grid-cols-5 md:grid-cols-2">
@@ -396,6 +417,14 @@ export function AutomataCockpit({
                                 disabled
                               </span>
                             ) : null}
+                            {item.tags?.map((tag) => (
+                              <span
+                                key={`${item.name}-${tag}`}
+                                className="rounded-full border px-2 py-1 text-muted-foreground"
+                              >
+                                {tag}
+                              </span>
+                            ))}
                             {activity ? (
                               <span className="rounded-full border px-2 py-1 text-foreground">
                                 Workspace runs: {activity.count}

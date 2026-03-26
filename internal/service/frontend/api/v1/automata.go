@@ -331,6 +331,13 @@ func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 		Name:          item.Name,
 		Stage:         ptrOf(item.Stage),
 		State:         api.AutomataLifecycleState(item.State),
+		Tags: func() *[]string {
+			if len(item.Tags) == 0 {
+				return nil
+			}
+			tags := append([]string(nil), item.Tags...)
+			return &tags
+		}(),
 	}
 }
 
@@ -373,6 +380,13 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 		Goal:        def.Goal,
 		Name:        def.Name,
 		Stages:      toAPIAutomataStages(def.Stages),
+		Tags: func() *[]string {
+			if len(def.Tags) == 0 {
+				return nil
+			}
+			tags := append([]string(nil), def.Tags...)
+			return &tags
+		}(),
 	}
 	if agentConfig := toAPIAutomataAgentConfig(def.Agent); agentConfig != nil {
 		resp.Agent = agentConfig

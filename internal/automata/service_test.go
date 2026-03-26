@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
@@ -27,6 +28,64 @@ func init() {
 		Script:           true,
 		Shell:            true,
 	})
+}
+
+type testAgentConfigStore struct {
+	cfg *agent.Config
+}
+
+func (s *testAgentConfigStore) Load(context.Context) (*agent.Config, error) {
+	return s.cfg, nil
+}
+
+func (s *testAgentConfigStore) Save(_ context.Context, cfg *agent.Config) error {
+	s.cfg = cfg
+	return nil
+}
+
+func (s *testAgentConfigStore) IsEnabled(context.Context) bool {
+	return s.cfg != nil && s.cfg.Enabled
+}
+
+type testAgentModelStore struct {
+	models map[string]*agent.ModelConfig
+}
+
+func (s *testAgentModelStore) Create(_ context.Context, model *agent.ModelConfig) error {
+	if s.models == nil {
+		s.models = map[string]*agent.ModelConfig{}
+	}
+	s.models[model.ID] = model
+	return nil
+}
+
+func (s *testAgentModelStore) GetByID(_ context.Context, id string) (*agent.ModelConfig, error) {
+	model, ok := s.models[id]
+	if !ok {
+		return nil, agent.ErrModelNotFound
+	}
+	return model, nil
+}
+
+func (s *testAgentModelStore) List(context.Context) ([]*agent.ModelConfig, error) {
+	out := make([]*agent.ModelConfig, 0, len(s.models))
+	for _, model := range s.models {
+		out = append(out, model)
+	}
+	return out, nil
+}
+
+func (s *testAgentModelStore) Update(_ context.Context, model *agent.ModelConfig) error {
+	if s.models == nil {
+		s.models = map[string]*agent.ModelConfig{}
+	}
+	s.models[model.ID] = model
+	return nil
+}
+
+func (s *testAgentModelStore) Delete(_ context.Context, id string) error {
+	delete(s.models, id)
+	return nil
 }
 
 func TestServiceListInitializesStateAndStage(t *testing.T) {
@@ -100,6 +159,56 @@ allowedDAGs:
 	detail, err := svc.Detail(ctx, "software-dev")
 	require.NoError(t, err)
 	require.Equal(t, "Complete the assigned software work", detail.Definition.Goal)
+}
+
+func TestServicePutSpecNormalizesTagsAndExposesThemInSummary(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+tags:
+  - workspace=Engineering
+  - Owner=Team-AI
+stages:
+  - name: research
+    allowed_dags:
+      names:
+        - build-app
+`
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", spec))
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, []string{"workspace=engineering", "owner=team-ai"}, detail.Definition.Tags)
+
+	items, err := svc.List(ctx)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, []string{"workspace=engineering", "owner=team-ai"}, items[0].Tags)
+}
+
+func TestServicePutSpecRejectsInvalidTags(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+tags:
+  - "bad tag"
+stages:
+  - name: research
+    allowed_dags:
+      names:
+        - build-app
+`
+
+	err := svc.PutSpec(ctx, "software-dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid tags")
 }
 
 func TestServicePutSpecRejectsUnknownTopLevelField(t *testing.T) {
@@ -856,6 +965,63 @@ func TestServiceReconcileOnceDoesNotWakePausedAutomata(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatePaused, detail.State.State)
 	require.Len(t, detail.State.PendingTurnMessages, 1)
+}
+
+func TestServiceReconcileOnceReturnsInactiveRunningAutomataToIdle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+	configStore := &testAgentConfigStore{
+		cfg: &agent.Config{
+			Enabled:        true,
+			DefaultModelID: "local-test",
+		},
+	}
+	modelStore := &testAgentModelStore{
+		models: map[string]*agent.ModelConfig{
+			"local-test": {
+				ID:       "local-test",
+				Name:     "Local Test",
+				Provider: "local",
+				Model:    "local-test",
+				BaseURL:  "http://127.0.0.1:11434/v1",
+			},
+		},
+	}
+	svc.agentAPI = agent.NewAPI(agent.APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   modelStore,
+		SessionStore: svc.sessionStore,
+	})
+
+	require.NoError(t, svc.PutSpec(ctx, "software-dev", automataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software-dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	state.State = StateRunning
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-inactive"
+
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	require.NoError(t, svc.ReconcileOnce(ctx))
+
+	detail, err := svc.Detail(ctx, "software-dev")
+	require.NoError(t, err)
+	require.Equal(t, StateIdle, detail.State.State)
+	require.Equal(t, WaitingReasonNone, detail.State.WaitingReason)
+	require.Equal(t, "Handle the current assigned task.", detail.State.Instruction)
 }
 
 func TestControllerRuntimeRunAllowedDAGRejectsConcurrentRun(t *testing.T) {
