@@ -226,6 +226,15 @@ func (s *Scheduler) SetDAGRunLeaseStore(store exec.DAGRunLeaseStore) {
 	s.queueProcessor.dagRunLeaseStore = store
 }
 
+// SetDispatchTaskStore configures the shared distributed dispatch reservation
+// store used for queue admission and restart-safe deduplication.
+func (s *Scheduler) SetDispatchTaskStore(store exec.DispatchTaskStore) {
+	if s == nil || s.queueProcessor == nil {
+		return
+	}
+	s.queueProcessor.dispatchTaskStore = store
+}
+
 // SetRestartFunc overrides the planner's restart function for testing purposes.
 // This must be called before Start().
 func (s *Scheduler) SetRestartFunc(fn RestartFunc) {

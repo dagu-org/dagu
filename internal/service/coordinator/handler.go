@@ -58,6 +58,16 @@ const (
 	remoteAttemptRejectedTerminal      = "stale attempt: run already terminal"
 )
 
+var (
+	errNoAvailableWorkers = errors.New("no available workers")
+	errNoMatchingWorkers  = errors.New("no workers match the required selector")
+)
+
+type preparedDispatchAttempt struct {
+	attempt      exec.DAGRunAttempt
+	newlyCreated bool
+}
+
 type Handler struct {
 	coordinatorv1.UnimplementedCoordinatorServiceServer
 
@@ -266,48 +276,30 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		slog.String("operation", req.Task.Operation.String()),
 	)
 
-	// Create attempt before dispatching to ensure coordinator has a place to store status updates.
-	// This is done before enqueueing so the run is visible immediately.
-	isRootRun := req.Task.ParentDagRunId == "" &&
-		(req.Task.RootDagRunId == "" || req.Task.RootDagRunId == req.Task.DagRunId)
-
-	runMu := h.getRunMutex(req.Task.DagRunId)
-	runMu.Lock()
-	if isRootRun {
-		// For root-level DAG runs (no parent), create the attempt
-		if err := h.createAttemptForTask(ctx, req.Task); err != nil {
-			logger.Warn(ctx, "Failed to create attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
-			// Don't fail dispatch - the task can still run, status just won't be stored
-		}
-	} else if req.Task.ParentDagRunId != "" {
-		// For sub-DAG runs, create the attempt under the root DAG run
-		if err := h.createSubAttemptForTask(ctx, req.Task); err != nil {
-			logger.Warn(ctx, "Failed to create sub-attempt for task", tag.Error(err), tag.RunID(req.Task.DagRunId))
-			// Don't fail dispatch - the task can still run, status just won't be stored
-		}
-	}
-	h.ensureTaskAttemptMetadata(req.Task)
-	runMu.Unlock()
-
 	if h.dispatchTaskStore == nil {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		for pollerID, worker := range h.waitingPollers {
-			if !matchesSelector(worker.labels, req.Task.WorkerSelector) {
-				continue
-			}
-			select {
-			case worker.taskChan <- req.Task:
-				delete(h.waitingPollers, pollerID)
-				return &coordinatorv1.DispatchResponse{}, nil
-			default:
-				delete(h.waitingPollers, pollerID)
-			}
+		if err := h.ensureWaitingWorkerAvailability(req.Task.WorkerSelector); err != nil {
+			return nil, status.Error(dispatchErrorCode(err), err.Error())
 		}
-		if len(req.Task.WorkerSelector) > 0 {
-			return nil, status.Error(codes.FailedPrecondition, "no workers match the required selector")
+
+		var prepared *preparedDispatchAttempt
+		if h.dagRunStore != nil {
+			var err error
+			prepared, err = h.prepareAttemptForDispatch(ctx, req.Task)
+			if err != nil {
+				return nil, status.Error(codes.Internal, "failed to prepare attempt: "+err.Error())
+			}
+		} else {
+			h.ensureTaskAttemptMetadata(req.Task)
 		}
-		return nil, status.Error(codes.Unavailable, "no available workers")
+
+		if err := h.dispatchToWaitingPoller(req.Task); err != nil {
+			h.markPreparedAttemptDispatchFailed(ctx, req.Task, prepared, err)
+			return nil, status.Error(dispatchErrorCode(err), err.Error())
+		}
+		return &coordinatorv1.DispatchResponse{}, nil
+	}
+	if h.dagRunStore == nil {
+		return nil, status.Error(codes.FailedPrecondition, "distributed dispatch requires DAG run storage")
 	}
 
 	healthyWorkers, err := h.listHealthyWorkers(ctx)
@@ -315,12 +307,18 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 		return nil, status.Error(codes.Internal, "failed to list workers: "+err.Error())
 	}
 	if len(healthyWorkers) == 0 {
-		return nil, status.Error(codes.Unavailable, "no available workers")
+		return nil, status.Error(codes.Unavailable, errNoAvailableWorkers.Error())
 	}
 	if len(req.Task.WorkerSelector) > 0 && !anyWorkerMatches(healthyWorkers, req.Task.WorkerSelector) {
-		return nil, status.Error(codes.FailedPrecondition, "no workers match the required selector")
+		return nil, status.Error(codes.FailedPrecondition, errNoMatchingWorkers.Error())
+	}
+
+	prepared, err := h.prepareAttemptForDispatch(ctx, req.Task)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to prepare attempt: "+err.Error())
 	}
 	if err := h.dispatchTaskStore.Enqueue(ctx, req.Task); err != nil {
+		h.markPreparedAttemptDispatchFailed(ctx, req.Task, prepared, err)
 		return nil, status.Error(codes.Internal, "failed to enqueue task: "+err.Error())
 	}
 	return &coordinatorv1.DispatchResponse{}, nil
@@ -329,14 +327,14 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 // createAttemptForTask creates a DAGRun attempt for a root-level task.
 // This is called when the coordinator receives a dispatch for a root-level DAG run
 // (not a sub-DAG), so it has a place to store status updates from the worker.
-func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.Task) error {
+func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.Task) (*preparedDispatchAttempt, error) {
 	if h.dagRunStore == nil {
-		return nil
+		return nil, nil
 	}
 
 	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
 	if err != nil {
-		return fmt.Errorf("failed to parse DAG definition: %w", err)
+		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
 
 	ref := exec.DAGRunRef{Name: dag.Name, ID: task.DagRunId}
@@ -350,7 +348,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 			task.AttemptKey = generateRootAttemptKey(task)
 
 			if err := existingAttempt.Open(ctx); err != nil {
-				return fmt.Errorf("failed to open existing attempt: %w", err)
+				return nil, fmt.Errorf("failed to open existing attempt: %w", err)
 			}
 
 			h.attemptsMu.Lock()
@@ -363,7 +361,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 				tag.AttemptID(task.AttemptId),
 				tag.AttemptKey(task.AttemptKey),
 			)
-			return nil
+			return &preparedDispatchAttempt{attempt: existingAttempt}, nil
 		}
 	}
 
@@ -373,17 +371,19 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 
 	attempt, err := h.dagRunStore.CreateAttempt(ctx, dag, time.Now(), task.DagRunId, opts)
 	if err != nil {
-		return fmt.Errorf("failed to create attempt: %w", err)
+		return nil, fmt.Errorf("failed to create attempt: %w", err)
 	}
 
 	task.AttemptId = attempt.ID()
 	task.AttemptKey = generateRootAttemptKey(task)
 
 	if err := attempt.Open(ctx); err != nil {
-		return fmt.Errorf("failed to open attempt: %w", err)
+		return nil, fmt.Errorf("failed to open attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, task.ScheduleTime, exec.DAGRunRef{}, dag.Tags.Strings())
+	if err := h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, task.ScheduleTime, exec.DAGRunRef{}, dag.Tags.Strings()); err != nil {
+		return nil, fmt.Errorf("failed to write initial status: %w", err)
+	}
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -396,7 +396,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		tag.AttemptKey(task.AttemptKey),
 	)
 
-	return nil
+	return &preparedDispatchAttempt{attempt: attempt, newlyCreated: true}, nil
 }
 
 // generateRootAttemptKey creates an AttemptKey for root-level tasks (self-referential hierarchy).
@@ -434,21 +434,21 @@ func (h *Handler) ensureTaskAttemptMetadata(task *coordinatorv1.Task) {
 // createSubAttemptForTask creates a sub-DAG attempt under the root DAG run.
 // This is called when the coordinator receives a dispatch for a sub-DAG
 // (dispatched from a parent DAG), so it has a place to store status updates from the worker.
-func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinatorv1.Task) error {
+func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinatorv1.Task) (*preparedDispatchAttempt, error) {
 	if h.dagRunStore == nil {
-		return nil
+		return nil, nil
 	}
 
 	rootRef := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
 
 	attempt, err := h.dagRunStore.CreateSubAttempt(ctx, rootRef, task.DagRunId)
 	if err != nil {
-		return fmt.Errorf("failed to create sub-attempt: %w", err)
+		return nil, fmt.Errorf("failed to create sub-attempt: %w", err)
 	}
 
 	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
 	if err != nil {
-		return fmt.Errorf("failed to parse DAG definition: %w", err)
+		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
 	attempt.SetDAG(dag)
 
@@ -459,10 +459,12 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 	)
 
 	if err := attempt.Open(ctx); err != nil {
-		return fmt.Errorf("failed to open sub-attempt: %w", err)
+		return nil, fmt.Errorf("failed to open sub-attempt: %w", err)
 	}
 
-	h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, task.ScheduleTime, rootRef, dag.Tags.Strings())
+	if err := h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, task.ScheduleTime, rootRef, dag.Tags.Strings()); err != nil {
+		return nil, fmt.Errorf("failed to write initial status: %w", err)
+	}
 
 	h.attemptsMu.Lock()
 	h.openAttempts[task.DagRunId] = attempt
@@ -475,12 +477,12 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		tag.AttemptKey(task.AttemptKey),
 	)
 
-	return nil
+	return &preparedDispatchAttempt{attempt: attempt, newlyCreated: true}, nil
 }
 
 // writeInitialStatus writes an initial NotStarted status to the attempt.
 // This ensures the status file is not empty when read before the worker reports its first status.
-func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID, attemptKey, scheduleTime string, root exec.DAGRunRef, tags []string) {
+func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAttempt, dagName, dagRunID, attemptKey, scheduleTime string, root exec.DAGRunRef, tags []string) error {
 	initialStatus := exec.DAGRunStatus{
 		Name:         dagName,
 		DAGRunID:     dagRunID,
@@ -493,8 +495,128 @@ func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAtt
 		ScheduleTime: scheduleTime,
 	}
 	if err := attempt.Write(ctx, initialStatus); err != nil {
-		logger.Warn(ctx, "Failed to write initial status", tag.Error(err), tag.RunID(dagRunID))
+		return err
 	}
+	return nil
+}
+
+func (h *Handler) prepareAttemptForDispatch(ctx context.Context, task *coordinatorv1.Task) (*preparedDispatchAttempt, error) {
+	if task == nil {
+		return nil, fmt.Errorf("task is required")
+	}
+	if h.dagRunStore == nil {
+		h.ensureTaskAttemptMetadata(task)
+		return nil, nil
+	}
+
+	runMu := h.getRunMutex(task.DagRunId)
+	runMu.Lock()
+	defer runMu.Unlock()
+
+	isRootRun := task.ParentDagRunId == "" &&
+		(task.RootDagRunId == "" || task.RootDagRunId == task.DagRunId)
+	if isRootRun {
+		return h.createAttemptForTask(ctx, task)
+	}
+	if task.ParentDagRunId != "" {
+		return h.createSubAttemptForTask(ctx, task)
+	}
+
+	h.ensureTaskAttemptMetadata(task)
+	return nil, nil
+}
+
+func (h *Handler) ensureWaitingWorkerAvailability(selector map[string]string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	matched := false
+	for _, worker := range h.waitingPollers {
+		if !matchesSelector(worker.labels, selector) {
+			continue
+		}
+		matched = true
+		break
+	}
+	if matched {
+		return nil
+	}
+	if len(selector) > 0 {
+		return errNoMatchingWorkers
+	}
+	return errNoAvailableWorkers
+}
+
+func (h *Handler) dispatchToWaitingPoller(task *coordinatorv1.Task) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	matched := false
+	for pollerID, worker := range h.waitingPollers {
+		if !matchesSelector(worker.labels, task.WorkerSelector) {
+			continue
+		}
+		matched = true
+		select {
+		case worker.taskChan <- task:
+			delete(h.waitingPollers, pollerID)
+			return nil
+		default:
+			delete(h.waitingPollers, pollerID)
+		}
+	}
+	if len(task.WorkerSelector) > 0 && !matched {
+		return errNoMatchingWorkers
+	}
+	return errNoAvailableWorkers
+}
+
+func dispatchErrorCode(err error) codes.Code {
+	switch {
+	case errors.Is(err, errNoMatchingWorkers):
+		return codes.FailedPrecondition
+	default:
+		return codes.Unavailable
+	}
+}
+
+func (h *Handler) markPreparedAttemptDispatchFailed(ctx context.Context, task *coordinatorv1.Task, prepared *preparedDispatchAttempt, dispatchErr error) {
+	if prepared == nil || !prepared.newlyCreated || prepared.attempt == nil {
+		return
+	}
+
+	storeCtx := context.WithoutCancel(ctx)
+	runStatus, err := prepared.attempt.ReadStatus(storeCtx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read prepared attempt after dispatch handoff failure",
+			tag.RunID(task.DagRunId),
+			tag.Error(err),
+		)
+		return
+	}
+	if runStatus == nil {
+		return
+	}
+	if runStatus.Status != core.NotStarted && runStatus.Status != core.Queued {
+		return
+	}
+
+	runStatus.Status = core.Failed
+	runStatus.FinishedAt = stringutil.FormatTime(time.Now())
+	runStatus.Error = fmt.Sprintf("failed to hand off distributed task to a worker: %v", dispatchErr)
+	if err := prepared.attempt.Write(storeCtx, *runStatus); err != nil {
+		logger.Warn(ctx, "Failed to mark prepared attempt as failed after dispatch handoff failure",
+			tag.RunID(task.DagRunId),
+			tag.Error(err),
+		)
+		return
+	}
+
+	logger.Warn(ctx, "Marked prepared distributed attempt as FAILED after dispatch handoff failure",
+		tag.RunID(task.DagRunId),
+		tag.AttemptKey(task.AttemptKey),
+		tag.Error(dispatchErr),
+	)
 }
 
 // GetWorkers returns the list of currently connected workers

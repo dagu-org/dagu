@@ -411,7 +411,7 @@ func TestWorkerDefaultID(t *testing.T) {
 func TestRunningTaskTracking(t *testing.T) {
 	t.Run("TrackRunningTasks", func(t *testing.T) {
 		// Setup test environment
-		coord := test.SetupCoordinator(t)
+		coord := test.SetupCoordinator(t, test.WithStatusPersistence())
 		th := test.Setup(t)
 
 		// Create worker that holds tasks
@@ -453,11 +453,9 @@ func TestRunningTaskTracking(t *testing.T) {
 		// Create first 3 tasks to fill all pollers
 		for i := range 3 {
 			task := &coordinatorv1.Task{
-				DagRunId:       "task-" + string(rune('a'+i)),
-				Target:         "test.yaml",
-				RootDagRunName: "root-dag",
-				RootDagRunId:   "root-123",
-				Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				DagRunId:   "task-" + string(rune('a'+i)),
+				Target:     "test.yaml",
+				Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
@@ -484,11 +482,9 @@ func TestRunningTaskTracking(t *testing.T) {
 
 		for i := 3; i < 5; i++ {
 			task := &coordinatorv1.Task{
-				DagRunId:       "task-" + string(rune('a'+i)),
-				Target:         "test.yaml",
-				RootDagRunName: "root-dag",
-				RootDagRunId:   "root-123",
-				Definition:     "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				DagRunId:   "task-" + string(rune('a'+i)),
+				Target:     "test.yaml",
+				Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
@@ -585,43 +581,60 @@ func TestWorkerCancellation(t *testing.T) {
 	t.Run("CancelClaimedTaskBeforeExecutionWhenOwnerRejectsAttempt", func(t *testing.T) {
 		mockCoordinatorCli := newMockCoordinatorCli()
 		var validationCalls atomic.Int32
+		executedTaskIDs := make(chan string, 2)
 
 		mockCoordinatorCli.RunHeartbeatFunc = func(_ context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error) {
-			validationCalls.Add(1)
+			callNum := validationCalls.Add(1)
 			assert.Equal(t, "coord-a", owner.ID)
 			assert.Len(t, req.RunningTasks, 1)
+			if callNum == 1 {
+				return &coordinatorv1.RunHeartbeatResponse{
+					CancelledRuns: []*coordinatorv1.CancelledRun{
+						{AttemptKey: "attempt-key-1"},
+					},
+				}, nil
+			}
 			return &coordinatorv1.RunHeartbeatResponse{
-				CancelledRuns: []*coordinatorv1.CancelledRun{
-					{AttemptKey: "attempt-key-1"},
-				},
+				CancelledRuns: nil,
 			}, nil
 		}
 
 		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, map[string]string{}, &config.Config{})
 
-		var executed atomic.Bool
 		w.SetHandler(&mockHandler{
-			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
-				executed.Store(true)
+			ExecuteFunc: func(_ context.Context, task *coordinatorv1.Task) error {
+				executedTaskIDs <- task.DagRunId
 				return nil
 			},
 		})
 
-		var dispatched atomic.Bool
+		var pollCalls atomic.Int32
 		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
-			if dispatched.Swap(true) {
+			switch pollCalls.Add(1) {
+			case 1:
+				return &coordinatorv1.Task{
+					DagRunId:             "run-123",
+					Target:               "test.yaml",
+					Definition:           "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+					AttemptKey:           "attempt-key-1",
+					OwnerCoordinatorId:   "coord-a",
+					OwnerCoordinatorHost: "127.0.0.1",
+					OwnerCoordinatorPort: 1234,
+				}, nil
+			case 2:
+				return &coordinatorv1.Task{
+					DagRunId:             "run-456",
+					Target:               "test.yaml",
+					Definition:           "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+					AttemptKey:           "attempt-key-2",
+					OwnerCoordinatorId:   "coord-a",
+					OwnerCoordinatorHost: "127.0.0.1",
+					OwnerCoordinatorPort: 1234,
+				}, nil
+			default:
 				<-ctx.Done()
 				return nil, ctx.Err()
 			}
-			return &coordinatorv1.Task{
-				DagRunId:             "run-123",
-				Target:               "test.yaml",
-				Definition:           "name: test\nsteps:\n  - name: step1\n    command: echo hello",
-				AttemptKey:           "attempt-key-1",
-				OwnerCoordinatorId:   "coord-a",
-				OwnerCoordinatorHost: "127.0.0.1",
-				OwnerCoordinatorPort: 1234,
-			}, nil
 		})
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -632,9 +645,18 @@ func TestWorkerCancellation(t *testing.T) {
 		}()
 
 		require.Eventually(t, func() bool {
-			return validationCalls.Load() > 0
+			return validationCalls.Load() >= 2
 		}, 2*time.Second, 10*time.Millisecond)
-		assert.False(t, executed.Load(), "handler should not run after owner cancellation")
+
+		select {
+		case runID := <-executedTaskIDs:
+			assert.Equal(t, "run-456", runID, "only the replacement task should execute")
+		case <-time.After(2 * time.Second):
+			t.Fatal("worker did not execute the next task after the rejected claim")
+		}
+
+		time.Sleep(1200 * time.Millisecond)
+		assert.Equal(t, int32(2), validationCalls.Load(), "rejected claims must not remain registered for owner heartbeats")
 
 		cancel()
 		_ = w.Stop(context.Background())

@@ -69,6 +69,8 @@ type DispatchTaskStore interface {
 	ClaimNext(ctx context.Context, claim DispatchTaskClaim) (*ClaimedDispatchTask, error)
 	GetClaim(ctx context.Context, claimToken string) (*ClaimedDispatchTask, error)
 	DeleteClaim(ctx context.Context, claimToken string) error
+	CountOutstandingByQueue(ctx context.Context, queueName string, claimTimeout time.Duration) (int, error)
+	HasOutstandingAttempt(ctx context.Context, attemptKey string, claimTimeout time.Duration) (bool, error)
 }
 
 // WorkerHeartbeatRecord is the shared presence record for a worker.

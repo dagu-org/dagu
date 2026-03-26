@@ -146,6 +146,67 @@ func TestDispatchTaskStore_ConcurrentClaimIsExclusive(t *testing.T) {
 	assert.Equal(t, 1, claimedCount)
 }
 
+func TestDispatchTaskStore_CountOutstandingByQueueAndAttempt(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store := NewDispatchTaskStore(filepath.Join(t.TempDir(), "distributed"))
+
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-a",
+		Target:     "dag-a",
+		QueueName:  "queue-a",
+		AttemptId:  "attempt-a",
+		AttemptKey: "attempt-key-a",
+	}))
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-b",
+		Target:     "dag-b",
+		QueueName:  "queue-b",
+		AttemptId:  "attempt-b",
+		AttemptKey: "attempt-key-b",
+	}))
+
+	count, err := store.CountOutstandingByQueue(ctx, "queue-a", time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	count, err = store.CountOutstandingByQueue(ctx, "", time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	hasOutstanding, err := store.HasOutstandingAttempt(ctx, "attempt-key-a", time.Second)
+	require.NoError(t, err)
+	assert.True(t, hasOutstanding)
+
+	hasOutstanding, err = store.HasOutstandingAttempt(ctx, "missing-attempt", time.Second)
+	require.NoError(t, err)
+	assert.False(t, hasOutstanding)
+
+	claimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-1",
+		PollerID:     "poller-1",
+		Owner:        exec.CoordinatorEndpoint{ID: "coord-a"},
+		ClaimTimeout: time.Second,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+
+	count, err = store.CountOutstandingByQueue(ctx, "queue-a", time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count, "claimed reservations must still count against queue admission")
+
+	require.NoError(t, store.DeleteClaim(ctx, claimed.ClaimToken))
+
+	count, err = store.CountOutstandingByQueue(ctx, "queue-a", time.Second)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+
+	hasOutstanding, err = store.HasOutstandingAttempt(ctx, "attempt-key-a", time.Second)
+	require.NoError(t, err)
+	assert.False(t, hasOutstanding)
+}
+
 func TestWorkerHeartbeatStore_UpsertListAndDeleteStale(t *testing.T) {
 	t.Parallel()
 

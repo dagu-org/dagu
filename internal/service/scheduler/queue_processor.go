@@ -58,6 +58,7 @@ type QueueProcessor struct {
 	dagRunStore         exec.DAGRunStore
 	procStore           exec.ProcStore
 	dagRunLeaseStore    exec.DAGRunLeaseStore
+	dispatchTaskStore   exec.DispatchTaskStore
 	dagExecutor         *DAGExecutor
 	queues              sync.Map // map[string]*queue
 	wakeUpCh            chan struct{}
@@ -118,6 +119,13 @@ func WithLeaseStaleThreshold(threshold time.Duration) QueueProcessorOption {
 func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) QueueProcessorOption {
 	return func(p *QueueProcessor) {
 		p.dagRunLeaseStore = store
+	}
+}
+
+// WithDispatchTaskStore sets the shared distributed dispatch reservation store.
+func WithDispatchTaskStore(store exec.DispatchTaskStore) QueueProcessorOption {
+	return func(p *QueueProcessor) {
+		p.dispatchTaskStore = store
 	}
 }
 
@@ -308,15 +316,21 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		logger.Error(ctx, "Failed to count distributed leases", tag.Error(err), tag.Queue(queueName))
 		return
 	}
+	outstandingDispatchCount, err := p.countOutstandingDispatchReservations(ctx, queueName)
+	if err != nil {
+		logger.Error(ctx, "Failed to count outstanding distributed dispatch reservations", tag.Error(err), tag.Queue(queueName))
+		return
+	}
 	aliveCount := localAliveCount + distributedAliveCount
 
 	maxConcurrency := q.getMaxConcurrency()
 	inflightCount := q.getInflight()
-	freeSlots := maxConcurrency - aliveCount - inflightCount
+	freeSlots := maxConcurrency - aliveCount - inflightCount - outstandingDispatchCount
 
 	logger.Debug(ctx, "Queue capacity check",
 		tag.MaxConcurrency(maxConcurrency),
 		tag.Alive(aliveCount),
+		slog.Int("outstanding-dispatches", outstandingDispatchCount),
 		tag.Count(freeSlots),
 	)
 
@@ -328,8 +342,15 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 		return
 	}
 
-	batchSize := min(freeSlots, len(items))
-	runnableItems := items[:batchSize]
+	runnableItems, err := p.selectRunnableQueueItems(ctx, items, freeSlots)
+	if err != nil {
+		logger.Error(ctx, "Failed to select runnable queue items", tag.Error(err), tag.Queue(queueName))
+		return
+	}
+	if len(runnableItems) == 0 {
+		logger.Debug(ctx, "No queue items eligible for a new dispatch attempt")
+		return
+	}
 	logger.Info(ctx, "Processing batch of items",
 		tag.Count(len(runnableItems)),
 		tag.MaxConcurrency(maxConcurrency),
@@ -641,6 +662,43 @@ func readStartupExecutionError(execErrCh <-chan error) error {
 	}
 }
 
+func (p *QueueProcessor) selectRunnableQueueItems(
+	ctx context.Context,
+	items []exec.QueuedItemData,
+	freeSlots int,
+) ([]exec.QueuedItemData, error) {
+	if freeSlots <= 0 {
+		return nil, nil
+	}
+
+	runnable := make([]exec.QueuedItemData, 0, min(freeSlots, len(items)))
+	for _, item := range items {
+		if len(runnable) >= freeSlots {
+			break
+		}
+		if p.dispatchTaskStore != nil {
+			runRef, err := item.Data()
+			if err != nil {
+				logger.Error(ctx, "Failed to get item data while selecting runnable queue items", tag.Error(err))
+				continue
+			}
+			reserved, err := p.hasOutstandingDispatchReservation(ctx, *runRef)
+			if err != nil {
+				return nil, err
+			}
+			if reserved {
+				logger.Debug(ctx, "Skipping queue item with outstanding distributed dispatch reservation",
+					tag.RunID(runRef.ID),
+				)
+				continue
+			}
+		}
+		runnable = append(runnable, item)
+	}
+
+	return runnable, nil
+}
+
 // isPreStartExecutionFailure reports whether an execution error proves the DAG
 // never reached an observable started state. Spawn and dispatch failures should
 // abort the startup wait immediately, while process exit errors should continue
@@ -678,6 +736,51 @@ func (p *QueueProcessor) countActiveDistributedRuns(ctx context.Context, queueNa
 	return count, nil
 }
 
+func (p *QueueProcessor) countOutstandingDispatchReservations(ctx context.Context, queueName string) (int, error) {
+	if p.dispatchTaskStore == nil {
+		return 0, nil
+	}
+	count, err := p.dispatchTaskStore.CountOutstandingByQueue(ctx, queueName, p.leaseStaleThresholdOrDefault())
+	if err != nil {
+		return 0, fmt.Errorf("list outstanding distributed dispatches for queue %q: %w", queueName, err)
+	}
+	return count, nil
+}
+
+func (p *QueueProcessor) hasOutstandingDispatchReservation(ctx context.Context, runRef exec.DAGRunRef) (bool, error) {
+	if p.dispatchTaskStore == nil {
+		return false, nil
+	}
+
+	attempt, err := p.dagRunStore.FindAttempt(ctx, runRef)
+	if err != nil {
+		if errors.Is(err, exec.ErrDAGRunIDNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if attempt.Hidden() {
+		return false, nil
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		if errors.Is(err, exec.ErrNoStatusData) || errors.Is(err, exec.ErrCorruptedStatusFile) {
+			return false, nil
+		}
+		return false, err
+	}
+	if status == nil || status.Status != core.Queued {
+		return false, nil
+	}
+
+	attemptKey := queueAttemptKey(runRef, attempt, status)
+	if attemptKey == "" {
+		return false, nil
+	}
+	return p.dispatchTaskStore.HasOutstandingAttempt(ctx, attemptKey, p.leaseStaleThresholdOrDefault())
+}
+
 func (p *QueueProcessor) hasFreshDistributedLease(
 	ctx context.Context,
 	queueName string,
@@ -693,10 +796,7 @@ func (p *QueueProcessor) hasFreshDistributedLease(
 	if attemptID == "" && attempt != nil {
 		attemptID = attempt.ID()
 	}
-	attemptKey := status.AttemptKey
-	if attemptKey == "" && attemptID != "" {
-		attemptKey = exec.GenerateAttemptKey(runRef.Name, runRef.ID, runRef.Name, runRef.ID, attemptID)
-	}
+	attemptKey := queueAttemptKey(runRef, attempt, status)
 	if attemptKey == "" {
 		return false, nil
 	}
@@ -722,6 +822,24 @@ func (p *QueueProcessor) hasFreshDistributedLease(
 	}
 
 	return lease.IsFresh(time.Now().UTC(), p.leaseStaleThresholdOrDefault()), nil
+}
+
+func queueAttemptKey(runRef exec.DAGRunRef, attempt exec.DAGRunAttempt, status *exec.DAGRunStatus) string {
+	if status == nil {
+		return ""
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" && attempt != nil {
+		attemptID = attempt.ID()
+	}
+	if status.AttemptKey != "" {
+		return status.AttemptKey
+	}
+	if attemptID == "" {
+		return ""
+	}
+	return exec.GenerateAttemptKey(runRef.Name, runRef.ID, runRef.Name, runRef.ID, attemptID)
 }
 
 func (p *QueueProcessor) leaseStaleThresholdOrDefault() time.Duration {

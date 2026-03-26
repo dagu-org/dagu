@@ -444,6 +444,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, err
 	}
 	sched.SetDAGRunLeaseStore(c.DAGRunLeaseStore)
+	sched.SetDispatchTaskStore(c.DispatchTaskStore)
 	return sched, nil
 }
 

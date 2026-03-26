@@ -22,6 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/runtime"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,15 +45,16 @@ func (b *syncBuffer) String() string {
 }
 
 type queueFixture struct {
-	t           *testing.T
-	ctx         context.Context
-	logBuffer   *syncBuffer
-	dagRunStore exec.DAGRunStore
-	leaseStore  exec.DAGRunLeaseStore
-	queueStore  exec.QueueStore
-	procStore   exec.ProcStore
-	processor   *QueueProcessor
-	dag         *core.DAG
+	t             *testing.T
+	ctx           context.Context
+	logBuffer     *syncBuffer
+	dagRunStore   exec.DAGRunStore
+	leaseStore    exec.DAGRunLeaseStore
+	dispatchStore exec.DispatchTaskStore
+	queueStore    exec.QueueStore
+	procStore     exec.ProcStore
+	processor     *QueueProcessor
+	dag           *core.DAG
 }
 
 func newQueueFixture(t *testing.T) *queueFixture {
@@ -67,10 +69,11 @@ func newQueueFixture(t *testing.T) *queueFixture {
 
 	return &queueFixture{
 		t: t, ctx: ctx, logBuffer: logBuffer,
-		dagRunStore: filedagrun.New(filepath.Join(tmpDir, "dag-runs")),
-		leaseStore:  filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed")),
-		queueStore:  filequeue.New(filepath.Join(tmpDir, "queue")),
-		procStore:   fileproc.New(filepath.Join(tmpDir, "proc")),
+		dagRunStore:   filedagrun.New(filepath.Join(tmpDir, "dag-runs")),
+		leaseStore:    filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed")),
+		dispatchStore: filedistributed.NewDispatchTaskStore(filepath.Join(tmpDir, "distributed")),
+		queueStore:    filequeue.New(filepath.Join(tmpDir, "queue")),
+		procStore:     fileproc.New(filepath.Join(tmpDir, "proc")),
 	}
 }
 
@@ -102,6 +105,7 @@ func (f *queueFixture) withProcessor(cfg config.Queues, opts ...QueueProcessorOp
 	options := append([]QueueProcessorOption{
 		WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
 		WithDAGRunLeaseStore(f.leaseStore),
+		WithDispatchTaskStore(f.dispatchStore),
 	}, opts...)
 	f.processor = NewQueueProcessor(f.queueStore, f.dagRunStore, f.procStore,
 		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}}), config.ExecutionModeLocal, ""),
@@ -269,6 +273,123 @@ func TestQueueProcessor_ProcessQueueItems_FailsClosedOnLeaseCountError(t *testin
 	require.NoError(t, err)
 	require.Len(t, items, 1, "queue should remain untouched when distributed lease counting fails")
 	assert.Contains(t, f.logs(), "Failed to count distributed leases")
+}
+
+func TestQueueProcessor_ProcessQueueItems_FailsClosedOnOutstandingDispatchCountError(t *testing.T) {
+	f := newQueueFixture(t).withDAG("distributed-dispatch-count-error-dag", 1).
+		withProcessor(config.Queues{}).
+		simulateQueue(1, false)
+
+	f.enqueueRuns(1)
+	f.processor.dispatchTaskStore = &mockDispatchTaskStore{
+		countOutstandingByQueueFunc: func(context.Context, string, time.Duration) (int, error) {
+			return 0, errors.New("dispatch store unavailable")
+		},
+	}
+
+	f.processor.ProcessQueueItems(f.ctx, "distributed-dispatch-count-error-dag")
+
+	items, err := f.queueStore.List(f.ctx, "distributed-dispatch-count-error-dag")
+	require.NoError(t, err)
+	require.Len(t, items, 1, "queue should remain untouched when outstanding dispatch counting fails")
+	assert.Contains(t, f.logs(), "Failed to count outstanding distributed dispatch reservations")
+}
+
+func TestQueueProcessor_CountsOutstandingDispatchReservationsAgainstQueueConcurrency(t *testing.T) {
+	f := newQueueFixture(t).withDAG("distributed-dispatch-reservation-dag", 1).
+		withProcessor(config.Queues{}, WithLeaseStaleThreshold(5*time.Second)).
+		simulateQueue(1, false)
+
+	f.enqueueRuns(1)
+
+	runRef := exec.NewDAGRunRef(f.dag.Name, "run-1")
+	attempt, err := f.dagRunStore.FindAttempt(f.ctx, runRef)
+	require.NoError(t, err)
+	status, err := attempt.ReadStatus(f.ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, f.dispatchStore.Enqueue(f.ctx, &coordinatorv1.Task{
+		DagRunId:   runRef.ID,
+		Target:     f.dag.Name,
+		QueueName:  f.dag.Name,
+		AttemptId:  attempt.ID(),
+		AttemptKey: queueAttemptKey(runRef, attempt, status),
+	}))
+
+	f.processor.ProcessQueueItems(f.ctx, "distributed-dispatch-reservation-dag")
+
+	items, err := f.queueStore.List(f.ctx, "distributed-dispatch-reservation-dag")
+	require.NoError(t, err)
+	require.Len(t, items, 1, "outstanding distributed dispatch reservations should consume queue capacity")
+	assert.Contains(t, f.logs(), "Max concurrency reached")
+}
+
+func TestQueueProcessor_SelectRunnableQueueItemsSkipsOutstandingReservations(t *testing.T) {
+	f := newQueueFixture(t).withDAG("distributed-select-dag", 2).
+		withProcessor(config.Queues{}, WithLeaseStaleThreshold(5*time.Second)).
+		simulateQueue(2, false)
+
+	f.enqueueRuns(2)
+
+	reservedRef := exec.NewDAGRunRef(f.dag.Name, "run-1")
+	reservedAttempt, err := f.dagRunStore.FindAttempt(f.ctx, reservedRef)
+	require.NoError(t, err)
+	reservedStatus, err := reservedAttempt.ReadStatus(f.ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, f.dispatchStore.Enqueue(f.ctx, &coordinatorv1.Task{
+		DagRunId:   reservedRef.ID,
+		Target:     f.dag.Name,
+		QueueName:  f.dag.Name,
+		AttemptId:  reservedAttempt.ID(),
+		AttemptKey: queueAttemptKey(reservedRef, reservedAttempt, reservedStatus),
+	}))
+
+	items, err := f.queueStore.List(f.ctx, "distributed-select-dag")
+	require.NoError(t, err)
+
+	runnable, err := f.processor.selectRunnableQueueItems(f.ctx, items, 1)
+	require.NoError(t, err)
+	require.Len(t, runnable, 1)
+
+	selectedRef, err := runnable[0].Data()
+	require.NoError(t, err)
+	assert.Equal(t, "run-2", selectedRef.ID)
+}
+
+type mockDispatchTaskStore struct {
+	countOutstandingByQueueFunc func(context.Context, string, time.Duration) (int, error)
+	hasOutstandingAttemptFunc   func(context.Context, string, time.Duration) (bool, error)
+}
+
+func (m *mockDispatchTaskStore) Enqueue(context.Context, *coordinatorv1.Task) error {
+	return nil
+}
+
+func (m *mockDispatchTaskStore) ClaimNext(context.Context, exec.DispatchTaskClaim) (*exec.ClaimedDispatchTask, error) {
+	return nil, nil
+}
+
+func (m *mockDispatchTaskStore) GetClaim(context.Context, string) (*exec.ClaimedDispatchTask, error) {
+	return nil, exec.ErrDispatchTaskNotFound
+}
+
+func (m *mockDispatchTaskStore) DeleteClaim(context.Context, string) error {
+	return nil
+}
+
+func (m *mockDispatchTaskStore) CountOutstandingByQueue(ctx context.Context, queueName string, claimTimeout time.Duration) (int, error) {
+	if m.countOutstandingByQueueFunc != nil {
+		return m.countOutstandingByQueueFunc(ctx, queueName, claimTimeout)
+	}
+	return 0, nil
+}
+
+func (m *mockDispatchTaskStore) HasOutstandingAttempt(ctx context.Context, attemptKey string, claimTimeout time.Duration) (bool, error) {
+	if m.hasOutstandingAttemptFunc != nil {
+		return m.hasOutstandingAttemptFunc(ctx, attemptKey, claimTimeout)
+	}
+	return false, nil
 }
 
 func TestQueueProcessor_CheckStartupStatusTreatsRunningStatusAsStarted(t *testing.T) {

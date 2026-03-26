@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filedistributed"
 	"github.com/dagu-org/dagu/internal/proto/convert"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -26,9 +27,11 @@ import (
 
 // mockDAGRunStore is a test implementation of execution.DAGRunStore
 type mockDAGRunStore struct {
-	attempts    map[string]*mockDAGRunAttempt
-	subAttempts map[string]*mockDAGRunAttempt // key: rootID:subID
-	mu          sync.Mutex
+	attempts            map[string]*mockDAGRunAttempt
+	subAttempts         map[string]*mockDAGRunAttempt // key: rootID:subID
+	createAttemptErr    error
+	createSubAttemptErr error
+	mu                  sync.Mutex
 }
 
 func newMockDAGRunStore() *mockDAGRunStore {
@@ -84,6 +87,9 @@ func (m *mockDAGRunStore) FindAttempt(_ context.Context, dagRun exec.DAGRunRef) 
 func (m *mockDAGRunStore) CreateAttempt(_ context.Context, dag *core.DAG, _ time.Time, dagRunID string, _ exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.createAttemptErr != nil {
+		return nil, m.createAttemptErr
+	}
 	attempt := &mockDAGRunAttempt{
 		status: &exec.DAGRunStatus{Name: dag.Name, DAGRunID: dagRunID},
 	}
@@ -181,6 +187,9 @@ func (m *mockDAGRunStore) FindSubAttempt(_ context.Context, rootRef exec.DAGRunR
 func (m *mockDAGRunStore) CreateSubAttempt(_ context.Context, rootRef exec.DAGRunRef, subDAGRunID string) (exec.DAGRunAttempt, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.createSubAttemptErr != nil {
+		return nil, m.createSubAttemptErr
+	}
 	key := rootRef.ID + ":" + subDAGRunID
 	attempt := &mockDAGRunAttempt{
 		status: &exec.DAGRunStatus{},
@@ -203,6 +212,9 @@ type mockDAGRunAttempt struct {
 	closed                 bool
 	written                bool
 	aborting               bool
+	openError              error
+	readStatusError        error
+	writeError             error
 	stepMessages           map[string][]exec.LLMMessage // stepName -> messages
 	writeStepMessagesError error                        // injected error for WriteStepMessages
 	mu                     sync.Mutex
@@ -219,12 +231,18 @@ func (m *mockDAGRunAttempt) ID() string {
 func (m *mockDAGRunAttempt) Open(_ context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.openError != nil {
+		return m.openError
+	}
 	m.opened = true
 	return nil
 }
 func (m *mockDAGRunAttempt) Write(_ context.Context, s exec.DAGRunStatus) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.writeError != nil {
+		return m.writeError
+	}
 	m.status = &s
 	m.written = true
 	return nil
@@ -238,6 +256,9 @@ func (m *mockDAGRunAttempt) Close(_ context.Context) error {
 func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.readStatusError != nil {
+		return nil, m.readStatusError
+	}
 	if m.status == nil {
 		return nil, exec.ErrNoStatusData
 	}
@@ -418,7 +439,7 @@ func TestHandler_Poll(t *testing.T) {
 		h := NewHandler(HandlerConfig{})
 		attempt := &mockDAGRunAttempt{}
 
-		h.writeInitialStatus(
+		err := h.writeInitialStatus(
 			context.Background(),
 			attempt,
 			"test-dag",
@@ -428,10 +449,128 @@ func TestHandler_Poll(t *testing.T) {
 			exec.DAGRunRef{},
 			nil,
 		)
+		require.NoError(t, err)
 
 		status, err := attempt.ReadStatus(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, "2026-03-13T10:00:00Z", status.ScheduleTime)
+	})
+
+	t.Run("DispatchFailsWhenAttemptPreparationFails", func(t *testing.T) {
+		t.Parallel()
+		core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{Command: true})
+
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		dispatchStore := filedistributed.NewDispatchTaskStore(baseDir)
+		heartbeatStore := filedistributed.NewWorkerHeartbeatStore(baseDir)
+		require.NoError(t, heartbeatStore.Upsert(context.Background(), exec.WorkerHeartbeatRecord{
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+		}))
+
+		store := newMockDAGRunStore()
+		store.createAttemptErr = errors.New("prepare failed")
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:          store,
+			DispatchTaskStore:    dispatchStore,
+			WorkerHeartbeatStore: heartbeatStore,
+		})
+
+		_, err := h.Dispatch(context.Background(), &coordinatorv1.DispatchRequest{
+			Task: &coordinatorv1.Task{
+				DagRunId:   "run-123",
+				Target:     "test-dag",
+				Definition: "name: test-dag\nsteps:\n  - name: step1\n    type: command\n    command: echo hello",
+				QueueName:  "test-queue",
+			},
+		})
+		require.Error(t, err)
+
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, codes.Internal, st.Code())
+		require.Contains(t, st.Message(), "failed to prepare attempt")
+
+		count, countErr := dispatchStore.CountOutstandingByQueue(context.Background(), "", time.Second)
+		require.NoError(t, countErr)
+		assert.Zero(t, count)
+	})
+
+	t.Run("DispatchMarksNewAttemptFailedWhenEnqueueFails", func(t *testing.T) {
+		t.Parallel()
+		core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{Command: true})
+
+		heartbeatStore := filedistributed.NewWorkerHeartbeatStore(filepath.Join(t.TempDir(), "distributed"))
+		require.NoError(t, heartbeatStore.Upsert(context.Background(), exec.WorkerHeartbeatRecord{
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+		}))
+
+		store := filedagrun.New(filepath.Join(t.TempDir(), "dag-runs"))
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:          store,
+			DispatchTaskStore:    &failingDispatchTaskStore{enqueueErr: errors.New("disk full")},
+			WorkerHeartbeatStore: heartbeatStore,
+		})
+
+		_, err := h.Dispatch(context.Background(), &coordinatorv1.DispatchRequest{
+			Task: &coordinatorv1.Task{
+				DagRunId:   "run-123",
+				Target:     "test-dag",
+				Definition: "name: test-dag\nsteps:\n  - name: step1\n    type: command\n    command: echo hello",
+				QueueName:  "test-queue",
+			},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to enqueue task")
+
+		attempt, findErr := store.FindAttempt(context.Background(), exec.DAGRunRef{Name: "test-dag", ID: "run-123"})
+		require.NoError(t, findErr)
+		runStatus, readErr := attempt.ReadStatus(context.Background())
+		require.NoError(t, readErr)
+		require.Equal(t, core.Failed, runStatus.Status)
+		require.Contains(t, runStatus.Error, "failed to hand off distributed task")
+	})
+
+	t.Run("DispatchLeavesReusedQueuedAttemptQueuedWhenEnqueueFails", func(t *testing.T) {
+		t.Parallel()
+		core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{Command: true})
+
+		heartbeatStore := filedistributed.NewWorkerHeartbeatStore(filepath.Join(t.TempDir(), "distributed"))
+		require.NoError(t, heartbeatStore.Upsert(context.Background(), exec.WorkerHeartbeatRecord{
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+		}))
+
+		store := newMockDAGRunStore()
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:      "test-dag",
+			DAGRunID:  "run-123",
+			AttemptID: "attempt-existing",
+			Status:    core.Queued,
+		})
+
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:          store,
+			DispatchTaskStore:    &failingDispatchTaskStore{enqueueErr: errors.New("disk full")},
+			WorkerHeartbeatStore: heartbeatStore,
+		})
+
+		_, err := h.Dispatch(context.Background(), &coordinatorv1.DispatchRequest{
+			Task: &coordinatorv1.Task{
+				DagRunId:   "run-123",
+				Target:     "test-dag",
+				Definition: "name: test-dag\nsteps:\n  - name: step1\n    type: command\n    command: echo hello",
+				QueueName:  "test-queue",
+			},
+		})
+		require.Error(t, err)
+
+		runStatus, readErr := attempt.ReadStatus(context.Background())
+		require.NoError(t, readErr)
+		require.Equal(t, core.Queued, runStatus.Status)
+		assert.Equal(t, "attempt-existing", runStatus.AttemptID)
 	})
 
 	t.Run("PollContextCancellation", func(t *testing.T) {
@@ -469,6 +608,34 @@ func TestHandler_Poll(t *testing.T) {
 			t.Fatal("Poll did not return after context cancellation")
 		}
 	})
+}
+
+type failingDispatchTaskStore struct {
+	enqueueErr error
+}
+
+func (s *failingDispatchTaskStore) Enqueue(context.Context, *coordinatorv1.Task) error {
+	return s.enqueueErr
+}
+
+func (s *failingDispatchTaskStore) ClaimNext(context.Context, exec.DispatchTaskClaim) (*exec.ClaimedDispatchTask, error) {
+	return nil, nil
+}
+
+func (s *failingDispatchTaskStore) GetClaim(context.Context, string) (*exec.ClaimedDispatchTask, error) {
+	return nil, exec.ErrDispatchTaskNotFound
+}
+
+func (s *failingDispatchTaskStore) DeleteClaim(context.Context, string) error {
+	return nil
+}
+
+func (s *failingDispatchTaskStore) CountOutstandingByQueue(context.Context, string, time.Duration) (int, error) {
+	return 0, nil
+}
+
+func (s *failingDispatchTaskStore) HasOutstandingAttempt(context.Context, string, time.Duration) (bool, error) {
+	return false, nil
 }
 
 func TestHandler_Heartbeat(t *testing.T) {

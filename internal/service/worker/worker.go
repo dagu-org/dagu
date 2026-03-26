@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -58,6 +59,8 @@ type runningTaskState struct {
 	owner                exec.HostInfo
 	lastOwnerHeartbeatAt time.Time
 }
+
+var errTaskClaimRejectedBeforeExecution = errors.New("task claim rejected before execution")
 
 // SetHandler sets a custom task executor for testing or custom execution logic
 func (w *Worker) SetHandler(executor TaskHandler) {
@@ -297,17 +300,6 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 		AttemptKey:       attemptKey,
 	}
 
-	// Mark task as running and register cancel function
-	t.worker.pollersMu.Lock()
-	t.worker.runningTasks[attemptKey] = &runningTaskState{
-		task:                 runningTask,
-		owner:                owner,
-		lastOwnerHeartbeatAt: time.Now().UTC(),
-	}
-	t.worker.pollerTasks[pollerID] = attemptKey
-	t.worker.cancelFuncs[attemptKey] = cancel
-	t.worker.pollersMu.Unlock()
-
 	if task.AttemptKey != "" && owner.Host != "" {
 		cancelled, heartbeatErr := t.worker.validateClaimedTask(taskCtx, owner, runningTask)
 		if heartbeatErr != nil {
@@ -323,21 +315,31 @@ func (t *trackingHandler) Handle(ctx context.Context, task *coordinatorv1.Task) 
 				tag.RunID(task.DagRunId),
 				tag.AttemptKey(attemptKey),
 			)
-			return context.Canceled
+			return errTaskClaimRejectedBeforeExecution
 		}
 	}
 
-	// Execute the task with cancellable context
-	err = t.handler.Handle(taskCtx, task)
-
-	// Remove from running tasks and cancel registry
+	// Register the task only after preflight validation has accepted it or
+	// failed softly. This keeps rejected claims from consuming worker capacity.
 	t.worker.pollersMu.Lock()
-	delete(t.worker.runningTasks, attemptKey)
-	delete(t.worker.pollerTasks, pollerID)
-	delete(t.worker.cancelFuncs, attemptKey)
+	t.worker.runningTasks[attemptKey] = &runningTaskState{
+		task:                 runningTask,
+		owner:                owner,
+		lastOwnerHeartbeatAt: time.Now().UTC(),
+	}
+	t.worker.pollerTasks[pollerID] = attemptKey
+	t.worker.cancelFuncs[attemptKey] = cancel
 	t.worker.pollersMu.Unlock()
+	defer func() {
+		t.worker.pollersMu.Lock()
+		delete(t.worker.runningTasks, attemptKey)
+		delete(t.worker.pollerTasks, pollerID)
+		delete(t.worker.cancelFuncs, attemptKey)
+		t.worker.pollersMu.Unlock()
+	}()
 
-	return err
+	// Execute the task with cancellable context
+	return t.handler.Handle(taskCtx, task)
 }
 
 func (w *Worker) validateClaimedTask(ctx context.Context, owner exec.HostInfo, task *coordinatorv1.RunningTask) (bool, error) {
@@ -355,13 +357,10 @@ func (w *Worker) validateClaimedTask(ctx context.Context, owner exec.HostInfo, t
 	if err != nil {
 		return false, err
 	}
-
-	w.markOwnerHeartbeatSuccess([]*coordinatorv1.RunningTask{task}, time.Now().UTC())
 	if resp == nil || len(resp.CancelledRuns) == 0 {
 		return false, nil
 	}
 
-	w.processCancellations(ctx, resp.CancelledRuns)
 	for _, cancelled := range resp.CancelledRuns {
 		if cancelled != nil && cancelled.AttemptKey == task.AttemptKey {
 			return true, nil
