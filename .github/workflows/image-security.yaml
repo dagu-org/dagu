@@ -12,8 +12,6 @@ on:
       - Dockerfile.alpine
       - go.mod
       - go.sum
-      - ui/package.json
-      - ui/pnpm-lock.yaml
       - .github/workflows/image-security.yaml
       - .github/workflows/docker.yaml
   push:
@@ -24,8 +22,6 @@ on:
       - Dockerfile.alpine
       - go.mod
       - go.sum
-      - ui/package.json
-      - ui/pnpm-lock.yaml
       - .github/workflows/image-security.yaml
       - .github/workflows/docker.yaml
   workflow_dispatch:
