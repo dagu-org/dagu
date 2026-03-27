@@ -690,6 +690,36 @@ func TestLoadYAML(t *testing.T) {
 	}
 }
 
+func TestLoadYAMLWithOpts_PreservesLegacyContract(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DoesNotInitializeDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(`
+name: test-dag
+steps:
+  - name: step1
+    command: echo hello
+`), spec.BuildOpts{})
+		require.NoError(t, err)
+		assert.Equal(t, core.LogOutputMode(""), dag.LogOutput)
+	})
+
+	t.Run("DoesNotSynthesizeWorkingDirWithoutContext", func(t *testing.T) {
+		t.Parallel()
+
+		dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(`
+steps:
+  - name: step1
+    command: echo hello
+`), spec.BuildOpts{})
+		require.NoError(t, err)
+		assert.Empty(t, dag.WorkingDir)
+		assert.False(t, dag.WorkingDirExplicit)
+	})
+}
+
 func TestLoadYAMLWithNameOption(t *testing.T) {
 	t.Parallel()
 	const testDAG = `
@@ -708,6 +738,33 @@ steps:
 	require.Equal(t, "1", step.Name)
 	require.Len(t, step.Commands, 1)
 	require.Equal(t, "true", step.Commands[0].Command)
+}
+
+func TestLoadYAMLWithOpts_PreservesLocalDAGsFromMultiDocumentYAML(t *testing.T) {
+	t.Parallel()
+
+	dag, err := spec.LoadYAMLWithOpts(context.Background(), []byte(`
+steps:
+  - name: call-child
+    call: child-task
+
+---
+name: child-task
+steps:
+  - name: work
+    command: echo "child"
+`), spec.BuildOpts{Name: "parent-task"})
+	require.NoError(t, err)
+
+	require.NotNil(t, dag.LocalDAGs)
+	require.Len(t, dag.LocalDAGs, 1)
+	assert.Equal(t, "parent-task", dag.Name)
+
+	childDAG, ok := dag.LocalDAGs["child-task"]
+	require.True(t, ok)
+	assert.Equal(t, "child-task", childDAG.Name)
+	require.Len(t, childDAG.Steps, 1)
+	assert.Equal(t, "work", childDAG.Steps[0].Name)
 }
 
 // createTempYAMLFile creates a temporary YAML file with the given content

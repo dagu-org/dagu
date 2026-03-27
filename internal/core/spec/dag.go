@@ -566,6 +566,10 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		}
 	}
 
+	if len(ctx.envScope.buildEnv) > 0 {
+		result.PresolvedBuildEnv = maps.Clone(ctx.envScope.buildEnv)
+	}
+
 	if len(errs) > 0 {
 		if ctx.opts.Has(BuildFlagAllowBuildErrors) {
 			result.BuildErrors = errs

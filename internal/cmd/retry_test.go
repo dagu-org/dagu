@@ -195,6 +195,49 @@ steps:
 	})
 }
 
+func TestRetryCommand_BuiltExecutableRestoresExplicitEnv(t *testing.T) {
+	th := test.SetupCommand(t, test.WithBuiltExecutable())
+	markerPath := th.TempFile(t, "retry-marker", nil)
+	require.NoError(t, os.Remove(markerPath))
+
+	dag := th.DAG(t, fmt.Sprintf(`name: built-retry-explicit-env
+env:
+  - EXPORTED_SECRET: ${CMD_RETRY_EXPLICIT_ENV}
+steps:
+  - name: "capture"
+    shell: bash
+    command: |
+      if [ ! -f %[1]q ]; then
+        touch %[1]q
+        printf '%%s|%%s' "$EXPORTED_SECRET" "${CMD_RETRY_EXPLICIT_ENV:-}"
+        exit 1
+      fi
+      printf '%%s|%%s' "$EXPORTED_SECRET" "${CMD_RETRY_EXPLICIT_ENV:-}"
+    output: RESULT
+`, markerPath))
+
+	_, err := test.RunBuiltCLICommand(t, th.Helper, []string{"CMD_RETRY_EXPLICIT_ENV=from-host"}, "start", dag.Location)
+	require.Error(t, err)
+
+	initialStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Equal(t, core.Failed, initialStatus.Status)
+
+	initialAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, initialStatus.DAGRunID))
+	require.NoError(t, err)
+
+	test.RunBuiltCLI(t, th.Helper, nil, "retry", fmt.Sprintf("--run-id=%s", initialStatus.DAGRunID), dag.Location)
+
+	retriedAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, initialStatus.DAGRunID))
+	require.NoError(t, err)
+	require.NotEqual(t, initialAttempt.ID(), retriedAttempt.ID())
+
+	retriedStatus, err := retriedAttempt.ReadStatus(th.Context)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, retriedStatus.Status)
+	require.Equal(t, "from-host|", test.StatusOutputValue(t, retriedStatus, "RESULT"))
+}
+
 func writeStatus(t *testing.T, ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) {
 	t.Helper()
 

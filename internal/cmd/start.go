@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/buildenv"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -311,6 +312,13 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 	}
 	if defaultWorkingDir != "" {
 		loadOpts = append(loadOpts, spec.WithDefaultWorkingDir(defaultWorkingDir))
+	}
+	presolvedBuildEnv, err := buildenv.Load()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load presolved build env: %w", err)
+	}
+	if len(presolvedBuildEnv) > 0 {
+		loadOpts = append(loadOpts, spec.WithBuildEnv(presolvedBuildEnv))
 	}
 
 	var params string

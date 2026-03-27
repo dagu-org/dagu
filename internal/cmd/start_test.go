@@ -74,6 +74,26 @@ steps:
 	}
 }
 
+func TestStartCommand_BuiltExecutablePreservesExplicitEnv(t *testing.T) {
+	th := test.SetupCommand(t, test.WithBuiltExecutable())
+
+	dag := th.DAG(t, `name: built-start-explicit-env
+env:
+  - EXPORTED_SECRET: ${CMD_START_EXPLICIT_ENV}
+steps:
+  - name: "capture"
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${CMD_START_EXPLICIT_ENV:-}"
+    output: RESULT
+`)
+
+	test.RunBuiltCLI(t, th.Helper, []string{"CMD_START_EXPLICIT_ENV=from-host"}, "start", dag.Location)
+
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, status.Status)
+	require.Equal(t, "from-host|from-host", test.StatusOutputValue(t, &status, "RESULT"))
+}
+
 func TestCmdStart_BackwardCompatibility(t *testing.T) {
 	t.Run("ShouldRejectParametersAfterWithoutSeparator", func(t *testing.T) {
 		th := test.SetupCommand(t)

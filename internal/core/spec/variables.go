@@ -98,6 +98,13 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 		value := p.val
 
 		if !ctx.opts.Has(BuildFlagNoEval) {
+			if presolved, ok := ctx.opts.BuildEnv[p.key]; ok {
+				value = presolved
+				scope = scope.WithEntry(p.key, value, eval.EnvSourcePresolved)
+				vars[p.key] = value
+				continue
+			}
+
 			// Chain the new variable to scope for subsequent evaluations
 			scopeCtx := eval.WithEnvScope(evalCtx, scope)
 

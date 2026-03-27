@@ -15,12 +15,35 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
+	runtimeexec "github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/test"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+func workerStatusOutputValue(t *testing.T, status *exec.DAGRunStatus, key string) string {
+	t.Helper()
+
+	require.NotNil(t, status)
+	for _, node := range status.Nodes {
+		if node.OutputVariables == nil {
+			continue
+		}
+		value, ok := node.OutputVariables.Load(key)
+		if ok {
+			result, ok := value.(string)
+			require.True(t, ok, "output %q has unexpected type %T", key, value)
+			result = strings.TrimPrefix(result, key+"=")
+			return result
+		}
+	}
+
+	t.Fatalf("output %q not found in DAG-run status", key)
+	return ""
+}
 
 func TestTaskHandler(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
@@ -184,6 +207,85 @@ func TestTaskHandler(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "operation not specified")
 	})
+
+	t.Run("HandleTaskStartPreservesExplicitEnv", func(t *testing.T) {
+		t.Setenv("WORKER_TASK_START_ENV", "from-host")
+
+		dagContent := `env:
+  - EXPORTED_SECRET: ${WORKER_TASK_START_ENV}
+steps:
+  - name: capture
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${WORKER_TASK_START_ENV:-}"
+    output: RESULT
+`
+		dag := th.DAG(t, dagContent)
+		runID := uuid.Must(uuid.NewV7()).String()
+		task := runtimeexec.CreateTask(
+			dag.Name,
+			dagContent,
+			coordinatorv1.Operation_OPERATION_START,
+			runID,
+		)
+
+		handler := NewTaskHandler(th.Config)
+		err := handler.Handle(th.Context, task)
+		require.NoError(t, err)
+
+		status, err := th.DAGRunMgr.GetCurrentStatus(th.Context, dag.DAG, runID)
+		require.NoError(t, err)
+		require.NotNil(t, status)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Equal(t, "from-host|", workerStatusOutputValue(t, status, "RESULT"))
+	})
+
+	t.Run("HandleTaskRetryPreservesExplicitEnv", func(t *testing.T) {
+		t.Setenv("WORKER_TASK_RETRY_ENV", "from-host")
+
+		dagContent := `env:
+  - EXPORTED_SECRET: ${WORKER_TASK_RETRY_ENV}
+steps:
+  - name: capture
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${WORKER_TASK_RETRY_ENV:-}"
+    output: RESULT
+`
+		dag := th.DAG(t, dagContent)
+		runID := uuid.Must(uuid.NewV7()).String()
+		handler := NewTaskHandler(th.Config)
+
+		startTask := runtimeexec.CreateTask(
+			dag.Name,
+			dagContent,
+			coordinatorv1.Operation_OPERATION_START,
+			runID,
+		)
+		err := handler.Handle(th.Context, startTask)
+		require.NoError(t, err)
+
+		initialAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, runID))
+		require.NoError(t, err)
+		initialStatus, err := initialAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, "from-host|", workerStatusOutputValue(t, initialStatus, "RESULT"))
+
+		retryTask := runtimeexec.CreateTask(
+			dag.Name,
+			dagContent,
+			coordinatorv1.Operation_OPERATION_RETRY,
+			runID,
+			runtimeexec.WithPreviousStatus(initialStatus),
+		)
+		err = handler.Handle(th.Context, retryTask)
+		require.NoError(t, err)
+
+		retriedAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, runID))
+		require.NoError(t, err)
+		require.NotEqual(t, initialAttempt.ID(), retriedAttempt.ID())
+
+		retriedStatus, err := retriedAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, retriedStatus.Status)
+		require.Equal(t, "from-host|", workerStatusOutputValue(t, retriedStatus, "RESULT"))
+	})
 }
 
 func TestCreateTempDAGFile(t *testing.T) {
@@ -228,11 +330,13 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 
 	originalTarget := "workflow.yaml"
 	task := &coordinatorv1.Task{
-		Operation:  coordinatorv1.Operation_OPERATION_START,
-		DagRunId:   "run-123",
-		Target:     originalTarget,
-		Definition: "steps:\n  - name: example\n",
-		Params:     "foo=bar",
+		Operation:      coordinatorv1.Operation_OPERATION_START,
+		DagRunId:       "run-123",
+		Target:         originalTarget,
+		Definition:     "steps:\n  - name: example\n    command: echo example\n",
+		Params:         "foo=bar",
+		RootDagRunName: "root-dag",
+		RootDagRunId:   "root-run-123",
 	}
 
 	err = handler.Handle(context.Background(), task)
@@ -246,9 +350,12 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 	argsLines := strings.Split(strings.TrimSpace(string(argsData)), "\n")
 	require.Contains(t, argsLines, "start")
 	require.Contains(t, argsLines, "--run-id=run-123")
+	require.Contains(t, argsLines, "--root=root-dag:root-run-123")
+	require.Contains(t, argsLines, "--name=workflow")
 	require.Contains(t, argsLines, task.Target)
 	require.Contains(t, argsLines, "--")
 	require.Contains(t, argsLines, "foo=bar")
+	require.NotContains(t, argsLines, "--name=root-dag")
 
 	_, statErr := os.Stat(task.Target)
 	require.True(t, os.IsNotExist(statErr), "temporary DAG file should be removed after execution")

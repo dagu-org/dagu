@@ -15,17 +15,22 @@ import (
 // Duplicated here to avoid a circular import (eval <- secrets).
 const internalSecretPrefix = "_DAGU_PRESOLVED_SECRET_" //nolint:gosec // Not a credential; this is an env var prefix for transport.
 
+// internalBuildEnvFileKey must match buildenv.PresolvedEnvFileKey.
+// Duplicated here to avoid a circular import (eval <- buildenv).
+const internalBuildEnvFileKey = "_DAGU_PRESOLVED_BUILD_ENV_FILE"
+
 // EnvSource tracks where an environment variable came from (for debugging)
 type EnvSource string
 
 const (
-	EnvSourceOS      EnvSource = "os"       // From os.Environ()
-	EnvSourceDAGEnv  EnvSource = "dag_env"  // From DAG env: field
-	EnvSourceDotEnv  EnvSource = "dotenv"   // From .env file
-	EnvSourceParam   EnvSource = "param"    // From params
-	EnvSourceOutput  EnvSource = "output"   // From step output
-	EnvSourceSecret  EnvSource = "secret"   // From secrets
-	EnvSourceStepEnv EnvSource = "step_env" // From step.env field
+	EnvSourceOS        EnvSource = "os"              // From os.Environ()
+	EnvSourceDAGEnv    EnvSource = "dag_env"         // From DAG env: field
+	EnvSourceDotEnv    EnvSource = "dotenv"          // From .env file
+	EnvSourceParam     EnvSource = "param"           // From params
+	EnvSourceOutput    EnvSource = "output"          // From step output
+	EnvSourcePresolved EnvSource = "presolved_build" // From presolved build env transport
+	EnvSourceSecret    EnvSource = "secret"          // From secrets
+	EnvSourceStepEnv   EnvSource = "step_env"        // From step.env field
 )
 
 // EnvSourceStep is deprecated: use EnvSourceOutput instead
@@ -62,7 +67,7 @@ func NewEnvScope(parent *EnvScope, includeOS bool) *EnvScope {
 				// direct os.LookupEnv; they must not appear in step environments.
 				// Must match secrets.PresolvedEnvPrefix (duplicated to avoid
 				// circular import: eval <- secrets).
-				if strings.HasPrefix(k, internalSecretPrefix) {
+				if strings.HasPrefix(k, internalSecretPrefix) || k == internalBuildEnvFileKey {
 					continue
 				}
 				e.entries[k] = EnvEntry{Key: k, Value: v, Source: EnvSourceOS}

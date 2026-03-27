@@ -18,7 +18,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/builtin/sql"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/healthcheck"
@@ -96,7 +95,7 @@ func NewWorker(workerID string, maxActiveRuns int, coordinatorClient coordinator
 		id:             workerID,
 		maxActiveRuns:  maxActiveRuns,
 		coordinatorCli: coordinatorClient,
-		handler:        &taskHandler{subCmdBuilder: runtime.NewSubCmdBuilder(cfg)},
+		handler:        NewTaskHandler(cfg),
 		labels:         labels,
 		cfg:            cfg,
 		runningTasks:   make(map[string]*runningTaskState),

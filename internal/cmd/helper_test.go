@@ -6,10 +6,13 @@ package cmd
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmn/buildenv"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -123,7 +126,7 @@ func TestQuoteParamValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := quoteParamValues(tt.input, tt.paramDefs)
+			result := spec.QuoteRuntimeParams(tt.input, tt.paramDefs)
 			assert.Equal(t, tt.expect, result)
 		})
 	}
@@ -184,4 +187,57 @@ func TestRebuildDAGFromYAML_RebuildEnvFromYAML(t *testing.T) {
 
 	assert.Equal(t, "Default", result.Queue)
 	assert.Contains(t, result.Env, "MY_VAR=my_value")
+}
+
+func TestRebuildDAGFromYAML_ReappliesBaseConfigContent(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{
+		Name: "test-dag",
+		YamlData: []byte(`
+steps:
+  - name: test
+    command: echo hello
+`),
+		BaseConfigData: []byte(`
+env:
+  - BASE_ONLY: "from-base-config"
+`),
+	}
+
+	result, err := rebuildDAGFromYAML(context.Background(), dag)
+	require.NoError(t, err)
+	assert.Contains(t, result.Env, "BASE_ONLY=from-base-config")
+}
+
+func TestRebuildDAGFromYAML_UsesTransportedBuildEnv(t *testing.T) {
+	extraEnv, cleanup, err := buildenv.Prepare([]string{
+		"HOST_VALUE=from-transport-host",
+		"BACKTICK_VALUE=from-transport-backtick",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, cleanup()) })
+
+	for _, entry := range extraEnv {
+		key, value, ok := strings.Cut(entry, "=")
+		require.True(t, ok)
+		t.Setenv(key, value)
+	}
+
+	dag := &core.DAG{
+		Name: "test-dag",
+		YamlData: []byte(`
+env:
+  - HOST_VALUE: "${MISSING_NON_WHITELISTED_ENV}"
+  - BACKTICK_VALUE: "` + "`command_that_does_not_exist_12345`" + `"
+steps:
+  - name: test
+    command: echo hello
+`),
+	}
+
+	result, err := rebuildDAGFromYAML(context.Background(), dag)
+	require.NoError(t, err)
+	assert.Contains(t, result.Env, "HOST_VALUE=from-transport-host")
+	assert.Contains(t, result.Env, "BACKTICK_VALUE=from-transport-backtick")
 }
