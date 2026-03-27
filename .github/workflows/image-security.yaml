@@ -1,0 +1,80 @@
+name: ImageSecurity
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    paths:
+      - Dockerfile
+      - Dockerfile.alpine
+      - go.mod
+      - go.sum
+      - ui/package.json
+      - ui/pnpm-lock.yaml
+      - .github/workflows/image-security.yaml
+      - .github/workflows/docker.yaml
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - Dockerfile.alpine
+      - go.mod
+      - go.sum
+      - ui/package.json
+      - ui/pnpm-lock.yaml
+      - .github/workflows/image-security.yaml
+      - .github/workflows/docker.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan-production-images:
+    name: Scan ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu Image
+            dockerfile: Dockerfile
+            tag: dagu-ci:ubuntu
+          - name: Alpine Image
+            dockerfile: Dockerfile.alpine
+            tag: dagu-ci:alpine
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image locally
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          provenance: false
+          tags: ${{ matrix.tag }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ matrix.tag }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
