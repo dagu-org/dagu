@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -198,27 +197,36 @@ steps:
 
 func TestRetryCommand_BuiltExecutableRestoresExplicitEnv(t *testing.T) {
 	th := test.SetupCommand(t, test.WithBuiltExecutable())
+	markerPath := th.TempFile(t, "retry-marker", nil)
+	require.NoError(t, os.Remove(markerPath))
 
-	dag := th.DAG(t, `name: built-retry-explicit-env
+	dag := th.DAG(t, fmt.Sprintf(`name: built-retry-explicit-env
 env:
   - EXPORTED_SECRET: ${CMD_RETRY_EXPLICIT_ENV}
 steps:
   - name: "capture"
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${CMD_RETRY_EXPLICIT_ENV:-}"
+    shell: bash
+    command: |
+      if [ ! -f %[1]q ]; then
+        touch %[1]q
+        printf '%%s|%%s' "$EXPORTED_SECRET" "${CMD_RETRY_EXPLICIT_ENV:-}"
+        exit 1
+      fi
+      printf '%%s|%%s' "$EXPORTED_SECRET" "${CMD_RETRY_EXPLICIT_ENV:-}"
     output: RESULT
-`)
+`, markerPath))
 
-	runBuiltCLI(t, th, []string{"CMD_RETRY_EXPLICIT_ENV=from-host"}, "start", dag.Location)
+	_, err := test.RunBuiltCLICommand(t, th.Helper, []string{"CMD_RETRY_EXPLICIT_ENV=from-host"}, "start", dag.Location)
+	require.Error(t, err)
 
 	initialStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
-	require.Equal(t, core.Succeeded, initialStatus.Status)
-	require.Equal(t, "from-host", strings.SplitN(statusOutputValue(t, &initialStatus, "RESULT"), "|", 2)[0])
+	require.Equal(t, core.Failed, initialStatus.Status)
 
 	initialAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, initialStatus.DAGRunID))
 	require.NoError(t, err)
 
-	runBuiltCLI(t, th, nil, "retry", fmt.Sprintf("--run-id=%s", initialStatus.DAGRunID), dag.Location)
+	test.RunBuiltCLI(t, th.Helper, nil, "retry", fmt.Sprintf("--run-id=%s", initialStatus.DAGRunID), dag.Location)
 
 	retriedAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, initialStatus.DAGRunID))
 	require.NoError(t, err)
@@ -227,7 +235,7 @@ steps:
 	retriedStatus, err := retriedAttempt.ReadStatus(th.Context)
 	require.NoError(t, err)
 	require.Equal(t, core.Succeeded, retriedStatus.Status)
-	require.Equal(t, "from-host", strings.SplitN(statusOutputValue(t, retriedStatus, "RESULT"), "|", 2)[0])
+	require.Equal(t, "from-host|", test.StatusOutputValue(t, retriedStatus, "RESULT"))
 }
 
 func writeStatus(t *testing.T, ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) {

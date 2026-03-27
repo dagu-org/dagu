@@ -89,18 +89,18 @@ steps:
 		return err == nil && status != nil && status.Status == core.Running
 	}, 10*time.Second, 100*time.Millisecond)
 
-	runBuiltCLI(t, th, []string{"CMD_RESTART_EXPLICIT_ENV=from-host"}, "restart", dag.Name)
+	test.RunBuiltCLI(t, th.Helper, []string{"CMD_RESTART_EXPLICIT_ENV=from-host"}, "restart", dag.Name)
 
 	require.NoError(t, <-startDone)
 
 	latestStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 	require.Equal(t, core.Succeeded, latestStatus.Status)
-	require.Equal(t, "from-host", strings.SplitN(statusOutputValue(t, &latestStatus, "RESULT"), "|", 2)[0])
+	require.Equal(t, "from-host", strings.SplitN(test.StatusOutputValue(t, &latestStatus, "RESULT"), "|", 2)[0])
 
 	latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, latestStatus.DAGRunID))
 	require.NoError(t, err)
 	latestAttemptStatus, err := latestAttempt.ReadStatus(th.Context)
 	require.NoError(t, err)
-	require.Equal(t, "from-host", strings.SplitN(statusOutputValue(t, latestAttemptStatus, "RESULT"), "|", 2)[0])
+	require.Equal(t, "from-host", strings.SplitN(test.StatusOutputValue(t, latestAttemptStatus, "RESULT"), "|", 2)[0])
 }

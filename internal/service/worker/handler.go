@@ -95,20 +95,22 @@ func (e *taskHandler) Handle(ctx context.Context, task *coordinatorv1.Task) erro
 }
 
 func (e *taskHandler) buildCommandSpec(ctx context.Context, task *coordinatorv1.Task, originalTarget string) (runtime.CmdSpec, error) {
+	dagName := dagNameHint(originalTarget)
+
 	switch task.Operation {
 	case coordinatorv1.Operation_OPERATION_START:
 		hints, err := e.subprocessHints(ctx, task, originalTarget)
 		if err != nil {
 			return runtime.CmdSpec{}, err
 		}
-		return e.subCmdBuilder.TaskStart(task, hints.secrets, hints.env), nil
+		return e.subCmdBuilder.TaskStart(task, hints.secrets, hints.env, dagName), nil
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
 		hints, err := e.subprocessHints(ctx, task, originalTarget)
 		if err != nil {
 			return runtime.CmdSpec{}, err
 		}
-		return e.subCmdBuilder.TaskRetry(task, hints.secrets, hints.env), nil
+		return e.subCmdBuilder.TaskRetry(task, hints.secrets, hints.env, dagName), nil
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return runtime.CmdSpec{}, fmt.Errorf("operation not specified")
@@ -124,10 +126,7 @@ type subprocessHintSet struct {
 }
 
 func (e *taskHandler) subprocessHints(ctx context.Context, task *coordinatorv1.Task, originalTarget string) (*subprocessHintSet, error) {
-	dagName := task.RootDagRunName
-	if dagName == "" {
-		dagName = dagNameHint(originalTarget)
-	}
+	dagName := dagNameHint(originalTarget)
 
 	var loadOpts []spec.LoadOption
 	if dagName != "" {

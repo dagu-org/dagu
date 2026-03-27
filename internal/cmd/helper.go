@@ -77,7 +77,17 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	}
 
 	buildEnvMap := buildenv.ToMap(dag.Env)
-	for key, value := range buildenv.Load() {
+	for key, value := range dag.PresolvedBuildEnv {
+		if buildEnvMap == nil {
+			buildEnvMap = make(map[string]string)
+		}
+		buildEnvMap[key] = value
+	}
+	presolvedBuildEnv, err := buildenv.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load presolved build env: %w", err)
+	}
+	for key, value := range presolvedBuildEnv {
 		if buildEnvMap == nil {
 			buildEnvMap = make(map[string]string)
 		}

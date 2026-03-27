@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -122,8 +123,17 @@ func preResolveEnvSecrets(refs []core.SecretRef) []string {
 	return extra
 }
 
-func preResolveBuildEnv(env []string) []string {
-	return buildenv.Encode(env)
+func dagNameHint(target string) string {
+	name := strings.TrimSpace(target)
+	if name == "" {
+		return ""
+	}
+	base := filepath.Base(name)
+	ext := filepath.Ext(base)
+	if ext == ".yaml" || ext == ".yml" {
+		return strings.TrimSuffix(base, ext)
+	}
+	return base
 }
 
 // Start creates a start command spec.
@@ -167,7 +177,8 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(append(preResolveEnvSecrets(dag.Secrets), preResolveBuildEnv(dag.Env)...)...),
+		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		BuildEnv:   append([]string{}, dag.Env...),
 	}
 }
 
@@ -207,7 +218,8 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(preResolveBuildEnv(dag.Env)...),
+		Env:        b.env(),
+		BuildEnv:   append([]string{}, dag.Env...),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -249,7 +261,8 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(append(preResolveEnvSecrets(dag.Secrets), preResolveBuildEnv(dag.Env)...)...),
+		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		BuildEnv:   append([]string{}, dag.Env...),
 	}
 }
 
@@ -269,7 +282,8 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(append(preResolveEnvSecrets(dag.Secrets), preResolveBuildEnv(dag.Env)...)...),
+		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		BuildEnv:   append([]string{}, dag.Env...),
 	}
 }
 
@@ -277,9 +291,9 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 // secretHints optionally provides secret refs for pre-resolving env-provider
 // secrets. envHints optionally provides resolved DAG/base-config env entries
 // for pre-resolving rebuild-time env values in the child process.
-func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string) CmdSpec {
+func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string, dagName string) CmdSpec {
 	args := []string{"start", "-q"}
-	env := b.env(append(preResolveEnvSecrets(secretHints), preResolveBuildEnv(envHints)...)...)
+	env := b.env(preResolveEnvSecrets(secretHints)...)
 
 	// Add hierarchy flags for sub DAGs
 	if task.RootDagRunId != "" {
@@ -295,8 +309,14 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.S
 	}
 
 	// Override derived name since temp files lack 'name:' field
-	if task.RootDagRunName != "" {
-		args = append(args, fmt.Sprintf("--name=%s", task.RootDagRunName))
+	if dagName == "" {
+		dagName = task.RootDagRunName
+	}
+	if dagName == "" {
+		dagName = dagNameHint(task.Target)
+	}
+	if dagName != "" {
+		args = append(args, fmt.Sprintf("--name=%s", dagName))
 	}
 
 	// Worker ID prevents re-dispatch to coordinator
@@ -327,6 +347,7 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.S
 		Executable: b.executable,
 		Args:       args,
 		Env:        env,
+		BuildEnv:   append([]string{}, envHints...),
 	}
 }
 
@@ -334,9 +355,9 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.S
 // secretHints optionally provides secret refs for pre-resolving env-provider
 // secrets. envHints optionally provides resolved DAG/base-config env entries
 // for pre-resolving rebuild-time env values in the child process.
-func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string) CmdSpec {
+func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string, dagName string) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
-	env := b.env(append(preResolveEnvSecrets(secretHints), preResolveBuildEnv(envHints)...)...)
+	env := b.env(preResolveEnvSecrets(secretHints)...)
 	if task.AttemptId != "" {
 		args = append(args, fmt.Sprintf("--attempt-id=%s", task.AttemptId))
 	}
@@ -353,9 +374,13 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.S
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)
 	}
-	// Use RootDagRunName instead of Target, because Target may be a temporary file
-	// created by the worker, but retry needs the original DAG name
-	args = append(args, task.RootDagRunName)
+	if dagName == "" {
+		dagName = task.RootDagRunName
+	}
+	if dagName == "" {
+		dagName = dagNameHint(task.Target)
+	}
+	args = append(args, dagName)
 	if task.ExternalStepRetry {
 		env = append(env, exec1.EnvKeyExternalStepRetry+"=1")
 	}
@@ -364,6 +389,7 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.S
 		Executable: b.executable,
 		Args:       args,
 		Env:        env,
+		BuildEnv:   append([]string{}, envHints...),
 	}
 }
 
@@ -372,6 +398,7 @@ type CmdSpec struct {
 	Executable string
 	Args       []string
 	Env        []string
+	BuildEnv   []string
 	Stdout     *os.File
 	Stderr     *os.File
 }
@@ -415,7 +442,11 @@ func Run(ctx context.Context, spec CmdSpec) error {
 	stdout := newCappedBuffer(defaultMaxBufferSize)
 	stderr := newCappedBuffer(defaultMaxBufferSize)
 
-	cmd := newCommand(ctx, spec, true)
+	cmd, cleanup, err := newCommand(ctx, spec, true)
+	if err != nil {
+		return err
+	}
+	defer cleanupTransport(cleanup)
 	cmd.Stdout = io.MultiWriter(stdout, fileOrDefault(spec.Stdout, os.Stdout))
 	cmd.Stderr = io.MultiWriter(stderr, fileOrDefault(spec.Stderr, os.Stderr))
 
@@ -445,13 +476,18 @@ func fileOrDefault(file, defaultFile *os.File) *os.File {
 
 // Start executes the command without waiting for it to complete.
 func Start(ctx context.Context, spec CmdSpec) error {
-	cmd := newCommand(ctx, spec, false)
+	cmd, cleanup, err := newCommand(ctx, spec, false)
+	if err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
+		cleanupTransport(cleanup)
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 
 	go execWithRecovery(ctx, func() {
 		_ = cmd.Wait()
+		cleanupTransport(cleanup)
 	})
 
 	return nil
@@ -459,7 +495,7 @@ func Start(ctx context.Context, spec CmdSpec) error {
 
 // newCommand creates an exec.Cmd from the spec with proper configuration.
 // nolint:gosec
-func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
+func newCommand(ctx context.Context, spec CmdSpec, withContext bool) (*exec.Cmd, func() error, error) {
 	var cmd *exec.Cmd
 	if withContext {
 		cmd = exec.CommandContext(ctx, spec.Executable, spec.Args...)
@@ -468,9 +504,27 @@ func newCommand(ctx context.Context, spec CmdSpec, withContext bool) *exec.Cmd {
 	}
 
 	cmdutil.SetupCommand(cmd)
-	cmd.Env = spec.Env
+	var env []string
+	if spec.Env != nil {
+		env = append([]string{}, spec.Env...)
+	}
+	extraEnv, cleanup, err := buildenv.Prepare(spec.BuildEnv)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to prepare presolved build env transport: %w", err)
+	}
+	if len(extraEnv) > 0 {
+		env = append(env, extraEnv...)
+	}
+	cmd.Env = env
 	cmd.Stdout = fileOrDefault(spec.Stdout, os.Stdout)
 	cmd.Stderr = fileOrDefault(spec.Stderr, os.Stderr)
 
-	return cmd
+	return cmd, cleanup, nil
+}
+
+func cleanupTransport(cleanup func() error) {
+	if cleanup == nil {
+		return
+	}
+	_ = cleanup()
 }

@@ -100,7 +100,7 @@ func evaluatePairs(ctx BuildContext, pairs []pair) (map[string]string, error) {
 		if !ctx.opts.Has(BuildFlagNoEval) {
 			if presolved, ok := ctx.opts.BuildEnv[p.key]; ok {
 				value = presolved
-				scope = scope.WithEntry(p.key, value, eval.EnvSourceDAGEnv)
+				scope = scope.WithEntry(p.key, value, eval.EnvSourcePresolved)
 				vars[p.key] = value
 				continue
 			}

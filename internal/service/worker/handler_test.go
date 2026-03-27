@@ -330,11 +330,13 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 
 	originalTarget := "workflow.yaml"
 	task := &coordinatorv1.Task{
-		Operation:  coordinatorv1.Operation_OPERATION_START,
-		DagRunId:   "run-123",
-		Target:     originalTarget,
-		Definition: "steps:\n  - name: example\n    command: echo example\n",
-		Params:     "foo=bar",
+		Operation:      coordinatorv1.Operation_OPERATION_START,
+		DagRunId:       "run-123",
+		Target:         originalTarget,
+		Definition:     "steps:\n  - name: example\n    command: echo example\n",
+		Params:         "foo=bar",
+		RootDagRunName: "root-dag",
+		RootDagRunId:   "root-run-123",
 	}
 
 	err = handler.Handle(context.Background(), task)
@@ -348,9 +350,12 @@ func TestTaskHandlerStartWithDefinition(t *testing.T) {
 	argsLines := strings.Split(strings.TrimSpace(string(argsData)), "\n")
 	require.Contains(t, argsLines, "start")
 	require.Contains(t, argsLines, "--run-id=run-123")
+	require.Contains(t, argsLines, "--root=root-dag:root-run-123")
+	require.Contains(t, argsLines, "--name=workflow")
 	require.Contains(t, argsLines, task.Target)
 	require.Contains(t, argsLines, "--")
 	require.Contains(t, argsLines, "foo=bar")
+	require.NotContains(t, argsLines, "--name=root-dag")
 
 	_, statErr := os.Stat(task.Target)
 	require.True(t, os.IsNotExist(statErr), "temporary DAG file should be removed after execution")

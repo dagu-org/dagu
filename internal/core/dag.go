@@ -8,6 +8,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -116,6 +117,11 @@ type DAG struct {
 	// Note: This field is evaluated at build time and may contain secrets.
 	// It is excluded from JSON serialization to prevent secret leakage.
 	Env []string `json:"-"`
+	// PresolvedBuildEnv stores resolved DAG/base-config env entries needed to
+	// rebuild the DAG from persisted YAML during retry/restart paths.
+	// It is serialized with dag.json because direct retry/restart cannot rely on
+	// parent-process transport once the original process has exited.
+	PresolvedBuildEnv map[string]string `json:"presolvedBuildEnv,omitempty"`
 	// LogDir is the directory where the logs are stored.
 	LogDir string `json:"logDir,omitempty"`
 	// LogOutput specifies how stdout and stderr are handled in log files.
@@ -291,6 +297,9 @@ func (d *DAG) Clone() *DAG {
 	clone := *d
 	// Reset sync.Once so LoadDotEnv can be called on the clone
 	clone.dotenvOnce = sync.Once{}
+	if d.PresolvedBuildEnv != nil {
+		clone.PresolvedBuildEnv = maps.Clone(d.PresolvedBuildEnv)
+	}
 	return &clone
 }
 

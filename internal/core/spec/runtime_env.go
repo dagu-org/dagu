@@ -63,15 +63,15 @@ func ResolveEnv(ctx context.Context, dag *core.DAG, params any, opts ResolveEnvO
 	}
 
 	switch {
-	case dag.Location != "":
-		fresh, err := Load(ctx, dag.Location, loadOpts...)
+	case len(dag.YamlData) > 0:
+		fresh, err := LoadYAML(ctx, dag.YamlData, loadOpts...)
 		if err != nil {
 			return nil, err
 		}
 		return append([]string{}, fresh.Env...), nil
 
-	case len(dag.YamlData) > 0:
-		fresh, err := LoadYAML(ctx, dag.YamlData, loadOpts...)
+	case dag.Location != "":
+		fresh, err := Load(ctx, dag.Location, loadOpts...)
 		if err != nil {
 			return nil, err
 		}

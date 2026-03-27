@@ -211,10 +211,14 @@ env:
 }
 
 func TestRebuildDAGFromYAML_UsesTransportedBuildEnv(t *testing.T) {
-	for _, entry := range buildenv.Encode([]string{
+	extraEnv, cleanup, err := buildenv.Prepare([]string{
 		"HOST_VALUE=from-transport-host",
 		"BACKTICK_VALUE=from-transport-backtick",
-	}) {
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, cleanup()) })
+
+	for _, entry := range extraEnv {
 		key, value, ok := strings.Cut(entry, "=")
 		require.True(t, ok)
 		t.Setenv(key, value)

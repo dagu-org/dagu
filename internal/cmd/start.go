@@ -313,7 +313,11 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 	if defaultWorkingDir != "" {
 		loadOpts = append(loadOpts, spec.WithDefaultWorkingDir(defaultWorkingDir))
 	}
-	if presolvedBuildEnv := buildenv.Load(); len(presolvedBuildEnv) > 0 {
+	presolvedBuildEnv, err := buildenv.Load()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load presolved build env: %w", err)
+	}
+	if len(presolvedBuildEnv) > 0 {
 		loadOpts = append(loadOpts, spec.WithBuildEnv(presolvedBuildEnv))
 	}
 

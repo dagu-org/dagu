@@ -229,47 +229,8 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 		return nil, core.ErrorList{err}
 	}
 
-	raw, err := unmarshalData(data)
-	if err != nil {
-		if opts.Has(BuildFlagAllowBuildErrors) {
-			return &core.DAG{
-				Name:        opts.Name,
-				BuildErrors: []error{err},
-			}, nil
-		}
-		return nil, core.ErrorList{err}
-	}
-
-	def, err := decode(raw)
-	if err != nil {
-		if opts.Has(BuildFlagAllowBuildErrors) {
-			return &core.DAG{
-				Name:        opts.Name,
-				BuildErrors: []error{err},
-			}, nil
-		}
-		return nil, core.ErrorList{err}
-	}
-
 	buildCtx := BuildContext{ctx: ctx, opts: opts}
-
-	var dest *core.DAG
-	if baseDef != nil {
-		dest, err = buildBaseDAG(buildCtx, baseDef)
-		if err != nil {
-			if opts.Has(BuildFlagAllowBuildErrors) {
-				return &core.DAG{
-					Name:        opts.Name,
-					BuildErrors: []error{err},
-				}, nil
-			}
-			return nil, core.ErrorList{err}
-		}
-	} else {
-		dest = new(core.DAG)
-	}
-
-	dag, err := def.build(buildCtx)
+	dags, err := loadDAGsFromData(buildCtx, data, "", baseDef)
 	if err != nil {
 		if opts.Has(BuildFlagAllowBuildErrors) {
 			return &core.DAG{
@@ -279,8 +240,8 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 		}
 		return nil, core.ErrorList{err}
 	}
-
-	if err := merge(dest, dag); err != nil {
+	if len(dags) == 0 {
+		err := fmt.Errorf("no DAGs found in YAML data")
 		if opts.Has(BuildFlagAllowBuildErrors) {
 			return &core.DAG{
 				Name:        opts.Name,
@@ -290,12 +251,31 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 		return nil, core.ErrorList{err}
 	}
 
-	dest.YamlData = data
-	if len(baseRaw) > 0 {
-		dest.BaseConfigData = baseRaw
+	mainDAG := dags[0]
+	if len(dags) > 1 {
+		mainDAG.LocalDAGs = make(map[string]*core.DAG, len(dags)-1)
+		for i := 1; i < len(dags); i++ {
+			subDAG := dags[i]
+			if subDAG.Name == "" {
+				err := fmt.Errorf("child core.DAG at index %d must have a name", i)
+				if opts.Has(BuildFlagAllowBuildErrors) {
+					return &core.DAG{
+						Name:        opts.Name,
+						BuildErrors: []error{err},
+					}, nil
+				}
+				return nil, core.ErrorList{err}
+			}
+			mainDAG.LocalDAGs[subDAG.Name] = subDAG
+		}
 	}
 
-	return dest, nil
+	mainDAG.YamlData = data
+	if len(baseRaw) > 0 {
+		mainDAG.BaseConfigData = baseRaw
+	}
+
+	return mainDAG, nil
 }
 
 // LoadBaseConfig loads the global configuration from the given file.
