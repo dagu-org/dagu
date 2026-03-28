@@ -195,7 +195,7 @@ func extractParamsSchemaDeclaration(params any) (any, bool) {
 	if !ok {
 		return nil, false
 	}
-	if !isExternalSchemaParamsMap(paramsMap) {
+	if !isSchemaBackedParamsMap(paramsMap) {
 		return nil, false
 	}
 
@@ -207,7 +207,13 @@ func extractParamsSchemaDeclaration(params any) (any, bool) {
 	return schemaDecl, true
 }
 
-func isExternalSchemaParamsMap(paramsMap map[string]any) bool {
+// isSchemaBackedParamsMap reports whether a top-level params map should be
+// interpreted as schema-backed params mode rather than as a legacy named-param map.
+// The rules intentionally preserve legacy compatibility for maps like:
+//
+//	params: { schema: prod }
+//	params: { schema: true }
+func isSchemaBackedParamsMap(paramsMap map[string]any) bool {
 	schemaDecl, hasSchema := paramsMap["schema"]
 	if !hasSchema {
 		return false

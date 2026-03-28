@@ -885,6 +885,9 @@ func buildStepOutputSchema(ctx StepBuildContext, s *step) (*jsonschema.Resolved,
 		return nil, nil
 	}
 
+	// Schema references resolve relative to DAG build context, matching params.schema.
+	// Step working_dir is execution-time behavior and is intentionally not part of
+	// schema file resolution.
 	workingDir := ""
 	if ctx.dag != nil {
 		workingDir = ctx.dag.WorkingDir

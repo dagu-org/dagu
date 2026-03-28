@@ -861,7 +861,7 @@
           }
         }
       ],
-      "description": "JSON Schema validation mode. Use `values` for explicit defaults, provide an inline object schema directly, or provide a path-like/URL schema reference by itself. Boolean schemas require `values` so legacy maps like `params: { schema: true }` remain valid."
+      "description": "JSON Schema validation mode. This top-level params object is treated as schema-backed only when it is unambiguous: use `values` for explicit defaults, provide an inline object schema directly, or provide a path-like/URL schema reference by itself. Boolean schemas require `values` so legacy maps like `params: { schema: true }` remain valid."
     },
     "dagParamLegacyMap": {
       "type": "object",
