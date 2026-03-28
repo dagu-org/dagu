@@ -112,7 +112,6 @@ jobs:
       - name: Test
         if: runner.os != 'Windows'
         run: |
-          make test-installer
           make test-coverage
 
       - name: Test (Windows)

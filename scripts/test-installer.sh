@@ -11,11 +11,25 @@ fixture_dir="$(mktemp -d)"
 trap 'rm -rf "${fixture_dir}"' EXIT
 
 bash -c '
-    set -euo pipefail
-
     installer_path="$1"
-    set --
+    set -- keep positional args
+    trap '\''true'\'' EXIT
+    before_flags="$(set +o)"
+    before_exit_trap="$(trap -p EXIT)"
+
     source "${installer_path}"
+
+    after_flags="$(set +o)"
+    after_exit_trap="$(trap -p EXIT)"
+
+    [[ "$#" -eq 3 ]]
+    [[ "$1" == "keep" ]]
+    [[ "$2" == "positional" ]]
+    [[ "$3" == "args" ]]
+    [[ "${before_flags}" == "${after_flags}" ]]
+    [[ "${before_exit_trap}" == "${after_exit_trap}" ]]
+
+    set -euo pipefail
 
     mktempdir tmpdir
     mktempfile tmpfile
@@ -37,12 +51,11 @@ DAGU_AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD=supersecret
 EOF
 
 bash -c '
-    set -euo pipefail
-
     installer_path="$1"
     bootstrap_path="$2"
-    set --
     source "${installer_path}"
+
+    set -euo pipefail
 
     OS="linux"
     SERVICE_SCOPE="user"

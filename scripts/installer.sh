@@ -2,8 +2,6 @@
 # Copyright (C) 2026 Yota Hamada
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-set -euo pipefail
-
 RELEASES_URL="https://github.com/dagu-org/dagu/releases"
 GITHUB_API_URL="https://api.github.com/repos/dagu-org/dagu/releases/latest"
 FILE_BASENAME="dagu"
@@ -26,7 +24,11 @@ cleanup_tmpfiles() {
         rm -rf "$f" 2>/dev/null || true
     done
 }
-trap cleanup_tmpfiles EXIT
+
+init_runtime() {
+    set -euo pipefail
+    trap cleanup_tmpfiles EXIT
+}
 
 set_outvar() {
     local __dagu_set_outvar_name="${1:?missing output variable}"
@@ -136,82 +138,84 @@ Options:
 EOF
 }
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --version)
-            shift
-            VERSION="${1:-}"
-            ;;
-        --install-dir|--prefix)
-            shift
-            DAGU_INSTALL_DIR="${1:-}"
-            ;;
-        --working-dir)
-            shift
-            WORKING_ROOT_DIR="${1:-}"
-            ;;
-        --service)
-            shift
-            SERVICE_MODE="${1:-}"
-            ;;
-        --service-scope)
-            shift
-            SERVICE_SCOPE="${1:-}"
-            ;;
-        --host)
-            shift
-            HOST="${1:-}"
-            ;;
-        --port)
-            shift
-            PORT="${1:-}"
-            ;;
-        --skills-dir)
-            shift
-            EXPLICIT_SKILL_DIRS+=("${1:-}")
-            ;;
-        --admin-username)
-            shift
-            ADMIN_USERNAME="${1:-}"
-            ;;
-        --admin-password)
-            shift
-            ADMIN_PASSWORD="${1:-}"
-            ;;
-        --open-browser)
-            shift
-            OPEN_BROWSER="${1:-}"
-            ;;
-        --no-prompt)
-            NO_PROMPT=1
-            ;;
-        --dry-run)
-            DRY_RUN=1
-            ;;
-        --verbose)
-            VERBOSE=1
-            ;;
-        --uninstall)
-            UNINSTALL_MODE=1
-            ;;
-        --purge-data)
-            PURGE_DATA=1
-            ;;
-        --remove-skill)
-            REMOVE_SKILL=1
-            ;;
-        --help|-h)
-            usage
-            exit 0
-            ;;
-        *)
-            printf '%s\n' "Unknown argument: $1" >&2
-            usage >&2
-            exit 2
-            ;;
-    esac
-    shift
-done
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --version)
+                shift
+                VERSION="${1:-}"
+                ;;
+            --install-dir|--prefix)
+                shift
+                DAGU_INSTALL_DIR="${1:-}"
+                ;;
+            --working-dir)
+                shift
+                WORKING_ROOT_DIR="${1:-}"
+                ;;
+            --service)
+                shift
+                SERVICE_MODE="${1:-}"
+                ;;
+            --service-scope)
+                shift
+                SERVICE_SCOPE="${1:-}"
+                ;;
+            --host)
+                shift
+                HOST="${1:-}"
+                ;;
+            --port)
+                shift
+                PORT="${1:-}"
+                ;;
+            --skills-dir)
+                shift
+                EXPLICIT_SKILL_DIRS+=("${1:-}")
+                ;;
+            --admin-username)
+                shift
+                ADMIN_USERNAME="${1:-}"
+                ;;
+            --admin-password)
+                shift
+                ADMIN_PASSWORD="${1:-}"
+                ;;
+            --open-browser)
+                shift
+                OPEN_BROWSER="${1:-}"
+                ;;
+            --no-prompt)
+                NO_PROMPT=1
+                ;;
+            --dry-run)
+                DRY_RUN=1
+                ;;
+            --verbose)
+                VERBOSE=1
+                ;;
+            --uninstall)
+                UNINSTALL_MODE=1
+                ;;
+            --purge-data)
+                PURGE_DATA=1
+                ;;
+            --remove-skill)
+                REMOVE_SKILL=1
+                ;;
+            --help|-h)
+                usage
+                exit 0
+                ;;
+            *)
+                printf '%s\n' "Unknown argument: $1" >&2
+                usage >&2
+                exit 2
+                ;;
+        esac
+        shift
+    done
+}
 
 detect_downloader() {
     if command -v curl >/dev/null 2>&1; then
@@ -2152,6 +2156,8 @@ print_summary() {
 }
 
 main() {
+    init_runtime
+    parse_args "$@"
     bootstrap_gum_temp || true
     print_banner
     detect_os_arch

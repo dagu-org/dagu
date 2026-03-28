@@ -149,7 +149,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 
 # test runs all tests.
 .PHONY: test
-test: bin
+test: test-installer bin
 	@printf '%b\n' "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache
@@ -157,7 +157,7 @@ test: bin
 
 # test-coverage runs all tests with coverage.
 .PHONY: test-coverage
-test-coverage:
+test-coverage: test-installer
 	@printf '%b\n' "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverpkg=./... -coverprofile="coverage.out" -covermode=atomic ${TEST_TARGET}
