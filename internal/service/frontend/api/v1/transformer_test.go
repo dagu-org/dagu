@@ -5,6 +5,7 @@ package api
 
 import (
 	"testing"
+	"time"
 
 	openapi "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/core"
@@ -95,6 +96,53 @@ func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
 	require.Len(t, *details.ParamDefs, 1)
 	require.NotNil(t, (*details.ParamDefs)[0].Description)
 	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
+}
+
+func TestToDAGIncludesTypedSchedules(t *testing.T) {
+	cronSchedule, err := core.NewCronSchedule("*/5 * * * *")
+	require.NoError(t, err)
+
+	oneOffSchedule, err := core.NewOneOffSchedule("2026-03-29T02:10:00+01:00")
+	require.NoError(t, err)
+
+	dag := toDAG(&core.DAG{
+		Name:     "typed-schedules",
+		Schedule: []core.Schedule{cronSchedule, oneOffSchedule},
+	})
+
+	require.NotNil(t, dag.Schedule)
+	require.Len(t, *dag.Schedule, 2)
+
+	cronAPI := (*dag.Schedule)[0]
+	require.NotNil(t, cronAPI.Expression)
+	assert.Equal(t, openapi.ScheduleKindCron, cronAPI.Kind)
+	assert.Equal(t, "*/5 * * * *", *cronAPI.Expression)
+	assert.Nil(t, cronAPI.At)
+
+	oneOffAPI := (*dag.Schedule)[1]
+	require.NotNil(t, oneOffAPI.At)
+	assert.Equal(t, openapi.ScheduleKindAt, oneOffAPI.Kind)
+	assert.Nil(t, oneOffAPI.Expression)
+
+	expectedAt, err := time.Parse(time.RFC3339, "2026-03-29T02:10:00+01:00")
+	require.NoError(t, err)
+	assert.True(t, expectedAt.Equal(*oneOffAPI.At))
+}
+
+func TestToDAGDetailsIncludesTypedSchedules(t *testing.T) {
+	oneOffSchedule, err := core.NewOneOffSchedule("2026-03-29T02:10:00Z")
+	require.NoError(t, err)
+
+	details := toDAGDetails(&core.DAG{
+		Name:     "typed-schedules",
+		Schedule: []core.Schedule{oneOffSchedule},
+	})
+
+	require.NotNil(t, details.Schedule)
+	require.Len(t, *details.Schedule, 1)
+	require.NotNil(t, (*details.Schedule)[0].At)
+	assert.Equal(t, openapi.ScheduleKindAt, (*details.Schedule)[0].Kind)
+	assert.Nil(t, (*details.Schedule)[0].Expression)
 }
 
 func TestToNodeMapsStatuses(t *testing.T) {

@@ -11,10 +11,23 @@ import (
 
 const maxIntValue = int(^uint(0) >> 1)
 
+func toSchedule(s core.Schedule) api.Schedule {
+	schedule := api.Schedule{
+		Kind: api.ScheduleKind(s.GetKind()),
+	}
+	if s.Expression != "" {
+		schedule.Expression = ptrOf(s.Expression)
+	}
+	if at, ok := s.OneOffTime(); ok {
+		schedule.At = &at
+	}
+	return schedule
+}
+
 func toDAG(dag *core.DAG) api.DAG {
 	schedules := make([]api.Schedule, len(dag.Schedule))
 	for i, s := range dag.Schedule {
-		schedules[i] = api.Schedule{Expression: s.Expression}
+		schedules[i] = toSchedule(s)
 	}
 
 	return api.DAG{
@@ -302,7 +315,7 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 
 	schedules := make([]api.Schedule, len(dag.Schedule))
 	for i, s := range dag.Schedule {
-		schedules[i] = api.Schedule{Expression: s.Expression}
+		schedules[i] = toSchedule(s)
 	}
 
 	preconditions := make([]api.Condition, len(dag.Preconditions))

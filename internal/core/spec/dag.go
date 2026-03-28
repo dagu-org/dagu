@@ -795,21 +795,21 @@ func buildSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 	if d.Schedule.IsZero() {
 		return nil, nil
 	}
-	return buildScheduler(d.Schedule.Starts())
+	return slices.Clone(d.Schedule.Starts()), nil
 }
 
 func buildStopSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 	if d.Schedule.IsZero() {
 		return nil, nil
 	}
-	return buildScheduler(d.Schedule.Stops())
+	return slices.Clone(d.Schedule.Stops()), nil
 }
 
 func buildRestartSchedule(_ BuildContext, d *dag) ([]core.Schedule, error) {
 	if d.Schedule.IsZero() {
 		return nil, nil
 	}
-	return buildScheduler(d.Schedule.Restarts())
+	return slices.Clone(d.Schedule.Restarts()), nil
 }
 
 // paramsResult holds the result of parsing parameters

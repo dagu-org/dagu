@@ -227,6 +227,7 @@ func TestBuildValidationError(t *testing.T) {
 		name        string
 		yaml        string
 		expectedErr error
+		errContains string
 	}{
 		{
 			name: "InvalidEnv",
@@ -245,7 +246,7 @@ params: 123`,
 			name: "InvalidSchedule",
 			yaml: `
 schedule: "1"`,
-			expectedErr: spec.ErrInvalidSchedule,
+			errContains: "invalid cron expression",
 		},
 	}
 
@@ -255,6 +256,10 @@ schedule: "1"`,
 
 			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
 			if errs, ok := err.(*core.ErrorList); ok && len(*errs) > 0 {
+				if tt.expectedErr == nil {
+					require.Contains(t, err.Error(), tt.errContains)
+					return
+				}
 				found := false
 				for _, e := range *errs {
 					if errors.Is(e, tt.expectedErr) {
@@ -263,8 +268,10 @@ schedule: "1"`,
 					}
 				}
 				require.True(t, found, "expected error %v, got %v", tt.expectedErr, err)
-			} else {
+			} else if tt.expectedErr != nil {
 				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				require.Contains(t, err.Error(), tt.errContains)
 			}
 		})
 	}

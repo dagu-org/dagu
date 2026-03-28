@@ -21,7 +21,7 @@ func TestStore_LoadMissing(t *testing.T) {
 	store := New(t.TempDir())
 	state, err := store.Load(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, 1, state.Version)
+	assert.Equal(t, scheduler.SchedulerStateVersion, state.Version)
 	assert.Empty(t, state.DAGs)
 	assert.True(t, state.LastTick.IsZero())
 }
@@ -35,7 +35,7 @@ func TestStore_SaveAndLoad(t *testing.T) {
 
 	now := time.Now().Truncate(time.Second)
 	state := &scheduler.SchedulerState{
-		Version:  1,
+		Version:  scheduler.SchedulerStateVersion,
 		LastTick: now,
 		DAGs: map[string]scheduler.DAGWatermark{
 			"hourly-etl":   {LastScheduledTime: now.Add(-time.Hour)},
@@ -48,7 +48,7 @@ func TestStore_SaveAndLoad(t *testing.T) {
 
 	loaded, err := store.Load(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, 1, loaded.Version)
+	assert.Equal(t, scheduler.SchedulerStateVersion, loaded.Version)
 	assert.Equal(t, now.UTC(), loaded.LastTick.UTC())
 	assert.Len(t, loaded.DAGs, 2)
 	assert.Equal(t, now.Add(-time.Hour).UTC(), loaded.DAGs["hourly-etl"].LastScheduledTime.UTC())
@@ -69,7 +69,7 @@ func TestStore_LoadCorrupt(t *testing.T) {
 
 	state, err := store.Load(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, 1, state.Version)
+	assert.Equal(t, scheduler.SchedulerStateVersion, state.Version)
 	assert.Empty(t, state.DAGs)
 }
 
@@ -80,7 +80,7 @@ func TestStore_SaveCreatesDir(t *testing.T) {
 	store := New(dir)
 
 	state := &scheduler.SchedulerState{
-		Version: 1,
+		Version: scheduler.SchedulerStateVersion,
 		DAGs:    make(map[string]scheduler.DAGWatermark),
 	}
 
@@ -108,7 +108,7 @@ func TestStore_LoadVersionMismatch(t *testing.T) {
 	state, err := store.Load(context.Background())
 	require.NoError(t, err)
 	// Should return fresh state due to version mismatch
-	assert.Equal(t, 1, state.Version)
+	assert.Equal(t, scheduler.SchedulerStateVersion, state.Version)
 	assert.Empty(t, state.DAGs)
 	assert.True(t, state.LastTick.IsZero())
 }
@@ -124,7 +124,7 @@ func TestStore_SaveAtomicity(t *testing.T) {
 
 	// Save initial state
 	state1 := &scheduler.SchedulerState{
-		Version:  1,
+		Version:  scheduler.SchedulerStateVersion,
 		LastTick: now,
 		DAGs: map[string]scheduler.DAGWatermark{
 			"dag1": {LastScheduledTime: now},
@@ -135,7 +135,7 @@ func TestStore_SaveAtomicity(t *testing.T) {
 	// Save updated state
 	later := now.Add(time.Minute)
 	state2 := &scheduler.SchedulerState{
-		Version:  1,
+		Version:  scheduler.SchedulerStateVersion,
 		LastTick: later,
 		DAGs: map[string]scheduler.DAGWatermark{
 			"dag1": {LastScheduledTime: later},
@@ -152,4 +152,19 @@ func TestStore_SaveAtomicity(t *testing.T) {
 	// Verify no temp file left behind
 	_, err = os.Stat(filepath.Join(dir, stateFileName+".tmp"))
 	assert.True(t, os.IsNotExist(err))
+}
+
+func TestStore_LoadMigratesVersionOneState(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	store := New(dir)
+
+	data := []byte(`{"version":1,"lastTick":"2026-02-07T12:00:00Z","dags":{"legacy":{"lastScheduledTime":"2026-02-07T11:00:00Z"}}}`)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, stateFileName), data, 0o600))
+
+	state, err := store.Load(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, scheduler.SchedulerStateVersion, state.Version)
+	assert.Equal(t, time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC), state.DAGs["legacy"].LastScheduledTime)
 }

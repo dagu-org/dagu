@@ -27,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -602,13 +603,28 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 	tags := parseCommaSeparatedTags(request.Params.Tags)
+	projectionTime := time.Now()
+	var schedulerState *scheduler.SchedulerState
+	if a.schedulerStateStore != nil {
+		state, loadErr := a.schedulerStateStore.Load(ctx)
+		if loadErr != nil {
+			logger.Warn(ctx, "Failed to load scheduler state for DAG list projection", tag.Error(loadErr))
+		} else {
+			schedulerState = state
+		}
+	}
+	nextRunProjection := func(dag *core.DAG, now time.Time) time.Time {
+		return scheduler.NextPlannedRun(dag, now, schedulerState)
+	}
 
 	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
-		Paginator: &pg,
-		Name:      valueOf(request.Params.Name),
-		Tags:      tags,
-		Sort:      sortField,
-		Order:     sortOrder,
+		Paginator:         &pg,
+		Name:              valueOf(request.Params.Name),
+		Tags:              tags,
+		Sort:              sortField,
+		Order:             sortOrder,
+		Time:              &projectionTime,
+		NextRunProjection: nextRunProjection,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error listing DAGs: %w", err)
@@ -621,12 +637,19 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 			errList = append(errList, err.Error())
 		}
 
+		nextRun := nextRunProjection(item, projectionTime)
+		var nextRunAt *time.Time
+		if !nextRun.IsZero() {
+			nextRunAt = &nextRun
+		}
+
 		dagFiles = append(dagFiles, api.DAGFile{
 			FileName:     item.FileName(),
 			FilePath:     ptrOf(item.Location),
 			LatestDAGRun: toDAGRunSummary(dagStatus),
 			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
 			Dag:          toDAG(item),
+			NextRun:      nextRunAt,
 			Errors:       extractBuildErrors(item.BuildErrors),
 		})
 	}

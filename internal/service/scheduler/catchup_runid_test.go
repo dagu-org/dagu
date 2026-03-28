@@ -94,3 +94,37 @@ func TestGenerateCatchupRunID(t *testing.T) {
 		assert.Equal(t, id1, id2, "same instant in different timezones must produce same ID")
 	})
 }
+
+func TestGenerateOneOffRunID(t *testing.T) {
+	t.Parallel()
+
+	ts := time.Date(2026, 3, 29, 1, 10, 0, 0, time.UTC)
+	fingerprint := "at:2026-03-29T02:10:00+01:00"
+
+	t.Run("normal name", func(t *testing.T) {
+		id := GenerateOneOffRunID("etl-pipeline", fingerprint, ts)
+		assert.Contains(t, id, "oneoff-etl-pipeline-")
+		assert.Contains(t, id, "-20260329T011000")
+		require.NoError(t, exec.ValidateDAGRunID(id))
+	})
+
+	t.Run("deterministic", func(t *testing.T) {
+		id1 := GenerateOneOffRunID("my-dag", fingerprint, ts)
+		id2 := GenerateOneOffRunID("my-dag", fingerprint, ts)
+		assert.Equal(t, id1, id2)
+	})
+
+	t.Run("fingerprint changes ID", func(t *testing.T) {
+		id1 := GenerateOneOffRunID("my-dag", fingerprint, ts)
+		id2 := GenerateOneOffRunID("my-dag", "at:2026-03-29T02:11:00+01:00", ts)
+		assert.NotEqual(t, id1, id2)
+	})
+
+	t.Run("UTC normalization", func(t *testing.T) {
+		loc, _ := time.LoadLocation("America/New_York")
+		tsLocal := ts.In(loc)
+		id1 := GenerateOneOffRunID("my-dag", fingerprint, ts)
+		id2 := GenerateOneOffRunID("my-dag", fingerprint, tsLocal)
+		assert.Equal(t, id1, id2)
+	})
+}

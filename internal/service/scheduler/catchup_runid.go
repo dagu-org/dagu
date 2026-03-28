@@ -14,6 +14,8 @@ import (
 const (
 	// catchupPrefix is the scheme identifier for catchup run IDs.
 	catchupPrefix = "catchup-"
+	// oneOffPrefix is the scheme identifier for one-off scheduled run IDs.
+	oneOffPrefix = "oneoff-"
 
 	// maxRunIDLen matches exec.maxDAGRunIDLen (64 chars).
 	maxRunIDLen = 64
@@ -23,12 +25,6 @@ const (
 
 	// timestampLayout is the format for the scheduled time portion.
 	timestampLayout = "20060102T150405"
-
-	// fixedOverhead = len("catchup-") + len("-") + len("-HASH8-") + len(timestamp)
-	//               = 8 + 1 + 8 + 1 + 15 = 33, leaving 31 for dagName.
-	// But we also need the separator before the hash: "catchup-{name}-{hash8}-{ts}"
-	// = 8 + len(name) + 1 + 8 + 1 + 15 = 33 + len(name)
-	maxNameLen = maxRunIDLen - len(catchupPrefix) - 1 - hashLen - 1 - len(timestampLayout)
 )
 
 // GenerateCatchupRunID produces a deterministic run ID for a catchup run.
@@ -40,15 +36,25 @@ const (
 //
 // When the sanitized name exceeds the available space, it is truncated.
 func GenerateCatchupRunID(dagName string, scheduledTime time.Time) string {
+	return generateScheduledRunID(catchupPrefix, dagName, dagName, scheduledTime)
+}
+
+// GenerateOneOffRunID produces a deterministic run ID for a one-off schedule.
+func GenerateOneOffRunID(dagName, fingerprint string, scheduledTime time.Time) string {
+	return generateScheduledRunID(oneOffPrefix, dagName, dagName+":"+fingerprint, scheduledTime)
+}
+
+func generateScheduledRunID(prefix, dagName, hashSource string, scheduledTime time.Time) string {
 	sanitized := sanitizeDagName(dagName)
-	hash := dagNameHash(dagName)
+	hash := dagNameHash(hashSource)
 	ts := scheduledTime.UTC().Format(timestampLayout)
 
+	maxNameLen := maxRunIDLen - len(prefix) - 1 - hashLen - 1 - len(timestampLayout)
 	if len(sanitized) > maxNameLen {
 		sanitized = sanitized[:maxNameLen]
 	}
 
-	return fmt.Sprintf("%s%s-%s-%s", catchupPrefix, sanitized, hash, ts)
+	return fmt.Sprintf("%s%s-%s-%s", prefix, sanitized, hash, ts)
 }
 
 // sanitizeDagName replaces characters not allowed in run IDs.

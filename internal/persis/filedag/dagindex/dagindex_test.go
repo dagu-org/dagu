@@ -253,7 +253,8 @@ func TestRoundTrip(t *testing.T) {
 	require.Len(t, entries, 1)
 	assert.Equal(t, "roundtrip", entries[0].Name)
 	assert.Contains(t, entries[0].Tags, "team=backend")
-	assert.Equal(t, "0 * * * *", entries[0].Schedule)
+	assert.Contains(t, entries[0].Schedule, `"kind":"cron"`)
+	assert.Contains(t, entries[0].Schedule, `"expression":"0 * * * *"`)
 }
 
 func TestDAGFromEntry(t *testing.T) {

@@ -391,10 +391,10 @@ func (d *DAG) Validate() error {
 func (d *DAG) NextRun(now time.Time) time.Time {
 	var next time.Time
 	for _, sched := range d.Schedule {
-		if sched.Parsed == nil {
+		t := sched.Next(now)
+		if t.IsZero() {
 			continue
 		}
-		t := sched.Parsed.Next(now)
 		if next.IsZero() || t.Before(next) {
 			next = t
 		}
@@ -679,18 +679,32 @@ type RedisConfig struct {
 
 // Schedule contains the cron expression and the parsed cron schedule.
 type Schedule struct {
+	// Kind identifies the schedule type.
+	Kind ScheduleKind `json:"kind,omitempty"`
 	// Expression is the cron expression.
-	Expression string `json:"expression"`
+	Expression string `json:"expression,omitempty"`
+	// At is the canonical RFC 3339 timestamp for one-off schedules.
+	At string `json:"at,omitempty"`
 	// Parsed is the parsed cron schedule.
 	Parsed cron.Schedule `json:"-"`
+	// AtTime is the parsed one-off schedule time.
+	AtTime time.Time `json:"-"`
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 func (s Schedule) MarshalJSON() ([]byte, error) {
+	normalized, err := s.normalized()
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(struct {
-		Expression string `json:"expression"`
+		Kind       ScheduleKind `json:"kind,omitempty"`
+		Expression string       `json:"expression,omitempty"`
+		At         string       `json:"at,omitempty"`
 	}{
-		Expression: s.Expression,
+		Kind:       normalized.Kind,
+		Expression: normalized.Expression,
+		At:         normalized.At,
 	})
 }
 
@@ -698,22 +712,28 @@ func (s Schedule) MarshalJSON() ([]byte, error) {
 // It also parses the cron expression to populate the Parsed field.
 func (s *Schedule) UnmarshalJSON(data []byte) error {
 	var alias struct {
-		Expression string `json:"expression"`
+		Kind       ScheduleKind `json:"kind"`
+		Expression string       `json:"expression"`
+		At         string       `json:"at"`
 	}
 	if err := json.Unmarshal(data, &alias); err != nil {
 		return err
 	}
 
-	s.Expression = alias.Expression
-	if s.Expression == "" {
+	if alias.Kind == "" && alias.Expression == "" && alias.At == "" {
+		*s = Schedule{}
 		return nil
 	}
 
-	parsed, err := cron.ParseStandard(s.Expression)
+	schedule, err := normalizeSchedule(Schedule{
+		Kind:       alias.Kind,
+		Expression: alias.Expression,
+		At:         alias.At,
+	})
 	if err != nil {
-		return fmt.Errorf("invalid cron expression %q: %w", s.Expression, err)
+		return err
 	}
-	s.Parsed = parsed
+	*s = schedule
 	return nil
 }
 

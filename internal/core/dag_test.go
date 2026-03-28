@@ -178,21 +178,19 @@ func TestScheduleJSON(t *testing.T) {
 	t.Run("MarshalUnmarshalJSON", func(t *testing.T) {
 		t.Parallel()
 
-		original := core.Schedule{Expression: "0 0 * * *"}
-		parsed, err := cron.ParseStandard(original.Expression)
+		original, err := core.NewCronSchedule("0 0 * * *")
 		require.NoError(t, err)
-		original.Parsed = parsed
 
 		data, err := json.Marshal(original)
 		require.NoError(t, err)
 
 		jsonStr := string(data)
+		require.Contains(t, jsonStr, `"kind":"cron"`)
 		require.Contains(t, jsonStr, `"expression":"0 0 * * *"`)
-		require.NotContains(t, jsonStr, `"Expression"`)
-		require.NotContains(t, jsonStr, `"Parsed"`)
 
 		var unmarshaled core.Schedule
 		require.NoError(t, json.Unmarshal(data, &unmarshaled))
+		require.Equal(t, core.ScheduleKindCron, unmarshaled.GetKind())
 		require.Equal(t, original.Expression, unmarshaled.Expression)
 		require.NotNil(t, unmarshaled.Parsed)
 
@@ -208,22 +206,53 @@ func TestScheduleJSON(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid cron expression")
 	})
+
+	t.Run("MarshalUnmarshalOneOffJSON", func(t *testing.T) {
+		t.Parallel()
+
+		original, err := core.NewOneOffSchedule("2026-03-29T02:10:00+01:00")
+		require.NoError(t, err)
+
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+		require.Contains(t, string(data), `"kind":"at"`)
+		require.Contains(t, string(data), `"at":"2026-03-29T02:10:00+01:00"`)
+
+		var unmarshaled core.Schedule
+		require.NoError(t, json.Unmarshal(data, &unmarshaled))
+		require.Equal(t, core.ScheduleKindAt, unmarshaled.GetKind())
+		require.Equal(t, original.At, unmarshaled.At)
+		assert.Equal(t, original.Fingerprint(), unmarshaled.Fingerprint())
+	})
 }
 
 func TestNextRun(t *testing.T) {
 	t.Parallel()
 
-	dag := &core.DAG{
-		Schedule: []core.Schedule{{Expression: "0 1 * * *"}},
-	}
-	parsed, err := cron.ParseStandard(dag.Schedule[0].Expression)
+	cronSchedule, err := core.NewCronSchedule("0 1 * * *")
 	require.NoError(t, err)
-	dag.Schedule[0].Parsed = parsed
+	oneOffSchedule, err := core.NewOneOffSchedule("2026-03-29T02:10:00+01:00")
+	require.NoError(t, err)
+	dag := &core.DAG{
+		Schedule: []core.Schedule{cronSchedule, oneOffSchedule},
+	}
 
 	now := time.Date(2023, 10, 1, 1, 0, 0, 0, time.UTC)
 	expected := time.Date(2023, 10, 2, 1, 0, 0, 0, time.UTC)
 
 	require.Equal(t, expected, dag.NextRun(now))
+}
+
+func TestNextRun_OneOffPastIsIgnored(t *testing.T) {
+	t.Parallel()
+
+	schedule, err := core.NewOneOffSchedule("2026-03-29T02:10:00+01:00")
+	require.NoError(t, err)
+
+	dag := &core.DAG{Schedule: []core.Schedule{schedule}}
+	now := time.Date(2026, 3, 29, 2, 10, 0, 0, time.FixedZone("CET", 3600)).Add(time.Minute)
+
+	assert.True(t, dag.NextRun(now).IsZero())
 }
 
 func TestEffectiveLogOutput(t *testing.T) {

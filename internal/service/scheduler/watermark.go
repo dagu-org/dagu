@@ -16,9 +16,24 @@ type SchedulerState struct {
 	DAGs     map[string]DAGWatermark `json:"dags,omitempty"`
 }
 
-// DAGWatermark tracks the last scheduled time for a single DAG.
+// DAGWatermark tracks cron progress and one-off schedule state for a single DAG.
 type DAGWatermark struct {
-	LastScheduledTime time.Time `json:"lastScheduledTime"`
+	LastScheduledTime time.Time                      `json:"lastScheduledTime"`
+	OneOffs           map[string]OneOffScheduleState `json:"oneOffs,omitempty"`
+}
+
+// OneOffScheduleStatus is the persisted state of a one-off schedule.
+type OneOffScheduleStatus string
+
+const (
+	OneOffStatusPending  OneOffScheduleStatus = "pending"
+	OneOffStatusConsumed OneOffScheduleStatus = "consumed"
+)
+
+// OneOffScheduleState tracks a single one-off schedule instance.
+type OneOffScheduleState struct {
+	ScheduledTime time.Time            `json:"scheduledTime"`
+	Status        OneOffScheduleStatus `json:"status"`
 }
 
 // WatermarkStore persists scheduler watermark state to durable storage.
@@ -33,7 +48,7 @@ type noopWatermarkStore struct{}
 var _ WatermarkStore = noopWatermarkStore{}
 
 func (noopWatermarkStore) Load(_ context.Context) (*SchedulerState, error) {
-	return &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}, nil
+	return &SchedulerState{Version: 2, DAGs: make(map[string]DAGWatermark)}, nil
 }
 
 func (noopWatermarkStore) Save(_ context.Context, _ *SchedulerState) error {

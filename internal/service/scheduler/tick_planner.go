@@ -42,6 +42,8 @@ type PlannedRun struct {
 	ScheduledTime time.Time
 	TriggerType   core.TriggerType
 	ScheduleType  ScheduleType
+	Schedule      core.Schedule
+	Fingerprint   string
 }
 
 // DispatchFunc dispatches a catch-up or scheduled run for the given DAG.
@@ -71,6 +73,9 @@ type EnqueueFunc func(ctx context.Context, dag *core.DAG, runID string, triggerT
 // IsQueuedFunc checks if a DAG has any pending queued items.
 type IsQueuedFunc func(ctx context.Context, dag *core.DAG) (bool, error)
 
+// RunExistsFunc checks whether a durable dag-run record already exists.
+type RunExistsFunc func(ctx context.Context, dag *core.DAG, runID string) (bool, error)
+
 // TickPlannerConfig holds the dependencies for creating a TickPlanner.
 type TickPlannerConfig struct {
 	WatermarkStore  WatermarkStore
@@ -92,6 +97,8 @@ type TickPlannerConfig struct {
 	Enqueue EnqueueFunc
 	// IsQueued checks if a DAG has any pending queued items.
 	IsQueued IsQueuedFunc
+	// RunExists checks whether a durable dag-run record already exists.
+	RunExists RunExistsFunc
 }
 
 // TickPlanner is the unified scheduling decision module.
@@ -165,6 +172,9 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 	if cfg.IsQueued == nil {
 		cfg.IsQueued = func(context.Context, *core.DAG) (bool, error) { return false, nil }
 	}
+	if cfg.RunExists == nil {
+		cfg.RunExists = func(context.Context, *core.DAG, string) (bool, error) { return false, nil }
+	}
 	if cfg.Clock == nil {
 		cfg.Clock = time.Now
 	}
@@ -201,7 +211,10 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 	state, err := tp.cfg.WatermarkStore.Load(ctx)
 	if err != nil {
 		logger.Error(ctx, "Failed to load watermark state", tag.Error(err))
-		state = &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}
+		state = &SchedulerState{Version: SchedulerStateVersion, DAGs: make(map[string]DAGWatermark)}
+	}
+	if state.Version == 0 {
+		state.Version = SchedulerStateVersion
 	}
 	if state.DAGs == nil {
 		state.DAGs = make(map[string]DAGWatermark)
@@ -219,6 +232,23 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 			pruned++
 		}
 	}
+	stateChanged := pruned > 0
+
+	observedAt := tp.cfg.Clock()
+	for _, dag := range dags {
+		current := state.DAGs[dag.Name]
+		next, changed := reconcileOneOffState(current, dag, observedAt)
+		if !changed {
+			continue
+		}
+		stateChanged = true
+		if next.LastScheduledTime.IsZero() && len(next.OneOffs) == 0 {
+			delete(state.DAGs, dag.Name)
+			continue
+		}
+		state.DAGs[dag.Name] = next
+	}
+
 	if pruned > 0 {
 		logger.Info(ctx, "Pruned stale watermark entries",
 			slog.Int("pruned", pruned),
@@ -228,6 +258,9 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 	tp.mu.Lock()
 	tp.watermarkState = state
 	tp.mu.Unlock()
+	if stateChanged {
+		tp.watermarkDirty.Store(true)
+	}
 
 	logger.Info(ctx, "Loaded scheduler watermark",
 		slog.Time("lastTick", state.LastTick),
@@ -235,6 +268,9 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 	)
 
 	tp.initBuffers(ctx, dags)
+	if stateChanged {
+		tp.Flush(ctx)
+	}
 	return nil
 }
 
@@ -379,7 +415,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 							item, _ = buf.Peek()
 						}
 						buf.Pop()
-						run, ok := tp.createPlannedRun(ctx, item.DAG, item.ScheduledTime, item.TriggerType)
+						run, ok := tp.createPlannedRun(ctx, item.DAG, core.Schedule{}, item.ScheduledTime, item.TriggerType)
 						if ok {
 							candidates = append(candidates, run)
 							catchupProduced = true
@@ -424,10 +460,39 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			continue
 		}
 
+		// Evaluate pending one-off schedules.
+		for _, schedule := range entry.dag.Schedule {
+			if !schedule.IsOneOff() {
+				continue
+			}
+
+			fingerprint := schedule.Fingerprint()
+			if fingerprint == "" {
+				continue
+			}
+
+			oneOffState, ok := tp.pendingOneOffState(entry.dag.Name, fingerprint)
+			if !ok || oneOffState.ScheduledTime.After(now) {
+				continue
+			}
+
+			if !tp.shouldRunOneOff(ctx, entry.dag) {
+				continue
+			}
+
+			run, ok := tp.createPlannedRun(ctx, entry.dag, schedule, oneOffState.ScheduledTime, core.TriggerTypeScheduler)
+			if ok {
+				candidates = append(candidates, run)
+			}
+		}
+
 		// Evaluate cron schedules for live start runs.
 		// Start schedules use raw `now`: the robfig/cron library applies the
 		// schedule's timezone internally, so no extra conversion is needed.
 		for _, schedule := range entry.dag.Schedule {
+			if !schedule.IsCron() {
+				continue
+			}
 			next, due := scheduleDueAt(schedule, now)
 			if !due {
 				continue
@@ -435,7 +500,7 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			if !tp.shouldRun(ctx, entry.dag, next, schedule) {
 				continue
 			}
-			run, ok := tp.createPlannedRun(ctx, entry.dag, next, core.TriggerTypeScheduler)
+			run, ok := tp.createPlannedRun(ctx, entry.dag, schedule, next, core.TriggerTypeScheduler)
 			if ok {
 				candidates = append(candidates, run)
 			}
@@ -562,6 +627,58 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 	return true
 }
 
+func (tp *TickPlanner) shouldRunOneOff(ctx context.Context, dag *core.DAG) bool {
+	running, err := tp.cfg.IsRunning(ctx, dag)
+	if err != nil {
+		logger.Error(ctx, "Failed to check if DAG is running",
+			tag.DAG(dag.Name),
+			tag.Error(err),
+		)
+		return false
+	}
+	if running {
+		return false
+	}
+
+	queued, qErr := tp.cfg.IsQueued(ctx, dag)
+	if qErr != nil {
+		logger.Error(ctx, "Failed to check if DAG is queued; assuming busy",
+			tag.DAG(dag.Name),
+			tag.Error(qErr),
+		)
+		return false
+	}
+	if queued {
+		return false
+	}
+
+	latestStatus, err := tp.cfg.GetLatestStatus(ctx, dag)
+	if err != nil {
+		logger.Error(ctx, "Failed to fetch latest DAG status",
+			tag.DAG(dag.Name),
+			tag.Error(err),
+		)
+		return false
+	}
+
+	return latestStatus.Status != core.Running
+}
+
+func (tp *TickPlanner) pendingOneOffState(dagName, fingerprint string) (OneOffScheduleState, bool) {
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+
+	dagState, ok := tp.watermarkState.DAGs[dagName]
+	if !ok || dagState.OneOffs == nil {
+		return OneOffScheduleState{}, false
+	}
+	oneOff, ok := dagState.OneOffs[fingerprint]
+	if !ok || oneOff.Status != OneOffStatusPending {
+		return OneOffScheduleState{}, false
+	}
+	return oneOff, true
+}
+
 // computePrevExecTime calculates the previous schedule fire time before next.
 // It walks forward from (next - 32 days) to find the last fire time before next.
 // 32 days covers monthly schedules, the most common sparse cron interval.
@@ -603,10 +720,12 @@ func scheduleDueAt(schedule core.Schedule, now time.Time) (time.Time, bool) {
 // createPlannedRun generates a run ID and constructs a PlannedRun.
 // For catchup runs, a deterministic ID is generated from the DAG name and
 // scheduled time. For all other runs, a random UUID v7 is used.
-func (tp *TickPlanner) createPlannedRun(ctx context.Context, dag *core.DAG, scheduledTime time.Time, triggerType core.TriggerType) (PlannedRun, bool) {
+func (tp *TickPlanner) createPlannedRun(ctx context.Context, dag *core.DAG, schedule core.Schedule, scheduledTime time.Time, triggerType core.TriggerType) (PlannedRun, bool) {
 	var runID string
 	if triggerType == core.TriggerTypeCatchUp {
 		runID = GenerateCatchupRunID(dag.Name, scheduledTime)
+	} else if schedule.IsOneOff() {
+		runID = GenerateOneOffRunID(dag.Name, schedule.Fingerprint(), scheduledTime)
 	} else {
 		var err error
 		runID, err = tp.cfg.GenRunID(ctx)
@@ -625,6 +744,8 @@ func (tp *TickPlanner) createPlannedRun(ctx context.Context, dag *core.DAG, sche
 		ScheduledTime: scheduledTime,
 		TriggerType:   triggerType,
 		ScheduleType:  ScheduleTypeStart,
+		Schedule:      schedule,
+		Fingerprint:   schedule.Fingerprint(),
 	}, true
 }
 
@@ -642,9 +763,12 @@ func (tp *TickPlanner) Advance(now time.Time) {
 		if run.TriggerType == core.TriggerTypeCatchUp {
 			continue // watermark updated in DispatchRun on success
 		}
-		tp.watermarkState.DAGs[run.DAG.Name] = DAGWatermark{
-			LastScheduledTime: run.ScheduledTime,
+		if !run.Schedule.IsCron() {
+			continue
 		}
+		dagState := cloneDAGWatermark(tp.watermarkState.DAGs[run.DAG.Name])
+		dagState.LastScheduledTime = run.ScheduledTime
+		tp.watermarkState.DAGs[run.DAG.Name] = dagState
 	}
 
 	tp.watermarkDirty.Store(true)
@@ -666,11 +790,39 @@ func (tp *TickPlanner) dropSuspendedCatchupState(dagName string, dag *core.DAG, 
 // and marks the state as dirty. Caller must NOT hold tp.mu.
 func (tp *TickPlanner) advanceDAGWatermark(dagName string, scheduledTime time.Time) {
 	tp.mu.Lock()
-	tp.watermarkState.DAGs[dagName] = DAGWatermark{
-		LastScheduledTime: scheduledTime,
-	}
+	dagState := cloneDAGWatermark(tp.watermarkState.DAGs[dagName])
+	dagState.LastScheduledTime = scheduledTime
+	tp.watermarkState.DAGs[dagName] = dagState
 	tp.watermarkDirty.Store(true)
 	tp.mu.Unlock()
+}
+
+func (tp *TickPlanner) markOneOffConsumed(dagName, fingerprint string, scheduledTime time.Time) bool {
+	if fingerprint == "" {
+		return false
+	}
+
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	dagState := cloneDAGWatermark(tp.watermarkState.DAGs[dagName])
+	if dagState.OneOffs == nil {
+		dagState.OneOffs = make(map[string]OneOffScheduleState)
+	}
+
+	state := dagState.OneOffs[fingerprint]
+	if state.ScheduledTime.IsZero() {
+		state.ScheduledTime = scheduledTime
+	}
+	if state.Status == OneOffStatusConsumed {
+		return false
+	}
+
+	state.Status = OneOffStatusConsumed
+	dagState.OneOffs[fingerprint] = state
+	tp.watermarkState.DAGs[dagName] = dagState
+	tp.watermarkDirty.Store(true)
+	return true
 }
 
 // Flush writes the watermark state to disk if dirty.
@@ -687,7 +839,9 @@ func (tp *TickPlanner) Flush(ctx context.Context) {
 		LastTick: tp.watermarkState.LastTick,
 		DAGs:     make(map[string]DAGWatermark, len(tp.watermarkState.DAGs)),
 	}
-	maps.Copy(snapshot.DAGs, tp.watermarkState.DAGs)
+	for dagName, dagState := range tp.watermarkState.DAGs {
+		snapshot.DAGs[dagName] = cloneDAGWatermark(dagState)
+	}
 	tp.mu.RUnlock()
 
 	if err := tp.cfg.WatermarkStore.Save(ctx, snapshot); err != nil {
@@ -756,6 +910,8 @@ func (tp *TickPlanner) drainEvents(ctx context.Context) {
 
 // handleEvent processes a single DAG change event.
 func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
+	flushNow := false
+
 	switch event.Type {
 	case DAGChangeAdded:
 		if event.DAG == nil {
@@ -764,6 +920,7 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		tp.entries[event.DAGName] = &plannerEntry{dag: event.DAG}
 		// Set watermark to now (new DAGs have no catchup)
 		tp.advanceDAGWatermark(event.DAGName, tp.cfg.Clock())
+		flushNow = tp.reconcileOneOffSchedules(event.DAG)
 		logger.Info(ctx, "Planner: DAG added", tag.DAG(event.DAGName))
 
 	case DAGChangeUpdated:
@@ -776,6 +933,7 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		if event.DAG.CatchupWindow > 0 {
 			tp.recomputeBuffer(ctx, event.DAG)
 		}
+		flushNow = tp.reconcileOneOffSchedules(event.DAG)
 		logger.Info(ctx, "Planner: DAG updated", tag.DAG(event.DAGName))
 
 	case DAGChangeDeleted:
@@ -785,8 +943,36 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		delete(tp.watermarkState.DAGs, event.DAGName)
 		tp.watermarkDirty.Store(true)
 		tp.mu.Unlock()
+		flushNow = true
 		logger.Info(ctx, "Planner: DAG deleted", tag.DAG(event.DAGName))
 	}
+
+	if flushNow {
+		tp.Flush(ctx)
+	}
+}
+
+func (tp *TickPlanner) reconcileOneOffSchedules(dag *core.DAG) bool {
+	if dag == nil {
+		return false
+	}
+
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	current := tp.watermarkState.DAGs[dag.Name]
+	next, changed := reconcileOneOffState(current, dag, tp.cfg.Clock())
+	if !changed {
+		return false
+	}
+
+	if next.LastScheduledTime.IsZero() && len(next.OneOffs) == 0 {
+		delete(tp.watermarkState.DAGs, dag.Name)
+	} else {
+		tp.watermarkState.DAGs[dag.Name] = next
+	}
+	tp.watermarkDirty.Store(true)
+	return true
 }
 
 // reinsertCatchupItem puts a failed catchup run back at the front of the
@@ -884,6 +1070,22 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 		return
 	}
 
+	if run.ScheduleType == ScheduleTypeStart && run.Schedule.IsOneOff() {
+		exists, err := tp.cfg.RunExists(ctx, run.DAG, run.RunID)
+		if err != nil {
+			logger.Error(ctx, "Failed to check for existing one-off dag-run",
+				tag.DAG(run.DAG.Name),
+				tag.RunID(run.RunID),
+				tag.Error(err),
+			)
+		} else if exists {
+			if tp.markOneOffConsumed(run.DAG.Name, run.Fingerprint, run.ScheduledTime) {
+				tp.Flush(ctx)
+			}
+			return
+		}
+	}
+
 	var err error
 	switch run.ScheduleType {
 	case ScheduleTypeStart:
@@ -905,6 +1107,22 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	}
 
 	if err != nil {
+		if run.ScheduleType == ScheduleTypeStart && run.Schedule.IsOneOff() {
+			exists, existsErr := tp.cfg.RunExists(ctx, run.DAG, run.RunID)
+			if existsErr != nil {
+				logger.Error(ctx, "Failed to re-check one-off dag-run after dispatch error",
+					tag.DAG(run.DAG.Name),
+					tag.RunID(run.RunID),
+					tag.Error(existsErr),
+				)
+			} else if exists {
+				if tp.markOneOffConsumed(run.DAG.Name, run.Fingerprint, run.ScheduledTime) {
+					tp.Flush(ctx)
+				}
+				return
+			}
+		}
+
 		logger.Error(ctx, "Failed to dispatch run",
 			tag.DAG(run.DAG.Name),
 			slog.String("scheduleType", run.ScheduleType.String()),
@@ -923,5 +1141,10 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 	// On successful catchup dispatch, advance the per-DAG watermark.
 	if run.TriggerType == core.TriggerTypeCatchUp && run.ScheduleType == ScheduleTypeStart {
 		tp.advanceDAGWatermark(run.DAG.Name, run.ScheduledTime)
+	}
+	if run.ScheduleType == ScheduleTypeStart && run.Schedule.IsOneOff() {
+		if tp.markOneOffConsumed(run.DAG.Name, run.Fingerprint, run.ScheduledTime) {
+			tp.Flush(ctx)
+		}
 	}
 }

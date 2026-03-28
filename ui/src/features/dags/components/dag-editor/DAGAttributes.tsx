@@ -6,6 +6,10 @@
 import { Calendar, CheckSquare, Settings, Tag } from 'lucide-react';
 import { components } from '../../../../api/v1/schema';
 import { Badge } from '../../../../components/ui/badge';
+import {
+  getScheduleKey,
+  getScheduleLabel,
+} from '../../../../lib/dagSchedule';
 
 /**
  * Props for the DAGAttributes component
@@ -46,13 +50,13 @@ function DAGAttributes({ dag }: Props) {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {dag.schedule?.map((schedule) => (
+              {dag.schedule?.map((schedule, index) => (
                 <Badge
-                  key={schedule.expression}
+                  key={getScheduleKey(schedule, index)}
                   variant="outline"
                   className="bg-primary/10 text-primary border-primary/30 px-2.5 py-1"
                 >
-                  {schedule.expression}
+                  {getScheduleLabel(schedule)}
                 </Badge>
               ))}
             </div>

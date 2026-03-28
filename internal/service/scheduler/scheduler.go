@@ -177,6 +177,17 @@ func newScheduler(
 		QueuesEnabled: queuesEnabled,
 		Enqueue:       enqueueFunc,
 		IsQueued:      isQueued,
+		RunExists: func(ctx context.Context, dag *core.DAG, runID string) (bool, error) {
+			_, err := dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, runID))
+			switch {
+			case err == nil:
+				return true, nil
+			case errors.Is(err, exec.ErrDAGRunIDNotFound):
+				return false, nil
+			default:
+				return false, err
+			}
+		},
 	})
 
 	retryScanner, err := NewRetryScanner(

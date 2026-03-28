@@ -52,16 +52,17 @@ func (s *Store) Load(ctx context.Context) (*scheduler.SchedulerState, error) {
 		return newEmptyState(), nil
 	}
 
-	const expectedVersion = 1
-	if state.Version != 0 && state.Version != expectedVersion {
+	const expectedVersion = scheduler.SchedulerStateVersion
+	switch state.Version {
+	case 0, 1:
+		state.Version = expectedVersion
+	case expectedVersion:
+	default:
 		logger.Warn(ctx, "Watermark state version mismatch, starting fresh",
 			tag.File(path),
 			slog.Int("version", state.Version),
 		)
 		return newEmptyState(), nil
-	}
-	if state.Version == 0 {
-		state.Version = expectedVersion
 	}
 
 	if state.DAGs == nil {
@@ -128,7 +129,7 @@ func writeFileSync(name string, data []byte, perm os.FileMode) error {
 
 func newEmptyState() *scheduler.SchedulerState {
 	return &scheduler.SchedulerState{
-		Version: 1,
+		Version: scheduler.SchedulerStateVersion,
 		DAGs:    make(map[string]scheduler.DAGWatermark),
 	}
 }
