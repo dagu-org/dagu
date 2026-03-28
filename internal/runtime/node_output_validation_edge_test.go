@@ -472,7 +472,7 @@ func TestValidateOutput_ConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make([]error, goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
