@@ -166,6 +166,7 @@ func TestIssue1252_ExternalSchemaReference(t *testing.T) {
 	// Write schema file to a temp location accessible by the DAG
 	schemaDir := t.TempDir()
 	schemaPath := filepath.Join(schemaDir, "test-schema.json")
+	schemaPathForYAML := filepath.ToSlash(schemaPath)
 	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
   "type": "object",
   "properties": {
@@ -186,7 +187,7 @@ func TestIssue1252_ExternalSchemaReference(t *testing.T) {
 	dagFile := th.CreateDAGFile(t, "issue1252-external.yaml", `
 name: issue1252-external
 params:
-  schema: "`+schemaPath+`"
+  schema: "`+schemaPathForYAML+`"
   values:
     ENVIRONMENT: staging
 steps:

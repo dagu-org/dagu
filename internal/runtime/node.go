@@ -260,11 +260,15 @@ func (n *Node) Execute(ctx context.Context, onSetup ...func()) error {
 		return err
 	}
 
-	// Validate captured output against schema if defined
-	if err := n.validateOutput(ctx); err != nil {
-		n.SetError(err)
-		logger.Error(ctx, "Output schema validation failed", tag.Error(err))
-		return err
+	// Validate captured output against schema if defined.
+	// Only treat schema validation as a failure when the command itself succeeded.
+	if n.Error() == nil {
+		if err := n.validateOutput(ctx); err != nil {
+			n.SetExitCode(1)
+			n.SetError(err)
+			logger.Error(ctx, "Output schema validation failed", tag.Error(err))
+			return err
+		}
 	}
 
 	statusErr := n.determineNodeStatus(cmd)
