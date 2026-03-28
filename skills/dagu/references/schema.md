@@ -50,6 +50,15 @@
 | `defaults` | object | — | Default values for all steps: `continue_on`, `retry_policy`, `repeat_policy`, `timeout_sec`, `signal_on_stop`, `env`, `preconditions` |
 | `run_config` | object | — | `disable_param_edit`, `disable_run_id_edit` |
 
+## Top-Level Notes
+
+- Omitting top-level `type:` means `chain`, not `graph`. In `graph` mode, steps without `depends:` may run in parallel.
+- `catchup_window:` is opt-in. Missed scheduled runs are skipped unless you set it.
+- `max_active_steps:` caps graph-mode concurrency for a single DAG run.
+- `params:` values are resolved as strings.
+- `handler_on` keys are exactly `init`, `success`, `failure`, `abort`, `exit`, and `wait`.
+- `container:` is polymorphic: a string targets an existing container, while an object creates a new one.
+
 ## Step-Level Fields
 
 | Field | Type | Default | Description |
@@ -86,6 +95,15 @@
 | `routes` | map | — | Router pattern→target step ID mappings |
 | `worker_selector` | map | — | Labels for distributed execution |
 
+## Step Notes
+
+- `depends:` is only valid in `graph` mode. In `chain` mode it is a validation error.
+- `retry_policy:` requires both `limit` and `interval_sec`.
+- `continue_on:` is evaluated after retries are exhausted.
+- `preconditions:` compare exact strings. Use a command that exits cleanly and prints only the expected value.
+- DAG-level `preconditions:` block the entire run. Step-level `preconditions:` only skip that step.
+- `repeat_policy.limit` must be a literal integer in YAML, not a variable reference.
+
 ## Step Reference Properties
 
 Steps with an `id` expose properties accessible via `${step_id.property}` in downstream steps:
@@ -101,3 +119,10 @@ Slicing: `${step_id.stdout:start:length}` — substring from `start` for `length
 **Note:** `${step_id.stdout}` is the **file path**, not the content. To capture stdout **content** into a variable, use the `output:` field and reference it as `${VAR_NAME}`.
 
 Resolution priority for `${foo.bar}`: step property lookup first, then JSON path on variable `foo`.
+
+## Output Notes
+
+- `output:` captures trimmed stdout only. Stderr stays in the step log files.
+- `${VAR.key}` JSON extraction only works when the captured stdout is clean JSON with no extra prefix or suffix text.
+- Captured output is limited by top-level `max_output_size:` (default 1 MB).
+- Multiline `output:` is still a single string. If you need line-by-line processing, read `${step_id.stdout}` as a file or convert the data into an array for `parallel:`.

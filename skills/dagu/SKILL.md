@@ -48,9 +48,8 @@ steps:
 
 Load only the file you need:
 
-- `references/pitfalls.md` when behavior is surprising, especially around output capture, shell interpolation, params, or sub-DAGs
-- `references/executors.md` when choosing a step type or checking executor-specific config
-- `references/schema.md` when you need exact field names or shapes
+- `references/executors.md` when choosing a step type or checking executor-specific caveats such as `dag`, `parallel`, `jq`, or `template`
+- `references/schema.md` when you need exact field names or runtime behavior for `output:`, retries, preconditions, scheduling, or repeat limits
 - `references/cli.md` when you need command flags or lookup commands such as `dagu schema`, `dagu config`, or `dagu history`
-- `references/env.md` when execution environment variables or `DAGU_*` config vars matter
+- `references/env.md` when execution environment variables, `DAGU_*` config vars, or `params:`/`env:` resolution order matters
 - `references/codingagent.md` only when the DAG itself runs AI coding agents as steps

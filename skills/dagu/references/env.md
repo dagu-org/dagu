@@ -32,6 +32,20 @@ These are only available inside lifecycle handler steps, not during normal step 
 | `DAG_RUN_STATUS` | `onSuccess`, `onFailure`, `onAbort`, `onExit`, `onWait` | Current DAG run status (e.g., `success`, `failed`) |
 | `DAG_WAITING_STEPS` | `onWait` only | Comma-separated list of step names that are waiting for approval |
 
+## Param and Env Resolution
+
+- `params:` values are exposed as strings. Pass structured data as JSON strings if a downstream step needs objects or arrays.
+- `env:` values can reference `params:` values because parameter resolution happens first.
+- Use list-of-maps for `env:` when one env var depends on another. Go maps do not preserve evaluation order.
+
+```yaml
+params:
+  base: /tmp
+env:
+  - ROOT: "${base}"
+  - OUTPUT_DIR: "${ROOT}/out"
+```
+
 ## Configuration Variables
 
 All configuration environment variables use the `DAGU_` prefix. They map to config keys via viper bindings in `internal/cmn/config/loader.go`.
