@@ -12,6 +12,8 @@ on:
       - "go.mod"
       - "go.sum"
       - "Makefile"
+      - "scripts/installer.sh"
+      - "scripts/test-installer.sh"
       - ".github/workflows/ci.yaml"
   pull_request:
     # Keep this workflow directly rerunnable from PR-only maintenance commits.
@@ -25,6 +27,8 @@ on:
       - "go.mod"
       - "go.sum"
       - "Makefile"
+      - "scripts/installer.sh"
+      - "scripts/test-installer.sh"
       - ".github/workflows/ci.yaml"
 
 env:
@@ -108,6 +112,7 @@ jobs:
       - name: Test
         if: runner.os != 'Windows'
         run: |
+          make test-installer
           make test-coverage
 
       - name: Test (Windows)

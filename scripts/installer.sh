@@ -28,24 +28,38 @@ cleanup_tmpfiles() {
 }
 trap cleanup_tmpfiles EXIT
 
+set_outvar() {
+    local __dagu_set_outvar_name="${1:?missing output variable}"
+    local __dagu_set_outvar_value="${2-}"
+    local __dagu_set_outvar_quoted
+    if [[ ! "${__dagu_set_outvar_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+        printf '%s\n' "Invalid output variable name: ${__dagu_set_outvar_name}" >&2
+        return 1
+    fi
+    printf -v __dagu_set_outvar_quoted '%q' "${__dagu_set_outvar_value}"
+    eval "${__dagu_set_outvar_name}=${__dagu_set_outvar_quoted}"
+}
+
 mktempdir() {
-    local d
+    local outvar="${1:?missing output variable}"
+    local __dagu_allocated_tmpdir
     if [[ -n "${WORKING_ROOT_DIR:-}" ]]; then
         mkdir -p "${WORKING_ROOT_DIR}" >/dev/null 2>&1 || true
-        d="$(mktemp -d "${WORKING_ROOT_DIR%/}/dagu-installer.XXXXXX")"
+        __dagu_allocated_tmpdir="$(mktemp -d "${WORKING_ROOT_DIR%/}/dagu-installer.XXXXXX")"
     else
-        d="$(mktemp -d)"
+        __dagu_allocated_tmpdir="$(mktemp -d)"
     fi
-    TMPFILES+=("$d")
-    printf '%s\n' "$d"
+    TMPFILES+=("${__dagu_allocated_tmpdir}")
+    set_outvar "${outvar}" "${__dagu_allocated_tmpdir}"
 }
 
 mktempfile() {
-    local d f
-    d="$(mktempdir)"
-    f="${d}/tmpfile"
-    : >"$f"
-    printf '%s\n' "$f"
+    local outvar="${1:?missing output variable}"
+    local __dagu_tmpdir_path __dagu_tempfile_path
+    mktempdir __dagu_tmpdir_path
+    __dagu_tempfile_path="${__dagu_tmpdir_path}/tmpfile"
+    : >"${__dagu_tempfile_path}"
+    set_outvar "${outvar}" "${__dagu_tempfile_path}"
 }
 
 WORKING_ROOT_DIR=""
@@ -359,7 +373,7 @@ bootstrap_gum_temp() {
         *) GUM_REASON="unsupported architecture"; return 1 ;;
     esac
 
-    gum_tmp="$(mktempdir)"
+    mktempdir gum_tmp
     asset="gum_${GUM_VERSION}_${os_name}_${gum_arch}.tar.gz"
     base="https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}"
 
@@ -489,7 +503,7 @@ run_quiet_step() {
         run_with_spinner "$title" "$@"
         return $?
     fi
-    log="$(mktempfile)"
+    mktempfile log
     if run_with_spinner "$title" bash -c "$(printf '%q ' "$@") >$(printf '%q' "$log") 2>&1"; then
         return 0
     fi
@@ -1326,7 +1340,7 @@ remove_managed_path_block_from_profile() {
         ui_info "Would remove the installer PATH block from ${profile}"
         return 0
     fi
-    tmp="$(mktempfile)"
+    mktempfile tmp
     awk '
         /^# >>> dagu installer >>>$/ { skip=1; next }
         /^# <<< dagu installer <<<$/{ skip=0; next }
@@ -1436,7 +1450,7 @@ remove_copilot_markers() {
         ui_info "Would remove the Dagu section from ${file}"
         return 0
     fi
-    tmp="$(mktempfile)"
+    mktempfile tmp
     awk '
         /<!-- BEGIN DAGU -->/ { skip=1; next }
         /<!-- END DAGU -->/ { skip=0; next }
@@ -1640,7 +1654,7 @@ write_linux_env_file() {
     local target="$1"
     local bootstrap="$2"
     local tmp
-    tmp="$(mktempfile)"
+    mktempfile tmp
     {
         printf 'DAGU_HOME=%s\n' "$(quote_env_value "${DAGU_HOME_DIR}")"
         printf 'DAGU_HOST=%s\n' "$(quote_env_value "${HOST}")"
@@ -1667,7 +1681,7 @@ write_linux_unit() {
     if [[ "$SERVICE_SCOPE" == "system" ]]; then
         wanted_by="multi-user.target"
     fi
-    tmp="$(mktempfile)"
+    mktempfile tmp
     cat >"${tmp}" <<EOF
 [Unit]
 Description=Dagu Workflow Engine
@@ -1781,7 +1795,7 @@ write_mac_plist() {
     if [[ -z "${service_path}" ]]; then
         service_path="${SERVICE_PATH}"
     fi
-    tmp="$(mktempfile)"
+    mktempfile tmp
     cat >"${tmp}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1846,17 +1860,19 @@ remove_bootstrap_file() {
 }
 
 backup_bootstrap_file() {
-    local backup
+    local outvar="${1:?missing output variable}"
+    local __dagu_backup_path
     if [[ ! -f "${SERVICE_BOOTSTRAP_FILE}" ]]; then
+        set_outvar "${outvar}" ""
         return 0
     fi
-    backup="$(mktempfile)"
+    mktempfile __dagu_backup_path
     if [[ "$OS" == "linux" && "$SERVICE_SCOPE" == "system" ]]; then
-        sudo cp "${SERVICE_BOOTSTRAP_FILE}" "${backup}"
+        sudo cp "${SERVICE_BOOTSTRAP_FILE}" "${__dagu_backup_path}"
     else
-        cp "${SERVICE_BOOTSTRAP_FILE}" "${backup}"
+        cp "${SERVICE_BOOTSTRAP_FILE}" "${__dagu_backup_path}"
     fi
-    printf '%s\n' "${backup}"
+    set_outvar "${outvar}" "${__dagu_backup_path}"
 }
 
 restore_bootstrap_credentials() {
@@ -2021,7 +2037,7 @@ scrub_bootstrap_credentials() {
     if [[ "$SERVICE_MODE" != "yes" || "$DRY_RUN" == "1" ]]; then
         return 0
     fi
-    SCRUB_BACKUP_FILE="$(backup_bootstrap_file)"
+    backup_bootstrap_file SCRUB_BACKUP_FILE
     remove_bootstrap_file
     if [[ "$OS" == "macos" ]]; then
         write_mac_plist
@@ -2168,7 +2184,7 @@ main() {
     fi
 
     local tmpdir archive binary
-    tmpdir="$(mktempdir)"
+    mktempdir tmpdir
 
     archive="$(download_dagu_archive "${tmpdir}")"
     binary="$(extract_binary_from_archive "${archive}" "${tmpdir}")"
@@ -2187,4 +2203,6 @@ main() {
     open_browser_if_requested
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

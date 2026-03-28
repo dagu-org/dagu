@@ -163,6 +163,12 @@ test-coverage:
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverpkg=./... -coverprofile="coverage.out" -covermode=atomic ${TEST_TARGET}
 	@go tool cover -html=coverage.out -o coverage.html
 
+# test-installer runs the installer shell regression tests.
+.PHONY: test-installer
+test-installer:
+	@printf '%b\n' "${COLOR_GREEN}Running installer regression tests...${COLOR_RESET}"
+	@bash ./scripts/test-installer.sh
+
 # lint runs the linter.
 .PHONY: lint
 lint: golangci-lint
