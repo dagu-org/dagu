@@ -4,6 +4,7 @@
 package spec
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
@@ -20,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // step defines a step in the DAG.
@@ -343,6 +345,7 @@ var stepTransformers = []stepTransform{
 	{"output", newStepTransformer("Output", buildStepOutput)},
 	{"output_key", newStepTransformer("OutputKey", buildStepOutputKey)},
 	{"output_omit", newStepTransformer("OutputOmit", buildStepOutputOmit)},
+	{"output_schema", newStepTransformer("OutputSchema", buildStepOutputSchema)},
 	{"env", newStepTransformer("Env", buildStepEnvs)},
 	{"preconditions", newStepTransformer("Preconditions", buildStepPreconditions)},
 }
@@ -793,9 +796,10 @@ func buildStepSignalOnStop(_ StepBuildContext, s *step) (string, error) {
 
 // outputConfig holds the parsed output configuration
 type outputConfig struct {
-	Name string
-	Key  string
-	Omit bool
+	Name   string
+	Key    string
+	Omit   bool
+	Schema any // raw schema from YAML, compiled later by buildStepOutputSchema
 }
 
 // parseOutputConfig parses the output field which can be string or object
@@ -826,6 +830,9 @@ func parseOutputConfig(output any) (*outputConfig, error) {
 		}
 		if omit, ok := v["omit"].(bool); ok {
 			cfg.Omit = omit
+		}
+		if schema, ok := v["schema"]; ok {
+			cfg.Schema = schema
 		}
 		if cfg.Name == "" {
 			return nil, fmt.Errorf("output.name is required when using object form")
@@ -868,6 +875,35 @@ func buildStepOutputOmit(_ StepBuildContext, s *step) (bool, error) {
 		return false, nil
 	}
 	return cfg.Omit, nil
+}
+
+func buildStepOutputSchema(_ StepBuildContext, s *step) (*jsonschema.Resolved, error) {
+	cfg, err := parseOutputConfig(s.Output)
+	if err != nil {
+		return nil, err
+	}
+	if cfg == nil || cfg.Schema == nil {
+		return nil, nil
+	}
+
+	schemaBytes, err := json.Marshal(cfg.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal output schema: %w", err)
+	}
+
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(schemaBytes, &schema); err != nil {
+		return nil, fmt.Errorf("failed to parse output schema: %w", err)
+	}
+
+	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{
+		ValidateDefaults: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve output schema: %w", err)
+	}
+
+	return resolved, nil
 }
 
 func buildStepEnvs(_ StepBuildContext, s *step) ([]string, error) {

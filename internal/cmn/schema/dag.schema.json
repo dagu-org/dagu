@@ -996,6 +996,44 @@
                   "type": "boolean",
                   "default": false,
                   "description": "When true, excludes this output from outputs.json."
+                },
+                "schema": {
+                  "type": "object",
+                  "description": "JSON Schema to validate captured output against. Output must be valid JSON matching this schema or the step fails. Supports standard JSON Schema keywords.",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["object", "array", "string", "number", "integer", "boolean"],
+                      "description": "The expected JSON type of the output."
+                    },
+                    "properties": {
+                      "type": "object",
+                      "description": "Property definitions for object-type output.",
+                      "additionalProperties": true
+                    },
+                    "required": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "description": "Required property names."
+                    },
+                    "items": {
+                      "description": "Schema for array items.",
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "enum": {
+                      "type": "array",
+                      "description": "Allowed values."
+                    },
+                    "minimum": { "type": "number" },
+                    "maximum": { "type": "number" },
+                    "minLength": { "type": "integer" },
+                    "maxLength": { "type": "integer" },
+                    "pattern": { "type": "string" },
+                    "minItems": { "type": "integer" },
+                    "maxItems": { "type": "integer" }
+                  },
+                  "additionalProperties": true
                 }
               },
               "required": ["name"],
