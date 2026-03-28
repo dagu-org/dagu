@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
 // Step contains the runtime information for a step in a DAG.
@@ -64,6 +66,9 @@ type Step struct {
 	OutputKey string `json:"outputKey,omitempty"`
 	// OutputOmit excludes this output from outputs.json when true.
 	OutputOmit bool `json:"outputOmit,omitempty"`
+	// OutputSchema is the compiled JSON schema for validating step output.
+	// Not serialized - re-compiled from YAML on each load.
+	OutputSchema *jsonschema.Resolved `json:"-"`
 	// Depends contains the list of step names to depend on.
 	Depends []string `json:"depends,omitempty"`
 	// ExplicitlyNoDeps indicates the depends field was explicitly set to empty

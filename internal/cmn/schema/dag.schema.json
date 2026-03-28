@@ -996,6 +996,14 @@
                   "type": "boolean",
                   "default": false,
                   "description": "When true, excludes this output from outputs.json."
+                },
+                "schema": {
+                  "oneOf": [
+                    { "type": "object" },
+                    { "type": "boolean" }
+                  ],
+                  "description": "JSON Schema (Draft-07) to validate captured output against. Output must be valid JSON matching this schema or the step fails. Accepts any valid JSON Schema including boolean schemas (true/false).",
+                  "additionalProperties": true
                 }
               },
               "required": ["name"],
