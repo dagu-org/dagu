@@ -215,3 +215,50 @@ steps:
 		require.Error(t, err)
 	})
 }
+
+func TestIssue1252_InlineSchemaReferenceMode(t *testing.T) {
+	t.Parallel()
+
+	th := test.SetupCommand(t)
+	dagFile := th.CreateDAGFile(t, "issue1252-inline-schema.yaml", `
+name: issue1252-inline-schema
+params:
+  schema:
+    type: object
+    properties:
+      ENVIRONMENT:
+        type: string
+        enum: [dev, staging, prod]
+      REPLICAS:
+        type: integer
+        minimum: 1
+        maximum: 10
+        default: 3
+    required: [ENVIRONMENT]
+  values:
+    ENVIRONMENT: staging
+steps:
+  - name: show-env
+    command: echo "env=$ENVIRONMENT replicas=$REPLICAS"
+    output: VALUES
+`)
+
+	t.Run("schema defaults applied", func(t *testing.T) {
+		runID := uuid.Must(uuid.NewV7()).String()
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args:        []string{"start", "--run-id", runID, dagFile},
+			ExpectedOut: []string{"DAG run finished"},
+		})
+		status, outputs := readAttemptStatusAndOutputs(t, th, "issue1252-inline-schema", runID)
+		require.Equal(t, core.Succeeded, status.Status)
+		assert.Equal(t, "env=staging replicas=3", outputs.Outputs["values"])
+	})
+
+	t.Run("override with invalid value rejected", func(t *testing.T) {
+		runID := uuid.Must(uuid.NewV7()).String()
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", "--run-id", runID, "--params", "ENVIRONMENT=production", dagFile},
+		})
+		require.Error(t, err)
+	})
+}

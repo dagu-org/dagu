@@ -489,7 +489,7 @@
           "$ref": "#/definitions/dagParamExternalSchema"
         }
       ],
-      "description": "Default parameters that can be overridden when triggering the DAG. Supports four formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where each definition is an object with a required 'name' field plus optional fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Schema validation format: object with 'schema' (path to JSON Schema file) and optional 'values' (parameter values) for runtime validation and defaults."
+      "description": "Default parameters that can be overridden when triggering the DAG. Supports four formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where each definition is an object with a required 'name' field plus optional fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Schema validation format: object with 'schema' (JSON Schema path/URL, inline object, or boolean schema) and optional 'values' (parameter values) for runtime validation and defaults."
     },
     "container": {
       "$ref": "#/definitions/container",
@@ -744,6 +744,25 @@
       ],
       "description": "Scalar DAG parameter value."
     },
+    "jsonSchemaDeclaration": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path or URL to a JSON Schema document."
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Inline JSON Schema object."
+        },
+        {
+          "type": "boolean",
+          "description": "Boolean JSON Schema (true or false)."
+        }
+      ],
+      "description": "JSON Schema declaration. Can be a path/URL string, an inline schema object, or a boolean schema."
+    },
     "dagParamLegacyEntry": {
       "type": "object",
       "minProperties": 1,
@@ -811,8 +830,8 @@
       "type": "object",
       "properties": {
         "schema": {
-          "type": "string",
-          "description": "Path or URL to a JSON Schema file used for parameter validation."
+          "$ref": "#/definitions/jsonSchemaDeclaration",
+          "description": "JSON Schema declaration used for parameter validation."
         },
         "values": {
           "type": "object",
@@ -829,12 +848,20 @@
         {
           "properties": {
             "schema": {
+              "type": "object"
+            }
+          }
+        },
+        {
+          "properties": {
+            "schema": {
+              "type": "string",
               "pattern": "(^[a-zA-Z][a-zA-Z0-9+.-]*://)|[./\\\\]"
             }
           }
         }
       ],
-      "description": "JSON Schema validation mode. Use `values` for explicit defaults, or provide a path-like `schema` reference by itself."
+      "description": "JSON Schema validation mode. Use `values` for explicit defaults, provide an inline object schema directly, or provide a path-like/URL schema reference by itself. Boolean schemas require `values` so legacy maps like `params: { schema: true }` remain valid."
     },
     "dagParamLegacyMap": {
       "type": "object",
@@ -998,19 +1025,15 @@
                   "description": "When true, excludes this output from outputs.json."
                 },
                 "schema": {
-                  "oneOf": [
-                    { "type": "object" },
-                    { "type": "boolean" }
-                  ],
-                  "description": "JSON Schema (Draft-07) to validate captured output against. Output must be valid JSON matching this schema or the step fails. Accepts any valid JSON Schema including boolean schemas (true/false).",
-                  "additionalProperties": true
+                  "$ref": "#/definitions/jsonSchemaDeclaration",
+                  "description": "JSON Schema declaration used to validate captured output. Output must be valid JSON matching this schema or the step fails."
                 }
               },
               "required": ["name"],
               "additionalProperties": false
             }
           ],
-          "description": "Variable name to capture the command's stdout. Can be a string or an object with name, key, and omit fields. This output can be referenced in subsequent steps."
+          "description": "Variable name to capture the command's stdout. Can be a string or an object with name, key, omit, and schema fields. This output can be referenced in subsequent steps."
         },
         "depends": {
           "oneOf": [

@@ -94,6 +94,40 @@ steps:
 	})
 }
 
+func TestOutputValidation_Success_SchemaReference(t *testing.T) {
+	t.Parallel()
+	th := test.Setup(t)
+
+	schemaDir := t.TempDir()
+	schemaPath := filepath.Join(schemaDir, "output-schema.json")
+	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+  "type": "object",
+  "properties": {
+    "summary": {"type": "string"},
+    "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+  },
+  "required": ["summary", "confidence"]
+}`), 0o600))
+
+	dag := th.DAG(t, `
+steps:
+  - name: generate-output
+    command: 'echo ''{"summary":"test result","confidence":0.95}'''
+    output:
+      name: RESULT
+      schema: "`+filepath.ToSlash(schemaPath)+`"
+`)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
+
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, status.Status)
+	require.Len(t, status.Nodes, 1)
+	assert.Equal(t, core.NodeSucceeded, status.Nodes[0].Status)
+	assert.Empty(t, status.Nodes[0].Error)
+}
+
 // ---------------------------------------------------------------------------
 // Scenario 2: Output Validation — Failure (schema violation)
 // ---------------------------------------------------------------------------

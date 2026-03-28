@@ -4,8 +4,11 @@
 package spec
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,11 +125,39 @@ func TestBuildStepOutputSchema(t *testing.T) {
 		require.NotNil(t, resolved)
 	})
 
-	t.Run("invalid schema returns error", func(t *testing.T) {
+	t.Run("schema reference resolves from DAG working dir", func(t *testing.T) {
+		dir := t.TempDir()
+		schemaPath := filepath.Join(dir, "output-schema.json")
+		require.NoError(t, os.WriteFile(schemaPath, []byte(`{
+			"type": "object",
+			"properties": {
+				"summary": {"type": "string"}
+			},
+			"required": ["summary"]
+		}`), 0o600))
+
 		s := &step{
 			Output: map[string]any{
 				"name":   "RESULT",
-				"schema": "not-a-schema-object",
+				"schema": "output-schema.json",
+			},
+		}
+		ctx := StepBuildContext{
+			BuildContext: BuildContext{file: filepath.Join(dir, "dag.yaml")},
+			dag:          &core.DAG{WorkingDir: dir},
+		}
+
+		resolved, err := buildStepOutputSchema(ctx, s)
+		require.NoError(t, err)
+		require.NotNil(t, resolved)
+		assert.NoError(t, resolved.Validate(map[string]any{"summary": "test"}))
+	})
+
+	t.Run("invalid schema reference returns error", func(t *testing.T) {
+		s := &step{
+			Output: map[string]any{
+				"name":   "RESULT",
+				"schema": "missing-schema.json",
 			},
 		}
 		_, err := buildStepOutputSchema(StepBuildContext{}, s)

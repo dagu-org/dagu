@@ -87,6 +87,32 @@ steps:
 `,
 		},
 		{
+			name: "ExternalInlineSchemaMode",
+			spec: `
+params:
+  schema:
+    type: object
+    properties:
+      batch_size:
+        type: integer
+  values:
+    batch_size: 25
+steps:
+  - command: echo done
+`,
+		},
+		{
+			name: "ExternalBooleanSchemaModeWithValues",
+			spec: `
+params:
+  schema: true
+  values:
+    batch_size: 25
+steps:
+  - command: echo done
+`,
+		},
+		{
 			name: "RejectCamelCaseInlineField",
 			spec: `
 params:
@@ -128,6 +154,65 @@ params:
   region: us
 steps:
   - command: echo "${schema} ${region}"
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestDAGSchemaStepOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "InlineObjectSchema",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      name: RESULT
+      schema:
+        type: object
+`,
+		},
+		{
+			name: "BooleanSchema",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      name: RESULT
+      schema: true
+`,
+		},
+		{
+			name: "StringSchemaReference",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      name: RESULT
+      schema: ./output.schema.json
 `,
 		},
 	}
