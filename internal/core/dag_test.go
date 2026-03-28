@@ -207,6 +207,26 @@ func TestScheduleJSON(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid cron expression")
 	})
 
+	t.Run("UnmarshalLegacyCronJSON", func(t *testing.T) {
+		t.Parallel()
+
+		var schedule core.Schedule
+		err := json.Unmarshal([]byte(`{"expression":"0 0 * * *"}`), &schedule)
+		require.NoError(t, err)
+		require.Equal(t, core.ScheduleKindCron, schedule.GetKind())
+		require.Equal(t, "0 0 * * *", schedule.Expression)
+		require.NotNil(t, schedule.Parsed)
+	})
+
+	t.Run("UnmarshalRejectsConflictingScheduleFields", func(t *testing.T) {
+		t.Parallel()
+
+		var schedule core.Schedule
+		err := json.Unmarshal([]byte(`{"kind":"cron","expression":"0 0 * * *","at":"2026-03-29T02:10:00+01:00"}`), &schedule)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "must not include both expression and at")
+	})
+
 	t.Run("MarshalUnmarshalOneOffJSON", func(t *testing.T) {
 		t.Parallel()
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -54,4 +55,19 @@ steps:
 	require.Equal(t, stringutil.FormatTime(scheduledAt), status.ScheduleTime)
 	f.assertWorkerID(status, "worker-1")
 	f.assertAllNodesSucceeded(status)
+
+	f.stopScheduler()
+	f.startSchedulerWithClock(30*time.Second, func() time.Time {
+		return scheduledAt.Add(time.Minute)
+	})
+
+	require.Never(t, func() bool {
+		statuses, err := f.coord.DAGRunStore.ListStatuses(
+			f.coord.Context,
+			exec.WithExactName(f.dagWrapper.Name),
+			exec.WithAllHistory(),
+		)
+		require.NoError(t, err)
+		return len(statuses) != 1
+	}, 3*time.Second, 100*time.Millisecond)
 }

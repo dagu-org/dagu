@@ -67,7 +67,7 @@ func reconcileOneOffState(current DAGWatermark, dag *core.DAG, now time.Time) (D
 		}
 
 		status := OneOffStatusConsumed
-		if scheduledTime.After(now) {
+		if !scheduledTime.Before(now) {
 			status = OneOffStatusPending
 		}
 		next.OneOffs[fingerprint] = OneOffScheduleState{

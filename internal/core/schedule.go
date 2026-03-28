@@ -208,6 +208,10 @@ func parseScheduleMap(m map[string]any, opts ScheduleParseOptions) (Schedule, er
 		}
 	}
 
+	if expression != "" && at != "" {
+		return Schedule{}, fmt.Errorf("schedule object must not include both expression and at")
+	}
+
 	if kind == "" {
 		switch {
 		case at != "":
@@ -216,6 +220,23 @@ func parseScheduleMap(m map[string]any, opts ScheduleParseOptions) (Schedule, er
 			kind = ScheduleKindCron
 		default:
 			return Schedule{}, fmt.Errorf("schedule object must include either expression or at")
+		}
+	}
+
+	switch kind {
+	case ScheduleKindCron:
+		if expression == "" {
+			return Schedule{}, fmt.Errorf("cron schedules must include expression")
+		}
+		if at != "" {
+			return Schedule{}, fmt.Errorf("cron schedules must not include at")
+		}
+	case ScheduleKindAt:
+		if at == "" {
+			return Schedule{}, fmt.Errorf("one-off schedules must include at")
+		}
+		if expression != "" {
+			return Schedule{}, fmt.Errorf("one-off schedules must not include expression")
 		}
 	}
 

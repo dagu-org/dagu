@@ -147,7 +147,8 @@ type plannerEntry struct {
 }
 
 // NewTickPlanner creates a new TickPlanner with the given configuration.
-// Nil config fields are replaced with no-op defaults.
+// Nil config fields are replaced with no-op defaults, except RunExists which
+// fails closed when it is not configured.
 func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 	if cfg.WatermarkStore == nil {
 		cfg.WatermarkStore = noopWatermarkStore{}
@@ -173,7 +174,9 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 		cfg.IsQueued = func(context.Context, *core.DAG) (bool, error) { return false, nil }
 	}
 	if cfg.RunExists == nil {
-		cfg.RunExists = func(context.Context, *core.DAG, string) (bool, error) { return false, nil }
+		cfg.RunExists = func(context.Context, *core.DAG, string) (bool, error) {
+			return false, fmt.Errorf("runExists not configured")
+		}
 	}
 	if cfg.Clock == nil {
 		cfg.Clock = time.Now
@@ -460,6 +463,11 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			continue
 		}
 
+		var (
+			startCandidate    PlannedRun
+			hasStartCandidate bool
+		)
+
 		// Evaluate pending one-off schedules.
 		for _, schedule := range entry.dag.Schedule {
 			if !schedule.IsOneOff() {
@@ -481,8 +489,9 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 			}
 
 			run, ok := tp.createPlannedRun(ctx, entry.dag, schedule, oneOffState.ScheduledTime, core.TriggerTypeScheduler)
-			if ok {
-				candidates = append(candidates, run)
+			if ok && shouldPreferStartCandidate(run, startCandidate, hasStartCandidate) {
+				startCandidate = run
+				hasStartCandidate = true
 			}
 		}
 
@@ -501,9 +510,14 @@ func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 				continue
 			}
 			run, ok := tp.createPlannedRun(ctx, entry.dag, schedule, next, core.TriggerTypeScheduler)
-			if ok {
-				candidates = append(candidates, run)
+			if ok && shouldPreferStartCandidate(run, startCandidate, hasStartCandidate) {
+				startCandidate = run
+				hasStartCandidate = true
 			}
+		}
+
+		if hasStartCandidate {
+			candidates = append(candidates, startCandidate)
 		}
 
 		// Evaluate stop schedules.
@@ -788,13 +802,18 @@ func (tp *TickPlanner) dropSuspendedCatchupState(dagName string, dag *core.DAG, 
 
 // advanceDAGWatermark updates the per-DAG watermark to the given time
 // and marks the state as dirty. Caller must NOT hold tp.mu.
-func (tp *TickPlanner) advanceDAGWatermark(dagName string, scheduledTime time.Time) {
+func (tp *TickPlanner) advanceDAGWatermark(dagName string, scheduledTime time.Time) bool {
 	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
 	dagState := cloneDAGWatermark(tp.watermarkState.DAGs[dagName])
+	if dagState.LastScheduledTime.Equal(scheduledTime) {
+		return false
+	}
 	dagState.LastScheduledTime = scheduledTime
 	tp.watermarkState.DAGs[dagName] = dagState
 	tp.watermarkDirty.Store(true)
-	tp.mu.Unlock()
+	return true
 }
 
 func (tp *TickPlanner) markOneOffConsumed(dagName, fingerprint string, scheduledTime time.Time) bool {
@@ -919,8 +938,8 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		}
 		tp.entries[event.DAGName] = &plannerEntry{dag: event.DAG}
 		// Set watermark to now (new DAGs have no catchup)
-		tp.advanceDAGWatermark(event.DAGName, tp.cfg.Clock())
-		flushNow = tp.reconcileOneOffSchedules(event.DAG)
+		flushNow = tp.advanceDAGWatermark(event.DAGName, tp.cfg.Clock())
+		flushNow = tp.reconcileOneOffSchedules(event.DAG) || flushNow
 		logger.Info(ctx, "Planner: DAG added", tag.DAG(event.DAGName))
 
 	case DAGChangeUpdated:
@@ -931,9 +950,9 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		// Remove existing buffer and recompute if catchupWindow > 0
 		delete(tp.buffers, event.DAGName)
 		if event.DAG.CatchupWindow > 0 {
-			tp.recomputeBuffer(ctx, event.DAG)
+			flushNow = tp.recomputeBuffer(ctx, event.DAG)
 		}
-		flushNow = tp.reconcileOneOffSchedules(event.DAG)
+		flushNow = tp.reconcileOneOffSchedules(event.DAG) || flushNow
 		logger.Info(ctx, "Planner: DAG updated", tag.DAG(event.DAGName))
 
 	case DAGChangeDeleted:
@@ -1000,9 +1019,9 @@ func (tp *TickPlanner) reinsertCatchupItem(ctx context.Context, run PlannedRun) 
 }
 
 // recomputeBuffer creates a new catch-up buffer for a DAG using the existing watermark.
-func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
+func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) bool {
 	if !tp.cfg.QueuesEnabled {
-		return
+		return false
 	}
 
 	// Snapshot needed values under the lock to avoid reading the shared map
@@ -1021,9 +1040,10 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 	missed := ComputeMissedIntervals(dag.Schedule, replayFrom, now)
 
 	if len(missed) == 0 {
-		return
+		return false
 	}
 
+	watermarkAdvanced := false
 	q := NewScheduleBuffer(dag.Name, dag.OverlapPolicy)
 	for _, t := range missed {
 		if !q.Send(QueueItem{
@@ -1038,7 +1058,7 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 
 	if dag.OverlapPolicy == core.OverlapPolicyLatest && q.Len() > 1 {
 		dropped := q.DropAllButLast()
-		tp.advanceDAGWatermark(dag.Name, dropped[len(dropped)-1].ScheduledTime)
+		watermarkAdvanced = tp.advanceDAGWatermark(dag.Name, dropped[len(dropped)-1].ScheduledTime)
 	}
 
 	tp.buffers[dag.Name] = q
@@ -1047,6 +1067,7 @@ func (tp *TickPlanner) recomputeBuffer(ctx context.Context, dag *core.DAG) {
 		tag.DAG(dag.Name),
 		slog.Int("missedCount", len(missed)),
 	)
+	return watermarkAdvanced
 }
 
 // DispatchRun dispatches a PlannedRun using the configured dispatch functions.
@@ -1078,6 +1099,7 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 				tag.RunID(run.RunID),
 				tag.Error(err),
 			)
+			return
 		} else if exists {
 			if tp.markOneOffConsumed(run.DAG.Name, run.Fingerprint, run.ScheduledTime) {
 				tp.Flush(ctx)
@@ -1115,6 +1137,7 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 					tag.RunID(run.RunID),
 					tag.Error(existsErr),
 				)
+				return
 			} else if exists {
 				if tp.markOneOffConsumed(run.DAG.Name, run.Fingerprint, run.ScheduledTime) {
 					tp.Flush(ctx)
@@ -1147,4 +1170,17 @@ func (tp *TickPlanner) DispatchRun(ctx context.Context, run PlannedRun) {
 			tp.Flush(ctx)
 		}
 	}
+}
+
+func shouldPreferStartCandidate(candidate, current PlannedRun, hasCurrent bool) bool {
+	if !hasCurrent {
+		return true
+	}
+	if candidate.ScheduledTime.Before(current.ScheduledTime) {
+		return true
+	}
+	if candidate.ScheduledTime.Equal(current.ScheduledTime) && candidate.Schedule.IsOneOff() && !current.Schedule.IsOneOff() {
+		return true
+	}
+	return false
 }

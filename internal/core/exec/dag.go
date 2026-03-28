@@ -54,10 +54,10 @@ type ListDAGsOptions struct {
 	Paginator         *Paginator
 	Name              string                               // Optional name filter
 	Tags              []string                             // Optional tags filter (AND logic - all tags must match)
-	Sort              string                               // Optional sort field (name, updated_at, created_at)
+	Sort              string                               // Optional sort field (name, updated_at, created_at, nextRun)
 	Order             string                               // Optional sort order (asc, desc)
-	Time              *time.Time                           // Optional time for next run calculations (defaults to time.Now())
-	NextRunProjection func(*core.DAG, time.Time) time.Time // Optional scheduler-aware next run projector
+	Time              *time.Time                           // Optional reference time for nextRun sorting/projection (defaults to time.Now())
+	NextRunProjection func(*core.DAG, time.Time) time.Time // Optional scheduler-aware nextRun projector used when Sort == "nextRun"
 }
 
 // ListDAGsResult contains the result of a paginated DAG listing operation

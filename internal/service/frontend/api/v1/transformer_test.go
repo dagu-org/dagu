@@ -114,15 +114,16 @@ func TestToDAGIncludesTypedSchedules(t *testing.T) {
 	require.Len(t, *dag.Schedule, 2)
 
 	cronAPI := (*dag.Schedule)[0]
-	require.NotNil(t, cronAPI.Expression)
-	assert.Equal(t, openapi.ScheduleKindCron, cronAPI.Kind)
-	assert.Equal(t, "*/5 * * * *", *cronAPI.Expression)
+	require.NotNil(t, cronAPI.Kind)
+	assert.Equal(t, openapi.ScheduleKindCron, *cronAPI.Kind)
+	assert.Equal(t, "*/5 * * * *", cronAPI.Expression)
 	assert.Nil(t, cronAPI.At)
 
 	oneOffAPI := (*dag.Schedule)[1]
 	require.NotNil(t, oneOffAPI.At)
-	assert.Equal(t, openapi.ScheduleKindAt, oneOffAPI.Kind)
-	assert.Nil(t, oneOffAPI.Expression)
+	require.NotNil(t, oneOffAPI.Kind)
+	assert.Equal(t, openapi.ScheduleKindAt, *oneOffAPI.Kind)
+	assert.Empty(t, oneOffAPI.Expression)
 
 	expectedAt, err := time.Parse(time.RFC3339, "2026-03-29T02:10:00+01:00")
 	require.NoError(t, err)
@@ -141,8 +142,9 @@ func TestToDAGDetailsIncludesTypedSchedules(t *testing.T) {
 	require.NotNil(t, details.Schedule)
 	require.Len(t, *details.Schedule, 1)
 	require.NotNil(t, (*details.Schedule)[0].At)
-	assert.Equal(t, openapi.ScheduleKindAt, (*details.Schedule)[0].Kind)
-	assert.Nil(t, (*details.Schedule)[0].Expression)
+	require.NotNil(t, (*details.Schedule)[0].Kind)
+	assert.Equal(t, openapi.ScheduleKindAt, *(*details.Schedule)[0].Kind)
+	assert.Empty(t, (*details.Schedule)[0].Expression)
 }
 
 func TestToNodeMapsStatuses(t *testing.T) {

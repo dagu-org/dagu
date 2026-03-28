@@ -291,7 +291,7 @@ func (f *testFixture) waitForWorkerRegistration(workerID string, timeout time.Du
 }
 
 func (f *testFixture) startScheduler(timeout time.Duration) {
-	f.startSchedulerWithOptions(timeout, nil, nil)
+	f.startSchedulerWithClock(timeout, nil)
 }
 
 func (f *testFixture) startSchedulerWithClock(timeout time.Duration, clock scheduler.Clock) {
@@ -498,6 +498,14 @@ func (f *testFixture) stop(dagRunID string) error {
 func (f *testFixture) cleanup() {
 	f.t.Helper()
 
+	f.stopScheduler()
+	f.schedulerErr = nil
+	f.schedulerErrSet = false
+}
+
+func (f *testFixture) stopScheduler() {
+	f.t.Helper()
+
 	schedulerInst := f.scheduler
 	schedulerCancel := f.schedulerCancel
 	schedulerErrCh := f.schedulerErrCh
@@ -507,8 +515,6 @@ func (f *testFixture) cleanup() {
 	f.schedulerCtx = nil
 	f.schedulerCancel = nil
 	f.schedulerErrCh = nil
-	f.schedulerErr = nil
-	f.schedulerErrSet = false
 
 	if schedulerCancel != nil {
 		schedulerCancel()

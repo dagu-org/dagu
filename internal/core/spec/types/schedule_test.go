@@ -232,6 +232,57 @@ schedule:
 	}
 }
 
+func TestScheduleValue_TypedScheduleValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		input       string
+		errContains string
+	}{
+		{
+			name:        "LegacyCronWithoutKind",
+			input:       "start:\n  expression: \"0 * * * *\"\n",
+			errContains: "",
+		},
+		{
+			name:        "RejectsBothExpressionAndAt",
+			input:       "start:\n  kind: cron\n  expression: \"0 * * * *\"\n  at: \"2026-03-29T02:10:00+01:00\"\n",
+			errContains: "must not include both expression and at",
+		},
+		{
+			name:        "RejectsCronWithoutExpression",
+			input:       "start:\n  kind: cron\n",
+			errContains: "cron schedules must include expression",
+		},
+		{
+			name:        "RejectsAtWithExpression",
+			input:       "start:\n  kind: at\n  expression: \"0 * * * *\"\n",
+			errContains: "one-off schedules must include at",
+		},
+		{
+			name:        "RejectsOneOffInStopSchedule",
+			input:       "stop:\n  at: \"2026-03-29T02:10:00+01:00\"\n",
+			errContains: "one-off schedules are only supported for start schedules",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var s types.ScheduleValue
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.errContains == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
+		})
+	}
+}
+
 func TestScheduleValue_AdditionalCoverage(t *testing.T) {
 	t.Parallel()
 

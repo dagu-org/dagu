@@ -12,11 +12,12 @@ import (
 const maxIntValue = int(^uint(0) >> 1)
 
 func toSchedule(s core.Schedule) api.Schedule {
-	schedule := api.Schedule{
-		Kind: api.ScheduleKind(s.GetKind()),
+	schedule := api.Schedule{}
+	if kind := s.GetKind(); kind != "" {
+		schedule.Kind = ptrOf(api.ScheduleKind(kind))
 	}
 	if s.Expression != "" {
-		schedule.Expression = ptrOf(s.Expression)
+		schedule.Expression = s.Expression
 	}
 	if at, ok := s.OneOffTime(); ok {
 		schedule.At = &at

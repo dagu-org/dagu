@@ -725,11 +725,18 @@ func (s *Schedule) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	schedule, err := normalizeSchedule(Schedule{
-		Kind:       alias.Kind,
-		Expression: alias.Expression,
-		At:         alias.At,
-	})
+	raw := make(map[string]any, 3)
+	if alias.Kind != "" {
+		raw["kind"] = string(alias.Kind)
+	}
+	if alias.Expression != "" {
+		raw["expression"] = alias.Expression
+	}
+	if alias.At != "" {
+		raw["at"] = alias.At
+	}
+
+	schedule, err := parseScheduleMap(raw, ScheduleParseOptions{AllowAt: true})
 	if err != nil {
 		return err
 	}

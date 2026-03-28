@@ -68,6 +68,23 @@ func TestReconcileOneOffState_NewEntriesRespectAddSemantics(t *testing.T) {
 	assert.Equal(t, OneOffStatusConsumed, next.OneOffs[past.Fingerprint()].Status)
 }
 
+func TestReconcileOneOffState_ScheduledNowStaysPending(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	schedule := mustOneOffSchedule(t, "2026-02-07T12:00:00Z")
+
+	dag := &core.DAG{
+		Name:     "one-off-dag",
+		Schedule: []core.Schedule{schedule},
+	}
+
+	next, changed := reconcileOneOffState(DAGWatermark{}, dag, now)
+	require.True(t, changed)
+	require.Len(t, next.OneOffs, 1)
+	assert.Equal(t, OneOffStatusPending, next.OneOffs[schedule.Fingerprint()].Status)
+}
+
 func TestTickPlanner_PlanPendingOneOffRun(t *testing.T) {
 	t.Parallel()
 
@@ -180,6 +197,88 @@ func TestTickPlanner_DispatchRun_OneOffFailureLeavesPendingState(t *testing.T) {
 	run, ok := tp.createPlannedRun(context.Background(), dag, schedule, time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC), core.TriggerTypeScheduler)
 	require.True(t, ok)
 	tp.DispatchRun(context.Background(), run)
+
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+	assert.Equal(t, OneOffStatusPending, tp.watermarkState.DAGs[dag.Name].OneOffs[schedule.Fingerprint()].Status)
+}
+
+func TestTickPlanner_PlanOneOffChoosesEarliestStartCandidate(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{}
+	tp, _ := newTestTickPlanner(store)
+
+	earlier := mustOneOffSchedule(t, "2026-02-07T11:59:00Z")
+	later := mustOneOffSchedule(t, "2026-02-07T12:00:00Z")
+	cronSchedule := mustParseSchedule(t, "0 12 * * *")
+	dag := &core.DAG{Name: "one-off-dag", Schedule: []core.Schedule{later, cronSchedule, earlier}}
+	store.state = &SchedulerState{
+		Version: SchedulerStateVersion,
+		DAGs: map[string]DAGWatermark{
+			dag.Name: {
+				OneOffs: map[string]OneOffScheduleState{
+					earlier.Fingerprint(): {
+						ScheduledTime: time.Date(2026, 2, 7, 11, 59, 0, 0, time.UTC),
+						Status:        OneOffStatusPending,
+					},
+					later.Fingerprint(): {
+						ScheduledTime: time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC),
+						Status:        OneOffStatusPending,
+					},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	runs := tp.Plan(context.Background(), time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC))
+	require.Len(t, runs, 1)
+	assert.True(t, runs[0].Schedule.IsOneOff())
+	assert.Equal(t, time.Date(2026, 2, 7, 11, 59, 0, 0, time.UTC), runs[0].ScheduledTime)
+	assert.Equal(t, earlier.Fingerprint(), runs[0].Fingerprint)
+}
+
+func TestTickPlanner_DispatchRun_OneOffRequiresRunExists(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{}
+	dispatched := false
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		Dispatch: func(context.Context, *core.DAG, string, core.TriggerType, time.Time) error {
+			dispatched = true
+			return nil
+		},
+		Clock: func() time.Time {
+			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		},
+	})
+
+	schedule := mustOneOffSchedule(t, "2026-02-07T12:00:00Z")
+	dag := &core.DAG{Name: "one-off-dag", Schedule: []core.Schedule{schedule}}
+	store.state = &SchedulerState{
+		Version: SchedulerStateVersion,
+		DAGs: map[string]DAGWatermark{
+			dag.Name: {
+				OneOffs: map[string]OneOffScheduleState{
+					schedule.Fingerprint(): {
+						ScheduledTime: time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC),
+						Status:        OneOffStatusPending,
+					},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	run, ok := tp.createPlannedRun(context.Background(), dag, schedule, time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC), core.TriggerTypeScheduler)
+	require.True(t, ok)
+	tp.DispatchRun(context.Background(), run)
+
+	assert.False(t, dispatched)
 
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()

@@ -184,6 +184,8 @@ func newScheduler(
 				return true, nil
 			case errors.Is(err, exec.ErrDAGRunIDNotFound):
 				return false, nil
+			case errors.Is(err, exec.ErrNoStatusData):
+				return true, nil
 			default:
 				return false, err
 			}

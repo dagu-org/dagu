@@ -255,6 +255,7 @@ schedule: "1"`,
 			t.Parallel()
 
 			_, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.Error(t, err)
 			if errs, ok := err.(*core.ErrorList); ok && len(*errs) > 0 {
 				if tt.expectedErr == nil {
 					require.Contains(t, err.Error(), tt.errContains)

@@ -2767,10 +2767,11 @@ export interface components {
         };
         /** @description Schedule configuration for DAG-run creation */
         Schedule: {
-            kind: ScheduleKind;
-            /** @description Cron expression when kind is cron */
+            /** @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility. */
+            kind?: ScheduleKind;
+            /** @description Cron expression for recurring schedules */
             expression?: string;
-            /** @description One-off schedule time when kind is at */
+            /** @description RFC 3339 timestamp with explicit offset for one-off schedules */
             at?: string;
         };
         /**

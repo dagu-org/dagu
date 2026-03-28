@@ -228,19 +228,26 @@ func TestWrite_Atomic(t *testing.T) {
 func TestRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create a DAG YAML file.
-	dagContent := []byte("name: roundtrip\ntags:\n  - team=backend\nschedule:\n  - \"0 * * * *\"\nsteps:\n  - name: s1\n    command: echo ok\n")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "rt.yaml"), dagContent, 0600))
+	// Create DAG YAML files.
+	cronContent := []byte("name: roundtrip\ntags:\n  - team=backend\nschedule:\n  - \"0 * * * *\"\nsteps:\n  - name: s1\n    command: echo ok\n")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "rt.yaml"), cronContent, 0600))
+
+	oneOffContent := []byte("name: roundtrip-one-off\nschedule:\n  - at: \"2026-03-29T02:10:00+01:00\"\nsteps:\n  - name: s1\n    command: echo ok\n")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "rt-one-off.yaml"), oneOffContent, 0600))
 
 	core.RegisterExecutorCapabilities("", core.ExecutorCapabilities{
 		Command: true, MultipleCommands: true, Script: true, Shell: true,
 	})
 
-	info, err := os.Stat(filepath.Join(dir, "rt.yaml"))
+	cronInfo, err := os.Stat(filepath.Join(dir, "rt.yaml"))
+	require.NoError(t, err)
+
+	oneOffInfo, err := os.Stat(filepath.Join(dir, "rt-one-off.yaml"))
 	require.NoError(t, err)
 
 	files := []YAMLFileMeta{
-		{Name: "rt.yaml", Size: info.Size(), ModTime: info.ModTime().UnixNano()},
+		{Name: "rt.yaml", Size: cronInfo.Size(), ModTime: cronInfo.ModTime().UnixNano()},
+		{Name: "rt-one-off.yaml", Size: oneOffInfo.Size(), ModTime: oneOffInfo.ModTime().UnixNano()},
 	}
 
 	// Build and write.
@@ -250,11 +257,24 @@ func TestRoundTrip(t *testing.T) {
 
 	// Load and validate.
 	entries := Load(indexPath, files, nil)
-	require.Len(t, entries, 1)
-	assert.Equal(t, "roundtrip", entries[0].Name)
-	assert.Contains(t, entries[0].Tags, "team=backend")
-	assert.Contains(t, entries[0].Schedule, `"kind":"cron"`)
-	assert.Contains(t, entries[0].Schedule, `"expression":"0 * * * *"`)
+	require.Len(t, entries, 2)
+
+	cronDAG := DAGFromEntry(entries[0], dir)
+	assert.Equal(t, "roundtrip", cronDAG.Name)
+	assert.Contains(t, cronDAG.Tags.Strings(), "team=backend")
+	require.Len(t, cronDAG.Schedule, 1)
+	assert.Equal(t, core.ScheduleKindCron, cronDAG.Schedule[0].GetKind())
+	assert.Equal(t, "0 * * * *", cronDAG.Schedule[0].Expression)
+	assert.NotNil(t, cronDAG.Schedule[0].Parsed)
+
+	oneOffDAG := DAGFromEntry(entries[1], dir)
+	assert.Equal(t, "roundtrip-one-off", oneOffDAG.Name)
+	require.Len(t, oneOffDAG.Schedule, 1)
+	assert.Equal(t, core.ScheduleKindAt, oneOffDAG.Schedule[0].GetKind())
+	assert.Equal(t, "2026-03-29T02:10:00+01:00", oneOffDAG.Schedule[0].At)
+	oneOffTime, ok := oneOffDAG.Schedule[0].OneOffTime()
+	require.True(t, ok)
+	assert.Equal(t, "2026-03-29T02:10:00+01:00", oneOffTime.Format(time.RFC3339))
 }
 
 func TestDAGFromEntry(t *testing.T) {

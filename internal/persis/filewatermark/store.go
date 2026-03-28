@@ -54,9 +54,17 @@ func (s *Store) Load(ctx context.Context) (*scheduler.SchedulerState, error) {
 
 	const expectedVersion = scheduler.SchedulerStateVersion
 	switch state.Version {
-	case 0, 1:
-		state.Version = expectedVersion
 	case expectedVersion:
+	case 0, 1:
+		migrated, migrateErr := migrateWatermarkState(state.Version, &state)
+		if migrateErr != nil {
+			logger.Warn(ctx, "Failed to migrate watermark state, starting fresh",
+				tag.Error(migrateErr),
+				tag.File(path),
+			)
+			return newEmptyState(), nil
+		}
+		state = *migrated
 	default:
 		logger.Warn(ctx, "Watermark state version mismatch, starting fresh",
 			tag.File(path),
@@ -131,5 +139,27 @@ func newEmptyState() *scheduler.SchedulerState {
 	return &scheduler.SchedulerState{
 		Version: scheduler.SchedulerStateVersion,
 		DAGs:    make(map[string]scheduler.DAGWatermark),
+	}
+}
+
+func migrateWatermarkState(version int, state *scheduler.SchedulerState) (*scheduler.SchedulerState, error) {
+	if state == nil {
+		return nil, fmt.Errorf("watermark state is nil")
+	}
+
+	migrated := *state
+
+	switch version {
+	case 0:
+		migrated.Version = 1
+		return migrateWatermarkState(1, &migrated)
+	case 1:
+		migrated.Version = scheduler.SchedulerStateVersion
+		if migrated.DAGs == nil {
+			migrated.DAGs = make(map[string]scheduler.DAGWatermark)
+		}
+		return &migrated, nil
+	default:
+		return nil, fmt.Errorf("unsupported watermark state version %d", version)
 	}
 }

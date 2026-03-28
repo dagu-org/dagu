@@ -14,9 +14,12 @@ export function getScheduleLabel(schedule: Schedule): string {
 }
 
 export function getScheduleKey(schedule: Schedule, index: number): string {
-  return schedule.kind === 'at'
-    ? schedule.at || `at-${index}`
-    : schedule.expression || `cron-${index}`;
+  const base =
+    schedule.kind === 'at'
+      ? schedule.at || 'at'
+      : schedule.expression || 'cron';
+
+  return `${base}-${index}`;
 }
 
 export function parseNextRun(nextRun?: string): Date | null {

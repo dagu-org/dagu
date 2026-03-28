@@ -48,7 +48,7 @@ type noopWatermarkStore struct{}
 var _ WatermarkStore = noopWatermarkStore{}
 
 func (noopWatermarkStore) Load(_ context.Context) (*SchedulerState, error) {
-	return &SchedulerState{Version: 2, DAGs: make(map[string]DAGWatermark)}, nil
+	return &SchedulerState{Version: SchedulerStateVersion, DAGs: make(map[string]DAGWatermark)}, nil
 }
 
 func (noopWatermarkStore) Save(_ context.Context, _ *SchedulerState) error {

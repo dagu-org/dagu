@@ -54,11 +54,23 @@
                 "properties": {
                   "kind": {
                     "type": "string",
-                    "enum": ["cron", "at"]
+                    "enum": ["cron"]
                   },
                   "expression": {
                     "type": "string",
                     "description": "Cron expression for a recurring schedule entry"
+                  }
+                },
+                "required": ["expression"],
+                "additionalProperties": false,
+                "description": "Typed cron schedule entry"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["at"]
                   },
                   "at": {
                     "type": "string",
@@ -66,8 +78,9 @@
                     "description": "RFC 3339 timestamp with explicit offset and minute precision for a one-off schedule entry"
                   }
                 },
+                "required": ["at"],
                 "additionalProperties": false,
-                "description": "Typed schedule entry"
+                "description": "Typed one-off schedule entry"
               }
             ]
           },
@@ -87,18 +100,31 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "enum": ["cron", "at"]
+                      "enum": ["cron"]
                     },
                     "expression": {
                       "type": "string"
+                    }
+                  },
+                  "required": ["expression"],
+                  "additionalProperties": false,
+                  "description": "Single typed cron schedule entry for starting the DAG"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["at"]
                     },
                     "at": {
                       "type": "string",
                       "format": "date-time"
                     }
                   },
+                  "required": ["at"],
                   "additionalProperties": false,
-                  "description": "Single typed schedule entry for starting the DAG"
+                  "description": "Single typed one-off schedule entry for starting the DAG"
                 },
                 {
                   "type": "array",
@@ -112,16 +138,28 @@
                         "properties": {
                           "kind": {
                             "type": "string",
-                            "enum": ["cron", "at"]
+                            "enum": ["cron"]
                           },
                           "expression": {
                             "type": "string"
+                          }
+                        },
+                        "required": ["expression"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["at"]
                           },
                           "at": {
                             "type": "string",
                             "format": "date-time"
                           }
                         },
+                        "required": ["at"],
                         "additionalProperties": false
                       }
                     ]
@@ -147,6 +185,7 @@
                       "type": "string"
                     }
                   },
+                  "required": ["expression"],
                   "additionalProperties": false,
                   "description": "Single typed cron schedule entry for stopping the DAG"
                 },
@@ -168,6 +207,7 @@
                             "type": "string"
                           }
                         },
+                        "required": ["expression"],
                         "additionalProperties": false
                       }
                     ]
@@ -193,6 +233,7 @@
                       "type": "string"
                     }
                   },
+                  "required": ["expression"],
                   "additionalProperties": false,
                   "description": "Single typed cron schedule entry for restarting the DAG"
                 },
@@ -214,6 +255,7 @@
                             "type": "string"
                           }
                         },
+                        "required": ["expression"],
                         "additionalProperties": false
                       }
                     ]
