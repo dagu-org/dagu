@@ -498,6 +498,14 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
+            <NavItem
+              to="/api-docs"
+              text="API Docs"
+              icon={<ScrollText size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
           </div>
 
           <div className="space-y-0.5">

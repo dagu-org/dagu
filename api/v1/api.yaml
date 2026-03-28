@@ -70,6 +70,28 @@ paths:
         default:
           description: "Unexpected error"
 
+  /openapi.json:
+    get:
+      summary: "Get the OpenAPI document"
+      description: "Returns the normalized OpenAPI document served by this Dagu instance"
+      operationId: "getOpenapiJson"
+      tags:
+        - "system"
+      responses:
+        "200":
+          description: "The OpenAPI document"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /auth/setup:
     post:
       summary: "Create initial admin account"

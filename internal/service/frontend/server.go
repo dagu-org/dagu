@@ -410,6 +410,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		opt(srv)
 	}
 
+	srv.funcsConfig.BasePath = srv.evaluateBasePath(ctx)
+	srv.funcsConfig.APIBasePath = srv.config.Server.APIBasePath
+
 	// Notify callback with the agent API instance (if both are set).
 	if srv.agentAPICallback != nil && srv.agentAPI != nil {
 		srv.agentAPICallback(srv.agentAPI)
@@ -836,14 +839,14 @@ func redactTokenFromRequest(r *http.Request) *http.Request {
 
 // buildPublicPaths returns the set of public endpoint paths that should be
 // excluded from access logging in "non-public" mode.
-func buildPublicPaths(basePath string, metrics config.MetricsAccess) map[string]struct{} {
+func buildPublicPaths(basePath, apiBasePath string, metrics config.MetricsAccess) map[string]struct{} {
 	paths := []string{
-		pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
-		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/login"),
-		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/setup"),
+		pathutil.BuildMountedAPIEndpointPath(basePath, apiBasePath, "health"),
+		pathutil.BuildMountedAPIEndpointPath(basePath, apiBasePath, "auth/login"),
+		pathutil.BuildMountedAPIEndpointPath(basePath, apiBasePath, "auth/setup"),
 	}
 	if metrics == config.MetricsAccessPublic {
-		paths = append(paths, pathutil.BuildPublicEndpointPath(basePath, "api/v1/metrics"))
+		paths = append(paths, pathutil.BuildMountedAPIEndpointPath(basePath, apiBasePath, "metrics"))
 	}
 	set := make(map[string]struct{}, len(paths))
 	for _, p := range paths {
@@ -869,6 +872,7 @@ func skipPathsMiddleware(mw func(http.Handler) http.Handler, skip map[string]str
 // Serve starts the HTTP server and configures routes.
 func (srv *Server) Serve(ctx context.Context) error {
 	r := chi.NewMux()
+	apiV1BasePath := srv.configureAPIPath(ctx)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Compress(5))
 	if srv.config.Server.AccessLog != config.AccessLogNone {
@@ -883,12 +887,12 @@ func (srv *Server) Serve(ctx context.Context) error {
 			RequestHeaders:   srv.config.Core.Debug,
 			MessageFieldName: "msg",
 			ResponseHeaders:  false,
-			QuietDownRoutes:  []string{"/api/v1/events"},
+			QuietDownRoutes:  []string{path.Join(apiV1BasePath, "events")},
 			QuietDownPeriod:  10 * time.Second,
 		})
 		logMiddleware := sanitizedRequestLogger(requestLogger)
 		if srv.config.Server.AccessLog == config.AccessLogNonPublic {
-			skipPaths := buildPublicPaths(srv.config.Server.BasePath, srv.config.Server.Metrics)
+			skipPaths := buildPublicPaths(srv.evaluateBasePath(ctx), srv.config.Server.APIBasePath, srv.config.Server.Metrics)
 			logMiddleware = skipPathsMiddleware(logMiddleware, skipPaths)
 		}
 		r.Use(logMiddleware)
@@ -903,14 +907,11 @@ func (srv *Server) Serve(ctx context.Context) error {
 	}))
 	r.Use(middleware.RedirectSlashes)
 
-	apiV1BasePath := srv.configureAPIPath()
-	scheme := srv.getScheme()
-
 	if err := srv.setupRoutes(ctx, r); err != nil {
 		return err
 	}
 
-	if err := srv.setupAPIRoutes(ctx, r, apiV1BasePath, scheme); err != nil {
+	if err := srv.setupAPIRoutes(ctx, r, apiV1BasePath); err != nil {
 		return err
 	}
 
@@ -969,16 +970,8 @@ func (srv *Server) startPeriodicUpdateCheck(ctx context.Context) {
 	}()
 }
 
-func (srv *Server) configureAPIPath() string {
-	apiV1BasePath := path.Join(srv.config.Server.BasePath, "api/v1")
-	return ensureLeadingSlash(apiV1BasePath)
-}
-
-func (srv *Server) getScheme() string {
-	if srv.config.Server.TLS == nil {
-		return "http"
-	}
-	return "https"
+func (srv *Server) configureAPIPath(ctx context.Context) string {
+	return pathutil.BuildMountedAPIPath(srv.evaluateBasePath(ctx), srv.config.Server.APIBasePath)
 }
 
 // ensureLeadingSlash ensures the path starts with a forward slash.
@@ -1058,11 +1051,10 @@ func (srv *Server) setupOIDCRoutes(r *chi.Mux) {
 	r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
 }
 
-func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath, scheme string) error {
+func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) error {
 	var setupErr error
 	r.Route(apiV1BasePath, func(r chi.Router) {
-		url := fmt.Sprintf("%s://%s:%d%s", scheme, srv.config.Server.Host, srv.config.Server.Port, apiV1BasePath)
-		if err := srv.apiV1.ConfigureRoutes(ctx, r, url); err != nil {
+		if err := srv.apiV1.ConfigureRoutes(ctx, r); err != nil {
 			logger.Error(ctx, "Failed to configure API routes", tag.Error(err))
 			setupErr = err
 		}

@@ -88,6 +88,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@radix-ui/themes": "^3.2.1",
+    "@scalar/api-reference-react": "^0.1.68",
     "@tanstack/react-table": "^8.21.3",
     "@types/lodash": "^4.17.20",
     "@types/node": "^24.1.0",

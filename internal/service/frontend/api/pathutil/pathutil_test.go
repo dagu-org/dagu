@@ -134,3 +134,80 @@ func TestNormalizePath(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildMountedAPIPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		basePath    string
+		apiBasePath string
+		want        string
+	}{
+		{
+			name:        "default api path",
+			basePath:    "",
+			apiBasePath: "/api/v1",
+			want:        "/api/v1",
+		},
+		{
+			name:        "empty api path falls back to default",
+			basePath:    "",
+			apiBasePath: "",
+			want:        "/api/v1",
+		},
+		{
+			name:        "nested base path",
+			basePath:    "/dagu",
+			apiBasePath: "/api/v1",
+			want:        "/dagu/api/v1",
+		},
+		{
+			name:        "custom api path without leading slash",
+			basePath:    "/dagu",
+			apiBasePath: "rest",
+			want:        "/dagu/rest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildMountedAPIPath(tt.basePath, tt.apiBasePath)
+			if got != tt.want {
+				t.Errorf("BuildMountedAPIPath(%q, %q) = %q, want %q", tt.basePath, tt.apiBasePath, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildMountedAPIEndpointPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		basePath    string
+		apiBasePath string
+		suffix      string
+		want        string
+	}{
+		{
+			name:        "default route",
+			basePath:    "",
+			apiBasePath: "/api/v1",
+			suffix:      "openapi.json",
+			want:        "/api/v1/openapi.json",
+		},
+		{
+			name:        "nested base and custom api path",
+			basePath:    "/dagu",
+			apiBasePath: "/rest",
+			suffix:      "/auth/login",
+			want:        "/dagu/rest/auth/login",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildMountedAPIEndpointPath(tt.basePath, tt.apiBasePath, tt.suffix)
+			if got != tt.want {
+				t.Errorf("BuildMountedAPIEndpointPath(%q, %q, %q) = %q, want %q", tt.basePath, tt.apiBasePath, tt.suffix, got, tt.want)
+			}
+		})
+	}
+}
