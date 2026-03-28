@@ -399,6 +399,22 @@ params:
 	assert.Equal(t, `region="us" schema="prod"`, dag.DefaultParams)
 }
 
+func TestLegacyParamsMap_AllowsBooleanSchemaKeyWithoutValues(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: legacy-boolean-schema-key
+params:
+  schema: true
+  debug: false
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"debug=false", "schema=true"}, dag.Params)
+	assert.Equal(t, `debug="false" schema="true"`, dag.DefaultParams)
+}
+
 func TestInlineParamDefs_RejectNegativeStringLengthConstraint(t *testing.T) {
 	t.Parallel()
 

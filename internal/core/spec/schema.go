@@ -17,14 +17,56 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
-// resolveSchemaFromParams extracts a schema reference from params and resolves it.
+// resolveSchemaFromParams extracts a schema declaration from params and resolves it.
 // Returns (nil, nil) if no schema is declared.
 func resolveSchemaFromParams(params any, workingDir, dagLocation string) (*jsonschema.Resolved, error) {
-	schemaRef := extractSchemaReference(params)
-	if schemaRef == "" {
+	schemaDecl, ok := extractParamsSchemaDeclaration(params)
+	if !ok {
 		return nil, nil
 	}
-	return getSchemaFromRef(workingDir, dagLocation, schemaRef)
+	return resolveSchemaDeclaration(schemaDecl, workingDir, dagLocation)
+}
+
+// resolveSchemaDeclaration resolves a schema declaration.
+// A declaration can be a path/URL string, an inline JSON Schema object, or a boolean schema.
+func resolveSchemaDeclaration(schemaDecl any, workingDir, dagLocation string) (*jsonschema.Resolved, error) {
+	switch v := schemaDecl.(type) {
+	case nil:
+		return nil, nil
+
+	case string:
+		schemaRef := strings.TrimSpace(v)
+		if schemaRef == "" {
+			return nil, fmt.Errorf("schema reference cannot be empty")
+		}
+		return getSchemaFromRef(workingDir, dagLocation, schemaRef)
+
+	case map[string]any, bool:
+		data, err := json.Marshal(schemaDecl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal inline schema: %w", err)
+		}
+		return resolveSchemaData(data)
+
+	default:
+		return nil, fmt.Errorf("schema must be a string, object, or boolean, got %T", schemaDecl)
+	}
+}
+
+func resolveSchemaData(schemaData []byte) (*jsonschema.Resolved, error) {
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(schemaData, &schema); err != nil {
+		return nil, fmt.Errorf("failed to parse schema JSON: %w", err)
+	}
+
+	resolvedSchema, err := schema.Resolve(&jsonschema.ResolveOptions{
+		ValidateDefaults: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve schema: %w", err)
+	}
+
+	return resolvedSchema, nil
 }
 
 // Schema Ref can be a local file (relative or absolute paths), or a remote URL
@@ -43,18 +85,9 @@ func getSchemaFromRef(workingDir string, dagLocation string, schemaRef string) (
 		return nil, fmt.Errorf("failed to load schema from %s: %w", schemaRef, err)
 	}
 
-	var schema jsonschema.Schema
-	if err := json.Unmarshal(schemaData, &schema); err != nil {
-		return nil, fmt.Errorf("failed to parse schema JSON: %w", err)
-	}
-
-	resolveOptions := &jsonschema.ResolveOptions{
-		ValidateDefaults: true,
-	}
-
-	resolvedSchema, err := schema.Resolve(resolveOptions)
+	resolvedSchema, err := resolveSchemaData(schemaData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve schema: %w", err)
+		return nil, err
 	}
 
 	return resolvedSchema, nil
@@ -155,33 +188,34 @@ func loadSchemaFromFile(workingDir string, dagLocation string, filePath string) 
 	return nil, fmt.Errorf("schema file not found for %q; tried %s", filePath, strings.Join(tried, ", "))
 }
 
-// extractSchemaReference extracts the schema reference from a params map.
-// Returns the schema reference as a string if present and valid, empty string otherwise.
-func extractSchemaReference(params any) string {
+// extractParamsSchemaDeclaration extracts the schema declaration from a params map.
+// Returns the raw declaration and true if the params object is in schema-backed mode.
+func extractParamsSchemaDeclaration(params any) (any, bool) {
 	paramsMap, ok := params.(map[string]any)
 	if !ok {
-		return ""
+		return nil, false
 	}
-	if !isExternalSchemaParamsMap(paramsMap) {
-		return ""
+	if !isSchemaBackedParamsMap(paramsMap) {
+		return nil, false
 	}
 
-	schemaRef, hasSchema := paramsMap["schema"]
+	schemaDecl, hasSchema := paramsMap["schema"]
 	if !hasSchema {
-		return ""
+		return nil, false
 	}
 
-	schemaRefStr, ok := schemaRef.(string)
-	if !ok {
-		return ""
-	}
-
-	return schemaRefStr
+	return schemaDecl, true
 }
 
-func isExternalSchemaParamsMap(paramsMap map[string]any) bool {
-	schemaRef, ok := paramsMap["schema"].(string)
-	if !ok {
+// isSchemaBackedParamsMap reports whether a top-level params map should be
+// interpreted as schema-backed params mode rather than as a legacy named-param map.
+// The rules intentionally preserve legacy compatibility for maps like:
+//
+//	params: { schema: prod }
+//	params: { schema: true }
+func isSchemaBackedParamsMap(paramsMap map[string]any) bool {
+	schemaDecl, hasSchema := paramsMap["schema"]
+	if !hasSchema {
 		return false
 	}
 
@@ -193,11 +227,26 @@ func isExternalSchemaParamsMap(paramsMap map[string]any) bool {
 		}
 	}
 
-	if _, hasValues := paramsMap["values"]; hasValues {
-		return true
-	}
+	_, hasValues := paramsMap["values"]
 
-	return looksLikeSchemaReference(schemaRef)
+	switch v := schemaDecl.(type) {
+	case map[string]any:
+		// Inline object schemas are unambiguous because legacy maps only allow scalar values.
+		return true
+
+	case bool:
+		// Boolean schemas require explicit values to avoid stealing legacy maps like {schema: true}.
+		return hasValues
+
+	case string:
+		if hasValues {
+			return true
+		}
+		return looksLikeSchemaReference(v)
+
+	default:
+		return false
+	}
 }
 
 func looksLikeSchemaReference(schemaRef string) bool {

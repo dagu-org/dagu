@@ -16,70 +16,88 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExtractSchemaReference(t *testing.T) {
+func TestExtractParamsSchemaDeclaration(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
 		params   any
-		expected string
+		expected any
+		ok       bool
 	}{
 		{
-			name:     "Nil",
-			params:   nil,
-			expected: "",
+			name:   "Nil",
+			params: nil,
 		},
 		{
-			name:     "NotAMap",
-			params:   "string value",
-			expected: "",
+			name:   "NotAMap",
+			params: "string value",
 		},
 		{
-			name:     "EmptyMap",
-			params:   map[string]any{},
-			expected: "",
+			name:   "EmptyMap",
+			params: map[string]any{},
 		},
 		{
-			name:     "NoSchemaKey",
-			params:   map[string]any{"values": map[string]any{"foo": "bar"}},
-			expected: "",
+			name:   "NoSchemaKey",
+			params: map[string]any{"values": map[string]any{"foo": "bar"}},
 		},
 		{
-			name:     "SchemaKeyNotString",
-			params:   map[string]any{"schema": 123},
-			expected: "",
+			name:   "SchemaKeyNotString",
+			params: map[string]any{"schema": 123},
 		},
 		{
 			name:     "SchemaKeyIsMap",
 			params:   map[string]any{"schema": map[string]any{"type": "object"}},
-			expected: "",
+			expected: map[string]any{"type": "object"},
+			ok:       true,
+		},
+		{
+			name:   "LegacyStringSchemaKeyRemainsLegacy",
+			params: map[string]any{"schema": "prod"},
 		},
 		{
 			name:     "ValidSchemaReference",
 			params:   map[string]any{"schema": "schema.json"},
 			expected: "schema.json",
+			ok:       true,
 		},
 		{
 			name:     "ValidSchemaReferenceWithValues",
-			params:   map[string]any{"schema": "./schemas/params.json", "values": map[string]any{"foo": "bar"}},
-			expected: "./schemas/params.json",
+			params:   map[string]any{"schema": "prod", "values": map[string]any{"foo": "bar"}},
+			expected: "prod",
+			ok:       true,
 		},
 		{
 			name:     "HTTPSchemaReference",
 			params:   map[string]any{"schema": "https://example.com/schema.json"},
 			expected: "https://example.com/schema.json",
+			ok:       true,
 		},
 		{
-			name:     "EmptySchemaString",
-			params:   map[string]any{"schema": ""},
-			expected: "",
+			name:   "EmptySchemaString",
+			params: map[string]any{"schema": ""},
+		},
+		{
+			name:   "BooleanSchemaWithoutValuesRemainsLegacy",
+			params: map[string]any{"schema": true},
+		},
+		{
+			name:     "BooleanSchemaWithValuesUsesSchemaMode",
+			params:   map[string]any{"schema": true, "values": map[string]any{"foo": "bar"}},
+			expected: true,
+			ok:       true,
+		},
+		{
+			name:   "LegacyMapAllowsSchemaKey",
+			params: map[string]any{"schema": "prod", "region": "us"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := extractSchemaReference(tt.params)
+			result, ok := extractParamsSchemaDeclaration(tt.params)
+			assert.Equal(t, tt.ok, ok)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -364,6 +382,43 @@ func TestGetSchemaFromRef(t *testing.T) {
 	})
 }
 
+func TestResolveSchemaDeclaration(t *testing.T) {
+	t.Parallel()
+
+	t.Run("InlineObjectSchema", func(t *testing.T) {
+		t.Parallel()
+
+		resolved, err := resolveSchemaDeclaration(map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"name": map[string]any{"type": "string"},
+			},
+			"required": []any{"name"},
+		}, "", "")
+		require.NoError(t, err)
+		require.NotNil(t, resolved)
+		assert.NoError(t, resolved.Validate(map[string]any{"name": "dagu"}))
+		assert.Error(t, resolved.Validate(map[string]any{}))
+	})
+
+	t.Run("BooleanSchema", func(t *testing.T) {
+		t.Parallel()
+
+		resolved, err := resolveSchemaDeclaration(false, "", "")
+		require.NoError(t, err)
+		require.NotNil(t, resolved)
+		assert.Error(t, resolved.Validate(map[string]any{}))
+	})
+
+	t.Run("InvalidType", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := resolveSchemaDeclaration(123, "", "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "string, object, or boolean")
+	})
+}
+
 func TestResolveSchemaFromParams(t *testing.T) {
 	t.Parallel()
 
@@ -416,6 +471,46 @@ func TestResolveSchemaFromParams(t *testing.T) {
 		resolved, err := resolveSchemaFromParams(params, "", "")
 		require.NoError(t, err)
 		assert.NotNil(t, resolved)
+	})
+
+	t.Run("ParamsWithInlineSchema", func(t *testing.T) {
+		t.Parallel()
+
+		params := map[string]any{
+			"schema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"batch_size": map[string]any{"type": "integer"},
+				},
+			},
+			"values": map[string]any{"batch_size": 20},
+		}
+		resolved, err := resolveSchemaFromParams(params, "", "")
+		require.NoError(t, err)
+		assert.NotNil(t, resolved)
+	})
+
+	t.Run("ParamsWithBooleanSchemaAndValues", func(t *testing.T) {
+		t.Parallel()
+
+		params := map[string]any{
+			"schema": true,
+			"values": map[string]any{"batch_size": 20},
+		}
+		resolved, err := resolveSchemaFromParams(params, "", "")
+		require.NoError(t, err)
+		assert.NotNil(t, resolved)
+	})
+
+	t.Run("ParamsWithBooleanSchemaWithoutValuesRemainsLegacy", func(t *testing.T) {
+		t.Parallel()
+
+		params := map[string]any{
+			"schema": true,
+		}
+		resolved, err := resolveSchemaFromParams(params, "", "")
+		require.NoError(t, err)
+		assert.Nil(t, resolved)
 	})
 
 	t.Run("ParamsWithInvalidSchemaPath", func(t *testing.T) {
@@ -563,6 +658,51 @@ params:
 	require.Len(t, dag.Params, 2)
 	require.Contains(t, dag.Params, "batch_size=50")
 	require.Contains(t, dag.Params, "environment=prod")
+}
+
+func TestBuildParamsWithInlineSchemaDeclaration(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`
+params:
+  schema:
+    type: object
+    properties:
+      batch_size:
+        type: integer
+        default: 25
+        minimum: 1
+      environment:
+        type: string
+        enum: [dev, staging, prod]
+    required: [environment]
+  values:
+    environment: "staging"
+`)
+
+	dag, err := LoadYAML(context.Background(), data)
+	require.NoError(t, err)
+
+	require.Len(t, dag.Params, 2)
+	require.Contains(t, dag.Params, "batch_size=25")
+	require.Contains(t, dag.Params, "environment=staging")
+}
+
+func TestBuildParamsWithBooleanSchemaDeclaration(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`
+params:
+  schema: true
+  values:
+    environment: "staging"
+`)
+
+	dag, err := LoadYAML(context.Background(), data)
+	require.NoError(t, err)
+
+	require.Len(t, dag.Params, 1)
+	require.Contains(t, dag.Params, "environment=staging")
 }
 
 func TestBuildParamsSchemaResolution(t *testing.T) {

@@ -4,7 +4,6 @@
 package spec
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
@@ -877,7 +876,7 @@ func buildStepOutputOmit(_ StepBuildContext, s *step) (bool, error) {
 	return cfg.Omit, nil
 }
 
-func buildStepOutputSchema(_ StepBuildContext, s *step) (*jsonschema.Resolved, error) {
+func buildStepOutputSchema(ctx StepBuildContext, s *step) (*jsonschema.Resolved, error) {
 	cfg, err := parseOutputConfig(s.Output)
 	if err != nil {
 		return nil, err
@@ -886,23 +885,18 @@ func buildStepOutputSchema(_ StepBuildContext, s *step) (*jsonschema.Resolved, e
 		return nil, nil
 	}
 
-	schemaBytes, err := json.Marshal(cfg.Schema)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal output schema: %w", err)
+	// Schema references resolve relative to DAG build context, matching params.schema.
+	// Step working_dir is execution-time behavior and is intentionally not part of
+	// schema file resolution.
+	workingDir := ""
+	if ctx.dag != nil {
+		workingDir = ctx.dag.WorkingDir
 	}
 
-	var schema jsonschema.Schema
-	if err := json.Unmarshal(schemaBytes, &schema); err != nil {
-		return nil, fmt.Errorf("failed to parse output schema: %w", err)
-	}
-
-	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{
-		ValidateDefaults: true,
-	})
+	resolved, err := resolveSchemaDeclaration(cfg.Schema, workingDir, ctx.file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve output schema: %w", err)
 	}
-
 	return resolved, nil
 }
 
