@@ -20,6 +20,7 @@ Use this skill for Dagu DAG YAML work. Keep the main skill lean and load only th
 - `output:` captures trimmed stdout content into a variable. `${step_id.stdout}` is a log file path, not stdout content.
 - `env:` should use list-of-maps when values depend on earlier env vars.
 - `params:` values arrive as strings.
+- Do not assume `bash` for `script:` steps. If a script depends on a specific interpreter, add a shebang such as `#!/bin/sh` or `#!/usr/bin/env bash` only after checking that shell exists on the target host or container. Otherwise keep the script portable or set `shell:` explicitly.
 - `parallel:` requires `call:` to a sub-DAG.
 - Sub-DAGs do not inherit parent env vars; pass what you need via `params:`.
 - For arbitrary text inside shell steps, prefer `printenv VAR_NAME` or `type: template` over `${VAR}` interpolation.
