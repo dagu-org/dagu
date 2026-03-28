@@ -184,6 +184,38 @@ steps:
 Query from `command:`, input JSON from `script:`. Config fields:
 - `raw` — Output raw strings without JSON encoding (like `jq -r`)
 
+## template
+
+Render text using Go `text/template`.
+
+```yaml
+steps:
+  - id: render
+    type: template
+    config:
+      data:
+        name: Alice
+    script: |
+      Hello, {{ .name }}!
+    output: RESULT
+```
+
+Behavior:
+- `script` is required and is rendered as a template, not executed as a shell script
+- Template data comes from `config.data` and is accessed as `{{ .key }}`
+- Supports normal Go template control flow plus a safe subset of slim-sprig functions
+- Missing keys fail the step
+- If `config.output` is set, the rendered result is written to that file instead of stdout
+- Relative `config.output` paths are resolved from the step working directory
+
+Config fields:
+- `data` — Object exposed to the template as `.`
+- `output` — File path for rendered output; if omitted, rendered text is written to stdout
+
+Important: step `output:` and `config.output` are different. Step `output:` captures stdout into a Dagu variable. `config.output` writes the rendered result directly to a file.
+
+Use `template` when you need to generate text files such as Markdown, config files, SQL, JSON, or prompts. It is usually safer and simpler than building files with `echo`, heredocs, or shell string interpolation.
+
 ## sql (postgres / sqlite)
 
 SQL database queries. Use `type: postgres` or `type: sqlite`.
