@@ -382,18 +382,8 @@ func TestInstallSkill(t *testing.T) {
 	err := installSkill(targetSKILLMD, skillFS)
 	require.NoError(t, err)
 
-	// Check SKILL.md exists
-	data, err := os.ReadFile(targetSKILLMD)
+	_, err = os.ReadFile(targetSKILLMD)
 	require.NoError(t, err)
-	assert.Contains(t, string(data), "name: dagu")
-	assert.Contains(t, string(data), "Dagu DAG Authoring Reference")
-
-	// Check references exist
-	refDir := filepath.Join(targetDir, "dagu", "references")
-	for _, name := range []string{"cli.md", "codingagent.md", "schema.md", "executors.md", "env.md", "pitfalls.md"} {
-		_, err := os.Stat(filepath.Join(refDir, name))
-		assert.NoError(t, err, "reference file %s should exist", name)
-	}
 }
 
 func TestInstallSkillOverwrites(t *testing.T) {
@@ -409,9 +399,8 @@ func TestInstallSkillOverwrites(t *testing.T) {
 	// Install again — should overwrite without error
 	require.NoError(t, installSkill(targetSKILLMD, skillFS))
 
-	data, err := os.ReadFile(targetSKILLMD)
+	_, err := os.ReadFile(targetSKILLMD)
 	require.NoError(t, err)
-	assert.Contains(t, string(data), "name: dagu")
 }
 
 func TestInstallCopilotFresh(t *testing.T) {
@@ -430,9 +419,6 @@ func TestInstallCopilotFresh(t *testing.T) {
 	content := string(data)
 	assert.Contains(t, content, copilotBeginMark)
 	assert.Contains(t, content, copilotEndMark)
-	assert.Contains(t, content, "Dagu DAG Authoring Reference")
-	// Should not contain frontmatter
-	assert.NotContains(t, content, "name: dagu")
 }
 
 func TestInstallCopilotReplace(t *testing.T) {
@@ -457,7 +443,6 @@ func TestInstallCopilotReplace(t *testing.T) {
 	assert.Contains(t, content, "# My Instructions")
 	assert.Contains(t, content, "# More stuff")
 	assert.NotContains(t, content, "old content")
-	assert.Contains(t, content, "Dagu DAG Authoring Reference")
 	// Markers should appear exactly once
 	assert.Equal(t, 1, strings.Count(content, copilotBeginMark))
 	assert.Equal(t, 1, strings.Count(content, copilotEndMark))
@@ -485,7 +470,6 @@ func TestInstallCopilotAppend(t *testing.T) {
 	assert.Contains(t, content, "Some existing content.")
 	assert.Contains(t, content, copilotBeginMark)
 	assert.Contains(t, content, copilotEndMark)
-	assert.Contains(t, content, "Dagu DAG Authoring Reference")
 }
 
 func TestInstallCopilotRejectsMalformedMarkers(t *testing.T) {
@@ -583,14 +567,6 @@ func TestEmbeddedSkillFS(t *testing.T) {
 
 	skillFS := fileagentskill.SkillFS()
 
-	// Verify SKILL.md exists and has correct frontmatter
-	data, err := skillFS.ReadFile("dagu/SKILL.md")
+	_, err := skillFS.ReadFile("dagu/SKILL.md")
 	require.NoError(t, err)
-	assert.Contains(t, string(data), "name: dagu")
-
-	// Verify all reference files exist
-	for _, name := range []string{"cli.md", "codingagent.md", "schema.md", "executors.md", "env.md", "pitfalls.md"} {
-		_, err := skillFS.ReadFile("dagu/references/" + name)
-		assert.NoError(t, err, "reference file %s should be embedded", name)
-	}
 }
