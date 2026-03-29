@@ -182,6 +182,7 @@ func (f *fixture) enqueueCatchup(scheduleTime time.Time) string {
 		f.th.DAGRunStore,
 		f.th.QueueStore,
 		f.th.Config.Paths.LogDir,
+		f.th.Config.Paths.BaseConfig,
 		f.dag,
 		runID,
 		core.TriggerTypeCatchUp,

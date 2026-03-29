@@ -230,6 +230,31 @@ func TestNewContext_DAGRunWorkDir(t *testing.T) {
 	}
 }
 
+func TestNewContext_AllEnvsUsesFilteredBaseEnv(t *testing.T) {
+	t.Setenv("EXEC_CONTEXT_HOST_ONLY", "host-value")
+
+	cfg := &config.Config{}
+	cfg.Core.BaseEnv = config.NewBaseEnv([]string{
+		"PATH=/usr/bin:/bin",
+		"EXEC_CONTEXT_ALLOWED=allowed",
+	})
+
+	ctx := config.WithConfig(context.Background(), cfg)
+	dag := &core.DAG{
+		Name: "test-dag",
+		Env:  []string{"DAG_VAR=dag"},
+	}
+
+	ctx = exec.NewContext(ctx, dag, "run-1", "test.log")
+	rCtx := exec.GetContext(ctx)
+	envs := rCtx.AllEnvs()
+
+	assert.Contains(t, envs, "PATH=/usr/bin:/bin")
+	assert.Contains(t, envs, "EXEC_CONTEXT_ALLOWED=allowed")
+	assert.Contains(t, envs, "DAG_VAR=dag")
+	assert.NotContains(t, envs, "EXEC_CONTEXT_HOST_ONLY=host-value")
+}
+
 func TestPendingStepRetryJSON(t *testing.T) {
 	t.Parallel()
 

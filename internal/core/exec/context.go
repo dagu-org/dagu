@@ -323,9 +323,15 @@ func NewContext(
 
 	secretEnvs := stringutil.KeyValuesToMap(options.secretEnvs)
 
-	// Build EnvScope with proper source tracking and layering
-	// Precedence (highest to lowest): Secrets > DAG Env > Params > OS
-	scope := eval.NewEnvScope(nil, true) // OS layer
+	// Build EnvScope with proper source tracking and layering.
+	// Seed the lowest-precedence layer from filtered BaseEnv so workflow step
+	// subprocesses stay isolated from arbitrary host env inherited by parent-
+	// spawned dagu start/retry/restart commands.
+	// Precedence (highest to lowest): Secrets > DAG Env > Params > BaseEnv
+	scope := eval.NewEnvScope(nil, false)
+	if baseEnv := config.GetBaseEnv(ctx); baseEnv != nil {
+		scope = scope.WithEntries(stringutil.KeyValuesToMap(baseEnv.AsSlice()), eval.EnvSourceOS)
+	}
 	scope = scope.WithEntries(envs, eval.EnvSourceDAGEnv)
 	if len(secretEnvs) > 0 {
 		scope = scope.WithEntries(secretEnvs, eval.EnvSourceSecret)

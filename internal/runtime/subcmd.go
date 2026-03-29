@@ -16,7 +16,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/buildenv"
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/cmn/secrets"
 	"github.com/dagu-org/dagu/internal/core"
 	exec1 "github.com/dagu-org/dagu/internal/core/exec"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -98,7 +97,7 @@ func NewSubCmdBuilder(cfg *config.Config) *SubCmdBuilder {
 	}
 }
 
-func (b *SubCmdBuilder) env(extra ...string) []string {
+func (b *SubCmdBuilder) filteredEnv(extra ...string) []string {
 	env := b.baseEnv.AsSlice()
 	if len(env) == 0 {
 		env = os.Environ()
@@ -107,20 +106,10 @@ func (b *SubCmdBuilder) env(extra ...string) []string {
 	return env
 }
 
-// preResolveEnvSecrets looks up env-provider secret source variables in the
-// current process environment and returns them with the presolved prefix.
-// Returns nil if no env-provider secrets reference accessible variables.
-func preResolveEnvSecrets(refs []core.SecretRef) []string {
-	var extra []string
-	for _, ref := range refs {
-		if ref.Provider != "env" || ref.Key == "" {
-			continue
-		}
-		if val, ok := os.LookupEnv(ref.Key); ok {
-			extra = append(extra, secrets.PresolvedEnvPrefix+ref.Key+"="+val)
-		}
-	}
-	return extra
+func (b *SubCmdBuilder) parentEnv(extra ...string) []string {
+	env := os.Environ()
+	env = append(env, extra...)
+	return env
 }
 
 func dagNameHint(target string) string {
@@ -177,7 +166,7 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		Env:        b.parentEnv(),
 		BuildEnv:   append([]string{}, dag.Env...),
 	}
 }
@@ -218,7 +207,7 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(),
+		Env:        b.filteredEnv(),
 		BuildEnv:   append([]string{}, dag.Env...),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
@@ -237,7 +226,7 @@ func (b *SubCmdBuilder) Dequeue(dag *core.DAG, dagRun exec1.DAGRunRef) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(),
+		Env:        b.filteredEnv(),
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 	}
@@ -261,7 +250,7 @@ func (b *SubCmdBuilder) Restart(dag *core.DAG, opts RestartOptions) CmdSpec {
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		Env:        b.parentEnv(),
 		BuildEnv:   append([]string{}, dag.Env...),
 	}
 }
@@ -282,18 +271,17 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        b.env(preResolveEnvSecrets(dag.Secrets)...),
+		Env:        b.parentEnv(),
 		BuildEnv:   append([]string{}, dag.Env...),
 	}
 }
 
 // TaskStart creates a start command spec for coordinator tasks.
-// secretHints optionally provides secret refs for pre-resolving env-provider
-// secrets. envHints optionally provides resolved DAG/base-config env entries
-// for pre-resolving rebuild-time env values in the child process.
-func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string, dagName string) CmdSpec {
+// envHints optionally provides resolved DAG/base-config env entries for
+// rebuild-time env values in the child process.
+func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, envHints []string, dagName string) CmdSpec {
 	args := []string{"start", "-q"}
-	env := b.env(preResolveEnvSecrets(secretHints)...)
+	env := b.parentEnv()
 
 	// Add hierarchy flags for sub DAGs
 	if task.RootDagRunId != "" {
@@ -352,12 +340,11 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, secretHints []core.S
 }
 
 // TaskRetry creates a retry command spec for coordinator tasks.
-// secretHints optionally provides secret refs for pre-resolving env-provider
-// secrets. envHints optionally provides resolved DAG/base-config env entries
-// for pre-resolving rebuild-time env values in the child process.
-func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, secretHints []core.SecretRef, envHints []string, dagName string) CmdSpec {
+// envHints optionally provides resolved DAG/base-config env entries for
+// rebuild-time env values in the child process.
+func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, envHints []string, dagName string) CmdSpec {
 	args := []string{"retry", fmt.Sprintf("--run-id=%s", task.DagRunId), "-q"}
-	env := b.env(preResolveEnvSecrets(secretHints)...)
+	env := b.parentEnv()
 	if task.AttemptId != "" {
 		args = append(args, fmt.Sprintf("--attempt-id=%s", task.AttemptId))
 	}

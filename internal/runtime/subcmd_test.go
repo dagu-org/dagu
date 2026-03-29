@@ -40,17 +40,30 @@ func TestNewSubCmdBuilder(t *testing.T) {
 	require.NotNil(t, builder)
 }
 
-func TestSubCmdBuilderEnvIncludesDockerVars(t *testing.T) {
-	t.Parallel()
+func TestSubCmdBuilderStartInheritsParentEnv(t *testing.T) {
+	t.Setenv("SUBCMD_PARENT_ENV", "from-parent")
 
-	baseEnv := []string{
-		"PATH=/usr/bin",
-		"DOCKER_HOST=tcp://remote:2375",
-		"DOCKER_TLS_VERIFY=1",
-		"DOCKER_CERT_PATH=/certs",
-		"DOCKER_API_VERSION=1.41",
+	cfg := &config.Config{
+		Paths: config.PathsConfig{
+			Executable:     "/path/to/dagu",
+			ConfigFileUsed: "/path/to/config.yaml",
+		},
+		Core: config.Core{
+			BaseEnv: config.NewBaseEnv([]string{"PATH=/usr/bin"}),
+		},
 	}
 
+	builder := runtime.NewSubCmdBuilder(cfg)
+	dag := &core.DAG{Location: "/tmp/test.yaml"}
+	spec := builder.Start(dag, runtime.StartOptions{})
+
+	assert.Contains(t, spec.Env, "SUBCMD_PARENT_ENV=from-parent")
+}
+
+func TestSubCmdBuilderFilteredCommandsUseBaseEnv(t *testing.T) {
+	t.Setenv("SUBCMD_PARENT_ENV", "from-parent")
+
+	baseEnv := []string{"PATH=/usr/bin", "HOME=/tmp/test-home"}
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/path/to/dagu",
@@ -62,24 +75,18 @@ func TestSubCmdBuilderEnvIncludesDockerVars(t *testing.T) {
 	}
 
 	builder := runtime.NewSubCmdBuilder(cfg)
-	dag := &core.DAG{Location: "/tmp/test.yaml"}
-	spec := builder.Start(dag, runtime.StartOptions{})
-
-	envMap := make(map[string]string)
-	for _, e := range spec.Env {
-		if k, v, ok := strings.Cut(e, "="); ok {
-			envMap[k] = v
-		}
+	dag := &core.DAG{
+		Name:     "test-dag",
+		Location: "/tmp/test.yaml",
 	}
 
-	assert.Equal(t, "tcp://remote:2375", envMap["DOCKER_HOST"])
-	assert.Equal(t, "1", envMap["DOCKER_TLS_VERIFY"])
-	assert.Equal(t, "/certs", envMap["DOCKER_CERT_PATH"])
-	assert.Equal(t, "1.41", envMap["DOCKER_API_VERSION"])
+	enqueueSpec := builder.Enqueue(dag, runtime.EnqueueOptions{})
+	assert.Equal(t, baseEnv, enqueueSpec.Env)
+	assert.NotContains(t, enqueueSpec.Env, "SUBCMD_PARENT_ENV=from-parent")
 
-	// DOCKER_AUTH_CONFIG should not be present (it was never in baseEnv).
-	_, found := envMap["DOCKER_AUTH_CONFIG"]
-	assert.False(t, found, "DOCKER_AUTH_CONFIG must not appear in subprocess env")
+	dequeueSpec := builder.Dequeue(dag, exec.NewDAGRunRef("test-dag", "run-1"))
+	assert.Equal(t, baseEnv, dequeueSpec.Env)
+	assert.NotContains(t, dequeueSpec.Env, "SUBCMD_PARENT_ENV=from-parent")
 }
 
 func TestRunRetryWithBuiltExecutable(t *testing.T) {
@@ -260,6 +267,41 @@ steps:
 	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
 }
 
+func TestRunStartWithBuiltExecutableResolvesEnvSecretFromParentEnv(t *testing.T) {
+	th := test.Setup(t, test.WithBuiltExecutable())
+	t.Setenv("SUBCMD_START_SECRET_SOURCE", "from-host")
+
+	dagFile := th.DAG(t, `name: built-exec-start-secret
+secrets:
+  - name: EXPORTED_SECRET
+    provider: env
+    key: SUBCMD_START_SECRET_SOURCE
+steps:
+  - name: capture
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${SUBCMD_START_SECRET_SOURCE:-}"
+    output: RESULT
+`)
+
+	spec := th.SubCmdBuilder.Start(dagFile.DAG, runtime.StartOptions{})
+	for _, entry := range spec.Env {
+		require.False(t, strings.HasPrefix(entry, "_DAGU_PRESOLVED_SECRET_"), "unexpected presolved secret transport env: %s", entry)
+	}
+
+	err := runtime.Start(th.Context, spec)
+	require.NoError(t, err, "env=%s", strings.Join(spec.Env, "\n"))
+
+	var status exec.DAGRunStatus
+	require.Eventually(t, func() bool {
+		latest, err := th.DAGRunMgr.GetLatestStatus(th.Context, dagFile.DAG)
+		if err != nil {
+			return false
+		}
+		status = latest
+		return status.Status == core.Succeeded
+	}, 10*time.Second, 100*time.Millisecond)
+	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
+}
+
 func TestStart(t *testing.T) {
 	t.Parallel()
 	baseEnv := config.NewBaseEnv([]string{"PATH=/usr/bin", "HOME=/tmp/test-home"})
@@ -289,7 +331,6 @@ func TestStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/dag.yaml")
-		assert.Equal(t, baseEnv.AsSlice(), spec.Env)
 	})
 
 	t.Run("StartWithParams", func(t *testing.T) {
@@ -640,14 +681,10 @@ func TestRetry(t *testing.T) {
 
 func TestTaskStart(t *testing.T) {
 	t.Parallel()
-	baseEnv := config.NewBaseEnv([]string{"PATH=/usr/bin", "HOME=/tmp/test-home"})
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
-		},
-		Core: config.Core{
-			BaseEnv: baseEnv,
 		},
 	}
 
@@ -660,7 +697,7 @@ func TestTaskStart(t *testing.T) {
 			AttemptId: "attempt-1",
 			Target:    "/path/to/task.yaml",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
 		assert.Contains(t, spec.Args, "start")
@@ -670,7 +707,6 @@ func TestTaskStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "/path/to/task.yaml")
-		assert.Equal(t, baseEnv.AsSlice(), spec.Env)
 	})
 
 	t.Run("TaskStartWithHierarchy", func(t *testing.T) {
@@ -683,7 +719,7 @@ func TestTaskStart(t *testing.T) {
 			ParentDagRunId:   "parent-id",
 			ParentDagRunName: "parent-dag",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Contains(t, spec.Args, "--root=root-dag:root-id")
 		assert.Contains(t, spec.Args, "--parent=parent-dag:parent-id")
@@ -699,7 +735,7 @@ func TestTaskStart(t *testing.T) {
 			RootDagRunId:   "root-id",
 			RootDagRunName: "root-dag",
 		}
-		spec := builder.TaskStart(task, nil, nil, "child-dag")
+		spec := builder.TaskStart(task, nil, "child-dag")
 
 		assert.Contains(t, spec.Args, "--name=child-dag")
 		for _, arg := range spec.Args {
@@ -715,7 +751,7 @@ func TestTaskStart(t *testing.T) {
 			Target:    "/path/to/task.yaml",
 			Params:    "env=production",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Contains(t, spec.Args, "--")
 		assert.Contains(t, spec.Args, "env=production")
@@ -729,7 +765,7 @@ func TestTaskStart(t *testing.T) {
 			RootDagRunId:   "root-id",
 			RootDagRunName: "root-dag",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Contains(t, spec.Args, "--root=root-dag:root-id")
 		// Should not contain parent flags
@@ -746,7 +782,7 @@ func TestTaskStart(t *testing.T) {
 			ParentDagRunId:   "parent-id",
 			ParentDagRunName: "parent-dag",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Contains(t, spec.Args, "--parent=parent-dag:parent-id")
 		// Should not contain root flags
@@ -763,7 +799,7 @@ func TestTaskStart(t *testing.T) {
 			Target:    "/path/to/task.yaml",
 			Tags:      "env=prod,team=backend",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Contains(t, spec.Args, "--tags=env=prod,team=backend")
 	})
@@ -776,7 +812,7 @@ func TestTaskStart(t *testing.T) {
 			Target:       "/path/to/task.yaml",
 			ScheduleTime: "2026-03-13T10:00:00Z",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Contains(t, spec.Args, "--schedule-time=2026-03-13T10:00:00Z")
 	})
@@ -789,7 +825,7 @@ func TestTaskStart(t *testing.T) {
 			Target:            "/path/to/task.yaml",
 			ExternalStepRetry: true,
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
 	})
@@ -801,7 +837,7 @@ func TestTaskStart(t *testing.T) {
 			AttemptId: "attempt-1",
 			Target:    "/path/to/task.yaml",
 		}
-		spec := builder.TaskStart(task, nil, nil, "")
+		spec := builder.TaskStart(task, nil, "")
 
 		for _, arg := range spec.Args {
 			assert.NotContains(t, arg, "--tags=")
@@ -821,7 +857,7 @@ func TestTaskStart(t *testing.T) {
 			AttemptId: "attempt-1",
 			Target:    "/path/to/task.yaml",
 		}
-		spec := builderNoFile.TaskStart(task, nil, nil, "")
+		spec := builderNoFile.TaskStart(task, nil, "")
 
 		assert.NotContains(t, spec.Args, "--config")
 	})
@@ -829,14 +865,10 @@ func TestTaskStart(t *testing.T) {
 
 func TestTaskRetry(t *testing.T) {
 	t.Parallel()
-	baseEnv := config.NewBaseEnv([]string{"PATH=/usr/bin", "HOME=/tmp/test-home"})
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/usr/bin/dagu",
 			ConfigFileUsed: "/etc/dagu/config.yaml",
-		},
-		Core: config.Core{
-			BaseEnv: baseEnv,
 		},
 	}
 
@@ -850,7 +882,7 @@ func TestTaskRetry(t *testing.T) {
 			Target:         "/path/to/task.yaml",
 			RootDagRunName: "root-dag",
 		}
-		spec := builder.TaskRetry(task, nil, nil, "")
+		spec := builder.TaskRetry(task, nil, "")
 
 		assert.Equal(t, "/usr/bin/dagu", spec.Executable)
 		assert.Contains(t, spec.Args, "retry")
@@ -859,7 +891,6 @@ func TestTaskRetry(t *testing.T) {
 		assert.Contains(t, spec.Args, "--config")
 		assert.Contains(t, spec.Args, "/etc/dagu/config.yaml")
 		assert.Contains(t, spec.Args, "root-dag")
-		assert.Equal(t, baseEnv.AsSlice(), spec.Env)
 	})
 
 	t.Run("TaskRetryWithStep", func(t *testing.T) {
@@ -870,7 +901,7 @@ func TestTaskRetry(t *testing.T) {
 			Target:    "/path/to/task.yaml",
 			Step:      "failed-step",
 		}
-		spec := builder.TaskRetry(task, nil, nil, "")
+		spec := builder.TaskRetry(task, nil, "")
 
 		assert.Contains(t, spec.Args, "--step=failed-step")
 	})
@@ -883,7 +914,7 @@ func TestTaskRetry(t *testing.T) {
 			Target:         "/tmp/worker-child.yaml",
 			RootDagRunName: "root-dag",
 		}
-		spec := builder.TaskRetry(task, nil, nil, "child-dag")
+		spec := builder.TaskRetry(task, nil, "child-dag")
 
 		assert.Contains(t, spec.Args, "child-dag")
 		assert.NotContains(t, spec.Args, "root-dag")
@@ -898,10 +929,8 @@ func TestTaskRetry(t *testing.T) {
 			RootDagRunName:    "root-dag",
 			ExternalStepRetry: true,
 		}
-		spec := builder.TaskRetry(task, nil, nil, "")
+		spec := builder.TaskRetry(task, nil, "")
 
-		assert.Contains(t, spec.Env, "PATH=/usr/bin")
-		assert.Contains(t, spec.Env, "HOME=/tmp/test-home")
 		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
 	})
 
@@ -918,7 +947,7 @@ func TestTaskRetry(t *testing.T) {
 			AttemptId: "attempt-2",
 			Target:    "/path/to/task.yaml",
 		}
-		spec := builderNoFile.TaskRetry(task, nil, nil, "")
+		spec := builderNoFile.TaskRetry(task, nil, "")
 
 		assert.NotContains(t, spec.Args, "--config")
 	})

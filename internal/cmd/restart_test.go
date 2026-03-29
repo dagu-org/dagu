@@ -4,7 +4,6 @@
 package cmd_test
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -96,11 +95,11 @@ steps:
 	latestStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 	require.Equal(t, core.Succeeded, latestStatus.Status)
-	require.Equal(t, "from-host", strings.SplitN(test.StatusOutputValue(t, &latestStatus, "RESULT"), "|", 2)[0])
+	require.Equal(t, "from-host|", test.StatusOutputValue(t, &latestStatus, "RESULT"))
 
 	latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, latestStatus.DAGRunID))
 	require.NoError(t, err)
 	latestAttemptStatus, err := latestAttempt.ReadStatus(th.Context)
 	require.NoError(t, err)
-	require.Equal(t, "from-host", strings.SplitN(test.StatusOutputValue(t, latestAttemptStatus, "RESULT"), "|", 2)[0])
+	require.Equal(t, "from-host|", test.StatusOutputValue(t, latestAttemptStatus, "RESULT"))
 }
