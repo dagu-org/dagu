@@ -14,7 +14,11 @@ func isSchedulerManagedTriggerType(triggerType core.TriggerType) bool {
 	switch triggerType {
 	case core.TriggerTypeScheduler, core.TriggerTypeCatchUp, core.TriggerTypeRetry:
 		return true
-	case core.TriggerTypeUnknown, core.TriggerTypeManual, core.TriggerTypeWebhook, core.TriggerTypeSubDAG:
+	case core.TriggerTypeUnknown,
+		core.TriggerTypeManual,
+		core.TriggerTypeWebhook,
+		core.TriggerTypeSubDAG,
+		core.TriggerTypeAutomata:
 		return false
 	}
 	return false

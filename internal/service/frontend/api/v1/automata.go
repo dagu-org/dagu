@@ -767,8 +767,3 @@ func toAPIAgentUserPromptOptions(options []agent.UserPromptOption) []api.AgentUs
 	}
 	return resp
 }
-
-//go:fix inline
-func refOf[T any](v T) *T {
-	return new(v)
-}

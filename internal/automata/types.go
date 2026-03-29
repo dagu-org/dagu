@@ -66,6 +66,8 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 			}
 			expressions = append(expressions, strings.TrimSpace(node.Value))
 		}
+	case yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode:
+		return fmt.Errorf("schedule must be a string or list of strings")
 	default:
 		return fmt.Errorf("schedule must be a string or list of strings")
 	}

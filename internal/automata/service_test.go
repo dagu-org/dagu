@@ -904,18 +904,3 @@ steps:
     command: echo hello
 `
 }
-
-//go:fix inline
-func ptr(value string) *string {
-	return new(value)
-}
-
-//go:fix inline
-func boolPtr(value bool) *bool {
-	return new(value)
-}
-
-//go:fix inline
-func ptrRunRef(ref exec.DAGRunRef) *exec.DAGRunRef {
-	return new(ref)
-}

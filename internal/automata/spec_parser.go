@@ -71,17 +71,14 @@ func validateAllowedDAGsNode(node *yaml.Node, path string) error {
 	if isNullNode(node) {
 		return nil
 	}
-	if err := validateMappingNode(node, path, map[string]yamlFieldRule{
+	return validateMappingNode(node, path, map[string]yamlFieldRule{
 		"names": {
 			validate: validateStringListNode,
 		},
 		"tags": {
 			validate: validateStringListNode,
 		},
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 func validateAgentConfigNode(node *yaml.Node, path string) error {
