@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/proto/convert"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -109,6 +110,9 @@ type Handler struct {
 	zombieDetectorMu      sync.Mutex
 	zombieDetectorStarted bool
 	zombieDetectorDone    chan struct{}
+
+	eventService        *eventstore.Service
+	eventSourceInstance string
 }
 
 // HandlerConfig holds configuration for creating a Handler.
@@ -144,6 +148,12 @@ type HandlerConfig struct {
 	// StaleLeaseThreshold is the duration after which a distributed run's
 	// lease is considered stale (worker stopped pushing status). Defaults to 90 seconds.
 	StaleLeaseThreshold time.Duration
+
+	// EventService persists coordinator-originated event envelopes.
+	EventService *eventstore.Service
+
+	// EventSourceInstance identifies this coordinator instance in event envelopes.
+	EventSourceInstance string
 }
 
 // applyDefaults sets default values for optional fields.
@@ -173,7 +183,16 @@ func NewHandler(cfg HandlerConfig) *Handler {
 		activeDistributedRunStore: cfg.ActiveDistributedRunStore,
 		staleHeartbeatThreshold:   cfg.StaleHeartbeatThreshold,
 		staleLeaseThreshold:       cfg.StaleLeaseThreshold,
+		eventService:              cfg.EventService,
+		eventSourceInstance:       cfg.EventSourceInstance,
 	}
+}
+
+func (h *Handler) eventContext(ctx context.Context) context.Context {
+	return eventstore.WithContext(ctx, h.eventService, eventstore.Source{
+		Service:  eventstore.SourceServiceCoordinator,
+		Instance: h.eventSourceInstance,
+	})
 }
 
 // Close cleans up all resources held by the handler.
@@ -1109,6 +1128,8 @@ func (h *Handler) isTaskCancelled(ctx context.Context, task *coordinatorv1.Runni
 // ReportStatus receives status updates from workers and persists them.
 // This is used in shared-nothing architecture where workers don't have filesystem access.
 func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+	ctx = h.eventContext(ctx)
+
 	if h.dagRunStore == nil {
 		return nil, status.Error(codes.FailedPrecondition, "status reporting not configured: DAG run storage not available")
 	}
@@ -1162,6 +1183,7 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get/open latest attempt: "+err.Error())
 	}
+	emitStarted := latestStatus.Status != core.Running && dagRunStatus.Status == core.Running
 
 	// Write the status
 	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
@@ -1179,6 +1201,22 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	// Note: We don't close the attempt immediately on terminal status because
 	// the agent may push the same terminal status multiple times from different
 	// code paths. Attempts are cleaned up during coordinator shutdown.
+	if emitStarted && h.eventService != nil {
+		source, ok := eventstore.SourceFromContext(ctx)
+		if !ok {
+			source = eventstore.Source{
+				Service:  eventstore.SourceServiceCoordinator,
+				Instance: h.eventSourceInstance,
+			}
+		}
+		if err := h.eventService.Emit(ctx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunStarted, dagRunStatus, map[string]any{
+			"worker_id":     req.WorkerId,
+			"trigger_type":  string(rune(dagRunStatus.TriggerType)),
+			"schedule_time": dagRunStatus.ScheduleTime,
+		})); err != nil {
+			logger.Warn(ctx, "Failed to emit remote DAG-run started event", tag.Error(err))
+		}
+	}
 
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 }

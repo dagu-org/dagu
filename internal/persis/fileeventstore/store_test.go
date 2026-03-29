@@ -1,0 +1,117 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package fileeventstore
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestStoreEmitWritesInboxFile(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	event := testEvent("evt-1", time.Date(2026, 3, 29, 10, 0, 0, 0, time.UTC))
+	require.NoError(t, store.Emit(context.Background(), event))
+
+	entries, err := os.ReadDir(store.inboxDir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+
+	data, err := os.ReadFile(filepath.Join(store.inboxDir, entries[0].Name()))
+	require.NoError(t, err)
+
+	var stored eventstore.Event
+	require.NoError(t, json.Unmarshal(data, &stored))
+	assert.Equal(t, event.ID, stored.ID)
+	assert.Equal(t, event.Type, stored.Type)
+	assert.Equal(t, event.OccurredAt, stored.OccurredAt)
+}
+
+func TestStoreQuerySkipsMalformedAndPaginates(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	dayOne := time.Date(2026, 3, 28, 12, 0, 0, 0, time.UTC)
+	dayTwo := time.Date(2026, 3, 29, 8, 0, 0, 0, time.UTC)
+	dayTwoOther := time.Date(2026, 3, 29, 9, 0, 0, 0, time.UTC)
+
+	eventOne := testEvent("evt-1", dayOne)
+	eventOne.DAGName = "example"
+	eventTwo := testEvent("evt-2", dayTwo)
+	eventTwo.DAGName = "example"
+	eventThree := testEvent("evt-3", dayTwoOther)
+	eventThree.DAGName = "other"
+
+	writeCommittedEvents(t, store.baseDir, dayOne, [][]byte{
+		mustMarshalEvent(t, eventOne),
+		[]byte("not-json"),
+	})
+	writeCommittedEvents(t, store.baseDir, dayTwo, [][]byte{
+		mustMarshalEvent(t, eventTwo),
+		mustMarshalEvent(t, eventThree),
+	})
+
+	result, err := store.Query(context.Background(), eventstore.QueryFilter{
+		DAGName: "example",
+		Limit:   1,
+		Offset:  1,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, 2, result.Total)
+	require.Len(t, result.Entries, 1)
+	assert.Equal(t, "evt-1", result.Entries[0].ID)
+	assert.True(t, result.Entries[0].OccurredAt.Equal(dayOne))
+}
+
+func mustMarshalEvent(t *testing.T, event *eventstore.Event) []byte {
+	t.Helper()
+	data, err := json.Marshal(event)
+	require.NoError(t, err)
+	return data
+}
+
+func writeCommittedEvents(t *testing.T, baseDir string, day time.Time, lines [][]byte) {
+	t.Helper()
+	path := filepath.Join(baseDir, logPrefix+day.UTC().Format(dayFormat)+logSuffix)
+	content := make([]string, 0, len(lines))
+	for _, line := range lines {
+		content = append(content, string(line))
+	}
+	require.NoError(t, os.WriteFile(path, []byte(strings.Join(content, "\n")+"\n"), filePermissions))
+}
+
+func testEvent(id string, occurredAt time.Time) *eventstore.Event {
+	return &eventstore.Event{
+		ID:             id,
+		SchemaVersion:  eventstore.SchemaVersion,
+		OccurredAt:     occurredAt.UTC(),
+		RecordedAt:     occurredAt.UTC().Add(10 * time.Millisecond),
+		Kind:           eventstore.KindDAGRun,
+		Type:           eventstore.TypeDAGRunQueued,
+		SourceService:  eventstore.SourceServiceScheduler,
+		SourceInstance: "test-instance",
+		DAGName:        "example",
+		DAGRunID:       "run-1",
+		AttemptID:      "attempt-1",
+		Status:         "queued",
+		Data: map[string]any{
+			"trigger_type": "manual",
+		},
+	}
+}

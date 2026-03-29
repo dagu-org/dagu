@@ -38,6 +38,7 @@ type Definition struct {
 	DataDir         string `mapstructure:"data_dir"`
 	SuspendFlagsDir string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir    string `mapstructure:"admin_logs_dir"`
+	EventStoreDir   string `mapstructure:"event_store_dir"`
 	BaseConfig      string `mapstructure:"base_config"`
 
 	// Paths (structured)
@@ -78,6 +79,7 @@ type Definition struct {
 	Cache      *string        `mapstructure:"cache"`   // "low", "normal", or "high"
 	Terminal   *TerminalDef   `mapstructure:"terminal"`
 	Audit      *AuditDef      `mapstructure:"audit"`
+	EventStore *EventStoreDef `mapstructure:"event_store"`
 	Session    *SessionDef    `mapstructure:"session"`
 	SSE        *SSEDef        `mapstructure:"sse"`
 	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
@@ -181,6 +183,7 @@ type PathsDef struct {
 	DataDir            string `mapstructure:"data_dir"`
 	SuspendFlagsDir    string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir       string `mapstructure:"admin_logs_dir"`
+	EventStoreDir      string `mapstructure:"event_store_dir"`
 	BaseConfig         string `mapstructure:"base_config"`
 	AltDagsDir         string `mapstructure:"alt_dags_dir"`
 	DAGRunsDir         string `mapstructure:"dag_runs_dir"`
@@ -342,6 +345,12 @@ type TerminalDef struct {
 type AuditDef struct {
 	Enabled       *bool `mapstructure:"enabled"`        // Default: true
 	RetentionDays *int  `mapstructure:"retention_days"` // Default: 7
+}
+
+// EventStoreDef configures the centralized event store.
+type EventStoreDef struct {
+	Enabled       *bool `mapstructure:"enabled"`        // Default: true
+	RetentionDays *int  `mapstructure:"retention_days"` // Default: 10
 }
 
 // SessionDef configures agent session storage.

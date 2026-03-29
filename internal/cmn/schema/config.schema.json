@@ -98,6 +98,10 @@
       "type": "string",
       "description": "Directory for admin log files."
     },
+    "event_store_dir": {
+      "type": "string",
+      "description": "Directory for centralized event log files and inbox files."
+    },
     "base_config": {
       "type": "string",
       "description": "Path to the base configuration file."
@@ -176,6 +180,9 @@
     },
     "audit": {
       "$ref": "#/definitions/AuditDef"
+    },
+    "event_store": {
+      "$ref": "#/definitions/EventStoreDef"
     },
     "session": {
       "$ref": "#/definitions/SessionDef"
@@ -415,6 +422,10 @@
         "admin_logs_dir": {
           "type": "string",
           "description": "Directory for admin log files."
+        },
+        "event_store_dir": {
+          "type": "string",
+          "description": "Directory for centralized event log files and inbox files."
         },
         "base_config": {
           "type": "string",
@@ -854,6 +865,22 @@
         "retention_days": {
           "type": "integer",
           "description": "Number of days to retain audit logs. Default: 7."
+        }
+      }
+    },
+    "EventStoreDef": {
+      "type": "object",
+      "description": "Centralized event store configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the centralized event store. Default: true."
+        },
+        "retention_days": {
+          "type": "integer",
+          "description": "Number of days to retain event logs. Default: 10.",
+          "minimum": 0
         }
       }
     },

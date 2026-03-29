@@ -34,6 +34,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/parser"
@@ -1844,7 +1845,24 @@ func (a *API) enqueueRetry(ctx context.Context, attempt exec.DAGRunAttempt, dag 
 	if err != nil {
 		return fmt.Errorf("error reading status: %w", err)
 	}
-	if err := exec.EnqueueRetry(ctx, a.dagRunStore, a.queueStore, dag, status, exec.EnqueueRetryOptions{}); err != nil {
+	eventCtx := a.withEventContext(ctx)
+	if err := exec.EnqueueRetry(eventCtx, a.dagRunStore, a.queueStore, dag, status, exec.EnqueueRetryOptions{
+		OnQueued: func(updated *exec.DAGRunStatus) error {
+			if a.eventService == nil || updated == nil {
+				return nil
+			}
+			source, ok := eventstore.SourceFromContext(eventCtx)
+			if !ok {
+				source = eventstore.Source{Service: eventstore.SourceServiceServer}
+			}
+			if err := a.eventService.Emit(eventCtx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunQueued, updated, map[string]any{
+				"trigger_type": string(rune(updated.TriggerType)),
+			})); err != nil {
+				logger.Warn(eventCtx, "Failed to emit queued retry event", tag.Error(err))
+			}
+			return nil
+		},
+	}); err != nil {
 		if errors.Is(err, exec.ErrRetryStaleLatest) {
 			return &Error{
 				HTTPStatus: http.StatusBadRequest,

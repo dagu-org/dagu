@@ -22,7 +22,9 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/fileeventstore"
 	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -54,6 +56,9 @@ type Scheduler struct {
 	startupCancel       context.CancelFunc
 	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
+	eventService        *eventstore.Service
+	eventSourceInstance string
+	eventCollector      *fileeventstore.Collector
 }
 
 type schedulerHooks struct {
@@ -142,7 +147,7 @@ func newScheduler(
 			return len(items) > 0, nil
 		}
 		enqueueFunc = func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error {
-			return EnqueueCatchupRun(ctx, dagRunStore, queueStore, cfg.Paths.LogDir, cfg.Paths.BaseConfig, dag, runID, triggerType, scheduleTime)
+			return EnqueueCatchupRun(ctx, dagRunStore, queueStore, cfg.Paths.LogDir, cfg.Paths.BaseConfig, dag, runID, triggerType, scheduleTime, nil)
 		}
 	}
 
@@ -228,6 +233,48 @@ func (s *Scheduler) SetClock(clock Clock) {
 	s.planner.cfg.Clock = clock
 	if s.retryScanner != nil {
 		s.retryScanner.clock = clock
+	}
+}
+
+// SetEventService configures the scheduler's event emitter source.
+// This must be called before Start().
+func (s *Scheduler) SetEventService(service *eventstore.Service, sourceInstance string) {
+	if s == nil {
+		return
+	}
+	s.eventService = service
+	if sourceInstance != "" {
+		s.eventSourceInstance = sourceInstance
+	}
+	s.updateEnqueueEmitter()
+}
+
+// SetEventCollector configures the scheduler-owned collector loop.
+// This must be called before Start().
+func (s *Scheduler) SetEventCollector(collector *fileeventstore.Collector) {
+	if s == nil {
+		return
+	}
+	s.eventCollector = collector
+}
+
+func (s *Scheduler) updateEnqueueEmitter() {
+	if s == nil || s.planner == nil || !s.config.Queues.Enabled {
+		return
+	}
+	s.planner.cfg.Enqueue = func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error {
+		return EnqueueCatchupRun(
+			ctx,
+			s.dagRunStore,
+			s.queueStore,
+			s.config.Paths.LogDir,
+			s.config.Paths.BaseConfig,
+			dag,
+			runID,
+			triggerType,
+			scheduleTime,
+			s.eventService,
+		)
 	}
 }
 
@@ -504,6 +551,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	})
 
 	wg.Go(func() {
+		s.startEventCollector(ctx)
+	})
+
+	wg.Go(func() {
 		s.entryReader.Start(ctx)
 	})
 
@@ -554,6 +605,16 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 
 	// Start blocks, so call it after releasing the lock
 	zd.Start(ctx)
+}
+
+func (s *Scheduler) startEventCollector(ctx context.Context) {
+	if s.eventCollector == nil {
+		return
+	}
+	s.eventCollector.Start(eventstore.WithContext(ctx, s.eventService, eventstore.Source{
+		Service:  eventstore.SourceServiceScheduler,
+		Instance: s.eventSourceInstance,
+	}))
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {

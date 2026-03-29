@@ -28,6 +28,7 @@ var legacyToSnakeCaseKey = map[string]string{
 	"datadir":               "data_dir",
 	"suspendflagsdir":       "suspend_flags_dir",
 	"adminlogsdir":          "admin_logs_dir",
+	"eventstoredir":         "event_store_dir",
 	"baseconfig":            "base_config",
 	"logencodingcharset":    "log_encoding_charset",
 	"navbarcolor":           "navbar_color",
@@ -69,6 +70,7 @@ var legacyToSnakeCaseKey = map[string]string{
 	"paths.datadir":            "paths.data_dir",
 	"paths.suspendflagsdir":    "paths.suspend_flags_dir",
 	"paths.adminlogsdir":       "paths.admin_logs_dir",
+	"paths.eventstoredir":      "paths.event_store_dir",
 	"paths.baseconfig":         "paths.base_config",
 	"paths.altdagsdir":         "paths.alt_dags_dir",
 	"paths.dagrunsdir":         "paths.dag_runs_dir",
@@ -134,7 +136,9 @@ var legacyToSnakeCaseKey = map[string]string{
 	"queues.config.maxconcurrency": "queues.config.max_concurrency",
 
 	// Audit
-	"audit.retentiondays": "audit.retention_days",
+	"audit.retentiondays":      "audit.retention_days",
+	"eventstore":               "event_store",
+	"eventstore.retentiondays": "event_store.retention_days",
 
 	// GitSync
 	"gitsync.enabled":            "git_sync.enabled",

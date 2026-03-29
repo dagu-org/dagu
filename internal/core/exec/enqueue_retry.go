@@ -21,6 +21,9 @@ type EnqueueRetryOptions struct {
 	// AutoRetry marks scheduler-issued DAG auto-retries. These consume the
 	// DAG-level retry budget at enqueue time.
 	AutoRetry bool
+	// OnQueued is called after the queued status and queue item are both durably written.
+	// Errors from this callback are returned to the caller.
+	OnQueued func(*DAGRunStatus) error
 }
 
 // EnqueueRetry enqueues a DAG run for retry and persists the Queued status.
@@ -105,6 +108,12 @@ func EnqueueRetry(
 			},
 		)
 		return fmt.Errorf("enqueue retry: %w", err)
+	}
+
+	if opts.OnQueued != nil {
+		if err := opts.OnQueued(updatedStatus); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -14,6 +14,7 @@ import (
 type Config struct {
 	Core            Core
 	Server          Server
+	EventStore      EventStoreConfig
 	Paths           PathsConfig
 	Secrets         SecretsConfig
 	UI              UI
@@ -192,6 +193,12 @@ type AuditConfig struct {
 	RetentionDays int  // Default: 7; 0 = keep forever
 }
 
+// EventStoreConfig contains configuration for the centralized event store.
+type EventStoreConfig struct {
+	Enabled       bool // Default: true
+	RetentionDays int  // Default: 10; 0 = keep forever
+}
+
 // SessionConfig contains configuration for agent session cleanup.
 type SessionConfig struct {
 	MaxPerUser int // Default: 100; 0 = unlimited
@@ -319,6 +326,7 @@ type PathsConfig struct {
 	DataDir            string
 	SuspendFlagsDir    string
 	AdminLogsDir       string
+	EventStoreDir      string
 	BaseConfig         string
 	AltDAGsDir         string
 	DAGRunsDir         string
@@ -504,6 +512,9 @@ func (c *Config) Validate() error {
 	if err := c.validateProc(); err != nil {
 		return err
 	}
+	if err := c.validateEventStore(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -544,6 +555,13 @@ func (c *Config) validateScheduler() error {
 	}
 	if c.Scheduler.RetryFailureWindow < 0 {
 		return fmt.Errorf("scheduler.retry_failure_window must be >= 0")
+	}
+	return nil
+}
+
+func (c *Config) validateEventStore() error {
+	if c.EventStore.RetentionDays < 0 {
+		return fmt.Errorf("event_store.retention_days must be >= 0")
 	}
 	return nil
 }

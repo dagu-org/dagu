@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/spf13/cobra"
 )
 
@@ -144,6 +145,22 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType cor
 		tag.RunID(dagRunID),
 		slog.Any("params", dag.Params),
 	)
+
+	if ctx.EventService != nil {
+		source, ok := eventstore.SourceFromContext(ctx.Context)
+		if !ok {
+			source = eventstore.Source{
+				Service:  eventstore.SourceServiceCLI,
+				Instance: ctx.EventSourceInstance,
+			}
+		}
+		if err := ctx.EventService.Emit(ctx.Context, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunQueued, &dagStatus, map[string]any{
+			"trigger_type":  string(rune(triggerType)),
+			"schedule_time": dagStatus.ScheduleTime,
+		})); err != nil {
+			logger.Warn(ctx.Context, "Failed to emit queued DAG-run event", tag.Error(err))
+		}
+	}
 
 	return nil
 }

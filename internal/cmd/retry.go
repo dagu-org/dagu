@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/spf13/cobra"
 )
 
@@ -186,7 +187,28 @@ func runRetry(ctx *Context, args []string) error {
 // Retries respect global queue capacity because the queue processor picks them up
 // when capacity is available.
 func enqueueRetry(ctx *Context, _ exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus, dagRunID string) error {
-	if err := exec.EnqueueRetry(ctx.Context, ctx.DAGRunStore, ctx.QueueStore, dag, status, exec.EnqueueRetryOptions{}); err != nil {
+	onQueued := func(updated *exec.DAGRunStatus) error {
+		if ctx.EventService == nil || updated == nil {
+			return nil
+		}
+		source, ok := eventstore.SourceFromContext(ctx.Context)
+		if !ok {
+			source = eventstore.Source{
+				Service:  eventstore.SourceServiceCLI,
+				Instance: ctx.EventSourceInstance,
+			}
+		}
+		if err := ctx.EventService.Emit(ctx.Context, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunQueued, updated, map[string]any{
+			"trigger_type": string(rune(updated.TriggerType)),
+		})); err != nil {
+			logger.Warn(ctx.Context, "Failed to emit retry enqueue event", tag.Error(err))
+		}
+		return nil
+	}
+
+	if err := exec.EnqueueRetry(ctx.Context, ctx.DAGRunStore, ctx.QueueStore, dag, status, exec.EnqueueRetryOptions{
+		OnQueued: onQueued,
+	}); err != nil {
 		if errors.Is(err, exec.ErrRetryStaleLatest) {
 			return fmt.Errorf("dag-run state changed before retry could be queued")
 		}

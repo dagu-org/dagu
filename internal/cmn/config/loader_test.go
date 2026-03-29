@@ -223,6 +223,10 @@ func TestLoad_Env(t *testing.T) {
 				SlowClientTimeout:      30 * time.Second,
 			},
 		},
+		EventStore: EventStoreConfig{
+			Enabled:       true,
+			RetentionDays: 10,
+		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
 			DocsDir:            filepath.Join(testPaths, "dags", "docs"),
@@ -232,6 +236,7 @@ func TestLoad_Env(t *testing.T) {
 			DataDir:            filepath.Join(testPaths, "data"),
 			SuspendFlagsDir:    filepath.Join(testPaths, "suspend"),
 			AdminLogsDir:       filepath.Join(testPaths, "admin"),
+			EventStoreDir:      cfg.Paths.EventStoreDir,
 			BaseConfig:         filepath.Join(testPaths, "base.yaml"),
 			DAGRunsDir:         filepath.Join(testPaths, "runs"),
 			ProcDir:            filepath.Join(testPaths, "proc"),
@@ -604,6 +609,10 @@ scheduler:
 				SlowClientTimeout:      30 * time.Second,
 			},
 		},
+		EventStore: EventStoreConfig{
+			Enabled:       true,
+			RetentionDays: 10,
+		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
 			DocsDir:            "/var/dagu/dags/docs",
@@ -611,6 +620,7 @@ scheduler:
 			DataDir:            "/var/dagu/data",
 			SuspendFlagsDir:    "/var/dagu/suspend",
 			AdminLogsDir:       "/var/dagu/adminlogs",
+			EventStoreDir:      cfg.Paths.EventStoreDir,
 			BaseConfig:         "/var/dagu/base.yaml",
 			Executable:         "/usr/local/bin/dagu",
 			DAGRunsDir:         "/var/dagu/data/dag-runs",
