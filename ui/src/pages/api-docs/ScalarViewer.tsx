@@ -1,7 +1,6 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import '@/lib/reactLegacyInternals';
 import { ApiReferenceReact } from '@scalar/api-reference-react';
 import * as React from 'react';
 
