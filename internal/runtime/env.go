@@ -84,8 +84,8 @@ func NewEnv(ctx context.Context, step core.Step) Env {
 		"PWD":                     workingDir,
 	}
 
-	// Build scope from DAG context + step envs
-	// The scope chain inherits from rCtx.EnvScope (which has OS + DAG env + secrets)
+	// Build scope from DAG context + step envs.
+	// The scope chain inherits from rCtx.EnvScope (filtered BaseEnv + DAG env + secrets).
 	// and adds step-specific environment variables
 	scope := rCtx.EnvScope
 	if scope == nil {

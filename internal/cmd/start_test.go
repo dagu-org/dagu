@@ -91,7 +91,7 @@ steps:
 	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
 	require.NoError(t, err)
 	require.Equal(t, core.Succeeded, status.Status)
-	require.Equal(t, "from-host|from-host", test.StatusOutputValue(t, &status, "RESULT"))
+	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
 }
 
 func TestCmdStart_BackwardCompatibility(t *testing.T) {

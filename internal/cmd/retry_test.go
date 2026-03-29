@@ -15,7 +15,9 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -165,6 +167,58 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, core.Succeeded, latestStatus.Status)
 		require.Equal(t, core.TriggerTypeRetry, latestStatus.TriggerType)
+	})
+
+	t.Run("QueuedCatchupRetryRestoresEnvSecretsFromPersistedFullDAG", func(t *testing.T) {
+		th := test.SetupCommand(t)
+		t.Setenv("QUEUED_CATCHUP_SECRET_SOURCE", "from-host")
+
+		dagFile := th.DAG(t, `name: queued-catchup-secret-dag
+secrets:
+  - name: EXPORTED_SECRET
+    provider: env
+    key: QUEUED_CATCHUP_SECRET_SOURCE
+steps:
+  - name: "1"
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${QUEUED_CATCHUP_SECRET_SOURCE:-}"
+    output: RESULT
+`)
+
+		metadataOnly, err := spec.Load(
+			th.Context,
+			dagFile.Location,
+			spec.OnlyMetadata(),
+			spec.WithoutEval(),
+			spec.SkipSchemaValidation(),
+		)
+		require.NoError(t, err)
+		require.Empty(t, metadataOnly.Secrets)
+
+		runID := "queued-catchup-secret-run"
+		scheduleTime := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+		require.NoError(t, scheduler.EnqueueCatchupRun(
+			th.Context,
+			th.DAGRunStore,
+			th.QueueStore,
+			th.Config.Paths.LogDir,
+			th.Config.Paths.BaseConfig,
+			metadataOnly,
+			runID,
+			core.TriggerTypeCatchUp,
+			scheduleTime,
+		))
+
+		args := []string{"retry", fmt.Sprintf("--run-id=%s", runID), dagFile.Location}
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{Args: args})
+
+		latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dagFile.Name, runID))
+		require.NoError(t, err)
+
+		latestStatus, err := latestAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, latestStatus.Status)
+		require.Equal(t, core.TriggerTypeCatchUp, latestStatus.TriggerType)
+		require.Equal(t, "from-host|", test.StatusOutputValue(t, latestStatus, "RESULT"))
 	})
 
 	t.Run("TrueRetryKeepsRetryTriggerType", func(t *testing.T) {

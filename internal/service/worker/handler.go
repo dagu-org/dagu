@@ -103,14 +103,14 @@ func (e *taskHandler) buildCommandSpec(ctx context.Context, task *coordinatorv1.
 		if err != nil {
 			return runtime.CmdSpec{}, err
 		}
-		return e.subCmdBuilder.TaskStart(task, hints.secrets, hints.env, dagName), nil
+		return e.subCmdBuilder.TaskStart(task, hints.env, dagName), nil
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
 		hints, err := e.subprocessHints(ctx, task, originalTarget)
 		if err != nil {
 			return runtime.CmdSpec{}, err
 		}
-		return e.subCmdBuilder.TaskRetry(task, hints.secrets, hints.env, dagName), nil
+		return e.subCmdBuilder.TaskRetry(task, hints.env, dagName), nil
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return runtime.CmdSpec{}, fmt.Errorf("operation not specified")
@@ -121,8 +121,7 @@ func (e *taskHandler) buildCommandSpec(ctx context.Context, task *coordinatorv1.
 }
 
 type subprocessHintSet struct {
-	secrets []core.SecretRef
-	env     []string
+	env []string
 }
 
 func (e *taskHandler) subprocessHints(ctx context.Context, task *coordinatorv1.Task, originalTarget string) (*subprocessHintSet, error) {
@@ -159,8 +158,7 @@ func (e *taskHandler) subprocessHints(ctx context.Context, task *coordinatorv1.T
 	}
 
 	return &subprocessHintSet{
-		secrets: dag.Secrets,
-		env:     env,
+		env: env,
 	}, nil
 }
 

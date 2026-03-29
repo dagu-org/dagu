@@ -380,6 +380,7 @@ func (f *testFixture) enqueueCatchup(scheduleTime time.Time) (string, error) {
 		f.coord.DAGRunStore,
 		f.coord.QueueStore,
 		f.coord.Config.Paths.LogDir,
+		f.coord.Config.Paths.BaseConfig,
 		f.dagWrapper.DAG,
 		runID,
 		core.TriggerTypeCatchUp,

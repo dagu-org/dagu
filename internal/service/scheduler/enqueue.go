@@ -25,13 +25,16 @@ import (
 // On failure after CreateAttempt but before Enqueue, the orphaned attempt
 // record is cleaned up via RemoveDAGRun.
 //
-// The DAG is shallow-copied to avoid mutating the shared planner entry
-// (Location is cleared to prevent unix pipe conflicts for concurrent runs).
+// The DAG is reloaded from source before persistence so queued catchup retries
+// inherit a complete execution snapshot. The reloaded DAG is then shallow-copied
+// to avoid mutating the shared planner entry (Location is cleared to prevent
+// unix pipe conflicts for concurrent runs).
 func EnqueueCatchupRun(
 	ctx context.Context,
 	dagRunStore exec.DAGRunStore,
 	queueStore exec.QueueStore,
 	baseLogDir string,
+	baseConfig string,
 	dag *core.DAG,
 	runID string,
 	triggerType core.TriggerType,
@@ -48,10 +51,18 @@ func EnqueueCatchupRun(
 		return nil
 	}
 
+	fullDAG, err := rehydrateExecutionDAG(ctx, dag, nil, baseConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load full DAG for catchup enqueue: %w", err)
+	}
+	if fullDAG == nil {
+		return fmt.Errorf("failed to load full DAG for catchup enqueue: DAG is nil")
+	}
+
 	// Clone to avoid mutating the shared planner entry.
 	// Location is cleared to prevent unix pipe conflicts for concurrent runs
 	// (same as cmd/enqueue.go:87).
-	dagCopy := dag.Clone()
+	dagCopy := fullDAG.Clone()
 	dagCopy.Location = ""
 
 	logFile, err := logpath.Generate(ctx, baseLogDir, dagCopy.LogDir, dagCopy.Name, runID)
