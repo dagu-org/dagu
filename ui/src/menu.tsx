@@ -283,14 +283,14 @@ function SidebarWorkspaceControl({
                 setIsCreating(true);
               }}
               className={cn(
-                'h-9 w-9 rounded-md border border-sidebar-border flex items-center justify-center',
+                'h-7 w-7 rounded-md border border-sidebar-border flex items-center justify-center',
                 customColor
                   ? 'hover:opacity-70'
                   : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
               )}
               title="New workspace"
             >
-              <Plus size={14} />
+              <Plus size={12} />
             </button>
           )}
           {canWrite && isOpen && !isCreating && selectedWorkspaceRecord && (
@@ -298,14 +298,14 @@ function SidebarWorkspaceControl({
               type="button"
               onClick={() => setDeleteTarget(selectedWorkspaceRecord.id)}
               className={cn(
-                'h-9 w-9 rounded-md border border-sidebar-border flex items-center justify-center',
+                'h-7 w-7 rounded-md border border-sidebar-border flex items-center justify-center',
                 customColor
                   ? 'hover:opacity-70'
                   : 'text-sidebar-foreground hover:text-destructive hover:bg-sidebar-hover'
               )}
               title="Delete workspace"
             >
-              <Trash2 size={14} />
+              <Trash2 size={12} />
             </button>
           )}
         </div>
