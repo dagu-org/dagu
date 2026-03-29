@@ -6982,6 +6982,10 @@ components:
           $ref: "#/components/schemas/DAG"
         latestDAGRun:
           $ref: "#/components/schemas/DAGRunSummary"
+        nextRun:
+          type: string
+          format: date-time
+          description: "Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed."
         suspended:
           type: boolean
           description: "Whether the DAG is suspended"
@@ -7044,12 +7048,25 @@ components:
     Schedule:
       type: object
       description: "Schedule configuration for DAG-run creation"
+      additionalProperties: false
+      minProperties: 1
+      not:
+        required:
+          - expression
+          - at
       properties:
+        kind:
+          type: string
+          enum: ["cron", "at"]
+          description: "Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility."
         expression:
           type: string
-          description: "Cron expression or schedule pattern"
-      required:
-        - expression
+          description: "Cron expression for recurring schedules"
+          x-go-type-skip-optional-pointer: true
+        at:
+          type: string
+          format: date-time
+          description: "RFC 3339 timestamp with explicit offset for one-off schedules"
 
     Status:
       type: integer

@@ -2735,6 +2735,8 @@ export interface components {
             latestDAGRun: components["schemas"]["DAGRunSummary"];
             /** @description Whether the DAG is suspended */
             suspended: boolean;
+            /** @description Next planned run time computed by the scheduler */
+            nextRun?: string;
             /** @description List of errors encountered during the request */
             errors: string[];
         };
@@ -2765,9 +2767,17 @@ export interface components {
         };
         /** @description Schedule configuration for DAG-run creation */
         Schedule: {
-            /** @description Cron expression or schedule pattern */
-            expression: string;
+            /** @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility. */
+            kind?: ScheduleKind;
+            /** @description Cron expression for recurring schedules */
+            expression?: string;
+            /** @description RFC 3339 timestamp with explicit offset for one-off schedules */
+            at?: string;
         };
+        /**
+         * @enum {string}
+         */
+        ScheduleKind: ScheduleKind;
         /**
          * @description Numeric status code indicating current DAG-run state:
          *     0: "Not started"
@@ -12341,6 +12351,10 @@ export enum Stream {
 export enum HealthResponseStatus {
     healthy = "healthy",
     unhealthy = "unhealthy"
+}
+export enum ScheduleKind {
+    cron = "cron",
+    at = "at"
 }
 export enum Status {
     NotStarted = 0,

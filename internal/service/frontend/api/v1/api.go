@@ -34,6 +34,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/tunnel"
 	"github.com/dagu-org/dagu/internal/workspace"
 	"github.com/getkin/kin-openapi/openapi3"
@@ -79,6 +80,7 @@ type API struct {
 	licenseManager      *license.Manager
 	workspaceStore      workspace.Store
 	leaseStaleThreshold time.Duration
+	schedulerStateStore scheduler.WatermarkStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -221,6 +223,13 @@ func WithRemoteNodeStore(s remotenode.Store) APIOption {
 func WithWorkspaceStore(s workspace.Store) APIOption {
 	return func(a *API) {
 		a.workspaceStore = s
+	}
+}
+
+// WithSchedulerStateStore sets the scheduler state store used for next-run projections.
+func WithSchedulerStateStore(store scheduler.WatermarkStore) APIOption {
+	return func(a *API) {
+		a.schedulerStateStore = store
 	}
 }
 
