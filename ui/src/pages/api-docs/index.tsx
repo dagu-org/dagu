@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY } from '@/contexts/AuthContext';
@@ -17,12 +20,13 @@ type LoadState =
 
 export default function APIDocsPage(): React.ReactElement {
   const appBarContext = React.useContext(AppBarContext);
+  const { setTitle } = appBarContext;
   const config = useConfig();
   const [state, setState] = React.useState<LoadState>({ status: 'loading' });
 
   React.useEffect(() => {
-    appBarContext.setTitle('API Docs');
-  }, [appBarContext]);
+    setTitle('API Docs');
+  }, [setTitle]);
 
   const loadSpec = React.useCallback(async () => {
     setState({ status: 'loading' });

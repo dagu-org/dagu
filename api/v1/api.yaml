@@ -85,6 +85,12 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Unexpected error"
           content:

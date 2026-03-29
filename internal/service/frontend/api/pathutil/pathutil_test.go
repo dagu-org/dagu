@@ -3,7 +3,11 @@
 
 package pathutil
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestBuildPublicEndpointPath(t *testing.T) {
 	tests := []struct {
@@ -171,9 +175,7 @@ func TestBuildMountedAPIPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := BuildMountedAPIPath(tt.basePath, tt.apiBasePath)
-			if got != tt.want {
-				t.Errorf("BuildMountedAPIPath(%q, %q) = %q, want %q", tt.basePath, tt.apiBasePath, got, tt.want)
-			}
+			assert.Equalf(t, tt.want, got, "BuildMountedAPIPath(%q, %q)", tt.basePath, tt.apiBasePath)
 		})
 	}
 }
@@ -205,9 +207,7 @@ func TestBuildMountedAPIEndpointPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := BuildMountedAPIEndpointPath(tt.basePath, tt.apiBasePath, tt.suffix)
-			if got != tt.want {
-				t.Errorf("BuildMountedAPIEndpointPath(%q, %q, %q) = %q, want %q", tt.basePath, tt.apiBasePath, tt.suffix, got, tt.want)
-			}
+			assert.Equalf(t, tt.want, got, "BuildMountedAPIEndpointPath(%q, %q, %q)", tt.basePath, tt.apiBasePath, tt.suffix)
 		})
 	}
 }

@@ -831,8 +831,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Terminate a running DAG-run
-         * @description Forcefully stops a running DAG-run created from this DAG
+         * Terminate or cancel a DAG-run
+         * @description Forcefully stops a running DAG-run, or cancels a failed root DAG-run that is still pending DAG-level automatic retry.
          */
         post: operations["terminateDAGRun"];
         delete?: never;
@@ -4453,7 +4453,18 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, unknown>;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Unexpected error */

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 declare module '@scalar/api-reference-react' {
   import type * as React from 'react';
 
@@ -8,5 +11,3 @@ declare module '@scalar/api-reference-react' {
   const DefaultExport: typeof ApiReferenceReact;
   export default DefaultExport;
 }
-
-declare module '@scalar/api-reference-react/style.css';

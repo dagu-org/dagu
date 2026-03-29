@@ -1,5 +1,7 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { ApiReferenceReact } from '@scalar/api-reference-react';
-import '@scalar/api-reference-react/style.css';
 import * as React from 'react';
 
 type ScalarViewerProps = {
@@ -12,7 +14,7 @@ export default function ScalarViewer({
   preferredBearerToken,
 }: ScalarViewerProps): React.ReactElement {
   const darkMode =
-    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
   const configuration: Record<string, unknown> = {
     content: spec,

@@ -186,6 +186,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		oidcButtonLabel string
 		setupRequired   bool
 	)
+	evaluatedBasePath := evaluateConfiguredBasePath(ctx, cfg.Server.BasePath)
 
 	auditSvc, auditStore, err := initAuditService(cfg)
 	if err != nil {
@@ -300,7 +301,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 				oidcCfg,
 				result.AuthService,
 				provisionSvc,
-				cfg.Server.BasePath,
+				evaluatedBasePath,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize builtin OIDC: %w", err)
@@ -386,7 +387,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		funcsConfig: funcsConfig{
 			NavbarColor:           cfg.UI.NavbarColor,
 			NavbarTitle:           cfg.UI.NavbarTitle,
-			BasePath:              cfg.Server.BasePath,
+			BasePath:              evaluatedBasePath,
 			APIBasePath:           cfg.Server.APIBasePath,
 			TZ:                    cfg.Core.TZ,
 			TzOffsetInSec:         cfg.Core.TzOffsetInSec,
@@ -410,7 +411,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		opt(srv)
 	}
 
-	srv.funcsConfig.BasePath = srv.evaluateBasePath(ctx)
 	srv.funcsConfig.APIBasePath = srv.config.Server.APIBasePath
 
 	// Notify callback with the agent API instance (if both are set).
@@ -892,7 +892,7 @@ func (srv *Server) Serve(ctx context.Context) error {
 		})
 		logMiddleware := sanitizedRequestLogger(requestLogger)
 		if srv.config.Server.AccessLog == config.AccessLogNonPublic {
-			skipPaths := buildPublicPaths(srv.evaluateBasePath(ctx), srv.config.Server.APIBasePath, srv.config.Server.Metrics)
+			skipPaths := buildPublicPaths(srv.funcsConfig.BasePath, srv.config.Server.APIBasePath, srv.config.Server.Metrics)
 			logMiddleware = skipPathsMiddleware(logMiddleware, skipPaths)
 		}
 		r.Use(logMiddleware)
@@ -970,8 +970,8 @@ func (srv *Server) startPeriodicUpdateCheck(ctx context.Context) {
 	}()
 }
 
-func (srv *Server) configureAPIPath(ctx context.Context) string {
-	return pathutil.BuildMountedAPIPath(srv.evaluateBasePath(ctx), srv.config.Server.APIBasePath)
+func (srv *Server) configureAPIPath(_ context.Context) string {
+	return pathutil.BuildMountedAPIPath(srv.funcsConfig.BasePath, srv.config.Server.APIBasePath)
 }
 
 // ensureLeadingSlash ensures the path starts with a forward slash.
@@ -988,9 +988,9 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 		return nil
 	}
 
-	basePath := srv.evaluateBasePath(ctx)
+	basePath := srv.funcsConfig.BasePath
 	srv.setupAssetRoutes(r, basePath)
-	srv.setupOIDCRoutes(r)
+	srv.setupOIDCRoutes(r, basePath)
 
 	indexHandler := srv.useTemplate(ctx, "index.gohtml", "index")
 	r.Route("/", func(r chi.Router) {
@@ -1003,8 +1003,7 @@ func (srv *Server) setupRoutes(ctx context.Context, r *chi.Mux) error {
 	return nil
 }
 
-func (srv *Server) evaluateBasePath(ctx context.Context) string {
-	basePath := srv.config.Server.BasePath
+func evaluateConfiguredBasePath(ctx context.Context, basePath string) string {
 	evaluated, err := eval.String(ctx, basePath, eval.WithOSExpansion())
 	if err != nil {
 		logger.Warn(ctx, "Failed to evaluate server base path", tag.Path(basePath), tag.Error(err))
@@ -1043,12 +1042,12 @@ func (srv *Server) setupAssetRoutes(r *chi.Mux, basePath string) {
 	})
 }
 
-func (srv *Server) setupOIDCRoutes(r *chi.Mux) {
+func (srv *Server) setupOIDCRoutes(r *chi.Mux, basePath string) {
 	if srv.builtinOIDCCfg == nil {
 		return
 	}
-	r.Get("/oidc-login", auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
-	r.Get("/oidc-callback", auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
+	r.Get(pathutil.BuildPublicEndpointPath(basePath, "oidc-login"), auth.BuiltinOIDCLoginHandler(srv.builtinOIDCCfg))
+	r.Get(pathutil.BuildPublicEndpointPath(basePath, "oidc-callback"), auth.BuiltinOIDCCallbackHandler(srv.builtinOIDCCfg))
 }
 
 func (srv *Server) setupAPIRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) error {

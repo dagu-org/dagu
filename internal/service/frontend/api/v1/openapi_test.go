@@ -17,7 +17,7 @@ type openAPIDocument struct {
 	Servers []struct {
 		URL string `json:"url"`
 	} `json:"servers"`
-	Paths map[string]any `json:"paths"`
+	Paths map[string]json.RawMessage `json:"paths"`
 }
 
 func TestOpenapiJSON_StrictValidation(t *testing.T) {
@@ -53,6 +53,9 @@ func TestOpenapiJSON_BuiltinAuth(t *testing.T) {
 
 	doc := decodeOpenAPIDocument(t, resp.Body)
 	require.Equal(t, "/api/v1", openAPIServerURL(t, doc))
+	responses := openAPIResponses(t, doc, "/openapi.json")
+	require.Contains(t, responses, "401")
+	require.NotContains(t, responses, "403")
 }
 
 func TestOpenapiJSON_MountedServerURL(t *testing.T) {
@@ -123,4 +126,19 @@ func openAPIServerURL(t *testing.T, doc openAPIDocument) string {
 
 	require.Len(t, doc.Servers, 1)
 	return doc.Servers[0].URL
+}
+
+func openAPIResponses(t *testing.T, doc openAPIDocument, path string) map[string]json.RawMessage {
+	t.Helper()
+
+	pathDoc, ok := doc.Paths[path]
+	require.True(t, ok)
+
+	var operation struct {
+		Get struct {
+			Responses map[string]json.RawMessage `json:"responses"`
+		} `json:"get"`
+	}
+	require.NoError(t, json.Unmarshal(pathDoc, &operation))
+	return operation.Get.Responses
 }
