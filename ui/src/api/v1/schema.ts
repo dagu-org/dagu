@@ -1482,6 +1482,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/recent-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List recent workflow events
+         * @description Returns recent workflow lifecycle events such as waiting, failed, aborted, rejected, approved, and push-back actions. Any authenticated user can access this endpoint when auth is enabled.
+         */
+        get: operations["listRecentEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sync/status": {
         parameters: {
             query?: never;
@@ -2502,6 +2522,53 @@ export interface components {
             /** @description Total number of entries matching the filter (before pagination) */
             total: number;
         };
+        /** @description A single recent workflow event */
+        RecentEventEntry: {
+            /** @description User or actor responsible for the action */
+            actor?: string;
+            /** @description Approval iteration for waiting or push-back events */
+            approvalIteration?: number;
+            /** @description Attempt ID for the affected run */
+            attemptId?: string;
+            /** @description Root DAG name */
+            dagName: string;
+            /** @description Root DAG-run ID */
+            dagRunId: string;
+            /** @description Unique identifier for this event */
+            id: string;
+            /** @description Optional failure or rejection reason */
+            reason?: string;
+            /** @description Resulting persisted DAG-run status after the event */
+            resultingRunStatus?: string;
+            /** @description Whether the action resumed execution */
+            resumed?: boolean;
+            /** @description Step name associated with the event */
+            stepName?: string;
+            /** @description Sub DAG-run ID when the event belongs to a sub DAG-run */
+            subDAGRunId?: string;
+            /**
+             * Format: date-time
+             * @description When the event occurred
+             */
+            timestamp: string;
+            /**
+             * @description Type of workflow event captured in the recent event feed
+             * @enum {string}
+             */
+            type: RecentEventType;
+        };
+        /** @description Response containing recent workflow events */
+        RecentEventsResponse: {
+            /** @description List of recent workflow events */
+            entries: components["schemas"]["RecentEventEntry"][];
+            /** @description Total number of entries matching the filter (before pagination) */
+            total: number;
+        };
+        /**
+         * @description Type of workflow event captured in the recent event feed
+         * @enum {string}
+         */
+        RecentEventType: RecentEventType;
         /** @description Request body for approving a waiting step */
         ApproveStepRequest: {
             /** @description Key-value parameters to provide. These will be available as environment variables in subsequent steps. */
@@ -8667,6 +8734,65 @@ export interface operations {
             };
         };
     };
+    listRecentEvents: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter by event type */
+                type?: components["schemas"]["RecentEventType"];
+                /** @description Filter by DAG name */
+                dagName?: string;
+                /** @description Filter by root or sub DAG-run ID */
+                dagRunId?: string;
+                /** @description Filter by actor username */
+                actor?: string;
+                /** @description Free-text search across DAG, run, step, reason, actor, and event type */
+                search?: string;
+                /** @description Filter entries after this time (ISO 8601 format) */
+                startTime?: string;
+                /** @description Filter entries before this time (ISO 8601 format) */
+                endTime?: string;
+                /** @description Maximum number of entries to return (default 50) */
+                limit?: number;
+                /** @description Number of entries to skip (for pagination) */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of recent workflow events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentEventsResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getSyncStatus: {
         parameters: {
             query?: {
@@ -12437,6 +12563,14 @@ export enum StatusLabel {
     partially_succeeded = "partially_succeeded",
     waiting = "waiting",
     rejected = "rejected"
+}
+export enum RecentEventType {
+    waiting = "waiting",
+    approved = "approved",
+    rejected = "rejected",
+    push_back = "push_back",
+    failed = "failed",
+    aborted = "aborted"
 }
 export enum TriggerType {
     unknown = "unknown",

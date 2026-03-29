@@ -31,11 +31,14 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filedistributed"
+	"github.com/dagu-org/dagu/internal/persis/fileeventfeed"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
 	runtimepkg "github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/agent"
+	"github.com/dagu-org/dagu/internal/service/eventfeed"
 	"github.com/dagu-org/dagu/internal/service/frontend"
+	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -243,7 +246,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	ctx = config.WithConfig(ctx, cfg)
 
 	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
-	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
+	rawRunStore := filedagrun.New(cfg.Paths.DAGRunsDir)
+	eventFeedStore, err := fileeventfeed.New(filepath.Join(cfg.Paths.DataDir, "events"), cfg.EventFeed.RetentionDays)
+	require.NoError(t, err)
+	eventFeedSvc := eventfeed.New(eventFeedStore)
+	runStore := eventfeed.WrapDAGRunStore(rawRunStore, eventFeedSvc)
 	procStore := newProcStore(cfg)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
@@ -261,6 +268,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		ChildEnv:                  cfg.Core.BaseEnv.AsSlice(),
 		DAGRunMgr:                 drm,
 		DAGStore:                  dagStore,
+		EventFeedService:          eventFeedSvc,
 		DAGRunStore:               runStore,
 		ProcStore:                 procStore,
 		QueueStore:                queueStore,
@@ -276,6 +284,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 		tmpDir: tmpDir,
 	}
+	helper.ServerOptions = append(helper.ServerOptions, frontend.WithAPIOption(apiv1.WithEventFeedService(eventFeedSvc)))
 
 	if options.CaptureLoggingOutput {
 		helper.LoggingOutput = &SyncBuffer{buf: new(bytes.Buffer)}
@@ -450,6 +459,9 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		}
 	}
 	configData["auth"] = authData
+	configData["event_feed"] = map[string]any{
+		"retention_days": cfg.EventFeed.RetentionDays,
+	}
 
 	content, err := yaml.Marshal(configData)
 	require.NoError(t, err)
@@ -464,6 +476,7 @@ type Helper struct {
 	ChildEnv                  []string
 	LoggingOutput             *SyncBuffer
 	DAGStore                  exec1.DAGStore
+	EventFeedService          *eventfeed.Service
 	DAGRunStore               exec1.DAGRunStore
 	DAGRunMgr                 runtimepkg.Manager
 	ProcStore                 exec1.ProcStore
@@ -485,6 +498,9 @@ type Helper struct {
 func (h Helper) Cleanup() {
 	if h.Cancel != nil {
 		h.Cancel()
+	}
+	if h.EventFeedService != nil {
+		_ = h.EventFeedService.Close()
 	}
 	_ = os.RemoveAll(h.tmpDir)
 }

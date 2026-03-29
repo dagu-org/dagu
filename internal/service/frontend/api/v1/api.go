@@ -29,6 +29,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventfeed"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/resource"
@@ -62,6 +63,7 @@ type API struct {
 	resourceService     *resource.Service
 	authService         AuthService
 	auditService        *audit.Service
+	eventFeedService    *eventfeed.Service
 	syncService         SyncService
 	tunnelService       *tunnel.Service
 	defaultExecMode     config.ExecutionMode
@@ -129,6 +131,13 @@ func WithAuthService(as AuthService) APIOption {
 func WithAuditService(as *audit.Service) APIOption {
 	return func(a *API) {
 		a.auditService = as
+	}
+}
+
+// WithEventFeedService returns an APIOption that sets the API's EventFeedService.
+func WithEventFeedService(svc *eventfeed.Service) APIOption {
+	return func(a *API) {
+		a.eventFeedService = svc
 	}
 }
 

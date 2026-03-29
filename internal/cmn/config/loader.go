@@ -281,6 +281,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	l.loadCacheConfig(&cfg, def)
 	l.loadExecutionModeConfig(&cfg, def)
+	l.loadEventFeedConfig(&cfg, def)
 
 	if err := l.LoadLegacyFields(&cfg, def); err != nil {
 		return nil, err
@@ -701,6 +702,13 @@ func (l *ConfigLoader) loadUIConfig(cfg *Config, def Definition) {
 	if def.UI.DAGs != nil {
 		setIfNotEmpty(&cfg.UI.DAGs.SortField, def.UI.DAGs.SortField)
 		setIfNotEmpty(&cfg.UI.DAGs.SortOrder, def.UI.DAGs.SortOrder)
+	}
+}
+
+func (l *ConfigLoader) loadEventFeedConfig(cfg *Config, def Definition) {
+	cfg.EventFeed.RetentionDays = l.v.GetInt("event_feed.retention_days")
+	if def.EventFeed != nil && def.EventFeed.RetentionDays != nil {
+		cfg.EventFeed.RetentionDays = *def.EventFeed.RetentionDays
 	}
 }
 
@@ -1461,6 +1469,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 
 	// Audit
 	l.v.SetDefault("audit.retention_days", 7)
+	l.v.SetDefault("event_feed.retention_days", 30)
 
 	// Terminal
 	l.v.SetDefault("terminal.max_sessions", 5)
@@ -1505,6 +1514,7 @@ var envBindings = []envBinding{
 	{key: "terminal.max_sessions", env: "TERMINAL_MAX_SESSIONS"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
+	{key: "event_feed.retention_days", env: "EVENT_FEED_RETENTION_DAYS"},
 	{key: "session.max_per_user", env: "SESSION_MAX_PER_USER"},
 	{key: "sse.max_topics_per_connection", env: "SSE_MAX_TOPICS_PER_CONNECTION"},
 	{key: "sse.max_clients", env: "SSE_MAX_CLIENTS"},

@@ -34,6 +34,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagu-org/dagu/internal/service/eventfeed"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/parser"
@@ -930,6 +931,7 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 	}
 
 	a.logStepApproval(ctx, request.Name, request.DagRunId, "", request.StepName, shouldResume)
+	a.recordApprovalActionEvent(ctx, eventfeed.EventTypeApproved, dagStatus, request.Name, request.DagRunId, "", dagStatus.Nodes[stepIdx], nil, shouldResume)
 
 	return &api.ApproveDAGRunStep200JSONResponse{
 		DagRunId: request.DagRunId,
@@ -998,6 +1000,7 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 	}
 
 	a.logStepApproval(ctx, request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, shouldResume)
+	a.recordApprovalActionEvent(ctx, eventfeed.EventTypeApproved, dagStatus, request.Name, request.DagRunId, request.SubDAGRunId, dagStatus.Nodes[stepIdx], nil, shouldResume)
 
 	return &api.ApproveSubDAGRunStep200JSONResponse{
 		DagRunId: request.SubDAGRunId,
@@ -1135,6 +1138,7 @@ func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStep
 	)
 
 	a.logStepRejection(ctx, request.Name, request.DagRunId, "", request.StepName, reason)
+	a.recordApprovalActionEvent(ctx, eventfeed.EventTypeRejected, dagStatus, request.Name, request.DagRunId, "", dagStatus.Nodes[stepIdx], reason, false)
 
 	return &api.RejectDAGRunStep200JSONResponse{
 		DagRunId: request.DagRunId,
@@ -1191,6 +1195,7 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 	)
 
 	a.logStepRejection(ctx, request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, reason)
+	a.recordApprovalActionEvent(ctx, eventfeed.EventTypeRejected, dagStatus, request.Name, request.DagRunId, request.SubDAGRunId, dagStatus.Nodes[stepIdx], reason, false)
 
 	return &api.RejectSubDAGRunStep200JSONResponse{
 		DagRunId: request.SubDAGRunId,
@@ -1277,6 +1282,7 @@ func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRun
 	)
 
 	a.logStepPushBack(ctx, request.Name, request.DagRunId, "", request.StepName, node.ApprovalIteration, true)
+	a.recordApprovalActionEvent(ctx, eventfeed.EventTypePushBack, dagStatus, request.Name, request.DagRunId, "", node, nil, true)
 
 	return &api.PushBackDAGRunStep200JSONResponse{
 		DagRunId:          request.DagRunId,
@@ -1365,6 +1371,7 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 	)
 
 	a.logStepPushBack(ctx, request.Name, request.DagRunId, request.SubDAGRunId, request.StepName, node.ApprovalIteration, true)
+	a.recordApprovalActionEvent(ctx, eventfeed.EventTypePushBack, dagStatus, request.Name, request.DagRunId, request.SubDAGRunId, node, nil, true)
 
 	return &api.PushBackSubDAGRunStep200JSONResponse{
 		DagRunId:          request.SubDAGRunId,
@@ -2569,6 +2576,82 @@ func (a *API) logStepPushBack(ctx context.Context, dagName, dagRunID, subDAGRunI
 	}
 
 	a.logAudit(ctx, audit.CategoryDAG, action, detailsMap)
+}
+
+func (a *API) recordApprovalActionEvent(
+	ctx context.Context,
+	eventType eventfeed.EventType,
+	status *exec.DAGRunStatus,
+	rootDAGName string,
+	rootDAGRunID string,
+	subDAGRunID string,
+	node *exec.Node,
+	reason *string,
+	resumed bool,
+) {
+	if status == nil || node == nil {
+		return
+	}
+
+	entry := eventfeed.Entry{
+		Type:      eventType,
+		Timestamp: approvalEventTimestamp(eventType, node),
+		DAGName:   rootDAGName,
+		DAGRunID:  rootDAGRunID,
+		AttemptID: status.AttemptID,
+		StepName:  node.Step.Name,
+		Actor:     recentEventActor(ctx),
+	}
+	if subDAGRunID != "" {
+		entry.SubDAGRunID = subDAGRunID
+	}
+	if reason != nil && *reason != "" {
+		entry.Reason = *reason
+	}
+	if node.ApprovalIteration > 0 {
+		entry.ApprovalIteration = ptrOf(node.ApprovalIteration)
+	}
+	if eventType == eventfeed.EventTypeApproved || eventType == eventfeed.EventTypePushBack {
+		entry.Resumed = &resumed
+	}
+
+	switch eventType {
+	case eventfeed.EventTypeRejected:
+		entry.ResultingRunStatus = core.Rejected.String()
+	case eventfeed.EventTypeApproved, eventfeed.EventTypePushBack:
+		if resumed {
+			entry.ResultingRunStatus = core.Running.String()
+		} else {
+			entry.ResultingRunStatus = status.Status.String()
+		}
+	case eventfeed.EventTypeWaiting, eventfeed.EventTypeFailed, eventfeed.EventTypeAborted:
+		entry.ResultingRunStatus = status.Status.String()
+	}
+
+	a.recordRecentEvent(ctx, entry)
+}
+
+func approvalEventTimestamp(eventType eventfeed.EventType, node *exec.Node) time.Time {
+	if node == nil {
+		return time.Now().UTC()
+	}
+
+	var raw string
+	switch eventType {
+	case eventfeed.EventTypeApproved:
+		raw = node.ApprovedAt
+	case eventfeed.EventTypeRejected:
+		raw = node.RejectedAt
+	case eventfeed.EventTypeWaiting, eventfeed.EventTypeFailed, eventfeed.EventTypeAborted, eventfeed.EventTypePushBack:
+	}
+
+	if raw != "" && raw != "-" {
+		if ts, err := stringutil.ParseTime(raw); err == nil && !ts.IsZero() {
+			return ts.UTC()
+		}
+	}
+
+	return time.Now().UTC()
 }
 
 // SSE Data Methods for DAG Runs

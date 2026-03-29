@@ -43,6 +43,8 @@ tags:
     description: "Webhook endpoints for triggering DAG execution"
   - name: "audit"
     description: "Audit log operations (admin only)"
+  - name: "recent-events"
+    description: "Recent workflow event feed operations"
   - name: "sync"
     description: "Git synchronization operations for DAGs"
   - name: "agent"
@@ -3488,6 +3490,96 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /recent-events:
+    get:
+      summary: "List recent workflow events"
+      description: "Returns recent workflow lifecycle events such as waiting, failed, aborted, rejected, approved, and push-back actions. Any authenticated user can access this endpoint when auth is enabled."
+      operationId: "listRecentEvents"
+      tags:
+        - "recent-events"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: type
+          in: query
+          description: "Filter by event type"
+          required: false
+          schema:
+            $ref: "#/components/schemas/RecentEventType"
+        - name: dagName
+          in: query
+          description: "Filter by DAG name"
+          required: false
+          schema:
+            type: string
+        - name: dagRunId
+          in: query
+          description: "Filter by root or sub DAG-run ID"
+          required: false
+          schema:
+            type: string
+        - name: actor
+          in: query
+          description: "Filter by actor username"
+          required: false
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: "Free-text search across DAG, run, step, reason, actor, and event type"
+          required: false
+          schema:
+            type: string
+        - name: startTime
+          in: query
+          description: "Filter entries after this time (ISO 8601 format)"
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endTime
+          in: query
+          description: "Filter entries before this time (ISO 8601 format)"
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: "Maximum number of entries to return (default 50)"
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 500
+        - name: offset
+          in: query
+          description: "Number of entries to skip (for pagination)"
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        "200":
+          description: "List of recent workflow events"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecentEventsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   # Git Sync endpoints
   /sync/status:
     get:
@@ -6548,6 +6640,83 @@ components:
           items:
             $ref: "#/components/schemas/AuditEntry"
           description: "List of audit log entries"
+        total:
+          type: integer
+          description: "Total number of entries matching the filter (before pagination)"
+      required:
+        - entries
+        - total
+
+    RecentEventType:
+      type: string
+      description: "Type of workflow event captured in the recent event feed"
+      enum:
+        - waiting
+        - failed
+        - aborted
+        - approved
+        - rejected
+        - push_back
+
+    RecentEventEntry:
+      type: object
+      description: "A single recent workflow event"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for this event"
+        timestamp:
+          type: string
+          format: date-time
+          description: "When the event occurred"
+        type:
+          $ref: "#/components/schemas/RecentEventType"
+        dagName:
+          type: string
+          description: "Root DAG name"
+        dagRunId:
+          type: string
+          description: "Root DAG-run ID"
+        subDAGRunId:
+          type: string
+          description: "Sub DAG-run ID when the event belongs to a sub DAG-run"
+        attemptId:
+          type: string
+          description: "Attempt ID for the affected run"
+        stepName:
+          type: string
+          description: "Step name associated with the event"
+        actor:
+          type: string
+          description: "User or actor responsible for the action"
+        reason:
+          type: string
+          description: "Optional failure or rejection reason"
+        approvalIteration:
+          type: integer
+          description: "Approval iteration for waiting or push-back events"
+        resumed:
+          type: boolean
+          description: "Whether the action resumed execution"
+        resultingRunStatus:
+          type: string
+          description: "Resulting persisted DAG-run status after the event"
+      required:
+        - id
+        - timestamp
+        - type
+        - dagName
+        - dagRunId
+
+    RecentEventsResponse:
+      type: object
+      description: "Response containing recent workflow events"
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentEventEntry"
+          description: "List of recent workflow events"
         total:
           type: integer
           description: "Total number of entries matching the filter (before pagination)"

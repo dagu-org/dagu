@@ -134,7 +134,8 @@ var legacyToSnakeCaseKey = map[string]string{
 	"queues.config.maxconcurrency": "queues.config.max_concurrency",
 
 	// Audit
-	"audit.retentiondays": "audit.retention_days",
+	"audit.retentiondays":     "audit.retention_days",
+	"eventfeed.retentiondays": "event_feed.retention_days",
 
 	// GitSync
 	"gitsync.enabled":            "git_sync.enabled",

@@ -23,6 +23,7 @@ import {
   Bot,
   Brain,
   ChevronDown,
+  Clock3,
   FileCog,
   FileText,
   Gauge,
@@ -522,6 +523,14 @@ export const mainListItems = React.forwardRef<
               to="/dag-runs"
               text="Runs"
               icon={<History size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
+            <NavItem
+              to="/recent-events"
+              text="Recent Events"
+              icon={<Clock3 size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}

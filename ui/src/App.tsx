@@ -48,6 +48,7 @@ import GitSyncPage from './pages/git-sync';
 import LicensePage from './pages/license';
 import LoginPage from './pages/login';
 import Queues from './pages/queues';
+import RecentEventsPage from './pages/recent-events';
 import Search from './pages/search';
 import SetupPage from './pages/setup';
 import SystemStatus from './pages/system-status';
@@ -254,6 +255,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/docs/*" element={<DocsPage />} />
                                         <Route path="/queues" element={<Queues />} />
                                         <Route path="/dag-runs" element={<DAGRuns />} />
+                                        <Route path="/recent-events" element={<RecentEventsPage />} />
                                         <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
                                         <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />
                                         <Route path="/base-config" element={<DeveloperElement><BaseConfigPage /></DeveloperElement>} />

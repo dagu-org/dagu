@@ -78,6 +78,7 @@ type Definition struct {
 	Cache      *string        `mapstructure:"cache"`   // "low", "normal", or "high"
 	Terminal   *TerminalDef   `mapstructure:"terminal"`
 	Audit      *AuditDef      `mapstructure:"audit"`
+	EventFeed  *EventFeedDef  `mapstructure:"event_feed"`
 	Session    *SessionDef    `mapstructure:"session"`
 	SSE        *SSEDef        `mapstructure:"sse"`
 	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
@@ -342,6 +343,11 @@ type TerminalDef struct {
 type AuditDef struct {
 	Enabled       *bool `mapstructure:"enabled"`        // Default: true
 	RetentionDays *int  `mapstructure:"retention_days"` // Default: 7
+}
+
+// EventFeedDef configures the internal event feed.
+type EventFeedDef struct {
+	RetentionDays *int `mapstructure:"retention_days"` // Default: 30
 }
 
 // SessionDef configures agent session storage.

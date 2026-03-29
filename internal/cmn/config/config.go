@@ -14,6 +14,7 @@ import (
 type Config struct {
 	Core            Core
 	Server          Server
+	EventFeed       EventFeedConfig
 	Paths           PathsConfig
 	Secrets         SecretsConfig
 	UI              UI
@@ -190,6 +191,11 @@ type TerminalConfig struct {
 type AuditConfig struct {
 	Enabled       bool // Default: true
 	RetentionDays int  // Default: 7; 0 = keep forever
+}
+
+// EventFeedConfig contains configuration for the internal event feed.
+type EventFeedConfig struct {
+	RetentionDays int // Default: 30; 0 = keep forever
 }
 
 // SessionConfig contains configuration for agent session cleanup.

@@ -37,6 +37,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filedistributed"
+	"github.com/dagu-org/dagu/internal/persis/fileeventfeed"
 	"github.com/dagu-org/dagu/internal/persis/filelicense"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
@@ -48,6 +49,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventfeed"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/service/resource"
@@ -66,6 +68,7 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
+	EventFeedService          *eventfeed.Service
 	DAGRunStore               exec.DAGRunStore
 	DAGRunMgr                 runtime.Manager
 	ProcStore                 exec.ProcStore
@@ -89,6 +92,7 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 		Flags:                     c.Flags,
 		Config:                    c.Config,
 		Quiet:                     c.Quiet,
+		EventFeedService:          c.EventFeedService,
 		DAGRunStore:               c.DAGRunStore,
 		DAGRunMgr:                 c.DAGRunMgr,
 		ProcStore:                 c.ProcStore,
@@ -234,7 +238,13 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	if err := ps.Validate(ctx); err != nil {
 		return nil, fmt.Errorf("failed to validate proc directory %s: %w", cfg.Paths.ProcDir, err)
 	}
-	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	rawDAGRunStore := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	eventFeedStore, err := fileeventfeed.New(filepath.Join(cfg.Paths.DataDir, "events"), cfg.EventFeed.RetentionDays)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize recent event feed store: %w", err)
+	}
+	eventFeedService := eventfeed.New(eventFeedStore)
+	drs := eventfeed.WrapDAGRunStore(rawDAGRunStore, eventFeedService)
 	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)
@@ -295,6 +305,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		Command:                   cmd,
 		Config:                    cfg,
 		Quiet:                     quiet,
+		EventFeedService:          eventFeedService,
 		DAGRunStore:               drs,
 		DAGRunMgr:                 drm,
 		Flags:                     flags,
@@ -382,6 +393,9 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 	}
 	if c.DAGRunLeaseStore != nil {
 		opts = append(opts, frontend.WithAPIOption(apiv1.WithDAGRunLeaseStore(c.DAGRunLeaseStore)))
+	}
+	if c.EventFeedService != nil {
+		opts = append(opts, frontend.WithAPIOption(apiv1.WithEventFeedService(c.EventFeedService)))
 	}
 	opts = append(opts, frontend.WithAPIOption(apiv1.WithSchedulerStateStore(
 		filewatermark.New(filepath.Join(c.Config.Paths.DataDir, "scheduler")),

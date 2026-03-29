@@ -223,6 +223,7 @@ func TestLoad_Env(t *testing.T) {
 				SlowClientTimeout:      30 * time.Second,
 			},
 		},
+		EventFeed: EventFeedConfig{RetentionDays: 30},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
 			DocsDir:            filepath.Join(testPaths, "dags", "docs"),
@@ -604,6 +605,7 @@ scheduler:
 				SlowClientTimeout:      30 * time.Second,
 			},
 		},
+		EventFeed: EventFeedConfig{RetentionDays: 30},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
 			DocsDir:            "/var/dagu/dags/docs",
