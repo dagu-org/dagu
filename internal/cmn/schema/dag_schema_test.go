@@ -233,6 +233,99 @@ steps:
 	}
 }
 
+func TestDAGSchemaSchedule(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "TypedCronStart",
+			spec: `
+schedule:
+  - kind: cron
+    expression: "0 * * * *"
+steps:
+  - command: echo hi
+`,
+		},
+		{
+			name: "TypedOneOffStart",
+			spec: `
+schedule:
+  start:
+    kind: at
+    at: "2026-03-29T02:10:00+01:00"
+steps:
+  - command: echo hi
+`,
+		},
+		{
+			name: "RejectTypedCronWithoutExpression",
+			spec: `
+schedule:
+  - kind: cron
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
+		},
+		{
+			name: "RejectTypedAtWithoutTimestamp",
+			spec: `
+schedule:
+  - kind: at
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
+		},
+		{
+			name: "RejectTypedStartWithBothFields",
+			spec: `
+schedule:
+  start:
+    kind: cron
+    expression: "0 * * * *"
+    at: "2026-03-29T02:10:00+01:00"
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
+		},
+		{
+			name: "RejectTypedStopWithoutExpression",
+			spec: `
+schedule:
+  stop:
+    kind: cron
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
 func TestDAGSchemaRootRetryPolicy(t *testing.T) {
 	t.Parallel()
 

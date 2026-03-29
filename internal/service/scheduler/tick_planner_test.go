@@ -30,7 +30,7 @@ func (m *mockWatermarkStore) Load(_ context.Context) (*SchedulerState, error) {
 		return nil, m.loadErr
 	}
 	if m.state == nil {
-		return &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}, nil
+		return &SchedulerState{Version: SchedulerStateVersion, DAGs: make(map[string]DAGWatermark)}, nil
 	}
 	return m.state, nil
 }
@@ -56,7 +56,7 @@ func (m *mockWatermarkStore) lastSaved() *SchedulerState {
 
 func newMockWatermarkState(lastTick time.Time) *SchedulerState {
 	return &SchedulerState{
-		Version:  1,
+		Version:  SchedulerStateVersion,
 		LastTick: lastTick,
 		DAGs:     make(map[string]DAGWatermark),
 	}
@@ -91,6 +91,9 @@ func newTestTickPlanner(store WatermarkStore) (*TickPlanner, chan DAGChangeEvent
 		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
 			return false, nil
 		},
+		RunExists: func(_ context.Context, _ *core.DAG, _ string) (bool, error) {
+			return false, nil
+		},
 		Clock: func() time.Time {
 			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 		},
@@ -116,7 +119,7 @@ func TestTickPlanner_InitLoadError(t *testing.T) {
 	// Falls back to empty state on load error
 	tp.mu.RLock()
 	require.NotNil(t, tp.watermarkState)
-	require.Equal(t, 1, tp.watermarkState.Version)
+	require.Equal(t, SchedulerStateVersion, tp.watermarkState.Version)
 	tp.mu.RUnlock()
 }
 
@@ -427,6 +430,7 @@ func TestTickPlanner_HandleEvent_Added(t *testing.T) {
 	_, hasWM := tp.watermarkState.DAGs["new-dag"]
 	tp.mu.RUnlock()
 	assert.True(t, hasWM, "watermark should be set for new DAG")
+	assert.NotNil(t, store.lastSaved(), "new DAG watermark should be flushed immediately")
 }
 
 func TestTickPlanner_HandleEvent_Deleted(t *testing.T) {
@@ -491,6 +495,38 @@ func TestTickPlanner_HandleEvent_Updated(t *testing.T) {
 	entry, ok := tp.entries["upd-dag"]
 	require.True(t, ok)
 	assert.Equal(t, "*/30 * * * *", entry.dag.Schedule[0].Expression)
+}
+
+func TestTickPlanner_HandleEvent_UpdatedFlushesWatermarkMutationsImmediately(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
+	}
+	tp, _ := newTestTickPlanner(store)
+
+	dag := &core.DAG{
+		Name:          "upd-latest-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		OverlapPolicy: core.OverlapPolicyLatest,
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
+		Type: DAGChangeUpdated,
+		DAG: &core.DAG{
+			Name:          "upd-latest-dag",
+			CatchupWindow: 6 * time.Hour,
+			Schedule:      []core.Schedule{mustParseSchedule(t, "*/30 * * * *")},
+			OverlapPolicy: core.OverlapPolicyLatest,
+		},
+		DAGName: "upd-latest-dag",
+	})
+	tp.entryMu.Unlock()
+
+	assert.NotNil(t, store.lastSaved(), "watermark mutations should be flushed immediately on update")
 }
 
 func TestTickPlanner_ConcurrentFlushAndAdvance(t *testing.T) {
@@ -575,6 +611,7 @@ func TestTickPlanner_AdvanceUpdatesPerDAGWatermarks(t *testing.T) {
 			RunID:         "run-1",
 			ScheduledTime: scheduledTime,
 			TriggerType:   core.TriggerTypeScheduler,
+			Schedule:      mustParseSchedule(t, "0 * * * *"),
 		},
 	}
 
@@ -812,6 +849,7 @@ func TestTickPlanner_AdvanceIgnoresStopRestartWatermarks(t *testing.T) {
 			RunID:         "run-1",
 			ScheduledTime: startTime,
 			ScheduleType:  ScheduleTypeStart,
+			Schedule:      mustParseSchedule(t, "0 * * * *"),
 		},
 		{
 			DAG:           &core.DAG{Name: "test-dag"},

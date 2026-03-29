@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -783,6 +784,76 @@ steps:
 	assert.Equal(t, "beta-dag", result.Items[1].Name)
 	assert.Equal(t, "GAMMA-dag", result.Items[2].Name)
 	assert.Equal(t, "zebra-dag", result.Items[3].Name)
+}
+
+func TestListSortByNextRunUsesSchedulerProjection(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-next-run-projection")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	oneOffTime := time.Date(2026, 3, 29, 2, 10, 0, 0, time.UTC)
+	now := time.Date(2026, 3, 29, 2, 30, 0, 0, time.UTC)
+
+	oneOffContent := fmt.Sprintf(`name: overdue-one-off
+schedule:
+  start:
+    - at: "%s"
+steps:
+  - name: step1
+    command: echo "one-off"`, oneOffTime.Format(time.RFC3339))
+	require.NoError(t, store.Create(ctx, "overdue-one-off", []byte(oneOffContent)))
+
+	cronContent := `name: future-cron
+schedule: "0 3 * * *"
+steps:
+  - name: step1
+    command: echo "cron"`
+	require.NoError(t, store.Create(ctx, "future-cron", []byte(cronContent)))
+
+	defaultResult, errList, err := store.List(ctx, exec.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "asc",
+		Time:  &now,
+	})
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, defaultResult.Items, 2)
+	assert.Equal(t, "future-cron", defaultResult.Items[0].Name)
+
+	oneOffSchedule, err := core.NewOneOffSchedule(oneOffTime.Format(time.RFC3339))
+	require.NoError(t, err)
+
+	state := &scheduler.SchedulerState{
+		Version: scheduler.SchedulerStateVersion,
+		DAGs: map[string]scheduler.DAGWatermark{
+			"overdue-one-off": {
+				OneOffs: map[string]scheduler.OneOffScheduleState{
+					oneOffSchedule.Fingerprint(): {
+						ScheduledTime: oneOffTime,
+						Status:        scheduler.OneOffStatusPending,
+					},
+				},
+			},
+		},
+	}
+
+	result, errList, err := store.List(ctx, exec.ListDAGsOptions{
+		Sort:  "nextRun",
+		Order: "asc",
+		Time:  &now,
+		NextRunProjection: func(dag *core.DAG, at time.Time) time.Time {
+			return scheduler.NextPlannedRun(dag, at, state)
+		},
+	})
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 2)
+	assert.Equal(t, "overdue-one-off", result.Items[0].Name)
+	assert.Equal(t, "future-cron", result.Items[1].Name)
 }
 
 func TestListWithSortingAndPagination(t *testing.T) {

@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filewatermark"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
@@ -290,6 +291,22 @@ func (f *testFixture) waitForWorkerRegistration(workerID string, timeout time.Du
 }
 
 func (f *testFixture) startScheduler(timeout time.Duration) {
+	f.startSchedulerWithClock(timeout, nil)
+}
+
+func (f *testFixture) startSchedulerWithClock(timeout time.Duration, clock scheduler.Clock) {
+	f.startSchedulerWithOptions(
+		timeout,
+		clock,
+		filewatermark.New(filepath.Join(f.coord.Config.Paths.DataDir, "scheduler")),
+	)
+}
+
+func (f *testFixture) startSchedulerWithOptions(
+	timeout time.Duration,
+	clock scheduler.Clock,
+	watermarkStore scheduler.WatermarkStore,
+) {
 	f.t.Helper()
 
 	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore)
@@ -303,10 +320,13 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		f.coord.ProcStore,
 		f.coord.ServiceRegistry,
 		f.coordinatorClient,
-		nil,
+		watermarkStore,
 	)
 	require.NoError(f.t, err)
 	schedulerInst.SetDAGRunLeaseStore(f.coord.DAGRunLeaseStore)
+	if clock != nil {
+		schedulerInst.SetClock(clock)
+	}
 
 	startupTimeout := timeout
 	if startupTimeout <= 0 {
@@ -478,6 +498,14 @@ func (f *testFixture) stop(dagRunID string) error {
 func (f *testFixture) cleanup() {
 	f.t.Helper()
 
+	f.stopScheduler()
+	f.schedulerErr = nil
+	f.schedulerErrSet = false
+}
+
+func (f *testFixture) stopScheduler() {
+	f.t.Helper()
+
 	schedulerInst := f.scheduler
 	schedulerCancel := f.schedulerCancel
 	schedulerErrCh := f.schedulerErrCh
@@ -487,8 +515,6 @@ func (f *testFixture) cleanup() {
 	f.schedulerCtx = nil
 	f.schedulerCancel = nil
 	f.schedulerErrCh = nil
-	f.schedulerErr = nil
-	f.schedulerErrSet = false
 
 	if schedulerCancel != nil {
 		schedulerCancel()

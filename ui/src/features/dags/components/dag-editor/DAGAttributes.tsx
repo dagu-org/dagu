@@ -6,6 +6,10 @@
 import { Calendar, CheckSquare, Settings, Tag } from 'lucide-react';
 import { components } from '../../../../api/v1/schema';
 import { Badge } from '../../../../components/ui/badge';
+import {
+  getScheduleKey,
+  getScheduleLabel,
+} from '../../../../lib/dagSchedule';
 
 /**
  * Props for the DAGAttributes component
@@ -34,7 +38,7 @@ function DAGAttributes({ dag }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Schedule */}
-        <div className="space-y-1">
+        <div className="space-y-1 md:col-span-2">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
             <Calendar className="h-4 w-4" />
             <span>Schedule</span>
@@ -46,13 +50,14 @@ function DAGAttributes({ dag }: Props) {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {dag.schedule?.map((schedule) => (
+              {dag.schedule?.map((schedule, index) => (
                 <Badge
-                  key={schedule.expression}
+                  key={getScheduleKey(schedule, index)}
                   variant="outline"
-                  className="bg-primary/10 text-primary border-primary/30 px-2.5 py-1"
+                  title={schedule.kind === 'at' ? schedule.at || undefined : schedule.expression || undefined}
+                  className="max-w-full justify-start bg-primary/10 px-2.5 py-1 text-primary border-primary/30 whitespace-nowrap normal-case tracking-normal"
                 >
-                  {schedule.expression}
+                  {getScheduleLabel(schedule)}
                 </Badge>
               ))}
             </div>

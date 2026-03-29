@@ -11,7 +11,6 @@ import {
   Updater,
   useReactTable,
 } from '@tanstack/react-table';
-import cronParser, { CronDate } from 'cron-parser';
 import {
   ArrowDown,
   ArrowUp,
@@ -32,6 +31,11 @@ import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import type { Config } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
+import {
+  getScheduleKey,
+  getScheduleLabel,
+  parseNextRun,
+} from '../../../../lib/dagSchedule';
 import StatusChip from '../../../../ui/StatusChip';
 import Ticker from '../../../../ui/Ticker';
 import VisuallyHidden from '../../../../ui/VisuallyHidden';
@@ -145,11 +149,11 @@ function DAGCard({
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
         {schedules.map((schedule, idx) => (
           <Badge
-            key={idx}
+            key={getScheduleKey(schedule, idx)}
             variant="outline"
-            className="text-xs font-normal px-1 py-0 h-3"
+            className={`text-xs font-normal px-1 py-0 h-3 normal-case tracking-normal ${schedule.kind === 'at' ? 'border-0' : ''}`}
           >
-            {schedule.expression}
+            {getScheduleLabel(schedule)}
           </Badge>
         ))}
         {dag.latestDAGRun.startedAt && dag.latestDAGRun.startedAt !== '-' && (
@@ -280,51 +284,6 @@ declare module '@tanstack/react-table' {
 }
 
 const columnHelper = createColumnHelper<Data>();
-
-function getTzAndExp(exp: string) {
-  const parts = exp.trim().split(/\s+/);
-
-  if (parts[0]?.startsWith('CRON_TZ=')) {
-    const timezone = parts[0]?.split('=')[1];
-    const cronExpr = parts?.slice(1).join(' ');
-    return [timezone, cronExpr];
-  } else {
-    return [parts.join(' ')];
-  }
-}
-
-function getNextSchedule(
-  data: components['schemas']['DAGFile']
-): CronDate | undefined {
-  const schedules = data.dag.schedule;
-  if (!schedules || schedules.length === 0 || data.suspended) {
-    return;
-  }
-  try {
-    const datesToRun = schedules.map((schedule) => {
-      const parsedCronExp = getTzAndExp(schedule.expression);
-      const options = {
-        tz: parsedCronExp.length > 1 ? parsedCronExp[0] : getConfig().tz,
-        iterator: true,
-      };
-      // Assuming 'parseExpression' is the correct method name based on library docs
-      const cronExp =
-        parsedCronExp.length > 1 ? parsedCronExp[1] : parsedCronExp[0];
-      const interval = cronParser.parse(cronExp!, options);
-      return interval.next();
-    });
-    // Sort the next run dates
-    datesToRun.sort((a, b) => a.getTime() - b.getTime());
-    // Return the earliest next run date
-    if (datesToRun[0]) {
-      return datesToRun[0];
-    }
-    return;
-  } catch (e) {
-    console.error('Error parsing cron expression:', e);
-    return;
-  }
-}
 // --- End Helper Functions ---
 
 const defaultColumns = [
@@ -662,13 +621,13 @@ const defaultColumns = [
       // Display schedule expressions
       const scheduleContent = (
         <div className="flex flex-wrap gap-0.5">
-          {schedules.map((schedule) => (
+          {schedules.map((schedule, index) => (
             <Badge
-              key={schedule.expression}
+              key={getScheduleKey(schedule, index)}
               variant="outline"
-              className="text-xs font-normal px-1 py-0 h-3.5"
+              className="text-xs font-normal px-1 py-0 h-3.5 normal-case tracking-normal"
             >
-              {schedule.expression}
+              {getScheduleLabel(schedule)}
             </Badge>
           ))}
         </div>
@@ -677,16 +636,25 @@ const defaultColumns = [
       // Display next run information
       let nextRunContent: React.ReactNode | null = null;
       if (!data.dag.suspended && schedules.length > 0) {
-        const nextRun = getNextSchedule(data.dag);
+        const nextRun = parseNextRun(data.dag.nextRun);
         if (nextRun) {
           nextRunContent = (
             <div className="text-xs text-muted-foreground font-normal leading-tight">
               <Ticker intervalMs={1000}>
                 {() => {
                   const ms = nextRun.getTime() - new Date().getTime();
+                  if (ms <= 0) {
+                    return <span>Due now</span>;
+                  }
                   return <span>Run in {formatMs(ms)}</span>;
                 }}
               </Ticker>
+            </div>
+          );
+        } else {
+          nextRunContent = (
+            <div className="text-xs text-muted-foreground font-normal leading-tight">
+              No upcoming run
             </div>
           );
         }
