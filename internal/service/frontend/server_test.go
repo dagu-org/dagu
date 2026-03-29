@@ -6,16 +6,21 @@ package frontend
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 
 	authmodel "github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/persis/fileuser"
+	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 )
 
 // testContext returns a context that is cancelled when the test ends,
@@ -168,6 +173,53 @@ func TestInitBuiltinAuthService_UserCanAuthenticate(t *testing.T) {
 	// Wrong password should fail
 	_, err = result.AuthService.Authenticate(testContext(t), "authadmin", "wrongpassword")
 	require.Error(t, err)
+}
+
+func TestServerUsesEvaluatedBasePathForOIDCAndAPI(t *testing.T) {
+	const envKey = "DAGU_TEST_BASE_PATH_SEGMENT"
+	t.Setenv(envKey, "dagu")
+
+	ctx := testContext(t)
+	cfg := &config.Config{
+		Server: config.Server{
+			BasePath:    "/${" + envKey + "}",
+			APIBasePath: "/rest",
+		},
+	}
+
+	srv := &Server{
+		config: cfg,
+		funcsConfig: funcsConfig{
+			BasePath:    evaluateConfiguredBasePath(ctx, cfg.Server.BasePath),
+			APIBasePath: cfg.Server.APIBasePath,
+		},
+		builtinOIDCCfg: &frontendauth.BuiltinOIDCConfig{
+			OAuth2Config:  &oauth2.Config{},
+			LoginBasePath: "/dagu",
+		},
+	}
+
+	assert.Equal(t, "/dagu/rest", srv.configureAPIPath(ctx))
+
+	r := chi.NewMux()
+	srv.setupOIDCRoutes(r, srv.funcsConfig.BasePath)
+
+	loginRecorder := httptest.NewRecorder()
+	r.ServeHTTP(loginRecorder, httptest.NewRequest(http.MethodGet, "/dagu/oidc-login", nil))
+	assert.Equal(t, http.StatusFound, loginRecorder.Code)
+
+	rootLoginRecorder := httptest.NewRecorder()
+	r.ServeHTTP(rootLoginRecorder, httptest.NewRequest(http.MethodGet, "/oidc-login", nil))
+	assert.Equal(t, http.StatusNotFound, rootLoginRecorder.Code)
+
+	callbackRecorder := httptest.NewRecorder()
+	r.ServeHTTP(callbackRecorder, httptest.NewRequest(http.MethodGet, "/dagu/oidc-callback", nil))
+	assert.Equal(t, http.StatusFound, callbackRecorder.Code)
+	assert.Contains(t, callbackRecorder.Header().Get("Location"), "/dagu/login?error=")
+
+	rootCallbackRecorder := httptest.NewRecorder()
+	r.ServeHTTP(rootCallbackRecorder, httptest.NewRequest(http.MethodGet, "/oidc-callback", nil))
+	assert.Equal(t, http.StatusNotFound, rootCallbackRecorder.Code)
 }
 
 func TestNewServerShutdownContext(t *testing.T) {

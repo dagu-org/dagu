@@ -34,6 +34,21 @@ func BuildPublicEndpointPath(basePath, suffix string) string {
 	return fullPath
 }
 
+// BuildMountedAPIPath constructs the effective mounted API path by combining
+// the app base path and the configured API base path.
+func BuildMountedAPIPath(basePath, apiBasePath string) string {
+	if strings.TrimSpace(apiBasePath) == "" {
+		apiBasePath = "/api/v1"
+	}
+	return BuildPublicEndpointPath(basePath, apiBasePath)
+}
+
+// BuildMountedAPIEndpointPath constructs a normalized endpoint path relative
+// to the mounted API path.
+func BuildMountedAPIEndpointPath(basePath, apiBasePath, suffix string) string {
+	return BuildPublicEndpointPath(BuildMountedAPIPath(basePath, apiBasePath), suffix)
+}
+
 // NormalizePath ensures paths are comparable by enforcing a leading slash
 // and trimming any trailing slash (except for root "/").
 func NormalizePath(p string) string {

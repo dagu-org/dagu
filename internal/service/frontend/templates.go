@@ -24,6 +24,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/license"
+	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	workspacepkg "github.com/dagu-org/dagu/internal/workspace"
 )
 
@@ -149,7 +150,7 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		"navbarColor":           func() string { return cfg.NavbarColor },
 		"navbarTitle":           func() string { return cfg.NavbarTitle },
 		"basePath":              func() string { return cfg.BasePath },
-		"apiURL":                func() string { return path.Join(cfg.BasePath, cfg.APIBasePath) },
+		"apiURL":                func() string { return pathutil.BuildMountedAPIPath(cfg.BasePath, cfg.APIBasePath) },
 		"tz":                    func() string { return cfg.TZ },
 		"tzOffsetInSec":         func() int { return cfg.TzOffsetInSec },
 		"maxDashboardPageLimit": func() int { return cfg.MaxDashboardPageLimit },
