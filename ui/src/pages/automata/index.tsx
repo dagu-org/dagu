@@ -254,10 +254,12 @@ function buildAutomataSpec(input: {
   tags: string[];
   allowedDAGNames: string[];
 }): string {
-  const lines = [
-    `description: ${quoteYAML(input.description || 'Automata workflow')}`,
-    `goal: ${quoteYAML(input.goal)}`,
-  ];
+  const description = input.description.trim();
+  const lines = [`goal: ${quoteYAML(input.goal)}`];
+
+  if (description) {
+    lines.unshift(`description: ${quoteYAML(description)}`);
+  }
 
   if (input.tags.length) {
     lines.push('tags:');
