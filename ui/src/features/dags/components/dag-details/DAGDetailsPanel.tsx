@@ -7,7 +7,9 @@ import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
+import { useOptionalWorkspace } from '../../../../contexts/WorkspaceContext';
 import { useQuery } from '../../../../hooks/api';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import {
   liveFallbackOptions,
   useLiveConnection,
@@ -15,6 +17,7 @@ import {
 } from '../../../../hooks/useAppLive';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
+import { matchesWorkspaceSelection } from '../../../../lib/workspaceTags';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
@@ -50,6 +53,9 @@ type DAGRunDetails = components['schemas']['DAGRunDetails'];
 function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactElement | null {
   const navigate = useNavigate();
   const appBarContext = useContext(AppBarContext);
+  const workspace = useOptionalWorkspace();
+  const selectedWorkspace = workspace?.selectedWorkspace ?? '';
+  const workspaceReady = workspace?.workspaceReady ?? true;
   const { setContext } = usePageContext();
 
   const [currentDAGRun, setCurrentDAGRun] = useState<DAGRunDetails | undefined>();
@@ -71,19 +77,24 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
 
   const liveState = useLiveConnection(!!fileName);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const dagQueryEnabled = Boolean(fileName) && workspaceReady;
   // Fetch DAG details — SWR is the single source of truth, refreshed by live invalidations
   const sseOpts = liveFallbackOptions(liveState);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
-    {
+    whenEnabled(dagQueryEnabled, {
       params: {
         query: { remoteNode },
         path: { fileName: fileName || '' },
       },
-    },
+    }),
     { ...sseOpts, refreshInterval: notFound ? 0 : sseOpts.refreshInterval }
   );
-  useLiveDAG(fileName, mutate, !!fileName);
+  useLiveDAG(fileName, mutate, dagQueryEnabled);
+  const isFilteredOut = Boolean(data?.dag) && !matchesWorkspaceSelection(
+    data.dag.tags,
+    selectedWorkspace
+  );
 
   // Track data loading state and handle 404 errors
   useEffect(() => {
@@ -156,6 +167,19 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
         <p className="text-sm">DAG not found or has been deleted.</p>
+        <Button variant="outline" size="sm" onClick={onClose}>
+          Close Tab
+        </Button>
+      </div>
+    );
+  }
+
+  if (isFilteredOut) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+        <p className="text-sm">
+          DAG not found or filtered out by the selected workspace.
+        </p>
         <Button variant="outline" size="sm" onClick={onClose}>
           Close Tab
         </Button>

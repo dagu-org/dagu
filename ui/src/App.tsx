@@ -16,6 +16,7 @@ import { useHasFeature } from './hooks/useLicense';
 import { PageContextProvider } from './contexts/PageContext';
 import { SchemaProvider } from './contexts/SchemaContext';
 import { SearchStateProvider } from './contexts/SearchStateContext';
+import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import {
   UserPreferencesProvider,
   useUserPreferences,
@@ -240,43 +241,45 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                             element={
                               <ProtectedRoute>
                                 <AgentChatProvider>
-                                  <PageContextProvider>
-                                    <Layout navbarColor={config.navbarColor}>
-                                      <Routes>
-                                        <Route path="/" element={<CockpitPage />} />
-                                        <Route path="/dashboard" element={<Dashboard />} />
-                                        <Route path="/cockpit" element={<CockpitPage />} />
-                                        <Route path="/api-docs" element={<APIDocsPage />} />
-                                        <Route path="/dags/" element={<DAGs />} />
-                                        <Route path="/dags/:fileName/:tab" element={<DAGDetails />} />
-                                        <Route path="/dags/:fileName/" element={<DAGDetails />} />
-                                        <Route path="/search/" element={<Search />} />
-                                        <Route path="/docs/*" element={<DocsPage />} />
-                                        <Route path="/queues" element={<Queues />} />
-                                        <Route path="/dag-runs" element={<DAGRuns />} />
-                                        <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
-                                        <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />
-                                        <Route path="/base-config" element={<DeveloperElement><BaseConfigPage /></DeveloperElement>} />
-                                        <Route path="/users" element={<AdminElement><UsersPage /></AdminElement>} />
-                                        <Route path="/remote-nodes" element={<AdminElement><RemoteNodesPage /></AdminElement>} />
-                                        <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
-                                        <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
-                                        <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />
-                                        <Route path="/audit-logs" element={<ManagerElement><LicensedRoute feature="audit"><AuditLogsPage /></LicensedRoute></ManagerElement>} />
-                                        <Route path="/license" element={<AdminElement><LicensePage /></AdminElement>} />
-                                        <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
-                                        <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
-                                        <Route path="/agent-memory" element={<AdminElement><AgentMemoryPage /></AdminElement>} />
-                                        <Route path="/agent-skills" element={<AdminElement><AgentSkillsPage /></AdminElement>} />
-                                        <Route path="/agent-skills/new" element={<AdminElement><SkillEditorPage /></AdminElement>} />
-                                        <Route path="/agent-skills/:skillId" element={<AdminElement><SkillEditorPage /></AdminElement>} />
-                                        <Route path="/agent-souls" element={<AdminElement><AgentSoulsPage /></AdminElement>} />
-                                        <Route path="/agent-souls/new" element={<AdminElement><SoulEditorPage /></AdminElement>} />
-                                        <Route path="/agent-souls/:soulId" element={<AdminElement><SoulEditorPage /></AdminElement>} />
-                                      </Routes>
-                                    </Layout>
-                                    {config.agentEnabled && <AgentChatModal />}
-                                  </PageContextProvider>
+                                  <WorkspaceProvider>
+                                    <PageContextProvider>
+                                      <Layout navbarColor={config.navbarColor}>
+                                        <Routes>
+                                          <Route path="/" element={<CockpitPage />} />
+                                          <Route path="/dashboard" element={<Dashboard />} />
+                                          <Route path="/cockpit" element={<CockpitPage />} />
+                                          <Route path="/api-docs" element={<APIDocsPage />} />
+                                          <Route path="/dags/" element={<DAGs />} />
+                                          <Route path="/dags/:fileName/:tab" element={<DAGDetails />} />
+                                          <Route path="/dags/:fileName/" element={<DAGDetails />} />
+                                          <Route path="/search/" element={<Search />} />
+                                          <Route path="/docs/*" element={<DocsPage />} />
+                                          <Route path="/queues" element={<Queues />} />
+                                          <Route path="/dag-runs" element={<DAGRuns />} />
+                                          <Route path="/dag-runs/:name/:dagRunId" element={<DAGRunDetails />} />
+                                          <Route path="/system-status" element={<DeveloperElement><SystemStatus /></DeveloperElement>} />
+                                          <Route path="/base-config" element={<DeveloperElement><BaseConfigPage /></DeveloperElement>} />
+                                          <Route path="/users" element={<AdminElement><UsersPage /></AdminElement>} />
+                                          <Route path="/remote-nodes" element={<AdminElement><RemoteNodesPage /></AdminElement>} />
+                                          <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
+                                          <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
+                                          <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />
+                                          <Route path="/audit-logs" element={<ManagerElement><LicensedRoute feature="audit"><AuditLogsPage /></LicensedRoute></ManagerElement>} />
+                                          <Route path="/license" element={<AdminElement><LicensePage /></AdminElement>} />
+                                          <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />
+                                          <Route path="/agent-settings" element={<AdminElement><AgentSettingsPage /></AdminElement>} />
+                                          <Route path="/agent-memory" element={<AdminElement><AgentMemoryPage /></AdminElement>} />
+                                          <Route path="/agent-skills" element={<AdminElement><AgentSkillsPage /></AdminElement>} />
+                                          <Route path="/agent-skills/new" element={<AdminElement><SkillEditorPage /></AdminElement>} />
+                                          <Route path="/agent-skills/:skillId" element={<AdminElement><SkillEditorPage /></AdminElement>} />
+                                          <Route path="/agent-souls" element={<AdminElement><AgentSoulsPage /></AdminElement>} />
+                                          <Route path="/agent-souls/new" element={<AdminElement><SoulEditorPage /></AdminElement>} />
+                                          <Route path="/agent-souls/:soulId" element={<AdminElement><SoulEditorPage /></AdminElement>} />
+                                        </Routes>
+                                      </Layout>
+                                      {config.agentEnabled && <AgentChatModal />}
+                                    </PageContextProvider>
+                                  </WorkspaceProvider>
                                 </AgentChatProvider>
                               </ProtectedRoute>
                             }

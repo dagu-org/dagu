@@ -10,6 +10,7 @@ interface Props {
   date: string;
   todayStr: string;
   selectedWorkspace: string;
+  workspaceReady: boolean;
   onCardClick: (run: DAGRunSummary) => void;
 }
 
@@ -21,6 +22,7 @@ export function DateKanbanSection({
   date,
   todayStr,
   selectedWorkspace,
+  workspaceReady,
   onCardClick,
 }: Props): React.ReactElement {
   const yesterdayStr = useMemo(
@@ -32,6 +34,7 @@ export function DateKanbanSection({
   const { columns, error, isLoading, isEmpty, retry } = useDateKanbanData(
     date,
     selectedWorkspace,
+    workspaceReady,
     isToday,
     isLive
   );

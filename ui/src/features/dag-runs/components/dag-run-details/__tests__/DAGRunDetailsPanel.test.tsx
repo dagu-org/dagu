@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
@@ -11,6 +11,13 @@ import DAGRunDetailsPanel from '../DAGRunDetailsPanel';
 
 vi.mock('../../../hooks/useBoundedDAGRunDetails', () => ({
   useBoundedDAGRunDetails: vi.fn(),
+}));
+
+vi.mock('@/contexts/WorkspaceContext', () => ({
+  useOptionalWorkspace: () => ({
+    selectedWorkspace: '',
+    workspaceReady: true,
+  }),
 }));
 
 vi.mock('../DAGRunDetailsContent', () => ({
@@ -51,6 +58,7 @@ function renderPanel() {
 }
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
   window.history.pushState({}, '', '/');
 });

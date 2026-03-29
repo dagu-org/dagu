@@ -8,11 +8,13 @@ type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
 interface Props {
   selectedWorkspace: string;
+  workspaceReady: boolean;
   suspendLoadMore?: boolean;
 }
 
 export function DateKanbanList({
   selectedWorkspace,
+  workspaceReady,
   suspendLoadMore = false,
 }: Props): React.ReactElement {
   const { loadedDates, todayStr, hasMore, loadNextDate } = useInfiniteKanban(selectedWorkspace);
@@ -40,6 +42,7 @@ export function DateKanbanList({
   const dateCount = loadedDates.length;
   useEffect(() => {
     awaitingSentinelExitRef.current = false;
+    setSelectedRun(null);
   }, [selectedWorkspace]);
 
   useEffect(() => {
@@ -83,6 +86,7 @@ export function DateKanbanList({
             date={date}
             todayStr={todayStr}
             selectedWorkspace={selectedWorkspace}
+            workspaceReady={workspaceReady}
             onCardClick={handleCardClick}
           />
         ))}

@@ -38,7 +38,7 @@ describe('DateKanbanList', () => {
       loadNextDate,
     });
 
-    render(<DateKanbanList selectedWorkspace="ops" />);
+    render(<DateKanbanList selectedWorkspace="ops" workspaceReady={true} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Load older day' }));
 
@@ -54,7 +54,13 @@ describe('DateKanbanList', () => {
       loadNextDate,
     });
 
-    render(<DateKanbanList selectedWorkspace="ops" suspendLoadMore={true} />);
+    render(
+      <DateKanbanList
+        selectedWorkspace="ops"
+        workspaceReady={true}
+        suspendLoadMore={true}
+      />
+    );
 
     expect(screen.getByRole('button', { name: 'Load older day' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Load older day' }));

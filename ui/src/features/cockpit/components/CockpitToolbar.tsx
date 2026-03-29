@@ -10,6 +10,7 @@ type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
 interface Props {
   workspaces: WorkspaceResponse[];
   selectedWorkspace: string;
+  workspaceReady: boolean;
   selectedTemplate: string;
   onSelectWorkspace: (name: string) => void;
   onCreateWorkspace: (name: string) => void;
@@ -21,6 +22,7 @@ interface Props {
 export function CockpitToolbar({
   workspaces,
   selectedWorkspace,
+  workspaceReady,
   selectedTemplate,
   onSelectWorkspace,
   onCreateWorkspace,
@@ -42,6 +44,7 @@ export function CockpitToolbar({
       <TemplateSelector
         selectedTemplate={selectedTemplate}
         selectedWorkspace={selectedWorkspace}
+        workspaceReady={workspaceReady}
         onSelect={onSelectTemplate}
         onOpenChange={onTemplateSelectorOpenChange}
       />

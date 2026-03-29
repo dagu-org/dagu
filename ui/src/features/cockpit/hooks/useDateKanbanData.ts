@@ -7,8 +7,10 @@ import {
 } from '@/hooks/useAppLive';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { whenEnabled } from '@/hooks/queryUtils';
 import dayjs from '@/lib/dayjs';
 import { components, Status } from '@/api/v1/schema';
+import { buildWorkspaceTag } from '@/lib/workspaceTags';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
@@ -65,13 +67,14 @@ function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
 export function useDateKanbanData(
   date: string,
   selectedWorkspace: string,
+  workspaceReady: boolean,
   isToday: boolean,
   isLive: boolean
 ) {
   const appBarContext = useContext(AppBarContext);
   const { tzOffsetInSec } = useConfig();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const tag = selectedWorkspace ? `workspace=${selectedWorkspace}` : undefined;
+  const tag = buildWorkspaceTag(selectedWorkspace);
 
   const { fromDate, toDate } = useMemo(
     () => dayBounds(date, tzOffsetInSec),
@@ -82,7 +85,7 @@ export function useDateKanbanData(
 
   const { data, error, mutate } = useQuery(
     '/dag-runs',
-    {
+    whenEnabled(workspaceReady, {
       params: {
         query: {
           remoteNode,
@@ -91,7 +94,7 @@ export function useDateKanbanData(
           toDate,
         },
       },
-    },
+    }),
     {
       ...(isToday
         ? liveFallbackOptions(liveState)
@@ -103,7 +106,7 @@ export function useDateKanbanData(
           }),
     }
   );
-  useLiveDAGRuns(mutate, isLive);
+  useLiveDAGRuns(mutate, isLive && workspaceReady);
 
   const typedError = useMemo(() => {
     if (!error) {

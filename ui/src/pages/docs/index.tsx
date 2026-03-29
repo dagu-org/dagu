@@ -51,6 +51,7 @@ function DocsContent() {
   const {
     workspaces,
     selectedWorkspace,
+    workspaceReady,
     selectedTemplate,
     selectWorkspace,
     selectTemplate,
@@ -500,6 +501,7 @@ function DocsContent() {
       <CockpitToolbar
         workspaces={workspaces}
         selectedWorkspace={selectedWorkspace}
+        workspaceReady={workspaceReady}
         selectedTemplate={selectedTemplate}
         onSelectWorkspace={selectWorkspace}
         onCreateWorkspace={createWorkspace}

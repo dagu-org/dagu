@@ -10,6 +10,7 @@ export default function CockpitPage(): React.ReactElement {
   const {
     workspaces,
     selectedWorkspace,
+    workspaceReady,
     selectedTemplate,
     createWorkspace,
     deleteWorkspace,
@@ -28,6 +29,7 @@ export default function CockpitPage(): React.ReactElement {
       <CockpitToolbar
         workspaces={workspaces}
         selectedWorkspace={selectedWorkspace}
+        workspaceReady={workspaceReady}
         selectedTemplate={selectedTemplate}
         onSelectWorkspace={selectWorkspace}
         onCreateWorkspace={createWorkspace}
@@ -37,6 +39,7 @@ export default function CockpitPage(): React.ReactElement {
       />
       <DateKanbanList
         selectedWorkspace={selectedWorkspace}
+        workspaceReady={workspaceReady}
         suspendLoadMore={suspendBackgroundLoading}
       />
     </div>

@@ -5,6 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { Search, ChevronDown, X, AlertTriangle, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  appendWorkspaceTag,
+  buildWorkspaceTag,
+  filterWorkspaceTags,
+  isWorkspaceTag,
+} from '@/lib/workspaceTags';
 import type { components } from '@/api/v1/schema';
 
 type DAGFile = components['schemas']['DAGFile'];
@@ -12,6 +18,7 @@ type DAGFile = components['schemas']['DAGFile'];
 interface Props {
   selectedTemplate: string;
   selectedWorkspace: string;
+  workspaceReady: boolean;
   onSelect: (fileName: string) => void;
   onOpenChange?: (isOpen: boolean) => void;
 }
@@ -19,6 +26,7 @@ interface Props {
 export function TemplateSelector({
   selectedTemplate,
   selectedWorkspace,
+  workspaceReady,
   onSelect,
   onOpenChange,
 }: Props): React.ReactElement {
@@ -47,11 +55,17 @@ export function TemplateSelector({
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
 
+  const queryTags = useMemo(
+    () => appendWorkspaceTag(selectedTags, selectedWorkspace),
+    [selectedTags, selectedWorkspace]
+  );
+  const workspaceHint = buildWorkspaceTag(selectedWorkspace);
+
   // Keep tags fully lazy. We only request them when the user explicitly opens
   // the tag filter UI inside the selector.
   const { data: tagsData } = useQuery(
     '/dags/tags',
-    whenEnabled(isOpen && isTagFilterOpen, {
+    whenEnabled(isOpen && isTagFilterOpen && workspaceReady, {
       params: { query: { remoteNode } },
     })
   );
@@ -61,34 +75,22 @@ export function TemplateSelector({
   // closed trigger uses locally cached selection metadata instead.
   const { data, isLoading } = useQuery(
     '/dags',
-    whenEnabled(isOpen, {
+    whenEnabled(isOpen && workspaceReady, {
       params: {
         query: {
           remoteNode,
           perPage: 50,
           ...(debouncedTerm ? { name: debouncedTerm } : {}),
-          ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
+          ...(queryTags.length > 0 ? { tags: queryTags.join(',') } : {}),
         },
       },
     })
   );
   const dags = data?.dags ?? [];
 
-  // Filter out DAGs with a workspace= tag that doesn't match the selected workspace
-  const filteredDags = useMemo(() => {
-    if (!selectedWorkspace) return dags;
-    return dags.filter((dag) => {
-      const wsTags = (dag.dag.tags ?? [])
-        .filter((t) => t.startsWith('workspace='))
-        .map((t) => t.slice('workspace='.length));
-      if (wsTags.length === 0) return true;
-      return wsTags.includes(selectedWorkspace);
-    });
-  }, [dags, selectedWorkspace]);
-
   // Filter workspace= tags from the tag filter row
   const displayTags = useMemo(
-    () => availableTags.filter((t) => !t.startsWith('workspace=')),
+    () => filterWorkspaceTags(availableTags),
     [availableTags]
   );
 
@@ -106,16 +108,16 @@ export function TemplateSelector({
       setSelectedDag(null);
       return;
     }
-    const found = filteredDags.find((d) => d.fileName === selectedTemplate);
+    const found = dags.find((d) => d.fileName === selectedTemplate);
     if (found) {
       setSelectedDag(found);
     }
-  }, [filteredDags, selectedTemplate]);
+  }, [dags, selectedTemplate]);
 
   // Group DAGs by group field
   const groupedDags = useMemo(() => {
     const groups = new Map<string, DAGFile[]>();
-    for (const dag of filteredDags) {
+    for (const dag of dags) {
       const group = dag.dag.group || '';
       const list = groups.get(group) || [];
       list.push(dag);
@@ -129,7 +131,7 @@ export function TemplateSelector({
       return a[0].localeCompare(b[0]);
     });
     return sorted;
-  }, [filteredDags]);
+  }, [dags]);
 
   // Flattened list for keyboard navigation
   const flatList = useMemo(() => {
@@ -176,13 +178,13 @@ export function TemplateSelector({
 
   const handleSelect = useCallback(
     (fileName: string) => {
-      const dag = filteredDags.find((d) => d.fileName === fileName);
+      const dag = dags.find((d) => d.fileName === fileName);
       if (dag) setSelectedDag(dag);
       setIsOpen(false);
       resetFilters();
       onSelect(fileName);
     },
-    [filteredDags, onSelect, resetFilters]
+    [dags, onSelect, resetFilters]
   );
 
   const toggleTag = useCallback((tag: string) => {
@@ -309,6 +311,11 @@ export function TemplateSelector({
           {/* Tag filter row */}
           {isTagFilterOpen && (
             <div className="flex flex-wrap gap-1 px-3 pt-2 pb-2.5 border-b border-border max-h-[200px] overflow-y-auto shrink-0">
+              {workspaceHint && (
+                <span className="w-full text-[10px] text-muted-foreground">
+                  Workspace filter: {workspaceHint}
+                </span>
+              )}
               {displayTags.length === 0 ? (
                 <span className="text-[10px] text-muted-foreground">
                   {tagsData ? 'No tags found' : 'Loading tags...'}
@@ -403,6 +410,9 @@ export function TemplateSelector({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  if (isWorkspaceTag(tag)) {
+                                    return;
+                                  }
                                   toggleTag(tag);
                                 }}
                               >

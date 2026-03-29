@@ -83,6 +83,7 @@ import {
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { parseTagParts } from '../../../../lib/utils';
+import { filterWorkspaceTags, isWorkspaceTag } from '../../../../lib/workspaceTags';
 
 // Threshold in pixels below which we switch to card view
 // Set higher than table's comfortable minimum width (~700px for all columns)
@@ -912,6 +913,9 @@ function DAGTable({
   // Handler for clicking a tag to add it to the filter
   const handleTagClick = useCallback(
     (tag: string) => {
+      if (isWorkspaceTag(tag)) {
+        return;
+      }
       const normalizedTag = tag.toLowerCase();
       if (!searchTags.includes(normalizedTag)) {
         handleSearchTagsChange([...searchTags, normalizedTag]);
@@ -1140,7 +1144,7 @@ function DAGTable({
           <TagCombobox
             selectedTags={searchTags}
             onTagsChange={handleSearchTagsChange}
-            availableTags={uniqueTags?.tags ?? []}
+            availableTags={filterWorkspaceTags(uniqueTags?.tags ?? [])}
             placeholder="Filter by tags..."
             className="min-w-[180px] max-w-[300px] flex-shrink-0 h-8"
           />

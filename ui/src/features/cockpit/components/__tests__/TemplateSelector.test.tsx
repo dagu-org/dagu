@@ -33,6 +33,17 @@ const mockDags = [
     },
     errors: [],
   },
+  {
+    fileName: 'untagged.yaml',
+    dag: {
+      name: 'Untagged DAG',
+      group: 'main',
+      tags: ['batch'],
+      description: 'Untagged workflow',
+      params: [],
+    },
+    errors: [],
+  },
 ];
 
 const queryCalls: Array<{
@@ -62,6 +73,7 @@ function renderSelector(
       <TemplateSelector
         selectedTemplate=""
         selectedWorkspace=""
+        workspaceReady={true}
         onSelect={vi.fn()}
         {...props}
       />
@@ -134,6 +146,7 @@ describe('TemplateSelector', () => {
           <TemplateSelector
             selectedTemplate={selectedTemplate}
             selectedWorkspace=""
+            workspaceReady={true}
             onSelect={setSelectedTemplate}
           />
         </AppBarContext.Provider>
@@ -170,5 +183,48 @@ describe('TemplateSelector', () => {
     fireEvent.click(screen.getByRole('button', { name: /select template/i }));
 
     expect(onOpenChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it('adds the workspace tag at the /dags query boundary', () => {
+    useQueryMock.mockImplementation((path, init) => {
+      queryCalls.push({ path, init });
+      if (path === '/dags') {
+        const tags =
+          (
+            init as {
+              params?: { query?: { tags?: string } };
+            }
+          )?.params?.query?.tags ?? '';
+        return {
+          data: {
+            dags: tags === 'workspace=ops'
+              ? [mockDags[0]]
+              : mockDags,
+          },
+          isLoading: false,
+        } as never;
+      }
+      if (path === '/dags/tags') {
+        return { data: { tags: ['batch', 'workspace=ops'] } } as never;
+      }
+      return { data: undefined } as never;
+    });
+
+    renderSelector({ selectedWorkspace: 'ops' });
+
+    fireEvent.click(screen.getByRole('button', { name: /select template/i }));
+
+    expect(latestQueryCall('/dags')?.init).toEqual(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          query: expect.objectContaining({
+            remoteNode: 'local',
+            tags: 'workspace=ops',
+          }),
+        }),
+      })
+    );
+    expect(screen.getByText('Example DAG')).toBeInTheDocument();
+    expect(screen.queryByText('Untagged DAG')).not.toBeInTheDocument();
   });
 });

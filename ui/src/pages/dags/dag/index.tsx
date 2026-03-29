@@ -4,6 +4,7 @@ import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { usePageContext } from '../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../contexts/UnsavedChangesContext';
+import { useWorkspace } from '../../../contexts/WorkspaceContext';
 import {
   DAGDetailsContent,
   DAGHeader,
@@ -19,6 +20,8 @@ import {
   useLiveDAGRuns,
 } from '../../../hooks/useAppLive';
 import dayjs from '../../../lib/dayjs';
+import { matchesWorkspaceSelection } from '../../../lib/workspaceTags';
+import LoadingIndicator from '../../../ui/LoadingIndicator';
 
 type Params = {
   fileName: string;
@@ -32,6 +35,7 @@ function DAGDetails() {
   const params = useParams<Params>();
   const navigate = useNavigate();
   const appBarContext = useContext(AppBarContext);
+  const { selectedWorkspace, workspaceReady } = useWorkspace();
   const { setContext } = usePageContext();
   const [searchParams] = useSearchParams();
 
@@ -106,22 +110,30 @@ function DAGDetails() {
     }
   }, [tab, handleTabChange]);
 
+  const dagQueryEnabled = Boolean(fileName) && workspaceReady;
   // Fetch DAG details — SWR is the single source of truth, refreshed by live invalidations
   const { data: dagData, mutate: mutateDag } = useQuery(
     '/dags/{fileName}',
-    {
+    whenEnabled(dagQueryEnabled, {
       params: {
         query: { remoteNode },
         path: { fileName },
       },
-    },
+    }),
     liveFallbackOptions(liveState)
   );
-  useLiveDAG(fileName, mutateDag, !!fileName);
+  useLiveDAG(fileName, mutateDag, dagQueryEnabled);
+
+  const isFilteredOut = Boolean(dagData?.dag) && !matchesWorkspaceSelection(
+    dagData.dag.tags,
+    selectedWorkspace
+  );
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
-  const dagRunQueryEnabled = Boolean(dagRunName && dagRunId && !subDAGRunId);
+  const dagRunQueryEnabled = Boolean(
+    dagRunName && dagRunId && !subDAGRunId && workspaceReady && !isFilteredOut
+  );
 
   // Fetch specific DAG-run data if dagRunId is provided
   const { data: dagRunResponse, mutate: mutateDagRun } = useQuery(
@@ -140,7 +152,9 @@ function DAGDetails() {
   useLiveDAGRuns(mutateDagRun, dagRunQueryEnabled);
 
   // Fetch sub DAG-run data if needed
-  const subDAGRunQueryEnabled = Boolean(subDAGRunId && dagRunId && dagRunName);
+  const subDAGRunQueryEnabled = Boolean(
+    subDAGRunId && dagRunId && dagRunName && workspaceReady && !isFilteredOut
+  );
   const { data: subDAGRunResponse, mutate: mutateSubDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     whenEnabled(subDAGRunQueryEnabled, {
@@ -192,6 +206,29 @@ function DAGDetails() {
 
   // Determine which DAG-run to display - fallback to latest when specific run is loading
   const displayDAGRun = currentDAGRun || dagData?.latestDAGRun;
+
+  if (!workspaceReady) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingIndicator />
+      </div>
+    );
+  }
+
+  if (isFilteredOut) {
+    return (
+      <div className="max-w-7xl p-4">
+        <div className="rounded-lg bg-muted p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-2">
+            DAG Not Available
+          </h2>
+          <p className="text-muted-foreground">
+            This DAG is outside the selected workspace.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <UnsavedChangesProvider>

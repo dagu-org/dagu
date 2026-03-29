@@ -1,13 +1,52 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '@/api/v1/schema';
 import DAGActions from '../DAGActions';
 
+const mocks = vi.hoisted(() => ({
+  client: {
+    POST: vi.fn(),
+    GET: vi.fn(),
+  },
+  startModal: vi.fn(
+    ({
+      visible,
+      onSubmit,
+    }: {
+      visible: boolean;
+      onSubmit: (
+        params: string,
+        dagRunId?: string,
+        immediate?: boolean
+      ) => Promise<void>;
+    }) =>
+      visible ? (
+        <div>
+          <button type="button" onClick={() => void onSubmit('["x"]', 'manual-run')}>
+            submit-enqueue
+          </button>
+          <button
+            type="button"
+            onClick={() => void onSubmit('["x"]', 'manual-run', true)}
+          >
+            submit-start
+          </button>
+        </div>
+      ) : null
+  ),
+}));
+
 vi.mock('../../dag-execution', () => ({
-  StartDAGModal: () => null,
+  StartDAGModal: (props: unknown) => mocks.startModal(props),
 }));
 
 vi.mock('../../../../../contexts/ConfigContext', () => ({
@@ -18,11 +57,14 @@ vi.mock('../../../../../contexts/ConfigContext', () => ({
   }),
 }));
 
-vi.mock('../../../../../hooks/api', () => ({
-  useClient: () => ({
-    POST: vi.fn(),
-    GET: vi.fn(),
+vi.mock('../../../../../contexts/WorkspaceContext', () => ({
+  useOptionalWorkspace: () => ({
+    selectedWorkspace: 'ops',
   }),
+}));
+
+vi.mock('../../../../../hooks/api', () => ({
+  useClient: () => mocks.client,
 }));
 
 vi.mock('@/components/ui/error-modal', () => ({
@@ -36,6 +78,20 @@ vi.mock('@/components/ui/simple-toast', () => ({
     showToast: vi.fn(),
   }),
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.client.POST.mockResolvedValue({ data: { dagRunId: 'queued-run' } });
+  mocks.client.GET.mockResolvedValue({
+    data: { dag: { name: 'example-dag' } },
+    error: undefined,
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe('DAGActions', () => {
   it('shows cancel for failed runs with pending auto retries', () => {
@@ -92,6 +148,62 @@ describe('DAGActions', () => {
       />
     );
 
-    expect(within(view.container).getByRole('button', { name: 'Retry' })).toBeDisabled();
+    expect(
+      within(view.container).getByRole('button', { name: 'Retry' })
+    ).toBeDisabled();
+  });
+
+  it('adds the selected workspace tag to enqueue requests', async () => {
+    mocks.client.POST.mockResolvedValue({ data: { dagRunId: 'queued-run' } });
+
+    render(
+      <DAGActions
+        fileName="example-dag.yaml"
+        dag={{ name: 'example-dag' }}
+        displayMode="full"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enqueue' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'submit-enqueue' }));
+
+    expect(mocks.client.POST).toHaveBeenCalledWith('/dags/{fileName}/enqueue', {
+      params: {
+        path: { fileName: 'example-dag.yaml' },
+        query: { remoteNode: 'local' },
+      },
+      body: {
+        params: '["x"]',
+        dagRunId: 'manual-run',
+        tags: ['workspace=ops'],
+      },
+    });
+  });
+
+  it('adds the selected workspace tag to start requests', async () => {
+    mocks.client.POST.mockResolvedValue({ data: { dagRunId: 'started-run' } });
+
+    render(
+      <DAGActions
+        fileName="example-dag.yaml"
+        dag={{ name: 'example-dag' }}
+        displayMode="full"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enqueue' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'submit-start' }));
+
+    expect(mocks.client.POST).toHaveBeenCalledWith('/dags/{fileName}/start', {
+      params: {
+        path: { fileName: 'example-dag.yaml' },
+        query: { remoteNode: 'local' },
+      },
+      body: {
+        params: '["x"]',
+        dagRunId: 'manual-run',
+        tags: ['workspace=ops'],
+      },
+    });
   });
 });

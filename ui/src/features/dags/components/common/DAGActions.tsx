@@ -35,11 +35,13 @@ import { components, NodeStatus, Status } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
+import { useOptionalWorkspace } from '../../../../contexts/WorkspaceContext';
 import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
 import { getDAGRunTerminateActionDetails } from '../../../dag-runs/components/common/terminateAction';
 import { DAGContext } from '../../contexts/DAGContext';
+import { submitDAGExecution } from '../../lib/submitDAGExecution';
 import { StartDAGModal } from '../dag-execution';
 
 /**
@@ -78,6 +80,8 @@ function DAGActions({
   const appBarContext = React.useContext(AppBarContext);
   const dagContext = React.useContext(DAGContext);
   const config = useConfig();
+  const workspace = useOptionalWorkspace();
+  const selectedWorkspace = workspace?.selectedWorkspace ?? '';
   const { hasUnsavedChanges } = useUnsavedChanges();
   const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
@@ -737,40 +741,15 @@ function DAGActions({
               return;
             }
 
-            const body: { params: string; dagRunId?: string } = { params };
-            if (dagRunId) {
-              body.dagRunId = dagRunId;
-            }
-
-            // Use /start endpoint if immediate is true, otherwise use /enqueue
-            const { error } = await (immediate
-              ? client.POST('/dags/{fileName}/start', {
-                  params: {
-                    path: {
-                      fileName: fileName,
-                    },
-                    query: {
-                      remoteNode: appBarContext.selectedRemoteNode || 'local',
-                    },
-                  },
-                  body,
-                })
-              : client.POST('/dags/{fileName}/enqueue', {
-                  params: {
-                    path: {
-                      fileName: fileName,
-                    },
-                    query: {
-                      remoteNode: appBarContext.selectedRemoteNode || 'local',
-                    },
-                  },
-                  body,
-                }));
-            if (error) {
-              throw new Error(
-                error.message || 'Failed to start DAG execution.'
-              );
-            }
+            await submitDAGExecution({
+              client,
+              fileName,
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+              selectedWorkspace,
+              params,
+              dagRunId,
+              immediate,
+            });
 
             // Just refresh the current page data
             reloadData();

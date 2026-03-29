@@ -11,16 +11,22 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { TabProvider, useTabContext } from '../../contexts/TabContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { DAGDetailsPanel } from '../../features/dags/components/dag-details';
 import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
+import { whenEnabled } from '../../hooks/queryUtils';
 import {
   liveFallbackOptions,
   useLiveConnection,
   useLiveDAGsList,
 } from '../../hooks/useAppLive';
+import {
+  buildWorkspaceTag,
+  sanitizeFilterTags,
+} from '../../lib/workspaceTags';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -58,6 +64,7 @@ function DAGsContent() {
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const { selectedWorkspace, workspaceReady } = useWorkspace();
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
@@ -119,6 +126,9 @@ function DAGsContent() {
     const base: DAGDefinitionsFilters = {
       ...defaultFilters,
       ...(stored ?? {}),
+      searchTags: sanitizeFilterTags(
+        stored?.searchTags ?? defaultFilters.searchTags
+      ),
     };
 
     const urlFilters: Partial<DAGDefinitionsFilters> = {};
@@ -132,10 +142,7 @@ function DAGsContent() {
     if (params.has('tags')) {
       const tagsParam = params.get('tags') ?? '';
       urlFilters.searchTags = tagsParam
-        ? tagsParam
-            .split(',')
-            .map((t) => t.trim().toLowerCase())
-            .filter((t) => t !== '')
+        ? sanitizeFilterTags(tagsParam.split(','))
         : [];
       hasUrlFilters = true;
     }
@@ -191,6 +198,38 @@ function DAGsContent() {
     searchState.writeState('dagDefinitions', remoteNode, currentFilters);
   }, [currentFilters, remoteNode, searchState]);
 
+  const resetFilterUrl = React.useCallback(() => {
+    const locationQuery = new URLSearchParams(window.location.search);
+    for (const key of ['search', 'tags', 'page', 'sort', 'order']) {
+      locationQuery.delete(key);
+    }
+    const nextSearch = locationQuery.toString();
+    window.history.replaceState(
+      {},
+      '',
+      nextSearch ? `${window.location.pathname}?${nextSearch}` : window.location.pathname
+    );
+  }, []);
+
+  const previousWorkspaceRef = React.useRef(selectedWorkspace);
+  React.useEffect(() => {
+    if (previousWorkspaceRef.current === selectedWorkspace) {
+      return;
+    }
+
+    previousWorkspaceRef.current = selectedWorkspace;
+    setSearchText(defaultFilters.searchText);
+    setSearchTags(defaultFilters.searchTags);
+    setPage(defaultFilters.page);
+    setAPISearchText(defaultFilters.searchText);
+    setAPISearchTags(defaultFilters.searchTags);
+    setSortField(defaultFilters.sortField);
+    setSortOrder(defaultFilters.sortOrder);
+    lastPersistedFiltersRef.current = defaultFilters;
+    searchState.writeState('dagDefinitions', remoteNode, defaultFilters);
+    resetFilterUrl();
+  }, [defaultFilters, remoteNode, resetFilterUrl, searchState, selectedWorkspace]);
+
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
@@ -200,26 +239,31 @@ function DAGsContent() {
       page,
       perPage: preferences.pageLimit || 200,
       name: apiSearchText || undefined,
-      tags: apiSearchTags.length > 0 ? apiSearchTags.join(',') : undefined,
       sort: sortField,
       order: sortOrder,
     }),
-    [page, preferences.pageLimit, apiSearchText, apiSearchTags, sortField, sortOrder]
+    [page, preferences.pageLimit, apiSearchText, sortField, sortOrder]
   );
 
   const liveState = useLiveConnection();
+  const workspaceTag = buildWorkspaceTag(selectedWorkspace);
+  const queryTags = React.useMemo(() => {
+    const tags = sanitizeFilterTags(apiSearchTags);
+    return workspaceTag ? [...tags, workspaceTag] : tags;
+  }, [apiSearchTags, workspaceTag]);
   const { data, mutate, isLoading } = useQuery(
     '/dags',
-    {
+    whenEnabled(workspaceReady, {
       params: {
         query: {
           ...queryParams,
+          tags: queryTags.length > 0 ? queryTags.join(',') : undefined,
           remoteNode,
           sort: sortField as PathsDagsGetParametersQuerySort,
           order: sortOrder as PathsDagsGetParametersQueryOrder,
         },
       },
-    },
+    }),
     {
       ...liveFallbackOptions(liveState),
       revalidateIfStale: false,
@@ -227,7 +271,7 @@ function DAGsContent() {
       revalidateOnReconnect: false,
     }
   );
-  useLiveDAGsList(mutate);
+  useLiveDAGsList(mutate, workspaceReady);
 
   const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -244,10 +288,13 @@ function DAGsContent() {
     } else {
       locationQuery.delete(key);
     }
+    const nextSearch = locationQuery.toString();
     window.history.pushState(
       {},
       '',
-      `${window.location.pathname}?${locationQuery.toString()}`
+      nextSearch
+        ? `${window.location.pathname}?${nextSearch}`
+        : window.location.pathname
     );
   };
 
@@ -288,10 +335,11 @@ function DAGsContent() {
   };
 
   const searchTagsChange = (tags: string[]) => {
-    addSearchParam('tags', tags);
-    setSearchTags(tags);
+    const sanitizedTags = sanitizeFilterTags(tags);
+    addSearchParam('tags', sanitizedTags);
+    setSearchTags(sanitizedTags);
     setPage(1);
-    debouncedAPISearchTags(tags);
+    debouncedAPISearchTags(sanitizedTags);
   };
 
   const handleSortChange = (field: string, order: string) => {

@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
@@ -19,15 +18,23 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
 import { useQuery } from '../../hooks/api';
+import { whenEnabled } from '../../hooks/queryUtils';
 import {
   liveFallbackOptions,
   useLiveConnection,
   useLiveDAGRuns,
 } from '../../hooks/useAppLive';
+import {
+  buildWorkspaceTag,
+  filterWorkspaceTags,
+  sanitizeFilterTags,
+} from '../../lib/workspaceTags';
+import dayjs from '../../lib/dayjs';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -104,6 +111,7 @@ function DAGRuns() {
   const { preferences, updatePreference } = useUserPreferences();
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const { selectedWorkspace, workspaceReady } = useWorkspace();
 
   // Extract short datetime format from URL if present
   const parseDateFromUrl = React.useCallback(
@@ -274,6 +282,7 @@ function DAGRuns() {
     const base: DAGRunsFilters = {
       ...defaultFilters,
       ...(stored ?? {}),
+      tags: sanitizeFilterTags(stored?.tags ?? defaultFilters.tags),
     };
 
     const urlFilters: Partial<DAGRunsFilters> = {};
@@ -297,10 +306,7 @@ function DAGRuns() {
     if (params.has('tags')) {
       const tagsParam = params.get('tags') ?? '';
       urlFilters.tags = tagsParam
-        ? tagsParam
-            .split(',')
-            .map((t) => t.trim().toLowerCase())
-            .filter((t) => t !== '')
+        ? sanitizeFilterTags(tagsParam.split(','))
         : [];
       hasUrlFilters = true;
     }
@@ -398,6 +404,59 @@ function DAGRuns() {
     appBarContext.setTitle('DAG Runs');
   }, [appBarContext]);
 
+  const resetFilterUrl = React.useCallback(() => {
+    const locationQuery = new URLSearchParams(window.location.search);
+    for (const key of [
+      'name',
+      'dagRunId',
+      'status',
+      'tags',
+      'fromDate',
+      'toDate',
+      'dateMode',
+      'preset',
+      'specificValue',
+      'specificPeriod',
+    ]) {
+      locationQuery.delete(key);
+    }
+    const nextSearch = locationQuery.toString();
+    window.history.replaceState(
+      {},
+      '',
+      nextSearch ? `${window.location.pathname}?${nextSearch}` : window.location.pathname
+    );
+  }, []);
+
+  const previousWorkspaceRef = React.useRef(selectedWorkspace);
+  React.useEffect(() => {
+    if (previousWorkspaceRef.current === selectedWorkspace) {
+      return;
+    }
+
+    previousWorkspaceRef.current = selectedWorkspace;
+    setSearchText(defaultFilters.searchText);
+    setDagRunId(defaultFilters.dagRunId);
+    setStatus(defaultFilters.status);
+    setSelectedTags(defaultFilters.tags);
+    setFromDate(defaultFilters.fromDate);
+    setToDate(defaultFilters.toDate);
+    setDateRangeMode(defaultFilters.dateRangeMode);
+    setDatePreset(defaultFilters.datePreset);
+    setSpecificPeriod(defaultFilters.specificPeriod);
+    setSpecificValue(defaultFilters.specificValue);
+    setAPISearchText(defaultFilters.searchText);
+    setApiDagRunId(defaultFilters.dagRunId);
+    setApiStatus(defaultFilters.status);
+    setApiTags(defaultFilters.tags);
+    setApiFromDate(defaultFilters.fromDate);
+    setApiToDate(defaultFilters.toDate);
+    setSelectedDAGRun(null);
+    lastPersistedFiltersRef.current = defaultFilters;
+    searchState.writeState('dagRuns', remoteKey, defaultFilters);
+    resetFilterUrl();
+  }, [defaultFilters, remoteKey, resetFilterUrl, searchState, selectedWorkspace]);
+
   // Fetch available tags for the filter dropdown
   const { data: tagsData } = useQuery(
     '/dags/tags',
@@ -413,27 +472,32 @@ function DAGRuns() {
       revalidateIfStale: false,
     }
   );
-  const availableTags = tagsData?.tags ?? [];
+  const availableTags = filterWorkspaceTags(tagsData?.tags ?? []);
 
   const liveState = useLiveConnection();
+  const workspaceTag = buildWorkspaceTag(selectedWorkspace);
+  const queryTags = React.useMemo(() => {
+    const tags = sanitizeFilterTags(apiTags);
+    return workspaceTag ? [...tags, workspaceTag] : tags;
+  }, [apiTags, workspaceTag]);
   const { data, mutate } = useQuery(
     '/dag-runs',
-    {
+    whenEnabled(workspaceReady, {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           name: apiSearchText || undefined,
           dagRunId: apiDagRunId || undefined,
           status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
-          tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
+          tags: queryTags.length > 0 ? queryTags.join(',') : undefined,
           fromDate: formatDateForApi(apiFromDate),
           toDate: formatDateForApi(apiToDate),
         },
       },
-    },
+    }),
     liveFallbackOptions(liveState)
   );
-  useLiveDAGRuns(mutate);
+  useLiveDAGRuns(mutate, workspaceReady);
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -442,10 +506,13 @@ function DAGRuns() {
     } else {
       locationQuery.delete(key);
     }
+    const nextSearch = locationQuery.toString();
     window.history.pushState(
       {},
       '',
-      `${window.location.pathname}?${locationQuery.toString()}`
+      nextSearch
+        ? `${window.location.pathname}?${nextSearch}`
+        : window.location.pathname
     );
   };
 
@@ -497,9 +564,13 @@ function DAGRuns() {
   };
 
   const updateTags = (newTags: string[]) => {
-    setSelectedTags(newTags);
-    setApiTags(newTags);
-    addSearchParam('tags', newTags.length > 0 ? newTags.join(',') : undefined);
+    const sanitizedTags = sanitizeFilterTags(newTags);
+    setSelectedTags(sanitizedTags);
+    setApiTags(sanitizedTags);
+    addSearchParam(
+      'tags',
+      sanitizedTags.length > 0 ? sanitizedTags.join(',') : undefined
+    );
     mutate();
   };
 

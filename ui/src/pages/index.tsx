@@ -15,16 +15,19 @@ import { Status } from '../api/v1/schema';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
+import { useWorkspace } from '../contexts/WorkspaceContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import PathsCard from '../features/system-status/components/PathsCard';
 import { useQuery } from '../hooks/api';
+import { whenEnabled } from '../hooks/queryUtils';
 import {
   liveFallbackOptions,
   useLiveConnection,
   useLiveDAGRuns,
 } from '../hooks/useAppLive';
 import dayjs from '../lib/dayjs';
+import { buildWorkspaceTag } from '../lib/workspaceTags';
 import Title from '../ui/Title';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -68,6 +71,7 @@ function Dashboard(): React.ReactElement | null {
   const config = useConfig();
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const { selectedWorkspace, workspaceReady } = useWorkspace();
 
   const [modalDAGRun, setModalDAGRun] = React.useState<{
     name: string;
@@ -169,6 +173,20 @@ function Dashboard(): React.ReactElement | null {
     searchState.writeState('dashboard', remoteKey, currentFilters);
   }, [currentFilters, remoteKey, searchState]);
 
+  const previousWorkspaceRef = React.useRef(selectedWorkspace);
+  React.useEffect(() => {
+    if (previousWorkspaceRef.current === selectedWorkspace) {
+      return;
+    }
+
+    previousWorkspaceRef.current = selectedWorkspace;
+    setSelectedDAGRun(defaultFilters.selectedDAGRun);
+    setDateRange(defaultFilters.dateRange);
+    setModalDAGRun(null);
+    lastPersistedFiltersRef.current = defaultFilters;
+    searchState.writeState('dashboard', remoteKey, defaultFilters);
+  }, [defaultFilters, remoteKey, searchState, selectedWorkspace]);
+
   const handleDateChange = (startTimestamp: number, endTimestamp: number) => {
     setDateRange({
       startDate: startTimestamp,
@@ -179,22 +197,24 @@ function Dashboard(): React.ReactElement | null {
   const selectedDAGName = selectedDAGRun !== 'all' ? selectedDAGRun : undefined;
 
   const liveState = useLiveConnection();
+  const workspaceTag = buildWorkspaceTag(selectedWorkspace);
 
   const { data, error, isLoading, mutate } = useQuery(
     '/dag-runs',
-    {
+    whenEnabled(workspaceReady, {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
           fromDate: dateRange.startDate,
           toDate: dateRange.endDate,
           name: selectedDAGName,
+          tags: workspaceTag,
         },
       },
-    },
+    }),
     liveFallbackOptions(liveState, 5000)
   );
-  useLiveDAGRuns(mutate);
+  useLiveDAGRuns(mutate, workspaceReady);
 
   const handleRefreshAll = async () => {
     await mutate();

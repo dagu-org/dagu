@@ -39,6 +39,7 @@ describe('DateKanbanSection live-update flags', () => {
         date="2026-03-22"
         todayStr="2026-03-22"
         selectedWorkspace=""
+        workspaceReady={true}
         onCardClick={() => {}}
       />
     );
@@ -46,6 +47,7 @@ describe('DateKanbanSection live-update flags', () => {
     expect(useDateKanbanDataMock).toHaveBeenCalledWith(
       '2026-03-22',
       '',
+      true,
       true,
       true
     );
@@ -59,6 +61,7 @@ describe('DateKanbanSection live-update flags', () => {
         date="2026-03-21"
         todayStr="2026-03-22"
         selectedWorkspace=""
+        workspaceReady={true}
         onCardClick={() => {}}
       />
     );
@@ -66,6 +69,7 @@ describe('DateKanbanSection live-update flags', () => {
     expect(useDateKanbanDataMock).toHaveBeenCalledWith(
       '2026-03-21',
       '',
+      true,
       false,
       true
     );
@@ -79,6 +83,7 @@ describe('DateKanbanSection live-update flags', () => {
         date="2026-03-20"
         todayStr="2026-03-22"
         selectedWorkspace=""
+        workspaceReady={true}
         onCardClick={() => {}}
       />
     );
@@ -86,6 +91,7 @@ describe('DateKanbanSection live-update flags', () => {
     expect(useDateKanbanDataMock).toHaveBeenCalledWith(
       '2026-03-20',
       '',
+      true,
       false,
       false
     );

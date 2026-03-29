@@ -2,10 +2,13 @@ import React, { useCallback, useContext, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { usePageContext } from '../../../contexts/PageContext';
+import { useWorkspace } from '../../../contexts/WorkspaceContext';
 import { DAGRunDetailsContent } from '../../../features/dag-runs/components/dag-run-details';
 import { DAGRunContext } from '../../../features/dag-runs/contexts/DAGRunContext';
 import { matchesRequestedDAGRunDetails } from '../../../features/dag-runs/hooks/dagRunDetailsRequest';
 import { useBoundedDAGRunDetails } from '../../../features/dag-runs/hooks/useBoundedDAGRunDetails';
+import { matchesWorkspaceSelection } from '../../../lib/workspaceTags';
+import LoadingIndicator from '../../../ui/LoadingIndicator';
 
 type ApiError = {
   response?: { status?: number };
@@ -47,9 +50,34 @@ function ErrorDisplay({ error, name, dagRunId }: ErrorDisplayProps) {
   );
 }
 
+function FilteredOutDisplay({
+  name,
+  dagRunId,
+}: {
+  name: string | undefined;
+  dagRunId: string | undefined;
+}) {
+  return (
+    <div className="w-full px-4">
+      <div className="rounded-lg bg-muted p-6 m-4">
+        <h2 className="text-lg font-semibold text-foreground mb-2">
+          DAG Run Not Available
+        </h2>
+        <p className="text-muted-foreground">
+          This DAG run is outside the selected workspace.
+        </p>
+        <p className="text-sm text-muted-foreground mt-2">
+          DAG: {name} | Run ID: {dagRunId}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function DAGRunDetailsPage() {
   const { name, dagRunId = 'latest' } = useParams();
   const appBarContext = useContext(AppBarContext);
+  const { selectedWorkspace, workspaceReady } = useWorkspace();
   const { setContext } = usePageContext();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -82,7 +110,7 @@ function DAGRunDetailsPage() {
     refresh,
   } = useBoundedDAGRunDetails({
     target: detailsTarget,
-    enabled: detailsTarget !== null,
+    enabled: detailsTarget !== null && workspaceReady,
     pollIntervalMs: detailsTarget ? 2000 : 0,
   });
 
@@ -97,6 +125,10 @@ function DAGRunDetailsPage() {
     matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
       ? latestDetails
       : null;
+  const isFilteredOut = Boolean(dagRunDetails) && !matchesWorkspaceSelection(
+    dagRunDetails.tags,
+    selectedWorkspace
+  );
   const displayDAGRunId = subDAGRunId || dagRunId || '';
 
   function getDisplayName(): string {
@@ -122,6 +154,18 @@ function DAGRunDetailsPage() {
 
   if (error && !dagRunDetails) {
     return <ErrorDisplay error={error} name={name} dagRunId={dagRunId} />;
+  }
+
+  if (!workspaceReady) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingIndicator />
+      </div>
+    );
+  }
+
+  if (isFilteredOut) {
+    return <FilteredOutDisplay name={name} dagRunId={dagRunId} />;
   }
 
   if (!dagRunDetails) {

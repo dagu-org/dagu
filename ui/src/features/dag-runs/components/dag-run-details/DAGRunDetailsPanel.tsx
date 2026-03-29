@@ -3,7 +3,9 @@ import { Maximize2, X } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
+import { useOptionalWorkspace } from '../../../../contexts/WorkspaceContext';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
+import { matchesWorkspaceSelection } from '../../../../lib/workspaceTags';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import { matchesRequestedDAGRunDetails } from '../../hooks/dagRunDetailsRequest';
@@ -25,6 +27,9 @@ function DAGRunDetailsPanel({
 }: Props): React.ReactElement {
   const navigate = useNavigate();
   const appBarContext = React.useContext(AppBarContext);
+  const workspace = useOptionalWorkspace();
+  const selectedWorkspace = workspace?.selectedWorkspace ?? '';
+  const workspaceReady = workspace?.workspaceReady ?? true;
 
   // Parse sub DAG-run params from URL
   const searchParams = new URLSearchParams(window.location.search);
@@ -57,7 +62,7 @@ function DAGRunDetailsPanel({
     refresh,
   } = useBoundedDAGRunDetails({
     target: detailsTarget,
-    enabled: detailsTarget !== null,
+    enabled: detailsTarget !== null && workspaceReady,
     pollIntervalMs: detailsTarget ? 2000 : 0,
   });
 
@@ -66,6 +71,10 @@ function DAGRunDetailsPanel({
     matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
       ? { dagRunDetails: latestDetails }
       : null;
+  const isFilteredOut = Boolean(data?.dagRunDetails) && !matchesWorkspaceSelection(
+    data.dagRunDetails.tags,
+    selectedWorkspace
+  );
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => {
@@ -136,6 +145,16 @@ function DAGRunDetailsPanel({
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingIndicator />
+      </div>
+    );
+  }
+
+  if (isFilteredOut) {
+    return (
+      <div className="flex h-full items-start justify-center p-4">
+        <div className="w-full rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+          DAG run not found or filtered out by the selected workspace.
+        </div>
       </div>
     );
   }

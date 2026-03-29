@@ -1,7 +1,8 @@
 import React, { useContext } from 'react';
-import { useClient } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useClient } from '@/hooks/api';
 import DAGDetailsSidePanel from '@/features/dags/components/dag-details/DAGDetailsSidePanel';
+import { submitDAGExecution } from '@/features/dags/lib/submitDAGExecution';
 
 interface DAGPreviewModalProps {
   fileName: string;
@@ -22,31 +23,14 @@ export function DAGPreviewModal({
 
   const handleEnqueue = React.useCallback(
     async (params: string, dagRunId?: string): Promise<string | void> => {
-      const tags: string[] = [];
-      if (selectedWorkspace) {
-        const safeName = selectedWorkspace.replace(/[^a-zA-Z0-9_-]/g, '');
-        if (safeName) {
-          tags.push(`workspace=${safeName}`);
-        }
-      }
-
-      const { data, error } = await client.POST('/dags/{fileName}/enqueue', {
-        params: {
-          path: { fileName },
-          query: { remoteNode },
-        },
-        body: {
-          params: params || undefined,
-          dagRunId: dagRunId || undefined,
-          tags: tags.length > 0 ? tags : undefined,
-        },
+      return submitDAGExecution({
+        client,
+        fileName,
+        remoteNode,
+        selectedWorkspace,
+        params,
+        dagRunId,
       });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to enqueue DAG execution.');
-      }
-
-      return data?.dagRunId;
     },
     [client, fileName, remoteNode, selectedWorkspace]
   );
