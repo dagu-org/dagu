@@ -51,9 +51,6 @@ func validateDefinitionNode(node *yaml.Node) error {
 		"tags": {
 			validate: validateStringListNode,
 		},
-		"stages": {
-			validate: validateStagesNode,
-		},
 		"schedule": {},
 		"allowedDAGs": {
 			canonical: "allowed_dags",
@@ -67,43 +64,6 @@ func validateDefinitionNode(node *yaml.Node) error {
 			validate: validateAgentConfigNode,
 		},
 		"disabled": {},
-	})
-}
-
-func validateStagesNode(node *yaml.Node, path string) error {
-	if isNullNode(node) {
-		return nil
-	}
-	if node.Kind != yaml.SequenceNode {
-		return fmt.Errorf("%s must be a list", path)
-	}
-	for i, child := range node.Content {
-		childPath := fmt.Sprintf("%s[%d]", path, i)
-		switch child.Kind {
-		case yaml.ScalarNode:
-			continue
-		case yaml.MappingNode:
-			if err := validateStageNode(child, childPath); err != nil {
-				return err
-			}
-		default:
-			return fmt.Errorf("%s must be a string or object", childPath)
-		}
-	}
-	return nil
-}
-
-func validateStageNode(node *yaml.Node, path string) error {
-	return validateMappingNode(node, path, map[string]yamlFieldRule{
-		"name": {},
-		"allowedDAGs": {
-			canonical: "allowed_dags",
-			validate:  validateAllowedDAGsNode,
-		},
-		"allowed_dags": {
-			canonical: "allowed_dags",
-			validate:  validateAllowedDAGsNode,
-		},
 	})
 }
 

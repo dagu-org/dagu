@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,10 +22,11 @@ var automataAllowedTools = []string{
 	"think",
 	"search_skills",
 	"use_skill",
+	"list_automata_tasks",
 	"list_allowed_dags",
 	"run_allowed_dag",
 	"retry_automata_run",
-	"set_automata_stage",
+	"set_automata_task_done",
 	"request_human_input",
 	"finish_automata",
 }
@@ -326,7 +326,7 @@ func (s *Service) inspectSessionActivity(ctx context.Context, name string, state
 }
 
 func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *State) (*agent.SessionRuntimeOptions, error) {
-	allowedDAGs, err := s.resolveAllowedDAGsForStage(ctx, def, state.CurrentStage)
+	allowedDAGs, err := s.resolveAllowedDAGSet(ctx, def.AllowedDAGs)
 	if err != nil {
 		return nil, err
 	}
@@ -365,9 +365,10 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 		fmt.Fprintf(&sb, "Description: %s\n", def.Description)
 	}
 	fmt.Fprintf(&sb, "Lifecycle state: %s\n", state.State)
-	fmt.Fprintf(&sb, "Current stage: %s\n", state.CurrentStage)
-	fmt.Fprintf(&sb, "Available stages: %s\n", strings.Join(def.StageNames(), ", "))
-	sb.WriteString("Current stage allowed DAGs:\n")
+	sb.WriteString("Checklist:\n")
+	sb.WriteString(buildTaskListSummary(state.Tasks))
+	sb.WriteString("\n")
+	sb.WriteString("Allowed DAGs:\n")
 	if len(allowed) == 0 {
 		sb.WriteString("- none\n")
 	} else {
@@ -384,7 +385,10 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	}
 	sb.WriteString("Rules:\n")
 	sb.WriteString("- Use only the tools available in this session.\n")
-	sb.WriteString("- Use set_automata_stage when the workflow stage changes; stage transitions require user approval before they apply.\n")
+	sb.WriteString("- The checklist is operator-owned. You may only mark existing tasks done or not done.\n")
+	sb.WriteString("- Do not create, edit, reorder, or delete checklist tasks.\n")
+	sb.WriteString("- Use list_automata_tasks when you need a fresh view of the checklist.\n")
+	sb.WriteString("- Use set_automata_task_done only to check or uncheck an existing checklist task.\n")
 	sb.WriteString("- Use run_allowed_dag for execution and wait for the scheduler to resume you.\n")
 	sb.WriteString("- Use request_human_input if blocked on approval or clarification.\n")
 	sb.WriteString("- Use finish_automata only when the goal is complete.\n")
@@ -394,28 +398,25 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 
 func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
 	return fmt.Sprintf(
-		"Continue Automata %q. Current instruction: %q. Current stage: %q. Decide the next best action toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
+		"Continue Automata %q. Current instruction: %q. Work through the checklist toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
 		def.Name,
 		state.Instruction,
-		state.CurrentStage,
 	)
 }
 
 func (s *Service) buildResumeMessage(def *Definition, state *State, requestedBy string) string {
 	if requestedBy == "" {
 		return fmt.Sprintf(
-			"Automata %q was resumed. Current instruction: %q. Current stage: %q. Continue the active task from the latest context.",
+			"Automata %q was resumed. Current instruction: %q. Continue the active task from the latest context and checklist state.",
 			def.Name,
 			state.Instruction,
-			state.CurrentStage,
 		)
 	}
 	return fmt.Sprintf(
-		"Automata %q was resumed by %s. Current instruction: %q. Current stage: %q. Continue the active task from the latest context.",
+		"Automata %q was resumed by %s. Current instruction: %q. Continue the active task from the latest context and checklist state.",
 		def.Name,
 		requestedBy,
 		state.Instruction,
-		state.CurrentStage,
 	)
 }
 
@@ -439,30 +440,26 @@ func (s *Service) buildHumanResponseMessage(prompt *Prompt, response *PromptResp
 	)
 }
 
-func buildStageTransitionQuestion(currentStage, requestedStage, note string) string {
-	if note == "" {
-		return fmt.Sprintf(
-			"The agent requested a stage change from %q to %q. Do you approve this transition?",
-			currentStage,
-			requestedStage,
-		)
-	}
-	return fmt.Sprintf(
-		"The agent requested a stage change from %q to %q.\nReason: %s\nDo you approve this transition?",
-		currentStage,
-		requestedStage,
-		note,
-	)
-}
-
 type controllerRuntime struct {
 	service *Service
 	def     *Definition
 	state   *State
 }
 
+func (r *controllerRuntime) ListTasks(_ context.Context) ([]agent.AutomataTask, error) {
+	out := make([]agent.AutomataTask, 0, len(r.state.Tasks))
+	for _, task := range r.state.Tasks {
+		out = append(out, agent.AutomataTask{
+			ID:          task.ID,
+			Description: task.Description,
+			State:       string(task.State),
+		})
+	}
+	return out, nil
+}
+
 func (r *controllerRuntime) ListAllowedDAGs(ctx context.Context) ([]agent.AutomataAllowedDAG, error) {
-	items, err := r.service.resolveAllowedDAGsForStage(ctx, r.def, r.state.CurrentStage)
+	items, err := r.service.resolveAllowedDAGSet(ctx, r.def.AllowedDAGs)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +481,7 @@ func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.Autom
 	if r.state.PendingPrompt != nil {
 		return agent.AutomataRunDAGResult{}, fmt.Errorf("cannot start a child DAG while waiting for human input")
 	}
-	allowed, err := r.service.resolveAllowedDAGsForStage(ctx, r.def, r.state.CurrentStage)
+	allowed, err := r.service.resolveAllowedDAGSet(ctx, r.def.AllowedDAGs)
 	if err != nil {
 		return agent.AutomataRunDAGResult{}, err
 	}
@@ -538,47 +535,12 @@ func (r *controllerRuntime) RetryCurrentRun(ctx context.Context) (agent.Automata
 	return r.RunAllowedDAG(ctx, agent.AutomataRunDAGInput{DAGName: r.state.LastRunRef.Name})
 }
 
-func (r *controllerRuntime) SetStage(ctx context.Context, stage, note string) error {
-	if !slices.Contains(r.def.StageNames(), stage) {
-		return fmt.Errorf("unknown stage %q", stage)
+func (r *controllerRuntime) SetTaskDone(ctx context.Context, taskID string, done bool) error {
+	if strings.TrimSpace(taskID) == "" {
+		return fmt.Errorf("task id is required")
 	}
-	if stage == r.state.CurrentStage {
-		return nil
-	}
-	if r.state.CurrentRunRef != nil {
-		return fmt.Errorf("cannot change stage while a child DAG run is active")
-	}
-	if r.state.PendingPrompt != nil {
-		return fmt.Errorf("automata is already waiting for human input")
-	}
-	now := r.service.clock()
-	r.state.PendingStageTransition = &PendingStageTransition{
-		RequestedStage: stage,
-		Note:           note,
-		RequestedBy:    "agent",
-		CreatedAt:      now,
-	}
-	r.state.PendingPrompt = &Prompt{
-		ID:        uuid.NewString(),
-		Question:  buildStageTransitionQuestion(r.state.CurrentStage, stage, note),
-		CreatedAt: now,
-		Options: []agent.UserPromptOption{
-			{
-				ID:          stageApprovalOptionApprove,
-				Label:       "Approve",
-				Description: fmt.Sprintf("Apply the requested stage change to %s and continue.", stage),
-			},
-			{
-				ID:          stageApprovalOptionReject,
-				Label:       "Reject",
-				Description: fmt.Sprintf("Keep the current stage %s and continue without the stage change.", r.state.CurrentStage),
-			},
-		},
-	}
-	r.state.PendingResponse = nil
-	r.state.State = StateWaiting
-	r.state.WaitingReason = WaitingReasonHuman
-	return r.service.saveState(ctx, r.def.Name, r.state)
+	_, err := r.service.SetTaskDone(ctx, r.def.Name, taskID, done, "agent")
+	return err
 }
 
 func (r *controllerRuntime) RequestHumanInput(ctx context.Context, prompt agent.AutomataHumanPrompt) error {

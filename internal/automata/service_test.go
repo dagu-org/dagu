@@ -88,7 +88,7 @@ func (s *testAgentModelStore) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-func TestServiceListInitializesStateAndStage(t *testing.T) {
+func TestServiceListInitializesStateAndTaskSummary(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -103,41 +103,29 @@ func TestServiceListInitializesStateAndStage(t *testing.T) {
 	item := items[0]
 	require.Equal(t, "software_dev", item.Name)
 	require.Equal(t, StateIdle, item.State)
-	require.Equal(t, "research", item.Stage)
+	require.Equal(t, 0, item.OpenTaskCount)
+	require.Equal(t, 0, item.DoneTaskCount)
+	require.Empty(t, item.NextTaskDescription)
 	require.Equal(t, fixedTime, item.LastUpdatedAt)
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
-	require.NotNil(t, detail.State)
 	require.Equal(t, StateIdle, detail.State.State)
-	require.Equal(t, "research", detail.State.CurrentStage)
-	require.Equal(t, "system", detail.State.StageChangedBy)
-	require.Len(t, detail.AllowedDAGs, 1)
-	require.Equal(t, "build-app", detail.AllowedDAGs[0].Name)
+	require.Empty(t, detail.State.Tasks)
+	require.Equal(t, []string{"build-app"}, allowedDAGNames(detail.AllowedDAGs))
 }
 
-func TestServiceDetailUsesCurrentStageAllowedDAGs(t *testing.T) {
+func TestServiceDetailUsesTopLevelAllowedDAGs(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecPerStage()))
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecMultiDAGs()))
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
-	require.Equal(t, "research", detail.State.CurrentStage)
-	require.Equal(t, []string{"build-app"}, allowedDAGNames(detail.AllowedDAGs))
-
-	require.NoError(t, svc.OverrideStage(ctx, "software_dev", StageOverrideRequest{
-		Stage:       "implement",
-		RequestedBy: "tester",
-	}))
-
-	detail, err = svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, "implement", detail.State.CurrentStage)
-	require.Equal(t, []string{"run-tests"}, allowedDAGNames(detail.AllowedDAGs))
+	require.Equal(t, []string{"build-app", "run-tests"}, allowedDAGNames(detail.AllowedDAGs))
 }
 
 func TestServicePutSpecAcceptsLegacyPurposeAsGoalAlias(t *testing.T) {
@@ -148,9 +136,7 @@ func TestServicePutSpecAcceptsLegacyPurposeAsGoalAlias(t *testing.T) {
 
 	spec := `description: Legacy automata
 purpose: Complete the assigned software work
-stages:
-  - research
-allowedDAGs:
+allowed_dags:
   names:
     - build-app
 `
@@ -159,6 +145,25 @@ allowedDAGs:
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
 	require.Equal(t, "Complete the assigned software work", detail.Definition.Goal)
+}
+
+func TestServicePutSpecRejectsStagesField(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+stages:
+  - research
+allowed_dags:
+  names:
+    - build-app
+`
+
+	err := svc.PutSpec(ctx, "software_dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, `unknown field "stages"`)
 }
 
 func TestServicePutSpecRejectsDotsAndHyphensInAutomataName(t *testing.T) {
@@ -184,11 +189,9 @@ func TestServicePutSpecNormalizesTagsAndExposesThemInSummary(t *testing.T) {
 tags:
   - workspace=Engineering
   - Owner=Team-AI
-stages:
-  - name: research
-    allowed_dags:
-      names:
-        - build-app
+allowed_dags:
+  names:
+    - build-app
 `
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
@@ -212,11 +215,9 @@ func TestServicePutSpecRejectsInvalidTags(t *testing.T) {
 	spec := `goal: Complete the assigned software work
 tags:
   - "bad tag"
-stages:
-  - name: research
-    allowed_dags:
-      names:
-        - build-app
+allowed_dags:
+  names:
+    - build-app
 `
 
 	err := svc.PutSpec(ctx, "software_dev", spec)
@@ -224,90 +225,41 @@ stages:
 	require.ErrorContains(t, err, "invalid tags")
 }
 
-func TestServicePutSpecRejectsUnknownTopLevelField(t *testing.T) {
+func TestServicePutSpecRejectsUnknownFields(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
-	spec := `goal: Complete the assigned software work
+	err := svc.PutSpec(ctx, "software_dev", `goal: Complete the assigned software work
 bogus: true
-stages:
-  - name: research
-    allowed_dags:
-      names:
-        - build-app
-`
-
-	err := svc.PutSpec(ctx, "software_dev", spec)
-	require.Error(t, err)
+allowed_dags:
+  names:
+    - build-app
+`)
 	require.ErrorContains(t, err, `unknown field "bogus"`)
-}
 
-func TestServicePutSpecRejectsUnknownStageField(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	spec := `goal: Complete the assigned software work
-stages:
-  - name: research
-    bogus: true
-    allowed_dags:
-      names:
-        - build-app
-`
-
-	err := svc.PutSpec(ctx, "software_dev", spec)
-	require.Error(t, err)
+	err = svc.PutSpec(ctx, "software_dev", `goal: Complete the assigned software work
+allowed_dags:
+  names:
+    - build-app
+  bogus:
+    - nope
+`)
 	require.ErrorContains(t, err, `unknown field "bogus"`)
-}
 
-func TestServicePutSpecRejectsUnknownAllowedDAGsField(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	spec := `goal: Complete the assigned software work
-stages:
-  - name: research
-    allowed_dags:
-      names:
-        - build-app
-      bogus:
-        - nope
-`
-
-	err := svc.PutSpec(ctx, "software_dev", spec)
-	require.Error(t, err)
-	require.ErrorContains(t, err, `unknown field "bogus"`)
-}
-
-func TestServicePutSpecRejectsUnknownAgentField(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	spec := `goal: Complete the assigned software work
-stages:
-  - name: research
-    allowed_dags:
-      names:
-        - build-app
+	err = svc.PutSpec(ctx, "software_dev", `goal: Complete the assigned software work
+allowed_dags:
+  names:
+    - build-app
 agent:
   safeMode: true
   bogus: true
-`
-
-	err := svc.PutSpec(ctx, "software_dev", spec)
-	require.Error(t, err)
+`)
 	require.ErrorContains(t, err, `unknown field "bogus"`)
 }
 
-func TestServiceOverrideStagePersistsDeclaredStage(t *testing.T) {
+func TestServiceTaskCRUDAndReorder(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -315,174 +267,57 @@ func TestServiceOverrideStagePersistsDeclaredStage(t *testing.T) {
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 
-	err := svc.OverrideStage(ctx, "software_dev", StageOverrideRequest{
-		Stage:       "implement",
+	first := createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+	second := createTask(t, svc, ctx, "software_dev", "Ship the fix", "tester")
+
+	updated, err := svc.UpdateTask(ctx, "software_dev", first.ID, UpdateTaskRequest{
+		Description: new("Investigate and reproduce the failing test"),
+		Done:        new(true),
 		RequestedBy: "tester",
-		Note:        "planning complete",
 	})
 	require.NoError(t, err)
+	require.Equal(t, TaskStateDone, updated.State)
+	require.Equal(t, "tester", updated.DoneBy)
+	require.Equal(t, fixedTime, updated.DoneAt)
+	require.Equal(t, fixedTime, updated.UpdatedAt)
 
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.NotNil(t, detail.State)
-	require.Equal(t, "implement", detail.State.CurrentStage)
-	require.Equal(t, "tester", detail.State.StageChangedBy)
-	require.Equal(t, "planning complete", detail.State.StageNote)
-	require.Equal(t, fixedTime, detail.State.StageChangedAt)
-}
-
-func TestServiceOverrideStageRejectsUnknownStage(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-
-	err := svc.OverrideStage(ctx, "software_dev", StageOverrideRequest{Stage: "deploy"})
-	require.Error(t, err)
-	require.ErrorContains(t, err, `unknown stage "deploy"`)
-}
-
-func TestControllerRuntimeSetStageRequestsApproval(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, fixedTime := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecPerStage()))
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-
-	rt := &controllerRuntime{service: svc, def: def, state: state}
-	err = rt.SetStage(ctx, "implement", "planning is complete")
-	require.NoError(t, err)
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, "research", detail.State.CurrentStage)
-	require.Equal(t, StateWaiting, detail.State.State)
-	require.Equal(t, WaitingReasonHuman, detail.State.WaitingReason)
-	require.NotNil(t, detail.State.PendingPrompt)
-	require.NotNil(t, detail.State.PendingStageTransition)
-	require.Equal(t, "implement", detail.State.PendingStageTransition.RequestedStage)
-	require.Equal(t, "planning is complete", detail.State.PendingStageTransition.Note)
-	require.Equal(t, "agent", detail.State.PendingStageTransition.RequestedBy)
-	require.Equal(t, fixedTime, detail.State.PendingStageTransition.CreatedAt)
-	require.Len(t, detail.State.PendingPrompt.Options, 2)
-}
-
-func TestServiceSubmitHumanResponseApprovesStageTransition(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, fixedTime := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecPerStage()))
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-
-	rt := &controllerRuntime{service: svc, def: def, state: state}
-	require.NoError(t, rt.SetStage(ctx, "implement", "ready to code"))
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.NotNil(t, detail.State.PendingPrompt)
-
-	err = svc.SubmitHumanResponse(ctx, "software_dev", HumanResponseRequest{
-		PromptID:          detail.State.PendingPrompt.ID,
-		SelectedOptionIDs: []string{stageApprovalOptionApprove},
-	})
-	require.NoError(t, err)
-
-	detail, err = svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, "implement", detail.State.CurrentStage)
-	require.Equal(t, "agent (approved)", detail.State.StageChangedBy)
-	require.Equal(t, "ready to code", detail.State.StageNote)
-	require.Equal(t, fixedTime, detail.State.StageChangedAt)
-	require.Equal(t, StateRunning, detail.State.State)
-	require.Nil(t, detail.State.PendingPrompt)
-	require.Nil(t, detail.State.PendingStageTransition)
-	require.Len(t, detail.State.PendingTurnMessages, 1)
-	require.Equal(t, "stage_transition_approved", detail.State.PendingTurnMessages[0].Kind)
-	require.Equal(t, []string{"run-tests"}, allowedDAGNames(detail.AllowedDAGs))
-}
-
-func TestServiceSubmitHumanResponseRejectsStageTransition(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecPerStage()))
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-
-	rt := &controllerRuntime{service: svc, def: def, state: state}
-	require.NoError(t, rt.SetStage(ctx, "implement", "ready to code"))
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.NotNil(t, detail.State.PendingPrompt)
-
-	err = svc.SubmitHumanResponse(ctx, "software_dev", HumanResponseRequest{
-		PromptID:          detail.State.PendingPrompt.ID,
-		SelectedOptionIDs: []string{stageApprovalOptionReject},
-	})
-	require.NoError(t, err)
-
-	detail, err = svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, "research", detail.State.CurrentStage)
-	require.Equal(t, StateRunning, detail.State.State)
-	require.Nil(t, detail.State.PendingPrompt)
-	require.Nil(t, detail.State.PendingStageTransition)
-	require.Len(t, detail.State.PendingTurnMessages, 1)
-	require.Equal(t, "stage_transition_rejected", detail.State.PendingTurnMessages[0].Kind)
-	require.Equal(t, []string{"build-app"}, allowedDAGNames(detail.AllowedDAGs))
-}
-
-func TestServiceOverrideStageClearsPendingStageTransition(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, fixedTime := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecPerStage()))
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-
-	rt := &controllerRuntime{service: svc, def: def, state: state}
-	require.NoError(t, rt.SetStage(ctx, "implement", "ready to code"))
-
-	err = svc.OverrideStage(ctx, "software_dev", StageOverrideRequest{
-		Stage:       "plan",
+	require.NoError(t, svc.ReorderTasks(ctx, "software_dev", ReorderTasksRequest{
+		TaskIDs:     []string{second.ID, first.ID},
 		RequestedBy: "tester",
-		Note:        "manual correction",
-	})
-	require.NoError(t, err)
+	}))
+	require.NoError(t, svc.DeleteTask(ctx, "software_dev", second.ID, "tester"))
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
-	require.Equal(t, "plan", detail.State.CurrentStage)
-	require.Equal(t, "tester", detail.State.StageChangedBy)
-	require.Equal(t, "manual correction", detail.State.StageNote)
-	require.Equal(t, fixedTime, detail.State.StageChangedAt)
-	require.Nil(t, detail.State.PendingPrompt)
-	require.Nil(t, detail.State.PendingStageTransition)
-	require.Equal(t, StateRunning, detail.State.State)
+	require.Len(t, detail.State.Tasks, 1)
+	require.Equal(t, first.ID, detail.State.Tasks[0].ID)
+	require.Equal(t, "Investigate and reproduce the failing test", detail.State.Tasks[0].Description)
+	require.Equal(t, TaskStateDone, detail.State.Tasks[0].State)
 }
 
-func TestServiceRequestStartRequiresInstruction(t *testing.T) {
+func TestServiceTaskOperationsValidateInput(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	task := createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	_, err := svc.UpdateTask(ctx, "software_dev", task.ID, UpdateTaskRequest{RequestedBy: "tester"})
+	require.ErrorContains(t, err, "no task changes requested")
+
+	err = svc.ReorderTasks(ctx, "software_dev", ReorderTasksRequest{
+		TaskIDs:     []string{task.ID, task.ID},
+		RequestedBy: "tester",
+	})
+	require.ErrorContains(t, err, "every task exactly once")
+
+	err = svc.DeleteTask(ctx, "software_dev", "missing", "tester")
+	require.ErrorContains(t, err, `unknown task "missing"`)
+}
+
+func TestServiceRequestStartRequiresInstructionAndOpenTask(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -490,14 +325,16 @@ func TestServiceRequestStartRequiresInstruction(t *testing.T) {
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 
-	err := svc.RequestStart(ctx, "software_dev", StartRequest{RequestedBy: "tester"})
-	require.Error(t, err)
+	err := svc.RequestStart(ctx, "software_dev", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle the current assigned task.",
+	})
+	require.ErrorContains(t, err, "at least one open task is required")
+
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	err = svc.RequestStart(ctx, "software_dev", StartRequest{RequestedBy: "tester"})
 	require.ErrorContains(t, err, "instruction is required before starting automata")
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, StateIdle, detail.State.State)
-	require.Empty(t, detail.State.Instruction)
 }
 
 func TestServiceRequestStartStoresInstruction(t *testing.T) {
@@ -507,6 +344,7 @@ func TestServiceRequestStartStoresInstruction(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 
 	err := svc.RequestStart(ctx, "software_dev", StartRequest{
 		RequestedBy: "tester",
@@ -525,24 +363,22 @@ func TestServiceRequestStartStoresInstruction(t *testing.T) {
 	require.Equal(t, "kickoff", detail.State.PendingTurnMessages[0].Kind)
 }
 
-func TestServiceRequestStartRejectsActiveTask(t *testing.T) {
+func TestServiceRequestStartRejectsWhenAllTasksDone(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, _ := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
+	task := createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+	_, err := svc.SetTaskDone(ctx, "software_dev", task.ID, true, "tester")
+	require.NoError(t, err)
+
+	err = svc.RequestStart(ctx, "software_dev", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle the current assigned task.",
-	}))
-
-	err := svc.RequestStart(ctx, "software_dev", StartRequest{
-		RequestedBy: "tester",
-		Instruction: "Start a second task.",
 	})
-	require.Error(t, err)
-	require.ErrorContains(t, err, "already has an active task")
+	require.ErrorContains(t, err, "at least one open task is required")
 }
 
 func TestServiceSubmitOperatorMessageRequiresActiveTask(t *testing.T) {
@@ -552,12 +388,12 @@ func TestServiceSubmitOperatorMessageRequiresActiveTask(t *testing.T) {
 	svc, _ := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 
 	err := svc.SubmitOperatorMessage(ctx, "software_dev", OperatorMessageRequest{
 		RequestedBy: "tester",
 		Message:     "Please prioritize the flaky test first.",
 	})
-	require.Error(t, err)
 	require.ErrorContains(t, err, "not running an active task")
 }
 
@@ -568,6 +404,7 @@ func TestServiceSubmitOperatorMessageQueuesMessage(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle the current assigned task.",
@@ -588,13 +425,15 @@ func TestServiceSubmitOperatorMessageQueuesMessage(t *testing.T) {
 	require.Contains(t, detail.State.PendingTurnMessages[1].Message, "Focus on the regression first.")
 }
 
-func TestServiceSubmitOperatorMessageWhileBlockedAppendsToSession(t *testing.T) {
+func TestServiceTaskUpdateWhileBlockedAppendsToSession(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, fixedTime := newTestServiceWithSessionStore(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	task := createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
 	def, err := svc.GetDefinition(ctx, "software_dev")
 	require.NoError(t, err)
 	state, err := svc.ensureState(ctx, def)
@@ -616,103 +455,33 @@ func TestServiceSubmitOperatorMessageWhileBlockedAppendsToSession(t *testing.T) 
 	}))
 	require.NoError(t, svc.saveState(ctx, def.Name, state))
 
-	err = svc.SubmitOperatorMessage(ctx, "software_dev", OperatorMessageRequest{
+	updated, err := svc.UpdateTask(ctx, "software_dev", task.ID, UpdateTaskRequest{
+		Done:        new(true),
 		RequestedBy: "tester",
-		Message:     "Focus on the regression first.",
 	})
 	require.NoError(t, err)
+	require.Equal(t, TaskStateDone, updated.State)
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
-	require.Equal(t, StateRunning, detail.State.State)
 	require.Len(t, detail.Messages, 1)
 	require.Equal(t, agent.MessageTypeUser, detail.Messages[0].Type)
-	require.Contains(t, detail.Messages[0].Content, "Focus on the regression first.")
+	require.Contains(t, detail.Messages[0].Content, "updated the checklist")
+	require.Contains(t, detail.Messages[0].Content, "[x] Investigate the failing test")
 	require.Len(t, detail.State.PendingTurnMessages, 1)
-	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[0].Kind)
-	require.NotContains(t, detail.State.PendingTurnMessages[0].Message, "Focus on the regression first.")
+	require.Equal(t, "task_list_updated", detail.State.PendingTurnMessages[0].Kind)
 	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "latest user message")
 }
 
-func TestServiceDuplicateCreatesFreshIdleAutomata(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
-		RequestedBy: "tester",
-		Instruction: "Handle the current assigned task.",
-	}))
-
-	err := svc.Duplicate(ctx, "software_dev", DuplicateRequest{NewName: "software_dev_copy"})
-	require.NoError(t, err)
-
-	detail, err := svc.Detail(ctx, "software_dev_copy")
-	require.NoError(t, err)
-	require.Equal(t, StateIdle, detail.State.State)
-	require.Empty(t, detail.State.Instruction)
-	require.Equal(t, "research", detail.State.CurrentStage)
-	require.Empty(t, detail.Messages)
-}
-
-func TestServiceRenamePreservesStoredSession(t *testing.T) {
+func TestServiceResetStatePreservesTasksAndInstruction(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	svc, fixedTime := newTestServiceWithSessionStore(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-	state.State = StateRunning
-	state.Instruction = "Handle the current assigned task."
-	state.InstructionUpdatedAt = fixedTime
-	state.InstructionUpdatedBy = "tester"
-	state.SessionID = "sess-rename"
-	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
-		ID:        state.SessionID,
-		UserID:    svc.systemUser(def.Name).UserID,
-		CreatedAt: fixedTime,
-		UpdatedAt: fixedTime,
-	}))
-	require.NoError(t, svc.sessionStore.AddMessage(ctx, state.SessionID, &agent.Message{
-		ID:         "msg-1",
-		SessionID:  state.SessionID,
-		Type:       agent.MessageTypeUser,
-		SequenceID: 1,
-		Content:    "Operator update from tester:\nFocus on the regression first.",
-		CreatedAt:  fixedTime,
-	}))
-	require.NoError(t, svc.saveState(ctx, def.Name, state))
+	task := createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 
-	err = svc.Rename(ctx, "software_dev", RenameRequest{NewName: "engineer_1"})
-	require.NoError(t, err)
-
-	_, err = svc.GetDefinition(ctx, "software_dev")
-	require.ErrorIs(t, err, exec.ErrDAGNotFound)
-
-	detail, err := svc.Detail(ctx, "engineer_1")
-	require.NoError(t, err)
-	require.Equal(t, "sess-rename", detail.State.SessionID)
-	require.Len(t, detail.Messages, 1)
-	require.Contains(t, detail.Messages[0].Content, "Focus on the regression first.")
-
-	sess, err := svc.sessionStore.GetSession(ctx, "sess-rename")
-	require.NoError(t, err)
-	require.Equal(t, svc.systemUser("engineer_1").UserID, sess.UserID)
-}
-
-func TestServiceResetStateClearsRuntimeAndSession(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, fixedTime := newTestServiceWithSessionStore(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 	def, err := svc.GetDefinition(ctx, "software_dev")
 	require.NoError(t, err)
 	state, err := svc.ensureState(ctx, def)
@@ -722,7 +491,7 @@ func TestServiceResetStateClearsRuntimeAndSession(t *testing.T) {
 	state.InstructionUpdatedAt = fixedTime
 	state.InstructionUpdatedBy = "tester"
 	state.SessionID = "sess-reset"
-	state.CurrentStage = "implement"
+	state.CurrentRunRef = new(exec.NewDAGRunRef("build-app", "run-1"))
 	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
 		ID:        state.SessionID,
 		UserID:    svc.systemUser(def.Name).UserID,
@@ -737,10 +506,11 @@ func TestServiceResetStateClearsRuntimeAndSession(t *testing.T) {
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
 	require.Equal(t, StateIdle, detail.State.State)
-	require.Empty(t, detail.State.Instruction)
+	require.Equal(t, "Handle the current assigned task.", detail.State.Instruction)
 	require.Empty(t, detail.State.SessionID)
-	require.Equal(t, "research", detail.State.CurrentStage)
-	require.Empty(t, detail.Messages)
+	require.Nil(t, detail.State.CurrentRunRef)
+	require.Len(t, detail.State.Tasks, 1)
+	require.Equal(t, task.ID, detail.State.Tasks[0].ID)
 
 	_, err = svc.sessionStore.GetSession(ctx, "sess-reset")
 	require.ErrorIs(t, err, agent.ErrSessionNotFound)
@@ -753,6 +523,7 @@ func TestServicePauseAndResumeTask(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle the current assigned task.",
@@ -766,7 +537,6 @@ func TestServicePauseAndResumeTask(t *testing.T) {
 	require.Equal(t, StatePaused, detail.State.State)
 	require.Equal(t, "tester", detail.State.PausedBy)
 	require.Equal(t, fixedTime, detail.State.PausedAt)
-	require.Len(t, detail.State.PendingTurnMessages, 1)
 
 	err = svc.Resume(ctx, "software_dev", "tester")
 	require.NoError(t, err)
@@ -776,71 +546,6 @@ func TestServicePauseAndResumeTask(t *testing.T) {
 	require.Equal(t, StateRunning, detail.State.State)
 	require.Empty(t, detail.State.PausedBy)
 	require.True(t, detail.State.PausedAt.IsZero())
-	require.Len(t, detail.State.PendingTurnMessages, 1)
-	require.Equal(t, "kickoff", detail.State.PendingTurnMessages[0].Kind)
-}
-
-func TestServicePausePreservesActiveChildRun(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, fixedTime := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
-		RequestedBy: "tester",
-		Instruction: "Handle the current assigned task.",
-	}))
-
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-	ref := exec.NewDAGRunRef("build-app", "run-1")
-	state.CurrentRunRef = &ref
-	require.NoError(t, svc.saveState(ctx, def.Name, state))
-
-	err = svc.Pause(ctx, "software_dev", "tester")
-	require.NoError(t, err)
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, StatePaused, detail.State.State)
-	require.Equal(t, "tester", detail.State.PausedBy)
-	require.Equal(t, fixedTime, detail.State.PausedAt)
-	require.NotNil(t, detail.State.CurrentRunRef)
-	require.Equal(t, "build-app", detail.State.CurrentRunRef.Name)
-	require.Equal(t, "run-1", detail.State.CurrentRunRef.ID)
-}
-
-func TestServiceResumePausedAutomataQueuesResumeMessage(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
-		RequestedBy: "tester",
-		Instruction: "Handle the current assigned task.",
-	}))
-
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-	state.PendingTurnMessages = nil
-	state.State = StatePaused
-	require.NoError(t, svc.saveState(ctx, def.Name, state))
-
-	err = svc.Resume(ctx, "software_dev", "tester")
-	require.NoError(t, err)
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, StateRunning, detail.State.State)
-	require.Len(t, detail.State.PendingTurnMessages, 1)
-	require.Equal(t, "resume", detail.State.PendingTurnMessages[0].Kind)
 }
 
 func TestServiceResumePausedPromptReturnsWaiting(t *testing.T) {
@@ -904,32 +609,6 @@ func TestServiceSubmitHumanResponseWhilePausedQueuesWithoutResuming(t *testing.T
 	require.Equal(t, "human_response", detail.State.PendingTurnMessages[0].Kind)
 }
 
-func TestServiceSubmitOperatorMessageWhilePausedKeepsPaused(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
-		RequestedBy: "tester",
-		Instruction: "Handle the current assigned task.",
-	}))
-	require.NoError(t, svc.Pause(ctx, "software_dev", "tester"))
-
-	err := svc.SubmitOperatorMessage(ctx, "software_dev", OperatorMessageRequest{
-		RequestedBy: "tester",
-		Message:     "Resume with the flaky test first.",
-	})
-	require.NoError(t, err)
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, StatePaused, detail.State.State)
-	require.Len(t, detail.State.PendingTurnMessages, 2)
-	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[1].Kind)
-}
-
 func TestServiceReconcileOnceDoesNotWakeIdleScheduledAutomata(t *testing.T) {
 	t.Parallel()
 
@@ -937,6 +616,7 @@ func TestServiceReconcileOnceDoesNotWakeIdleScheduledAutomata(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecWithSchedule("build-app", "* * * * *")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 
 	def, err := svc.GetDefinition(ctx, "software_dev")
 	require.NoError(t, err)
@@ -954,30 +634,6 @@ func TestServiceReconcileOnceDoesNotWakeIdleScheduledAutomata(t *testing.T) {
 	require.Equal(t, StateIdle, detail.State.State)
 	require.Equal(t, "Keep shipping queued work.", detail.State.Instruction)
 	require.Empty(t, detail.State.PendingTurnMessages)
-}
-
-func TestServiceReconcileOnceDoesNotWakePausedAutomata(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	svc, _ := newTestService(t)
-
-	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
-	def, err := svc.GetDefinition(ctx, "software_dev")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-	state.State = StatePaused
-	state.Instruction = "Handle the current assigned task."
-	queueTurnMessage(state, "resume", "resume now", time.Now())
-	require.NoError(t, svc.saveState(ctx, def.Name, state))
-
-	require.NoError(t, svc.ReconcileOnce(ctx))
-
-	detail, err := svc.Detail(ctx, "software_dev")
-	require.NoError(t, err)
-	require.Equal(t, StatePaused, detail.State.State)
-	require.Len(t, detail.State.PendingTurnMessages, 1)
 }
 
 func TestServiceReconcileOnceReturnsInactiveRunningAutomataToIdle(t *testing.T) {
@@ -1009,6 +665,8 @@ func TestServiceReconcileOnceReturnsInactiveRunningAutomataToIdle(t *testing.T) 
 	})
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
 	def, err := svc.GetDefinition(ctx, "software_dev")
 	require.NoError(t, err)
 	state, err := svc.ensureState(ctx, def)
@@ -1037,6 +695,31 @@ func TestServiceReconcileOnceReturnsInactiveRunningAutomataToIdle(t *testing.T) 
 	require.Equal(t, "Handle the current assigned task.", detail.State.Instruction)
 }
 
+func TestControllerRuntimeSetTaskDonePersists(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	task := createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	require.NoError(t, rt.SetTaskDone(ctx, task.ID, true))
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Len(t, detail.State.Tasks, 1)
+	require.Equal(t, TaskStateDone, detail.State.Tasks[0].State)
+	require.Equal(t, "agent", detail.State.Tasks[0].DoneBy)
+	require.Equal(t, fixedTime, detail.State.Tasks[0].DoneAt)
+}
+
 func TestControllerRuntimeRunAllowedDAGRejectsConcurrentRun(t *testing.T) {
 	t.Parallel()
 
@@ -1053,7 +736,6 @@ func TestControllerRuntimeRunAllowedDAGRejectsConcurrentRun(t *testing.T) {
 
 	rt := &controllerRuntime{service: svc, def: def, state: state}
 	_, err = rt.RunAllowedDAG(ctx, agent.AutomataRunDAGInput{DAGName: "build-app"})
-	require.Error(t, err)
 	require.ErrorContains(t, err, "already active")
 }
 
@@ -1073,7 +755,6 @@ func TestControllerRuntimeFinishRejectsActiveChildRun(t *testing.T) {
 
 	rt := &controllerRuntime{service: svc, def: def, state: state}
 	err = rt.Finish(ctx, "done")
-	require.Error(t, err)
 	require.ErrorContains(t, err, "while a child DAG run is active")
 }
 
@@ -1166,16 +847,32 @@ func newTestServiceWithSessionStore(t *testing.T) (*Service, time.Time) {
 	return svc, fixedTime
 }
 
+func createTask(t *testing.T, svc *Service, ctx context.Context, name, description, requestedBy string) *Task {
+	t.Helper()
+	task, err := svc.CreateTask(ctx, name, CreateTaskRequest{
+		Description: description,
+		RequestedBy: requestedBy,
+	})
+	require.NoError(t, err)
+	return task
+}
+
 func automataSpec(allowedDAG string) string {
 	return `description: Software development automata
 goal: Complete the assigned software work
-stages:
-  - research
-  - plan
-  - implement
 allowed_dags:
   names:
     - ` + allowedDAG + `
+`
+}
+
+func automataSpecMultiDAGs() string {
+	return `description: Software development automata
+goal: Complete the assigned software work
+allowed_dags:
+  names:
+    - build-app
+    - run-tests
 `
 }
 
@@ -1183,29 +880,9 @@ func automataSpecWithSchedule(allowedDAG, schedule string) string {
 	return `description: Software development automata
 goal: Complete the assigned software work
 schedule: "` + schedule + `"
-stages:
-  - research
-  - plan
-  - implement
 allowed_dags:
   names:
     - ` + allowedDAG + `
-`
-}
-
-func automataSpecPerStage() string {
-	return `description: Software development automata
-goal: Complete the assigned software work
-stages:
-  - name: research
-    allowed_dags:
-      names:
-        - build-app
-  - name: plan
-  - name: implement
-    allowed_dags:
-      names:
-        - run-tests
 `
 }
 
@@ -1226,4 +903,19 @@ steps:
   - name: echo
     command: echo hello
 `
+}
+
+//go:fix inline
+func ptr(value string) *string {
+	return new(value)
+}
+
+//go:fix inline
+func boolPtr(value bool) *bool {
+	return new(value)
+}
+
+//go:fix inline
+func ptrRunRef(ref exec.DAGRunRef) *exec.DAGRunRef {
+	return new(ref)
 }

@@ -11,15 +11,28 @@ import (
 )
 
 const (
-	listAllowedDAGsToolName = "list_allowed_dags"
-	runAllowedDAGToolName   = "run_allowed_dag"
-	retryAutomataRunTool    = "retry_automata_run"
-	setAutomataStageTool    = "set_automata_stage"
-	requestHumanInputTool   = "request_human_input"
-	finishAutomataTool      = "finish_automata"
+	listAutomataTasksToolName = "list_automata_tasks"
+	listAllowedDAGsToolName   = "list_allowed_dags"
+	runAllowedDAGToolName     = "run_allowed_dag"
+	retryAutomataRunTool      = "retry_automata_run"
+	setAutomataTaskDoneTool   = "set_automata_task_done"
+	requestHumanInputTool     = "request_human_input"
+	finishAutomataTool        = "finish_automata"
 )
 
 func init() {
+	RegisterTool(ToolRegistration{
+		Name:           listAutomataTasksToolName,
+		Label:          "List Automata Tasks",
+		Description:    "List the checklist tasks for this Automata",
+		DefaultEnabled: true,
+		Factory: func(cfg ToolConfig) *AgentTool {
+			if cfg.AutomataRuntime == nil {
+				return nil
+			}
+			return newListAutomataTasksTool(cfg.AutomataRuntime)
+		},
+	})
 	RegisterTool(ToolRegistration{
 		Name:           listAllowedDAGsToolName,
 		Label:          "List Allowed DAGs",
@@ -57,15 +70,15 @@ func init() {
 		},
 	})
 	RegisterTool(ToolRegistration{
-		Name:           setAutomataStageTool,
-		Label:          "Set Automata Stage",
-		Description:    "Update the current stage for this Automata",
+		Name:           setAutomataTaskDoneTool,
+		Label:          "Set Automata Task Done",
+		Description:    "Check or uncheck an existing Automata checklist task",
 		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
 			if cfg.AutomataRuntime == nil {
 				return nil
 			}
-			return newSetAutomataStageTool(cfg.AutomataRuntime)
+			return newSetAutomataTaskDoneTool(cfg.AutomataRuntime)
 		},
 	})
 	RegisterTool(ToolRegistration{
@@ -92,6 +105,33 @@ func init() {
 			return newFinishAutomataTool(cfg.AutomataRuntime)
 		},
 	})
+}
+
+func newListAutomataTasksTool(runtime AutomataRuntime) *AgentTool {
+	return &AgentTool{
+		Tool: llm.Tool{
+			Type: "function",
+			Function: llm.ToolFunction{
+				Name:        listAutomataTasksToolName,
+				Description: "Return the ordered checklist tasks for this Automata.",
+				Parameters: map[string]any{
+					"type":       "object",
+					"properties": map[string]any{},
+				},
+			},
+		},
+		Run: func(ctx ToolContext, _ json.RawMessage) ToolOut {
+			items, err := runtime.ListTasks(ctx.Context)
+			if err != nil {
+				return toolError("failed to list automata tasks: %v", err)
+			}
+			body, err := json.MarshalIndent(items, "", "  ")
+			if err != nil {
+				return toolError("failed to format automata tasks: %v", err)
+			}
+			return ToolOut{Content: string(body)}
+		},
+	}
 }
 
 func newListAllowedDAGsTool(runtime AutomataRuntime) *AgentTool {
@@ -195,43 +235,46 @@ func newRetryAutomataRunTool(runtime AutomataRuntime) *AgentTool {
 	}
 }
 
-type setAutomataStageInput struct {
-	Stage string `json:"stage"`
-	Note  string `json:"note,omitempty"`
+type setAutomataTaskDoneInput struct {
+	TaskID string `json:"task_id"`
+	Done   bool   `json:"done"`
 }
 
-func newSetAutomataStageTool(runtime AutomataRuntime) *AgentTool {
+func newSetAutomataTaskDoneTool(runtime AutomataRuntime) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
 			Function: llm.ToolFunction{
-				Name:        setAutomataStageTool,
-				Description: "Update the Automata's current stage. The stage must be one of the declared stage names for this Automata.",
+				Name:        setAutomataTaskDoneTool,
+				Description: "Check or uncheck one existing checklist task for this Automata.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"stage": map[string]any{
+						"task_id": map[string]any{
 							"type":        "string",
-							"description": "New stage name.",
+							"description": "ID of the task to update.",
 						},
-						"note": map[string]any{
-							"type":        "string",
-							"description": "Optional short reason for the stage transition.",
+						"done": map[string]any{
+							"type":        "boolean",
+							"description": "True to mark the task done, false to mark it open again.",
 						},
 					},
-					"required": []string{"stage"},
+					"required": []string{"task_id", "done"},
 				},
 			},
 		},
 		Run: func(ctx ToolContext, input json.RawMessage) ToolOut {
-			var args setAutomataStageInput
+			var args setAutomataTaskDoneInput
 			if err := json.Unmarshal(input, &args); err != nil {
 				return toolError("invalid input: %v", err)
 			}
-			if err := runtime.SetStage(ctx.Context, args.Stage, args.Note); err != nil {
-				return toolError("failed to set stage %q: %v", args.Stage, err)
+			if err := runtime.SetTaskDone(ctx.Context, args.TaskID, args.Done); err != nil {
+				return toolError("failed to update task %q: %v", args.TaskID, err)
 			}
-			return ToolOut{Content: fmt.Sprintf("Automata stage set to %q.", args.Stage)}
+			if args.Done {
+				return ToolOut{Content: fmt.Sprintf("Task %q marked done.", args.TaskID)}
+			}
+			return ToolOut{Content: fmt.Sprintf("Task %q marked open.", args.TaskID)}
 		},
 	}
 }

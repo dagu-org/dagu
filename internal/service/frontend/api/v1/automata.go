@@ -203,7 +203,7 @@ func (a *API) ResumeAutomata(ctx context.Context, request api.ResumeAutomataRequ
 	return api.ResumeAutomata204Response{}, nil
 }
 
-func (a *API) OverrideAutomataStage(ctx context.Context, request api.OverrideAutomataStageRequestObject) (api.OverrideAutomataStageResponseObject, error) {
+func (a *API) CreateAutomataTask(ctx context.Context, request api.CreateAutomataTaskRequestObject) (api.CreateAutomataTaskResponseObject, error) {
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
@@ -214,19 +214,85 @@ func (a *API) OverrideAutomataStage(ctx context.Context, request api.OverrideAut
 		return nil, ErrInvalidRequestBody
 	}
 	name := string(request.Name)
-	body := automata.StageOverrideRequest{
-		Stage:       request.Body.Stage,
+	task, err := a.automataService.CreateTask(ctx, name, automata.CreateTaskRequest{
+		Description: request.Body.Description,
 		RequestedBy: a.currentUsername(ctx),
-		Note:        valueOf(request.Body.Note),
-	}
-	if err := a.automataService.OverrideStage(ctx, name, body); err != nil {
+	})
+	if err != nil {
 		return nil, toAutomataAPIError(err)
 	}
-	a.logAudit(ctx, audit.CategoryAutomata, "stage_override", map[string]any{
-		"name":  name,
-		"stage": body.Stage,
+	a.logAudit(ctx, audit.CategoryAutomata, "task_create", map[string]any{
+		"name": name,
+		"id":   task.ID,
 	})
-	return api.OverrideAutomataStage204Response{}, nil
+	return api.CreateAutomataTask200JSONResponse(toAPIAutomataTask(task)), nil
+}
+
+func (a *API) UpdateAutomataTask(ctx context.Context, request api.UpdateAutomataTaskRequestObject) (api.UpdateAutomataTaskResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	task, err := a.automataService.UpdateTask(ctx, name, request.TaskId, automata.UpdateTaskRequest{
+		Description: request.Body.Description,
+		Done:        request.Body.Done,
+		RequestedBy: a.currentUsername(ctx),
+	})
+	if err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "task_update", map[string]any{
+		"name": name,
+		"id":   request.TaskId,
+	})
+	return api.UpdateAutomataTask200JSONResponse(toAPIAutomataTask(task)), nil
+}
+
+func (a *API) DeleteAutomataTask(ctx context.Context, request api.DeleteAutomataTaskRequestObject) (api.DeleteAutomataTaskResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	name := string(request.Name)
+	if err := a.automataService.DeleteTask(ctx, name, request.TaskId, a.currentUsername(ctx)); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "task_delete", map[string]any{
+		"name": name,
+		"id":   request.TaskId,
+	})
+	return api.DeleteAutomataTask204Response{}, nil
+}
+
+func (a *API) ReorderAutomataTasks(ctx context.Context, request api.ReorderAutomataTasksRequestObject) (api.ReorderAutomataTasksResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	if err := a.automataService.ReorderTasks(ctx, name, automata.ReorderTasksRequest{
+		TaskIDs:     append([]string(nil), request.Body.TaskIds...),
+		RequestedBy: a.currentUsername(ctx),
+	}); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, "task_reorder", map[string]any{
+		"name": name,
+	})
+	return api.ReorderAutomataTasks204Response{}, nil
 }
 
 func (a *API) MessageAutomata(ctx context.Context, request api.MessageAutomataRequestObject) (api.MessageAutomataResponseObject, error) {
@@ -322,15 +388,17 @@ func toAutomataAPIError(err error) error {
 
 func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 	return api.AutomataSummary{
-		CurrentRun:    toAPIAutomataRunSummary(item.CurrentRun),
-		Description:   ptrOf(item.Description),
-		Disabled:      ptrOf(item.Disabled),
-		Goal:          item.Goal,
-		Instruction:   ptrOf(item.Instruction),
-		LastUpdatedAt: ptrOf(item.LastUpdatedAt),
-		Name:          item.Name,
-		Stage:         ptrOf(item.Stage),
-		State:         api.AutomataLifecycleState(item.State),
+		CurrentRun:          toAPIAutomataRunSummary(item.CurrentRun),
+		Description:         ptrOf(item.Description),
+		Disabled:            ptrOf(item.Disabled),
+		DoneTaskCount:       ptrOf(item.DoneTaskCount),
+		Goal:                item.Goal,
+		Instruction:         ptrOf(item.Instruction),
+		LastUpdatedAt:       ptrOf(item.LastUpdatedAt),
+		Name:                item.Name,
+		NextTaskDescription: ptrOf(item.NextTaskDescription),
+		OpenTaskCount:       ptrOf(item.OpenTaskCount),
+		State:               api.AutomataLifecycleState(item.State),
 		Tags: func() *[]string {
 			if len(item.Tags) == 0 {
 				return nil
@@ -379,7 +447,7 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 		Disabled:    ptrOf(def.Disabled),
 		Goal:        def.Goal,
 		Name:        def.Name,
-		Stages:      toAPIAutomataStages(def.Stages),
+		AllowedDAGs: toAPIAutomataAllowedDAGs(def.AllowedDAGs),
 		Tags: func() *[]string {
 			if len(def.Tags) == 0 {
 				return nil
@@ -397,7 +465,7 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 func toAPIAutomataAgentConfig(cfg automata.AgentConfig) *api.AutomataAgentConfig {
 	resp := &api.AutomataAgentConfig{
 		Model:    ptrOf(cfg.Model),
-		SafeMode: refOf(cfg.SafeMode),
+		SafeMode: new(cfg.SafeMode),
 		Soul:     ptrOf(cfg.Soul),
 	}
 	if len(cfg.EnabledSkills) > 0 {
@@ -406,20 +474,6 @@ func toAPIAutomataAgentConfig(cfg automata.AgentConfig) *api.AutomataAgentConfig
 	}
 	if resp.Model == nil && resp.SafeMode == nil && resp.Soul == nil && resp.EnabledSkills == nil {
 		return nil
-	}
-	return resp
-}
-
-func toAPIAutomataStages(stages []automata.StageDefinition) []api.AutomataStageDefinition {
-	if len(stages) == 0 {
-		return []api.AutomataStageDefinition{}
-	}
-	resp := make([]api.AutomataStageDefinition, 0, len(stages))
-	for _, stage := range stages {
-		resp = append(resp, api.AutomataStageDefinition{
-			AllowedDAGs: toAPIAutomataAllowedDAGs(stage.AllowedDAGs),
-			Name:        stage.Name,
-		})
 	}
 	return resp
 }
@@ -466,7 +520,6 @@ func toAPIAutomataState(state *automata.State) api.AutomataState {
 	resp := api.AutomataState{
 		CurrentCycleId:       ptrOf(state.CurrentCycleID),
 		CurrentRunRef:        toAPIAutomataRunRef(state.CurrentRunRef),
-		CurrentStage:         ptrOf(state.CurrentStage),
 		FinishedAt:           ptrOf(state.FinishedAt),
 		Instruction:          ptrOf(state.Instruction),
 		InstructionUpdatedAt: ptrOf(state.InstructionUpdatedAt),
@@ -481,16 +534,14 @@ func toAPIAutomataState(state *automata.State) api.AutomataState {
 		PausedBy:             ptrOf(state.PausedBy),
 		PendingPrompt:        toAPIAutomataPrompt(state.PendingPrompt),
 		PendingResponse:      toAPIAutomataPromptResponse(state.PendingResponse),
-		PendingStageTransition: toAPIAutomataPendingStageTransition(
-			state.PendingStageTransition,
-		),
-		SessionId:        ptrOf(state.SessionID),
-		StageChangedAt:   ptrOf(state.StageChangedAt),
-		StageChangedBy:   ptrOf(state.StageChangedBy),
-		StageNote:        ptrOf(state.StageNote),
-		StartRequestedAt: ptrOf(state.StartRequestedAt),
-		State:            api.AutomataLifecycleState(state.State),
-		WaitingReason:    toAPIAutomataWaitingReason(state.WaitingReason),
+		SessionId:            ptrOf(state.SessionID),
+		StartRequestedAt:     ptrOf(state.StartRequestedAt),
+		State:                api.AutomataLifecycleState(state.State),
+		WaitingReason:        toAPIAutomataWaitingReason(state.WaitingReason),
+	}
+	if len(state.Tasks) > 0 {
+		tasks := toAPIAutomataTasks(state.Tasks)
+		resp.Tasks = &tasks
 	}
 	if len(state.PendingTurnMessages) > 0 {
 		messages := toAPIAutomataPendingTurnMessages(state.PendingTurnMessages)
@@ -512,7 +563,7 @@ func toAPIAutomataPrompt(prompt *automata.Prompt) *api.AutomataPrompt {
 		return nil
 	}
 	resp := &api.AutomataPrompt{
-		AllowFreeText:       refOf(prompt.AllowFreeText),
+		AllowFreeText:       new(prompt.AllowFreeText),
 		CreatedAt:           prompt.CreatedAt,
 		FreeTextPlaceholder: ptrOf(prompt.FreeTextPlaceholder),
 		Id:                  prompt.ID,
@@ -541,20 +592,6 @@ func toAPIAutomataPromptResponse(response *automata.PromptResponse) *api.Automat
 	return resp
 }
 
-func toAPIAutomataPendingStageTransition(
-	transition *automata.PendingStageTransition,
-) *api.AutomataPendingStageTransition {
-	if transition == nil {
-		return nil
-	}
-	return &api.AutomataPendingStageTransition{
-		CreatedAt:      transition.CreatedAt,
-		Note:           ptrOf(transition.Note),
-		RequestedBy:    ptrOf(transition.RequestedBy),
-		RequestedStage: transition.RequestedStage,
-	}
-}
-
 func toAPIAutomataPendingTurnMessages(
 	messages []automata.PendingTurnMessage,
 ) []api.AutomataPendingTurnMessage {
@@ -566,6 +603,32 @@ func toAPIAutomataPendingTurnMessages(
 			Kind:      message.Kind,
 			Message:   message.Message,
 		})
+	}
+	return resp
+}
+
+func toAPIAutomataTask(task *automata.Task) api.AutomataTask {
+	if task == nil {
+		return api.AutomataTask{}
+	}
+	return api.AutomataTask{
+		CreatedAt:   ptrOf(task.CreatedAt),
+		CreatedBy:   ptrOf(task.CreatedBy),
+		Description: task.Description,
+		DoneAt:      ptrOf(task.DoneAt),
+		DoneBy:      ptrOf(task.DoneBy),
+		Id:          task.ID,
+		State:       api.AutomataTaskState(task.State),
+		UpdatedAt:   ptrOf(task.UpdatedAt),
+		UpdatedBy:   ptrOf(task.UpdatedBy),
+	}
+}
+
+func toAPIAutomataTasks(tasks []automata.Task) []api.AutomataTask {
+	resp := make([]api.AutomataTask, 0, len(tasks))
+	for i := range tasks {
+		task := tasks[i]
+		resp = append(resp, toAPIAutomataTask(&task))
 	}
 	return resp
 }
@@ -644,7 +707,7 @@ func toAPIAgentMessage(message agent.Message) api.AgentMessage {
 		for _, result := range message.ToolResults {
 			toolResults = append(toolResults, api.AgentToolResult{
 				Content:    result.Content,
-				IsError:    refOf(result.IsError),
+				IsError:    new(result.IsError),
 				ToolCallId: result.ToolCallID,
 			})
 		}
@@ -652,9 +715,9 @@ func toAPIAgentMessage(message agent.Message) api.AgentMessage {
 	}
 	if message.Usage != nil {
 		resp.Usage = &api.AgentTokenUsage{
-			CompletionTokens: refOf(message.Usage.CompletionTokens),
-			PromptTokens:     refOf(message.Usage.PromptTokens),
-			TotalTokens:      refOf(message.Usage.TotalTokens),
+			CompletionTokens: new(message.Usage.CompletionTokens),
+			PromptTokens:     new(message.Usage.PromptTokens),
+			TotalTokens:      new(message.Usage.TotalTokens),
 		}
 	}
 	if message.UIAction != nil {
@@ -705,6 +768,7 @@ func toAPIAgentUserPromptOptions(options []agent.UserPromptOption) []api.AgentUs
 	return resp
 }
 
+//go:fix inline
 func refOf[T any](v T) *T {
-	return &v
+	return new(v)
 }

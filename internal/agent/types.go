@@ -314,6 +314,13 @@ type AutomataAllowedDAG struct {
 	Tags        []string `json:"tags,omitempty"`
 }
 
+// AutomataTask describes a single checklist item in an Automata runtime.
+type AutomataTask struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	State       string `json:"state"`
+}
+
 // AutomataRunDAGInput contains the arguments for launching an allowed DAG.
 type AutomataRunDAGInput struct {
 	DAGName string `json:"dag_name"`
@@ -336,10 +343,11 @@ type AutomataHumanPrompt struct {
 
 // AutomataRuntime exposes scheduler-owned workflow controls to restricted Automata sessions.
 type AutomataRuntime interface {
+	ListTasks(ctx context.Context) ([]AutomataTask, error)
 	ListAllowedDAGs(ctx context.Context) ([]AutomataAllowedDAG, error)
 	RunAllowedDAG(ctx context.Context, input AutomataRunDAGInput) (AutomataRunDAGResult, error)
 	RetryCurrentRun(ctx context.Context) (AutomataRunDAGResult, error)
-	SetStage(ctx context.Context, stage, note string) error
+	SetTaskDone(ctx context.Context, taskID string, done bool) error
 	RequestHumanInput(ctx context.Context, prompt AutomataHumanPrompt) error
 	Finish(ctx context.Context, summary string) error
 }

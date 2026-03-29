@@ -127,7 +127,9 @@ function formatTimestamp(value?: string): string {
   return parsed.fromNow();
 }
 
-function workspaceSelectionToTag(selectedWorkspace: string): string | undefined {
+function workspaceSelectionToTag(
+  selectedWorkspace: string
+): string | undefined {
   const safeName = selectedWorkspace
     .replace(/[^a-zA-Z0-9_-]/g, '')
     .trim()
@@ -180,7 +182,9 @@ function sortAutomata(
       return aActivity ? -1 : 1;
     }
     if (aActivity?.latestRun && bActivity?.latestRun) {
-      return runSortTime(bActivity.latestRun) - runSortTime(aActivity.latestRun);
+      return (
+        runSortTime(bActivity.latestRun) - runSortTime(aActivity.latestRun)
+      );
     }
     return a.name.localeCompare(b.name);
   });
@@ -193,17 +197,23 @@ export function AutomataCockpit({
 }): React.ReactElement {
   const appBar = React.useContext(AppBarContext);
   const remoteNode = appBar.selectedRemoteNode || 'local';
-  const [selectedAutomataName, setSelectedAutomataName] = React.useState<string | null>(null);
+  const [selectedAutomataName, setSelectedAutomataName] = React.useState<
+    string | null
+  >(null);
 
   const {
     data: automataData,
     error: automataError,
     mutate: retryAutomata,
-  } = useQuery('/automata', {}, {
-    refreshInterval: 5000,
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-  });
+  } = useQuery(
+    '/automata',
+    {},
+    {
+      refreshInterval: 5000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+    }
+  );
 
   const workspaceTag = selectedWorkspace
     ? workspaceSelectionToTag(selectedWorkspace)
@@ -291,14 +301,20 @@ export function AutomataCockpit({
     return (
       <div className="flex flex-1 min-h-0 items-center justify-center">
         <div className="rounded-lg border bg-card p-6 text-center">
-          <div className="text-base font-semibold">Failed to load Automata cockpit</div>
+          <div className="text-base font-semibold">
+            Failed to load Automata cockpit
+          </div>
           <div className="mt-2 text-sm text-muted-foreground">{message}</div>
           <div className="mt-4 flex justify-center gap-2">
             <Button size="sm" onClick={() => void retryAutomata()}>
               Retry Automata
             </Button>
             {selectedWorkspace ? (
-              <Button size="sm" variant="outline" onClick={() => void retryWorkspaceRuns()}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void retryWorkspaceRuns()}
+              >
                 Retry Workspace Activity
               </Button>
             ) : null}
@@ -330,7 +346,8 @@ export function AutomataCockpit({
           <span className="mx-1 font-mono text-foreground">
             {workspaceTag || 'workspace=<invalid>'}
           </span>
-          . Workspace activity is derived from Automata-triggered DAG runs carrying the same tag on
+          . Workspace activity is derived from Automata-triggered DAG runs
+          carrying the same tag on
           <span className="mx-1 font-mono text-foreground">{remoteNode}</span>.
           {workspaceAutomataCount > 0 ? (
             <span className="ml-1">
@@ -340,7 +357,8 @@ export function AutomataCockpit({
         </div>
       ) : (
         <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          Select a workspace to overlay workspace-tagged Automata activity on top of the lifecycle board.
+          Select a workspace to overlay workspace-tagged Automata activity on
+          top of the lifecycle board.
         </div>
       )}
 
@@ -359,10 +377,15 @@ export function AutomataCockpit({
           {STATE_ORDER.map((state) => {
             const items = stateBuckets[state];
             return (
-              <section key={state} className="min-w-0 rounded-lg border bg-card p-3">
+              <section
+                key={state}
+                className="min-w-0 rounded-lg border bg-card p-3"
+              >
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="text-muted-foreground">{STATE_META[state].icon}</span>
+                    <span className="text-muted-foreground">
+                      {STATE_META[state].icon}
+                    </span>
                     <span>{STATE_META[state].label}</span>
                   </div>
                   <span
@@ -391,7 +414,9 @@ export function AutomataCockpit({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="truncate font-medium">{item.name}</div>
+                              <div className="truncate font-medium">
+                                {item.name}
+                              </div>
                               <div className="mt-1 text-xs text-muted-foreground break-words">
                                 {item.instruction || item.goal}
                               </div>
@@ -407,11 +432,11 @@ export function AutomataCockpit({
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                            {item.stage ? (
-                              <span className="rounded-full border px-2 py-1 text-muted-foreground">
-                                Stage: {item.stage}
-                              </span>
-                            ) : null}
+                            <span className="rounded-full border px-2 py-1 text-muted-foreground">
+                              Tasks: {item.doneTaskCount || 0}/
+                              {(item.doneTaskCount || 0) +
+                                (item.openTaskCount || 0)}
+                            </span>
                             {item.disabled ? (
                               <span className="rounded-full border px-2 py-1 text-muted-foreground">
                                 disabled
@@ -442,12 +467,20 @@ export function AutomataCockpit({
                                   {item.currentRun.name}
                                 </span>
                                 <StatusChip
-                                  status={dagRunStatusToStatus(item.currentRun.status)}
+                                  status={dagRunStatusToStatus(
+                                    item.currentRun.status
+                                  )}
                                   size="xs"
                                 >
                                   {item.currentRun.status}
                                 </StatusChip>
                               </div>
+                            </div>
+                          ) : null}
+
+                          {item.nextTaskDescription ? (
+                            <div className="mt-3 text-xs text-muted-foreground">
+                              Next task: {item.nextTaskDescription}
                             </div>
                           ) : null}
 
@@ -457,9 +490,13 @@ export function AutomataCockpit({
                                 Latest workspace run
                               </div>
                               <div className="mt-1 flex items-center justify-between gap-2">
-                                <span className="truncate text-sm">{activity.latestRun.name}</span>
+                                <span className="truncate text-sm">
+                                  {activity.latestRun.name}
+                                </span>
                                 <StatusChip
-                                  status={dagRunStatusToStatus(activity.latestRun.statusLabel)}
+                                  status={dagRunStatusToStatus(
+                                    activity.latestRun.statusLabel
+                                  )}
                                   size="xs"
                                 >
                                   {activity.latestRun.statusLabel}

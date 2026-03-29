@@ -24,6 +24,10 @@ func (r *testRemoteNodeResolver) ListTokenAuthNodes(_ context.Context) ([]Remote
 
 type testAutomataRuntime struct{}
 
+func (r *testAutomataRuntime) ListTasks(_ context.Context) ([]AutomataTask, error) {
+	return []AutomataTask{{ID: "task-1", Description: "Investigate failure", State: "open"}}, nil
+}
+
 func (r *testAutomataRuntime) ListAllowedDAGs(_ context.Context) ([]AutomataAllowedDAG, error) {
 	return []AutomataAllowedDAG{{Name: "example"}}, nil
 }
@@ -36,7 +40,7 @@ func (r *testAutomataRuntime) RetryCurrentRun(_ context.Context) (AutomataRunDAG
 	return AutomataRunDAGResult{DAGName: "example", DAGRunID: "run-2"}, nil
 }
 
-func (r *testAutomataRuntime) SetStage(_ context.Context, _, _ string) error {
+func (r *testAutomataRuntime) SetTaskDone(_ context.Context, _ string, _ bool) error {
 	return nil
 }
 
@@ -56,8 +60,9 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 		"navigate", "ask_user",
 		"delegate", "use_skill", "search_skills",
 		"remote_agent", "list_remote_nodes",
+		"list_automata_tasks",
 		"list_allowed_dags", "run_allowed_dag", "retry_automata_run",
-		"set_automata_stage", "request_human_input", "finish_automata",
+		"set_automata_task_done", "request_human_input", "finish_automata",
 	}
 
 	regs := RegisteredTools()

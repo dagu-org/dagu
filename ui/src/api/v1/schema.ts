@@ -2250,7 +2250,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/stage": {
+    "/automata/{name}/tasks": {
         parameters: {
             query?: never;
             header?: never;
@@ -2260,14 +2260,58 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Override automata stage
-         * @description Immediately overrides the current stage for an Automata.
+         * Create automata task
+         * @description Creates a new checklist task for an Automata.
          */
-        post: operations["overrideAutomataStage"];
+        post: operations["createAutomataTask"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/automata/{name}/tasks/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reorder automata tasks
+         * @description Reorders the checklist tasks for an Automata.
+         */
+        post: operations["reorderAutomataTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automata/{name}/tasks/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete automata task
+         * @description Deletes a checklist task from an Automata.
+         */
+        delete: operations["deleteAutomataTask"];
+        options?: never;
+        head?: never;
+        /**
+         * Update automata task
+         * @description Updates a checklist task for an Automata.
+         */
+        patch: operations["updateAutomataTask"];
         trace?: never;
     };
     "/automata/{name}/response": {
@@ -2281,7 +2325,7 @@ export interface paths {
         put?: never;
         /**
          * Respond to automata prompt
-         * @description Submits a human response for an Automata prompt or stage approval.
+         * @description Submits a human response for an Automata prompt.
          */
         post: operations["respondAutomata"];
         delete?: never;
@@ -3001,10 +3045,13 @@ export interface components {
             filePath?: string;
             dag: components["schemas"]["DAG"];
             latestDAGRun: components["schemas"]["DAGRunSummary"];
+            /**
+             * Format: date-time
+             * @description Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed.
+             */
+            nextRun?: string;
             /** @description Whether the DAG is suspended */
             suspended: boolean;
-            /** @description Next planned run time computed by the scheduler */
-            nextRun?: string;
             /** @description List of errors encountered during the request */
             errors: string[];
         };
@@ -3035,17 +3082,19 @@ export interface components {
         };
         /** @description Schedule configuration for DAG-run creation */
         Schedule: {
-            /** @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility. */
+            /**
+             * @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility.
+             * @enum {string}
+             */
             kind?: ScheduleKind;
             /** @description Cron expression for recurring schedules */
             expression?: string;
-            /** @description RFC 3339 timestamp with explicit offset for one-off schedules */
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp with explicit offset for one-off schedules
+             */
             at?: string;
         };
-        /**
-         * @enum {string}
-         */
-        ScheduleKind: ScheduleKind;
         /**
          * @description Numeric status code indicating current DAG-run state:
          *     0: "Not started"
@@ -4546,10 +4595,25 @@ export interface components {
             names?: string[];
             tags?: string[];
         };
-        /** @description A user-defined Automata stage */
-        AutomataStageDefinition: {
-            name: string;
-            allowedDAGs?: components["schemas"]["AutomataAllowedDAGs"];
+        /**
+         * @description Checklist task state
+         * @enum {string}
+         */
+        AutomataTaskState: AutomataTaskState;
+        /** @description Runtime checklist task for an Automata */
+        AutomataTask: {
+            id: string;
+            description: string;
+            state: components["schemas"]["AutomataTaskState"];
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
+            /** Format: date-time */
+            doneAt?: string;
+            doneBy?: string;
         };
         /** @description Agent runtime configuration for an Automata definition */
         AutomataAgentConfig: {
@@ -4564,7 +4628,7 @@ export interface components {
             description?: string;
             goal: string;
             tags?: string[];
-            stages: components["schemas"]["AutomataStageDefinition"][];
+            allowedDAGs?: components["schemas"]["AutomataAllowedDAGs"];
             agent?: components["schemas"]["AutomataAgentConfig"];
             disabled?: boolean;
         };
@@ -4585,14 +4649,6 @@ export interface components {
             freeTextResponse?: string;
             /** Format: date-time */
             respondedAt: string;
-        };
-        /** @description Pending agent-requested stage transition awaiting approval */
-        AutomataPendingStageTransition: {
-            requestedStage: string;
-            note?: string;
-            requestedBy?: string;
-            /** Format: date-time */
-            createdAt: string;
         };
         /** @description Queued message to be delivered on the next Automata turn */
         AutomataPendingTurnMessage: {
@@ -4619,7 +4675,7 @@ export interface components {
             createdAt?: string;
             error?: string;
         };
-        /** @description Resolved DAG allowed in the current Automata stage */
+        /** @description Resolved DAG allowed in the current Automata */
         AutomataAllowedDAGInfo: {
             name: string;
             description?: string;
@@ -4632,11 +4688,7 @@ export interface components {
             /** Format: date-time */
             instructionUpdatedAt?: string;
             instructionUpdatedBy?: string;
-            currentStage?: string;
-            /** Format: date-time */
-            stageChangedAt?: string;
-            stageChangedBy?: string;
-            stageNote?: string;
+            tasks?: components["schemas"]["AutomataTask"][];
             sessionId?: string;
             currentRunRef?: components["schemas"]["AutomataRunRef"];
             lastRunRef?: components["schemas"]["AutomataRunRef"];
@@ -4644,7 +4696,6 @@ export interface components {
             waitingReason?: components["schemas"]["AutomataWaitingReason"];
             pendingPrompt?: components["schemas"]["AutomataPrompt"];
             pendingResponse?: components["schemas"]["AutomataPromptResponse"];
-            pendingStageTransition?: components["schemas"]["AutomataPendingStageTransition"];
             pendingTurnMessages?: components["schemas"]["AutomataPendingTurnMessage"][];
             /** Format: date-time */
             startRequestedAt?: string;
@@ -4670,9 +4721,11 @@ export interface components {
             tags?: string[];
             instruction?: string;
             state: components["schemas"]["AutomataLifecycleState"];
-            stage?: string;
             disabled?: boolean;
             currentRun?: components["schemas"]["AutomataRunSummary"];
+            openTaskCount?: number;
+            doneTaskCount?: number;
+            nextTaskDescription?: string;
             /** Format: date-time */
             lastUpdatedAt?: string;
         };
@@ -4701,10 +4754,18 @@ export interface components {
         AutomataStartRequest: {
             instruction?: string;
         };
-        /** @description Request body for an immediate operator stage override */
-        AutomataStageOverrideRequest: {
-            stage: string;
-            note?: string;
+        /** @description Request body for creating an Automata checklist task */
+        AutomataTaskCreateRequest: {
+            description: string;
+        };
+        /** @description Request body for updating an Automata checklist task */
+        AutomataTaskUpdateRequest: {
+            description?: string;
+            done?: boolean;
+        };
+        /** @description Request body for reordering Automata checklist tasks */
+        AutomataTaskReorderRequest: {
+            taskIds: string[];
         };
         /** @description Request body for an operator message */
         AutomataOperatorMessageRequest: {
@@ -12013,7 +12074,7 @@ export interface operations {
             };
         };
     };
-    overrideAutomataStage: {
+    createAutomataTask: {
         parameters: {
             query?: never;
             header?: never;
@@ -12025,16 +12086,201 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutomataStageOverrideRequest"];
+                "application/json": components["schemas"]["AutomataTaskCreateRequest"];
             };
         };
         responses: {
-            /** @description Automata stage updated */
+            /** @description Automata task created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomataTask"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reorderAutomataTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Automata name */
+                name: components["parameters"]["AutomataName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomataTaskReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Automata tasks reordered */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAutomataTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Automata name */
+                name: components["parameters"]["AutomataName"];
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Automata task deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAutomataTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Automata name */
+                name: components["parameters"]["AutomataName"];
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomataTaskUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Automata task updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomataTask"];
+                };
             };
             /** @description Invalid request */
             400: {
@@ -13881,6 +14127,10 @@ export enum AutomataLifecycleState {
 export enum AutomataWaitingReason {
     human_input = "human_input",
     dag_wait = "dag_wait"
+}
+export enum AutomataTaskState {
+    open = "open",
+    done = "done"
 }
 export enum CreateRemoteNodeRequestAuthType {
     none = "none",

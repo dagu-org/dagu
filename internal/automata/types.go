@@ -39,11 +39,6 @@ type AllowedDAGs struct {
 	Tags  []string `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
-type StageDefinition struct {
-	Name        string      `json:"name" yaml:"name"`
-	AllowedDAGs AllowedDAGs `json:"allowedDAGs,omitempty" yaml:"allowed_dags,omitempty"`
-}
-
 type AgentConfig struct {
 	Model         string   `json:"model,omitempty" yaml:"model,omitempty"`
 	Soul          string   `json:"soul,omitempty" yaml:"soul,omitempty"`
@@ -99,18 +94,15 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type Definition struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Purpose     string            `json:"purpose,omitempty" yaml:"purpose,omitempty"`
-	Goal        string            `json:"goal" yaml:"goal"`
-	Tags        []string          `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Stages      []StageDefinition `json:"stages" yaml:"stages"`
-	Schedule    ScheduleList      `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	AllowedDAGs AllowedDAGs       `json:"allowedDAGs" yaml:"allowed_dags"`
-	Agent       AgentConfig       `json:"agent,omitempty" yaml:"agent,omitempty"`
-	Disabled    bool              `json:"disabled,omitempty" yaml:"disabled,omitempty"`
-
-	legacyStringStages bool `json:"-" yaml:"-"`
+	Name        string       `json:"name"`
+	Description string       `json:"description,omitempty" yaml:"description,omitempty"`
+	Purpose     string       `json:"purpose,omitempty" yaml:"purpose,omitempty"`
+	Goal        string       `json:"goal" yaml:"goal"`
+	Tags        []string     `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Schedule    ScheduleList `json:"schedule,omitempty" yaml:"schedule,omitempty"`
+	AllowedDAGs AllowedDAGs  `json:"allowedDAGs" yaml:"allowed_dags"`
+	Agent       AgentConfig  `json:"agent" yaml:"agent,omitempty"`
+	Disabled    bool         `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 }
 
 type Prompt struct {
@@ -136,40 +128,48 @@ type PendingTurnMessage struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
-type PendingStageTransition struct {
-	RequestedStage string    `json:"requestedStage"`
-	Note           string    `json:"note,omitempty"`
-	RequestedBy    string    `json:"requestedBy,omitempty"`
-	CreatedAt      time.Time `json:"createdAt"`
+type TaskState string
+
+const (
+	TaskStateOpen TaskState = "open"
+	TaskStateDone TaskState = "done"
+)
+
+type Task struct {
+	ID          string    `json:"id"`
+	Description string    `json:"description"`
+	State       TaskState `json:"state"`
+	CreatedAt   time.Time `json:"createdAt"`
+	CreatedBy   string    `json:"createdBy,omitempty"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	UpdatedBy   string    `json:"updatedBy,omitempty"`
+	DoneAt      time.Time `json:"doneAt"`
+	DoneBy      string    `json:"doneBy,omitempty"`
 }
 
 type State struct {
-	State                  LifecycleState          `json:"state"`
-	Instruction            string                  `json:"instruction,omitempty"`
-	InstructionUpdatedAt   time.Time               `json:"instructionUpdatedAt,omitempty"`
-	InstructionUpdatedBy   string                  `json:"instructionUpdatedBy,omitempty"`
-	CurrentStage           string                  `json:"currentStage,omitempty"`
-	StageChangedAt         time.Time               `json:"stageChangedAt,omitempty"`
-	StageChangedBy         string                  `json:"stageChangedBy,omitempty"`
-	StageNote              string                  `json:"stageNote,omitempty"`
-	SessionID              string                  `json:"sessionId,omitempty"`
-	CurrentRunRef          *exec.DAGRunRef         `json:"currentRunRef,omitempty"`
-	LastRunRef             *exec.DAGRunRef         `json:"lastRunRef,omitempty"`
-	CurrentCycleID         string                  `json:"currentCycleId,omitempty"`
-	WaitingReason          WaitingReason           `json:"waitingReason,omitempty"`
-	PendingPrompt          *Prompt                 `json:"pendingPrompt,omitempty"`
-	PendingResponse        *PromptResponse         `json:"pendingResponse,omitempty"`
-	PendingStageTransition *PendingStageTransition `json:"pendingStageTransition,omitempty"`
-	PendingTurnMessages    []PendingTurnMessage    `json:"pendingTurnMessages,omitempty"`
-	StartRequestedAt       time.Time               `json:"startRequestedAt,omitempty"`
-	LastTriggeredAt        time.Time               `json:"lastTriggeredAt,omitempty"`
-	LastScheduleMinute     time.Time               `json:"lastScheduleMinute,omitempty"`
-	LastUpdatedAt          time.Time               `json:"lastUpdatedAt,omitempty"`
-	PausedAt               time.Time               `json:"pausedAt,omitempty"`
-	PausedBy               string                  `json:"pausedBy,omitempty"`
-	FinishedAt             time.Time               `json:"finishedAt,omitempty"`
-	LastSummary            string                  `json:"lastSummary,omitempty"`
-	LastError              string                  `json:"lastError,omitempty"`
+	State                LifecycleState       `json:"state"`
+	Instruction          string               `json:"instruction,omitempty"`
+	InstructionUpdatedAt time.Time            `json:"instructionUpdatedAt"`
+	InstructionUpdatedBy string               `json:"instructionUpdatedBy,omitempty"`
+	Tasks                []Task               `json:"tasks,omitempty"`
+	SessionID            string               `json:"sessionId,omitempty"`
+	CurrentRunRef        *exec.DAGRunRef      `json:"currentRunRef,omitempty"`
+	LastRunRef           *exec.DAGRunRef      `json:"lastRunRef,omitempty"`
+	CurrentCycleID       string               `json:"currentCycleId,omitempty"`
+	WaitingReason        WaitingReason        `json:"waitingReason,omitempty"`
+	PendingPrompt        *Prompt              `json:"pendingPrompt,omitempty"`
+	PendingResponse      *PromptResponse      `json:"pendingResponse,omitempty"`
+	PendingTurnMessages  []PendingTurnMessage `json:"pendingTurnMessages,omitempty"`
+	StartRequestedAt     time.Time            `json:"startRequestedAt"`
+	LastTriggeredAt      time.Time            `json:"lastTriggeredAt"`
+	LastScheduleMinute   time.Time            `json:"lastScheduleMinute"`
+	LastUpdatedAt        time.Time            `json:"lastUpdatedAt"`
+	PausedAt             time.Time            `json:"pausedAt"`
+	PausedBy             string               `json:"pausedBy,omitempty"`
+	FinishedAt           time.Time            `json:"finishedAt"`
+	LastSummary          string               `json:"lastSummary,omitempty"`
+	LastError            string               `json:"lastError,omitempty"`
 }
 
 type AllowedDAGInfo struct {
@@ -185,22 +185,24 @@ type RunSummary struct {
 	TriggerType string    `json:"triggerType,omitempty"`
 	StartedAt   string    `json:"startedAt,omitempty"`
 	FinishedAt  string    `json:"finishedAt,omitempty"`
-	CreatedAt   time.Time `json:"createdAt,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
 	Error       string    `json:"error,omitempty"`
 }
 
 type Summary struct {
-	Name          string         `json:"name"`
-	Description   string         `json:"description,omitempty"`
-	Purpose       string         `json:"purpose"`
-	Goal          string         `json:"goal"`
-	Tags          []string       `json:"tags,omitempty"`
-	Instruction   string         `json:"instruction,omitempty"`
-	State         LifecycleState `json:"state"`
-	Stage         string         `json:"stage,omitempty"`
-	Disabled      bool           `json:"disabled,omitempty"`
-	CurrentRun    *RunSummary    `json:"currentRun,omitempty"`
-	LastUpdatedAt time.Time      `json:"lastUpdatedAt,omitempty"`
+	Name                string         `json:"name"`
+	Description         string         `json:"description,omitempty"`
+	Purpose             string         `json:"purpose"`
+	Goal                string         `json:"goal"`
+	Tags                []string       `json:"tags,omitempty"`
+	Instruction         string         `json:"instruction,omitempty"`
+	State               LifecycleState `json:"state"`
+	Disabled            bool           `json:"disabled,omitempty"`
+	CurrentRun          *RunSummary    `json:"currentRun,omitempty"`
+	OpenTaskCount       int            `json:"openTaskCount"`
+	DoneTaskCount       int            `json:"doneTaskCount"`
+	NextTaskDescription string         `json:"nextTaskDescription,omitempty"`
+	LastUpdatedAt       time.Time      `json:"lastUpdatedAt"`
 }
 
 type Detail struct {
@@ -226,12 +228,6 @@ type DuplicateRequest struct {
 	NewName string `json:"newName"`
 }
 
-type StageOverrideRequest struct {
-	Stage       string `json:"stage"`
-	RequestedBy string `json:"requestedBy,omitempty"`
-	Note        string `json:"note,omitempty"`
-}
-
 type HumanResponseRequest struct {
 	PromptID          string   `json:"promptId"`
 	SelectedOptionIDs []string `json:"selectedOptionIds,omitempty"`
@@ -243,43 +239,33 @@ type OperatorMessageRequest struct {
 	RequestedBy string `json:"requestedBy,omitempty"`
 }
 
-func newInitialState(def *Definition) *State {
-	stage := ""
-	if def != nil && len(def.Stages) > 0 {
-		stage = def.Stages[0].Name
-	}
+type CreateTaskRequest struct {
+	Description string `json:"description"`
+	RequestedBy string `json:"requestedBy,omitempty"`
+}
+
+type UpdateTaskRequest struct {
+	Description *string `json:"description,omitempty"`
+	Done        *bool   `json:"done,omitempty"`
+	RequestedBy string  `json:"requestedBy,omitempty"`
+}
+
+type ReorderTasksRequest struct {
+	TaskIDs     []string `json:"taskIds"`
+	RequestedBy string   `json:"requestedBy,omitempty"`
+}
+
+func newInitialState() *State {
 	now := time.Now()
 	return &State{
-		State:          StateIdle,
-		CurrentStage:   stage,
-		StageChangedAt: now,
-		StageChangedBy: "system",
-		LastUpdatedAt:  now,
+		State:         StateIdle,
+		Tasks:         []Task{},
+		LastUpdatedAt: now,
 	}
 }
 
 func nextCycleID() string {
 	return uuid.NewString()
-}
-
-func (s *StageDefinition) UnmarshalYAML(value *yaml.Node) error {
-	type rawStageDefinition struct {
-		Name             string      `yaml:"name"`
-		AllowedDAGs      AllowedDAGs `yaml:"allowedDAGs,omitempty"`
-		AllowedDAGsSnake AllowedDAGs `yaml:"allowed_dags,omitempty"`
-	}
-
-	var raw rawStageDefinition
-	if err := value.Decode(&raw); err != nil {
-		return err
-	}
-
-	s.Name = raw.Name
-	s.AllowedDAGs = raw.AllowedDAGsSnake
-	if len(s.AllowedDAGs.Names) == 0 && len(s.AllowedDAGs.Tags) == 0 {
-		s.AllowedDAGs = raw.AllowedDAGs
-	}
-	return nil
 }
 
 func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
@@ -288,7 +274,6 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 		Purpose          string       `yaml:"purpose"`
 		Goal             string       `yaml:"goal"`
 		Tags             []string     `yaml:"tags"`
-		Stages           yaml.Node    `yaml:"stages"`
 		Schedule         ScheduleList `yaml:"schedule,omitempty"`
 		AllowedDAGs      AllowedDAGs  `yaml:"allowedDAGs"`
 		AllowedDAGsSnake AllowedDAGs  `yaml:"allowed_dags"`
@@ -313,40 +298,6 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	}
 	d.Agent = raw.Agent
 	d.Disabled = raw.Disabled
-	d.legacyStringStages = false
-
-	if raw.Stages.Kind == 0 {
-		d.Stages = nil
-		return nil
-	}
-	if raw.Stages.Kind != yaml.SequenceNode {
-		return fmt.Errorf("stages must be a list")
-	}
-
-	stages := make([]StageDefinition, 0, len(raw.Stages.Content))
-	var sawScalar bool
-	var sawMapping bool
-	for _, node := range raw.Stages.Content {
-		switch node.Kind {
-		case yaml.ScalarNode:
-			sawScalar = true
-			stages = append(stages, StageDefinition{Name: strings.TrimSpace(node.Value)})
-		case yaml.MappingNode:
-			sawMapping = true
-			var stage StageDefinition
-			if err := node.Decode(&stage); err != nil {
-				return err
-			}
-			stages = append(stages, stage)
-		default:
-			return fmt.Errorf("stages entries must be strings or objects")
-		}
-	}
-	if sawScalar && sawMapping {
-		return fmt.Errorf("stages must use either legacy string entries or object entries, not both")
-	}
-	d.legacyStringStages = sawScalar
-	d.Stages = stages
 	return nil
 }
 
@@ -362,27 +313,4 @@ func (d *Definition) normalizeGoal() {
 	case d.Goal != "" && d.Purpose == "":
 		d.Purpose = d.Goal
 	}
-}
-
-func (d *Definition) StageNames() []string {
-	if d == nil {
-		return nil
-	}
-	names := make([]string, 0, len(d.Stages))
-	for _, stage := range d.Stages {
-		names = append(names, stage.Name)
-	}
-	return names
-}
-
-func (d *Definition) StageByName(name string) *StageDefinition {
-	if d == nil {
-		return nil
-	}
-	for i := range d.Stages {
-		if d.Stages[i].Name == name {
-			return &d.Stages[i]
-		}
-	}
-	return nil
 }

@@ -5659,11 +5659,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/stage:
+  /automata/{name}/tasks:
     post:
-      summary: "Override automata stage"
-      description: "Immediately overrides the current stage for an Automata."
-      operationId: "overrideAutomataStage"
+      summary: "Create automata task"
+      description: "Creates a new checklist task for an Automata."
+      operationId: "createAutomataTask"
       tags:
         - "automata"
       parameters:
@@ -5673,10 +5673,149 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AutomataStageOverrideRequest"
+              $ref: "#/components/schemas/AutomataTaskCreateRequest"
+      responses:
+        "200":
+          description: "Automata task created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomataTask"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /automata/{name}/tasks/reorder:
+    post:
+      summary: "Reorder automata tasks"
+      description: "Reorders the checklist tasks for an Automata."
+      operationId: "reorderAutomataTasks"
+      tags:
+        - "automata"
+      parameters:
+        - $ref: "#/components/parameters/AutomataName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutomataTaskReorderRequest"
       responses:
         "204":
-          description: "Automata stage updated"
+          description: "Automata tasks reordered"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /automata/{name}/tasks/{taskId}:
+    patch:
+      summary: "Update automata task"
+      description: "Updates a checklist task for an Automata."
+      operationId: "updateAutomataTask"
+      tags:
+        - "automata"
+      parameters:
+        - $ref: "#/components/parameters/AutomataName"
+        - name: "taskId"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutomataTaskUpdateRequest"
+      responses:
+        "200":
+          description: "Automata task updated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomataTask"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Delete automata task"
+      description: "Deletes a checklist task from an Automata."
+      operationId: "deleteAutomataTask"
+      tags:
+        - "automata"
+      parameters:
+        - $ref: "#/components/parameters/AutomataName"
+        - name: "taskId"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Automata task deleted"
         "400":
           description: "Invalid request"
           content:
@@ -5705,7 +5844,7 @@ paths:
   /automata/{name}/response:
     post:
       summary: "Respond to automata prompt"
-      description: "Submits a human response for an Automata prompt or stage approval."
+      description: "Submits a human response for an Automata prompt."
       operationId: "respondAutomata"
       tags:
         - "automata"
@@ -10653,16 +10792,42 @@ components:
           items:
             type: string
 
-    AutomataStageDefinition:
+    AutomataTaskState:
+      type: string
+      description: "Checklist task state"
+      enum:
+        - open
+        - done
+
+    AutomataTask:
       type: object
-      description: "A user-defined Automata stage"
+      description: "Runtime checklist task for an Automata"
       required:
-        - name
+        - id
+        - description
+        - state
       properties:
-        name:
+        id:
           type: string
-        allowedDAGs:
-          $ref: "#/components/schemas/AutomataAllowedDAGs"
+        description:
+          type: string
+        state:
+          $ref: "#/components/schemas/AutomataTaskState"
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+        doneAt:
+          type: string
+          format: date-time
+        doneBy:
+          type: string
 
     AutomataAgentConfig:
       type: object
@@ -10685,7 +10850,6 @@ components:
       required:
         - name
         - goal
-        - stages
       properties:
         name:
           type: string
@@ -10697,10 +10861,8 @@ components:
           type: array
           items:
             type: string
-        stages:
-          type: array
-          items:
-            $ref: "#/components/schemas/AutomataStageDefinition"
+        allowedDAGs:
+          $ref: "#/components/schemas/AutomataAllowedDAGs"
         agent:
           $ref: "#/components/schemas/AutomataAgentConfig"
         disabled:
@@ -10746,23 +10908,6 @@ components:
         freeTextResponse:
           type: string
         respondedAt:
-          type: string
-          format: date-time
-
-    AutomataPendingStageTransition:
-      type: object
-      description: "Pending agent-requested stage transition awaiting approval"
-      required:
-        - requestedStage
-        - createdAt
-      properties:
-        requestedStage:
-          type: string
-        note:
-          type: string
-        requestedBy:
-          type: string
-        createdAt:
           type: string
           format: date-time
 
@@ -10825,7 +10970,7 @@ components:
 
     AutomataAllowedDAGInfo:
       type: object
-      description: "Resolved DAG allowed in the current Automata stage"
+      description: "Resolved DAG allowed in the current Automata"
       required:
         - name
       properties:
@@ -10853,15 +10998,10 @@ components:
           format: date-time
         instructionUpdatedBy:
           type: string
-        currentStage:
-          type: string
-        stageChangedAt:
-          type: string
-          format: date-time
-        stageChangedBy:
-          type: string
-        stageNote:
-          type: string
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/AutomataTask"
         sessionId:
           type: string
         currentRunRef:
@@ -10876,8 +11016,6 @@ components:
           $ref: "#/components/schemas/AutomataPrompt"
         pendingResponse:
           $ref: "#/components/schemas/AutomataPromptResponse"
-        pendingStageTransition:
-          $ref: "#/components/schemas/AutomataPendingStageTransition"
         pendingTurnMessages:
           type: array
           items:
@@ -10929,12 +11067,16 @@ components:
           type: string
         state:
           $ref: "#/components/schemas/AutomataLifecycleState"
-        stage:
-          type: string
         disabled:
           type: boolean
         currentRun:
           $ref: "#/components/schemas/AutomataRunSummary"
+        openTaskCount:
+          type: integer
+        doneTaskCount:
+          type: integer
+        nextTaskDescription:
+          type: string
         lastUpdatedAt:
           type: string
           format: date-time
@@ -11002,16 +11144,34 @@ components:
         instruction:
           type: string
 
-    AutomataStageOverrideRequest:
+    AutomataTaskCreateRequest:
       type: object
-      description: "Request body for an immediate operator stage override"
+      description: "Request body for creating an Automata checklist task"
       required:
-        - stage
+        - description
       properties:
-        stage:
+        description:
           type: string
-        note:
+
+    AutomataTaskUpdateRequest:
+      type: object
+      description: "Request body for updating an Automata checklist task"
+      properties:
+        description:
           type: string
+        done:
+          type: boolean
+
+    AutomataTaskReorderRequest:
+      type: object
+      description: "Request body for reordering Automata checklist tasks"
+      required:
+        - taskIds
+      properties:
+        taskIds:
+          type: array
+          items:
+            type: string
 
     AutomataOperatorMessageRequest:
       type: object
