@@ -7,7 +7,7 @@ type Schedule = components['schemas']['Schedule'];
 
 export function getScheduleLabel(schedule: Schedule): string {
   if (schedule.kind === 'at') {
-    return schedule.at ? `At ${schedule.at}` : 'At';
+    return schedule.at ? `at ${schedule.at}` : 'at';
   }
 
   return schedule.expression || '';

@@ -54,7 +54,7 @@ function DAGAttributes({ dag }: Props) {
                 <Badge
                   key={getScheduleKey(schedule, index)}
                   variant="outline"
-                  className="bg-primary/10 text-primary border-primary/30 px-2.5 py-1 max-w-full whitespace-normal break-words"
+                  className="bg-primary/10 text-primary border-primary/30 px-2.5 py-1 max-w-full justify-start overflow-x-auto whitespace-nowrap no-scrollbar normal-case tracking-normal"
                 >
                   {getScheduleLabel(schedule)}
                 </Badge>

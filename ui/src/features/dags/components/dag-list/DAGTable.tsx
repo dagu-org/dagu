@@ -151,7 +151,7 @@ function DAGCard({
           <Badge
             key={getScheduleKey(schedule, idx)}
             variant="outline"
-            className="text-xs font-normal px-1 py-0 h-3"
+            className={`text-xs font-normal px-1 py-0 h-3 normal-case tracking-normal ${schedule.kind === 'at' ? 'border-0' : ''}`}
           >
             {getScheduleLabel(schedule)}
           </Badge>
@@ -625,7 +625,7 @@ const defaultColumns = [
             <Badge
               key={getScheduleKey(schedule, index)}
               variant="outline"
-              className="text-xs font-normal px-1 py-0 h-3.5"
+              className="text-xs font-normal px-1 py-0 h-3.5 normal-case tracking-normal"
             >
               {getScheduleLabel(schedule)}
             </Badge>
