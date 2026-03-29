@@ -13,14 +13,9 @@ export function useCockpitState() {
   }, [remoteNode, workspace.selectedWorkspace]);
 
   return {
-    workspaces: workspace.workspaces,
-    workspaceError: workspace.workspaceError,
     selectedWorkspace: workspace.selectedWorkspace,
     workspaceReady: workspace.workspaceReady,
     selectedTemplate,
-    selectWorkspace: workspace.selectWorkspace,
     selectTemplate: setSelectedTemplate,
-    createWorkspace: workspace.createWorkspace,
-    deleteWorkspace: workspace.deleteWorkspace,
   };
 }

@@ -1,4 +1,7 @@
 import {
+  Input,
+} from '@/components/ui/input';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -34,20 +37,25 @@ import {
   History,
   Inbox,
   KeyRound,
+  Layers,
   Moon,
   Network,
   PanelLeft,
+  Plus,
   ScrollText,
   Search,
   Sun,
   Terminal,
+  Trash2,
   Users,
   Webhook,
 } from 'lucide-react';
 import * as React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import ConfirmModal from './ui/ConfirmModal';
 import { AppBarContext } from './contexts/AppBarContext';
 import { useUserPreferences } from './contexts/UserPreference';
+import { useWorkspace } from './contexts/WorkspaceContext';
 import { useAgentChatContext } from './features/agent';
 
 type NavItemProps = {
@@ -107,6 +115,220 @@ function RemoteNodeSelectContent({ nodes }: RemoteNodeSelectContentProps): React
         </SelectItem>
       ))}
     </SelectContent>
+  );
+}
+
+type WorkspaceSelectContentProps = {
+  workspaces: Array<{ id: string; name: string }>;
+  selectedWorkspace: string;
+};
+
+function WorkspaceSelectContent({
+  workspaces,
+  selectedWorkspace,
+}: WorkspaceSelectContentProps): React.ReactElement {
+  const hasSelectedWorkspace = Boolean(selectedWorkspace);
+  const selectedWorkspaceExists = workspaces.some(
+    (workspace) => workspace.name === selectedWorkspace
+  );
+
+  return (
+    <SelectContent>
+      {hasSelectedWorkspace && !selectedWorkspaceExists && (
+        <SelectItem value={selectedWorkspace}>{selectedWorkspace}</SelectItem>
+      )}
+      <SelectItem value="__none__">All workspaces</SelectItem>
+      {workspaces.map((workspace) => (
+        <SelectItem key={workspace.id} value={workspace.name}>
+          {workspace.name}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  );
+}
+
+type SidebarWorkspaceControlProps = {
+  canWrite: boolean;
+  customColor: boolean;
+  isOpen: boolean;
+  selectedWorkspace: string;
+  workspaceReady: boolean;
+  workspaces: Array<{ id: string; name: string }>;
+  selectWorkspace: (name: string) => void;
+  createWorkspace: (name: string) => Promise<void>;
+  deleteWorkspace: (id: string) => Promise<void>;
+};
+
+function SidebarWorkspaceControl({
+  canWrite,
+  customColor,
+  isOpen,
+  selectedWorkspace,
+  workspaceReady,
+  workspaces,
+  selectWorkspace,
+  createWorkspace,
+  deleteWorkspace,
+}: SidebarWorkspaceControlProps): React.ReactElement {
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const createStateRef = React.useRef<'idle' | 'submitted' | 'cancelled'>(
+    'idle'
+  );
+
+  const selectedWorkspaceRecord = workspaces.find(
+    (workspace) => workspace.name === selectedWorkspace
+  );
+  const workspaceLabel = selectedWorkspace
+    ? selectedWorkspace
+    : workspaceReady
+      ? 'All workspaces'
+      : 'Loading workspaces...';
+
+  const handleCreate = React.useCallback(async () => {
+    if (createStateRef.current !== 'idle') {
+      return;
+    }
+    createStateRef.current = 'submitted';
+    const name = inputRef.current?.value
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, '');
+    if (name) {
+      await createWorkspace(name);
+    }
+    setIsCreating(false);
+  }, [createWorkspace]);
+
+  const handleCreateKeyDown = React.useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void handleCreate();
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        createStateRef.current = 'cancelled';
+        setIsCreating(false);
+      }
+    },
+    [handleCreate]
+  );
+
+  return (
+    <>
+      <div className="px-1">
+        <div className="flex items-center gap-1">
+          {isCreating && isOpen ? (
+            <Input
+              ref={inputRef}
+              autoFocus
+              className="h-9 flex-1 px-2 text-xs"
+              placeholder="Workspace name..."
+              onKeyDown={handleCreateKeyDown}
+              onBlur={() => {
+                void handleCreate();
+              }}
+            />
+          ) : (
+            <Select
+              value={selectedWorkspace || '__none__'}
+              onValueChange={(value) => {
+                selectWorkspace(value === '__none__' ? '' : value);
+              }}
+            >
+              <SelectTrigger
+                className={cn(
+                  'h-9 text-xs text-sidebar-foreground rounded-md flex-1',
+                  isOpen
+                    ? 'bg-sidebar-hover border-sidebar-border hover:bg-sidebar-active'
+                    : 'bg-transparent border-transparent hover:bg-sidebar-hover [&>svg:last-child]:hidden'
+                )}
+                title={isOpen ? '' : workspaceLabel}
+                style={{
+                  transition: 'width 280ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease, border-color 150ms ease, padding 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  width: isOpen ? 'auto' : '36px',
+                  paddingLeft: isOpen ? '12px' : '9px',
+                  paddingRight: isOpen ? '12px' : '9px',
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <Layers
+                    size={18}
+                    className="text-sidebar-foreground flex-shrink-0"
+                  />
+                  <span
+                    className="overflow-hidden whitespace-nowrap"
+                    style={{
+                      transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                      opacity: isOpen ? 1 : 0,
+                      maxWidth: isOpen ? '150px' : '0px',
+                    }}
+                  >
+                    {workspaceLabel}
+                  </span>
+                </div>
+              </SelectTrigger>
+              <WorkspaceSelectContent
+                workspaces={workspaces}
+                selectedWorkspace={selectedWorkspace}
+              />
+            </Select>
+          )}
+          {canWrite && isOpen && !isCreating && (
+            <button
+              type="button"
+              onClick={() => {
+                createStateRef.current = 'idle';
+                setIsCreating(true);
+              }}
+              className={cn(
+                'h-9 w-9 rounded-md border border-sidebar-border flex items-center justify-center',
+                customColor
+                  ? 'hover:opacity-70'
+                  : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+              )}
+              title="New workspace"
+            >
+              <Plus size={14} />
+            </button>
+          )}
+          {canWrite && isOpen && !isCreating && selectedWorkspaceRecord && (
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(selectedWorkspaceRecord.id)}
+              className={cn(
+                'h-9 w-9 rounded-md border border-sidebar-border flex items-center justify-center',
+                customColor
+                  ? 'hover:opacity-70'
+                  : 'text-sidebar-foreground hover:text-destructive hover:bg-sidebar-hover'
+              )}
+              title="Delete workspace"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <ConfirmModal
+        title="Delete Workspace"
+        buttonText="Delete"
+        visible={!!deleteTarget}
+        dismissModal={() => setDeleteTarget(null)}
+        onSubmit={() => {
+          if (!deleteTarget) {
+            return;
+          }
+          void deleteWorkspace(deleteTarget);
+          setDeleteTarget(null);
+        }}
+      >
+        <p className="text-sm">
+          Are you sure you want to delete this workspace? This action cannot be
+          undone.
+        </p>
+      </ConfirmModal>
+    </>
   );
 }
 
@@ -350,6 +572,16 @@ export const mainListItems = React.forwardRef<
   MainListItemsProps
 >(function MainListItems({ isOpen = false, onNavItemClick, onToggle, customColor = false }, ref) {
   const config = useConfig();
+  const { remoteNodes, selectedRemoteNode, selectRemoteNode } =
+    React.useContext(AppBarContext);
+  const {
+    workspaces,
+    selectedWorkspace,
+    selectWorkspace,
+    workspaceReady,
+    createWorkspace,
+    deleteWorkspace,
+  } = useWorkspace();
   const isAdmin = useIsAdmin();
   const hasRbac = useHasFeature('rbac');
   const hasAudit = useHasFeature('audit');
@@ -363,7 +595,6 @@ export const mainListItems = React.forwardRef<
   const theme = preferences.theme || 'dark';
   const title = config.title || DEFAULT_TITLE;
   const titleInitial = getTitleInitial(title);
-
   function toggleTheme(): void {
     updatePreference('theme', theme === 'dark' ? 'light' : 'dark');
   }
@@ -428,48 +659,55 @@ export const mainListItems = React.forwardRef<
 
       {/* GCP-Style Navigation - Compact Spacing */}
       <nav className="flex-1 flex flex-col gap-4">
-        <AppBarContext.Consumer>
-          {(context) => {
-            const { remoteNodes, selectedRemoteNode, selectRemoteNode } = context;
-            if (!remoteNodes || remoteNodes.length === 0) return null;
+        <div className="space-y-2">
+          {remoteNodes && remoteNodes.length > 0 && (
+            <div className="px-1">
+              <Select value={selectedRemoteNode} onValueChange={selectRemoteNode}>
+                <SelectTrigger
+                  className={cn(
+                    'h-9 text-xs text-sidebar-foreground rounded-md',
+                    isOpen
+                      ? 'bg-sidebar-hover border-sidebar-border hover:bg-sidebar-active'
+                      : 'bg-transparent border-transparent hover:bg-sidebar-hover [&>svg:last-child]:hidden'
+                  )}
+                  style={{
+                    transition: 'width 280ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease, border-color 150ms ease, padding 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    width: isOpen ? '100%' : '36px',
+                    paddingLeft: isOpen ? '12px' : '9px',
+                    paddingRight: isOpen ? '12px' : '9px',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Globe size={18} className="text-sidebar-foreground flex-shrink-0" />
+                    <span
+                      className="overflow-hidden whitespace-nowrap"
+                      style={{
+                        transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
+                        opacity: isOpen ? 1 : 0,
+                        maxWidth: isOpen ? '150px' : '0px',
+                      }}
+                    >
+                      <SelectValue />
+                    </span>
+                  </div>
+                </SelectTrigger>
+                <RemoteNodeSelectContent nodes={remoteNodes} />
+              </Select>
+            </div>
+          )}
 
-            return (
-              <div className="px-1">
-                <Select value={selectedRemoteNode} onValueChange={selectRemoteNode}>
-                  <SelectTrigger
-                    className={cn(
-                      'h-9 text-xs text-sidebar-foreground rounded-md',
-                      isOpen
-                        ? 'bg-sidebar-hover border-sidebar-border hover:bg-sidebar-active'
-                        : 'bg-transparent border-transparent hover:bg-sidebar-hover [&>svg:last-child]:hidden'
-                    )}
-                    style={{
-                      transition: 'width 280ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease, border-color 150ms ease, padding 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-                      width: isOpen ? '100%' : '36px',
-                      paddingLeft: isOpen ? '12px' : '9px',
-                      paddingRight: isOpen ? '12px' : '9px',
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Globe size={18} className="text-sidebar-foreground flex-shrink-0" />
-                      <span
-                        className="overflow-hidden whitespace-nowrap"
-                        style={{
-                          transition: 'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-                          opacity: isOpen ? 1 : 0,
-                          maxWidth: isOpen ? '150px' : '0px',
-                        }}
-                      >
-                        <SelectValue />
-                      </span>
-                    </div>
-                  </SelectTrigger>
-                  <RemoteNodeSelectContent nodes={remoteNodes} />
-                </Select>
-              </div>
-            );
-          }}
-        </AppBarContext.Consumer>
+          <SidebarWorkspaceControl
+            canWrite={canWrite}
+            customColor={customColor}
+            isOpen={isOpen}
+            selectedWorkspace={selectedWorkspace}
+            workspaceReady={workspaceReady}
+            workspaces={workspaces}
+            selectWorkspace={selectWorkspace}
+            createWorkspace={createWorkspace}
+            deleteWorkspace={deleteWorkspace}
+          />
+        </div>
 
         <div className="space-y-4">
           <div className="space-y-0.5">

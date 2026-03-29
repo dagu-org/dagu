@@ -49,14 +49,10 @@ function DocsContent() {
   const isMobile = useIsMobile();
 
   const {
-    workspaces,
     selectedWorkspace,
     workspaceReady,
     selectedTemplate,
-    selectWorkspace,
     selectTemplate,
-    createWorkspace,
-    deleteWorkspace,
   } = useCockpitState();
 
   const { setContext } = usePageContext();
@@ -499,13 +495,9 @@ function DocsContent() {
   const cockpitToolbar = (
     <div className="[&>div]:mb-0">
       <CockpitToolbar
-        workspaces={workspaces}
         selectedWorkspace={selectedWorkspace}
         workspaceReady={workspaceReady}
         selectedTemplate={selectedTemplate}
-        onSelectWorkspace={selectWorkspace}
-        onCreateWorkspace={createWorkspace}
-        onDeleteWorkspace={deleteWorkspace}
         onSelectTemplate={selectTemplate}
       />
     </div>
