@@ -1159,6 +1159,14 @@ func (a *Agent) writeStatus(ctx context.Context, attempt exec.DAGRunAttempt, sta
 		pushCtx := context.WithoutCancel(ctx)
 		if err := a.statusPusher.Push(pushCtx, status); err != nil {
 			logger.Error(ctx, "Failed to push status to coordinator", tag.Error(err))
+			var rejectedErr *remote.AttemptRejectedError
+			if errors.As(err, &rejectedErr) && !a.finished.Load() {
+				logger.Warn(ctx, "Coordinator rejected the worker attempt; stopping execution",
+					tag.AttemptID(a.dagRunAttemptID),
+					slog.String("reason", rejectedErr.Reason),
+				)
+				a.signal(context.Background(), syscall.SIGTERM, true)
+			}
 		}
 		return
 	}
@@ -1655,6 +1663,13 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 	}
 
 	if a.preparedAttempt != nil {
+		if a.attemptID != "" && a.preparedAttempt.ID() != a.attemptID {
+			return nil, fmt.Errorf(
+				"prepared attempt ID %q does not match requested attempt ID %q",
+				a.preparedAttempt.ID(),
+				a.attemptID,
+			)
+		}
 		a.preparedAttempt.SetDAG(a.dag)
 		return a.preparedAttempt, nil
 	}

@@ -8,9 +8,6 @@ on:
         required: true
         type: string
 
-env:
-  SNAPCRAFT_STORE_CREDENTIALS: ${{secrets.SNAPCRAFT_TOKEN}}
-
 jobs:
   # Build release binaries
   goreleaser:
@@ -46,8 +43,8 @@ jobs:
       - name: Copy web assets
         run: cp ui/dist/* ./internal/service/frontend/assets/
 
-      - name: Install Snapcraft
-        run: sudo snap install snapcraft --classic
+      - name: Clean UI dependencies
+        run: rm -rf ui/node_modules
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6

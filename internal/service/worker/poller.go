@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -88,6 +89,13 @@ func (p *Poller) Run(ctx context.Context) {
 					if ctx.Err() != nil {
 						// Context cancelled, exit gracefully
 						return
+					}
+					if errors.Is(err, errTaskClaimRejectedBeforeExecution) {
+						logger.Info(ctx, "Task claim rejected before execution",
+							tag.WorkerID(p.workerID),
+							tag.PollerIndex(p.index),
+							tag.RunID(task.DagRunId))
+						continue
 					}
 					logger.Error(ctx, "Task execution failed",
 						tag.WorkerID(p.workerID),

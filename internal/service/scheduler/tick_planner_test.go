@@ -30,7 +30,7 @@ func (m *mockWatermarkStore) Load(_ context.Context) (*SchedulerState, error) {
 		return nil, m.loadErr
 	}
 	if m.state == nil {
-		return &SchedulerState{Version: 1, DAGs: make(map[string]DAGWatermark)}, nil
+		return &SchedulerState{Version: SchedulerStateVersion, DAGs: make(map[string]DAGWatermark)}, nil
 	}
 	return m.state, nil
 }
@@ -56,7 +56,7 @@ func (m *mockWatermarkStore) lastSaved() *SchedulerState {
 
 func newMockWatermarkState(lastTick time.Time) *SchedulerState {
 	return &SchedulerState{
-		Version:  1,
+		Version:  SchedulerStateVersion,
 		LastTick: lastTick,
 		DAGs:     make(map[string]DAGWatermark),
 	}
@@ -91,6 +91,9 @@ func newTestTickPlanner(store WatermarkStore) (*TickPlanner, chan DAGChangeEvent
 		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
 			return false, nil
 		},
+		RunExists: func(_ context.Context, _ *core.DAG, _ string) (bool, error) {
+			return false, nil
+		},
 		Clock: func() time.Time {
 			return time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 		},
@@ -116,7 +119,7 @@ func TestTickPlanner_InitLoadError(t *testing.T) {
 	// Falls back to empty state on load error
 	tp.mu.RLock()
 	require.NotNil(t, tp.watermarkState)
-	require.Equal(t, 1, tp.watermarkState.Version)
+	require.Equal(t, SchedulerStateVersion, tp.watermarkState.Version)
 	tp.mu.RUnlock()
 }
 
@@ -352,6 +355,52 @@ func TestTickPlanner_PlanSuspendedDAGSkipped(t *testing.T) {
 	assert.Len(t, runs, 0)
 }
 
+func TestTickPlanner_PlanSuspendedCatchupDropsBufferAndAdvancesWatermark(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
+	}
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		QueuesEnabled:  true,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return true
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "run-id", nil
+		},
+		Clock: func() time.Time {
+			return now
+		},
+		Events: eventCh,
+	})
+
+	dag := newHourlyCatchupDAG(t, "suspended-catchup-dag")
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+	_, ok := tp.buffers[dag.Name]
+	require.True(t, ok, "catchup buffer should exist before planning while suspended")
+
+	runs := tp.Plan(context.Background(), now)
+	assert.Len(t, runs, 0)
+	_, ok = tp.buffers[dag.Name]
+	assert.False(t, ok, "catchup buffer should be cleared while suspended")
+
+	tp.mu.RLock()
+	wm, ok := tp.watermarkState.DAGs[dag.Name]
+	tp.mu.RUnlock()
+	require.True(t, ok)
+	assert.Equal(t, now, wm.LastScheduledTime)
+}
+
 func TestTickPlanner_HandleEvent_Added(t *testing.T) {
 	t.Parallel()
 
@@ -381,6 +430,7 @@ func TestTickPlanner_HandleEvent_Added(t *testing.T) {
 	_, hasWM := tp.watermarkState.DAGs["new-dag"]
 	tp.mu.RUnlock()
 	assert.True(t, hasWM, "watermark should be set for new DAG")
+	assert.NotNil(t, store.lastSaved(), "new DAG watermark should be flushed immediately")
 }
 
 func TestTickPlanner_HandleEvent_Deleted(t *testing.T) {
@@ -445,6 +495,38 @@ func TestTickPlanner_HandleEvent_Updated(t *testing.T) {
 	entry, ok := tp.entries["upd-dag"]
 	require.True(t, ok)
 	assert.Equal(t, "*/30 * * * *", entry.dag.Schedule[0].Expression)
+}
+
+func TestTickPlanner_HandleEvent_UpdatedFlushesWatermarkMutationsImmediately(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{
+		state: newMockWatermarkState(time.Date(2026, 2, 7, 9, 0, 0, 0, time.UTC)),
+	}
+	tp, _ := newTestTickPlanner(store)
+
+	dag := &core.DAG{
+		Name:          "upd-latest-dag",
+		CatchupWindow: 6 * time.Hour,
+		Schedule:      []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+		OverlapPolicy: core.OverlapPolicyLatest,
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
+		Type: DAGChangeUpdated,
+		DAG: &core.DAG{
+			Name:          "upd-latest-dag",
+			CatchupWindow: 6 * time.Hour,
+			Schedule:      []core.Schedule{mustParseSchedule(t, "*/30 * * * *")},
+			OverlapPolicy: core.OverlapPolicyLatest,
+		},
+		DAGName: "upd-latest-dag",
+	})
+	tp.entryMu.Unlock()
+
+	assert.NotNil(t, store.lastSaved(), "watermark mutations should be flushed immediately on update")
 }
 
 func TestTickPlanner_ConcurrentFlushAndAdvance(t *testing.T) {
@@ -529,6 +611,7 @@ func TestTickPlanner_AdvanceUpdatesPerDAGWatermarks(t *testing.T) {
 			RunID:         "run-1",
 			ScheduledTime: scheduledTime,
 			TriggerType:   core.TriggerTypeScheduler,
+			Schedule:      mustParseSchedule(t, "0 * * * *"),
 		},
 	}
 
@@ -766,6 +849,7 @@ func TestTickPlanner_AdvanceIgnoresStopRestartWatermarks(t *testing.T) {
 			RunID:         "run-1",
 			ScheduledTime: startTime,
 			ScheduleType:  ScheduleTypeStart,
+			Schedule:      mustParseSchedule(t, "0 * * * *"),
 		},
 		{
 			DAG:           &core.DAG{Name: "test-dag"},
@@ -1349,6 +1433,66 @@ func TestTickPlanner_DispatchRunStart(t *testing.T) {
 	})
 	assert.True(t, dispatched, "Dispatch callback should be invoked for ScheduleTypeStart")
 	assert.Equal(t, scheduledTime, gotScheduleTime, "Dispatch callback should receive the scheduled time")
+}
+
+func TestTickPlanner_DispatchRunSuspendedStartSkipped(t *testing.T) {
+	t.Parallel()
+
+	dispatched := false
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool { return true },
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
+			dispatched = true
+			return nil
+		},
+		Events: make(chan DAGChangeEvent, 1),
+	})
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	tp.DispatchRun(context.Background(), PlannedRun{
+		DAG:           &core.DAG{Name: "start-dag"},
+		RunID:         "run-1",
+		ScheduledTime: time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC),
+		ScheduleType:  ScheduleTypeStart,
+		TriggerType:   core.TriggerTypeScheduler,
+	})
+
+	assert.False(t, dispatched, "suspended scheduler-managed run should not dispatch")
+}
+
+func TestTickPlanner_DispatchRunSuspendedCatchupAdvancesWatermark(t *testing.T) {
+	t.Parallel()
+
+	store := &mockWatermarkStore{}
+	enqueued := false
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		QueuesEnabled:  true,
+		IsSuspended:    func(_ context.Context, _ string) bool { return true },
+		Enqueue: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
+			enqueued = true
+			return nil
+		},
+		Events: make(chan DAGChangeEvent, 1),
+	})
+	require.NoError(t, tp.Init(context.Background(), nil))
+
+	scheduledTime := time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC)
+	dag := newHourlyCatchupDAG(t, "suspended-catchup-dag")
+	tp.DispatchRun(context.Background(), PlannedRun{
+		DAG:           dag,
+		RunID:         "run-1",
+		ScheduledTime: scheduledTime,
+		ScheduleType:  ScheduleTypeStart,
+		TriggerType:   core.TriggerTypeCatchUp,
+	})
+
+	assert.False(t, enqueued, "suspended catchup run should not enqueue")
+	tp.mu.RLock()
+	wm, ok := tp.watermarkState.DAGs[dag.Name]
+	tp.mu.RUnlock()
+	require.True(t, ok)
+	assert.Equal(t, scheduledTime, wm.LastScheduledTime)
 }
 
 func TestTickPlanner_DispatchRunRestartForwardsScheduledTime(t *testing.T) {

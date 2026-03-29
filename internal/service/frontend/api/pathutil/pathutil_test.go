@@ -3,7 +3,11 @@
 
 package pathutil
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestBuildPublicEndpointPath(t *testing.T) {
 	tests := []struct {
@@ -131,6 +135,79 @@ func TestNormalizePath(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("NormalizePath(%q) = %q, want %q", tt.path, got, tt.want)
 			}
+		})
+	}
+}
+
+func TestBuildMountedAPIPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		basePath    string
+		apiBasePath string
+		want        string
+	}{
+		{
+			name:        "default api path",
+			basePath:    "",
+			apiBasePath: "/api/v1",
+			want:        "/api/v1",
+		},
+		{
+			name:        "empty api path falls back to default",
+			basePath:    "",
+			apiBasePath: "",
+			want:        "/api/v1",
+		},
+		{
+			name:        "nested base path",
+			basePath:    "/dagu",
+			apiBasePath: "/api/v1",
+			want:        "/dagu/api/v1",
+		},
+		{
+			name:        "custom api path without leading slash",
+			basePath:    "/dagu",
+			apiBasePath: "rest",
+			want:        "/dagu/rest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildMountedAPIPath(tt.basePath, tt.apiBasePath)
+			assert.Equalf(t, tt.want, got, "BuildMountedAPIPath(%q, %q)", tt.basePath, tt.apiBasePath)
+		})
+	}
+}
+
+func TestBuildMountedAPIEndpointPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		basePath    string
+		apiBasePath string
+		suffix      string
+		want        string
+	}{
+		{
+			name:        "default route",
+			basePath:    "",
+			apiBasePath: "/api/v1",
+			suffix:      "openapi.json",
+			want:        "/api/v1/openapi.json",
+		},
+		{
+			name:        "nested base and custom api path",
+			basePath:    "/dagu",
+			apiBasePath: "/rest",
+			suffix:      "/auth/login",
+			want:        "/dagu/rest/auth/login",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildMountedAPIEndpointPath(tt.basePath, tt.apiBasePath, tt.suffix)
+			assert.Equalf(t, tt.want, got, "BuildMountedAPIEndpointPath(%q, %q, %q)", tt.basePath, tt.apiBasePath, tt.suffix)
 		})
 	}
 }

@@ -6,11 +6,28 @@ package types_test
 import (
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec/types"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func scheduleExpressions(schedules []core.Schedule) []string {
+	result := make([]string, 0, len(schedules))
+	for _, schedule := range schedules {
+		result = append(result, schedule.DisplayValue())
+	}
+	return result
+}
+
+func scheduleKinds(schedules []core.Schedule) []core.ScheduleKind {
+	result := make([]core.ScheduleKind, 0, len(schedules))
+	for _, schedule := range schedules {
+		result = append(result, schedule.GetKind())
+	}
+	return result
+}
 
 func TestScheduleValue_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
@@ -125,13 +142,13 @@ start:
 			}
 			require.NoError(t, err)
 			if tt.wantStarts != nil {
-				assert.Equal(t, tt.wantStarts, s.Starts())
+				assert.Equal(t, tt.wantStarts, scheduleExpressions(s.Starts()))
 			}
 			if tt.wantStops != nil {
-				assert.Equal(t, tt.wantStops, s.Stops())
+				assert.Equal(t, tt.wantStops, scheduleExpressions(s.Stops()))
 			}
 			if tt.wantRestarts != nil {
-				assert.Equal(t, tt.wantRestarts, s.Restarts())
+				assert.Equal(t, tt.wantRestarts, scheduleExpressions(s.Restarts()))
 			}
 			if tt.checkHasStop {
 				assert.Equal(t, tt.wantHasStop, s.HasStopSchedule())
@@ -203,14 +220,65 @@ schedule:
 				assert.Equal(t, tt.wantName, cfg.Name)
 			}
 			if tt.wantStarts != nil {
-				assert.Equal(t, tt.wantStarts, cfg.Schedule.Starts())
+				assert.Equal(t, tt.wantStarts, scheduleExpressions(cfg.Schedule.Starts()))
 			}
 			if tt.wantStops != nil {
-				assert.Equal(t, tt.wantStops, cfg.Schedule.Stops())
+				assert.Equal(t, tt.wantStops, scheduleExpressions(cfg.Schedule.Stops()))
 			}
 			if tt.wantIsZero {
 				assert.True(t, cfg.Schedule.IsZero())
 			}
+		})
+	}
+}
+
+func TestScheduleValue_TypedScheduleValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		input       string
+		errContains string
+	}{
+		{
+			name:        "LegacyCronWithoutKind",
+			input:       "start:\n  expression: \"0 * * * *\"\n",
+			errContains: "",
+		},
+		{
+			name:        "RejectsBothExpressionAndAt",
+			input:       "start:\n  kind: cron\n  expression: \"0 * * * *\"\n  at: \"2026-03-29T02:10:00+01:00\"\n",
+			errContains: "must not include both expression and at",
+		},
+		{
+			name:        "RejectsCronWithoutExpression",
+			input:       "start:\n  kind: cron\n",
+			errContains: "cron schedules must include expression",
+		},
+		{
+			name:        "RejectsAtWithExpression",
+			input:       "start:\n  kind: at\n  expression: \"0 * * * *\"\n",
+			errContains: "one-off schedules must include at",
+		},
+		{
+			name:        "RejectsOneOffInStopSchedule",
+			input:       "stop:\n  at: \"2026-03-29T02:10:00+01:00\"\n",
+			errContains: "one-off schedules are only supported for start schedules",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var s types.ScheduleValue
+			err := yaml.Unmarshal([]byte(tt.input), &s)
+			if tt.errContains == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
 		})
 	}
 }
@@ -252,7 +320,7 @@ func TestScheduleValue_AdditionalCoverage(t *testing.T) {
 			name:        "InvalidScheduleEntryTypeInMap",
 			input:       "start: 123",
 			wantErr:     true,
-			errContains: "expected string or array",
+			errContains: "expected string, object, or array",
 		},
 		{
 			name:        "InvalidTypeInStartArray",
@@ -282,7 +350,7 @@ func TestScheduleValue_AdditionalCoverage(t *testing.T) {
 				assert.True(t, s.IsZero())
 			}
 			if tt.wantStarts != nil {
-				assert.Equal(t, tt.wantStarts, s.Starts())
+				assert.Equal(t, tt.wantStarts, scheduleExpressions(s.Starts()))
 			}
 		})
 	}
@@ -304,5 +372,39 @@ func TestScheduleValue_AdditionalCoverage(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, s.IsZero())
 		assert.Nil(t, s.Starts())
+	})
+
+	t.Run("OneOffStartEntry", func(t *testing.T) {
+		t.Parallel()
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`
+start:
+  - at: "2026-03-29T02:10:00+01:00"
+`), &s)
+		require.NoError(t, err)
+		require.Equal(t, []core.ScheduleKind{core.ScheduleKindAt}, scheduleKinds(s.Starts()))
+		assert.Equal(t, []string{"2026-03-29T02:10:00+01:00"}, scheduleExpressions(s.Starts()))
+	})
+
+	t.Run("OneOffStopRejected", func(t *testing.T) {
+		t.Parallel()
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`
+stop:
+  - at: "2026-03-29T02:10:00+01:00"
+`), &s)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "only supported for start schedules")
+	})
+
+	t.Run("ZoneLessOneOffRejected", func(t *testing.T) {
+		t.Parallel()
+		var s types.ScheduleValue
+		err := yaml.Unmarshal([]byte(`
+start:
+  - at: "2026-03-29T02:10:00"
+`), &s)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "explicit offset")
 	})
 }

@@ -5,6 +5,8 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -42,6 +44,37 @@ func TestSupportsHelpers(t *testing.T) {
 	assert.False(t, SupportsCommand("unknown"))
 	assert.False(t, SupportsScript("unknown"))
 	assert.False(t, SupportsShell("unknown"))
+}
+
+func TestExecutorCapabilities_ConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	registry := &executorCapabilitiesRegistry{
+		caps: make(map[string]ExecutorCapabilities),
+	}
+
+	var wg sync.WaitGroup
+	for i := range 64 {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			name := fmt.Sprintf("executor-%d", i)
+			registry.Register(name, ExecutorCapabilities{Command: true})
+			assert.True(t, registry.Get(name).Command)
+		}(i)
+	}
+
+	for i := range 64 {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_ = registry.Get(fmt.Sprintf("executor-%d", i))
+			_ = registry.Get("missing")
+		}(i)
+	}
+
+	wg.Wait()
+	assert.True(t, registry.Get("executor-63").Command)
 }
 
 func TestStep_EvalOptions(t *testing.T) {

@@ -305,14 +305,13 @@ Available references:
 - `schema.md` — Complete DAG YAML schema (top-level and step-level fields)
 - `executors.md` — All executor types with full configuration details
 - `cli.md` — All CLI subcommands with flags
-- `env.md` — Execution and configuration environment variables
-- `pitfalls.md` — Critical pitfalls and how to avoid them
+- `env.md` — Execution and configuration environment variables, plus params/env resolution notes
 - `codingagent.md` — Integrating AI coding agents (Claude Code, Codex, Gemini, etc.) into DAG workflows
 
 Load a reference when:
 - A user asks about a specific executor, CLI command, or env var and `dagu schema` doesn't cover the detail
 - You need to write a DAG that uses coding agents (claude -p, codex exec, gemini -p, etc.)
-- You want to double-check a pitfall before authoring a DAG
+- You need executor-specific or runtime-behavior notes that are more precise than the schema output
 {{end}}
 Use `dagu schema` and `dagu example` via bash to look up DAG YAML structure and see examples:
 - `dagu schema dag` — root-level DAG fields

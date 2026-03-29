@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/openapi.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the OpenAPI document
+         * @description Returns the normalized OpenAPI document served by this Dagu instance
+         */
+        get: operations["getOpenapiJson"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/setup": {
         parameters: {
             query?: never;
@@ -2983,6 +3003,8 @@ export interface components {
             latestDAGRun: components["schemas"]["DAGRunSummary"];
             /** @description Whether the DAG is suspended */
             suspended: boolean;
+            /** @description Next planned run time computed by the scheduler */
+            nextRun?: string;
             /** @description List of errors encountered during the request */
             errors: string[];
         };
@@ -3013,9 +3035,17 @@ export interface components {
         };
         /** @description Schedule configuration for DAG-run creation */
         Schedule: {
-            /** @description Cron expression or schedule pattern */
-            expression: string;
+            /** @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility. */
+            kind?: ScheduleKind;
+            /** @description Cron expression for recurring schedules */
+            expression?: string;
+            /** @description RFC 3339 timestamp with explicit offset for one-off schedules */
+            at?: string;
         };
+        /**
+         * @enum {string}
+         */
+        ScheduleKind: ScheduleKind;
         /**
          * @description Numeric status code indicating current DAG-run state:
          *     0: "Not started"
@@ -4852,6 +4882,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getOpenapiJson: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The OpenAPI document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -13598,6 +13668,10 @@ export enum Stream {
 export enum HealthResponseStatus {
     healthy = "healthy",
     unhealthy = "unhealthy"
+}
+export enum ScheduleKind {
+    cron = "cron",
+    at = "at"
 }
 export enum Status {
     NotStarted = 0,

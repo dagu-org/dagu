@@ -45,9 +45,46 @@
         {
           "type": "array",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["cron"]
+                  },
+                  "expression": {
+                    "type": "string",
+                    "description": "Cron expression for a recurring schedule entry"
+                  }
+                },
+                "required": ["expression"],
+                "additionalProperties": false,
+                "description": "Typed cron schedule entry"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["at"]
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "RFC 3339 timestamp with explicit offset and minute precision for a one-off schedule entry"
+                  }
+                },
+                "required": ["at"],
+                "additionalProperties": false,
+                "description": "Typed one-off schedule entry"
+              }
+            ]
           },
-          "description": "Multiple cron expressions for starting the DAG at different times"
+          "description": "Multiple schedule entries for starting the DAG at different times"
         },
         {
           "type": "object",
@@ -59,11 +96,75 @@
                   "description": "Single cron expression for starting the DAG"
                 },
                 {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["cron"]
+                    },
+                    "expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["expression"],
+                  "additionalProperties": false,
+                  "description": "Single typed cron schedule entry for starting the DAG"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["at"]
+                    },
+                    "at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["at"],
+                  "additionalProperties": false,
+                  "description": "Single typed one-off schedule entry for starting the DAG"
+                },
+                {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["cron"]
+                          },
+                          "expression": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["expression"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["at"]
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["at"],
+                        "additionalProperties": false
+                      }
+                    ]
                   },
-                  "description": "Multiple cron expressions for starting the DAG"
+                  "description": "Multiple schedule entries for starting the DAG"
                 }
               ]
             },
@@ -74,9 +175,42 @@
                   "description": "Single cron expression for stopping the DAG"
                 },
                 {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["cron"]
+                    },
+                    "expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["expression"],
+                  "additionalProperties": false,
+                  "description": "Single typed cron schedule entry for stopping the DAG"
+                },
+                {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["cron"]
+                          },
+                          "expression": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["expression"],
+                        "additionalProperties": false
+                      }
+                    ]
                   },
                   "description": "Multiple cron expressions for stopping the DAG"
                 }
@@ -89,9 +223,42 @@
                   "description": "Single cron expression for restarting the DAG"
                 },
                 {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["cron"]
+                    },
+                    "expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["expression"],
+                  "additionalProperties": false,
+                  "description": "Single typed cron schedule entry for restarting the DAG"
+                },
+                {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["cron"]
+                          },
+                          "expression": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["expression"],
+                        "additionalProperties": false
+                      }
+                    ]
                   },
                   "description": "Multiple cron expressions for restarting the DAG"
                 }
@@ -102,7 +269,7 @@
           "description": "Advanced scheduling with separate start, stop, and restart schedules"
         }
       ],
-      "description": "Schedule configuration for the DAG. Can be a simple cron expression, multiple cron expressions, or an object with start/stop/restart schedules. If omitted, the DAG will only run manually."
+      "description": "Schedule configuration for the DAG. Start schedules support cron expressions and one-off RFC 3339 timestamps with explicit offsets. Stop and restart remain cron-only."
     },
     "skip_if_successful": {
       "type": "boolean",
@@ -489,7 +656,7 @@
           "$ref": "#/definitions/dagParamExternalSchema"
         }
       ],
-      "description": "Default parameters that can be overridden when triggering the DAG. Supports four formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where each definition is an object with a required 'name' field plus optional fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Schema validation format: object with 'schema' (path to JSON Schema file) and optional 'values' (parameter values) for runtime validation and defaults."
+      "description": "Default parameters that can be overridden when triggering the DAG. Supports four formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where each definition is an object with a required 'name' field plus optional fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Schema validation format: object with 'schema' (JSON Schema path/URL, inline object, or boolean schema) and optional 'values' (parameter values) for runtime validation and defaults."
     },
     "container": {
       "$ref": "#/definitions/container",
@@ -744,6 +911,25 @@
       ],
       "description": "Scalar DAG parameter value."
     },
+    "jsonSchemaDeclaration": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path or URL to a JSON Schema document."
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Inline JSON Schema object."
+        },
+        {
+          "type": "boolean",
+          "description": "Boolean JSON Schema (true or false)."
+        }
+      ],
+      "description": "JSON Schema declaration. Can be a path/URL string, an inline schema object, or a boolean schema."
+    },
     "dagParamLegacyEntry": {
       "type": "object",
       "minProperties": 1,
@@ -811,8 +997,8 @@
       "type": "object",
       "properties": {
         "schema": {
-          "type": "string",
-          "description": "Path or URL to a JSON Schema file used for parameter validation."
+          "$ref": "#/definitions/jsonSchemaDeclaration",
+          "description": "JSON Schema declaration used for parameter validation."
         },
         "values": {
           "type": "object",
@@ -829,12 +1015,20 @@
         {
           "properties": {
             "schema": {
+              "type": "object"
+            }
+          }
+        },
+        {
+          "properties": {
+            "schema": {
+              "type": "string",
               "pattern": "(^[a-zA-Z][a-zA-Z0-9+.-]*://)|[./\\\\]"
             }
           }
         }
       ],
-      "description": "JSON Schema validation mode. Use `values` for explicit defaults, or provide a path-like `schema` reference by itself."
+      "description": "JSON Schema validation mode. This top-level params object is treated as schema-backed only when it is unambiguous: use `values` for explicit defaults, provide an inline object schema directly, or provide a path-like/URL schema reference by itself. Boolean schemas require `values` so legacy maps like `params: { schema: true }` remain valid."
     },
     "dagParamLegacyMap": {
       "type": "object",
@@ -996,13 +1190,17 @@
                   "type": "boolean",
                   "default": false,
                   "description": "When true, excludes this output from outputs.json."
+                },
+                "schema": {
+                  "$ref": "#/definitions/jsonSchemaDeclaration",
+                  "description": "JSON Schema declaration used to validate captured output. Output must be valid JSON matching this schema or the step fails."
                 }
               },
               "required": ["name"],
               "additionalProperties": false
             }
           ],
-          "description": "Variable name to capture the command's stdout. Can be a string or an object with name, key, and omit fields. This output can be referenced in subsequent steps."
+          "description": "Variable name to capture the command's stdout. Can be a string or an object with name, key, omit, and schema fields. This output can be referenced in subsequent steps."
         },
         "depends": {
           "oneOf": [

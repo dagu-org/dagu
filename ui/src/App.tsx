@@ -37,6 +37,7 @@ import AgentSoulsPage from './pages/agent-souls';
 import SoulEditorPage from './pages/agent-souls/SoulEditorPage';
 import APIKeysPage from './pages/api-keys';
 import AutomataPage from './pages/automata';
+import APIDocsPage from './pages/api-docs';
 import AuditLogsPage from './pages/audit-logs';
 import BaseConfigPage from './pages/base-config';
 import DAGRuns from './pages/dag-runs';
@@ -250,6 +251,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/" element={<CockpitPage />} />
                                         <Route path="/dashboard" element={<Dashboard />} />
                                         <Route path="/cockpit" element={<CockpitPage />} />
+                                        <Route path="/api-docs" element={<APIDocsPage />} />
                                         <Route path="/dags/" element={<DAGs />} />
                                         <Route path="/dags/:fileName/:tab" element={<DAGDetails />} />
                                         <Route path="/dags/:fileName/" element={<DAGDetails />} />

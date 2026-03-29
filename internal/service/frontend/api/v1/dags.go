@@ -27,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -344,7 +345,9 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 		dagRuns = append(dagRuns, ToDAGRunDetails(status))
 	}
 
-	gridData := a.readHistoryData(ctx, recentHistory)
+	dag, _ := a.dagStore.GetDetails(ctx, request.FileName, spec.WithAllowBuildErrors())
+
+	gridData := a.readHistoryData(ctx, dag, recentHistory)
 	return api.GetDAGDAGRunHistory200JSONResponse{
 		DagRuns:  dagRuns,
 		GridData: gridData,
@@ -414,10 +417,12 @@ func extractBuildErrors(errs []error) []string {
 	return result
 }
 
-func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus) []api.DAGGridItem {
+func (a *API) readHistoryData(_ context.Context, dag *core.DAG, statusList []exec.DAGRunStatus) []api.DAGGridItem {
 	statusLen := len(statusList)
 	nodeData := make(map[string][]core.NodeStatus)
 	handlerData := make(map[string][]core.NodeStatus)
+	originalIndex := make(map[string]int)
+	nextOriginalIndex := 0
 
 	addStatus := func(data map[string][]core.NodeStatus, idx int, name string, status core.NodeStatus) {
 		if _, exists := data[name]; !exists {
@@ -428,6 +433,10 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 
 	for idx, st := range statusList {
 		for _, node := range st.Nodes {
+			if _, ok := originalIndex[node.Step.Name]; !ok {
+				originalIndex[node.Step.Name] = nextOriginalIndex
+				nextOriginalIndex++
+			}
 			addStatus(nodeData, idx, node.Step.Name, node.Status)
 		}
 		// Key handlers by their type (onSuccess, onFailure, etc.) not step name
@@ -443,6 +452,10 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 		}
 		for _, h := range handlerPairs {
 			if h.node != nil {
+				if _, ok := originalIndex[h.handlerType.String()]; !ok {
+					originalIndex[h.handlerType.String()] = nextOriginalIndex
+					nextOriginalIndex++
+				}
 				addStatus(handlerData, idx, h.handlerType.String(), h.node.Status)
 			}
 		}
@@ -461,7 +474,102 @@ func (a *API) readHistoryData(_ context.Context, statusList []exec.DAGRunStatus)
 		grid = append(grid, api.DAGGridItem{Name: name, History: toHistory(statuses)})
 	}
 
+	var stepIndex map[string]int
+	if dag != nil {
+		stepIndex = make(map[string]int)
+		if dag.Type == core.TypeGraph {
+			if len(dag.BuildErrors) > 0 {
+				for i, step := range dag.Steps {
+					stepIndex[step.Name] = i
+				}
+			} else {
+				inDegree := make(map[string]int)
+				adj := make(map[string][]string)
+
+				for _, step := range dag.Steps {
+					inDegree[step.Name] = 0
+				}
+				for _, step := range dag.Steps {
+					for _, dep := range step.Depends {
+						adj[dep] = append(adj[dep], step.Name)
+						inDegree[step.Name]++
+					}
+				}
+
+				var queue []string
+				for _, step := range dag.Steps {
+					if inDegree[step.Name] == 0 {
+						queue = append(queue, step.Name)
+					}
+				}
+
+				origIdx := make(map[string]int)
+				for i, s := range dag.Steps {
+					origIdx[s.Name] = i
+				}
+
+				var topoOrder []string
+				for len(queue) > 0 {
+					sort.Slice(queue, func(i, j int) bool {
+						return origIdx[queue[i]] < origIdx[queue[j]]
+					})
+					u := queue[0]
+					queue = queue[1:]
+					topoOrder = append(topoOrder, u)
+
+					for _, v := range adj[u] {
+						inDegree[v]--
+						if inDegree[v] == 0 {
+							queue = append(queue, v)
+						}
+					}
+				}
+
+				for i, name := range topoOrder {
+					stepIndex[name] = i
+				}
+
+				// Assign any unreached steps an index offset
+				offset := len(topoOrder)
+				for i, s := range dag.Steps {
+					if _, ok := stepIndex[s.Name]; !ok {
+						stepIndex[s.Name] = offset + i
+					}
+				}
+			}
+		} else {
+			for i, step := range dag.Steps {
+				stepIndex[step.Name] = i
+			}
+		}
+	}
+
 	sort.Slice(grid, func(i, j int) bool {
+		if stepIndex != nil {
+			idxI, okI := stepIndex[grid[i].Name]
+			idxJ, okJ := stepIndex[grid[j].Name]
+			if okI && okJ {
+				return idxI < idxJ
+			}
+			if okI {
+				return true
+			}
+			if okJ {
+				return false
+			}
+		}
+
+		origI, okOrigI := originalIndex[grid[i].Name]
+		origJ, okOrigJ := originalIndex[grid[j].Name]
+		if okOrigI && okOrigJ {
+			return origI < origJ
+		}
+		if okOrigI {
+			return true
+		}
+		if okOrigJ {
+			return false
+		}
 		return grid[i].Name < grid[j].Name
 	})
 
@@ -495,8 +603,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 	tags := parseCommaSeparatedTags(request.Params.Tags)
-
-	result, errList, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
+	resp, err := a.listDAGsData(ctx, exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
 		Tags:      tags,
@@ -504,33 +611,9 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		Order:     sortOrder,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error listing DAGs: %w", err)
+		return nil, err
 	}
-
-	dagFiles := make([]api.DAGFile, 0, len(result.Items))
-	for _, item := range result.Items {
-		dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, item)
-		if err != nil {
-			errList = append(errList, err.Error())
-		}
-
-		dagFiles = append(dagFiles, api.DAGFile{
-			FileName:     item.FileName(),
-			FilePath:     ptrOf(item.Location),
-			LatestDAGRun: toDAGRunSummary(dagStatus),
-			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
-			Dag:          toDAG(item),
-			Errors:       extractBuildErrors(item.BuildErrors),
-		})
-	}
-
-	resp := &api.ListDAGs200JSONResponse{
-		Dags:       dagFiles,
-		Errors:     errList,
-		Pagination: toPagination(result),
-	}
-
-	return resp, nil
+	return &resp, nil
 }
 
 func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
@@ -1346,7 +1429,9 @@ func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, erro
 		dagRuns = append(dagRuns, ToDAGRunDetails(status))
 	}
 
-	gridData := a.readHistoryData(ctx, recentHistory)
+	dag, _ := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
+
+	gridData := a.readHistoryData(ctx, dag, recentHistory)
 	return api.GetDAGDAGRunHistory200JSONResponse{
 		DagRuns:  dagRuns,
 		GridData: gridData,
@@ -1390,20 +1475,49 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		Order:     sortOrder,
 	}
 
+	return a.listDAGsData(ctx, listOpts)
+}
+
+func (a *API) listDAGsData(ctx context.Context, listOpts exec.ListDAGsOptions) (api.ListDAGs200JSONResponse, error) {
+	projectionTime := time.Now()
+	var schedulerState *scheduler.SchedulerState
+	if a.schedulerStateStore != nil {
+		state, loadErr := a.schedulerStateStore.Load(ctx)
+		if loadErr != nil {
+			logger.Warn(ctx, "Failed to load scheduler state for DAG list projection", tag.Error(loadErr))
+		} else {
+			schedulerState = state
+		}
+	}
+
+	nextRunProjection := func(dag *core.DAG, now time.Time) time.Time {
+		return scheduler.NextPlannedRun(dag, now, schedulerState)
+	}
+
+	listOpts.Time = &projectionTime
+	listOpts.NextRunProjection = nextRunProjection
+
 	result, errList, err := a.dagStore.List(ctx, listOpts)
 	if err != nil {
-		return nil, fmt.Errorf("error listing DAGs: %w", err)
+		return api.ListDAGs200JSONResponse{}, fmt.Errorf("error listing DAGs: %w", err)
 	}
 
 	dagFiles := make([]api.DAGFile, 0, len(result.Items))
 	for _, item := range result.Items {
 		dagStatus, statusErr := a.dagRunMgr.GetLatestStatus(ctx, item)
+		nextRun := nextRunProjection(item, projectionTime)
+		var nextRunAt *time.Time
+		if !nextRun.IsZero() {
+			nextRunAt = &nextRun
+		}
+
 		dagFile := api.DAGFile{
 			FileName:     item.FileName(),
 			FilePath:     ptrOf(item.Location),
 			LatestDAGRun: toDAGRunSummary(dagStatus),
 			Suspended:    a.dagStore.IsSuspended(ctx, item.FileName()),
 			Dag:          toDAG(item),
+			NextRun:      nextRunAt,
 			Errors:       extractBuildErrors(item.BuildErrors),
 		}
 		if statusErr != nil {

@@ -136,7 +136,7 @@ func legacyPlanHasEval(plan *dagParamPlan) bool {
 }
 
 func buildDAGParamPlan(ctx BuildContext, d *dag) (*dagParamPlan, error) {
-	if extractSchemaReference(d.Params) != "" {
+	if _, ok := extractParamsSchemaDeclaration(d.Params); ok {
 		if ctx.opts.Has(BuildFlagSkipSchemaValidation) {
 			return buildLegacyParamPlan(extractSchemaValues(d.Params))
 		}

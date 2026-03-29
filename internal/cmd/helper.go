@@ -6,10 +6,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/buildenv"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
@@ -59,55 +59,9 @@ func parseScheduleTimeParam(ctx *Context) (string, error) {
 // It restores params from the status, loads dotenv, and rebuilds fields excluded
 // from JSON serialization (env, shell, workingDir, registryAuths, etc.).
 func restoreDAGFromStatus(ctx context.Context, dag *core.DAG, status *exec.DAGRunStatus) (*core.DAG, error) {
-	dag.Params = quoteParamValues(status.ParamsList, dag.ParamDefs)
+	dag.Params = spec.QuoteRuntimeParams(status.ParamsList, dag.ParamDefs)
 	dag.LoadDotEnv(ctx)
 	return rebuildDAGFromYAML(ctx, dag)
-}
-
-// quoteParamValues quotes the value portion of each parameter so that
-// values containing spaces survive re-parsing by parseStringParams.
-//
-// ParamsList stores unquoted "key=value" strings (produced by paramPair.String()),
-// but the rebuild path feeds them back through parseStringParams which splits
-// on whitespace. Quoting each value prevents that re-split.
-//
-// Positional params are stored in ParamsList using numeric names ("1=value",
-// "2=value", ...). When replaying them into the loader, convert those numeric
-// placeholders back to positional arguments so they override positional defaults
-// instead of being appended as named parameters.
-func quoteParamValues(params []string, paramDefs []core.ParamDef) []string {
-	positionalKeys := positionalParamKeys(paramDefs)
-	quoted := make([]string, len(params))
-	for i, p := range params {
-		if k, v, ok := strings.Cut(p, "="); ok {
-			if _, isPositional := positionalKeys[k]; isPositional {
-				quoted[i] = strconv.Quote(v)
-				continue
-			}
-			quoted[i] = k + "=" + strconv.Quote(v)
-		} else {
-			quoted[i] = strconv.Quote(p)
-		}
-	}
-	return quoted
-}
-
-func positionalParamKeys(paramDefs []core.ParamDef) map[string]struct{} {
-	if len(paramDefs) == 0 {
-		return nil
-	}
-
-	keys := make(map[string]struct{})
-	position := 1
-	for _, def := range paramDefs {
-		if def.Name != "" {
-			continue
-		}
-		keys[strconv.Itoa(position)] = struct{}{}
-		position++
-	}
-
-	return keys
 }
 
 // rebuildDAGFromYAML rebuilds a DAG from its YamlData using the spec loader.
@@ -122,18 +76,33 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 		return dag, nil
 	}
 
-	// Build env map from dag.Env (includes dotenv values if LoadDotEnv was called).
-	buildEnv := make(map[string]string, len(dag.Env))
-	for _, env := range dag.Env {
-		if k, v, ok := strings.Cut(env, "="); ok {
-			buildEnv[k] = v
+	buildEnvMap := buildenv.ToMap(dag.Env)
+	for key, value := range dag.PresolvedBuildEnv {
+		if buildEnvMap == nil {
+			buildEnvMap = make(map[string]string)
 		}
+		buildEnvMap[key] = value
+	}
+	presolvedBuildEnv, err := buildenv.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load presolved build env: %w", err)
+	}
+	for key, value := range presolvedBuildEnv {
+		if buildEnvMap == nil {
+			buildEnvMap = make(map[string]string)
+		}
+		buildEnvMap[key] = value
 	}
 
 	loadOpts := []spec.LoadOption{
 		spec.WithParams(dag.Params),
-		spec.WithBuildEnv(buildEnv),
 		spec.SkipSchemaValidation(),
+	}
+	if len(buildEnvMap) > 0 {
+		loadOpts = append(loadOpts, spec.WithBuildEnv(buildEnvMap))
+	}
+	if len(dag.BaseConfigData) > 0 {
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent(dag.BaseConfigData))
 	}
 
 	if dag.Name != "" {

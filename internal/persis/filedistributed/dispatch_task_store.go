@@ -171,6 +171,62 @@ func (s *DispatchTaskStore) DeleteClaim(_ context.Context, claimToken string) er
 	return err
 }
 
+func (s *DispatchTaskStore) CountOutstandingByQueue(_ context.Context, queueName string, claimTimeout time.Duration) (int, error) {
+	paths, err := s.snapshotOutstandingPaths(claimTimeout)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, path := range paths {
+		record, readErr := s.readTaskFile(path)
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return 0, readErr
+		}
+		if record == nil || record.Task == nil {
+			continue
+		}
+		if queueName != "" && record.Task.QueueName != queueName {
+			continue
+		}
+		count++
+	}
+
+	return count, nil
+}
+
+func (s *DispatchTaskStore) HasOutstandingAttempt(_ context.Context, attemptKey string, claimTimeout time.Duration) (bool, error) {
+	if attemptKey == "" {
+		return false, nil
+	}
+
+	paths, err := s.snapshotOutstandingPaths(claimTimeout)
+	if err != nil {
+		return false, err
+	}
+
+	for _, path := range paths {
+		record, readErr := s.readTaskFile(path)
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return false, readErr
+		}
+		if record == nil || record.Task == nil {
+			continue
+		}
+		if record.Task.AttemptKey == attemptKey {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (s *DispatchTaskStore) recycleExpiredClaims(claimTimeout time.Duration) error {
 	if claimTimeout <= 0 {
 		claimTimeout = 30 * time.Second
@@ -229,6 +285,29 @@ func (s *DispatchTaskStore) recycleExpiredClaims(claimTimeout time.Duration) err
 	}
 
 	return nil
+}
+
+func (s *DispatchTaskStore) snapshotOutstandingPaths(claimTimeout time.Duration) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.recycleExpiredClaims(claimTimeout); err != nil {
+		return nil, err
+	}
+
+	return s.listOutstandingPathsLocked()
+}
+
+func (s *DispatchTaskStore) listOutstandingPathsLocked() ([]string, error) {
+	var paths []string
+	for _, dir := range []string{s.pendingDir(), s.claimsDir()} {
+		files, err := sortedFiles(dir)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, files...)
+	}
+	return paths, nil
 }
 
 func (s *DispatchTaskStore) readTaskFile(path string) (*dispatchTaskFile, error) {

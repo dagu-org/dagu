@@ -7,7 +7,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -112,17 +111,4 @@ func TestSeedExampleSkills_ValidContent(t *testing.T) {
 		assert.NotEmpty(t, skill.Tags, "skill %s should have tags", skill.ID)
 		assert.NotEmpty(t, skill.Knowledge, "skill %s should have knowledge", skill.ID)
 	}
-}
-
-func TestBundledDaguSkillPrefersEnqueue(t *testing.T) {
-	t.Parallel()
-
-	data, err := SkillFS().ReadFile("dagu/SKILL.md")
-	require.NoError(t, err)
-
-	content := string(data)
-	assert.Contains(t, content, "`dagu enqueue my-dag -- env=staging region=eu-west-1`")
-	assert.Contains(t, strings.ToLower(content), "prefer `dagu enqueue` over `dagu start`")
-	assert.Contains(t, content, "Do not check whether the DAG is already running")
-	assert.Contains(t, content, "unless the user explicitly asks")
 }

@@ -3,7 +3,7 @@
 
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Status } from '@/api/v1/schema';
+import { Status, StatusLabel } from '@/api/v1/schema';
 import DAGActions from '../DAGActions';
 
 vi.mock('../../dag-execution', () => ({
@@ -45,8 +45,11 @@ describe('DAGActions', () => {
           name: 'retry-dag',
           dagRunId: 'run-1',
           status: Status.Failed,
+          statusLabel: StatusLabel.failed,
           autoRetryCount: 1,
           autoRetryLimit: 3,
+          startedAt: '',
+          finishedAt: '',
         }}
         fileName="retry-dag.yaml"
         dag={{ name: 'retry-dag' }}
@@ -64,6 +67,10 @@ describe('DAGActions', () => {
           name: 'running-dag',
           dagRunId: 'run-1',
           status: Status.Running,
+          statusLabel: StatusLabel.running,
+          autoRetryCount: 0,
+          startedAt: '',
+          finishedAt: '',
         }}
         fileName="running-dag.yaml"
         dag={{ name: 'running-dag' }}
@@ -82,9 +89,13 @@ describe('DAGActions', () => {
       <DAGActions
         status={{
           name: 'finished-dag',
+          dagRunId: '',
           status: Status.Failed,
+          statusLabel: StatusLabel.failed,
           autoRetryCount: 3,
           autoRetryLimit: 3,
+          startedAt: '',
+          finishedAt: '',
         }}
         fileName="finished-dag.yaml"
         dag={{ name: 'finished-dag' }}

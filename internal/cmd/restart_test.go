@@ -4,10 +4,13 @@
 package cmd_test
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -57,4 +60,47 @@ steps:
 	require.Len(t, recentHistory, 2)
 	require.Equal(t, recentHistory[0].Params, recentHistory[1].Params)
 	require.Equal(t, "2026-03-13T10:00:00Z", recentHistory[0].ScheduleTime)
+}
+
+func TestRestartCommand_BuiltExecutableRestoresExplicitEnv(t *testing.T) {
+	th := test.SetupCommand(t, test.WithBuiltExecutable())
+	t.Setenv("CMD_RESTART_EXPLICIT_ENV", "from-host")
+
+	dag := th.DAG(t, `name: built-restart-explicit-env
+env:
+  - EXPORTED_SECRET: ${CMD_RESTART_EXPLICIT_ENV}
+steps:
+  - name: "hold"
+    command: sleep 5
+  - name: "capture"
+    command: printf '%s|%s' "$EXPORTED_SECRET" "${CMD_RESTART_EXPLICIT_ENV:-}"
+    output: RESULT
+`)
+
+	startDone := make(chan error, 1)
+	go func() {
+		startDone <- th.ExecuteCommand(cmd.Start(), test.CmdTest{
+			Args: []string{"start", dag.Location},
+		})
+	}()
+
+	require.Eventually(t, func() bool {
+		status, err := th.DAGRunMgr.GetCurrentStatus(th.Context, dag.DAG, "")
+		return err == nil && status != nil && status.Status == core.Running
+	}, 10*time.Second, 100*time.Millisecond)
+
+	test.RunBuiltCLI(t, th.Helper, []string{"CMD_RESTART_EXPLICIT_ENV=from-host"}, "restart", dag.Name)
+
+	require.NoError(t, <-startDone)
+
+	latestStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, latestStatus.Status)
+	require.Equal(t, "from-host", strings.SplitN(test.StatusOutputValue(t, &latestStatus, "RESULT"), "|", 2)[0])
+
+	latestAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, latestStatus.DAGRunID))
+	require.NoError(t, err)
+	latestAttemptStatus, err := latestAttempt.ReadStatus(th.Context)
+	require.NoError(t, err)
+	require.Equal(t, "from-host", strings.SplitN(test.StatusOutputValue(t, latestAttemptStatus, "RESULT"), "|", 2)[0])
 }

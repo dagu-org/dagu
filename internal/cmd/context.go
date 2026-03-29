@@ -68,14 +68,15 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
-	DAGRunStore          exec.DAGRunStore
-	DAGRunMgr            runtime.Manager
-	ProcStore            exec.ProcStore
-	QueueStore           exec.QueueStore
-	ServiceRegistry      exec.ServiceRegistry
-	DispatchTaskStore    exec.DispatchTaskStore
-	WorkerHeartbeatStore exec.WorkerHeartbeatStore
-	DAGRunLeaseStore     exec.DAGRunLeaseStore
+	DAGRunStore               exec.DAGRunStore
+	DAGRunMgr                 runtime.Manager
+	ProcStore                 exec.ProcStore
+	QueueStore                exec.QueueStore
+	ServiceRegistry           exec.ServiceRegistry
+	DispatchTaskStore         exec.DispatchTaskStore
+	WorkerHeartbeatStore      exec.WorkerHeartbeatStore
+	DAGRunLeaseStore          exec.DAGRunLeaseStore
+	ActiveDistributedRunStore exec.ActiveDistributedRunStore
 
 	Proc           exec.ProcHandle
 	LicenseManager *license.Manager
@@ -85,21 +86,22 @@ type Context struct {
 // This is useful for creating a signal-aware context for service operations.
 func (c *Context) WithContext(ctx context.Context) *Context {
 	return &Context{
-		Context:              ctx,
-		Command:              c.Command,
-		Flags:                c.Flags,
-		Config:               c.Config,
-		Quiet:                c.Quiet,
-		DAGRunStore:          c.DAGRunStore,
-		DAGRunMgr:            c.DAGRunMgr,
-		ProcStore:            c.ProcStore,
-		QueueStore:           c.QueueStore,
-		ServiceRegistry:      c.ServiceRegistry,
-		DispatchTaskStore:    c.DispatchTaskStore,
-		WorkerHeartbeatStore: c.WorkerHeartbeatStore,
-		DAGRunLeaseStore:     c.DAGRunLeaseStore,
-		Proc:                 c.Proc,
-		LicenseManager:       c.LicenseManager,
+		Context:                   ctx,
+		Command:                   c.Command,
+		Flags:                     c.Flags,
+		Config:                    c.Config,
+		Quiet:                     c.Quiet,
+		DAGRunStore:               c.DAGRunStore,
+		DAGRunMgr:                 c.DAGRunMgr,
+		ProcStore:                 c.ProcStore,
+		QueueStore:                c.QueueStore,
+		ServiceRegistry:           c.ServiceRegistry,
+		DispatchTaskStore:         c.DispatchTaskStore,
+		WorkerHeartbeatStore:      c.WorkerHeartbeatStore,
+		DAGRunLeaseStore:          c.DAGRunLeaseStore,
+		ActiveDistributedRunStore: c.ActiveDistributedRunStore,
+		Proc:                      c.Proc,
+		LicenseManager:            c.LicenseManager,
 	}
 }
 
@@ -235,13 +237,14 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		return nil, fmt.Errorf("failed to validate proc directory %s: %w", cfg.Paths.ProcDir, err)
 	}
 	drs := filedagrun.New(cfg.Paths.DAGRunsDir, hrOpts...)
+	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
+	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
+	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)
 	drm := runtime.NewManager(drs, ps, cfg)
 	qs := filequeue.New(cfg.Paths.QueueDir)
 	sm := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
-	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
 	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
 	workerHeartbeatStore := filedistributed.NewWorkerHeartbeatStore(distributedDir)
-	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 
 	// Initialize license manager for server commands
 	var licMgr *license.Manager
@@ -290,20 +293,21 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	return &Context{
-		Context:              ctx,
-		Command:              cmd,
-		Config:               cfg,
-		Quiet:                quiet,
-		DAGRunStore:          drs,
-		DAGRunMgr:            drm,
-		Flags:                flags,
-		ProcStore:            ps,
-		QueueStore:           qs,
-		ServiceRegistry:      sm,
-		DispatchTaskStore:    dispatchTaskStore,
-		WorkerHeartbeatStore: workerHeartbeatStore,
-		DAGRunLeaseStore:     dagRunLeaseStore,
-		LicenseManager:       licMgr,
+		Context:                   ctx,
+		Command:                   cmd,
+		Config:                    cfg,
+		Quiet:                     quiet,
+		DAGRunStore:               drs,
+		DAGRunMgr:                 drm,
+		Flags:                     flags,
+		ProcStore:                 ps,
+		QueueStore:                qs,
+		ServiceRegistry:           sm,
+		DispatchTaskStore:         dispatchTaskStore,
+		WorkerHeartbeatStore:      workerHeartbeatStore,
+		DAGRunLeaseStore:          dagRunLeaseStore,
+		ActiveDistributedRunStore: activeDistributedRunStore,
+		LicenseManager:            licMgr,
 	}, nil
 }
 
@@ -381,6 +385,9 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 	if c.DAGRunLeaseStore != nil {
 		opts = append(opts, frontend.WithAPIOption(apiv1.WithDAGRunLeaseStore(c.DAGRunLeaseStore)))
 	}
+	opts = append(opts, frontend.WithAPIOption(apiv1.WithSchedulerStateStore(
+		filewatermark.New(filepath.Join(c.Config.Paths.DataDir, "scheduler")),
+	)))
 
 	return frontend.NewServer(c.Context, c.Config, dr, c.DAGRunStore, c.QueueStore, c.ProcStore, c.DAGRunMgr, cc, c.ServiceRegistry, mr, collector, rs, opts...)
 }
@@ -451,6 +458,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	} else {
 		sched.SetAutomataService(automataService)
 	}
+	sched.SetDispatchTaskStore(c.DispatchTaskStore)
 	return sched, nil
 }
 

@@ -87,6 +87,32 @@ steps:
 `,
 		},
 		{
+			name: "ExternalInlineSchemaMode",
+			spec: `
+params:
+  schema:
+    type: object
+    properties:
+      batch_size:
+        type: integer
+  values:
+    batch_size: 25
+steps:
+  - command: echo done
+`,
+		},
+		{
+			name: "ExternalBooleanSchemaModeWithValues",
+			spec: `
+params:
+  schema: true
+  values:
+    batch_size: 25
+steps:
+  - command: echo done
+`,
+		},
+		{
 			name: "RejectCamelCaseInlineField",
 			spec: `
 params:
@@ -129,6 +155,158 @@ params:
 steps:
   - command: echo "${schema} ${region}"
 `,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestDAGSchemaStepOutputSchema(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "InlineObjectSchema",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      name: RESULT
+      schema:
+        type: object
+`,
+		},
+		{
+			name: "BooleanSchema",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      name: RESULT
+      schema: true
+`,
+		},
+		{
+			name: "StringSchemaReference",
+			spec: `
+steps:
+  - command: echo hi
+    output:
+      name: RESULT
+      schema: ./output.schema.json
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestDAGSchemaSchedule(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "TypedCronStart",
+			spec: `
+schedule:
+  - kind: cron
+    expression: "0 * * * *"
+steps:
+  - command: echo hi
+`,
+		},
+		{
+			name: "TypedOneOffStart",
+			spec: `
+schedule:
+  start:
+    kind: at
+    at: "2026-03-29T02:10:00+01:00"
+steps:
+  - command: echo hi
+`,
+		},
+		{
+			name: "RejectTypedCronWithoutExpression",
+			spec: `
+schedule:
+  - kind: cron
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
+		},
+		{
+			name: "RejectTypedAtWithoutTimestamp",
+			spec: `
+schedule:
+  - kind: at
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
+		},
+		{
+			name: "RejectTypedStartWithBothFields",
+			spec: `
+schedule:
+  start:
+    kind: cron
+    expression: "0 * * * *"
+    at: "2026-03-29T02:10:00+01:00"
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
+		},
+		{
+			name: "RejectTypedStopWithoutExpression",
+			spec: `
+schedule:
+  stop:
+    kind: cron
+steps:
+  - command: echo hi
+`,
+			wantErr: "schedule",
 		},
 	}
 

@@ -10,9 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"path"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -35,6 +33,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/resource"
+	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/tunnel"
 	"github.com/dagu-org/dagu/internal/workspace"
 	"github.com/getkin/kin-openapi/openapi3"
@@ -55,7 +54,6 @@ type API struct {
 	dagRunLeaseStore    exec.DAGRunLeaseStore
 	remoteNodeResolver  *remotenode.Resolver
 	remoteNodeStore     remotenode.Store
-	apiBasePath         string
 	logEncodingCharset  string
 	config              *config.Config
 	metricsRegistry     *prometheus.Registry
@@ -81,6 +79,7 @@ type API struct {
 	workspaceStore      workspace.Store
 	leaseStaleThreshold time.Duration
 	automataService     *automata.Service
+	schedulerStateStore scheduler.WatermarkStore
 }
 
 // AuthService defines the interface for authentication operations.
@@ -226,6 +225,13 @@ func WithWorkspaceStore(s workspace.Store) APIOption {
 	}
 }
 
+// WithSchedulerStateStore sets the scheduler state store used for next-run projections.
+func WithSchedulerStateStore(store scheduler.WatermarkStore) APIOption {
+	return func(a *API) {
+		a.schedulerStateStore = store
+	}
+}
+
 // WithDAGRunLeaseStore sets the shared distributed run lease store.
 func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) APIOption {
 	return func(a *API) {
@@ -280,7 +286,6 @@ func New(
 		dagRunMgr:           drm,
 		logEncodingCharset:  cfg.UI.LogEncodingCharset,
 		subCmdBuilder:       runtime.NewSubCmdBuilder(cfg),
-		apiBasePath:         cfg.Server.APIBasePath,
 		config:              cfg,
 		coordinatorCli:      cc,
 		serviceRegistry:     sr,
@@ -301,27 +306,18 @@ func New(
 	return a
 }
 
-func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string) error {
-	swagger, err := api.GetSwagger()
+func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router) error {
+	swagger, err := a.loadOpenAPISpec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get swagger: %w", err)
+		return err
 	}
-
-	baseURL = a.evaluateAndNormalizeURL(ctx, baseURL)
-	swagger.Servers = append(swagger.Servers, &openapi3.Server{URL: baseURL})
-
-	basePath := a.evaluateBasePath(ctx)
-	if basePath != "" {
-		swagger.Servers = append(swagger.Servers, &openapi3.Server{
-			URL: path.Join(baseURL, basePath),
-		})
-	}
+	mountedAPIPath := a.evaluateMountedAPIPath(ctx)
 
 	if a.config.Server.StrictValidation {
 		r.Use(a.createValidatorMiddleware(swagger))
 	}
 
-	authOptions, err := a.buildAuthOptions(ctx, basePath)
+	authOptions, err := a.buildAuthOptions(mountedAPIPath)
 	if err != nil {
 		return err
 	}
@@ -329,7 +325,7 @@ func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router, baseURL string)
 	r.Group(func(r chi.Router) {
 		r.Use(frontendauth.ClientIPMiddleware())
 		r.Use(frontendauth.Middleware(authOptions))
-		r.Use(WithRemoteNode(a.remoteNodeResolver, a.apiBasePath))
+		r.Use(WithRemoteNode(a.remoteNodeResolver, mountedAPIPath))
 		r.Use(WebhookRawBodyMiddleware())
 
 		middlewares := []api.StrictMiddlewareFunc{validateDAGFileNameMiddleware}
@@ -385,17 +381,6 @@ func validateDAGFileNameFromRequest(request any) error {
 	return nil
 }
 
-func (a *API) evaluateAndNormalizeURL(ctx context.Context, baseURL string) string {
-	if evaluated, err := eval.String(ctx, baseURL, eval.WithOSExpansion()); err != nil {
-		logger.Warn(ctx, "Failed to evaluate API base URL",
-			tag.URL(baseURL),
-			tag.Error(err))
-	} else {
-		baseURL = evaluated
-	}
-	return strings.TrimRight(baseURL, "/")
-}
-
 func (a *API) evaluateBasePath(ctx context.Context) string {
 	basePath := a.config.Server.BasePath
 	if evaluated, err := eval.String(ctx, basePath, eval.WithOSExpansion()); err != nil {
@@ -406,6 +391,22 @@ func (a *API) evaluateBasePath(ctx context.Context) string {
 		basePath = evaluated
 	}
 	return basePath
+}
+
+func (a *API) evaluateMountedAPIPath(ctx context.Context) string {
+	return pathutil.BuildMountedAPIPath(a.evaluateBasePath(ctx), a.config.Server.APIBasePath)
+}
+
+func (a *API) loadOpenAPISpec(ctx context.Context) (*openapi3.T, error) {
+	swagger, err := api.GetSwagger()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get swagger: %w", err)
+	}
+
+	swagger.Servers = openapi3.Servers{
+		&openapi3.Server{URL: a.evaluateMountedAPIPath(ctx)},
+	}
+	return swagger, nil
 }
 
 func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) http.Handler {
@@ -421,18 +422,18 @@ func (a *API) createValidatorMiddleware(swagger *openapi3.T) func(http.Handler) 
 	)
 }
 
-func (a *API) buildAuthOptions(_ context.Context, basePath string) (frontendauth.Options, error) {
+func (a *API) buildAuthOptions(mountedAPIPath string) (frontendauth.Options, error) {
 	authConfig := a.config.Server.Auth
 
 	// Setup endpoint is intentionally public — the handler enforces a one-time
 	// guard (returns 403 once an admin user exists).
 	publicPaths := []string{
-		pathutil.BuildPublicEndpointPath(basePath, "api/v1/health"),
-		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/login"),
-		pathutil.BuildPublicEndpointPath(basePath, "api/v1/auth/setup"),
+		pathutil.BuildPublicEndpointPath(mountedAPIPath, "health"),
+		pathutil.BuildPublicEndpointPath(mountedAPIPath, "auth/login"),
+		pathutil.BuildPublicEndpointPath(mountedAPIPath, "auth/setup"),
 	}
 	if a.config.Server.Metrics == config.MetricsAccessPublic {
-		publicPaths = append(publicPaths, pathutil.BuildPublicEndpointPath(basePath, "api/v1/metrics"))
+		publicPaths = append(publicPaths, pathutil.BuildPublicEndpointPath(mountedAPIPath, "metrics"))
 	}
 
 	// When auth mode is "none", disable all authentication entirely.
@@ -442,7 +443,7 @@ func (a *API) buildAuthOptions(_ context.Context, basePath string) (frontendauth
 			Realm:       "restricted",
 			PublicPaths: publicPaths,
 			PublicPathPrefixes: []string{
-				pathutil.BuildPublicEndpointPath(basePath, "api/v1/webhooks") + "/",
+				pathutil.BuildPublicEndpointPath(mountedAPIPath, "webhooks") + "/",
 			},
 		}, nil
 	}
@@ -452,7 +453,7 @@ func (a *API) buildAuthOptions(_ context.Context, basePath string) (frontendauth
 		AuthRequired: true,
 		PublicPaths:  publicPaths,
 		PublicPathPrefixes: []string{
-			pathutil.BuildPublicEndpointPath(basePath, "api/v1/webhooks") + "/",
+			pathutil.BuildPublicEndpointPath(mountedAPIPath, "webhooks") + "/",
 		},
 	}
 

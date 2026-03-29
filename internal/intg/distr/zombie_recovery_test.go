@@ -5,16 +5,21 @@ package distr_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	osexec "os/exec"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/worker"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +52,7 @@ steps:
 
 	require.NoError(t, f.enqueue())
 	f.waitForQueued()
-	f.startScheduler(30 * time.Second)
+	f.startScheduler(90 * time.Second)
 
 	status := f.waitForStatus(core.Running, 15*time.Second)
 	require.Equal(t, core.Running, status.Status)
@@ -61,6 +66,26 @@ steps:
 	finalStatus := f.waitForStatus(core.Failed, 20*time.Second)
 	assert.Equal(t, core.Failed, finalStatus.Status)
 	assert.Contains(t, finalStatus.Error, "worker")
+}
+
+func TestDistributedRun_AckedTaskWithoutInitialStatus_MarkedFailedAndCleansLease(t *testing.T) {
+	t.Run("SharedNothing", func(t *testing.T) {
+		testDistributedRunAckedTaskWithoutInitialStatus(t, sharedNothingMode)
+	})
+
+	t.Run("SharedStorage", func(t *testing.T) {
+		testDistributedRunAckedTaskWithoutInitialStatus(t, sharedFSMode)
+	})
+}
+
+func TestDistributedRun_DelayedAfterAck_DoesNotExecuteAfterStaleCleanup(t *testing.T) {
+	t.Run("SharedNothing", func(t *testing.T) {
+		testDistributedRunDelayedAfterAckDoesNotExecute(t, sharedNothingMode)
+	})
+
+	t.Run("SharedStorage", func(t *testing.T) {
+		testDistributedRunDelayedAfterAckDoesNotExecute(t, sharedFSMode)
+	})
 }
 
 // TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive verifies that a
@@ -286,6 +311,167 @@ steps:
 	}, 10*time.Second, 100*time.Millisecond, "shared lease should be removed after completion")
 }
 
+func testDistributedRunAckedTaskWithoutInitialStatus(t *testing.T, mode workerMode) {
+	t.Helper()
+
+	opts := []fixtureOption{
+		withWorkerCount(0),
+		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
+		withZombieDetectionInterval(testZombieDetectorInterval),
+	}
+	if mode == sharedFSMode {
+		opts = append(opts, withWorkerMode(sharedFSMode))
+	}
+
+	f := newTestFixture(t, `
+type: graph
+name: ack-orphan-test
+worker_selector:
+  test: "true"
+steps:
+  - name: step1
+    command: echo "recovered"
+`, opts...)
+	defer f.cleanup()
+
+	labels := map[string]string{"test": "true"}
+	var (
+		crashWorker *worker.Worker
+		abandonOnce sync.Once
+	)
+	afterAckHook := func(context.Context, *coordinatorv1.Task) bool {
+		triggered := false
+		abandonOnce.Do(func() {
+			triggered = true
+		})
+		return triggered
+	}
+
+	switch mode {
+	case sharedFSMode:
+		crashWorker = f.setupSharedFSWorkerWithAfterAckHook("crash-worker", labels, afterAckHook)
+	case sharedNothingMode:
+		crashWorker = f.setupSharedNothingWorkerWithAfterAckHook("crash-worker", labels, "", afterAckHook)
+	default:
+		t.Fatalf("unsupported worker mode: %v", mode)
+	}
+	require.NotNil(t, crashWorker)
+
+	require.NoError(t, f.enqueue())
+	f.waitForQueued()
+	f.startScheduler(30 * time.Second)
+
+	lease := waitForAnyLease(t, f, 5*time.Second)
+	require.Equal(t, "crash-worker", lease.WorkerID)
+
+	queuedStatus, err := f.latestStatus()
+	require.NoError(t, err)
+	require.Equal(t, core.Queued, queuedStatus.Status)
+	require.Equal(t, lease.AttemptKey, queuedStatus.AttemptKey)
+
+	finalStatus := f.waitForStatus(core.Failed, 20*time.Second)
+	require.Equal(t, core.Failed, finalStatus.Status)
+	assert.Equal(t, lease.AttemptKey, finalStatus.AttemptKey)
+	assert.Contains(t, finalStatus.Error, "distributed run lease expired")
+	assert.Contains(t, finalStatus.Error, "accepted the task claim")
+	assert.Contains(t, finalStatus.Error, "owner coordinator")
+
+	require.Eventually(t, func() bool {
+		_, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, lease.AttemptKey)
+		return errors.Is(err, exec.ErrDAGRunLeaseNotFound)
+	}, 10*time.Second, 100*time.Millisecond, "stale distributed lease should be removed after failure")
+
+	crashWorker.SetAfterTaskAckHook(nil)
+}
+
+func testDistributedRunDelayedAfterAckDoesNotExecute(t *testing.T, mode workerMode) {
+	t.Helper()
+
+	markerPath := filepath.Join(t.TempDir(), "executed.txt")
+	yaml := fmt.Sprintf(`
+type: graph
+name: delayed-after-ack-test
+worker_selector:
+  test: "true"
+steps:
+  - name: step1
+    command: sh -c 'echo executed > %s'
+`, markerPath)
+
+	opts := []fixtureOption{
+		withWorkerCount(0),
+		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
+		withZombieDetectionInterval(testZombieDetectorInterval),
+	}
+	if mode == sharedFSMode {
+		opts = append(opts, withWorkerMode(sharedFSMode))
+	}
+
+	f := newTestFixture(t, yaml, opts...)
+	defer f.cleanup()
+
+	release := make(chan struct{})
+	var blockOnce sync.Once
+	afterAckHook := func(ctx context.Context, _ *coordinatorv1.Task) bool {
+		shouldBlock := false
+		blockOnce.Do(func() {
+			shouldBlock = true
+		})
+		if !shouldBlock {
+			return false
+		}
+		select {
+		case <-release:
+			return false
+		case <-ctx.Done():
+			return false
+		}
+	}
+
+	var delayedWorker *worker.Worker
+	switch mode {
+	case sharedFSMode:
+		delayedWorker = f.setupSharedFSWorkerWithAfterAckHook("delayed-worker", map[string]string{"test": "true"}, afterAckHook)
+	case sharedNothingMode:
+		delayedWorker = f.setupSharedNothingWorkerWithAfterAckHook("delayed-worker", map[string]string{"test": "true"}, "", afterAckHook)
+	default:
+		t.Fatalf("unsupported worker mode: %v", mode)
+	}
+	require.NotNil(t, delayedWorker)
+
+	require.NoError(t, f.enqueue())
+	f.waitForQueued()
+	f.startScheduler(30 * time.Second)
+
+	lease := waitForAnyLease(t, f, 5*time.Second)
+	require.Equal(t, "delayed-worker", lease.WorkerID)
+
+	failedStatus := f.waitForStatus(core.Failed, 20*time.Second)
+	require.Equal(t, core.Failed, failedStatus.Status)
+	require.Equal(t, lease.AttemptKey, failedStatus.AttemptKey)
+
+	close(release)
+
+	require.Eventually(t, func() bool {
+		current, err := f.latestStatus()
+		if err != nil {
+			return false
+		}
+		if current.Status != core.Failed {
+			return false
+		}
+		_, err = os.Stat(markerPath)
+		return errors.Is(err, os.ErrNotExist)
+	}, 5*time.Second, 100*time.Millisecond, "stale worker should not execute after resuming")
+
+	require.Eventually(t, func() bool {
+		_, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, lease.AttemptKey)
+		return errors.Is(err, exec.ErrDAGRunLeaseNotFound)
+	}, 10*time.Second, 100*time.Millisecond, "stale lease should remain deleted after worker resumes")
+
+	delayedWorker.SetAfterTaskAckHook(nil)
+}
+
 func startWorkerProcess(t *testing.T, f *testFixture, workerID, labels string) (*osexec.Cmd, *bytes.Buffer) {
 	t.Helper()
 
@@ -345,4 +531,20 @@ func waitForLease(t *testing.T, f *testFixture, attemptKey string, timeout time.
 	}, timeout, 100*time.Millisecond, "lease %s should exist", attemptKey)
 
 	return *lease
+}
+
+func waitForAnyLease(t *testing.T, f *testFixture, timeout time.Duration) exec.DAGRunLease {
+	t.Helper()
+
+	var lease exec.DAGRunLease
+	require.Eventually(t, func() bool {
+		leases, err := f.coord.DAGRunLeaseStore.ListAll(f.coord.Context)
+		if err != nil || len(leases) == 0 {
+			return false
+		}
+		lease = leases[0]
+		return true
+	}, timeout, 100*time.Millisecond, "a distributed lease should exist")
+
+	return lease
 }

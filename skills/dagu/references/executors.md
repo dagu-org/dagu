@@ -29,6 +29,9 @@ Step-level fields:
 - `script` — Multi-line shell script content
 - `shell` — Shell interpreter (e.g., `/bin/bash`)
 
+Notes:
+- Dagu expands `${VAR}` before the shell runs. For large or arbitrary text, prefer `printenv VAR_NAME`, reading `${step_id.stdout}` as a file, or `type: template`.
+
 ## docker
 
 Run commands in Docker containers.
@@ -75,6 +78,10 @@ Aliases: `dag`, `subworkflow`
 
 Uses step `call:` and `params:` fields. Sub-DAGs do not inherit parent env vars.
 
+Notes:
+- Pass values explicitly via `params:` when the child needs parent env vars or derived values.
+- Child step `output:` variables are not propagated back into the parent DAG output map. Use shared files or another explicit handoff if the parent needs results.
+
 ## parallel
 
 Execute same DAG multiple times in parallel. Requires `call:` field.
@@ -118,6 +125,10 @@ Config fields:
 - `max_concurrent` — Max parallel executions (default 10)
 
 Each parallel invocation receives the current item as the `ITEM` variable.
+
+Notes:
+- `parallel:` only works with `call:` to a sub-DAG; it does not fan out a normal shell step.
+- If an upstream step produced multiline text, read `${step_id.stdout}` from a shell step or convert the data into an array before using `parallel:`.
 
 ## ssh / sftp
 
@@ -183,6 +194,42 @@ steps:
 
 Query from `command:`, input JSON from `script:`. Config fields:
 - `raw` — Output raw strings without JSON encoding (like `jq -r`)
+
+Notes:
+- The built-in `jq` executor reads inline JSON from `script:` only. It does not consume file paths, `${step_id.stdout}` files, or shell stdin.
+- For local files or large JSON documents, use a shell step with the `jq` CLI instead.
+
+## template
+
+Render text using Go `text/template`.
+
+```yaml
+steps:
+  - id: render
+    type: template
+    config:
+      data:
+        name: Alice
+    script: |
+      Hello, {{ .name }}!
+    output: RESULT
+```
+
+Behavior:
+- `script` is required and is rendered as a template, not executed as a shell script
+- Template data comes from `config.data` and is accessed as `{{ .key }}`
+- Supports normal Go template control flow plus a safe subset of slim-sprig functions
+- Missing keys fail the step
+- If `config.output` is set, the rendered result is written to that file instead of stdout
+- Relative `config.output` paths are resolved from the step working directory
+
+Config fields:
+- `data` — Object exposed to the template as `.`
+- `output` — File path for rendered output; if omitted, rendered text is written to stdout
+
+Important: step `output:` and `config.output` are different. Step `output:` captures stdout into a Dagu variable. `config.output` writes the rendered result directly to a file.
+
+Use `template` when you need to generate text files such as Markdown, config files, SQL, JSON, or prompts. It is usually safer and simpler than building files with `echo`, heredocs, or shell string interpolation.
 
 ## sql (postgres / sqlite)
 

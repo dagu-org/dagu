@@ -20,6 +20,19 @@ type StatusPusher struct {
 	owner    exec.HostInfo
 }
 
+// AttemptRejectedError indicates the coordinator explicitly rejected a status
+// update because the worker's claimed attempt is no longer authoritative.
+type AttemptRejectedError struct {
+	Reason string
+}
+
+func (e *AttemptRejectedError) Error() string {
+	if e == nil || e.Reason == "" {
+		return "status rejected"
+	}
+	return fmt.Sprintf("status rejected: %s", e.Reason)
+}
+
 // NewStatusPusher creates a new StatusPusher
 func NewStatusPusher(client coordinator.Client, workerID string, owner ...exec.HostInfo) *StatusPusher {
 	var target exec.HostInfo
@@ -60,7 +73,7 @@ func (p *StatusPusher) Push(ctx context.Context, status exec.DAGRunStatus) error
 	}
 
 	if !resp.Accepted {
-		return fmt.Errorf("status rejected: %s", resp.Error)
+		return &AttemptRejectedError{Reason: resp.Error}
 	}
 
 	return nil

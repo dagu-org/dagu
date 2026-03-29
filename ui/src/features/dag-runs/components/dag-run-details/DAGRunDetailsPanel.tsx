@@ -62,9 +62,9 @@ function DAGRunDetailsPanel({
   });
 
   const expectedDagRunId = isSubDAGRun ? (subDAGRunId as string) : (dagRunId || 'latest');
-  const data =
+  const dagRunDetails =
     matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
-      ? { dagRunDetails: latestDetails }
+      ? latestDetails
       : null;
 
   const refreshFn = React.useCallback(() => {
@@ -123,7 +123,7 @@ function DAGRunDetailsPanel({
   }, [onClose, onNavigate, handleFullscreenClick]);
 
   // Only show loading on initial load, not when switching DAG runs
-  if (!data) {
+  if (!dagRunDetails) {
     if (error) {
       return (
         <div className="flex h-full items-start justify-center p-4">
@@ -181,7 +181,7 @@ function DAGRunDetailsPanel({
         <div className="flex-1 overflow-y-auto min-h-0">
           <DAGRunDetailsContent
             name={name}
-            dagRun={data.dagRunDetails}
+            dagRun={dagRunDetails}
             refreshFn={refreshFn}
             dagRunId={dagRunId}
           />

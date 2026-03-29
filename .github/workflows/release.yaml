@@ -38,6 +38,9 @@ jobs:
       - name: Copy web assets
         run: cp ui/dist/* ./internal/service/frontend/assets/
 
+      - name: Clean UI dependencies
+        run: rm -rf ui/node_modules
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

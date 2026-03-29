@@ -5,6 +5,7 @@ package core
 
 import (
 	"context"
+	"sync"
 
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 )
@@ -36,6 +37,7 @@ type ExecutorCapabilities struct {
 
 // executorCapabilitiesRegistry is a typed registry of executor capabilities.
 type executorCapabilitiesRegistry struct {
+	mu   sync.RWMutex
 	caps map[string]ExecutorCapabilities
 }
 
@@ -45,12 +47,16 @@ var executorCapabilities = executorCapabilitiesRegistry{
 
 // Register registers capabilities for an executor type.
 func (r *executorCapabilitiesRegistry) Register(executorType string, caps ExecutorCapabilities) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.caps[executorType] = caps
 }
 
 // Get returns capabilities for an executor type.
 // Returns an empty ExecutorCapabilities if not registered.
 func (r *executorCapabilitiesRegistry) Get(executorType string) ExecutorCapabilities {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if caps, ok := r.caps[executorType]; ok {
 		return caps
 	}

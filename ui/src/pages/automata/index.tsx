@@ -525,7 +525,10 @@ function AutomataPage(): React.ReactElement {
       return;
     }
     if (!stageOverride || !stageNames.includes(stageOverride)) {
-      setStageOverride(stageNames[0]);
+      const firstStage = stageNames[0];
+      if (firstStage) {
+        setStageOverride(firstStage);
+      }
     }
   }, [detail?.state?.currentStage, stageNames, stageOverride]);
 

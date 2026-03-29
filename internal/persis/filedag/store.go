@@ -415,10 +415,16 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 		if opts.Time != nil {
 			now = *opts.Time
 		}
+		projectNextRun := opts.NextRunProjection
+		if projectNextRun == nil {
+			projectNextRun = func(dag *core.DAG, at time.Time) time.Time {
+				return dag.NextRun(at)
+			}
+		}
 		// Pre-calculate next run times to avoid recalculating on each comparison
 		nextRunTimes := make(map[*core.DAG]time.Time, len(allDags))
 		for _, dag := range allDags {
-			nextRunTimes[dag] = dag.NextRun(now)
+			nextRunTimes[dag] = projectNextRun(dag, now)
 		}
 
 		// Sort DAGs by next run time using cached values

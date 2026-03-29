@@ -5,6 +5,7 @@ package dagindex
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,19 +17,14 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/spec"
 	indexv1 "github.com/dagu-org/dagu/proto/index/v1"
-	"github.com/robfig/cron/v3"
 	"google.golang.org/protobuf/proto"
-)
-
-var cronParser = cron.NewParser(
-	cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
 )
 
 const (
 	// IndexFileName is the name of the DAG definition index file.
 	IndexFileName = ".dag.index"
 	// IndexVersion is the current index format version.
-	IndexVersion = 1
+	IndexVersion = 2
 )
 
 // YAMLFileMeta holds stat metadata for a single YAML file.
@@ -188,34 +184,34 @@ func tagsToStrings(tags core.Tags) []string {
 	return strs
 }
 
-// scheduleToString joins schedule expressions with "; " as a delimiter.
-// This is safe because cron expressions never contain semicolons.
 func scheduleToString(schedules []core.Schedule) string {
 	if len(schedules) == 0 {
 		return ""
 	}
-	exprs := make([]string, len(schedules))
-	for i, s := range schedules {
-		exprs[i] = s.Expression
+	data, err := json.Marshal(schedules)
+	if err != nil {
+		return ""
 	}
-	return strings.Join(exprs, "; ")
+	return string(data)
 }
 
 func parseScheduleExpressions(s string) []core.Schedule {
-	parts := strings.Split(s, "; ")
 	var schedules []core.Schedule
-	for _, expr := range parts {
+	if err := json.Unmarshal([]byte(s), &schedules); err == nil {
+		return schedules
+	}
+
+	parts := strings.SplitSeq(s, "; ")
+	for expr := range parts {
 		expr = strings.TrimSpace(expr)
 		if expr == "" {
 			continue
 		}
-		sched := core.Schedule{Expression: expr}
-		// Parse the cron expression for NextRun support.
-		// Failure is non-fatal: the schedule just won't have a Parsed field.
-		if parsed, err := cronParser.Parse(expr); err == nil {
-			sched.Parsed = parsed
+		if sched, err := core.NewCronSchedule(expr); err == nil {
+			schedules = append(schedules, sched)
+		} else {
+			schedules = append(schedules, core.Schedule{Expression: expr})
 		}
-		schedules = append(schedules, sched)
 	}
 	return schedules
 }

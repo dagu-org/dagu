@@ -159,6 +159,9 @@ func TestPush(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "status rejected")
 		assert.Contains(t, err.Error(), "duplicate status")
+		var rejectedErr *AttemptRejectedError
+		require.ErrorAs(t, err, &rejectedErr)
+		assert.Equal(t, "duplicate status", rejectedErr.Reason)
 	})
 
 	t.Run("RejectedNoMessage", func(t *testing.T) {
@@ -175,6 +178,9 @@ func TestPush(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "status rejected")
+		var rejectedErr *AttemptRejectedError
+		require.ErrorAs(t, err, &rejectedErr)
+		assert.Empty(t, rejectedErr.Reason)
 	})
 
 	t.Run("NilResponse", func(t *testing.T) {

@@ -151,8 +151,7 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	// 2. a map with no "schema" key
 	// e.g. { "batch_size": 10, "environment": "dev" }
 	case map[string]any:
-		schemaRef := extractSchemaReference(v)
-		if schemaRef == "" {
+		if _, ok := extractParamsSchemaDeclaration(v); !ok {
 			return parseMapParams(ctx, []any{v})
 		}
 

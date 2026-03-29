@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
@@ -96,6 +97,10 @@ func (e *DAGExecutor) HandleJob(
 ) error {
 	// For distributed execution with START operation, enqueue for persistence
 	if e.shouldUseDistributedExecution(dag) && operation == coordinatorv1.Operation_OPERATION_START {
+		dag, err := e.prepareDAGForSubprocess(ctx, dag, "")
+		if err != nil {
+			return fmt.Errorf("failed to prepare DAG env for enqueue: %w", err)
+		}
 		ctx = logger.WithValues(ctx,
 			tag.DAG(dag.Name),
 			tag.RunID(runID),
@@ -159,6 +164,15 @@ func (e *DAGExecutor) ExecuteDAG(
 	}
 
 	// Local execution
+	var params any
+	if previousStatus != nil {
+		params = spec.QuoteRuntimeParams(previousStatus.ParamsList, dag.ParamDefs)
+	}
+	dag, err := e.prepareDAGForSubprocess(ctx, dag, params)
+	if err != nil {
+		return fmt.Errorf("failed to prepare DAG env for subprocess: %w", err)
+	}
+
 	switch operation {
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
 		return fmt.Errorf("operation not specified")
@@ -224,11 +238,32 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 
 // Restart restarts a DAG unconditionally.
 func (e *DAGExecutor) Restart(ctx context.Context, dag *core.DAG, scheduleTime time.Time) error {
-	spec := e.subCmdBuilder.Restart(dag, runtime.RestartOptions{
+	prepared, err := e.prepareDAGForSubprocess(ctx, dag, "")
+	if err != nil {
+		return fmt.Errorf("failed to prepare DAG env for restart: %w", err)
+	}
+	spec := e.subCmdBuilder.Restart(prepared, runtime.RestartOptions{
 		Quiet:        true,
 		ScheduleTime: stringutil.FormatTime(scheduleTime),
 	})
 	return runtime.Start(ctx, spec)
+}
+
+func (e *DAGExecutor) prepareDAGForSubprocess(ctx context.Context, dag *core.DAG, params any) (*core.DAG, error) {
+	if dag == nil {
+		return nil, nil
+	}
+
+	env, err := spec.ResolveEnv(ctx, dag, params, spec.ResolveEnvOptions{
+		BaseConfig: e.baseConfigPath,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	prepared := dag.Clone()
+	prepared.Env = env
+	return prepared, nil
 }
 
 // Close closes any resources held by the DAGExecutor, including the coordinator client.

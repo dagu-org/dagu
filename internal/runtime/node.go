@@ -260,6 +260,17 @@ func (n *Node) Execute(ctx context.Context, onSetup ...func()) error {
 		return err
 	}
 
+	// Validate captured output against schema if defined.
+	// Only treat schema validation as a failure when the command itself succeeded.
+	if n.Error() == nil {
+		if err := n.validateOutput(ctx); err != nil {
+			n.SetExitCode(1)
+			n.SetError(err)
+			logger.Error(ctx, "Output schema validation failed", tag.Error(err))
+			return err
+		}
+	}
+
 	statusErr := n.determineNodeStatus(cmd)
 
 	// Prefer the execution error over the status determination error,
@@ -391,6 +402,43 @@ func (n *Node) captureOutput(ctx context.Context) error {
 		return fmt.Errorf("failed to capture output: %w", err)
 	}
 	n.setVariable(output, value)
+	return nil
+}
+
+// validateOutput validates captured output against the step's output schema if defined.
+func (n *Node) validateOutput(_ context.Context) error {
+	schema := n.Step().OutputSchema
+	if schema == nil {
+		return nil
+	}
+
+	output := n.Step().Output
+	if output == "" {
+		return nil
+	}
+
+	// getVariable returns (stringutil.KeyValue, bool)
+	kv, ok := n.getVariable(output)
+	if !ok {
+		return fmt.Errorf("output validation failed: output %q is empty but schema requires content", output)
+	}
+
+	value := kv.Value()
+	if value == "" {
+		return fmt.Errorf("output validation failed: output %q is empty but schema requires content", output)
+	}
+
+	// Parse output as JSON
+	var parsed any
+	if err := json.Unmarshal([]byte(value), &parsed); err != nil {
+		return fmt.Errorf("output validation failed: output %q is not valid JSON: %w", output, err)
+	}
+
+	// Validate against schema
+	if err := schema.Validate(parsed); err != nil {
+		return fmt.Errorf("output validation failed for %q: %w", output, err)
+	}
+
 	return nil
 }
 

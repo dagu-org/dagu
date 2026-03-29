@@ -93,15 +93,16 @@ type DAGRunStore interface {
 
 // ListDAGRunStatusesOptions contains options for listing runs
 type ListDAGRunStatusesOptions struct {
-	DAGRunID  string
-	Name      string
-	ExactName string
-	From      TimeInUTC
-	To        TimeInUTC
-	Statuses  []core.Status
-	Limit     int
-	Tags      []string // Filter by DAG tags (AND logic - all tags must match)
-	Unlimited bool
+	DAGRunID   string
+	Name       string
+	ExactName  string
+	From       TimeInUTC
+	To         TimeInUTC
+	Statuses   []core.Status
+	Limit      int
+	Tags       []string // Filter by DAG tags (AND logic - all tags must match)
+	Unlimited  bool
+	AllHistory bool
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
@@ -168,6 +169,14 @@ func WithLimit(limit int) ListDAGRunStatusesOption {
 func WithoutLimit() ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.Unlimited = true
+	}
+}
+
+// WithAllHistory disables the default implicit "today only" time window when
+// no explicit range is supplied.
+func WithAllHistory() ListDAGRunStatusesOption {
+	return func(o *ListDAGRunStatusesOptions) {
+		o.AllHistory = true
 	}
 }
 

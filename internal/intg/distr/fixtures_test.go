@@ -16,11 +16,13 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/filewatermark"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
 	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/service/worker"
 	"github.com/dagu-org/dagu/internal/test"
+	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,6 +192,15 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 }
 
 func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[string]string, workerBaseConfigPath string) *worker.Worker {
+	return f.setupSharedNothingWorkerWithAfterAckHook(workerID, labels, workerBaseConfigPath, nil)
+}
+
+func (f *testFixture) setupSharedNothingWorkerWithAfterAckHook(
+	workerID string,
+	labels map[string]string,
+	workerBaseConfigPath string,
+	afterAckHook func(context.Context, *coordinatorv1.Task) bool,
+) *worker.Worker {
 	f.t.Helper()
 
 	workerConfig := f.coord.Config
@@ -216,15 +227,29 @@ func (f *testFixture) setupSharedNothingWorker(workerID string, labels map[strin
 
 	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewRemoteTaskHandler(handlerCfg))
+	if afterAckHook != nil {
+		w.SetAfterTaskAckHook(afterAckHook)
+	}
 
 	return f.startWorker(w, workerID)
 }
 
 func (f *testFixture) setupSharedFSWorker(workerID string, labels map[string]string) *worker.Worker {
+	return f.setupSharedFSWorkerWithAfterAckHook(workerID, labels, nil)
+}
+
+func (f *testFixture) setupSharedFSWorkerWithAfterAckHook(
+	workerID string,
+	labels map[string]string,
+	afterAckHook func(context.Context, *coordinatorv1.Task) bool,
+) *worker.Worker {
 	f.t.Helper()
 
 	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewTaskHandler(f.coord.Config))
+	if afterAckHook != nil {
+		w.SetAfterTaskAckHook(afterAckHook)
+	}
 
 	return f.startWorker(w, workerID)
 }
@@ -266,6 +291,22 @@ func (f *testFixture) waitForWorkerRegistration(workerID string, timeout time.Du
 }
 
 func (f *testFixture) startScheduler(timeout time.Duration) {
+	f.startSchedulerWithClock(timeout, nil)
+}
+
+func (f *testFixture) startSchedulerWithClock(timeout time.Duration, clock scheduler.Clock) {
+	f.startSchedulerWithOptions(
+		timeout,
+		clock,
+		filewatermark.New(filepath.Join(f.coord.Config.Paths.DataDir, "scheduler")),
+	)
+}
+
+func (f *testFixture) startSchedulerWithOptions(
+	timeout time.Duration,
+	clock scheduler.Clock,
+	watermarkStore scheduler.WatermarkStore,
+) {
 	f.t.Helper()
 
 	em := scheduler.NewEntryReader(f.coord.Config.Paths.DAGsDir, f.coord.DAGStore)
@@ -279,10 +320,13 @@ func (f *testFixture) startScheduler(timeout time.Duration) {
 		f.coord.ProcStore,
 		f.coord.ServiceRegistry,
 		f.coordinatorClient,
-		nil,
+		watermarkStore,
 	)
 	require.NoError(f.t, err)
 	schedulerInst.SetDAGRunLeaseStore(f.coord.DAGRunLeaseStore)
+	if clock != nil {
+		schedulerInst.SetClock(clock)
+	}
 
 	startupTimeout := timeout
 	if startupTimeout <= 0 {
@@ -454,6 +498,14 @@ func (f *testFixture) stop(dagRunID string) error {
 func (f *testFixture) cleanup() {
 	f.t.Helper()
 
+	f.stopScheduler()
+	f.schedulerErr = nil
+	f.schedulerErrSet = false
+}
+
+func (f *testFixture) stopScheduler() {
+	f.t.Helper()
+
 	schedulerInst := f.scheduler
 	schedulerCancel := f.schedulerCancel
 	schedulerErrCh := f.schedulerErrCh
@@ -463,8 +515,6 @@ func (f *testFixture) cleanup() {
 	f.schedulerCtx = nil
 	f.schedulerCancel = nil
 	f.schedulerErrCh = nil
-	f.schedulerErr = nil
-	f.schedulerErrSet = false
 
 	if schedulerCancel != nil {
 		schedulerCancel()
