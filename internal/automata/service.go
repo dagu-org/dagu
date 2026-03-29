@@ -31,7 +31,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var automataNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+var automataNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_]*$`)
 
 const (
 	stageApprovalOptionApprove = "approve"

@@ -17,7 +17,7 @@ import StatusChip from '@/ui/StatusChip';
 
 type AutomataDetail = components['schemas']['AutomataDetailResponse'];
 
-const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
+const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
 const DEFAULT_STAGE_NAMES = ['research', 'plan', 'implement', 'review'];
 
 type DAGOption = {
@@ -320,7 +320,7 @@ function validateAutomataCreateForm(input: {
     return 'Automata name is required.';
   }
   if (!AUTOMATA_NAME_PATTERN.test(name)) {
-    return 'Automata name must start with a letter or number and use only letters, numbers, underscores, dots, and hyphens.';
+    return 'Automata name must start with a letter or number and use only letters, numbers, and underscores.';
   }
   if (!input.goal.trim()) {
     return 'Goal is required.';
@@ -1014,13 +1014,13 @@ function AutomataPage(): React.ReactElement {
                     id="automata-name"
                     value={createName}
                     onChange={(e) => setCreateName(e.target.value)}
-                    placeholder="software-dev"
+                    placeholder="software_dev"
                     autoFocus
                     disabled={isCreating}
                   />
                   <div className="text-xs text-muted-foreground">
                     Must start with a letter or number. Use letters, numbers,
-                    underscores, dots, and hyphens only.
+                    and underscores only.
                   </div>
                 </div>
 
