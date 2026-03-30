@@ -31,7 +31,7 @@ describe('useBulkDAGRunSelection', () => {
     const { result } = renderHook(() => useBulkDAGRunSelection(dagRuns));
 
     act(() => {
-      result.current.selectAllVisible();
+      result.current.selectAllMatching();
     });
 
     expect(result.current.selectedCount).toBe(2);
@@ -58,11 +58,29 @@ describe('useBulkDAGRunSelection', () => {
     );
 
     act(() => {
-      result.current.selectAllVisible();
+      result.current.selectAllMatching();
     });
 
     rerender({
       dagRuns: [remainingRun],
+    });
+
+    expect(result.current.selectedCount).toBe(1);
+    expect(result.current.selectedRuns).toEqual([
+      { name: 'beta', dagRunId: 'run-2' },
+    ]);
+  });
+
+  it('replaces the selection with the provided visible items', () => {
+    const dagRuns = [
+      buildDagRun('alpha', 'run-1'),
+      buildDagRun('beta', 'run-2'),
+    ];
+
+    const { result } = renderHook(() => useBulkDAGRunSelection(dagRuns));
+
+    act(() => {
+      result.current.replaceSelection([{ name: 'beta', dagRunId: 'run-2' }]);
     });
 
     expect(result.current.selectedCount).toBe(1);

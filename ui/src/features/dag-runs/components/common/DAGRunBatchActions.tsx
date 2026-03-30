@@ -1,10 +1,4 @@
-import React from 'react';
-import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
-import { useErrorModal } from '@/components/ui/error-modal';
-import { useSimpleToast } from '@/components/ui/simple-toast';
-import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
 import {
   Dialog,
   DialogContent,
@@ -12,20 +6,39 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
-import ConfirmModal from '@/ui/ConfirmModal';
+} from '@/components/ui/dialog';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useClient } from '@/hooks/api';
+import { RefreshCw } from 'lucide-react';
+import React from 'react';
 import { DAGRunSelectionItem } from '../../hooks/useBulkDAGRunSelection';
 
 type BatchActionType = 'retry' | 'reschedule';
+type BatchActionPhase = 'confirm' | 'running' | 'complete';
 
-type BatchActionResponse = components['schemas']['DAGRunBatchActionResponse'];
+type BatchActionResult = DAGRunSelectionItem & {
+  ok: boolean;
+  error?: string;
+  newDagRunId?: string;
+  queued?: boolean;
+};
+
+type BatchProgressState = {
+  currentItem: DAGRunSelectionItem | null;
+  failureCount: number;
+  processedCount: number;
+  refreshError: string | null;
+  results: BatchActionResult[];
+  successCount: number;
+};
 
 interface DAGRunBatchActionsProps {
-  onActionComplete?: () => Promise<void> | void;
+  matchingCount: number;
+  onActionComplete?: () => Promise<unknown> | unknown;
   onClearSelection: () => void;
-  onSelectAllVisible: () => void;
+  onReplaceSelection: (items: DAGRunSelectionItem[]) => void;
+  onSelectAllMatching: () => void;
   selectedRuns: DAGRunSelectionItem[];
-  visibleCount: number;
 }
 
 const actionLabels: Record<BatchActionType, string> = {
@@ -33,113 +46,288 @@ const actionLabels: Record<BatchActionType, string> = {
   reschedule: 'Reschedule selected',
 };
 
-const actionNouns: Record<BatchActionType, string> = {
+const actionVerbs: Record<BatchActionType, string> = {
   retry: 'retry',
   reschedule: 'reschedule',
 };
 
-const actionPastTense: Record<BatchActionType, string> = {
-  retry: 'Retried',
-  reschedule: 'Rescheduled',
+const createEmptyProgress = (): BatchProgressState => ({
+  currentItem: null,
+  failureCount: 0,
+  processedCount: 0,
+  refreshError: null,
+  results: [],
+  successCount: 0,
+});
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message.length > 0
+  ) {
+    return error.message;
+  }
+  return fallback;
 };
 
 function DAGRunBatchActions({
+  matchingCount,
   onActionComplete,
   onClearSelection,
-  onSelectAllVisible,
+  onReplaceSelection,
+  onSelectAllMatching,
   selectedRuns,
-  visibleCount,
 }: DAGRunBatchActionsProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
-  const { showError } = useErrorModal();
-  const { showToast } = useSimpleToast();
-  const [pendingAction, setPendingAction] =
-    React.useState<BatchActionType | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [resultsState, setResultsState] = React.useState<{
+  const [activeBatch, setActiveBatch] = React.useState<{
     action: BatchActionType;
-    response: BatchActionResponse;
+    snapshot: DAGRunSelectionItem[];
   } | null>(null);
+  const [phase, setPhase] = React.useState<BatchActionPhase | null>(null);
+  const [progress, setProgress] =
+    React.useState<BatchProgressState>(createEmptyProgress);
 
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const selectedCount = selectedRuns.length;
+  const isRunning = phase === 'running';
+  const snapshot = activeBatch?.snapshot ?? [];
+  const totalCount = snapshot.length;
+  const remainingCount = Math.max(totalCount - progress.processedCount, 0);
+
+  const closeDialog = React.useCallback(() => {
+    if (phase === 'running') {
+      return;
+    }
+    setActiveBatch(null);
+    setPhase(null);
+    setProgress(createEmptyProgress());
+  }, [phase]);
+
+  const openBatchDialog = React.useCallback(
+    (action: BatchActionType) => {
+      if (selectedRuns.length === 0) {
+        return;
+      }
+      setActiveBatch({
+        action,
+        snapshot: [...selectedRuns],
+      });
+      setPhase('confirm');
+      setProgress(createEmptyProgress());
+    },
+    [selectedRuns]
+  );
+
+  const submitBatchItem = React.useCallback(
+    async (
+      action: BatchActionType,
+      dagRun: DAGRunSelectionItem
+    ): Promise<BatchActionResult> => {
+      const fallback = `Failed to ${actionVerbs[action]} DAG run`;
+
+      try {
+        if (action === 'retry') {
+          const { error } = await client.POST(
+            '/dag-runs/{name}/{dagRunId}/retry',
+            {
+              params: {
+                path: {
+                  name: dagRun.name,
+                  dagRunId: dagRun.dagRunId,
+                },
+                query: {
+                  remoteNode,
+                },
+              },
+              body: {
+                dagRunId: dagRun.dagRunId,
+              },
+            }
+          );
+
+          if (error) {
+            return {
+              ...dagRun,
+              ok: false,
+              error: error.message || fallback,
+            };
+          }
+
+          return {
+            ...dagRun,
+            ok: true,
+          };
+        }
+
+        const { data, error } = await client.POST(
+          '/dag-runs/{name}/{dagRunId}/reschedule',
+          {
+            params: {
+              path: {
+                name: dagRun.name,
+                dagRunId: dagRun.dagRunId,
+              },
+              query: {
+                remoteNode,
+              },
+            },
+          }
+        );
+
+        if (error) {
+          return {
+            ...dagRun,
+            ok: false,
+            error: error.message || fallback,
+          };
+        }
+
+        return {
+          ...dagRun,
+          ok: true,
+          newDagRunId: data?.dagRunId,
+          queued: data?.queued,
+        };
+      } catch (error) {
+        return {
+          ...dagRun,
+          ok: false,
+          error: getErrorMessage(error, fallback),
+        };
+      }
+    },
+    [client, remoteNode]
+  );
 
   const submitBatchAction = React.useCallback(async () => {
-    if (!pendingAction || selectedCount === 0) {
-      setPendingAction(null);
+    if (!activeBatch) {
       return;
     }
 
-    const action = pendingAction;
-    setPendingAction(null);
-    setIsSubmitting(true);
+    const { action, snapshot } = activeBatch;
+    const results: BatchActionResult[] = [];
+    let successCount = 0;
+    let failureCount = 0;
 
-    const path =
-      action === 'retry' ? '/dag-runs/retry-batch' : '/dag-runs/reschedule-batch';
-
-    const { data, error } = await client.POST(path, {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-        },
-      },
-      body: {
-        items: selectedRuns.map((dagRun) => ({
-          name: dagRun.name,
-          dagRunId: dagRun.dagRunId,
-        })),
-      },
+    setPhase('running');
+    setProgress({
+      currentItem: snapshot[0] ?? null,
+      failureCount: 0,
+      processedCount: 0,
+      refreshError: null,
+      results: [],
+      successCount: 0,
     });
 
-    setIsSubmitting(false);
+    for (const [index, dagRun] of snapshot.entries()) {
+      setProgress({
+        currentItem: dagRun,
+        failureCount,
+        processedCount: index,
+        refreshError: null,
+        results: [...results],
+        successCount,
+      });
 
-    if (error) {
-      showError(
-        error.message ||
-          `Failed to ${actionNouns[action]} ${selectedCount} DAG run${selectedCount === 1 ? '' : 's'}`,
-        'Refresh the page and try again.'
-      );
-      return;
+      const result = await submitBatchItem(action, dagRun);
+      results.push(result);
+
+      if (result.ok) {
+        successCount++;
+      } else {
+        failureCount++;
+      }
+
+      setProgress({
+        currentItem: snapshot[index + 1] ?? null,
+        failureCount,
+        processedCount: index + 1,
+        refreshError: null,
+        results: [...results],
+        successCount,
+      });
     }
 
-    if (!data) {
-      showError(
-        `Failed to ${actionNouns[action]} DAG runs`,
-        'The server returned an empty response.'
+    let refreshError: string | null = null;
+    try {
+      await Promise.resolve(onActionComplete?.());
+    } catch (error) {
+      refreshError = getErrorMessage(
+        error,
+        'Failed to refresh DAG runs after submitting the batch action.'
       );
-      return;
     }
 
-    await Promise.resolve(onActionComplete?.());
-    onClearSelection();
+    onReplaceSelection(
+      results
+        .filter((result) => !result.ok)
+        .map((result) => ({
+          name: result.name,
+          dagRunId: result.dagRunId,
+        }))
+    );
 
-    if (data.failureCount === 0) {
-      showToast(
-        `${actionPastTense[action]} ${data.successCount} DAG run${data.successCount === 1 ? '' : 's'}`
-      );
-      return;
-    }
-
-    setResultsState({
-      action,
-      response: data,
+    setProgress({
+      currentItem: null,
+      failureCount,
+      processedCount: snapshot.length,
+      refreshError,
+      results,
+      successCount,
     });
-  }, [
-    appBarContext.selectedRemoteNode,
-    client,
-    onActionComplete,
-    onClearSelection,
-    pendingAction,
-    selectedCount,
-    selectedRuns,
-    showError,
-    showToast,
-  ]);
+    setPhase('complete');
+  }, [activeBatch, onActionComplete, onReplaceSelection, submitBatchItem]);
 
   const summaryText =
     selectedCount === 0
-      ? `${visibleCount} visible`
-      : `${selectedCount} selected of ${visibleCount} visible`;
+      ? `${matchingCount} matching`
+      : `${selectedCount} selected of ${matchingCount} matching`;
+
+  const progressPercent =
+    totalCount === 0 ? 0 : (progress.processedCount / totalCount) * 100;
+
+  const renderResultDetails = (
+    action: BatchActionType,
+    result: BatchActionResult
+  ) => {
+    if (!result.ok) {
+      return <div className="mt-2 text-sm text-error">{result.error}</div>;
+    }
+
+    if (action === 'retry') {
+      return (
+        <div className="mt-2 text-sm text-muted-foreground">
+          Retry request accepted
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-2 space-y-1 text-sm">
+        {result.newDagRunId ? (
+          <div>
+            New DAG run: <span className="font-mono">{result.newDagRunId}</span>
+          </div>
+        ) : (
+          <div className="text-muted-foreground">
+            Reschedule request accepted
+          </div>
+        )}
+        {typeof result.queued === 'boolean' && (
+          <div className="text-muted-foreground">
+            {result.queued ? 'Queued for execution' : 'Started immediately'}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -149,130 +337,220 @@ function DAGRunBatchActions({
           <Button
             size="sm"
             variant="outline"
-            onClick={onSelectAllVisible}
-            disabled={visibleCount === 0 || isSubmitting}
+            onClick={onSelectAllMatching}
+            disabled={matchingCount === 0 || isRunning}
           >
-            Select all visible
+            Select all matching
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={onClearSelection}
-            disabled={selectedCount === 0 || isSubmitting}
+            disabled={selectedCount === 0 || isRunning}
           >
             Clear selection
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setPendingAction('retry')}
-            disabled={selectedCount === 0 || isSubmitting}
+            onClick={() => openBatchDialog('retry')}
+            disabled={selectedCount === 0 || isRunning}
           >
             Retry selected
           </Button>
           <Button
             size="sm"
-            onClick={() => setPendingAction('reschedule')}
-            disabled={selectedCount === 0 || isSubmitting}
+            onClick={() => openBatchDialog('reschedule')}
+            disabled={selectedCount === 0 || isRunning}
           >
             Reschedule selected
           </Button>
         </div>
       </div>
 
-      <ConfirmModal
-        title={pendingAction ? actionLabels[pendingAction] : 'Batch action'}
-        buttonText={pendingAction ? actionLabels[pendingAction] : 'Run'}
-        visible={pendingAction !== null}
-        dismissModal={() => setPendingAction(null)}
-        onSubmit={submitBatchAction}
-      >
-        <div className="space-y-2">
-          <p>
-            Do you want to {pendingAction ? actionNouns[pendingAction] : 'run'}{' '}
-            {selectedCount} selected DAG run
-            {selectedCount === 1 ? '' : 's'}?
-          </p>
-          <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-3">
-            {selectedRuns.map((dagRun) => (
-              <div
-                key={`${dagRun.name}-${dagRun.dagRunId}`}
-                className="text-sm"
-              >
-                <div className="font-medium">{dagRun.name}</div>
-                <div className="font-mono text-xs text-muted-foreground">
-                  {dagRun.dagRunId}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </ConfirmModal>
-
       <Dialog
-        open={resultsState !== null}
+        open={phase !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setResultsState(null);
+            closeDialog();
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent
+          hideCloseButton
+          className="sm:max-w-2xl"
+          onPointerDownOutside={(event) => {
+            if (phase === 'running') {
+              event.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (phase === 'running') {
+              event.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
-              {resultsState
-                ? `${actionLabels[resultsState.action]} results`
-                : 'Batch results'}
+              {activeBatch ? actionLabels[activeBatch.action] : 'Batch action'}
             </DialogTitle>
             <DialogDescription>
-              {resultsState
-                ? `${resultsState.response.successCount} succeeded, ${resultsState.response.failureCount} failed.`
-                : ''}
+              {phase === 'confirm' && activeBatch
+                ? `Submit ${activeBatch.snapshot.length} ${actionVerbs[activeBatch.action]} request${activeBatch.snapshot.length === 1 ? '' : 's'} using the existing DAG-run API.`
+                : phase === 'running'
+                  ? `Submitting ${progress.processedCount} of ${totalCount} request${totalCount === 1 ? '' : 's'} one at a time.`
+                  : phase === 'complete'
+                    ? `${progress.successCount} succeeded, ${progress.failureCount} failed.`
+                    : ''}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-            {resultsState?.response.results.map((result, index) => (
-              <div
-                key={`${result.name}-${result.dagRunId}-${index}`}
-                data-testid="batch-action-result-item"
-                className="rounded-md border p-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium">{result.name}</div>
+          {phase === 'confirm' && activeBatch && (
+            <div className="space-y-3">
+              <p className="text-sm text-foreground">
+                Do you want to {actionVerbs[activeBatch.action]}{' '}
+                {activeBatch.snapshot.length} selected DAG run
+                {activeBatch.snapshot.length === 1 ? '' : 's'}?
+              </p>
+              <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-3">
+                {activeBatch.snapshot.map((dagRun) => (
+                  <div
+                    key={`${dagRun.name}-${dagRun.dagRunId}`}
+                    className="text-sm"
+                  >
+                    <div className="font-medium">{dagRun.name}</div>
                     <div className="font-mono text-xs text-muted-foreground">
-                      {result.dagRunId}
+                      {dagRun.dagRunId}
                     </div>
                   </div>
-                  <div
-                    className={`text-xs font-medium ${result.ok ? 'text-success' : 'text-error'}`}
-                  >
-                    {result.ok ? 'Succeeded' : 'Failed'}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {phase === 'running' && activeBatch && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Submission progress
+                  </span>
+                  <span className="font-mono tabular-nums">
+                    {progress.processedCount}/{totalCount}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="flex h-full">
+                    {progress.successCount > 0 && (
+                      <div
+                        className="h-full bg-success"
+                        style={{
+                          width: `${(progress.successCount / totalCount) * 100}%`,
+                        }}
+                      />
+                    )}
+                    {progress.failureCount > 0 && (
+                      <div
+                        className="h-full bg-error"
+                        style={{
+                          width: `${(progress.failureCount / totalCount) * 100}%`,
+                        }}
+                      />
+                    )}
+                    {remainingCount > 0 && (
+                      <div
+                        className="h-full bg-muted-foreground/20"
+                        style={{ width: `${100 - progressPercent}%` }}
+                      />
+                    )}
                   </div>
                 </div>
-                {result.newDagRunId && (
-                  <div className="mt-2 text-sm">
-                    New DAG run:{' '}
-                    <span className="font-mono">{result.newDagRunId}</span>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{progress.successCount} succeeded</span>
+                  <span>{progress.failureCount} failed</span>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Current item
+                </div>
+                {progress.currentItem ? (
+                  <>
+                    <div className="font-medium">
+                      {progress.currentItem.name}
+                    </div>
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {progress.currentItem.dagRunId}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Finalizing results
                   </div>
-                )}
-                {typeof result.queued === 'boolean' && (
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {result.queued ? 'Queued for execution' : 'Started immediately'}
-                  </div>
-                )}
-                {result.error && (
-                  <div className="mt-2 text-sm text-error">{result.error}</div>
                 )}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {phase === 'complete' && activeBatch && (
+            <div className="space-y-4">
+              {progress.refreshError && (
+                <div className="rounded-md border border-error/30 bg-error-muted p-3 text-sm text-error">
+                  {progress.refreshError}
+                </div>
+              )}
+              <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                {progress.results.map((result, index) => (
+                  <div
+                    key={`${result.name}-${result.dagRunId}-${index}`}
+                    data-testid="batch-action-result-item"
+                    className="rounded-md border p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium">{result.name}</div>
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {result.dagRunId}
+                        </div>
+                      </div>
+                      <div
+                        className={`text-xs font-medium ${result.ok ? 'text-success' : 'text-error'}`}
+                      >
+                        {result.ok ? 'Succeeded' : 'Failed'}
+                      </div>
+                    </div>
+                    {renderResultDetails(activeBatch.action, result)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResultsState(null)}>
-              Close
-            </Button>
+            {phase === 'confirm' && activeBatch && (
+              <>
+                <Button variant="outline" onClick={closeDialog}>
+                  Cancel
+                </Button>
+                <Button onClick={submitBatchAction}>
+                  {activeBatch.action === 'retry'
+                    ? `Retry ${activeBatch.snapshot.length} Run${activeBatch.snapshot.length === 1 ? '' : 's'}`
+                    : `Reschedule ${activeBatch.snapshot.length} Run${activeBatch.snapshot.length === 1 ? '' : 's'}`}
+                </Button>
+              </>
+            )}
+            {phase === 'running' && (
+              <Button disabled>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </Button>
+            )}
+            {phase === 'complete' && (
+              <Button variant="outline" onClick={closeDialog}>
+                Close
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

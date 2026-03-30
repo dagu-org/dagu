@@ -1778,49 +1778,6 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	return api.RetryDAGRun200Response{}, nil
 }
 
-func (a *API) RetryDAGRunsBatch(ctx context.Context, request api.RetryDAGRunsBatchRequestObject) (api.RetryDAGRunsBatchResponseObject, error) {
-	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
-		return nil, err
-	}
-	if err := a.requireExecute(ctx); err != nil {
-		return nil, err
-	}
-	if request.Body == nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "request body is required",
-		}
-	}
-	if err := validateDAGRunBatchItems(request.Body.Items); err != nil {
-		return nil, err
-	}
-
-	results := make([]api.DAGRunBatchActionResult, 0, len(request.Body.Items))
-	for _, item := range request.Body.Items {
-		result := api.DAGRunBatchActionResult{
-			Name:     item.Name,
-			DagRunId: item.DagRunId,
-		}
-
-		outcome, err := a.retryDAGRun(ctx, item.Name, item.DagRunId, item.DagRunId, "")
-		if err != nil {
-			result.Ok = false
-			errMsg := dagRunBatchActionErrorMessage(err)
-			result.Error = &errMsg
-			results = append(results, result)
-			continue
-		}
-
-		result.Ok = true
-		queued := outcome.queued
-		result.Queued = &queued
-		results = append(results, result)
-	}
-
-	return api.RetryDAGRunsBatch200JSONResponse(buildDAGRunBatchActionResponse(results)), nil
-}
-
 type retryDAGRunResult struct {
 	queued bool
 }
@@ -1966,100 +1923,6 @@ func (a *API) waitForRetryStarted(ctx context.Context, dag *core.DAG, dagRunID s
 			}
 			time.Sleep(pollInterval)
 		}
-	}
-}
-
-const dagRunBatchActionMaxItems = 100
-
-func validateDAGRunBatchItems(items []api.DAGRunBatchActionItem) error {
-	if len(items) == 0 {
-		return &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "at least one batch item is required",
-		}
-	}
-	if len(items) > dagRunBatchActionMaxItems {
-		return &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("batch requests support at most %d items", dagRunBatchActionMaxItems),
-		}
-	}
-
-	seen := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		if item.Name == "" {
-			return &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "batch item name is required",
-			}
-		}
-		if item.DagRunId == "" {
-			return &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "batch item dagRunId is required",
-			}
-		}
-		if item.DagRunId == "latest" {
-			return &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    `batch item dagRunId must reference a historical DAG-run, not "latest"`,
-			}
-		}
-		if err := core.ValidateDAGName(item.Name); err != nil {
-			return &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
-		}
-		if err := validateDAGRunID(item.DagRunId); err != nil {
-			return err
-		}
-
-		key := dagRunBatchActionItemKey(item.Name, item.DagRunId)
-		if _, ok := seen[key]; ok {
-			return &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    fmt.Sprintf("duplicate batch item for DAG %s and dag-run ID %s", item.Name, item.DagRunId),
-			}
-		}
-		seen[key] = struct{}{}
-	}
-
-	return nil
-}
-
-func dagRunBatchActionItemKey(name, dagRunID string) string {
-	return name + "\x00" + dagRunID
-}
-
-func dagRunBatchActionErrorMessage(err error) string {
-	var apiErr *Error
-	if errors.As(err, &apiErr) {
-		return apiErr.Message
-	}
-	return err.Error()
-}
-
-func buildDAGRunBatchActionResponse(results []api.DAGRunBatchActionResult) api.DAGRunBatchActionResponse {
-	successCount := 0
-	for _, result := range results {
-		if result.Ok {
-			successCount++
-		}
-	}
-
-	return api.DAGRunBatchActionResponse{
-		TotalCount:   len(results),
-		SuccessCount: successCount,
-		FailureCount: len(results) - successCount,
-		Results:      results,
 	}
 }
 
@@ -2290,51 +2153,6 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		DagRunId: result.newDagRunID,
 		Queued:   result.queued,
 	}, nil
-}
-
-func (a *API) RescheduleDAGRunsBatch(ctx context.Context, request api.RescheduleDAGRunsBatchRequestObject) (api.RescheduleDAGRunsBatchResponseObject, error) {
-	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
-		return nil, err
-	}
-	if err := a.requireExecute(ctx); err != nil {
-		return nil, err
-	}
-	if request.Body == nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "request body is required",
-		}
-	}
-	if err := validateDAGRunBatchItems(request.Body.Items); err != nil {
-		return nil, err
-	}
-
-	results := make([]api.DAGRunBatchActionResult, 0, len(request.Body.Items))
-	for _, item := range request.Body.Items {
-		result := api.DAGRunBatchActionResult{
-			Name:     item.Name,
-			DagRunId: item.DagRunId,
-		}
-
-		outcome, err := a.rescheduleDAGRun(ctx, item.Name, item.DagRunId, rescheduleDAGRunOptions{})
-		if err != nil {
-			result.Ok = false
-			errMsg := dagRunBatchActionErrorMessage(err)
-			result.Error = &errMsg
-			results = append(results, result)
-			continue
-		}
-
-		result.Ok = true
-		newDagRunID := outcome.newDagRunID
-		result.NewDagRunId = &newDagRunID
-		queued := outcome.queued
-		result.Queued = &queued
-		results = append(results, result)
-	}
-
-	return api.RescheduleDAGRunsBatch200JSONResponse(buildDAGRunBatchActionResponse(results)), nil
 }
 
 type rescheduleDAGRunOptions struct {

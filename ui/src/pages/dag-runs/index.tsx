@@ -439,7 +439,8 @@ function DAGRuns() {
   const dagRuns = data?.dagRuns ?? [];
   const {
     clearSelection,
-    selectAllVisible,
+    replaceSelection,
+    selectAllMatching,
     selectedKeys,
     selectedRuns,
     toggleSelection,
@@ -883,9 +884,10 @@ function DAGRuns() {
         </div>
         <DAGRunBatchActions
           selectedRuns={selectedRuns}
-          visibleCount={dagRuns.length}
-          onSelectAllVisible={selectAllVisible}
+          matchingCount={dagRuns.length}
+          onSelectAllMatching={selectAllMatching}
           onClearSelection={clearSelection}
+          onReplaceSelection={replaceSelection}
           onActionComplete={mutate}
         />
         {viewMode === 'list' ? (

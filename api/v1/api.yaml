@@ -1755,76 +1755,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /dag-runs/retry-batch:
-    post:
-      summary: "Retry multiple DAG-runs"
-      description: "Retries multiple historical DAG-runs in request order and reports per-item outcomes."
-      operationId: "retryDAGRunsBatch"
-      tags:
-        - "dag-runs"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DAGRunBatchActionRequest"
-      responses:
-        "200":
-          description: "Batch retry completed with per-item results"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DAGRunBatchActionResponse"
-        "400":
-          description: "Invalid batch request"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Generic error response"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /dag-runs/reschedule-batch:
-    post:
-      summary: "Reschedule multiple DAG-runs as new runs"
-      description: "Reschedules multiple historical DAG-runs in request order, reusing each run's stored DAG snapshot and persisted params."
-      operationId: "rescheduleDAGRunsBatch"
-      tags:
-        - "dag-runs"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DAGRunBatchActionRequest"
-      responses:
-        "200":
-          description: "Batch reschedule completed with per-item results"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DAGRunBatchActionResponse"
-        "400":
-          description: "Invalid batch request"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Generic error response"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
   /dag-runs/{name}:
     get:
       summary: "List all DAG-runs with a specific name"
@@ -7043,14 +6973,6 @@ components:
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
 
-    HistoricalDAGRunId:
-      type: string
-      description: "Unique identifier for a historical DAG-run. The special value 'latest' is not allowed."
-      example: "20260330_123456"
-      pattern: "^[a-zA-Z0-9_-]+$"
-      not:
-        enum: ["latest"]
-
     HealthResponse:
       type: object
       description: "Response object for the health check endpoint"
@@ -7660,87 +7582,6 @@ components:
             - rootDAGRunId
             - log
             - nodes
-
-    DAGRunBatchActionItem:
-      type: object
-      additionalProperties: false
-      description: "Identifies one historical DAG-run to act on in a batch request."
-      required:
-        - name
-        - dagRunId
-      properties:
-        name:
-          $ref: "#/components/schemas/DAGName"
-        dagRunId:
-          $ref: "#/components/schemas/HistoricalDAGRunId"
-
-    DAGRunBatchActionRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - items
-      properties:
-        items:
-          type: array
-          minItems: 1
-          maxItems: 100
-          uniqueItems: true
-          description: "Ordered DAG-runs to process. Results preserve this order."
-          items:
-            $ref: "#/components/schemas/DAGRunBatchActionItem"
-
-    DAGRunBatchActionResult:
-      type: object
-      additionalProperties: false
-      required:
-        - name
-        - dagRunId
-        - ok
-      properties:
-        name:
-          $ref: "#/components/schemas/DAGName"
-        dagRunId:
-          $ref: "#/components/schemas/DAGRunId"
-        ok:
-          type: boolean
-          description: "True when the requested action succeeded for this DAG-run."
-        error:
-          type: string
-          description: "Error message for failed items."
-        newDagRunId:
-          allOf:
-            - $ref: "#/components/schemas/DAGRunId"
-            - description: "New DAG-run ID created by a successful reschedule."
-        queued:
-          type: boolean
-          description: "True when the action resulted in a queued DAG-run instead of an immediate start."
-
-    DAGRunBatchActionResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - totalCount
-        - successCount
-        - failureCount
-        - results
-      properties:
-        totalCount:
-          type: integer
-          minimum: 0
-          description: "Total number of requested items."
-        successCount:
-          type: integer
-          minimum: 0
-          description: "Number of items that succeeded."
-        failureCount:
-          type: integer
-          minimum: 0
-          description: "Number of items that failed."
-        results:
-          type: array
-          description: "Per-item outcomes in the same order as the request."
-          items:
-            $ref: "#/components/schemas/DAGRunBatchActionResult"
 
     DAGRunOutputs:
       type: object
