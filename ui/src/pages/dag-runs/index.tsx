@@ -445,6 +445,9 @@ function DAGRuns() {
     selectedRuns,
     toggleSelection,
   } = useBulkDAGRunSelection(dagRuns);
+  const refreshDagRuns = React.useCallback(async (): Promise<void> => {
+    await mutate();
+  }, [mutate]);
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -888,7 +891,7 @@ function DAGRuns() {
           onSelectAllMatching={selectAllMatching}
           onClearSelection={clearSelection}
           onReplaceSelection={replaceSelection}
-          onActionComplete={mutate}
+          onActionComplete={refreshDagRuns}
         />
         {viewMode === 'list' ? (
           <DAGRunTable

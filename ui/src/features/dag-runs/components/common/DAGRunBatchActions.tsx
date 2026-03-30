@@ -7,34 +7,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
 import { RefreshCw } from 'lucide-react';
 import React from 'react';
 import { DAGRunSelectionItem } from '../../hooks/useBulkDAGRunSelection';
-
-type BatchActionType = 'retry' | 'reschedule';
-type BatchActionPhase = 'confirm' | 'running' | 'complete';
-
-type BatchActionResult = DAGRunSelectionItem & {
-  ok: boolean;
-  error?: string;
-  newDagRunId?: string;
-  queued?: boolean;
-};
-
-type BatchProgressState = {
-  currentItem: DAGRunSelectionItem | null;
-  failureCount: number;
-  processedCount: number;
-  refreshError: string | null;
-  results: BatchActionResult[];
-  successCount: number;
-};
+import {
+  BatchActionResult,
+  BatchActionType,
+  useDAGRunBatchSubmission,
+} from '../../hooks/useDAGRunBatchSubmission';
 
 interface DAGRunBatchActionsProps {
   matchingCount: number;
-  onActionComplete?: () => Promise<unknown> | unknown;
+  onActionComplete?: () => Promise<void>;
   onClearSelection: () => void;
   onReplaceSelection: (items: DAGRunSelectionItem[]) => void;
   onSelectAllMatching: () => void;
@@ -51,31 +35,6 @@ const actionVerbs: Record<BatchActionType, string> = {
   reschedule: 'reschedule',
 };
 
-const createEmptyProgress = (): BatchProgressState => ({
-  currentItem: null,
-  failureCount: 0,
-  processedCount: 0,
-  refreshError: null,
-  results: [],
-  successCount: 0,
-});
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (
-    error &&
-    typeof error === 'object' &&
-    'message' in error &&
-    typeof error.message === 'string' &&
-    error.message.length > 0
-  ) {
-    return error.message;
-  }
-  return fallback;
-};
-
 function DAGRunBatchActions({
   matchingCount,
   onActionComplete,
@@ -84,206 +43,23 @@ function DAGRunBatchActions({
   onSelectAllMatching,
   selectedRuns,
 }: DAGRunBatchActionsProps) {
-  const appBarContext = React.useContext(AppBarContext);
-  const client = useClient();
-  const [activeBatch, setActiveBatch] = React.useState<{
-    action: BatchActionType;
-    snapshot: DAGRunSelectionItem[];
-  } | null>(null);
-  const [phase, setPhase] = React.useState<BatchActionPhase | null>(null);
-  const [progress, setProgress] =
-    React.useState<BatchProgressState>(createEmptyProgress);
-
-  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const {
+    activeBatch,
+    closeDialog,
+    isRunning,
+    openBatchDialog,
+    phase,
+    progress,
+    submitBatchAction,
+  } = useDAGRunBatchSubmission({
+    onActionComplete,
+    onReplaceSelection,
+    selectedRuns,
+  });
   const selectedCount = selectedRuns.length;
-  const isRunning = phase === 'running';
   const snapshot = activeBatch?.snapshot ?? [];
   const totalCount = snapshot.length;
   const remainingCount = Math.max(totalCount - progress.processedCount, 0);
-
-  const closeDialog = React.useCallback(() => {
-    if (phase === 'running') {
-      return;
-    }
-    setActiveBatch(null);
-    setPhase(null);
-    setProgress(createEmptyProgress());
-  }, [phase]);
-
-  const openBatchDialog = React.useCallback(
-    (action: BatchActionType) => {
-      if (selectedRuns.length === 0) {
-        return;
-      }
-      setActiveBatch({
-        action,
-        snapshot: [...selectedRuns],
-      });
-      setPhase('confirm');
-      setProgress(createEmptyProgress());
-    },
-    [selectedRuns]
-  );
-
-  const submitBatchItem = React.useCallback(
-    async (
-      action: BatchActionType,
-      dagRun: DAGRunSelectionItem
-    ): Promise<BatchActionResult> => {
-      const fallback = `Failed to ${actionVerbs[action]} DAG run`;
-
-      try {
-        if (action === 'retry') {
-          const { error } = await client.POST(
-            '/dag-runs/{name}/{dagRunId}/retry',
-            {
-              params: {
-                path: {
-                  name: dagRun.name,
-                  dagRunId: dagRun.dagRunId,
-                },
-                query: {
-                  remoteNode,
-                },
-              },
-              body: {
-                dagRunId: dagRun.dagRunId,
-              },
-            }
-          );
-
-          if (error) {
-            return {
-              ...dagRun,
-              ok: false,
-              error: error.message || fallback,
-            };
-          }
-
-          return {
-            ...dagRun,
-            ok: true,
-          };
-        }
-
-        const { data, error } = await client.POST(
-          '/dag-runs/{name}/{dagRunId}/reschedule',
-          {
-            params: {
-              path: {
-                name: dagRun.name,
-                dagRunId: dagRun.dagRunId,
-              },
-              query: {
-                remoteNode,
-              },
-            },
-          }
-        );
-
-        if (error) {
-          return {
-            ...dagRun,
-            ok: false,
-            error: error.message || fallback,
-          };
-        }
-
-        return {
-          ...dagRun,
-          ok: true,
-          newDagRunId: data?.dagRunId,
-          queued: data?.queued,
-        };
-      } catch (error) {
-        return {
-          ...dagRun,
-          ok: false,
-          error: getErrorMessage(error, fallback),
-        };
-      }
-    },
-    [client, remoteNode]
-  );
-
-  const submitBatchAction = React.useCallback(async () => {
-    if (!activeBatch) {
-      return;
-    }
-
-    const { action, snapshot } = activeBatch;
-    const results: BatchActionResult[] = [];
-    let successCount = 0;
-    let failureCount = 0;
-
-    setPhase('running');
-    setProgress({
-      currentItem: snapshot[0] ?? null,
-      failureCount: 0,
-      processedCount: 0,
-      refreshError: null,
-      results: [],
-      successCount: 0,
-    });
-
-    for (const [index, dagRun] of snapshot.entries()) {
-      setProgress({
-        currentItem: dagRun,
-        failureCount,
-        processedCount: index,
-        refreshError: null,
-        results: [...results],
-        successCount,
-      });
-
-      const result = await submitBatchItem(action, dagRun);
-      results.push(result);
-
-      if (result.ok) {
-        successCount++;
-      } else {
-        failureCount++;
-      }
-
-      setProgress({
-        currentItem: snapshot[index + 1] ?? null,
-        failureCount,
-        processedCount: index + 1,
-        refreshError: null,
-        results: [...results],
-        successCount,
-      });
-    }
-
-    let refreshError: string | null = null;
-    try {
-      await Promise.resolve(onActionComplete?.());
-    } catch (error) {
-      refreshError = getErrorMessage(
-        error,
-        'Failed to refresh DAG runs after submitting the batch action.'
-      );
-    }
-
-    onReplaceSelection(
-      results
-        .filter((result) => !result.ok)
-        .map((result) => ({
-          name: result.name,
-          dagRunId: result.dagRunId,
-        }))
-    );
-
-    setProgress({
-      currentItem: null,
-      failureCount,
-      processedCount: snapshot.length,
-      refreshError,
-      results,
-      successCount,
-    });
-    setPhase('complete');
-  }, [activeBatch, onActionComplete, onReplaceSelection, submitBatchItem]);
 
   const summaryText =
     selectedCount === 0
