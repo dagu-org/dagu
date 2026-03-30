@@ -61,11 +61,13 @@ function DAGRunDetailsPanel({
     pollIntervalMs: detailsTarget ? 2000 : 0,
   });
 
-  const expectedDagRunId = isSubDAGRun ? (subDAGRunId as string) : (dagRunId || 'latest');
-  const data =
-    matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
-      ? { dagRunDetails: latestDetails }
-      : null;
+  const expectedDagRunId = isSubDAGRun
+    ? (subDAGRunId as string)
+    : dagRunId || 'latest';
+  const data = matchesRequestedDAGRunDetails(latestDetails, expectedDagRunId)
+    ? { dagRunDetails: latestDetails }
+    : null;
+  const dagRunDetails = data?.dagRunDetails ?? null;
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => {
@@ -123,7 +125,7 @@ function DAGRunDetailsPanel({
   }, [onClose, onNavigate, handleFullscreenClick]);
 
   // Only show loading on initial load, not when switching DAG runs
-  if (!data) {
+  if (!dagRunDetails) {
     if (error) {
       return (
         <div className="flex h-full items-start justify-center p-4">
@@ -168,11 +170,7 @@ function DAGRunDetailsPanel({
             >
               <Maximize2 className="h-4 w-4" />
             </Button>
-            <Button
-              size="icon"
-              onClick={onClose}
-              title="Close (Esc)"
-            >
+            <Button size="icon" onClick={onClose} title="Close (Esc)">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -181,7 +179,7 @@ function DAGRunDetailsPanel({
         <div className="flex-1 overflow-y-auto min-h-0">
           <DAGRunDetailsContent
             name={name}
-            dagRun={data.dagRunDetails}
+            dagRun={dagRunDetails}
             refreshFn={refreshFn}
             dagRunId={dagRunId}
           />
@@ -189,6 +187,6 @@ function DAGRunDetailsPanel({
       </div>
     </DAGRunContext.Provider>
   );
-};
+}
 
 export default DAGRunDetailsPanel;

@@ -2753,10 +2753,13 @@ export interface components {
             filePath?: string;
             dag: components["schemas"]["DAG"];
             latestDAGRun: components["schemas"]["DAGRunSummary"];
+            /**
+             * Format: date-time
+             * @description Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed.
+             */
+            nextRun?: string;
             /** @description Whether the DAG is suspended */
             suspended: boolean;
-            /** @description Next planned run time computed by the scheduler */
-            nextRun?: string;
             /** @description List of errors encountered during the request */
             errors: string[];
         };
@@ -2787,17 +2790,19 @@ export interface components {
         };
         /** @description Schedule configuration for DAG-run creation */
         Schedule: {
-            /** @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility. */
+            /**
+             * @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility.
+             * @enum {string}
+             */
             kind?: ScheduleKind;
             /** @description Cron expression for recurring schedules */
             expression?: string;
-            /** @description RFC 3339 timestamp with explicit offset for one-off schedules */
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp with explicit offset for one-off schedules
+             */
             at?: string;
         };
-        /**
-         * @enum {string}
-         */
-        ScheduleKind: ScheduleKind;
         /**
          * @description Numeric status code indicating current DAG-run state:
          *     0: "Not started"
@@ -6658,7 +6663,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Conflict (run ID already exists or concurrency guard blocks execution) */
+            /** @description Conflict (run ID already exists) */
             409: {
                 headers: {
                     [name: string]: unknown;

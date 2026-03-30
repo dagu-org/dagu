@@ -19,6 +19,7 @@ import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import { useUserPreferences } from '../../contexts/UserPreference';
+import DAGRunBatchActions from '../../features/dag-runs/components/common/DAGRunBatchActions';
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
@@ -28,6 +29,7 @@ import {
   useLiveConnection,
   useLiveDAGRuns,
 } from '../../hooks/useAppLive';
+import { useBulkDAGRunSelection } from '../../features/dag-runs/hooks/useBulkDAGRunSelection';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -434,6 +436,18 @@ function DAGRuns() {
     liveFallbackOptions(liveState)
   );
   useLiveDAGRuns(mutate);
+  const dagRuns = data?.dagRuns ?? [];
+  const {
+    clearSelection,
+    replaceSelection,
+    selectAllMatching,
+    selectedKeys,
+    selectedRuns,
+    toggleSelection,
+  } = useBulkDAGRunSelection(dagRuns);
+  const refreshDagRuns = React.useCallback(async (): Promise<void> => {
+    await mutate();
+  }, [mutate]);
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -871,14 +885,30 @@ function DAGRuns() {
             )}
           </div>
         </div>
+        <DAGRunBatchActions
+          selectedRuns={selectedRuns}
+          matchingCount={dagRuns.length}
+          onSelectAllMatching={selectAllMatching}
+          onClearSelection={clearSelection}
+          onReplaceSelection={replaceSelection}
+          onActionComplete={refreshDagRuns}
+        />
         {viewMode === 'list' ? (
           <DAGRunTable
-            dagRuns={data?.dagRuns || []}
+            dagRuns={dagRuns}
             selectedDAGRun={selectedDAGRun}
             onSelectDAGRun={setSelectedDAGRun}
+            selectedRunKeys={selectedKeys}
+            onToggleBulkSelect={toggleSelection}
           />
         ) : (
-          <DAGRunGroupedView dagRuns={data?.dagRuns || []} />
+          <DAGRunGroupedView
+            dagRuns={dagRuns}
+            selectedDAGRun={selectedDAGRun}
+            onSelectDAGRun={setSelectedDAGRun}
+            selectedRunKeys={selectedKeys}
+            onToggleBulkSelect={toggleSelection}
+          />
         )}
       </div>
 

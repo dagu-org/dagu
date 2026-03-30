@@ -3,7 +3,7 @@
 
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Status } from '@/api/v1/schema';
+import { Status, StatusLabel } from '@/api/v1/schema';
 import DAGActions from '../DAGActions';
 
 vi.mock('../../dag-execution', () => ({
@@ -45,8 +45,11 @@ describe('DAGActions', () => {
           name: 'retry-dag',
           dagRunId: 'run-1',
           status: Status.Failed,
+          statusLabel: StatusLabel.failed,
           autoRetryCount: 1,
           autoRetryLimit: 3,
+          startedAt: '',
+          finishedAt: '',
         }}
         fileName="retry-dag.yaml"
         dag={{ name: 'retry-dag' }}
@@ -64,6 +67,10 @@ describe('DAGActions', () => {
           name: 'running-dag',
           dagRunId: 'run-1',
           status: Status.Running,
+          statusLabel: StatusLabel.running,
+          autoRetryCount: 0,
+          startedAt: '',
+          finishedAt: '',
         }}
         fileName="running-dag.yaml"
         dag={{ name: 'running-dag' }}
@@ -80,18 +87,15 @@ describe('DAGActions', () => {
   it('disables retry when there is no DAG run id', () => {
     const view = render(
       <DAGActions
-        status={{
-          name: 'finished-dag',
-          status: Status.Failed,
-          autoRetryCount: 3,
-          autoRetryLimit: 3,
-        }}
+        status={undefined}
         fileName="finished-dag.yaml"
         dag={{ name: 'finished-dag' }}
         displayMode="full"
       />
     );
 
-    expect(within(view.container).getByRole('button', { name: 'Retry' })).toBeDisabled();
+    expect(
+      within(view.container).getByRole('button', { name: 'Retry' })
+    ).toBeDisabled();
   });
 });

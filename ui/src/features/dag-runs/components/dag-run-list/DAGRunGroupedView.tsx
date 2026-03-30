@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { components, Status } from '../../../../api/v1/schema';
@@ -8,23 +9,32 @@ import dayjs from '../../../../lib/dayjs';
 import { getDAGRunScheduleSortValue } from '../../../../lib/dagRunTiming';
 import StatusChip from '../../../../ui/StatusChip';
 import AutoRetryBadge from '../common/AutoRetryBadge';
-import { DAGRunDetailsModal } from '../dag-run-details';
+import {
+  DAGRunSelectionItem,
+  getDAGRunSelectionKey,
+} from '../../hooks/useBulkDAGRunSelection';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
 interface DAGRunGroupedViewProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
+  selectedRunKeys?: Set<string>;
+  selectedDAGRun?: { name: string; dagRunId: string } | null;
+  onSelectDAGRun?: (dagRun: { name: string; dagRunId: string } | null) => void;
+  onToggleBulkSelect?: (dagRun: DAGRunSelectionItem) => void;
 }
 
 interface GroupedDAGRuns {
   [dagName: string]: components['schemas']['DAGRunSummary'][];
 }
 
-function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
+function DAGRunGroupedView({
+  dagRuns,
+  selectedRunKeys,
+  selectedDAGRun = null,
+  onSelectDAGRun,
+  onToggleBulkSelect,
+}: DAGRunGroupedViewProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [selectedDAGRun, setSelectedDAGRun] = useState<{
-    name: string;
-    dagRunId: string;
-  } | null>(null);
 
   // Group DAG runs by name
   const groupedDAGRuns = useMemo(() => {
@@ -161,6 +171,11 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
   }
 
   const sortedDagNames = Object.keys(groupedDAGRuns).sort();
+  const isBulkSelected = (dagRun: DAGRunSelectionItem) =>
+    selectedRunKeys?.has(getDAGRunSelectionKey(dagRun)) ?? false;
+  const isFocused = (dagRun: DAGRunSelectionItem) =>
+    selectedDAGRun?.name === dagRun.name &&
+    selectedDAGRun?.dagRunId === dagRun.dagRunId;
 
   return (
     <div className="border rounded-md bg-card">
@@ -255,15 +270,17 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                     {runs.map((dagRun) => (
                       <div
                         key={dagRun.dagRunId}
-                        className="px-3 py-2 pl-11 hover:bg-muted/20 cursor-pointer transition-colors text-xs"
+                        className={`px-3 py-2 pl-11 hover:bg-muted/20 cursor-pointer transition-colors text-xs ${
+                          isFocused(dagRun) ? 'bg-muted/20' : ''
+                        } ${isBulkSelected(dagRun) ? 'bg-muted/30' : ''}`}
                         onClick={(e) => {
                           if (e.ctrlKey || e.metaKey) {
                             window.open(
                               `/dag-runs/${dagRun.name}/${dagRun.dagRunId}`,
                               '_blank'
                             );
-                          } else {
-                            setSelectedDAGRun({
+                          } else if (onSelectDAGRun) {
+                            onSelectDAGRun({
                               name: dagRun.name,
                               dagRunId: dagRun.dagRunId,
                             });
@@ -271,44 +288,63 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
                         }}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <div className="font-mono text-muted-foreground truncate">
-                              {dagRun.dagRunId}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                              {dagRun.scheduleTime && (
+                          <div className="flex flex-1 items-start gap-3 min-w-0">
+                            {onToggleBulkSelect && (
+                              <div
+                                className="pt-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Checkbox
+                                  aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
+                                  checked={isBulkSelected(dagRun)}
+                                  onCheckedChange={() =>
+                                    onToggleBulkSelect({
+                                      name: dagRun.name,
+                                      dagRunId: dagRun.dagRunId,
+                                    })
+                                  }
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="font-mono text-muted-foreground truncate">
+                                {dagRun.dagRunId}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                {dagRun.scheduleTime && (
+                                  <div className="whitespace-nowrap">
+                                    <span className="text-muted-foreground">
+                                      Scheduled:{' '}
+                                    </span>
+                                    {dagRun.scheduleTime}
+                                  </div>
+                                )}
                                 <div className="whitespace-nowrap">
                                   <span className="text-muted-foreground">
-                                    Scheduled:{' '}
+                                    Queued:{' '}
                                   </span>
-                                  {dagRun.scheduleTime}
+                                  {dagRun.queuedAt || '-'}
                                 </div>
-                              )}
-                              <div className="whitespace-nowrap">
-                                <span className="text-muted-foreground">
-                                  Queued:{' '}
-                                </span>
-                                {dagRun.queuedAt || '-'}
-                              </div>
-                              <div className="whitespace-nowrap">
-                                <span className="text-muted-foreground">
-                                  Started:{' '}
-                                </span>
-                                {dagRun.startedAt || '-'}
-                              </div>
-                              <div className="flex items-center gap-1 whitespace-nowrap">
-                                <span className="text-muted-foreground">
-                                  Duration:{' '}
-                                </span>
-                                {calculateDuration(
-                                  dagRun.startedAt,
-                                  dagRun.finishedAt,
-                                  dagRun.status
-                                )}
-                                {dagRun.status === Status.Running &&
-                                  dagRun.startedAt && (
-                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                                <div className="whitespace-nowrap">
+                                  <span className="text-muted-foreground">
+                                    Started:{' '}
+                                  </span>
+                                  {dagRun.startedAt || '-'}
+                                </div>
+                                <div className="flex items-center gap-1 whitespace-nowrap">
+                                  <span className="text-muted-foreground">
+                                    Duration:{' '}
+                                  </span>
+                                  {calculateDuration(
+                                    dagRun.startedAt,
+                                    dagRun.finishedAt,
+                                    dagRun.status
                                   )}
+                                  {dagRun.status === Status.Running &&
+                                    dagRun.startedAt && (
+                                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                                    )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -337,18 +373,6 @@ function DAGRunGroupedView({ dagRuns }: DAGRunGroupedViewProps) {
           );
         })}
       </div>
-
-      {/* DAG Run Details Modal */}
-      {selectedDAGRun && (
-        <DAGRunDetailsModal
-          name={selectedDAGRun.name}
-          dagRunId={selectedDAGRun.dagRunId}
-          isOpen={!!selectedDAGRun}
-          onClose={() => {
-            setSelectedDAGRun(null);
-          }}
-        />
-      )}
     </div>
   );
 }
