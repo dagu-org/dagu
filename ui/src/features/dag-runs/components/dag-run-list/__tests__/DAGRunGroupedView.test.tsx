@@ -87,7 +87,7 @@ describe('DAGRunGroupedView', () => {
 
     fireEvent.click(screen.getByText('grouped-dag'));
     fireEvent.click(
-      screen.getByRole('checkbox', { name: 'Select DAG run run-1' })
+      screen.getByRole('checkbox', { name: 'Select DAG run grouped-dag run-1' })
     );
 
     expect(onToggleBulkSelect).toHaveBeenCalledWith({

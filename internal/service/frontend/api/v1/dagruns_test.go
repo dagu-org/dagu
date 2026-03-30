@@ -736,6 +736,59 @@ func TestRescheduleDAGRun(t *testing.T) {
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
+func TestRescheduleDAGRunResolvesLatest(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: main
+    command: "echo reschedule latest"`
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "reschedule_latest_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post("/api/v1/dags/reschedule_latest_dag/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v1/dags/reschedule_latest_dag/dag-runs/%s", startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	rescheduleResp := server.Client().Post(
+		"/api/v1/dag-runs/reschedule_latest_dag/latest/reschedule",
+		api.RescheduleDAGRunJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var rescheduleBody api.RescheduleDAGRun200JSONResponse
+	rescheduleResp.Unmarshal(t, &rescheduleBody)
+	require.NotEmpty(t, rescheduleBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v1/dags/reschedule_latest_dag/dag-runs/%s", rescheduleBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
 func TestRetryDAGRunQueuesRetryForQueuedDAGs(t *testing.T) {
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Queues.Enabled = true

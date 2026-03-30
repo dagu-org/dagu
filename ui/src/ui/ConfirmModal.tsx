@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -105,11 +108,7 @@ function ConfirmModal({
         <div className="py-4">{children}</div>
 
         <DialogFooter>
-          <Button
-            ref={cancelButtonRef}
-            variant="ghost"
-            onClick={dismissModal}
-          >
+          <Button ref={cancelButtonRef} variant="ghost" onClick={dismissModal}>
             <X className="h-4 w-4" />
             Cancel
           </Button>

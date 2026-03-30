@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useEffect, useRef, useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate } from 'react-router-dom';
@@ -280,7 +283,7 @@ function DAGRunTable({
                 {onToggleBulkSelect && (
                   <div onClick={(e) => e.stopPropagation()}>
                     <Checkbox
-                      aria-label={`Select DAG run ${dagRun.dagRunId}`}
+                      aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
                       checked={isBulkSelected(dagRun)}
                       onCheckedChange={() =>
                         onToggleBulkSelect({
@@ -373,7 +376,9 @@ function DAGRunTable({
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-10">Select</TableHead>
+            {onToggleBulkSelect && (
+              <TableHead className="w-10">Select</TableHead>
+            )}
             <TableHead>DAG Name</TableHead>
             <TableHead>Run ID</TableHead>
             <TableHead>Status</TableHead>
@@ -432,11 +437,11 @@ function DAGRunTable({
                 }
               }}
             >
-              <TableCell className="py-1 px-2">
-                {onToggleBulkSelect && (
+              {onToggleBulkSelect && (
+                <TableCell className="py-1 px-2">
                   <div onClick={(e) => e.stopPropagation()}>
                     <Checkbox
-                      aria-label={`Select DAG run ${dagRun.dagRunId}`}
+                      aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
                       checked={isBulkSelected(dagRun)}
                       onCheckedChange={() =>
                         onToggleBulkSelect({
@@ -446,8 +451,8 @@ function DAGRunTable({
                       }
                     />
                   </div>
-                )}
-              </TableCell>
+                </TableCell>
+              )}
               <TableCell className="py-1 px-2 font-normal">
                 {dagRun.name}
               </TableCell>

@@ -95,6 +95,7 @@ describe('DAGRunTable', () => {
     expect(screen.getByText('2026-03-13T10:00:00Z')).toBeInTheDocument();
     expect(screen.getByText('2026-03-13T10:00:30Z')).toBeInTheDocument();
     expect(screen.getByText('1/3 auto retries')).toBeInTheDocument();
+    expect(screen.queryByText('Select')).not.toBeInTheDocument();
   });
 
   it('toggles bulk selection without opening the focused run', () => {
@@ -127,7 +128,7 @@ describe('DAGRunTable', () => {
     );
 
     fireEvent.click(
-      screen.getByRole('checkbox', { name: 'Select DAG run run-1' })
+      screen.getByRole('checkbox', { name: 'Select DAG run bulk-dag run-1' })
     );
 
     expect(onToggleBulkSelect).toHaveBeenCalledWith({

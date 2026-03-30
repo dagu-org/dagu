@@ -295,7 +295,7 @@ function DAGRunGroupedView({
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Checkbox
-                                  aria-label={`Select DAG run ${dagRun.dagRunId}`}
+                                  aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
                                   checked={isBulkSelected(dagRun)}
                                   onCheckedChange={() =>
                                     onToggleBulkSelect({

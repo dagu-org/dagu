@@ -143,3 +143,69 @@ func TestRetryDAGRun_RejectsMismatchedBodyDagRunID(t *testing.T) {
 	require.Equal(t, openapiv1.ErrorCodeBadRequest, apiErr.Code)
 	require.Contains(t, apiErr.Message, "must match the path parameter")
 }
+
+func TestRetryDAGRun_ResolvesLatestPathDagRunID(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	dagFile := filepath.Join(tmpDir, "distributed-retry-latest.yaml")
+	require.NoError(t, os.WriteFile(dagFile, []byte(`
+name: distributed_retry_latest_dag
+worker_selector:
+  region: apac
+steps:
+  - name: main
+    command: echo distributed retry latest
+`), 0o600))
+
+	dag, err := spec.Load(ctx, dagFile)
+	require.NoError(t, err)
+
+	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
+	attempt, err := dagRunStore.CreateAttempt(
+		ctx,
+		dag,
+		time.Now().Add(-time.Minute),
+		"latest-run",
+		exec.NewDAGRunAttemptOptions{},
+	)
+	require.NoError(t, err)
+
+	status := transform.NewStatusBuilder(dag).Create(
+		"latest-run",
+		core.Failed,
+		0,
+		time.Now().Add(-time.Minute),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithFinishedAt(time.Now().Add(-30*time.Second)),
+		transform.WithError("step failed"),
+	)
+	require.NoError(t, attempt.Open(ctx))
+	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, attempt.Close(ctx))
+
+	coordinatorCli := &retryCoordinatorRecorder{}
+	api := &API{
+		dagRunStore: dagRunStore,
+		config: &config.Config{
+			Server: config.Server{
+				Permissions: map[config.Permission]bool{
+					config.PermissionRunDAGs: true,
+				},
+			},
+		},
+		coordinatorCli:  coordinatorCli,
+		defaultExecMode: config.ExecutionModeLocal,
+	}
+
+	resp, err := api.RetryDAGRun(ctx, openapiv1.RetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "latest",
+	})
+	require.NoError(t, err)
+	_, ok := resp.(openapiv1.RetryDAGRun200Response)
+	require.True(t, ok)
+
+	require.Len(t, coordinatorCli.dispatched, 1)
+	require.Equal(t, "latest-run", coordinatorCli.dispatched[0].DagRunId)
+}

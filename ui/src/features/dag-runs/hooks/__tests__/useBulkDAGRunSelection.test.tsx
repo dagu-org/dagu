@@ -22,6 +22,31 @@ const buildDagRun = (name: string, dagRunId: string) => ({
 type HookDagRun = ReturnType<typeof buildDagRun>;
 
 describe('useBulkDAGRunSelection', () => {
+  it('toggles a single DAG run on and off', () => {
+    const dagRuns = [
+      buildDagRun('alpha', 'run-1'),
+      buildDagRun('beta', 'run-2'),
+    ];
+
+    const { result } = renderHook(() => useBulkDAGRunSelection(dagRuns));
+
+    act(() => {
+      result.current.toggleSelection({ name: 'alpha', dagRunId: 'run-1' });
+    });
+
+    expect(result.current.selectedCount).toBe(1);
+    expect(result.current.selectedRuns).toEqual([
+      { name: 'alpha', dagRunId: 'run-1' },
+    ]);
+
+    act(() => {
+      result.current.toggleSelection({ name: 'alpha', dagRunId: 'run-1' });
+    });
+
+    expect(result.current.selectedCount).toBe(0);
+    expect(result.current.selectedRuns).toEqual([]);
+  });
+
   it('selects all currently visible DAG runs', () => {
     const dagRuns = [
       buildDagRun('alpha', 'run-1'),
