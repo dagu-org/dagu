@@ -971,6 +971,7 @@ select:focus-visible {
       height: 100%;
       min-height: 0;
       overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     .api-docs-viewer .references-rendered {
