@@ -752,6 +752,45 @@ func TestRetryDAGRunsBatchRejectsDuplicateItems(t *testing.T) {
 	require.Contains(t, errBody.Message, "duplicate batch item")
 }
 
+func TestRetryDAGRunsBatchRejectsInvalidBatchItems(t *testing.T) {
+	tests := []struct {
+		name    string
+		item    api.DAGRunBatchActionItem
+		message string
+	}{
+		{
+			name:    "empty name",
+			item:    api.DAGRunBatchActionItem{Name: "", DagRunId: "run-1"},
+			message: "batch item name is required",
+		},
+		{
+			name:    "empty dag run id",
+			item:    api.DAGRunBatchActionItem{Name: "example-dag", DagRunId: ""},
+			message: "batch item dagRunId is required",
+		},
+		{
+			name:    "latest alias",
+			item:    api.DAGRunBatchActionItem{Name: "example-dag", DagRunId: "latest"},
+			message: `batch item dagRunId must reference a historical DAG-run, not "latest"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := test.SetupServer(t)
+
+			resp := server.Client().Post("/api/v1/dag-runs/retry-batch", api.RetryDAGRunsBatchJSONRequestBody{
+				Items: []api.DAGRunBatchActionItem{tt.item},
+			}).ExpectStatus(http.StatusBadRequest).Send(t)
+
+			var errBody api.Error
+			resp.Unmarshal(t, &errBody)
+			require.Equal(t, api.ErrorCodeBadRequest, errBody.Code)
+			require.Contains(t, errBody.Message, tt.message)
+		})
+	}
+}
+
 func TestRetryDAGRunsBatchRejectsRequestsOverMaxItems(t *testing.T) {
 	server := test.SetupServer(t)
 

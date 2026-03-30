@@ -2771,6 +2771,11 @@ export interface components {
          * @example latest
          */
         DAGRunId: string;
+        /**
+         * @description Unique identifier for a historical DAG-run. The special value 'latest' is not allowed.
+         * @example 20260330_123456
+         */
+        HistoricalDAGRunId: string;
         /** @description Response object for the health check endpoint */
         HealthResponse: {
             /**
@@ -3106,7 +3111,7 @@ export interface components {
         /** @description Identifies one historical DAG-run to act on in a batch request. */
         DAGRunBatchActionItem: {
             name: components["schemas"]["DAGName"];
-            dagRunId: components["schemas"]["DAGRunId"];
+            dagRunId: components["schemas"]["HistoricalDAGRunId"];
         };
         DAGRunBatchActionRequest: {
             /** @description Ordered DAG-runs to process. Results preserve this order. */

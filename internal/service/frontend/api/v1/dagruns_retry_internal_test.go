@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -112,4 +113,33 @@ steps:
 	require.Equal(t, "distributed-run", task.DagRunId)
 	require.Equal(t, dag.WorkerSelector, task.WorkerSelector)
 	require.NotNil(t, task.PreviousStatus)
+}
+
+func TestRetryDAGRun_RejectsMismatchedBodyDagRunID(t *testing.T) {
+	ctx := context.Background()
+
+	api := &API{
+		config: &config.Config{
+			Server: config.Server{
+				Permissions: map[config.Permission]bool{
+					config.PermissionRunDAGs: true,
+				},
+			},
+		},
+	}
+
+	resp, err := api.RetryDAGRun(ctx, openapiv1.RetryDAGRunRequestObject{
+		Name:     "distributed_retry_dag",
+		DagRunId: "path-run",
+		Body: &openapiv1.RetryDAGRunJSONRequestBody{
+			DagRunId: "body-run",
+		},
+	})
+	require.Nil(t, resp)
+
+	var apiErr *Error
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	require.Equal(t, openapiv1.ErrorCodeBadRequest, apiErr.Code)
+	require.Contains(t, apiErr.Message, "must match the path parameter")
 }

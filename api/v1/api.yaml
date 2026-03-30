@@ -7043,6 +7043,14 @@ components:
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
 
+    HistoricalDAGRunId:
+      type: string
+      description: "Unique identifier for a historical DAG-run. The special value 'latest' is not allowed."
+      example: "20260330_123456"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      not:
+        enum: ["latest"]
+
     HealthResponse:
       type: object
       description: "Response object for the health check endpoint"
@@ -7664,7 +7672,7 @@ components:
         name:
           $ref: "#/components/schemas/DAGName"
         dagRunId:
-          $ref: "#/components/schemas/DAGRunId"
+          $ref: "#/components/schemas/HistoricalDAGRunId"
 
     DAGRunBatchActionRequest:
       type: object

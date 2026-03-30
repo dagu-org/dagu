@@ -126,10 +126,11 @@ steps:
 	for i, result := range body.Results {
 		require.True(t, result.Ok, "result %d should succeed", i)
 		require.NotNil(t, result.NewDagRunId)
+		require.NotEqual(t, result.DagRunId, *result.NewDagRunId, "reschedule should create a new DAG-run")
 
 		rescheduled := waitForRunStatus(t, server, "intg_batch_reschedule_dag", *result.NewDagRunId, core.Succeeded, 15*time.Second)
 		require.NotNil(t, rescheduled.DagRun.Params)
-		require.Equal(t, originalParams[sourceRuns[i].runID], *rescheduled.DagRun.Params)
+		require.Equal(t, originalParams[result.DagRunId], *rescheduled.DagRun.Params)
 	}
 }
 

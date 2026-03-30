@@ -1758,6 +1758,13 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 	retryDagRunID := request.DagRunId
 	stepName := ""
 	if request.Body != nil {
+		if request.Body.DagRunId != "" && request.DagRunId != "" && request.Body.DagRunId != request.DagRunId {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "dagRunId in the request body must match the path parameter",
+			}
+		}
 		if request.Body.DagRunId != "" {
 			retryDagRunID = request.Body.DagRunId
 		}
@@ -1982,6 +1989,27 @@ func validateDAGRunBatchItems(items []api.DAGRunBatchActionItem) error {
 
 	seen := make(map[string]struct{}, len(items))
 	for _, item := range items {
+		if item.Name == "" {
+			return &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "batch item name is required",
+			}
+		}
+		if item.DagRunId == "" {
+			return &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "batch item dagRunId is required",
+			}
+		}
+		if item.DagRunId == "latest" {
+			return &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    `batch item dagRunId must reference a historical DAG-run, not "latest"`,
+			}
+		}
 		if err := core.ValidateDAGName(item.Name); err != nil {
 			return &Error{
 				HTTPStatus: http.StatusBadRequest,
