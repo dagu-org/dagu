@@ -621,6 +621,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/retry-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry multiple DAG-runs
+         * @description Retries multiple historical DAG-runs in request order and reports per-item outcomes.
+         */
+        post: operations["retryDAGRunsBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/reschedule-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reschedule multiple DAG-runs as new runs
+         * @description Reschedules multiple historical DAG-runs in request order, reusing each run's stored DAG snapshot and persisted params.
+         */
+        post: operations["rescheduleDAGRunsBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}": {
         parameters: {
             query?: never;
@@ -2753,10 +2793,13 @@ export interface components {
             filePath?: string;
             dag: components["schemas"]["DAG"];
             latestDAGRun: components["schemas"]["DAGRunSummary"];
+            /**
+             * Format: date-time
+             * @description Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed.
+             */
+            nextRun?: string;
             /** @description Whether the DAG is suspended */
             suspended: boolean;
-            /** @description Next planned run time computed by the scheduler */
-            nextRun?: string;
             /** @description List of errors encountered during the request */
             errors: string[];
         };
@@ -2787,17 +2830,19 @@ export interface components {
         };
         /** @description Schedule configuration for DAG-run creation */
         Schedule: {
-            /** @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility. */
+            /**
+             * @description Schedule type. When omitted alongside expression, the schedule is treated as cron for backward compatibility.
+             * @enum {string}
+             */
             kind?: ScheduleKind;
             /** @description Cron expression for recurring schedules */
             expression?: string;
-            /** @description RFC 3339 timestamp with explicit offset for one-off schedules */
+            /**
+             * Format: date-time
+             * @description RFC 3339 timestamp with explicit offset for one-off schedules
+             */
             at?: string;
         };
-        /**
-         * @enum {string}
-         */
-        ScheduleKind: ScheduleKind;
         /**
          * @description Numeric status code indicating current DAG-run state:
          *     0: "Not started"
@@ -3057,6 +3102,36 @@ export interface components {
             onAbort?: components["schemas"]["Node"];
             /** @description List of preconditions that must be met before the DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
+        };
+        /** @description Identifies one historical DAG-run to act on in a batch request. */
+        DAGRunBatchActionItem: {
+            name: components["schemas"]["DAGName"];
+            dagRunId: components["schemas"]["DAGRunId"];
+        };
+        DAGRunBatchActionRequest: {
+            /** @description Ordered DAG-runs to process. Results preserve this order. */
+            items: components["schemas"]["DAGRunBatchActionItem"][];
+        };
+        DAGRunBatchActionResult: {
+            name: components["schemas"]["DAGName"];
+            dagRunId: components["schemas"]["DAGRunId"];
+            /** @description True when the requested action succeeded for this DAG-run. */
+            ok: boolean;
+            /** @description Error message for failed items. */
+            error?: string;
+            newDagRunId?: components["schemas"]["DAGRunId"] & unknown;
+            /** @description True when the action resulted in a queued DAG-run instead of an immediate start. */
+            queued?: boolean;
+        };
+        DAGRunBatchActionResponse: {
+            /** @description Total number of requested items. */
+            totalCount: number;
+            /** @description Number of items that succeeded. */
+            successCount: number;
+            /** @description Number of items that failed. */
+            failureCount: number;
+            /** @description Per-item outcomes in the same order as the request. */
+            results: components["schemas"]["DAGRunBatchActionResult"][];
         };
         /** @description Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings. */
         DAGRunOutputs: {
@@ -6459,6 +6534,96 @@ export interface operations {
             };
         };
     };
+    retryDAGRunsBatch: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DAGRunBatchActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Batch retry completed with per-item results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DAGRunBatchActionResponse"];
+                };
+            };
+            /** @description Invalid batch request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    rescheduleDAGRunsBatch: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DAGRunBatchActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Batch reschedule completed with per-item results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DAGRunBatchActionResponse"];
+                };
+            };
+            /** @description Invalid batch request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listDAGRunsByName: {
         parameters: {
             query?: {
@@ -6658,7 +6823,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Conflict (run ID already exists or concurrency guard blocks execution) */
+            /** @description Conflict (run ID already exists) */
             409: {
                 headers: {
                     [name: string]: unknown;

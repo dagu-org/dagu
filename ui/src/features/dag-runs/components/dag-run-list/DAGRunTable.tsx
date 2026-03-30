@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import {
@@ -14,18 +15,26 @@ import dayjs from '../../../../lib/dayjs';
 import StatusChip from '../../../../ui/StatusChip';
 import AutoRetryBadge from '../common/AutoRetryBadge';
 import { TriggerTypeIndicator } from '../../../dags/components/common/TriggerTypeIndicator';
+import {
+  DAGRunSelectionItem,
+  getDAGRunSelectionKey,
+} from '../../hooks/useBulkDAGRunSelection';
 import { StepDetailsTooltip } from './StepDetailsTooltip';
 
 interface DAGRunTableProps {
   dagRuns: components['schemas']['DAGRunSummary'][];
+  selectedRunKeys?: Set<string>;
   selectedDAGRun?: { name: string; dagRunId: string } | null;
   onSelectDAGRun?: (dagRun: { name: string; dagRunId: string } | null) => void;
+  onToggleBulkSelect?: (dagRun: DAGRunSelectionItem) => void;
 }
 
 function DAGRunTable({
   dagRuns,
+  selectedRunKeys,
   selectedDAGRun = null,
   onSelectDAGRun,
+  onToggleBulkSelect,
 }: DAGRunTableProps) {
   const config = useConfig();
   const navigate = useNavigate();
@@ -221,6 +230,8 @@ function DAGRunTable({
   const showScheduleColumn = dagRuns.some((dagRun) =>
     Boolean(dagRun.scheduleTime)
   );
+  const isBulkSelected = (dagRun: DAGRunSelectionItem) =>
+    selectedRunKeys?.has(getDAGRunSelectionKey(dagRun)) ?? false;
 
   // Empty state component
   const EmptyState = () => (
@@ -248,7 +259,7 @@ function DAGRunTable({
         {dagRuns.map((dagRun, index) => (
           <div
             key={dagRun.dagRunId}
-            className={`p-3 rounded-lg border border-l-4 min-h-[80px] flex flex-col bg-card border-border ${selectedIndex === index ? 'border-l-border' : 'border-l-transparent'} ${dagRun.status === Status.Running ? 'animate-running-row' : ''} cursor-pointer`}
+            className={`p-3 rounded-lg border border-l-4 min-h-[80px] flex flex-col bg-card border-border ${selectedIndex === index ? 'border-l-border' : 'border-l-transparent'} ${isBulkSelected(dagRun) ? 'bg-muted/30' : ''} ${dagRun.status === Status.Running ? 'animate-running-row' : ''} cursor-pointer`}
             onClick={(e) => {
               // Navigate directly to DAG-run page with correct URL pattern
               if (e.metaKey || e.ctrlKey) {
@@ -264,8 +275,24 @@ function DAGRunTable({
             }}
           >
             {/* Header with name and status */}
-            <div className="flex justify-between items-start mb-2">
-              <div className="font-normal text-sm">{dagRun.name}</div>
+            <div className="flex justify-between items-start gap-3 mb-2">
+              <div className="flex items-start gap-2 min-w-0">
+                {onToggleBulkSelect && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      aria-label={`Select DAG run ${dagRun.dagRunId}`}
+                      checked={isBulkSelected(dagRun)}
+                      onCheckedChange={() =>
+                        onToggleBulkSelect({
+                          name: dagRun.name,
+                          dagRunId: dagRun.dagRunId,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                <div className="font-normal text-sm">{dagRun.name}</div>
+              </div>
               <StepDetailsTooltip dagRun={dagRun}>
                 <div className="flex flex-col items-end gap-1">
                   <StatusChip status={dagRun.status} size="xs">
@@ -346,6 +373,7 @@ function DAGRunTable({
       <Table className="w-full text-xs">
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">Select</TableHead>
             <TableHead>DAG Name</TableHead>
             <TableHead>Run ID</TableHead>
             <TableHead>Status</TableHead>
@@ -382,7 +410,7 @@ function DAGRunTable({
                 selectedIndex === index
                   ? 'border-l-border'
                   : 'border-l-transparent'
-              } ${dagRun.status === Status.Running ? 'animate-running-row' : ''}`}
+              } ${isBulkSelected(dagRun) ? 'bg-muted/30' : ''} ${dagRun.status === Status.Running ? 'animate-running-row' : ''}`}
               style={{ fontSize: '0.8125rem' }}
               onClick={(e) => {
                 if (e.ctrlKey || e.metaKey) {
@@ -404,6 +432,22 @@ function DAGRunTable({
                 }
               }}
             >
+              <TableCell className="py-1 px-2">
+                {onToggleBulkSelect && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      aria-label={`Select DAG run ${dagRun.dagRunId}`}
+                      checked={isBulkSelected(dagRun)}
+                      onCheckedChange={() =>
+                        onToggleBulkSelect({
+                          name: dagRun.name,
+                          dagRunId: dagRun.dagRunId,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </TableCell>
               <TableCell className="py-1 px-2 font-normal">
                 {dagRun.name}
               </TableCell>
