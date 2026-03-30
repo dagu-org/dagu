@@ -104,10 +104,13 @@ describe('DAGRunBatchActions', () => {
             remoteNode: 'local',
           },
         },
+        body: {
+          dagRunId: undefined,
+        },
       }
     );
 
-    expect(screen.getByText('Submission progress')).toBeInTheDocument();
+    expect(screen.getByText('Submitting requests...')).toBeInTheDocument();
     firstRequest.resolve({
       data: {
         dagRunId: 'run-1-copy',
@@ -128,6 +131,9 @@ describe('DAGRunBatchActions', () => {
           query: {
             remoteNode: 'local',
           },
+        },
+        body: {
+          dagRunId: undefined,
         },
       }
     );
@@ -187,5 +193,39 @@ describe('DAGRunBatchActions', () => {
       },
     });
     expect(onReplaceSelection).toHaveBeenCalledWith([]);
+  });
+
+  it('treats a reschedule response without a new run ID as a failure', async () => {
+    postMock.mockResolvedValueOnce({
+      data: {},
+    });
+
+    render(
+      <AppBarContext.Provider value={appBarContextValue}>
+        <DAGRunBatchActions
+          selectedRuns={[{ name: 'alpha', dagRunId: 'run-1' }]}
+          matchingCount={1}
+          onSelectAllMatching={vi.fn()}
+          onClearSelection={vi.fn()}
+          onReplaceSelection={vi.fn()}
+          onActionComplete={vi.fn().mockResolvedValue(undefined)}
+        />
+      </AppBarContext.Provider>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reschedule selected' })
+    );
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Reschedule 1 Run',
+      })
+    );
+
+    expect(
+      await screen.findByText(
+        'Reschedule request did not return a new DAG run ID.'
+      )
+    ).toBeInTheDocument();
   });
 });

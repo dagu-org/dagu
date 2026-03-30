@@ -59,15 +59,11 @@ function DAGRunBatchActions({
   const selectedCount = selectedRuns.length;
   const snapshot = activeBatch?.snapshot ?? [];
   const totalCount = snapshot.length;
-  const remainingCount = Math.max(totalCount - progress.processedCount, 0);
 
   const summaryText =
     selectedCount === 0
       ? `${matchingCount} matching`
       : `${selectedCount} selected of ${matchingCount} matching`;
-
-  const progressPercent =
-    totalCount === 0 ? 0 : (progress.processedCount / totalCount) * 100;
 
   const renderResultDetails = (
     action: BatchActionType,
@@ -174,7 +170,7 @@ function DAGRunBatchActions({
               {phase === 'confirm' && activeBatch
                 ? `Submit ${activeBatch.snapshot.length} ${actionVerbs[activeBatch.action]} request${activeBatch.snapshot.length === 1 ? '' : 's'} using the existing DAG-run API.`
                 : phase === 'running'
-                  ? `Submitting ${progress.processedCount} of ${totalCount} request${totalCount === 1 ? '' : 's'} one at a time.`
+                  ? `Submitting ${totalCount} request${totalCount === 1 ? '' : 's'} using the existing DAG-run API.`
                   : phase === 'complete'
                     ? `${progress.successCount} succeeded, ${progress.failureCount} failed.`
                     : ''}
@@ -205,67 +201,23 @@ function DAGRunBatchActions({
           )}
 
           {phase === 'running' && activeBatch && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Submission progress
-                  </span>
-                  <span className="font-mono tabular-nums">
-                    {progress.processedCount}/{totalCount}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="flex h-full">
-                    {progress.successCount > 0 && (
-                      <div
-                        className="h-full bg-success"
-                        style={{
-                          width: `${(progress.successCount / totalCount) * 100}%`,
-                        }}
-                      />
-                    )}
-                    {progress.failureCount > 0 && (
-                      <div
-                        className="h-full bg-error"
-                        style={{
-                          width: `${(progress.failureCount / totalCount) * 100}%`,
-                        }}
-                      />
-                    )}
-                    {remainingCount > 0 && (
-                      <div
-                        className="h-full bg-muted-foreground/20"
-                        style={{ width: `${100 - progressPercent}%` }}
-                      />
-                    )}
+            <div className="flex min-h-32 flex-col items-center justify-center gap-3 py-4 text-center">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+              <div className="text-sm font-medium text-foreground">
+                Submitting requests...
+              </div>
+              {progress.currentItem ? (
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  <div>{progress.currentItem.name}</div>
+                  <div className="font-mono">
+                    {progress.currentItem.dagRunId}
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{progress.successCount} succeeded</span>
-                  <span>{progress.failureCount} failed</span>
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  Finalizing results
                 </div>
-              </div>
-
-              <div className="rounded-md border bg-muted/20 p-3">
-                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Current item
-                </div>
-                {progress.currentItem ? (
-                  <>
-                    <div className="font-medium">
-                      {progress.currentItem.name}
-                    </div>
-                    <div className="font-mono text-xs text-muted-foreground">
-                      {progress.currentItem.dagRunId}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Finalizing results
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
 

@@ -152,6 +152,9 @@ export function useDAGRunBatchSubmission({
                 remoteNode,
               },
             },
+            body: {
+              dagRunId: undefined,
+            },
           }
         );
 
@@ -163,10 +166,18 @@ export function useDAGRunBatchSubmission({
           };
         }
 
+        if (!data?.dagRunId) {
+          return {
+            ...dagRun,
+            ok: false,
+            error: 'Reschedule request did not return a new DAG run ID.',
+          };
+        }
+
         return {
           ...dagRun,
           ok: true,
-          newDagRunId: data?.dagRunId,
+          newDagRunId: data.dagRunId,
           queued: data?.queued,
         };
       } catch (error) {
