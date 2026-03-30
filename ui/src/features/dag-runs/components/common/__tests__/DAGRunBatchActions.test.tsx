@@ -53,16 +53,20 @@ describe('DAGRunBatchActions', () => {
         queued: boolean;
       };
     }>();
+    const secondRequest = createDeferred<{
+      error: {
+        message: string;
+      };
+    }>();
+    const actionComplete = createDeferred<void>();
 
     postMock
       .mockImplementationOnce(() => firstRequest.promise)
-      .mockResolvedValueOnce({
-        error: {
-          message: 'unable to reschedule',
-        },
-      });
+      .mockImplementationOnce(() => secondRequest.promise);
 
-    const onActionComplete = vi.fn().mockResolvedValue(undefined);
+    const onActionComplete = vi
+      .fn()
+      .mockImplementation(() => actionComplete.promise);
     const onReplaceSelection = vi.fn();
 
     render(
@@ -119,6 +123,10 @@ describe('DAGRunBatchActions', () => {
     });
 
     await waitFor(() => expect(postMock).toHaveBeenCalledTimes(2));
+    expect(
+      await screen.findAllByTestId('batch-action-result-item')
+    ).toHaveLength(1);
+    expect(screen.getByText('Submitting requests...')).toBeInTheDocument();
     expect(postMock).toHaveBeenNthCalledWith(
       2,
       '/dag-runs/{name}/{dagRunId}/reschedule',
@@ -138,8 +146,22 @@ describe('DAGRunBatchActions', () => {
       }
     );
 
+    secondRequest.resolve({
+      error: {
+        message: 'unable to reschedule',
+      },
+    });
+
+    expect(
+      await screen.findByText('Refreshing the DAG-run list')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Refreshing...')).toBeDisabled();
     expect(await screen.findByText('unable to reschedule')).toBeInTheDocument();
+
+    actionComplete.resolve();
+
     const items = await screen.findAllByTestId('batch-action-result-item');
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeVisible();
 
     expect(onActionComplete).toHaveBeenCalledTimes(1);
     expect(onReplaceSelection).toHaveBeenCalledWith([

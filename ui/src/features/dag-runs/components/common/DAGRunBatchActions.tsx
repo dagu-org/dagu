@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { RefreshCw } from 'lucide-react';
+import { CheckCircle2, RefreshCw } from 'lucide-react';
 import React from 'react';
 import { DAGRunSelectionItem } from '../../hooks/useBulkDAGRunSelection';
 import {
@@ -59,6 +59,8 @@ function DAGRunBatchActions({
   const selectedCount = selectedRuns.length;
   const snapshot = activeBatch?.snapshot ?? [];
   const totalCount = snapshot.length;
+  const isLocked = phase === 'running' || progress.isRefreshing;
+  const isProcessing = phase === 'running' || phase === 'complete';
 
   const summaryText =
     selectedCount === 0
@@ -152,12 +154,12 @@ function DAGRunBatchActions({
           hideCloseButton
           className="sm:max-w-2xl"
           onPointerDownOutside={(event) => {
-            if (phase === 'running') {
+            if (isLocked) {
               event.preventDefault();
             }
           }}
           onEscapeKeyDown={(event) => {
-            if (phase === 'running') {
+            if (isLocked) {
               event.preventDefault();
             }
           }}
@@ -169,11 +171,9 @@ function DAGRunBatchActions({
             <DialogDescription>
               {phase === 'confirm' && activeBatch
                 ? `Submit ${activeBatch.snapshot.length} ${actionVerbs[activeBatch.action]} request${activeBatch.snapshot.length === 1 ? '' : 's'} using the existing DAG-run API.`
-                : phase === 'running'
-                  ? `Submitting ${totalCount} request${totalCount === 1 ? '' : 's'} using the existing DAG-run API.`
-                  : phase === 'complete'
-                    ? `${progress.successCount} succeeded, ${progress.failureCount} failed.`
-                    : ''}
+                : isProcessing
+                  ? `Processing ${totalCount} request${totalCount === 1 ? '' : 's'} using the existing DAG-run API.`
+                  : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -200,57 +200,96 @@ function DAGRunBatchActions({
             </div>
           )}
 
-          {phase === 'running' && activeBatch && (
-            <div className="flex min-h-32 flex-col items-center justify-center gap-3 py-4 text-center">
-              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-              <div className="text-sm font-medium text-foreground">
-                Submitting requests...
-              </div>
-              {progress.currentItem ? (
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  <div>{progress.currentItem.name}</div>
-                  <div className="font-mono">
-                    {progress.currentItem.dagRunId}
+          {isProcessing && activeBatch && (
+            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/20 p-4">
+                <div className="flex items-start gap-3">
+                  {isLocked ? (
+                    <RefreshCw className="mt-0.5 h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 text-success" />
+                  )}
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="text-sm font-medium text-foreground">
+                      {phase === 'running'
+                        ? 'Submitting requests...'
+                        : progress.isRefreshing
+                          ? 'Refreshing DAG runs...'
+                          : 'Finished submitting requests'}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="font-mono tabular-nums">
+                        {progress.processedCount}/{totalCount} processed
+                      </span>
+                      <span>{progress.successCount} succeeded</span>
+                      <span>{progress.failureCount} failed</span>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="text-xs text-muted-foreground">
-                  Finalizing results
-                </div>
-              )}
-            </div>
-          )}
+              </div>
 
-          {phase === 'complete' && activeBatch && (
-            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Current item
+                </div>
+                {progress.currentItem ? (
+                  <>
+                    <div className="font-medium">
+                      {progress.currentItem.name}
+                    </div>
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {progress.currentItem.dagRunId}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    {progress.isRefreshing
+                      ? 'Refreshing the DAG-run list'
+                      : 'All requests have been submitted'}
+                  </div>
+                )}
+              </div>
+
               {progress.refreshError && (
                 <div className="rounded-md border border-error/30 bg-error-muted p-3 text-sm text-error">
                   {progress.refreshError}
                 </div>
               )}
-              <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-                {progress.results.map((result, index) => (
-                  <div
-                    key={`${result.name}-${result.dagRunId}-${index}`}
-                    data-testid="batch-action-result-item"
-                    className="rounded-md border p-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium">{result.name}</div>
-                        <div className="font-mono text-xs text-muted-foreground">
-                          {result.dagRunId}
-                        </div>
-                      </div>
-                      <div
-                        className={`text-xs font-medium ${result.ok ? 'text-success' : 'text-error'}`}
-                      >
-                        {result.ok ? 'Succeeded' : 'Failed'}
-                      </div>
+
+              <div className="rounded-md border">
+                <div className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Results
+                </div>
+                <div className="min-h-40 max-h-[45vh] space-y-3 overflow-y-auto p-3">
+                  {progress.results.length === 0 ? (
+                    <div className="flex min-h-32 items-center justify-center text-sm text-muted-foreground">
+                      Results will appear here as each request finishes.
                     </div>
-                    {renderResultDetails(activeBatch.action, result)}
-                  </div>
-                ))}
+                  ) : (
+                    progress.results.map((result, index) => (
+                      <div
+                        key={`${result.name}-${result.dagRunId}-${index}`}
+                        data-testid="batch-action-result-item"
+                        className="rounded-md border p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium">{result.name}</div>
+                            <div className="font-mono text-xs text-muted-foreground">
+                              {result.dagRunId}
+                            </div>
+                          </div>
+                          <div
+                            className={`text-xs font-medium ${result.ok ? 'text-success' : 'text-error'}`}
+                          >
+                            {result.ok ? 'Succeeded' : 'Failed'}
+                          </div>
+                        </div>
+                        {renderResultDetails(activeBatch.action, result)}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -268,13 +307,13 @@ function DAGRunBatchActions({
                 </Button>
               </>
             )}
-            {phase === 'running' && (
+            {(phase === 'running' || progress.isRefreshing) && (
               <Button disabled>
                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
+                {phase === 'running' ? 'Submitting...' : 'Refreshing...'}
               </Button>
             )}
-            {phase === 'complete' && (
+            {phase === 'complete' && !progress.isRefreshing && (
               <Button variant="outline" onClick={closeDialog}>
                 Close
               </Button>

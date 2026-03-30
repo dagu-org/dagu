@@ -21,6 +21,7 @@ export type BatchActionResult = DAGRunSelectionItem & {
 export type BatchProgressState = {
   currentItem: DAGRunSelectionItem | null;
   failureCount: number;
+  isRefreshing: boolean;
   processedCount: number;
   refreshError: string | null;
   results: BatchActionResult[];
@@ -36,6 +37,7 @@ interface UseDAGRunBatchSubmissionProps {
 const createEmptyProgress = (): BatchProgressState => ({
   currentItem: null,
   failureCount: 0,
+  isRefreshing: false,
   processedCount: 0,
   refreshError: null,
   results: [],
@@ -205,6 +207,7 @@ export function useDAGRunBatchSubmission({
     setProgress({
       currentItem: snapshot[0] ?? null,
       failureCount: 0,
+      isRefreshing: false,
       processedCount: 0,
       refreshError: null,
       results: [],
@@ -215,6 +218,7 @@ export function useDAGRunBatchSubmission({
       setProgress({
         currentItem: dagRun,
         failureCount,
+        isRefreshing: false,
         processedCount: index,
         refreshError: null,
         results: [...results],
@@ -233,12 +237,24 @@ export function useDAGRunBatchSubmission({
       setProgress({
         currentItem: snapshot[index + 1] ?? null,
         failureCount,
+        isRefreshing: false,
         processedCount: index + 1,
         refreshError: null,
         results: [...results],
         successCount,
       });
     }
+
+    setPhase('complete');
+    setProgress({
+      currentItem: null,
+      failureCount,
+      isRefreshing: true,
+      processedCount: snapshot.length,
+      refreshError: null,
+      results,
+      successCount,
+    });
 
     let refreshError: string | null = null;
     try {
@@ -259,15 +275,11 @@ export function useDAGRunBatchSubmission({
         }))
     );
 
-    setProgress({
-      currentItem: null,
-      failureCount,
-      processedCount: snapshot.length,
+    setProgress((previous) => ({
+      ...previous,
+      isRefreshing: false,
       refreshError,
-      results,
-      successCount,
-    });
-    setPhase('complete');
+    }));
   }, [activeBatch, onActionComplete, onReplaceSelection, submitBatchItem]);
 
   return {
