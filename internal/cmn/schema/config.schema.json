@@ -879,7 +879,7 @@
         },
         "retention_days": {
           "type": "integer",
-          "description": "Number of days to retain event logs. Default: 10.",
+          "description": "Number of days to retain event logs. Default: 3.",
           "minimum": 0
         }
       }

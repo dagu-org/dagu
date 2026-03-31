@@ -196,7 +196,7 @@ type AuditConfig struct {
 // EventStoreConfig contains configuration for the centralized event store.
 type EventStoreConfig struct {
 	Enabled       bool // Default: true
-	RetentionDays int  // Default: 10; 0 = keep forever
+	RetentionDays int  // Default: 3; 0 = keep forever
 }
 
 // SessionConfig contains configuration for agent session cleanup.

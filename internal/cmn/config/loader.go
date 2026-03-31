@@ -1488,7 +1488,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 
 	// Event store
 	l.v.SetDefault("event_store.enabled", true)
-	l.v.SetDefault("event_store.retention_days", 10)
+	l.v.SetDefault("event_store.retention_days", 3)
 
 	// Terminal
 	l.v.SetDefault("terminal.max_sessions", 5)

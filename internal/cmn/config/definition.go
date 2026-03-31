@@ -350,7 +350,7 @@ type AuditDef struct {
 // EventStoreDef configures the centralized event store.
 type EventStoreDef struct {
 	Enabled       *bool `mapstructure:"enabled"`        // Default: true
-	RetentionDays *int  `mapstructure:"retention_days"` // Default: 10
+	RetentionDays *int  `mapstructure:"retention_days"` // Default: 3
 }
 
 // SessionDef configures agent session storage.
