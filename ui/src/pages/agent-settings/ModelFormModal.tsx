@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -24,20 +25,40 @@ import { getAuthHeaders } from '@/lib/authHeaders';
 
 type ModelConfig = components['schemas']['ModelConfigResponse'];
 type ModelPreset = components['schemas']['ModelPreset'];
+type ProviderValue = components['schemas']['CreateModelConfigRequest']['provider'];
 
 // Mirrors internal/agent/store.go:GenerateSlugID
 function generateSlugId(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-const LLM_PROVIDERS = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'local', label: 'Local' },
-  { value: 'zai', label: 'Z.AI' },
+type ProviderOption = {
+  value: ProviderValue;
+  label: string;
+  modelPlaceholder: string;
+  apiKeyPlaceholder?: string;
+  apiKeyHelpText?: string;
+};
+
+const PROVIDER_OPTIONS: ProviderOption[] = [
+  {
+    value: 'local',
+    label: 'Local',
+    modelPlaceholder: 'llama3.2:latest',
+    apiKeyPlaceholder: 'Optional if your local endpoint requires auth',
+    apiKeyHelpText: 'Optional for local providers. Leave empty if your local endpoint does not require authentication.',
+  },
+  { value: 'anthropic', label: 'Anthropic', modelPlaceholder: 'claude-sonnet-4-5' },
+  { value: 'openai', label: 'OpenAI', modelPlaceholder: 'gpt-5' },
+  { value: 'gemini', label: 'Google Gemini', modelPlaceholder: 'gemini-2.5-pro' },
+  { value: 'openrouter', label: 'OpenRouter', modelPlaceholder: 'anthropic/claude-sonnet-4.5' },
+  { value: 'zai', label: 'Z.AI', modelPlaceholder: 'glm-4.5' },
 ];
+
+const DEFAULT_PROVIDER = PROVIDER_OPTIONS[0].value;
+const PROVIDER_OPTIONS_BY_VALUE = Object.fromEntries(
+  PROVIDER_OPTIONS.map((option) => [option.value, option])
+) as Record<ProviderValue, ProviderOption>;
 
 interface ModelFormModalProps {
   open: boolean;
@@ -55,7 +76,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const [configId, setConfigId] = useState('');
   const [customId, setCustomId] = useState(false);
   const [name, setName] = useState('');
-  const [provider, setProvider] = useState('anthropic');
+  const [provider, setProvider] = useState<ProviderValue>(DEFAULT_PROVIDER);
   const [modelId, setModelId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
@@ -67,12 +88,17 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const [supportsThinking, setSupportsThinking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const providerOption = PROVIDER_OPTIONS_BY_VALUE[provider] ?? PROVIDER_OPTIONS[0];
+  const apiKeyPlaceholder =
+    isEditing && model?.apiKeyConfigured
+      ? '********'
+      : providerOption.apiKeyPlaceholder ?? 'Enter API key';
 
   useEffect(() => {
     if (open && model) {
       setConfigId(model.id);
       setName(model.name);
-      setProvider(model.provider);
+      setProvider(model.provider as ProviderValue);
       setModelId(model.model);
       setBaseUrl(model.baseUrl ?? '');
       setDescription(model.description ?? '');
@@ -94,7 +120,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
     setConfigId('');
     setCustomId(false);
     setName('');
-    setProvider('anthropic');
+    setProvider(DEFAULT_PROVIDER);
     setModelId('');
     setApiKey('');
     setBaseUrl('');
@@ -112,7 +138,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       setCustomId(false);
       setConfigId(generateSlugId(preset.name));
       setName(preset.name);
-      setProvider(preset.provider);
+      setProvider(preset.provider as ProviderValue);
       setModelId(preset.model);
       setDescription(preset.description ?? '');
       setContextWindow(preset.contextWindow ?? '');
@@ -179,6 +205,11 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Model' : 'Add Model'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {isEditing
+              ? 'Update the selected model configuration.'
+              : 'Create a new model configuration.'}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-3 py-3">
@@ -190,9 +221,9 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
 
             {!isEditing && presets.length > 0 && (
               <div className="space-y-1.5">
-                <Label className="text-sm">Import from Preset</Label>
+                <Label id="model-preset-label" className="text-sm">Import from Preset</Label>
                 <Select onValueChange={handlePresetSelect}>
-                  <SelectTrigger className="h-8">
+                  <SelectTrigger aria-labelledby="model-preset-label" className="h-8">
                     <SelectValue placeholder="Select a preset..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -246,13 +277,19 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="model-provider" className="text-sm">Provider</Label>
-              <Select value={provider} onValueChange={setProvider}>
-                <SelectTrigger id="model-provider" className="h-8">
+              <Label id="model-provider-label" htmlFor="model-provider" className="text-sm">
+                Provider
+              </Label>
+              <Select value={provider} onValueChange={(value) => setProvider(value as ProviderValue)}>
+                <SelectTrigger
+                  id="model-provider"
+                  aria-labelledby="model-provider-label"
+                  className="h-8"
+                >
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {LLM_PROVIDERS.map((p) => (
+                  {PROVIDER_OPTIONS.map((p) => (
                     <SelectItem key={p.value} value={p.value}>
                       {p.label}
                     </SelectItem>
@@ -267,7 +304,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
                 id="model-id"
                 value={modelId}
                 onChange={(e) => setModelId(e.target.value)}
-                placeholder="claude-sonnet-4-5"
+                placeholder={providerOption.modelPlaceholder}
                 className="h-8"
                 required
               />
@@ -280,12 +317,17 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={isEditing && model?.apiKeyConfigured ? '********' : 'Enter API key'}
+                placeholder={apiKeyPlaceholder}
                 className="h-8"
               />
               {isEditing && model?.apiKeyConfigured && (
                 <p className="text-xs text-muted-foreground">
                   Leave empty to keep existing key
+                </p>
+              )}
+              {!isEditing && providerOption.apiKeyHelpText && (
+                <p className="text-xs text-muted-foreground">
+                  {providerOption.apiKeyHelpText}
                 </p>
               )}
             </div>
