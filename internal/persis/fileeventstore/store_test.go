@@ -79,6 +79,27 @@ func TestStoreQuerySkipsMalformedAndPaginates(t *testing.T) {
 	assert.True(t, result.Entries[0].OccurredAt.Equal(dayOne))
 }
 
+func TestStoreQueryIncludesLegacyDailyFilesWithinHourlyRange(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	event := testEvent("evt-legacy", time.Date(2026, 3, 29, 18, 30, 0, 0, time.UTC))
+	writeLegacyDailyEvents(t, store.baseDir, event.OccurredAt, [][]byte{
+		mustMarshalEvent(t, event),
+	})
+
+	result, err := store.Query(context.Background(), eventstore.QueryFilter{
+		StartTime: time.Date(2026, 3, 29, 18, 0, 0, 0, time.UTC),
+		EndTime:   time.Date(2026, 3, 29, 19, 0, 0, 0, time.UTC),
+	})
+	require.NoError(t, err)
+
+	require.Len(t, result.Entries, 1)
+	assert.Equal(t, "evt-legacy", result.Entries[0].ID)
+}
+
 func mustMarshalEvent(t *testing.T, event *eventstore.Event) []byte {
 	t.Helper()
 	data, err := json.Marshal(event)
@@ -86,7 +107,17 @@ func mustMarshalEvent(t *testing.T, event *eventstore.Event) []byte {
 	return data
 }
 
-func writeCommittedEvents(t *testing.T, baseDir string, day time.Time, lines [][]byte) {
+func writeCommittedEvents(t *testing.T, baseDir string, slot time.Time, lines [][]byte) {
+	t.Helper()
+	path := filepath.Join(baseDir, logPrefix+slot.UTC().Format(hourFormat)+logSuffix)
+	content := make([]string, 0, len(lines))
+	for _, line := range lines {
+		content = append(content, string(line))
+	}
+	require.NoError(t, os.WriteFile(path, []byte(strings.Join(content, "\n")+"\n"), filePermissions))
+}
+
+func writeLegacyDailyEvents(t *testing.T, baseDir string, day time.Time, lines [][]byte) {
 	t.Helper()
 	path := filepath.Join(baseDir, logPrefix+day.UTC().Format(dayFormat)+logSuffix)
 	content := make([]string, 0, len(lines))

@@ -129,7 +129,7 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 		return fmt.Errorf("read inbox directory: %w", err)
 	}
 
-	var pendingByDay = make(map[string][]pendingInboxEvent)
+	var pendingByHour = make(map[string][]pendingInboxEvent)
 	processed := 0
 	for _, entry := range entries {
 		if processed >= c.batchSize {
@@ -153,31 +153,31 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 			}
 			continue
 		}
-		day := pending.event.OccurredAt.UTC().Format(dayFormat)
-		pendingByDay[day] = append(pendingByDay[day], pending)
+		hour := pending.event.OccurredAt.UTC().Format(hourFormat)
+		pendingByHour[hour] = append(pendingByHour[hour], pending)
 	}
 
-	if len(pendingByDay) == 0 {
+	if len(pendingByHour) == 0 {
 		return nil
 	}
 
-	days := make([]string, 0, len(pendingByDay))
-	for day := range pendingByDay {
-		days = append(days, day)
+	hours := make([]string, 0, len(pendingByHour))
+	for hour := range pendingByHour {
+		hours = append(hours, hour)
 	}
-	sort.Strings(days)
+	sort.Strings(hours)
 
-	for _, day := range days {
-		group := pendingByDay[day]
-		if err := c.appendGroup(day, group); err != nil {
+	for _, hour := range hours {
+		group := pendingByHour[hour]
+		if err := c.appendGroup(hour, group); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Collector) appendGroup(day string, group []pendingInboxEvent) error {
-	logPath := filepath.Join(c.store.baseDir, logPrefix+day+logSuffix)
+func (c *Collector) appendGroup(hour string, group []pendingInboxEvent) error {
+	logPath := filepath.Join(c.store.baseDir, logPrefix+hour+logSuffix)
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, filePermissions) //nolint:gosec // controlled path
 	if err != nil {
 		return fmt.Errorf("open event log %s: %w", logPath, err)
@@ -308,11 +308,11 @@ func (c *Collector) cleanupExpired() {
 			if entry.IsDir() {
 				continue
 			}
-			day, ok := parseCommittedFileDay(entry.Name())
-			if !ok || !day.Before(cutoff) {
+			window, ok := parseCommittedFileWindow(filepath.Join(c.store.baseDir, entry.Name()), entry.Name())
+			if !ok || window.end.After(cutoff) {
 				continue
 			}
-			path := filepath.Join(c.store.baseDir, entry.Name())
+			path := window.path
 			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 				slog.Warn("fileeventstore: failed to remove expired event log",
 					slog.String("file", path),

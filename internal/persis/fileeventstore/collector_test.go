@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCollectorDrainOnceAppendsByDayAndDeduplicatesAcrossRestart(t *testing.T) {
+func TestCollectorDrainOnceAppendsByHourAndDeduplicatesAcrossRestart(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
@@ -35,8 +35,8 @@ func TestCollectorDrainOnceAppendsByDayAndDeduplicatesAcrossRestart(t *testing.T
 	require.NoError(t, collector.DrainOnce(context.Background()))
 
 	assertInboxCount(t, store.inboxDir, 0)
-	assertLogLineCount(t, filepath.Join(baseDir, "_20260328.jsonl"), 1)
-	assertLogLineCount(t, filepath.Join(baseDir, "_20260329.jsonl"), 1)
+	assertLogLineCount(t, filepath.Join(baseDir, "_2026032823.jsonl"), 1)
+	assertLogLineCount(t, filepath.Join(baseDir, "_2026032901.jsonl"), 1)
 
 	restarted, err := NewCollector(baseDir, 10)
 	require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestCollectorDrainOnceAppendsByDayAndDeduplicatesAcrossRestart(t *testing.T
 	require.NoError(t, restarted.DrainOnce(context.Background()))
 
 	assertInboxCount(t, store.inboxDir, 0)
-	assertLogLineCount(t, filepath.Join(baseDir, "_20260328.jsonl"), 1)
+	assertLogLineCount(t, filepath.Join(baseDir, "_2026032823.jsonl"), 1)
 }
 
 func TestCollectorDrainOnceQuarantinesMalformedInbox(t *testing.T) {
@@ -76,11 +76,11 @@ func TestCollectorCleanupExpiredPreservesInbox(t *testing.T) {
 	collector, err := NewCollector(baseDir, 10, WithNow(func() time.Time { return now }))
 	require.NoError(t, err)
 
-	expiredDay := now.AddDate(0, 0, -20)
-	recentDay := now.AddDate(0, 0, -1)
+	expiredHour := now.AddDate(0, 0, -20)
+	recentHour := now.Add(-time.Hour)
 
-	expiredLog := filepath.Join(baseDir, "_"+expiredDay.UTC().Format(dayFormat)+".jsonl")
-	recentLog := filepath.Join(baseDir, "_"+recentDay.UTC().Format(dayFormat)+".jsonl")
+	expiredLog := filepath.Join(baseDir, "_"+expiredHour.UTC().Format(hourFormat)+".jsonl")
+	recentLog := filepath.Join(baseDir, "_"+recentHour.UTC().Format(hourFormat)+".jsonl")
 	expiredQuarantine := filepath.Join(collector.store.quarantineDir, "expired.json")
 	inboxFile := filepath.Join(collector.store.inboxDir, "pending.json")
 
@@ -88,7 +88,7 @@ func TestCollectorCleanupExpiredPreservesInbox(t *testing.T) {
 	require.NoError(t, os.WriteFile(recentLog, []byte("{}\n"), filePermissions))
 	require.NoError(t, os.WriteFile(expiredQuarantine, []byte("{}"), filePermissions))
 	require.NoError(t, os.WriteFile(inboxFile, []byte("{}"), filePermissions))
-	require.NoError(t, os.Chtimes(expiredQuarantine, expiredDay, expiredDay))
+	require.NoError(t, os.Chtimes(expiredQuarantine, expiredHour, expiredHour))
 
 	collector.cleanupExpired()
 

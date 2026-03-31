@@ -26,10 +26,17 @@ const (
 	dirPermissions  = 0o750
 	filePermissions = 0o640
 	dayFormat       = "20060102"
+	hourFormat      = "2006010215"
 	logSuffix       = ".jsonl"
 	inboxSuffix     = ".json"
 	logPrefix       = "_"
 )
+
+type committedFileWindow struct {
+	path  string
+	start time.Time
+	end   time.Time
+}
 
 type Store struct {
 	baseDir       string
@@ -128,28 +135,40 @@ func (s *Store) listCommittedFiles(startTime, endTime time.Time) ([]string, erro
 		return nil, fmt.Errorf("fileeventstore: read directory %s: %w", s.baseDir, err)
 	}
 
-	startDay, hasStart := utcDay(startTime)
-	endDay, hasEnd := utcDay(endTime)
-	var files []string
+	startTime = startTime.UTC()
+	endTime = endTime.UTC()
+	hasStart := !startTime.IsZero()
+	hasEnd := !endTime.IsZero()
+	var files []committedFileWindow
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-		day, ok := parseCommittedFileDay(entry.Name())
+		window, ok := parseCommittedFileWindow(filepath.Join(s.baseDir, entry.Name()), entry.Name())
 		if !ok {
 			continue
 		}
-		if hasStart && day.Before(startDay) {
+		if hasStart && !window.end.After(startTime) {
 			continue
 		}
-		if hasEnd && day.After(endDay) {
+		if hasEnd && window.start.After(endTime) {
 			continue
 		}
-		files = append(files, filepath.Join(s.baseDir, entry.Name()))
+		files = append(files, window)
 	}
 
-	sort.Sort(sort.Reverse(sort.StringSlice(files)))
-	return files, nil
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].start.Equal(files[j].start) {
+			return files[i].path > files[j].path
+		}
+		return files[i].start.After(files[j].start)
+	})
+
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.path)
+	}
+	return paths, nil
 }
 
 func (s *Store) readCommittedEvents(filePath string, filter eventstore.QueryFilter) ([]*eventstore.Event, error) {
@@ -234,16 +253,37 @@ func matchesFilter(event *eventstore.Event, filter eventstore.QueryFilter) bool 
 	return true
 }
 
-func parseCommittedFileDay(name string) (time.Time, bool) {
+func parseCommittedFileWindow(path, name string) (committedFileWindow, bool) {
 	if !strings.HasPrefix(name, logPrefix) || !strings.HasSuffix(name, logSuffix) {
-		return time.Time{}, false
+		return committedFileWindow{}, false
 	}
 	datePart := strings.TrimSuffix(strings.TrimPrefix(name, logPrefix), logSuffix)
-	day, err := time.Parse(dayFormat, datePart)
-	if err != nil {
-		return time.Time{}, false
+	switch len(datePart) {
+	case len(hourFormat):
+		hour, err := time.Parse(hourFormat, datePart)
+		if err != nil {
+			return committedFileWindow{}, false
+		}
+		hour = hour.UTC()
+		return committedFileWindow{
+			path:  path,
+			start: hour,
+			end:   hour.Add(time.Hour),
+		}, true
+	case len(dayFormat):
+		day, err := time.Parse(dayFormat, datePart)
+		if err != nil {
+			return committedFileWindow{}, false
+		}
+		day = day.UTC()
+		return committedFileWindow{
+			path:  path,
+			start: day,
+			end:   day.Add(24 * time.Hour),
+		}, true
+	default:
+		return committedFileWindow{}, false
 	}
-	return day.UTC(), true
 }
 
 func utcDay(t time.Time) (time.Time, bool) {
