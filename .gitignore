@@ -47,3 +47,9 @@ __debug_bin*
 
 # Ralph PRD file
 prd.json
+
+# Compiled integration test binary
+intg.test
+
+# Agent workspace
+projects/
