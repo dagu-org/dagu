@@ -51,5 +51,3 @@ prd.json
 # Compiled integration test binary
 intg.test
 
-# Agent workspace
-projects/
