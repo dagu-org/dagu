@@ -7,6 +7,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -140,10 +141,84 @@ func TestDeleteJobIgnoresNotFound(t *testing.T) {
 	assert.Empty(t, client.GetJobName())
 }
 
+func TestCurrentPodNamePrefersPendingRetryOverFailedPod(t *testing.T) {
+	failedPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job-pod-attempt-1",
+			Namespace:         "default",
+			CreationTimestamp: metav1.NewTime(time.Unix(1, 0)),
+			Labels: map[string]string{
+				"job-name": "job-1",
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodFailed,
+		},
+	}
+	retryPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "job-pod-attempt-2",
+			Namespace:         "default",
+			CreationTimestamp: metav1.NewTime(time.Unix(2, 0)),
+			Labels: map[string]string{
+				"job-name": "job-1",
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+		},
+	}
+
+	client := &Client{
+		clientset: fake.NewSimpleClientset(failedPod, retryPod),
+		namespace: "default",
+	}
+	client.setJobName("job-1")
+
+	podName, err := client.currentPodName(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, podName)
+}
+
+func TestCurrentPodNameReturnsFailedPodWhenNoRetryExists(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "job-pod",
+			Namespace: "default",
+			Labels: map[string]string{
+				"job-name": "job-1",
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodFailed,
+		},
+	}
+
+	client := &Client{
+		clientset: fake.NewSimpleClientset(pod),
+		namespace: "default",
+	}
+	client.setJobName("job-1")
+
+	podName, err := client.currentPodName(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "job-pod", podName)
+}
+
 func TestBuildRESTConfigFailsFastForExplicitKubeconfig(t *testing.T) {
 	cfg, err := buildRESTConfig(&Config{
 		Kubeconfig: "/definitely/missing/kubeconfig",
 	})
+
+	require.Nil(t, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "kubeconfig error")
+}
+
+func TestBuildRESTConfigFailsFastForExplicitKubeconfigEnv(t *testing.T) {
+	t.Setenv(clientcmd.RecommendedConfigPathEnvVar, filepath.Join(t.TempDir(), "missing-kubeconfig"))
+
+	cfg, err := buildRESTConfig(&Config{})
 
 	require.Nil(t, cfg)
 	require.Error(t, err)

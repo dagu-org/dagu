@@ -58,6 +58,7 @@ func NewClient(cfg *Config) (*Client, error) {
 func buildRESTConfig(cfg *Config) (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	explicitKubeconfig := cfg.Kubeconfig != ""
+	explicitKubeconfigEnv := hasExplicitKubeconfigEnv()
 	if explicitKubeconfig {
 		loadingRules.ExplicitPath = cfg.Kubeconfig
 	}
@@ -71,7 +72,7 @@ func buildRESTConfig(cfg *Config) (*rest.Config, error) {
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 	restCfg, err := kubeConfig.ClientConfig()
 	if err != nil {
-		if explicitKubeconfig || explicitContext || hasAnyKubeconfigFile(loadingRules.GetLoadingPrecedence()) {
+		if explicitKubeconfig || explicitKubeconfigEnv || explicitContext || hasAnyKubeconfigFile(loadingRules.GetLoadingPrecedence()) {
 			return nil, fmt.Errorf("kubeconfig error: %w", err)
 		}
 
@@ -82,6 +83,10 @@ func buildRESTConfig(cfg *Config) (*rest.Config, error) {
 		return restCfg, nil
 	}
 	return restCfg, nil
+}
+
+func hasExplicitKubeconfigEnv() bool {
+	return strings.TrimSpace(os.Getenv(clientcmd.RecommendedConfigPathEnvVar)) != ""
 }
 
 func hasAnyKubeconfigFile(paths []string) bool {
@@ -338,10 +343,12 @@ func selectPod(pods []corev1.Pod) corev1.Pod {
 func podPriority(pod corev1.Pod) int {
 	switch pod.Status.Phase {
 	case corev1.PodRunning:
-		return 4
-	case corev1.PodSucceeded, corev1.PodFailed:
-		return 3
+		return 5
 	case corev1.PodPending:
+		return 4
+	case corev1.PodSucceeded:
+		return 3
+	case corev1.PodFailed:
 		return 2
 	default:
 		return 1

@@ -34,6 +34,21 @@ func TestLoadConfigFromMapValidation(t *testing.T) {
 		assert.Contains(t, err.Error(), "resources.requests.cpu")
 	})
 
+	t.Run("NegativeResourceQuantityReturnsError", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"resources": map[string]any{
+				"limits": map[string]any{
+					"cpu": "-100m",
+				},
+			},
+		})
+
+		require.Nil(t, cfg)
+		require.ErrorIs(t, err, ErrNegativeQuantity)
+		assert.Contains(t, err.Error(), "resources.limits.cpu")
+	})
+
 	t.Run("InvalidEmptyDirSizeLimitReturnsError", func(t *testing.T) {
 		cfg, err := LoadConfigFromMap(map[string]any{
 			"image": "busybox",
@@ -115,6 +130,45 @@ func TestLoadConfigFromMapValidation(t *testing.T) {
 		require.Nil(t, cfg)
 		require.ErrorIs(t, err, ErrInvalidVolumeSource)
 	})
+
+	t.Run("EnvRejectsValueAndValueFromTogether", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"env": []map[string]any{
+				{
+					"name":  "TOKEN",
+					"value": "literal",
+					"value_from": map[string]any{
+						"secret_key_ref": map[string]any{
+							"name": "app-secret",
+							"key":  "token",
+						},
+					},
+				},
+			},
+		})
+
+		require.Nil(t, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "env[0]")
+		assert.Contains(t, err.Error(), "mutually exclusive")
+	})
+
+	t.Run("EnvFromRejectsMissingSource", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"env_from": []map[string]any{
+				{
+					"prefix": "APP_",
+				},
+			},
+		})
+
+		require.Nil(t, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "env_from[0]")
+		assert.Contains(t, err.Error(), "exactly one source")
+	})
 }
 
 func TestValidateStep(t *testing.T) {
@@ -165,5 +219,29 @@ func TestKubernetesDefaultsSchema(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported_field")
+	})
+
+	t.Run("RejectsInvalidEnvShape", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"env": []map[string]any{
+				{
+					"value": "missing-name",
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "env")
+	})
+
+	t.Run("RejectsInvalidEnvFromShape", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"env_from": []map[string]any{
+				{
+					"prefix": "APP_",
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "env_from")
 	})
 }

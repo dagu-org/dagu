@@ -492,7 +492,7 @@ steps:
 
 func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
@@ -1076,7 +1076,7 @@ func TestContainerExecMode(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
@@ -1275,7 +1275,7 @@ func TestContainerExecNotRunning(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
@@ -1387,7 +1387,7 @@ func TestContainerExecVariableExpansion(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 

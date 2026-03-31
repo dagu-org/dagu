@@ -1496,7 +1496,7 @@ func TestWrapCommandWithShell(t *testing.T) {
 func TestDockerClientRespectsDockerHostEnv(t *testing.T) {
 	t.Setenv("DOCKER_HOST", "tcp://test-host:2375")
 
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := client.New(client.FromEnv)
 	require.NoError(t, err)
 	defer cli.Close()
 

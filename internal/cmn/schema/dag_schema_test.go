@@ -506,6 +506,21 @@ steps:
 `,
 		},
 		{
+			name: "StepConfigAllowsImageOmittedWhenRootDefaultsProvideIt",
+			spec: `
+kubernetes:
+  image: alpine:3.20
+  namespace: batch
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      cleanup_policy: keep
+    command: echo hello
+`,
+		},
+		{
 			name: "StepConfigSupportsKubernetesAlias",
 			spec: `
 steps:
@@ -545,16 +560,29 @@ steps:
 			wantErr: "kubernetes",
 		},
 		{
-			name: "RejectMissingImageAtStepLevel",
+			name: "RejectInvalidEnvEntry",
 			spec: `
-kubernetes:
-  namespace: batch
-
 steps:
   - id: report
     type: k8s
     config:
-      namespace: jobs
+      image: alpine:3.20
+      env:
+        - value: missing-name
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectInvalidEnvFromEntry",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      env_from:
+        - prefix: APP_
     command: echo hello
 `,
 			wantErr: "steps",

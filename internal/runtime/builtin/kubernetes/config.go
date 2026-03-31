@@ -22,6 +22,7 @@ var (
 	ErrNegativeActiveDeadline   = errors.New("kubernetes executor active_deadline must be >= 0")
 	ErrNegativeBackoffLimit     = errors.New("kubernetes executor backoff_limit must be >= 0")
 	ErrNegativeTTLAfterFinished = errors.New("kubernetes executor ttl_after_finished must be >= 0")
+	ErrNegativeQuantity         = errors.New("kubernetes executor resource quantity must be >= 0")
 	ErrInvalidVolumeSource      = errors.New("kubernetes executor volume must define exactly one source")
 )
 
@@ -251,10 +252,114 @@ func validateConfig(cfg *Config) error {
 	if _, err := cfg.toK8sResourceRequirements(); err != nil {
 		return err
 	}
+	if err := validateEnvVars(cfg.Env); err != nil {
+		return err
+	}
+	if err := validateEnvFromSources(cfg.EnvFrom); err != nil {
+		return err
+	}
 	if _, err := cfg.toK8sVolumes(); err != nil {
 		return err
 	}
 	return nil
+}
+
+func validateEnvVars(env []EnvVar) error {
+	for i, entry := range env {
+		field := fmt.Sprintf("env[%d]", i)
+		if strings.TrimSpace(entry.Name) == "" {
+			return fmt.Errorf("%s.name: required", field)
+		}
+		if entry.Value != "" && entry.ValueFrom != nil {
+			return fmt.Errorf("%s: value and value_from are mutually exclusive", field)
+		}
+		if entry.ValueFrom == nil {
+			continue
+		}
+		if err := validateEnvVarSource(field+".value_from", entry.ValueFrom); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateEnvVarSource(field string, src *EnvVarSource) error {
+	switch countEnvVarSources(src) {
+	case 0:
+		return fmt.Errorf("%s: must define exactly one source", field)
+	case 1:
+	default:
+		return fmt.Errorf("%s: must define exactly one source", field)
+	}
+
+	if src.SecretKeyRef != nil {
+		if strings.TrimSpace(src.SecretKeyRef.Name) == "" {
+			return fmt.Errorf("%s.secret_key_ref.name: required", field)
+		}
+		if strings.TrimSpace(src.SecretKeyRef.Key) == "" {
+			return fmt.Errorf("%s.secret_key_ref.key: required", field)
+		}
+	}
+	if src.ConfigMapKeyRef != nil {
+		if strings.TrimSpace(src.ConfigMapKeyRef.Name) == "" {
+			return fmt.Errorf("%s.config_map_key_ref.name: required", field)
+		}
+		if strings.TrimSpace(src.ConfigMapKeyRef.Key) == "" {
+			return fmt.Errorf("%s.config_map_key_ref.key: required", field)
+		}
+	}
+	if src.FieldRef != nil && strings.TrimSpace(src.FieldRef.FieldPath) == "" {
+		return fmt.Errorf("%s.field_ref.field_path: required", field)
+	}
+	return nil
+}
+
+func countEnvVarSources(src *EnvVarSource) int {
+	count := 0
+	if src == nil {
+		return count
+	}
+	if src.SecretKeyRef != nil {
+		count++
+	}
+	if src.ConfigMapKeyRef != nil {
+		count++
+	}
+	if src.FieldRef != nil {
+		count++
+	}
+	return count
+}
+
+func validateEnvFromSources(sources []EnvFromSource) error {
+	for i, source := range sources {
+		field := fmt.Sprintf("env_from[%d]", i)
+		switch countEnvFromSources(source) {
+		case 0:
+			return fmt.Errorf("%s: must define exactly one source", field)
+		case 1:
+		default:
+			return fmt.Errorf("%s: must define exactly one source", field)
+		}
+		if source.ConfigMapRef != nil && strings.TrimSpace(source.ConfigMapRef.Name) == "" {
+			return fmt.Errorf("%s.config_map_ref.name: required", field)
+		}
+		if source.SecretRef != nil && strings.TrimSpace(source.SecretRef.Name) == "" {
+			return fmt.Errorf("%s.secret_ref.name: required", field)
+		}
+	}
+	return nil
+}
+
+func countEnvFromSources(source EnvFromSource) int {
+	count := 0
+	if source.ConfigMapRef != nil {
+		count++
+	}
+	if source.SecretRef != nil {
+		count++
+	}
+	return count
 }
 
 // toK8sEnvVars converts config EnvVars to Kubernetes API types.
@@ -495,6 +600,9 @@ func parseQuantity(field, value string) (resource.Quantity, error) {
 	if err != nil {
 		return resource.Quantity{}, fmt.Errorf("%s: invalid quantity %q: %w", field, value, err)
 	}
+	if qty.Sign() < 0 {
+		return resource.Quantity{}, fmt.Errorf("%s: %w (%q)", field, ErrNegativeQuantity, value)
+	}
 	return qty, nil
 }
 
@@ -508,33 +616,207 @@ var configSchema = &jsonschema.Schema{
 	Type:                 "object",
 	Required:             []string{"image"},
 	AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
-	Properties: map[string]*jsonschema.Schema{
-		"image":              {Type: "string", Description: "Container image (required)"},
-		"namespace":          {Type: "string", Description: "Kubernetes namespace (default: default)"},
-		"kubeconfig":         {Type: "string", Description: "Path to kubeconfig file"},
-		"context":            {Type: "string", Description: "Kubeconfig context name"},
-		"service_account":    {Type: "string", Description: "Service account for the pod"},
-		"working_dir":        {Type: "string", Description: "Working directory inside the container"},
-		"image_pull_policy":  {Type: "string", Description: "Image pull policy (Always, IfNotPresent, Never)"},
-		"image_pull_secrets": {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Secret names for private registries"},
-		"env":                {Type: "array", Items: &jsonschema.Schema{Type: "object"}, Description: "Environment variables"},
-		"env_from":           {Type: "array", Items: &jsonschema.Schema{Type: "object"}, Description: "Environment variable sources"},
-		"resources":          {Type: "object", Description: "CPU/memory requests and limits"},
-		"node_selector":      {Type: "object", Description: "Node selector constraints"},
-		"tolerations":        {Type: "array", Items: &jsonschema.Schema{Type: "object"}, Description: "Pod tolerations"},
-		"labels":             {Type: "object", Description: "Labels for Job and Pod"},
-		"annotations":        {Type: "object", Description: "Annotations for Job and Pod"},
-		"volumes":            {Type: "array", Items: &jsonschema.Schema{Type: "object"}, Description: "Pod volumes"},
-		"volume_mounts":      {Type: "array", Items: &jsonschema.Schema{Type: "object"}, Description: "Container volume mounts"},
-		"active_deadline":    {Type: "integer", Description: "Job timeout in seconds"},
-		"backoff_limit":      {Type: "integer", Description: "Number of retries (default: 0)"},
-		"ttl_after_finished": {Type: "integer", Description: "TTL for automatic cleanup in seconds"},
-		"cleanup_policy":     {Type: "string", Description: "delete (default) or keep"},
-	},
+	Properties:           kubernetesConfigProperties,
 }
 
 var configDefaultsSchema = &jsonschema.Schema{
 	Type:                 "object",
-	Properties:           configSchema.Properties,
+	Properties:           kubernetesConfigProperties,
 	AdditionalProperties: configSchema.AdditionalProperties,
+}
+
+var kubernetesConfigProperties = map[string]*jsonschema.Schema{
+	"image":              {Type: "string", Description: "Container image (required after DAG-level defaults are merged)"},
+	"namespace":          {Type: "string", Description: "Kubernetes namespace (default: default)"},
+	"kubeconfig":         {Type: "string", Description: "Path to kubeconfig file"},
+	"context":            {Type: "string", Description: "Kubeconfig context name"},
+	"service_account":    {Type: "string", Description: "Service account for the pod"},
+	"working_dir":        {Type: "string", Description: "Working directory inside the container"},
+	"image_pull_policy":  {Type: "string", Description: "Image pull policy (Always, IfNotPresent, Never)"},
+	"image_pull_secrets": {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Secret names for private registries"},
+	"env":                {Type: "array", Items: kubernetesEnvVarSchema, Description: "Environment variables"},
+	"env_from":           {Type: "array", Items: kubernetesEnvFromSourceSchema, Description: "Environment variable sources"},
+	"resources":          kubernetesResourceRequirementsSchema,
+	"node_selector":      stringMapSchema("Node selector constraints"),
+	"tolerations":        {Type: "array", Items: kubernetesTolerationSchema, Description: "Pod tolerations"},
+	"labels":             stringMapSchema("Labels for Job and Pod"),
+	"annotations":        stringMapSchema("Annotations for Job and Pod"),
+	"volumes":            {Type: "array", Items: kubernetesVolumeSchema, Description: "Pod volumes"},
+	"volume_mounts":      {Type: "array", Items: kubernetesVolumeMountSchema, Description: "Container volume mounts"},
+	"active_deadline":    {Type: "integer", Description: "Job timeout in seconds"},
+	"backoff_limit":      {Type: "integer", Description: "Number of retries (default: 0)"},
+	"ttl_after_finished": {Type: "integer", Description: "TTL for automatic cleanup in seconds"},
+	"cleanup_policy":     {Type: "string", Description: "delete (default) or keep"},
+}
+
+var kubernetesEnvVarSchema = func() *jsonschema.Schema {
+	schema := closedObjectSchema(
+		map[string]*jsonschema.Schema{
+			"name":       {Type: "string", Description: "Environment variable name"},
+			"value":      {Type: "string", Description: "Literal environment variable value"},
+			"value_from": kubernetesEnvVarSourceSchema,
+		},
+		"name",
+	)
+	schema.Not = &jsonschema.Schema{
+		Required: []string{"value", "value_from"},
+	}
+	return schema
+}()
+
+var kubernetesEnvVarSourceSchema = &jsonschema.Schema{
+	OneOf: []*jsonschema.Schema{
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"secret_key_ref": newKubernetesKeySelectorSchema(),
+		}, "secret_key_ref"),
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"config_map_key_ref": newKubernetesKeySelectorSchema(),
+		}, "config_map_key_ref"),
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"field_ref": newKubernetesFieldRefSchema(),
+		}, "field_ref"),
+	},
+	Description: "Source configuration for an environment variable value",
+}
+
+var kubernetesEnvFromSourceSchema = &jsonschema.Schema{
+	OneOf: []*jsonschema.Schema{
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"config_map_ref": newKubernetesEnvFromRefSchema(),
+			"prefix":         {Type: "string", Description: "Optional variable prefix"},
+		}, "config_map_ref"),
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"secret_ref": newKubernetesEnvFromRefSchema(),
+			"prefix":     {Type: "string", Description: "Optional variable prefix"},
+		}, "secret_ref"),
+	},
+	Description: "Environment variable source import",
+}
+
+var kubernetesResourceRequirementsSchema = closedObjectSchema(map[string]*jsonschema.Schema{
+	"requests": stringMapSchema("CPU/memory requests"),
+	"limits":   stringMapSchema("CPU/memory limits"),
+})
+
+var kubernetesTolerationSchema = closedObjectSchema(map[string]*jsonschema.Schema{
+	"key":      {Type: "string", Description: "Taint key to tolerate"},
+	"operator": {Type: "string", Description: "Toleration operator"},
+	"value":    {Type: "string", Description: "Taint value to match"},
+	"effect":   {Type: "string", Description: "Taint effect to tolerate"},
+})
+
+var kubernetesVolumeSchema = &jsonschema.Schema{
+	OneOf: []*jsonschema.Schema{
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"name":      {Type: "string", Description: "Volume name"},
+			"empty_dir": kubernetesEmptyDirSchema,
+		}, "name", "empty_dir"),
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"name":      {Type: "string", Description: "Volume name"},
+			"host_path": kubernetesHostPathSchema,
+		}, "name", "host_path"),
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"name":       {Type: "string", Description: "Volume name"},
+			"config_map": kubernetesConfigMapVolumeSchema,
+		}, "name", "config_map"),
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"name":   {Type: "string", Description: "Volume name"},
+			"secret": kubernetesSecretVolumeSchema,
+		}, "name", "secret"),
+		closedObjectSchema(map[string]*jsonschema.Schema{
+			"name":                    {Type: "string", Description: "Volume name"},
+			"persistent_volume_claim": kubernetesPVCVolumeSchema,
+		}, "name", "persistent_volume_claim"),
+	},
+	Description: "Volume definition. Exactly one source must be specified",
+}
+
+var kubernetesEmptyDirSchema = closedObjectSchema(map[string]*jsonschema.Schema{
+	"medium":     {Type: "string", Description: "Storage medium, such as Memory"},
+	"size_limit": {Type: "string", Description: "Optional size limit using Kubernetes quantity syntax"},
+})
+
+var kubernetesHostPathSchema = closedObjectSchema(
+	map[string]*jsonschema.Schema{
+		"path": {Type: "string", Description: "Host filesystem path"},
+		"type": {Type: "string", Description: "Optional hostPath type"},
+	},
+	"path",
+)
+
+var kubernetesConfigMapVolumeSchema = closedObjectSchema(
+	map[string]*jsonschema.Schema{
+		"name": {Type: "string", Description: "ConfigMap name"},
+	},
+	"name",
+)
+
+var kubernetesSecretVolumeSchema = closedObjectSchema(
+	map[string]*jsonschema.Schema{
+		"secret_name": {Type: "string", Description: "Secret name"},
+	},
+	"secret_name",
+)
+
+var kubernetesPVCVolumeSchema = closedObjectSchema(
+	map[string]*jsonschema.Schema{
+		"claim_name": {Type: "string", Description: "PersistentVolumeClaim name"},
+		"read_only":  {Type: "boolean", Description: "Mount claim read-only"},
+	},
+	"claim_name",
+)
+
+var kubernetesVolumeMountSchema = closedObjectSchema(
+	map[string]*jsonschema.Schema{
+		"name":       {Type: "string", Description: "Referenced volume name"},
+		"mount_path": {Type: "string", Description: "Mount path inside the container"},
+		"sub_path":   {Type: "string", Description: "Optional sub-path within the volume"},
+		"read_only":  {Type: "boolean", Description: "Mount the volume read-only"},
+	},
+	"name", "mount_path",
+)
+
+func closedObjectSchema(properties map[string]*jsonschema.Schema, required ...string) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:                 "object",
+		Properties:           properties,
+		Required:             required,
+		AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+	}
+}
+
+func newKubernetesKeySelectorSchema() *jsonschema.Schema {
+	return closedObjectSchema(
+		map[string]*jsonschema.Schema{
+			"name": {Type: "string", Description: "Secret or ConfigMap name"},
+			"key":  {Type: "string", Description: "Key within the referenced object"},
+		},
+		"name", "key",
+	)
+}
+
+func newKubernetesFieldRefSchema() *jsonschema.Schema {
+	return closedObjectSchema(
+		map[string]*jsonschema.Schema{
+			"field_path": {Type: "string", Description: "Pod field path"},
+		},
+		"field_path",
+	)
+}
+
+func newKubernetesEnvFromRefSchema() *jsonschema.Schema {
+	return closedObjectSchema(
+		map[string]*jsonschema.Schema{
+			"name": {Type: "string", Description: "Secret or ConfigMap name"},
+		},
+		"name",
+	)
+}
+
+func stringMapSchema(description string) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:                 "object",
+		AdditionalProperties: &jsonschema.Schema{Type: "string"},
+		Description:          description,
+	}
 }

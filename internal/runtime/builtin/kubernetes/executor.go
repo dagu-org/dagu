@@ -135,7 +135,11 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 	podName, err := client.WaitForPod(ctx)
 	if err != nil {
 		logger.Error(ctx, "Kubernetes executor: pod scheduling failed", slog.Any("error", err))
-		e.cleanup(ctx, true)
+		if ctx.Err() != nil {
+			e.cleanup(ctx, true)
+			return ctx.Err()
+		}
+		e.cleanup(ctx, false)
 		return fmt.Errorf("pod scheduling failed: %w", err)
 	}
 	logger.Info(ctx, "Kubernetes executor: pod running",

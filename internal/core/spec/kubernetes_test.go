@@ -121,6 +121,23 @@ steps:
 	assert.Contains(t, err.Error(), "unsupported_field")
 }
 
+func TestKubernetesStepRequiresEffectiveImage(t *testing.T) {
+	t.Parallel()
+
+	yaml := `
+steps:
+  - name: step1
+    type: k8s
+    config:
+      namespace: jobs
+    command: echo hello
+`
+
+	_, err := spec.LoadYAML(context.Background(), []byte(yaml))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "image")
+}
+
 func TestKubernetesBaseConfigMerge(t *testing.T) {
 	t.Parallel()
 

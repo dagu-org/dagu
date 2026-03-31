@@ -3265,27 +3265,50 @@
       "description": "Reference to a Pod field for downward API environment variables."
     },
     "kubernetesEnvVarSource": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "secret_key_ref": {
-          "$ref": "#/definitions/kubernetesKeySelector",
-          "description": "Read the value from a specific key in a Secret."
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["secret_key_ref"],
+          "properties": {
+            "secret_key_ref": {
+              "$ref": "#/definitions/kubernetesKeySelector",
+              "description": "Read the value from a specific key in a Secret."
+            }
+          }
         },
-        "config_map_key_ref": {
-          "$ref": "#/definitions/kubernetesKeySelector",
-          "description": "Read the value from a specific key in a ConfigMap."
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["config_map_key_ref"],
+          "properties": {
+            "config_map_key_ref": {
+              "$ref": "#/definitions/kubernetesKeySelector",
+              "description": "Read the value from a specific key in a ConfigMap."
+            }
+          }
         },
-        "field_ref": {
-          "$ref": "#/definitions/kubernetesFieldRef",
-          "description": "Read the value from a Pod field."
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["field_ref"],
+          "properties": {
+            "field_ref": {
+              "$ref": "#/definitions/kubernetesFieldRef",
+              "description": "Read the value from a Pod field."
+            }
+          }
         }
-      },
-      "description": "Source configuration for an environment variable value."
+      ],
+      "description": "Source configuration for an environment variable value. Exactly one source must be specified."
     },
     "kubernetesEnvVar": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["name"],
+      "not": {
+        "required": ["value", "value_from"]
+      },
       "properties": {
         "name": {
           "type": "string",
@@ -3300,7 +3323,7 @@
           "description": "Dynamic source for the environment variable value."
         }
       },
-      "description": "A Kubernetes environment variable entry."
+      "description": "A Kubernetes environment variable entry. Set either value or value_from, but not both."
     },
     "kubernetesEnvFromRef": {
       "type": "object",
@@ -3315,23 +3338,39 @@
       "description": "Reference to a Secret or ConfigMap for env_from."
     },
     "kubernetesEnvFromSource": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "config_map_ref": {
-          "$ref": "#/definitions/kubernetesEnvFromRef",
-          "description": "Import all keys from a ConfigMap."
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["config_map_ref"],
+          "properties": {
+            "config_map_ref": {
+              "$ref": "#/definitions/kubernetesEnvFromRef",
+              "description": "Import all keys from a ConfigMap."
+            },
+            "prefix": {
+              "type": "string",
+              "description": "Optional prefix applied to imported environment variable names."
+            }
+          }
         },
-        "secret_ref": {
-          "$ref": "#/definitions/kubernetesEnvFromRef",
-          "description": "Import all keys from a Secret."
-        },
-        "prefix": {
-          "type": "string",
-          "description": "Optional prefix applied to imported environment variable names."
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["secret_ref"],
+          "properties": {
+            "secret_ref": {
+              "$ref": "#/definitions/kubernetesEnvFromRef",
+              "description": "Import all keys from a Secret."
+            },
+            "prefix": {
+              "type": "string",
+              "description": "Optional prefix applied to imported environment variable names."
+            }
+          }
         }
-      },
-      "description": "Import a Secret or ConfigMap as environment variables."
+      ],
+      "description": "Import a Secret or ConfigMap as environment variables. Exactly one source must be specified."
     },
     "kubernetesResourceRequirements": {
       "type": "object",
@@ -3553,7 +3592,7 @@
       "properties": {
         "image": {
           "type": "string",
-          "description": "Container image to run. Required at step level; optional for DAG-level defaults."
+          "description": "Container image to run. Optional in raw step YAML because DAG or base kubernetes defaults may provide it, but required in the effective step config used at runtime."
         },
         "namespace": {
           "type": "string",
@@ -3683,10 +3722,6 @@
       "allOf": [
         {
           "$ref": "#/definitions/kubernetesCommonConfig"
-        },
-        {
-          "type": "object",
-          "required": ["image"]
         }
       ],
       "description": "Kubernetes executor configuration for running a workflow step as a Kubernetes Job."

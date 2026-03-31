@@ -256,3 +256,55 @@ func TestKubernetesExecutorWaitForCompletionReturnsJobFailure(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "job failed: exit 1")
 }
+
+func TestKubernetesExecutorPodSchedulingFailureRespectsCleanupPolicy(t *testing.T) {
+	tests := []struct {
+		name          string
+		cleanupPolicy string
+		wantDelete    bool
+	}{
+		{name: "DeletePolicy", cleanupPolicy: cleanupPolicyDelete, wantDelete: true},
+		{name: "KeepPolicy", cleanupPolicy: cleanupPolicyKeep, wantDelete: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalFactory := newJobClient
+			t.Cleanup(func() {
+				newJobClient = originalFactory
+			})
+
+			deleteCalled := false
+			client := &stubJobClient{
+				jobName: "job-1",
+				waitForPod: func(context.Context) (string, error) {
+					return "", errors.New("unschedulable")
+				},
+				deleteJob: func(context.Context) error {
+					deleteCalled = true
+					return nil
+				},
+			}
+			newJobClient = func(_ *Config) (jobClient, error) {
+				return client, nil
+			}
+
+			exec, err := newKubernetes(context.Background(), core.Step{
+				Name: "run-in-k8s",
+				ExecutorConfig: core.ExecutorConfig{
+					Type: "kubernetes",
+					Config: map[string]any{
+						"image":          "busybox",
+						"cleanup_policy": tt.cleanupPolicy,
+					},
+				},
+			})
+			require.NoError(t, err)
+
+			err = exec.Run(context.Background())
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "pod scheduling failed")
+			assert.Equal(t, tt.wantDelete, deleteCalled)
+		})
+	}
+}

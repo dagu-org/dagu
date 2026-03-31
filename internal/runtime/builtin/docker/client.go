@@ -110,7 +110,7 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 		slog.Bool("autoRemove", cfg.AutoRemove),
 	)
 
-	dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerCli, err := client.New(client.FromEnv)
 	if err != nil {
 		logger.Error(ctx, "Docker: failed to create docker client", tag.Error(err))
 		return nil, err
@@ -157,8 +157,9 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 				ctID = info.ID
 			}
 			if !isRunning {
-				// Container doesn't exist or not running - will be created
-				ctID = ""
+				// Preserve the stopped container ID so Run can remove it before re-creating
+				// the named container without hitting a Docker name conflict.
+				ctID = info.ID
 			}
 		}
 	}
@@ -539,6 +540,14 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		if !c.cfg.ShouldStart {
 			return errorExitCode, fmt.Errorf("container %s already exists and is not running", ctID)
 		}
+		if err == nil {
+			if removeErr := removeStoppedContainer(ctx, c.cli, ctID); removeErr != nil {
+				return errorExitCode, fmt.Errorf("failed to remove stopped container %s: %w", ctID, removeErr)
+			}
+			c.mu.Lock()
+			c.containerID = ""
+			c.mu.Unlock()
+		}
 	}
 
 	// If container is not running, start a new one
@@ -876,8 +885,14 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	defer wg.Wait()
 
 	go func() {
-		if _, err := stdcopy.StdCopy(stdout, stderr, resp.Reader); err != nil {
-			logger.Error(ctx, "Docker executor: stdcopy", tag.Error(err))
+		var copyErr error
+		if c.cfg.ExecOptions.TTY {
+			_, copyErr = io.Copy(stdout, resp.Reader)
+		} else {
+			_, copyErr = stdcopy.StdCopy(stdout, stderr, resp.Reader)
+		}
+		if copyErr != nil {
+			logger.Error(ctx, "Docker executor: exec output copy", tag.Error(copyErr))
 		}
 		wg.Done()
 	}()
@@ -906,6 +921,16 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 			time.Sleep(defaultPollInterval)
 		}
 	}
+}
+
+func removeStoppedContainer(ctx context.Context, cli *client.Client, containerID string) error {
+	if _, err := cli.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{}); err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containerID string, stdout, stderr io.Writer) (int, error) {
