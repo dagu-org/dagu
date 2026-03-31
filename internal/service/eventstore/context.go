@@ -54,5 +54,5 @@ func EmitPersistedStatusFromContext(ctx context.Context, status *exec.DAGRunStat
 	if !ok {
 		return nil
 	}
-	return service.Emit(ctx, NewDAGRunEvent(source, eventType, status, nil))
+	return service.Emit(context.WithoutCancel(ctx), NewDAGRunEvent(source, eventType, status, nil))
 }

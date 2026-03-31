@@ -6,12 +6,12 @@ package eventstore
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -36,6 +36,7 @@ const (
 	TypeDAGRunSucceeded EventType = "dag.run.succeeded"
 	TypeDAGRunFailed    EventType = "dag.run.failed"
 	TypeDAGRunAborted   EventType = "dag.run.aborted"
+	TypeDAGRunRejected  EventType = "dag.run.rejected"
 
 	TypeLLMUsageRecorded EventType = "llm.usage.recorded"
 )
@@ -76,6 +77,18 @@ func (e *Event) Normalize() {
 	if e == nil {
 		return
 	}
+	if !e.RecordedAt.IsZero() {
+		e.RecordedAt = e.RecordedAt.UTC()
+	}
+	if !e.OccurredAt.IsZero() {
+		e.OccurredAt = e.OccurredAt.UTC()
+	}
+}
+
+func (e *Event) applyDefaults() {
+	if e == nil {
+		return
+	}
 	if e.SchemaVersion == 0 {
 		e.SchemaVersion = SchemaVersion
 	}
@@ -87,11 +100,6 @@ func (e *Event) Normalize() {
 	}
 	if e.RecordedAt.IsZero() {
 		e.RecordedAt = time.Now().UTC()
-	} else {
-		e.RecordedAt = e.RecordedAt.UTC()
-	}
-	if !e.OccurredAt.IsZero() {
-		e.OccurredAt = e.OccurredAt.UTC()
 	}
 }
 
@@ -161,6 +169,7 @@ func (s *Service) Emit(ctx context.Context, event *Event) error {
 	if s == nil || s.store == nil {
 		return nil
 	}
+	event.applyDefaults()
 	event.Normalize()
 	if err := event.Validate(); err != nil {
 		return err
@@ -263,7 +272,7 @@ func NewLLMUsageEvent(
 
 func PersistedDAGRunEventTypeForStatus(status core.Status) (EventType, bool) {
 	switch status {
-	case core.NotStarted, core.Queued, core.Running, core.Rejected:
+	case core.NotStarted, core.Queued, core.Running:
 		return "", false
 	case core.Waiting:
 		return TypeDAGRunWaiting, true
@@ -273,6 +282,8 @@ func PersistedDAGRunEventTypeForStatus(status core.Status) (EventType, bool) {
 		return TypeDAGRunFailed, true
 	case core.Aborted:
 		return TypeDAGRunAborted, true
+	case core.Rejected:
+		return TypeDAGRunRejected, true
 	default:
 		return "", false
 	}
@@ -293,7 +304,7 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 		return time.Now().UTC()
 	}
 	switch eventType {
-	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted:
+	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 		if t, err := stringutil.ParseTime(status.FinishedAt); err == nil && !t.IsZero() {
 			return t.UTC()
 		}
@@ -313,8 +324,14 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 }
 
 func stableID(parts ...string) string {
-	sum := sha256.Sum256([]byte(strings.Join(parts, "\x1f")))
-	return hex.EncodeToString(sum[:])
+	h := sha256.New()
+	var lenBuf [8]byte
+	for _, part := range parts {
+		binary.BigEndian.PutUint64(lenBuf[:], uint64(len(part)))
+		_, _ = h.Write(lenBuf[:])
+		_, _ = h.Write([]byte(part))
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func cloneData(data map[string]any) map[string]any {

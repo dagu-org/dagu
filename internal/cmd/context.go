@@ -215,7 +215,8 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	baseCtx := ctx
 	eventSourceInstance := eventstore.DefaultSourceInstance()
 	var eventSvc *eventstore.Service
-	if cfg.EventStore.Enabled {
+	sharedNothingWorker := isSharedNothingWorker(cmd, cfg)
+	if !sharedNothingWorker && cfg.EventStore.Enabled {
 		store, eventErr := fileeventstore.New(cfg.Paths.EventStoreDir)
 		if eventErr != nil {
 			logger.Warn(ctx, "Failed to initialize event store; continuing without event persistence", tag.Error(eventErr))
@@ -230,7 +231,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	// For shared-nothing workers, skip creating file-based stores
 	// as they only use temporary directories and push status to coordinator
-	if isSharedNothingWorker(cmd, cfg) {
+	if sharedNothingWorker {
 		logger.Debug(ctx, "Shared-nothing worker mode: skipping file-based stores",
 			slog.Any("coordinators", cfg.Worker.Coordinators),
 		)

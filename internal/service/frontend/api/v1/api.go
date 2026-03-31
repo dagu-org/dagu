@@ -732,6 +732,27 @@ func (a *API) withEventContext(ctx context.Context) context.Context {
 }
 
 func (a *API) updateDAGRunStatus(ctx context.Context, ref exec.DAGRunRef, status exec.DAGRunStatus) error {
+	if a != nil && a.dagRunStore != nil {
+		var (
+			attempt exec.DAGRunAttempt
+			err     error
+		)
+		if ref.ID == status.DAGRunID {
+			attempt, err = a.dagRunStore.FindAttempt(ctx, ref)
+		} else {
+			attempt, err = a.dagRunStore.FindSubAttempt(ctx, ref, status.DAGRunID)
+		}
+		if err != nil {
+			return err
+		}
+		latest, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return err
+		}
+		if latest != nil && latest.Status == status.Status {
+			return a.dagRunMgr.UpdateStatus(ctx, ref, status)
+		}
+	}
 	return a.dagRunMgr.UpdateStatus(a.withEventContext(ctx), ref, status)
 }
 

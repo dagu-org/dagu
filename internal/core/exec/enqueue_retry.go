@@ -22,7 +22,8 @@ type EnqueueRetryOptions struct {
 	// DAG-level retry budget at enqueue time.
 	AutoRetry bool
 	// OnQueued is called after the queued status and queue item are both durably written.
-	// Errors from this callback are returned to the caller.
+	// Errors from this callback are returned to the caller but do not roll back the
+	// already-persisted queue item and status.
 	OnQueued func(*DAGRunStatus) error
 }
 

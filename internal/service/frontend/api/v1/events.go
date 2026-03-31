@@ -86,9 +86,15 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 			HTTPStatus: http.StatusInternalServerError,
 		}
 	}
+	if result == nil {
+		result = &eventstore.QueryResult{}
+	}
 
 	entries := make([]api.EventLogEntry, 0, len(result.Entries))
 	for _, e := range result.Entries {
+		if e == nil {
+			continue
+		}
 		entry := api.EventLogEntry{
 			Id:            e.ID,
 			SchemaVersion: e.SchemaVersion,

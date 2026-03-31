@@ -67,13 +67,15 @@ func (s *Store) Emit(_ context.Context, event *eventstore.Event) error {
 	if event == nil {
 		return errors.New("fileeventstore: event cannot be nil")
 	}
-	data, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("fileeventstore: marshal event: %w", err)
-	}
-	recordedAt := event.RecordedAt
+	payload := *event
+	recordedAt := payload.RecordedAt
 	if recordedAt.IsZero() {
 		recordedAt = time.Now().UTC()
+		payload.RecordedAt = recordedAt
+	}
+	data, err := json.Marshal(&payload)
+	if err != nil {
+		return fmt.Errorf("fileeventstore: marshal event: %w", err)
 	}
 	name := fmt.Sprintf("%020d-%s%s", recordedAt.UnixNano(), uuid.NewString(), inboxSuffix)
 	path := filepath.Join(s.inboxDir, name)
@@ -183,6 +185,7 @@ func (s *Store) readCommittedEvents(filePath string, filter eventstore.QueryFilt
 
 	var entries []*eventstore.Event
 	scanner := bufio.NewScanner(f)
+	fileutil.ConfigureScanner(scanner)
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++

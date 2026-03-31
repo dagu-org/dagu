@@ -40,6 +40,28 @@ func TestStoreEmitWritesInboxFile(t *testing.T) {
 	assert.Equal(t, event.OccurredAt, stored.OccurredAt)
 }
 
+func TestStoreEmitDefaultsRecordedAtInInboxPayload(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	event := testEvent("evt-zero-recorded", time.Date(2026, 3, 29, 10, 0, 0, 0, time.UTC))
+	event.RecordedAt = time.Time{}
+	require.NoError(t, store.Emit(context.Background(), event))
+
+	entries, err := os.ReadDir(store.inboxDir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+
+	data, err := os.ReadFile(filepath.Join(store.inboxDir, entries[0].Name()))
+	require.NoError(t, err)
+
+	var stored eventstore.Event
+	require.NoError(t, json.Unmarshal(data, &stored))
+	assert.False(t, stored.RecordedAt.IsZero())
+}
+
 func TestStoreQuerySkipsMalformedAndPaginates(t *testing.T) {
 	t.Parallel()
 
@@ -98,6 +120,28 @@ func TestStoreQueryIncludesLegacyDailyFilesWithinHourlyRange(t *testing.T) {
 
 	require.Len(t, result.Entries, 1)
 	assert.Equal(t, "evt-legacy", result.Entries[0].ID)
+}
+
+func TestStoreQueryReadsLargeCommittedEventLine(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	event := testEvent("evt-large", time.Date(2026, 3, 29, 20, 0, 0, 0, time.UTC))
+	event.Data = map[string]any{
+		"payload": strings.Repeat("x", 128*1024),
+	}
+	writeCommittedEvents(t, store.baseDir, event.OccurredAt, [][]byte{
+		mustMarshalEvent(t, event),
+	})
+
+	result, err := store.Query(context.Background(), eventstore.QueryFilter{
+		DAGName: event.DAGName,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Entries, 1)
+	assert.Equal(t, event.ID, result.Entries[0].ID)
 }
 
 func mustMarshalEvent(t *testing.T, event *eventstore.Event) []byte {

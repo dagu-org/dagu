@@ -138,6 +138,7 @@ var legacyToSnakeCaseKey = map[string]string{
 	// Audit
 	"audit.retentiondays":      "audit.retention_days",
 	"eventstore":               "event_store",
+	"eventstore.enabled":       "event_store.enabled",
 	"eventstore.retentiondays": "event_store.retention_days",
 
 	// GitSync

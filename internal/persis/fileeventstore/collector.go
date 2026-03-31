@@ -15,6 +15,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
@@ -184,30 +185,52 @@ func (c *Collector) appendGroup(hour string, group []pendingInboxEvent) error {
 	}
 	defer func() { _ = f.Close() }()
 
+	removePersistedInboxFiles := func() {
+		for _, item := range group {
+			if _, ok := c.seenIDs[item.event.ID]; !ok {
+				continue
+			}
+			if err := os.Remove(item.path); err != nil && !os.IsNotExist(err) {
+				slog.Warn("fileeventstore: failed to delete processed inbox file",
+					slog.String("file", item.path),
+					slog.String("error", err.Error()))
+			}
+		}
+	}
+	reloadSeenIDs := func() {
+		if err := c.loadSeenIDsFromFile(logPath); err != nil {
+			slog.Warn("fileeventstore: failed to reload seen-set after append error",
+				slog.String("file", logPath),
+				slog.String("error", err.Error()))
+			return
+		}
+		removePersistedInboxFiles()
+	}
+
 	writer := bufio.NewWriter(f)
 	for _, item := range group {
 		if _, err := writer.Write(item.raw); err != nil {
+			reloadSeenIDs()
 			return fmt.Errorf("append event log %s: %w", logPath, err)
 		}
 		if err := writer.WriteByte('\n'); err != nil {
+			reloadSeenIDs()
 			return fmt.Errorf("append newline %s: %w", logPath, err)
 		}
 	}
 	if err := writer.Flush(); err != nil {
+		reloadSeenIDs()
 		return fmt.Errorf("flush event log %s: %w", logPath, err)
 	}
 	if err := f.Sync(); err != nil {
+		reloadSeenIDs()
 		return fmt.Errorf("sync event log %s: %w", logPath, err)
 	}
 
 	for _, item := range group {
 		c.seenIDs[item.event.ID] = struct{}{}
-		if err := os.Remove(item.path); err != nil && !os.IsNotExist(err) {
-			slog.Warn("fileeventstore: failed to delete processed inbox file",
-				slog.String("file", item.path),
-				slog.String("error", err.Error()))
-		}
 	}
+	removePersistedInboxFiles()
 	return nil
 }
 
@@ -272,6 +295,7 @@ func (c *Collector) loadSeenIDsFromFile(filePath string) error {
 	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
+	fileutil.ConfigureScanner(scanner)
 	lineNum := 0
 	for scanner.Scan() {
 		lineNum++
@@ -301,6 +325,7 @@ func (c *Collector) cleanupExpired() {
 	now := c.now().UTC()
 	cutoff := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).
 		AddDate(0, 0, -c.retentionDays)
+	removedCommitted := false
 
 	baseEntries, err := os.ReadDir(c.store.baseDir)
 	if err == nil {
@@ -317,6 +342,8 @@ func (c *Collector) cleanupExpired() {
 				slog.Warn("fileeventstore: failed to remove expired event log",
 					slog.String("file", path),
 					slog.String("error", err.Error()))
+			} else {
+				removedCommitted = true
 			}
 		}
 	} else if !os.IsNotExist(err) {
@@ -350,6 +377,14 @@ func (c *Collector) cleanupExpired() {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			slog.Warn("fileeventstore: failed to remove expired quarantined event file",
 				slog.String("file", path),
+				slog.String("error", err.Error()))
+		}
+	}
+	if removedCommitted {
+		c.seenIDs = make(map[string]struct{})
+		if err := c.loadSeenIDs(); err != nil {
+			slog.Warn("fileeventstore: failed to rebuild seen-set after cleanup",
+				slog.String("dir", c.store.baseDir),
 				slog.String("error", err.Error()))
 		}
 	}

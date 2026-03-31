@@ -131,6 +131,47 @@ func TestListEventLogsReturnsServiceUnavailableWithoutStore(t *testing.T) {
 	assert.Equal(t, "Event logging is not configured", errResp.Message)
 }
 
+func TestListEventLogsHandlesNilResultsAndEntries(t *testing.T) {
+	t.Parallel()
+
+	api := frontendapi.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		frontendapi.WithEventService(eventstore.New(&mockEventStore{
+			result: &eventstore.QueryResult{
+				Entries: []*eventstore.Event{nil},
+				Total:   1,
+			},
+		})),
+	)
+
+	resp, err := api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{})
+	require.NoError(t, err)
+
+	okResp, ok := resp.(apigen.ListEventLogs200JSONResponse)
+	require.True(t, ok)
+	assert.Empty(t, okResp.Entries)
+	assert.Equal(t, 1, okResp.Total)
+
+	nilStoreAPI := frontendapi.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		frontendapi.WithEventService(eventstore.New(&mockEventStore{})),
+	)
+
+	resp, err = nilStoreAPI.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{})
+	require.NoError(t, err)
+
+	okResp, ok = resp.(apigen.ListEventLogs200JSONResponse)
+	require.True(t, ok)
+	assert.Empty(t, okResp.Entries)
+	assert.Equal(t, 0, okResp.Total)
+}
+
 type mockEventStore struct {
 	lastFilter eventstore.QueryFilter
 	result     *eventstore.QueryResult

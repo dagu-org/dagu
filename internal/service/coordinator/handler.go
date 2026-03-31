@@ -292,6 +292,7 @@ func (h *Handler) Poll(ctx context.Context, req *coordinatorv1.PollRequest) (*co
 // Dispatch tries to send a task to a waiting poller
 // It fails if no pollers are available or no workers match the selector
 func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
+	ctx = h.eventContext(ctx)
 	if req.Task == nil {
 		return nil, status.Error(codes.InvalidArgument, "task is required")
 	}
@@ -2351,6 +2352,7 @@ func (h *Handler) markRunFailed(ctx context.Context, dagName, dagRunID, reason s
 		}()
 	}
 
+	storeCtx = h.eventContext(storeCtx)
 	if err := attempt.Write(storeCtx, *dagRunStatus); err != nil {
 		logger.Error(ctx, "Failed to write failed status for zombie cleanup",
 			tag.DAG(dagName), tag.RunID(dagRunID), tag.Error(err))

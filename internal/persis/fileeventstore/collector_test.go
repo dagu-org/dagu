@@ -8,9 +8,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,6 +100,51 @@ func TestCollectorCleanupExpiredPreservesInbox(t *testing.T) {
 	assertFileExists(t, inboxFile, true)
 }
 
+func TestCollectorCleanupExpiredRebuildsSeenIDs(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	now := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
+	collector, err := NewCollector(baseDir, 10, WithNow(func() time.Time { return now }))
+	require.NoError(t, err)
+
+	expiredEvent := testEvent("evt-expired", now.AddDate(0, 0, -20))
+	recentEvent := testEvent("evt-recent", now.Add(-time.Hour))
+	writeCommittedEvents(t, baseDir, expiredEvent.OccurredAt, [][]byte{mustMarshalEvent(t, expiredEvent)})
+	writeCommittedEvents(t, baseDir, recentEvent.OccurredAt, [][]byte{mustMarshalEvent(t, recentEvent)})
+
+	require.NoError(t, collector.loadSeenIDs())
+	_, hasExpired := collector.seenIDs[expiredEvent.ID]
+	_, hasRecent := collector.seenIDs[recentEvent.ID]
+	require.True(t, hasExpired)
+	require.True(t, hasRecent)
+
+	collector.cleanupExpired()
+
+	_, hasExpired = collector.seenIDs[expiredEvent.ID]
+	_, hasRecent = collector.seenIDs[recentEvent.ID]
+	require.False(t, hasExpired)
+	require.True(t, hasRecent)
+}
+
+func TestCollectorLoadSeenIDsReadsLargeCommittedEventLine(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	collector, err := NewCollector(baseDir, 10)
+	require.NoError(t, err)
+
+	event := testEvent("evt-large", time.Date(2026, 3, 29, 22, 0, 0, 0, time.UTC))
+	event.Data = map[string]any{
+		"payload": strings.Repeat("x", 128*1024),
+	}
+	writeCommittedEvents(t, baseDir, event.OccurredAt, [][]byte{mustMarshalEvent(t, event)})
+
+	require.NoError(t, collector.loadSeenIDs())
+	_, ok := collector.seenIDs[event.ID]
+	require.True(t, ok)
+}
+
 func assertInboxCount(t *testing.T, dir string, count int) {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -112,6 +159,7 @@ func assertLogLineCount(t *testing.T, path string, expected int) {
 	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
+	fileutil.ConfigureScanner(scanner)
 	count := 0
 	for scanner.Scan() {
 		count++

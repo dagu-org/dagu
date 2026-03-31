@@ -3433,37 +3433,10 @@ paths:
           required: false
           schema:
             type: string
-        - name: startTime
-          in: query
-          description: "Filter entries after this time (ISO 8601 format)"
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: endTime
-          in: query
-          description: "Filter entries before this time (ISO 8601 format)"
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: limit
-          in: query
-          description: "Maximum number of entries to return (default 100)"
-          required: false
-          schema:
-            type: integer
-            default: 100
-            minimum: 1
-            maximum: 1000
-        - name: offset
-          in: query
-          description: "Number of entries to skip (for pagination)"
-          required: false
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
+        - $ref: "#/components/parameters/LogStartTime"
+        - $ref: "#/components/parameters/LogEndTime"
+        - $ref: "#/components/parameters/AuditLogLimit"
+        - $ref: "#/components/parameters/LogOffset"
       responses:
         "200":
           description: "List of audit log entries"
@@ -3547,37 +3520,10 @@ paths:
           required: false
           schema:
             type: string
-        - name: startTime
-          in: query
-          description: "Filter entries after this time (ISO 8601 format)"
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: endTime
-          in: query
-          description: "Filter entries before this time (ISO 8601 format)"
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: limit
-          in: query
-          description: "Maximum number of entries to return (default 50)"
-          required: false
-          schema:
-            type: integer
-            default: 50
-            minimum: 1
-            maximum: 500
-        - name: offset
-          in: query
-          description: "Number of entries to skip (for pagination)"
-          required: false
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
+        - $ref: "#/components/parameters/LogStartTime"
+        - $ref: "#/components/parameters/LogEndTime"
+        - $ref: "#/components/parameters/EventLogLimit"
+        - $ref: "#/components/parameters/LogOffset"
       responses:
         "200":
           description: "List of event log entries"
@@ -6491,6 +6437,56 @@ components:
       schema:
         type: string
         default: "local"
+
+    LogStartTime:
+      name: startTime
+      in: query
+      description: "Filter entries after this time (ISO 8601 format)"
+      required: false
+      schema:
+        type: string
+        format: date-time
+
+    LogEndTime:
+      name: endTime
+      in: query
+      description: "Filter entries before this time (ISO 8601 format)"
+      required: false
+      schema:
+        type: string
+        format: date-time
+
+    AuditLogLimit:
+      name: limit
+      in: query
+      description: "Maximum number of entries to return (default 100)"
+      required: false
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 1000
+
+    EventLogLimit:
+      name: limit
+      in: query
+      description: "Maximum number of entries to return (default 50)"
+      required: false
+      schema:
+        type: integer
+        default: 50
+        minimum: 1
+        maximum: 500
+
+    LogOffset:
+      name: offset
+      in: query
+      description: "Number of entries to skip (for pagination)"
+      required: false
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
 
     DAGRunId:
       name: dagRunId
