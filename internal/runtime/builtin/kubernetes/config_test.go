@@ -150,3 +150,20 @@ func TestBuildCommand(t *testing.T) {
 
 	assert.Equal(t, []string{"echo", "hello"}, buildCommand(step))
 }
+
+func TestKubernetesDefaultsSchema(t *testing.T) {
+	t.Run("DoesNotRequireImage", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"namespace": "dag-ns",
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("RejectsUnknownKeys", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"unsupported_field": true,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported_field")
+	})
+}

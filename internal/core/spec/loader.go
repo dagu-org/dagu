@@ -689,6 +689,29 @@ func (*mergeTransformer) Transformer(
 		}
 	}
 
+	if typ == reflect.TypeFor[core.KubernetesConfig]() {
+		return func(dst, src reflect.Value) error {
+			if !dst.CanSet() || !src.IsValid() || src.IsNil() {
+				return nil
+			}
+
+			srcCfg := src.Interface().(core.KubernetesConfig)
+			if len(srcCfg) == 0 {
+				dst.Set(reflect.ValueOf(core.KubernetesConfig{}))
+				return nil
+			}
+
+			var dstCfg map[string]any
+			if !dst.IsNil() {
+				dstCfg = map[string]any(dst.Interface().(core.KubernetesConfig))
+			}
+
+			merged := mergeKubernetesConfigMaps(dstCfg, map[string]any(srcCfg))
+			dst.Set(reflect.ValueOf(core.KubernetesConfig(merged)))
+			return nil
+		}
+	}
+
 	// Handle []string fields (like Env) by appending instead of replacing
 	if typ == reflect.TypeFor[[]string]() {
 		return func(dst, src reflect.Value) error {

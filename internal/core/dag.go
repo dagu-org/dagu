@@ -224,6 +224,10 @@ type DAG struct {
 	// Steps with type: redis inherit this configuration.
 	// Excluded from JSON: may contain password.
 	Redis *RedisConfig `json:"-"`
+	// Kubernetes contains the default Kubernetes executor configuration for the DAG.
+	// Steps with type: k8s or type: kubernetes inherit this configuration.
+	// Excluded from JSON: may contain secret references.
+	Kubernetes KubernetesConfig `json:"-"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
 	// dotenvOnce ensures LoadDotEnv is called only once, even with concurrent calls.
@@ -676,6 +680,11 @@ type RedisConfig struct {
 	// MaxRetries is the maximum number of retries.
 	MaxRetries int `json:"maxRetries,omitempty"`
 }
+
+// KubernetesConfig contains default Kubernetes executor configuration for the DAG.
+// It stores the raw executor config map so step-level overrides can be merged
+// using executor-specific semantics during DAG build.
+type KubernetesConfig map[string]any
 
 // Schedule contains the cron expression and the parsed cron schedule.
 type Schedule struct {

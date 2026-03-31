@@ -501,11 +501,13 @@ func parseQuantity(field, value string) (resource.Quantity, error) {
 func init() {
 	core.RegisterExecutorConfigSchema("kubernetes", configSchema)
 	core.RegisterExecutorConfigSchema("k8s", configSchema)
+	core.RegisterExecutorConfigSchema("kubernetes_defaults", configDefaultsSchema)
 }
 
 var configSchema = &jsonschema.Schema{
-	Type:     "object",
-	Required: []string{"image"},
+	Type:                 "object",
+	Required:             []string{"image"},
+	AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
 	Properties: map[string]*jsonschema.Schema{
 		"image":              {Type: "string", Description: "Container image (required)"},
 		"namespace":          {Type: "string", Description: "Kubernetes namespace (default: default)"},
@@ -529,4 +531,10 @@ var configSchema = &jsonschema.Schema{
 		"ttl_after_finished": {Type: "integer", Description: "TTL for automatic cleanup in seconds"},
 		"cleanup_policy":     {Type: "string", Description: "delete (default) or keep"},
 	},
+}
+
+var configDefaultsSchema = &jsonschema.Schema{
+	Type:                 "object",
+	Properties:           configSchema.Properties,
+	AdditionalProperties: configSchema.AdditionalProperties,
 }
