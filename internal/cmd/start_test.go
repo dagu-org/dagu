@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/core/spec"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -122,12 +123,18 @@ steps:
 `
 		dagFile := th.CreateDAGFile(t, "test-params-flag.yaml", dagContent)
 
-		cli := cmd.Start()
-		cli.SetArgs([]string{dagFile, "--params", "KEY=value"})
+		err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", dagFile, "--params", "KEY=value"},
+		})
+		require.NoError(t, err)
 
-		// Execute will fail due to missing context setup, but we're testing
-		// that the command accepts the arguments
-		_ = cli.Execute()
+		dag, err := spec.Load(th.Context, dagFile)
+		require.NoError(t, err)
+
+		status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Equal(t, "KEY=value", status.Params)
 	})
 }
 
