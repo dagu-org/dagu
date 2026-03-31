@@ -5,6 +5,9 @@ package schema
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -475,6 +478,145 @@ steps:
 	err := resolved.Validate(doc)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "steps")
+}
+
+func TestDAGSchemaKubernetes(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "RootDefaultsAllowOmittedImage",
+			spec: `
+kubernetes:
+  namespace: batch
+  service_account: dagu-runner
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+    command: echo hello
+`,
+		},
+		{
+			name: "StepConfigSupportsKubernetesAlias",
+			spec: `
+steps:
+  - id: report
+    type: kubernetes
+    config:
+      image: alpine:3.20
+      namespace: batch
+      cleanup_policy: keep
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+      volumes:
+        - name: scratch
+          empty_dir:
+            size_limit: 256Mi
+      volume_mounts:
+        - name: scratch
+          mount_path: /tmp/work
+    command: [sh, -c, "echo hello"]
+`,
+		},
+		{
+			name: "RejectUnknownRootField",
+			spec: `
+kubernetes:
+  unknown_field: true
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+    command: echo hello
+`,
+			wantErr: "kubernetes",
+		},
+		{
+			name: "RejectMissingImageAtStepLevel",
+			spec: `
+kubernetes:
+  namespace: batch
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      namespace: jobs
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectUnknownStepField",
+			spec: `
+steps:
+  - id: report
+    type: kubernetes
+    config:
+      image: alpine:3.20
+      unknown_field: true
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectMultipleVolumeSources",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      volumes:
+        - name: data
+          empty_dir: {}
+          secret:
+            secret_name: app-secret
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestDAGSchemaRepoCopyMatchesEmbeddedSchema(t *testing.T) {
+	t.Parallel()
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+
+	repoSchemaPath := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "schemas", "dag.schema.json")
+	repoSchemaJSON, err := os.ReadFile(repoSchemaPath)
+	require.NoError(t, err)
+	require.Equal(t, string(DAGSchemaJSON), string(repoSchemaJSON))
 }
 
 func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {

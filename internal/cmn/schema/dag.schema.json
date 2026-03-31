@@ -801,6 +801,10 @@
         }
       ],
       "description": "Default Redis configuration for all steps in the DAG. Steps with type: redis inherit this configuration if they don't specify their own connection settings."
+    },
+    "kubernetes": {
+      "$ref": "#/definitions/kubernetesDefaultsConfig",
+      "description": "Default Kubernetes configuration for explicit k8s / kubernetes steps in the DAG. The same fields as step-level Kubernetes config are supported, but image is optional at the DAG level."
     }
   },
   "definitions": {
@@ -1678,6 +1682,16 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/redisExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["kubernetes", "k8s"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/kubernetesExecutorConfig" }
             }
           }
         },
@@ -3222,6 +3236,461 @@
       ],
       "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
     },
+    "kubernetesKeySelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "key"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the Secret or ConfigMap."
+        },
+        "key": {
+          "type": "string",
+          "description": "Key to read from the referenced Secret or ConfigMap."
+        }
+      },
+      "description": "Reference to a specific key in a Secret or ConfigMap."
+    },
+    "kubernetesFieldRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_path"],
+      "properties": {
+        "field_path": {
+          "type": "string",
+          "description": "Pod field path to expose as an environment variable value (for example, metadata.name)."
+        }
+      },
+      "description": "Reference to a Pod field for downward API environment variables."
+    },
+    "kubernetesEnvVarSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "secret_key_ref": {
+          "$ref": "#/definitions/kubernetesKeySelector",
+          "description": "Read the value from a specific key in a Secret."
+        },
+        "config_map_key_ref": {
+          "$ref": "#/definitions/kubernetesKeySelector",
+          "description": "Read the value from a specific key in a ConfigMap."
+        },
+        "field_ref": {
+          "$ref": "#/definitions/kubernetesFieldRef",
+          "description": "Read the value from a Pod field."
+        }
+      },
+      "description": "Source configuration for an environment variable value."
+    },
+    "kubernetesEnvVar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Environment variable name."
+        },
+        "value": {
+          "type": "string",
+          "description": "Literal environment variable value."
+        },
+        "value_from": {
+          "$ref": "#/definitions/kubernetesEnvVarSource",
+          "description": "Dynamic source for the environment variable value."
+        }
+      },
+      "description": "A Kubernetes environment variable entry."
+    },
+    "kubernetesEnvFromRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the Secret or ConfigMap to import."
+        }
+      },
+      "description": "Reference to a Secret or ConfigMap for env_from."
+    },
+    "kubernetesEnvFromSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config_map_ref": {
+          "$ref": "#/definitions/kubernetesEnvFromRef",
+          "description": "Import all keys from a ConfigMap."
+        },
+        "secret_ref": {
+          "$ref": "#/definitions/kubernetesEnvFromRef",
+          "description": "Import all keys from a Secret."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Optional prefix applied to imported environment variable names."
+        }
+      },
+      "description": "Import a Secret or ConfigMap as environment variables."
+    },
+    "kubernetesResourceRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Resource requests such as cpu and memory. Values use Kubernetes quantity syntax (for example, 100m, 128Mi)."
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Resource limits such as cpu and memory. Values use Kubernetes quantity syntax (for example, 500m, 1Gi)."
+        }
+      },
+      "description": "CPU and memory requests and limits for the Job container."
+    },
+    "kubernetesToleration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Taint key to tolerate."
+        },
+        "operator": {
+          "type": "string",
+          "description": "Toleration operator."
+        },
+        "value": {
+          "type": "string",
+          "description": "Taint value to match."
+        },
+        "effect": {
+          "type": "string",
+          "description": "Taint effect to tolerate."
+        }
+      },
+      "description": "Pod toleration entry."
+    },
+    "kubernetesEmptyDirVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "medium": {
+          "type": "string",
+          "description": "Storage medium for emptyDir, such as Memory."
+        },
+        "size_limit": {
+          "type": "string",
+          "description": "Optional size limit using Kubernetes quantity syntax."
+        }
+      },
+      "description": "emptyDir volume source."
+    },
+    "kubernetesHostPathVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Host filesystem path to mount."
+        },
+        "type": {
+          "type": "string",
+          "description": "Optional Kubernetes HostPath type."
+        }
+      },
+      "description": "hostPath volume source."
+    },
+    "kubernetesConfigMapVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "ConfigMap name to mount."
+        }
+      },
+      "description": "configMap volume source."
+    },
+    "kubernetesSecretVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secret_name"],
+      "properties": {
+        "secret_name": {
+          "type": "string",
+          "description": "Secret name to mount."
+        }
+      },
+      "description": "secret volume source."
+    },
+    "kubernetesPersistentVolumeClaimVolume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_name"],
+      "properties": {
+        "claim_name": {
+          "type": "string",
+          "description": "PersistentVolumeClaim name to mount."
+        },
+        "read_only": {
+          "type": "boolean",
+          "description": "Mount the PersistentVolumeClaim read-only."
+        }
+      },
+      "description": "persistentVolumeClaim volume source."
+    },
+    "kubernetesVolume": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "empty_dir"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Volume name."
+            },
+            "empty_dir": {
+              "$ref": "#/definitions/kubernetesEmptyDirVolume"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "host_path"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Volume name."
+            },
+            "host_path": {
+              "$ref": "#/definitions/kubernetesHostPathVolume"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "config_map"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Volume name."
+            },
+            "config_map": {
+              "$ref": "#/definitions/kubernetesConfigMapVolume"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "secret"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Volume name."
+            },
+            "secret": {
+              "$ref": "#/definitions/kubernetesSecretVolume"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "persistent_volume_claim"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Volume name."
+            },
+            "persistent_volume_claim": {
+              "$ref": "#/definitions/kubernetesPersistentVolumeClaimVolume"
+            }
+          }
+        }
+      ],
+      "description": "Volume definition. Exactly one volume source must be specified."
+    },
+    "kubernetesVolumeMount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "mount_path"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the referenced volume."
+        },
+        "mount_path": {
+          "type": "string",
+          "description": "Mount path inside the container."
+        },
+        "sub_path": {
+          "type": "string",
+          "description": "Optional sub-path within the volume."
+        },
+        "read_only": {
+          "type": "boolean",
+          "description": "Mount the volume read-only."
+        }
+      },
+      "description": "Volume mount for the Job container."
+    },
+    "kubernetesCommonConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Container image to run. Required at step level; optional for DAG-level defaults."
+        },
+        "namespace": {
+          "type": "string",
+          "default": "default",
+          "description": "Kubernetes namespace for the Job. Default: default."
+        },
+        "kubeconfig": {
+          "type": "string",
+          "description": "Explicit path to a kubeconfig file."
+        },
+        "context": {
+          "type": "string",
+          "description": "Kubeconfig context name."
+        },
+        "service_account": {
+          "type": "string",
+          "description": "Service account name for the Pod."
+        },
+        "working_dir": {
+          "type": "string",
+          "description": "Working directory inside the container."
+        },
+        "image_pull_policy": {
+          "type": "string",
+          "description": "Image pull policy. Accepted values are Always, IfNotPresent, or Never (case-insensitive)."
+        },
+        "image_pull_secrets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of image pull secrets for private registries."
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesEnvVar"
+          },
+          "description": "Environment variables for the Job container."
+        },
+        "env_from": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesEnvFromSource"
+          },
+          "description": "Bulk environment variable imports from Secrets or ConfigMaps."
+        },
+        "resources": {
+          "$ref": "#/definitions/kubernetesResourceRequirements",
+          "description": "CPU and memory requests and limits."
+        },
+        "node_selector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Node selector labels for Pod scheduling."
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesToleration"
+          },
+          "description": "Pod tolerations."
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels applied to both the Job and Pod."
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations applied to both the Job and Pod."
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesVolume"
+          },
+          "description": "Volumes available to the Pod."
+        },
+        "volume_mounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesVolumeMount"
+          },
+          "description": "Volume mounts for the Job container."
+        },
+        "active_deadline": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Kubernetes Job active deadline in seconds."
+        },
+        "backoff_limit": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Kubernetes Job retry limit. Default: 0."
+        },
+        "ttl_after_finished": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Kubernetes TTL-after-finished in seconds."
+        },
+        "cleanup_policy": {
+          "type": "string",
+          "default": "delete",
+          "description": "Cleanup policy after execution. Accepted values are delete or keep (case-insensitive)."
+        }
+      },
+      "description": "Common Kubernetes configuration shared by DAG-level defaults and step-level Kubernetes executor config."
+    },
+    "kubernetesDefaultsConfig": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/kubernetesCommonConfig"
+        }
+      ],
+      "description": "Default Kubernetes configuration for explicit Kubernetes steps. Same fields as step-level config, but image is optional."
+    },
+    "kubernetesExecutorConfig": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/kubernetesCommonConfig"
+        },
+        {
+          "type": "object",
+          "required": ["image"]
+        }
+      ],
+      "description": "Kubernetes executor configuration for running a workflow step as a Kubernetes Job."
+    },
     "llmProvider": {
       "type": "string",
       "enum": [
@@ -3518,6 +3987,8 @@
         "shell",
         "docker",
         "container",
+        "kubernetes",
+        "k8s",
         "http",
         "mail",
         "ssh",
@@ -3537,7 +4008,7 @@
         "router",
         "agent"
       ],
-      "description": "Type of executor to use for this step."
+      "description": "Type of executor to use for this step, including aliases such as k8s / kubernetes and gha / github_action / github-action."
     },
     "executorConfig": {
       "type": "object",
@@ -3639,6 +4110,16 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/redisExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "enum": ["kubernetes", "k8s"] } }
+          },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/kubernetesExecutorConfig" }
             }
           }
         },
