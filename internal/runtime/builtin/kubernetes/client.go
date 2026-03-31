@@ -7,18 +7,21 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+var clientPollInterval = 500 * time.Millisecond
 
 // Client wraps the Kubernetes clientset and manages Job lifecycle.
 type Client struct {
@@ -54,19 +57,24 @@ func NewClient(cfg *Config) (*Client, error) {
 
 func buildRESTConfig(cfg *Config) (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	if cfg.Kubeconfig != "" {
+	explicitKubeconfig := cfg.Kubeconfig != ""
+	if explicitKubeconfig {
 		loadingRules.ExplicitPath = cfg.Kubeconfig
 	}
 
 	overrides := &clientcmd.ConfigOverrides{}
-	if cfg.Context != "" {
+	explicitContext := cfg.Context != ""
+	if explicitContext {
 		overrides.CurrentContext = cfg.Context
 	}
 
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 	restCfg, err := kubeConfig.ClientConfig()
 	if err != nil {
-		// Fall back to in-cluster config
+		if explicitKubeconfig || explicitContext || hasAnyKubeconfigFile(loadingRules.GetLoadingPrecedence()) {
+			return nil, fmt.Errorf("kubeconfig error: %w", err)
+		}
+
 		restCfg, inClusterErr := rest.InClusterConfig()
 		if inClusterErr != nil {
 			return nil, fmt.Errorf("kubeconfig error: %w; in-cluster error: %w", err, inClusterErr)
@@ -76,32 +84,58 @@ func buildRESTConfig(cfg *Config) (*rest.Config, error) {
 	return restCfg, nil
 }
 
+func hasAnyKubeconfigFile(paths []string) bool {
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // CreateJob creates a Kubernetes Job from the config.
 // The command parameter overrides the container command if non-empty.
 func (c *Client) CreateJob(ctx context.Context, stepName string, command []string) error {
-	job := c.buildJob(stepName, command)
+	job, err := c.buildJob(stepName, command)
+	if err != nil {
+		return err
+	}
 
 	created, err := c.clientset.BatchV1().Jobs(c.namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create kubernetes job: %w", err)
 	}
 
-	c.mu.Lock()
-	c.jobName = created.Name
-	c.mu.Unlock()
+	c.setJobName(created.Name)
 
 	return nil
 }
 
-func (c *Client) buildJob(stepName string, command []string) *batchv1.Job {
+func (c *Client) buildJob(stepName string, command []string) (*batchv1.Job, error) {
+	imagePullPolicy, err := c.cfg.toK8sImagePullPolicy()
+	if err != nil {
+		return nil, err
+	}
+	resources, err := c.cfg.toK8sResourceRequirements()
+	if err != nil {
+		return nil, err
+	}
+	volumes, err := c.cfg.toK8sVolumes()
+	if err != nil {
+		return nil, err
+	}
+
 	// Build container spec
 	container := corev1.Container{
 		Name:            "step",
 		Image:           c.cfg.Image,
-		ImagePullPolicy: c.cfg.toK8sImagePullPolicy(),
+		ImagePullPolicy: imagePullPolicy,
 		Env:             c.cfg.toK8sEnvVars(),
 		EnvFrom:         c.cfg.toK8sEnvFromSources(),
-		Resources:       c.cfg.toK8sResourceRequirements(),
+		Resources:       resources,
 		VolumeMounts:    c.cfg.toK8sVolumeMounts(),
 	}
 
@@ -120,7 +154,7 @@ func (c *Client) buildJob(stepName string, command []string) *batchv1.Job {
 	podSpec := corev1.PodSpec{
 		Containers:       []corev1.Container{container},
 		RestartPolicy:    corev1.RestartPolicyNever,
-		Volumes:          c.cfg.toK8sVolumes(),
+		Volumes:          volumes,
 		ImagePullSecrets: c.cfg.toK8sImagePullSecrets(),
 	}
 
@@ -161,48 +195,28 @@ func (c *Client) buildJob(stepName string, command []string) *batchv1.Job {
 		job.Spec.TTLSecondsAfterFinished = c.cfg.TTLSecondsAfterFinished
 	}
 
-	return job
+	return job, nil
 }
 
-// WaitForPod watches for a Pod created by the Job and returns its name
-// once it reaches Running, Succeeded, or Failed state.
+// WaitForPod waits until a Pod created by the Job reaches Running,
+// Succeeded, or Failed state and returns its name.
 func (c *Client) WaitForPod(ctx context.Context) (string, error) {
-	c.mu.Lock()
-	jobName := c.jobName
-	c.mu.Unlock()
-
-	watcher, err := c.clientset.CoreV1().Pods(c.namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "job-name=" + jobName,
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to watch pods: %w", err)
-	}
-	defer watcher.Stop()
+	ticker := time.NewTicker(clientPollInterval)
+	defer ticker.Stop()
 
 	for {
+		podName, err := c.currentPodName(ctx)
+		if err != nil {
+			return "", err
+		}
+		if podName != "" {
+			return podName, nil
+		}
+
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
-		case event, ok := <-watcher.ResultChan():
-			if !ok {
-				return "", fmt.Errorf("pod watcher closed unexpectedly")
-			}
-			if event.Type == watch.Error {
-				return "", fmt.Errorf("watch error: %v", event.Object)
-			}
-			pod, ok := event.Object.(*corev1.Pod)
-			if !ok {
-				continue
-			}
-			switch pod.Status.Phase {
-			case corev1.PodRunning, corev1.PodSucceeded, corev1.PodFailed:
-				return pod.Name, nil
-			case corev1.PodPending:
-				// Check for scheduling or image pull errors
-				if reason := getPodFailureReason(pod); reason != "" {
-					return "", fmt.Errorf("pod scheduling failed: %s", reason)
-				}
-			}
+		case <-ticker.C:
 		}
 	}
 }
@@ -231,44 +245,106 @@ func (c *Client) StreamLogs(ctx context.Context, podName string, stdout io.Write
 	return nil
 }
 
-// WaitForCompletion watches the Job until it completes or fails.
+// WaitForCompletion polls the Job until it completes or fails.
 func (c *Client) WaitForCompletion(ctx context.Context) error {
-	c.mu.Lock()
-	jobName := c.jobName
-	c.mu.Unlock()
-
-	watcher, err := c.clientset.BatchV1().Jobs(c.namespace).Watch(ctx, metav1.ListOptions{
-		FieldSelector: "metadata.name=" + jobName,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to watch job: %w", err)
-	}
-	defer watcher.Stop()
+	ticker := time.NewTicker(clientPollInterval)
+	defer ticker.Stop()
 
 	for {
+		done, err := c.currentJobCompletion(ctx)
+		if err != nil {
+			return err
+		}
+		if done {
+			return nil
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case event, ok := <-watcher.ResultChan():
-			if !ok {
-				return fmt.Errorf("job watcher closed unexpectedly")
-			}
-			if event.Type == watch.Error {
-				return fmt.Errorf("job watch error: %v", event.Object)
-			}
-			job, ok := event.Object.(*batchv1.Job)
-			if !ok {
-				continue
-			}
-			for _, cond := range job.Status.Conditions {
-				if cond.Type == batchv1.JobComplete && cond.Status == corev1.ConditionTrue {
-					return nil
-				}
-				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-					return fmt.Errorf("job failed: %s", cond.Message)
-				}
-			}
+		case <-ticker.C:
 		}
+	}
+}
+
+func (c *Client) currentPodName(ctx context.Context) (string, error) {
+	jobName := c.GetJobName()
+	pods, err := c.clientset.CoreV1().Pods(c.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "job-name=" + jobName,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list pods: %w", err)
+	}
+	if len(pods.Items) == 0 {
+		return "", nil
+	}
+
+	pod := selectPod(pods.Items)
+	switch pod.Status.Phase {
+	case corev1.PodRunning, corev1.PodSucceeded, corev1.PodFailed:
+		return pod.Name, nil
+	case corev1.PodPending:
+		if reason := getPodFailureReason(&pod); reason != "" {
+			return "", fmt.Errorf("pod scheduling failed: %s", reason)
+		}
+	}
+
+	return "", nil
+}
+
+func (c *Client) currentJobCompletion(ctx context.Context) (bool, error) {
+	jobName := c.GetJobName()
+	job, err := c.clientset.BatchV1().Jobs(c.namespace).Get(ctx, jobName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to get job: %w", err)
+	}
+
+	return evaluateJobCompletion(job)
+}
+
+func evaluateJobCompletion(job *batchv1.Job) (bool, error) {
+	for _, cond := range job.Status.Conditions {
+		if cond.Type == batchv1.JobComplete && cond.Status == corev1.ConditionTrue {
+			return true, nil
+		}
+		if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+			msg := strings.TrimSpace(cond.Message)
+			if msg == "" {
+				msg = strings.TrimSpace(cond.Reason)
+			}
+			if msg == "" {
+				msg = "job failed"
+			}
+			return false, fmt.Errorf("job failed: %s", msg)
+		}
+	}
+	return false, nil
+}
+
+func selectPod(pods []corev1.Pod) corev1.Pod {
+	best := pods[0]
+	for _, pod := range pods[1:] {
+		if podPriority(pod) > podPriority(best) {
+			best = pod
+			continue
+		}
+		if podPriority(pod) == podPriority(best) && pod.CreationTimestamp.After(best.CreationTimestamp.Time) {
+			best = pod
+		}
+	}
+	return best
+}
+
+func podPriority(pod corev1.Pod) int {
+	switch pod.Status.Phase {
+	case corev1.PodRunning:
+		return 4
+	case corev1.PodSucceeded, corev1.PodFailed:
+		return 3
+	case corev1.PodPending:
+		return 2
+	default:
+		return 1
 	}
 }
 
@@ -290,9 +366,7 @@ func (c *Client) GetExitCode(ctx context.Context, podName string) (int, error) {
 
 // DeleteJob deletes the Job and its Pods using background propagation.
 func (c *Client) DeleteJob(ctx context.Context) error {
-	c.mu.Lock()
-	jobName := c.jobName
-	c.mu.Unlock()
+	jobName := c.GetJobName()
 
 	if jobName == "" {
 		return nil
@@ -303,8 +377,13 @@ func (c *Client) DeleteJob(ctx context.Context) error {
 		PropagationPolicy: &propagation,
 	})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			c.setJobName("")
+			return nil
+		}
 		return fmt.Errorf("failed to delete job %s: %w", jobName, err)
 	}
+	c.setJobName("")
 	return nil
 }
 
@@ -313,6 +392,12 @@ func (c *Client) GetJobName() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.jobName
+}
+
+func (c *Client) setJobName(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.jobName = name
 }
 
 // getPodFailureReason checks for known failure conditions in pod status.
@@ -363,10 +448,10 @@ func sanitizeName(name string) string {
 	return result
 }
 
-// waitForPodTermination polls the pod until its container terminates.
+// WaitForPodTermination polls the pod until its container terminates.
 // This is used after log streaming completes to ensure we can read the exit code.
-func (c *Client) waitForPodTermination(ctx context.Context, podName string) error {
-	ticker := time.NewTicker(time.Second)
+func (c *Client) WaitForPodTermination(ctx context.Context, podName string) error {
+	ticker := time.NewTicker(clientPollInterval)
 	defer ticker.Stop()
 
 	for {

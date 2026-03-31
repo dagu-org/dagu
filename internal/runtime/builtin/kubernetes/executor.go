@@ -44,12 +44,29 @@ steps:
 var _ executor.Executor = (*kubernetesExecutor)(nil)
 var _ executor.ExitCoder = (*kubernetesExecutor)(nil)
 
+type jobClient interface {
+	CreateJob(ctx context.Context, stepName string, command []string) error
+	WaitForPod(ctx context.Context) (string, error)
+	StreamLogs(ctx context.Context, podName string, stdout io.Writer) error
+	WaitForPodTermination(ctx context.Context, podName string) error
+	GetExitCode(ctx context.Context, podName string) (int, error)
+	WaitForCompletion(ctx context.Context) error
+	DeleteJob(ctx context.Context) error
+	GetJobName() string
+}
+
+var newJobClient = func(cfg *Config) (jobClient, error) {
+	return NewClient(cfg)
+}
+
+const jobCleanupTimeout = 30 * time.Second
+
 type kubernetesExecutor struct {
 	step     core.Step
 	stdout   io.Writer
 	stderr   io.Writer
 	cfg      *Config
-	client   *Client
+	client   jobClient
 	mu       sync.Mutex
 	exitCode int
 	cancel   func()
@@ -64,21 +81,14 @@ func (e *kubernetesExecutor) SetStderr(out io.Writer) {
 }
 
 func (e *kubernetesExecutor) Kill(_ os.Signal) error {
-	if e.cancel != nil {
-		e.cancel()
-		e.cancel = nil
+	cancel, client := e.stopExecution()
+	if cancel != nil {
+		cancel()
 	}
-	if e.client == nil {
+	if client == nil {
 		return nil
 	}
-	// Use a background context for cleanup since the main context is cancelled
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	logger.Info(ctx, "Deleting kubernetes job",
-		slog.String("job", e.client.GetJobName()),
-	)
-	return e.client.DeleteJob(ctx)
+	return e.deleteJob(context.Background(), client)
 }
 
 func (e *kubernetesExecutor) Run(ctx context.Context) error {
@@ -89,8 +99,9 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 	)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	e.cancel = cancelFunc
+	e.setCancel(cancelFunc)
 	defer cancelFunc()
+	defer e.clearCancel()
 
 	// Wrap stderr with a tail writer for error messages
 	env := runtime.GetEnv(ctx)
@@ -98,12 +109,12 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 	e.stderr = tw
 
 	// Initialize Kubernetes client
-	client, err := NewClient(e.cfg)
+	client, err := newJobClient(e.cfg)
 	if err != nil {
 		logger.Error(ctx, "Kubernetes executor: failed to create client", slog.Any("error", err))
 		return fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
-	e.client = client
+	e.setClient(client)
 
 	// Build command from step
 	command := buildCommand(e.step)
@@ -124,7 +135,7 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 	podName, err := client.WaitForPod(ctx)
 	if err != nil {
 		logger.Error(ctx, "Kubernetes executor: pod scheduling failed", slog.Any("error", err))
-		e.cleanup(ctx)
+		e.cleanup(ctx, true)
 		return fmt.Errorf("pod scheduling failed: %w", err)
 	}
 	logger.Info(ctx, "Kubernetes executor: pod running",
@@ -138,9 +149,9 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 	}
 
 	// Ensure pod has terminated before reading exit code
-	if err := client.waitForPodTermination(ctx, podName); err != nil {
+	if err := client.WaitForPodTermination(ctx, podName); err != nil {
 		if ctx.Err() != nil {
-			e.cleanup(ctx)
+			e.cleanup(ctx, true)
 			return ctx.Err()
 		}
 		logger.Warn(ctx, "Kubernetes executor: error waiting for pod termination", slog.Any("error", err))
@@ -156,8 +167,12 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 
 	// Wait for Job completion status
 	if err := client.WaitForCompletion(ctx); err != nil {
+		if ctx.Err() != nil {
+			e.cleanup(ctx, true)
+			return ctx.Err()
+		}
 		logger.Error(ctx, "Kubernetes executor: job failed", slog.Any("error", err))
-		e.cleanup(ctx)
+		e.cleanup(ctx, false)
 		if tail := tw.Tail(); tail != "" {
 			return fmt.Errorf("kubernetes job failed: %w\nrecent stderr (tail):\n%s", err, tail)
 		}
@@ -165,7 +180,7 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 	}
 
 	// Clean up if configured
-	e.cleanup(ctx)
+	e.cleanup(ctx, false)
 
 	logger.Info(ctx, "Kubernetes executor: completed successfully",
 		slog.String("job", client.GetJobName()),
@@ -174,14 +189,16 @@ func (e *kubernetesExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *kubernetesExecutor) cleanup(ctx context.Context) {
-	if e.client == nil {
+func (e *kubernetesExecutor) cleanup(ctx context.Context, force bool) {
+	client := e.getClient()
+	if client == nil {
 		return
 	}
-	if e.cfg.CleanupPolicy == "delete" {
-		if err := e.client.DeleteJob(ctx); err != nil {
-			logger.Warn(ctx, "Kubernetes executor: cleanup failed", slog.Any("error", err))
-		}
+	if !force && e.cfg.CleanupPolicy != cleanupPolicyDelete {
+		return
+	}
+	if err := e.deleteJob(ctx, client); err != nil {
+		logger.Warn(ctx, "Kubernetes executor: cleanup failed", slog.Any("error", err))
 	}
 }
 
@@ -196,6 +213,48 @@ func (e *kubernetesExecutor) setExitCode(code int) {
 	e.mu.Lock()
 	e.exitCode = code
 	e.mu.Unlock()
+}
+
+func (e *kubernetesExecutor) setCancel(cancel func()) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.cancel = cancel
+}
+
+func (e *kubernetesExecutor) clearCancel() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.cancel = nil
+}
+
+func (e *kubernetesExecutor) setClient(client jobClient) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.client = client
+}
+
+func (e *kubernetesExecutor) getClient() jobClient {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.client
+}
+
+func (e *kubernetesExecutor) stopExecution() (func(), jobClient) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	cancel := e.cancel
+	e.cancel = nil
+	return cancel, e.client
+}
+
+func (e *kubernetesExecutor) deleteJob(ctx context.Context, client jobClient) error {
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), jobCleanupTimeout)
+	defer cancel()
+
+	logger.Info(ctx, "Deleting kubernetes job",
+		slog.String("job", client.GetJobName()),
+	)
+	return client.DeleteJob(cleanupCtx)
 }
 
 func newKubernetes(_ context.Context, step core.Step) (executor.Executor, error) {
@@ -218,6 +277,14 @@ func newKubernetes(_ context.Context, step core.Step) (executor.Executor, error)
 	}, nil
 }
 
+func validateStep(step core.Step) error {
+	if len(step.ExecutorConfig.Config) == 0 {
+		return fmt.Errorf("kubernetes executor requires config with at least 'image' field")
+	}
+	_, err := LoadConfigFromMap(step.ExecutorConfig.Config)
+	return err
+}
+
 // buildCommand constructs the command slice from the step's commands.
 func buildCommand(step core.Step) []string {
 	if len(step.Commands) == 0 {
@@ -228,10 +295,6 @@ func buildCommand(step core.Step) []string {
 	if cmd.Command == "" {
 		return nil
 	}
-	// If there's a shell configured, wrap the command
-	if step.Shell != "" {
-		return []string{step.Shell, "-c", cmd.CmdWithArgs}
-	}
 	return append([]string{cmd.Command}, cmd.Args...)
 }
 
@@ -239,6 +302,6 @@ func init() {
 	caps := core.ExecutorCapabilities{
 		Command: true,
 	}
-	executor.RegisterExecutor("kubernetes", newKubernetes, nil, caps)
-	executor.RegisterExecutor("k8s", newKubernetes, nil, caps)
+	executor.RegisterExecutor("kubernetes", newKubernetes, validateStep, caps)
+	executor.RegisterExecutor("k8s", newKubernetes, validateStep, caps)
 }

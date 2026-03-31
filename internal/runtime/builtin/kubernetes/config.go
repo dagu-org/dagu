@@ -16,7 +16,18 @@ import (
 )
 
 var (
-	ErrImageRequired = errors.New("kubernetes executor requires an image")
+	ErrImageRequired            = errors.New("kubernetes executor requires an image")
+	ErrInvalidCleanupPolicy     = errors.New("kubernetes executor cleanup_policy must be either delete or keep")
+	ErrInvalidImagePullPolicy   = errors.New("kubernetes executor image_pull_policy must be one of Always, IfNotPresent, or Never")
+	ErrNegativeActiveDeadline   = errors.New("kubernetes executor active_deadline must be >= 0")
+	ErrNegativeBackoffLimit     = errors.New("kubernetes executor backoff_limit must be >= 0")
+	ErrNegativeTTLAfterFinished = errors.New("kubernetes executor ttl_after_finished must be >= 0")
+	ErrInvalidVolumeSource      = errors.New("kubernetes executor volume must define exactly one source")
+)
+
+const (
+	cleanupPolicyDelete = "delete"
+	cleanupPolicyKeep   = "keep"
 )
 
 // Config holds the configuration for creating a Kubernetes Job.
@@ -186,13 +197,21 @@ func LoadConfigFromMap(data map[string]any) (*Config, error) {
 		return nil, fmt.Errorf("failed to decode kubernetes config: %w", err)
 	}
 
-	if strings.TrimSpace(cfg.Image) == "" {
-		return nil, ErrImageRequired
-	}
-	cfg.Image = strings.TrimSpace(cfg.Image)
-
+	normalizeConfig(cfg)
 	applyDefaults(cfg)
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
+}
+
+func normalizeConfig(cfg *Config) {
+	cfg.Kubeconfig = strings.TrimSpace(cfg.Kubeconfig)
+	cfg.Context = strings.TrimSpace(cfg.Context)
+	cfg.Namespace = strings.TrimSpace(cfg.Namespace)
+	cfg.Image = strings.TrimSpace(cfg.Image)
+	cfg.ImagePullPolicy = strings.TrimSpace(cfg.ImagePullPolicy)
+	cfg.CleanupPolicy = strings.ToLower(strings.TrimSpace(cfg.CleanupPolicy))
 }
 
 func applyDefaults(cfg *Config) {
@@ -200,12 +219,42 @@ func applyDefaults(cfg *Config) {
 		cfg.Namespace = "default"
 	}
 	if cfg.CleanupPolicy == "" {
-		cfg.CleanupPolicy = "delete"
+		cfg.CleanupPolicy = cleanupPolicyDelete
 	}
 	if cfg.BackoffLimit == nil {
 		zero := int32(0)
 		cfg.BackoffLimit = &zero
 	}
+}
+
+func validateConfig(cfg *Config) error {
+	if cfg.Image == "" {
+		return ErrImageRequired
+	}
+	if _, err := cfg.toK8sImagePullPolicy(); err != nil {
+		return err
+	}
+	switch cfg.CleanupPolicy {
+	case cleanupPolicyDelete, cleanupPolicyKeep:
+	default:
+		return ErrInvalidCleanupPolicy
+	}
+	if cfg.ActiveDeadlineSeconds != nil && *cfg.ActiveDeadlineSeconds < 0 {
+		return ErrNegativeActiveDeadline
+	}
+	if cfg.BackoffLimit != nil && *cfg.BackoffLimit < 0 {
+		return ErrNegativeBackoffLimit
+	}
+	if cfg.TTLSecondsAfterFinished != nil && *cfg.TTLSecondsAfterFinished < 0 {
+		return ErrNegativeTTLAfterFinished
+	}
+	if _, err := cfg.toK8sResourceRequirements(); err != nil {
+		return err
+	}
+	if _, err := cfg.toK8sVolumes(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // toK8sEnvVars converts config EnvVars to Kubernetes API types.
@@ -270,24 +319,32 @@ func (cfg *Config) toK8sEnvFromSources() []corev1.EnvFromSource {
 }
 
 // toK8sResourceRequirements converts config resources to Kubernetes API types.
-func (cfg *Config) toK8sResourceRequirements() corev1.ResourceRequirements {
+func (cfg *Config) toK8sResourceRequirements() (corev1.ResourceRequirements, error) {
 	reqs := corev1.ResourceRequirements{}
 	if cfg.Resources == nil {
-		return reqs
+		return reqs, nil
 	}
 	if len(cfg.Resources.Requests) > 0 {
 		reqs.Requests = make(corev1.ResourceList)
 		for k, v := range cfg.Resources.Requests {
-			reqs.Requests[corev1.ResourceName(k)] = resource.MustParse(v)
+			qty, err := parseQuantity(fmt.Sprintf("resources.requests.%s", k), v)
+			if err != nil {
+				return corev1.ResourceRequirements{}, err
+			}
+			reqs.Requests[corev1.ResourceName(k)] = qty
 		}
 	}
 	if len(cfg.Resources.Limits) > 0 {
 		reqs.Limits = make(corev1.ResourceList)
 		for k, v := range cfg.Resources.Limits {
-			reqs.Limits[corev1.ResourceName(k)] = resource.MustParse(v)
+			qty, err := parseQuantity(fmt.Sprintf("resources.limits.%s", k), v)
+			if err != nil {
+				return corev1.ResourceRequirements{}, err
+			}
+			reqs.Limits[corev1.ResourceName(k)] = qty
 		}
 	}
-	return reqs
+	return reqs, nil
 }
 
 // toK8sTolerations converts config tolerations to Kubernetes API types.
@@ -308,20 +365,30 @@ func (cfg *Config) toK8sTolerations() []corev1.Toleration {
 }
 
 // toK8sVolumes converts config volumes to Kubernetes API types.
-func (cfg *Config) toK8sVolumes() []corev1.Volume {
+func (cfg *Config) toK8sVolumes() ([]corev1.Volume, error) {
 	if len(cfg.Volumes) == 0 {
-		return nil
+		return nil, nil
 	}
 	vols := make([]corev1.Volume, 0, len(cfg.Volumes))
 	for _, v := range cfg.Volumes {
+		if countVolumeSources(v) != 1 {
+			return nil, fmt.Errorf("volume %q: %w", v.Name, ErrInvalidVolumeSource)
+		}
+
 		vol := corev1.Volume{Name: v.Name}
 		switch {
 		case v.EmptyDir != nil:
-			vol.VolumeSource = corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium: corev1.StorageMedium(v.EmptyDir.Medium),
-				},
+			emptyDir := &corev1.EmptyDirVolumeSource{
+				Medium: corev1.StorageMedium(v.EmptyDir.Medium),
 			}
+			if v.EmptyDir.SizeLimit != "" {
+				qty, err := parseQuantity(fmt.Sprintf("volumes[%s].empty_dir.size_limit", v.Name), v.EmptyDir.SizeLimit)
+				if err != nil {
+					return nil, err
+				}
+				emptyDir.SizeLimit = &qty
+			}
+			vol.VolumeSource = corev1.VolumeSource{EmptyDir: emptyDir}
 		case v.HostPath != nil:
 			hostPathType := corev1.HostPathUnset
 			if v.HostPath.Type != "" {
@@ -355,7 +422,7 @@ func (cfg *Config) toK8sVolumes() []corev1.Volume {
 		}
 		vols = append(vols, vol)
 	}
-	return vols
+	return vols, nil
 }
 
 // toK8sVolumeMounts converts config volume mounts to Kubernetes API types.
@@ -376,16 +443,18 @@ func (cfg *Config) toK8sVolumeMounts() []corev1.VolumeMount {
 }
 
 // toK8sImagePullPolicy converts config image pull policy to Kubernetes API type.
-func (cfg *Config) toK8sImagePullPolicy() corev1.PullPolicy {
+func (cfg *Config) toK8sImagePullPolicy() (corev1.PullPolicy, error) {
 	switch strings.ToLower(cfg.ImagePullPolicy) {
+	case "":
+		return "", nil
 	case "always":
-		return corev1.PullAlways
+		return corev1.PullAlways, nil
 	case "never":
-		return corev1.PullNever
+		return corev1.PullNever, nil
 	case "ifnotpresent":
-		return corev1.PullIfNotPresent
+		return corev1.PullIfNotPresent, nil
 	default:
-		return ""
+		return "", ErrInvalidImagePullPolicy
 	}
 }
 
@@ -399,6 +468,34 @@ func (cfg *Config) toK8sImagePullSecrets() []corev1.LocalObjectReference {
 		refs = append(refs, corev1.LocalObjectReference{Name: name})
 	}
 	return refs
+}
+
+func countVolumeSources(v Volume) int {
+	count := 0
+	if v.EmptyDir != nil {
+		count++
+	}
+	if v.HostPath != nil {
+		count++
+	}
+	if v.ConfigMap != nil {
+		count++
+	}
+	if v.Secret != nil {
+		count++
+	}
+	if v.PersistentVolumeClaim != nil {
+		count++
+	}
+	return count
+}
+
+func parseQuantity(field, value string) (resource.Quantity, error) {
+	qty, err := resource.ParseQuantity(value)
+	if err != nil {
+		return resource.Quantity{}, fmt.Errorf("%s: invalid quantity %q: %w", field, value, err)
+	}
+	return qty, nil
 }
 
 func init() {
