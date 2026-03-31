@@ -1183,8 +1183,6 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get/open latest attempt: "+err.Error())
 	}
-	emitStarted := latestStatus.Status != core.Running && dagRunStatus.Status == core.Running
-
 	// Write the status
 	if err := attempt.Write(ctx, *dagRunStatus); err != nil {
 		return nil, status.Error(codes.Internal, "failed to write status: "+err.Error())
@@ -1201,23 +1199,6 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 	// Note: We don't close the attempt immediately on terminal status because
 	// the agent may push the same terminal status multiple times from different
 	// code paths. Attempts are cleaned up during coordinator shutdown.
-	if emitStarted && h.eventService != nil {
-		source, ok := eventstore.SourceFromContext(ctx)
-		if !ok {
-			source = eventstore.Source{
-				Service:  eventstore.SourceServiceCoordinator,
-				Instance: h.eventSourceInstance,
-			}
-		}
-		if err := h.eventService.Emit(ctx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunStarted, dagRunStatus, map[string]any{
-			"worker_id":     req.WorkerId,
-			"trigger_type":  string(rune(dagRunStatus.TriggerType)),
-			"schedule_time": dagRunStatus.ScheduleTime,
-		})); err != nil {
-			logger.Warn(ctx, "Failed to emit remote DAG-run started event", tag.Error(err))
-		}
-	}
-
 	return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 }
 

@@ -502,7 +502,6 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		return nil, err
 	}
 	if c.EventService != nil {
-		sched.SetEventService(c.EventService, c.EventSourceInstance)
 		collector, eventErr := fileeventstore.NewCollector(c.Config.Paths.EventStoreDir, c.Config.EventStore.RetentionDays)
 		if eventErr != nil {
 			logger.Warn(c, "Failed to initialize event collector; continuing without collection", tag.Error(eventErr))

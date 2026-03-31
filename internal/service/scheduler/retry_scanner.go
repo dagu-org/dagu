@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
 const retryScanInterval = 30 * time.Second
@@ -166,19 +165,6 @@ func (s *RetryScanner) processFailedRunFromSummary(
 
 	err := exec.EnqueueRetry(ctx, s.dagRunStore, s.queueStore, nil, listed, exec.EnqueueRetryOptions{
 		AutoRetry: true,
-		OnQueued: func(updated *exec.DAGRunStatus) error {
-			service, source, ok := eventstore.FromContext(ctx)
-			if !ok || service == nil || updated == nil {
-				return nil
-			}
-			if err := service.Emit(ctx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunQueued, updated, map[string]any{
-				"trigger_type": string(rune(updated.TriggerType)),
-				"auto_retry":   true,
-			})); err != nil {
-				logger.Warn(ctx, "Failed to emit auto-retry enqueue event", tag.Error(err))
-			}
-			return nil
-		},
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrRetryStaleLatest) {
@@ -260,19 +246,6 @@ func (s *RetryScanner) processFailedRunLegacy(
 
 	err = exec.EnqueueRetry(ctx, s.dagRunStore, s.queueStore, dagSnapshot, latestStatus, exec.EnqueueRetryOptions{
 		AutoRetry: true,
-		OnQueued: func(updated *exec.DAGRunStatus) error {
-			service, source, ok := eventstore.FromContext(ctx)
-			if !ok || service == nil || updated == nil {
-				return nil
-			}
-			if err := service.Emit(ctx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunQueued, updated, map[string]any{
-				"trigger_type": string(rune(updated.TriggerType)),
-				"auto_retry":   true,
-			})); err != nil {
-				logger.Warn(ctx, "Failed to emit auto-retry enqueue event", tag.Error(err))
-			}
-			return nil
-		},
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrRetryStaleLatest) {

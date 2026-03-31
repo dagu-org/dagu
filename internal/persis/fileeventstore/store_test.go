@@ -103,15 +103,12 @@ func testEvent(id string, occurredAt time.Time) *eventstore.Event {
 		OccurredAt:     occurredAt.UTC(),
 		RecordedAt:     occurredAt.UTC().Add(10 * time.Millisecond),
 		Kind:           eventstore.KindDAGRun,
-		Type:           eventstore.TypeDAGRunQueued,
+		Type:           eventstore.TypeDAGRunFailed,
 		SourceService:  eventstore.SourceServiceScheduler,
 		SourceInstance: "test-instance",
 		DAGName:        "example",
 		DAGRunID:       "run-1",
 		AttemptID:      "attempt-1",
-		Status:         "queued",
-		Data: map[string]any{
-			"trigger_type": "manual",
-		},
+		Status:         "failed",
 	}
 }

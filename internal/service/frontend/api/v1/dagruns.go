@@ -34,7 +34,6 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/executor"
 	"github.com/dagu-org/dagu/internal/service/audit"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/parser"
@@ -855,7 +854,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 
 	dagStatus.Nodes[stepIdx].Status = nodeStatusMapping[request.Body.Status]
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -912,7 +911,7 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 	// Apply approval to the node
 	applyApproval(ctx, dagStatus.Nodes[stepIdx], request.Body)
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -980,7 +979,7 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 
 	applyApproval(ctx, dagStatus.Nodes[stepIdx], request.Body)
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, rootRef, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
 	}
 
@@ -1126,7 +1125,7 @@ func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStep
 	}
 	applyRejection(ctx, dagStatus.Nodes[stepIdx], dagStatus, reason)
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -1182,7 +1181,7 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 	}
 	applyRejection(ctx, dagStatus.Nodes[stepIdx], dagStatus, reason)
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, rootRef, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
 	}
 
@@ -1256,7 +1255,7 @@ func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRun
 
 	applyPushBack(ctx, node, dagStatus, request.Body)
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, ref, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -1264,7 +1263,7 @@ func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRun
 		logger.Error(ctx, "Failed to resume DAG after push-back, rolling back", tag.Error(err))
 		var original exec.DAGRunStatus
 		if unmarshalErr := json.Unmarshal(snapshot, &original); unmarshalErr == nil {
-			if rollbackErr := a.dagRunMgr.UpdateStatus(ctx, ref, original); rollbackErr != nil {
+			if rollbackErr := a.updateDAGRunStatus(ctx, ref, original); rollbackErr != nil {
 				logger.Error(ctx, "Failed to rollback push-back state", tag.Error(rollbackErr))
 			}
 		}
@@ -1344,7 +1343,7 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 
 	applyPushBack(ctx, node, dagStatus, request.Body)
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, rootRef, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, rootRef, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating sub DAG-run status: %w", err)
 	}
 
@@ -1352,7 +1351,7 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 		logger.Error(ctx, "Failed to resume sub DAG after push-back, rolling back", tag.Error(err))
 		var original exec.DAGRunStatus
 		if unmarshalErr := json.Unmarshal(snapshot, &original); unmarshalErr == nil {
-			if rollbackErr := a.dagRunMgr.UpdateStatus(ctx, rootRef, original); rollbackErr != nil {
+			if rollbackErr := a.updateDAGRunStatus(ctx, rootRef, original); rollbackErr != nil {
 				logger.Error(ctx, "Failed to rollback push-back state", tag.Error(rollbackErr))
 			}
 		}
@@ -1714,7 +1713,7 @@ func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateS
 
 	dagStatus.Nodes[stepIdx].Status = nodeStatusMapping[request.Body.Status]
 
-	if err := a.dagRunMgr.UpdateStatus(ctx, root, *dagStatus); err != nil {
+	if err := a.updateDAGRunStatus(ctx, root, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
 	}
 
@@ -1846,23 +1845,7 @@ func (a *API) enqueueRetry(ctx context.Context, attempt exec.DAGRunAttempt, dag 
 		return fmt.Errorf("error reading status: %w", err)
 	}
 	eventCtx := a.withEventContext(ctx)
-	if err := exec.EnqueueRetry(eventCtx, a.dagRunStore, a.queueStore, dag, status, exec.EnqueueRetryOptions{
-		OnQueued: func(updated *exec.DAGRunStatus) error {
-			if a.eventService == nil || updated == nil {
-				return nil
-			}
-			source, ok := eventstore.SourceFromContext(eventCtx)
-			if !ok {
-				source = eventstore.Source{Service: eventstore.SourceServiceServer}
-			}
-			if err := a.eventService.Emit(eventCtx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunQueued, updated, map[string]any{
-				"trigger_type": string(rune(updated.TriggerType)),
-			})); err != nil {
-				logger.Warn(eventCtx, "Failed to emit queued retry event", tag.Error(err))
-			}
-			return nil
-		},
-	}); err != nil {
+	if err := exec.EnqueueRetry(eventCtx, a.dagRunStore, a.queueStore, dag, status, exec.EnqueueRetryOptions{}); err != nil {
 		if errors.Is(err, exec.ErrRetryStaleLatest) {
 			return &Error{
 				HTTPStatus: http.StatusBadRequest,

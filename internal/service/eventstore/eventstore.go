@@ -32,8 +32,6 @@ const (
 type EventType string
 
 const (
-	TypeDAGRunQueued    EventType = "dag.run.queued"
-	TypeDAGRunStarted   EventType = "dag.run.started"
 	TypeDAGRunWaiting   EventType = "dag.run.waiting"
 	TypeDAGRunSucceeded EventType = "dag.run.succeeded"
 	TypeDAGRunFailed    EventType = "dag.run.failed"
@@ -263,27 +261,6 @@ func NewLLMUsageEvent(
 	return event
 }
 
-func DAGRunEventTypeForStatus(status core.Status) (EventType, bool) {
-	switch status {
-	case core.NotStarted, core.Rejected:
-		return "", false
-	case core.Queued:
-		return TypeDAGRunQueued, true
-	case core.Running:
-		return TypeDAGRunStarted, true
-	case core.Waiting:
-		return TypeDAGRunWaiting, true
-	case core.Succeeded, core.PartiallySucceeded:
-		return TypeDAGRunSucceeded, true
-	case core.Failed:
-		return TypeDAGRunFailed, true
-	case core.Aborted:
-		return TypeDAGRunAborted, true
-	default:
-		return "", false
-	}
-}
-
 func PersistedDAGRunEventTypeForStatus(status core.Status) (EventType, bool) {
 	switch status {
 	case core.NotStarted, core.Queued, core.Running, core.Rejected:
@@ -316,14 +293,6 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 		return time.Now().UTC()
 	}
 	switch eventType {
-	case TypeDAGRunQueued:
-		if t, err := stringutil.ParseTime(status.QueuedAt); err == nil && !t.IsZero() {
-			return t.UTC()
-		}
-	case TypeDAGRunStarted:
-		if t, err := stringutil.ParseTime(status.StartedAt); err == nil && !t.IsZero() {
-			return t.UTC()
-		}
 	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted:
 		if t, err := stringutil.ParseTime(status.FinishedAt); err == nil && !t.IsZero() {
 			return t.UTC()

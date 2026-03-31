@@ -47,7 +47,6 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime/remote"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
 
 	_ "github.com/dagu-org/dagu/internal/runtime/builtin"
 )
@@ -572,17 +571,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	st := a.Status(ctx)
 	st.Status = core.Running
 	a.writeStatus(ctx, attempt, st)
-	if a.statusPusher == nil {
-		if service, source, ok := eventstore.FromContext(ctx); ok && service != nil {
-			if err := service.Emit(ctx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunStarted, &st, map[string]any{
-				"trigger_type":  string(a.triggerType),
-				"schedule_time": st.ScheduleTime,
-				"worker_id":     a.workerID,
-			})); err != nil {
-				logger.Warn(ctx, "Failed to emit DAG-run started event", tag.Error(err))
-			}
-		}
-	}
 
 	defer func() {
 		if initErr != nil {

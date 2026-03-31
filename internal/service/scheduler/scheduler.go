@@ -24,7 +24,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/fileeventstore"
 	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
 
@@ -56,8 +55,6 @@ type Scheduler struct {
 	startupCancel       context.CancelFunc
 	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
-	eventService        *eventstore.Service
-	eventSourceInstance string
 	eventCollector      *fileeventstore.Collector
 }
 
@@ -147,7 +144,7 @@ func newScheduler(
 			return len(items) > 0, nil
 		}
 		enqueueFunc = func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error {
-			return EnqueueCatchupRun(ctx, dagRunStore, queueStore, cfg.Paths.LogDir, cfg.Paths.BaseConfig, dag, runID, triggerType, scheduleTime, nil)
+			return EnqueueCatchupRun(ctx, dagRunStore, queueStore, cfg.Paths.LogDir, cfg.Paths.BaseConfig, dag, runID, triggerType, scheduleTime)
 		}
 	}
 
@@ -236,19 +233,6 @@ func (s *Scheduler) SetClock(clock Clock) {
 	}
 }
 
-// SetEventService configures the scheduler's event emitter source.
-// This must be called before Start().
-func (s *Scheduler) SetEventService(service *eventstore.Service, sourceInstance string) {
-	if s == nil {
-		return
-	}
-	s.eventService = service
-	if sourceInstance != "" {
-		s.eventSourceInstance = sourceInstance
-	}
-	s.updateEnqueueEmitter()
-}
-
 // SetEventCollector configures the scheduler-owned collector loop.
 // This must be called before Start().
 func (s *Scheduler) SetEventCollector(collector *fileeventstore.Collector) {
@@ -256,26 +240,6 @@ func (s *Scheduler) SetEventCollector(collector *fileeventstore.Collector) {
 		return
 	}
 	s.eventCollector = collector
-}
-
-func (s *Scheduler) updateEnqueueEmitter() {
-	if s == nil || s.planner == nil || !s.config.Queues.Enabled {
-		return
-	}
-	s.planner.cfg.Enqueue = func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error {
-		return EnqueueCatchupRun(
-			ctx,
-			s.dagRunStore,
-			s.queueStore,
-			s.config.Paths.LogDir,
-			s.config.Paths.BaseConfig,
-			dag,
-			runID,
-			triggerType,
-			scheduleTime,
-			s.eventService,
-		)
-	}
 }
 
 // SetDAGRunLeaseStore configures the shared distributed lease store used for
@@ -611,10 +575,7 @@ func (s *Scheduler) startEventCollector(ctx context.Context) {
 	if s.eventCollector == nil {
 		return
 	}
-	s.eventCollector.Start(eventstore.WithContext(ctx, s.eventService, eventstore.Source{
-		Service:  eventstore.SourceServiceScheduler,
-		Instance: s.eventSourceInstance,
-	}))
+	s.eventCollector.Start(ctx)
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {

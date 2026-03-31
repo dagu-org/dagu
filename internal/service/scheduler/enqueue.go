@@ -15,7 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
 // EnqueueCatchupRun enqueues a catchup run for a DAG.
@@ -40,13 +39,7 @@ func EnqueueCatchupRun(
 	runID string,
 	triggerType core.TriggerType,
 	scheduleTime time.Time,
-	eventServices ...*eventstore.Service,
 ) error {
-	var eventService *eventstore.Service
-	if len(eventServices) > 0 {
-		eventService = eventServices[0]
-	}
-
 	dagRun := exec.NewDAGRunRef(dag.Name, runID)
 
 	// Idempotency: skip if a run with this ID already exists.
@@ -134,19 +127,6 @@ func EnqueueCatchupRun(
 		tag.DAG(dag.Name),
 		tag.RunID(runID),
 	)
-
-	if eventService != nil {
-		source, ok := eventstore.SourceFromContext(ctx)
-		if !ok {
-			source = eventstore.Source{Service: eventstore.SourceServiceScheduler}
-		}
-		if err := eventService.Emit(ctx, eventstore.NewDAGRunEvent(source, eventstore.TypeDAGRunQueued, &dagStatus, map[string]any{
-			"trigger_type":  string(rune(triggerType)),
-			"schedule_time": dagStatus.ScheduleTime,
-		})); err != nil {
-			logger.Warn(ctx, "Failed to emit catchup enqueue event", tag.Error(err))
-		}
-	}
 
 	return nil
 }

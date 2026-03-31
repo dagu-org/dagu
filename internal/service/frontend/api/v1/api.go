@@ -731,6 +731,10 @@ func (a *API) withEventContext(ctx context.Context) context.Context {
 	})
 }
 
+func (a *API) updateDAGRunStatus(ctx context.Context, ref exec.DAGRunRef, status exec.DAGRunStatus) error {
+	return a.dagRunMgr.UpdateStatus(a.withEventContext(ctx), ref, status)
+}
+
 // ptrOf returns a pointer to v, or nil if v is the zero value for its type.
 func ptrOf[T any](v T) *T {
 	if reflect.ValueOf(v).IsZero() {
