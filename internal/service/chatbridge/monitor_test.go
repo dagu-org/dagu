@@ -260,7 +260,11 @@ func TestNotificationMonitor_BootstrapFailureDoesNotReplayFromZeroCursor(t *test
 	mu.Unlock()
 
 	store.setHeadFailure(false)
-	time.Sleep(50 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		monitor.stateMu.Lock()
+		defer monitor.stateMu.Unlock()
+		return monitor.state.Bootstrapped
+	}, time.Second, 10*time.Millisecond)
 
 	mu.Lock()
 	assert.Empty(t, delivered)

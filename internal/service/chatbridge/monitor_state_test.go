@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/dirlock"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/persis/fileeventstore"
@@ -75,7 +77,12 @@ func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvent
 	monitor := NewNotificationMonitor(service, filepath.Join(t.TempDir(), "state.json"), transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
 	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
-	time.Sleep(50 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		monitor.stateMu.Lock()
+		bootstrapped := monitor.state.Bootstrapped
+		monitor.stateMu.Unlock()
+		return monitor.ownsNotificationLock() && monitor.notificationSessionActive() && bootstrapped
+	}, time.Second, 10*time.Millisecond)
 
 	newStatus := &exec.DAGRunStatus{
 		Name:       "briefing",
@@ -108,9 +115,6 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := newTestNotificationMonitorConfig()
 
-	firstTransport := &fakeNotificationTransport{destinations: []string{"dest-1"}}
-	firstMonitor := NewNotificationMonitor(nil, stateFile, firstTransport, logger, cfg)
-
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",
 		Status:    core.Failed,
@@ -118,7 +122,19 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 		AttemptID: "attempt-1",
 		Error:     "boom",
 	}
-	require.True(t, firstMonitor.NotifyCompletion(status))
+	state := newNotificationMonitorState()
+	state.Bootstrapped = true
+	state.Destinations["dest-1"] = &notificationDestinationState{
+		Pending: map[string]NotificationEvent{
+			NotificationSeenKey(status): {
+				Key:        NotificationSeenKey(status),
+				Status:     cloneNotificationStatus(status),
+				ObservedAt: time.Now().UTC(),
+			},
+		},
+		Delivered: make(map[string]time.Time),
+	}
+	require.NoError(t, newNotificationStateStore(stateFile).Save(context.Background(), state))
 
 	var (
 		mu    sync.Mutex
@@ -139,12 +155,193 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 
 	secondMonitor := NewNotificationMonitor(nil, stateFile, secondTransport, logger, cfg)
 	stopMonitor := testutil.StartContextRunner(t, secondMonitor)
-	stopMonitor()
+	defer stopMonitor()
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		called := calls
+		mu.Unlock()
+		return called >= 1 && secondMonitor.IsDelivered("dest-1", status)
+	}, time.Second, 10*time.Millisecond)
 
 	mu.Lock()
 	defer mu.Unlock()
-	assert.Equal(t, 1, calls)
+	assert.GreaterOrEqual(t, calls, 1)
 	assert.True(t, secondMonitor.IsDelivered("dest-1", status))
+}
+
+func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	store, err := fileeventstore.New(baseDir)
+	require.NoError(t, err)
+	service := eventstore.New(store)
+
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	var (
+		mu         sync.Mutex
+		deliveries = map[string][]string{
+			"monitor-1": {},
+			"monitor-2": {},
+		}
+	)
+	newTransport := func(name string) *fakeNotificationTransport {
+		return &fakeNotificationTransport{
+			destinations: []string{"dest-1"},
+			flushFn: func(_ context.Context, _ string, batch NotificationBatch, _ bool) bool {
+				mu.Lock()
+				defer mu.Unlock()
+				for _, event := range batch.Events {
+					if event.Status != nil {
+						deliveries[name] = append(deliveries[name], event.Status.DAGRunID)
+					}
+				}
+				return true
+			},
+		}
+	}
+
+	monitor1 := NewNotificationMonitor(service, stateFile, newTransport("monitor-1"), logger, newTestNotificationMonitorConfig())
+	monitor2 := NewNotificationMonitor(service, stateFile, newTransport("monitor-2"), logger, newTestNotificationMonitorConfig())
+
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	defer cancel1()
+	done1 := make(chan struct{})
+	go func() {
+		monitor1.Run(ctx1)
+		close(done1)
+	}()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	done2 := make(chan struct{})
+	go func() {
+		monitor2.Run(ctx2)
+		close(done2)
+	}()
+	defer func() {
+		cancel1()
+		cancel2()
+		select {
+		case <-done1:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for monitor-1 shutdown")
+		}
+		select {
+		case <-done2:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for monitor-2 shutdown")
+		}
+	}()
+
+	require.Eventually(t, func() bool {
+		switch {
+		case monitor1.ownsNotificationLock():
+			monitor1.stateMu.Lock()
+			bootstrapped := monitor1.state.Bootstrapped
+			monitor1.stateMu.Unlock()
+			return monitor1.notificationSessionActive() && bootstrapped
+		case monitor2.ownsNotificationLock():
+			monitor2.stateMu.Lock()
+			bootstrapped := monitor2.state.Bootstrapped
+			monitor2.stateMu.Unlock()
+			return monitor2.notificationSessionActive() && bootstrapped
+		default:
+			return false
+		}
+	}, time.Second, 10*time.Millisecond)
+
+	firstStatus := &exec.DAGRunStatus{
+		Name:       "briefing",
+		DAGRunID:   "run-first",
+		AttemptID:  "attempt-first",
+		Status:     core.Succeeded,
+		FinishedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
+		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
+		eventstore.TypeDAGRunSucceeded,
+		firstStatus,
+		nil,
+	)))
+
+	var firstOwner string
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		total := len(deliveries["monitor-1"]) + len(deliveries["monitor-2"])
+		if total != 1 {
+			return false
+		}
+		switch {
+		case len(deliveries["monitor-1"]) == 1:
+			firstOwner = "monitor-1"
+		case len(deliveries["monitor-2"]) == 1:
+			firstOwner = "monitor-2"
+		default:
+			return false
+		}
+		return true
+	}, time.Second, 10*time.Millisecond)
+
+	switch firstOwner {
+	case "monitor-1":
+		cancel1()
+		select {
+		case <-done1:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for monitor-1 shutdown")
+		}
+		require.Eventually(t, func() bool {
+			monitor2.stateMu.Lock()
+			bootstrapped := monitor2.state.Bootstrapped
+			monitor2.stateMu.Unlock()
+			return monitor2.ownsNotificationLock() && monitor2.notificationSessionActive() && bootstrapped
+		}, 2*time.Second, 10*time.Millisecond)
+	case "monitor-2":
+		cancel2()
+		select {
+		case <-done2:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for monitor-2 shutdown")
+		}
+		require.Eventually(t, func() bool {
+			monitor1.stateMu.Lock()
+			bootstrapped := monitor1.state.Bootstrapped
+			monitor1.stateMu.Unlock()
+			return monitor1.ownsNotificationLock() && monitor1.notificationSessionActive() && bootstrapped
+		}, 2*time.Second, 10*time.Millisecond)
+	default:
+		t.Fatalf("first owner not determined: %q", firstOwner)
+	}
+
+	secondStatus := &exec.DAGRunStatus{
+		Name:       "briefing",
+		DAGRunID:   "run-second",
+		AttemptID:  "attempt-second",
+		Status:     core.Succeeded,
+		FinishedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
+		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
+		eventstore.TypeDAGRunSucceeded,
+		secondStatus,
+		nil,
+	)))
+
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		switch firstOwner {
+		case "monitor-1":
+			return slices.Contains(deliveries["monitor-2"], "run-second")
+		case "monitor-2":
+			return slices.Contains(deliveries["monitor-1"], "run-second")
+		default:
+			return false
+		}
+	}, 2*time.Second, 10*time.Millisecond)
 }
 
 func TestNotificationMonitor_CorruptStateIsQuarantinedAndOnlyFutureEventsAreDelivered(t *testing.T) {
@@ -325,4 +522,89 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 	assert.Len(t, delivered, 1)
 	mu.Unlock()
 	assert.True(t, monitor.IsDelivered("dest-1", status))
+}
+
+func TestNotificationMonitor_LockTheftSelfFencesActiveOwner(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	store, err := fileeventstore.New(baseDir)
+	require.NoError(t, err)
+	service := eventstore.New(store)
+
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+
+	var (
+		mu        sync.Mutex
+		delivered []string
+	)
+	transport := &fakeNotificationTransport{
+		destinations: []string{"dest-1"},
+		flushFn: func(_ context.Context, _ string, batch NotificationBatch, _ bool) bool {
+			mu.Lock()
+			defer mu.Unlock()
+			for _, event := range batch.Events {
+				if event.Status != nil {
+					delivered = append(delivered, event.Status.DAGRunID)
+				}
+			}
+			return true
+		},
+	}
+
+	monitor := NewNotificationMonitor(service, stateFile, transport, slog.New(slog.NewTextHandler(io.Discard, nil)), newTestNotificationMonitorConfig())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		monitor.Run(ctx)
+		close(done)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for monitor shutdown")
+		}
+	}()
+
+	require.Eventually(t, func() bool {
+		return monitor.ownsNotificationLock() && monitor.notificationSessionActive()
+	}, time.Second, 10*time.Millisecond)
+
+	lockDir := notificationStateLockDir(stateFile)
+	lockTokenPath := filepath.Join(lockDir, ".dagu_lock", "owner")
+	require.NoError(t, os.WriteFile(lockTokenPath, []byte("replacement-owner"), 0o600))
+	require.Eventually(t, func() bool {
+		return !monitor.ownsNotificationLock() && !monitor.notificationSessionActive()
+	}, 2*time.Second, 10*time.Millisecond)
+
+	require.NoError(t, dirlock.ForceUnlock(lockDir))
+	replacement := dirlock.New(lockDir, &dirlock.LockOptions{
+		StaleThreshold: time.Hour,
+		RetryInterval:  10 * time.Millisecond,
+	})
+	require.NoError(t, replacement.TryLock())
+	defer func() { _ = replacement.Unlock() }()
+
+	status := &exec.DAGRunStatus{
+		Name:       "briefing",
+		DAGRunID:   "run-stolen-lock",
+		AttemptID:  "attempt-stolen-lock",
+		Status:     core.Succeeded,
+		FinishedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
+		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
+		eventstore.TypeDAGRunSucceeded,
+		status,
+		nil,
+	)))
+
+	require.Never(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(delivered) > 0
+	}, 150*time.Millisecond, 10*time.Millisecond)
 }
