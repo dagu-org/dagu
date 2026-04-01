@@ -4328,6 +4328,176 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent/auth/providers:
+    get:
+      summary: "List agent auth providers"
+      description: "Returns subscription-backed agent auth provider status for the selected node. Requires admin role."
+      operationId: "listAgentAuthProviders"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "List of auth providers"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAgentAuthProvidersResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/auth/providers/{providerId}/login:
+    post:
+      summary: "Start agent auth provider login"
+      description: "Starts a manual OAuth login flow for the selected provider. Requires admin role."
+      operationId: "startAgentAuthProviderLogin"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Auth provider ID"
+      responses:
+        "200":
+          description: "Login flow started"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartAgentAuthProviderLoginResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Disconnect agent auth provider login"
+      description: "Removes the stored OAuth credential for the selected provider. Requires admin role."
+      operationId: "disconnectAgentAuthProviderLogin"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Auth provider ID"
+      responses:
+        "204":
+          description: "Provider disconnected"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /settings/agent/auth/providers/{providerId}/login/complete:
+    post:
+      summary: "Complete agent auth provider login"
+      description: "Completes a manual OAuth login flow using the pasted redirect URL or authorization code. Requires admin role."
+      operationId: "completeAgentAuthProviderLogin"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Auth provider ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteAgentAuthProviderLoginRequest"
+      responses:
+        "200":
+          description: "Login completed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteAgentAuthProviderLoginResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /settings/agent/models/{modelId}:
     patch:
       summary: "Update agent model"
@@ -9075,7 +9245,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local, zai]
+          enum: [anthropic, openai, openai-codex, gemini, openrouter, local, zai]
         model:
           type: string
         apiKeyConfigured:
@@ -9116,7 +9286,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local, zai]
+          enum: [anthropic, openai, openai-codex, gemini, openrouter, local, zai]
         model:
           type: string
         apiKey:
@@ -9151,7 +9321,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local, zai]
+          enum: [anthropic, openai, openai-codex, gemini, openrouter, local, zai]
         model:
           type: string
         apiKey:
@@ -9207,6 +9377,75 @@ components:
             $ref: "#/components/schemas/ModelConfigResponse"
         defaultModelId:
           type: string
+
+    AgentAuthProviderStatus:
+      type: object
+      required:
+        - id
+        - name
+        - connected
+      description: "Connection status for one subscription-backed agent auth provider"
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        connected:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        canRefresh:
+          type: boolean
+        accountId:
+          type: string
+
+    ListAgentAuthProvidersResponse:
+      type: object
+      required:
+        - providers
+      description: "List of subscription-backed auth providers"
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentAuthProviderStatus"
+
+    StartAgentAuthProviderLoginResponse:
+      type: object
+      required:
+        - flowId
+        - authUrl
+      description: "Manual OAuth login flow information"
+      properties:
+        flowId:
+          type: string
+        authUrl:
+          type: string
+        instructions:
+          type: string
+
+    CompleteAgentAuthProviderLoginRequest:
+      type: object
+      required:
+        - flowId
+      description: "Complete a manual OAuth login flow"
+      properties:
+        flowId:
+          type: string
+        redirectUrl:
+          type: string
+        code:
+          type: string
+
+    CompleteAgentAuthProviderLoginResponse:
+      type: object
+      required:
+        - provider
+      description: "Updated provider status after login completion"
+      properties:
+        provider:
+          $ref: "#/components/schemas/AgentAuthProviderStatus"
 
     SkillResponse:
       type: object
@@ -9593,7 +9832,7 @@ components:
           type: string
         provider:
           type: string
-          enum: [anthropic, openai, gemini, openrouter, local, zai]
+          enum: [anthropic, openai, openai-codex, gemini, openrouter, local, zai]
         model:
           type: string
         contextWindow:

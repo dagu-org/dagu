@@ -126,7 +126,9 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Create LLM provider.
-	provider, err := agent.CreateLLMProvider(modelCfg.ToLLMConfig())
+	provider, err := agent.CreateLLMProvider(modelCfg.ToLLMConfig(), agent.ProviderDeps{
+		OAuthManager: agent.GetOAuthManager(ctx),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}

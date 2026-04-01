@@ -7,11 +7,13 @@ package agent
 // These are shown in the frontend as "quick add" options.
 // No API key or base URL is included — admin fills those in.
 //
-// Sources (verified 2026-02-11):
+// Sources:
 //
-//	Anthropic: https://platform.claude.com/docs/en/docs/about-claude/models
-//	OpenAI:    https://platform.openai.com/docs/models
-//	Gemini:    https://ai.google.dev/gemini-api/docs/models
+//	Anthropic (verified 2026-02-11): https://platform.claude.com/docs/en/docs/about-claude/models
+//	OpenAI API (verified 2026-04-01): https://platform.openai.com/docs/models
+//	OpenAI Codex rollout (verified 2026-04-01): https://openai.com/index/introducing-gpt-5-4/
+//	OpenAI Codex mini rollout (verified 2026-04-01): https://openai.com/index/introducing-gpt-5-4-mini-and-nano/
+//	Gemini (verified 2026-02-11): https://ai.google.dev/gemini-api/docs/models
 var modelPresets = []ModelConfig{
 	// --- Anthropic ---
 	// https://platform.claude.com/docs/en/docs/about-claude/models
@@ -33,26 +35,35 @@ var modelPresets = []ModelConfig{
 		InputCostPer1M: 1, OutputCostPer1M: 5, SupportsThinking: true,
 		Description: "Fastest with near-frontier intelligence."},
 	// --- OpenAI ---
-	// https://platform.openai.com/docs/models/gpt-5.2
-	// https://platform.openai.com/docs/models/gpt-5-mini
-	// https://platform.openai.com/docs/models/gpt-5-nano
+	// https://developers.openai.com/api/docs/models/gpt-5.4
+	// https://developers.openai.com/api/docs/models/gpt-5.4-mini
+	// https://developers.openai.com/api/docs/models/gpt-5.4-nano
 	// https://platform.openai.com/docs/models/o3
-	{Name: "GPT-5.2", Provider: "openai", Model: "gpt-5.2",
+	{Name: "GPT-5.4", Provider: "openai", Model: "gpt-5.4",
+		ContextWindow: 1_050_000, MaxOutputTokens: 128_000,
+		InputCostPer1M: 2.50, OutputCostPer1M: 15, SupportsThinking: true,
+		Description: "Latest flagship GPT for professional work. 1.05M context."},
+	{Name: "GPT-5.4 mini", Provider: "openai", Model: "gpt-5.4-mini",
 		ContextWindow: 400_000, MaxOutputTokens: 128_000,
-		InputCostPer1M: 1.75, OutputCostPer1M: 14, SupportsThinking: true,
-		Description: "Latest flagship GPT with reasoning. 400K context."},
-	{Name: "GPT-5 mini", Provider: "openai", Model: "gpt-5-mini",
+		InputCostPer1M: 0.75, OutputCostPer1M: 4.50, SupportsThinking: true,
+		Description: "Latest mini GPT for coding, computer use, and subagents. 400K context."},
+	{Name: "GPT-5.4 nano", Provider: "openai", Model: "gpt-5.4-nano",
 		ContextWindow: 400_000, MaxOutputTokens: 128_000,
-		InputCostPer1M: 0.25, OutputCostPer1M: 2, SupportsThinking: true,
-		Description: "Affordable GPT-5 with reasoning. 400K context."},
-	{Name: "GPT-5 nano", Provider: "openai", Model: "gpt-5-nano",
-		ContextWindow: 400_000, MaxOutputTokens: 128_000,
-		InputCostPer1M: 0.05, OutputCostPer1M: 0.40, SupportsThinking: true,
-		Description: "Cheapest GPT-5. 400K context."},
+		InputCostPer1M: 0.20, OutputCostPer1M: 1.25, SupportsThinking: true,
+		Description: "Cheapest GPT-5.4-class model for simple high-volume tasks. 400K context."},
 	{Name: "o3", Provider: "openai", Model: "o3",
 		ContextWindow: 200_000, MaxOutputTokens: 100_000,
 		InputCostPer1M: 2, OutputCostPer1M: 8, SupportsThinking: true,
 		Description: "Reasoning specialist. 200K context."},
+	// --- OpenAI Codex Subscription ---
+	{Name: "GPT-5.4 Codex", Provider: "openai-codex", Model: "gpt-5.4",
+		ContextWindow: 1_000_000, MaxOutputTokens: 128_000,
+		InputCostPer1M: 0, OutputCostPer1M: 0, SupportsThinking: true,
+		Description: "Latest Codex model via your ChatGPT Plus/Pro subscription."},
+	{Name: "GPT-5.4 Codex Mini", Provider: "openai-codex", Model: "gpt-5.4-mini",
+		ContextWindow: 400_000, MaxOutputTokens: 128_000,
+		InputCostPer1M: 0, OutputCostPer1M: 0, SupportsThinking: true,
+		Description: "Faster lower-cost Codex model via ChatGPT subscription."},
 	// --- Google Gemini ---
 	// https://ai.google.dev/gemini-api/docs/models
 	// https://ai.google.dev/gemini-api/docs/pricing

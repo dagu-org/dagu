@@ -31,6 +31,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/dagu-org/dagu/internal/cmn/config"
@@ -48,6 +49,7 @@ import (
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentoauth"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
@@ -315,17 +317,21 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	// Initialize remote node store and resolver
-	var remoteNodeResolver *remotenode.Resolver
+	var (
+		remoteNodeResolver *remotenode.Resolver
+		encryptor          *crypto.Encryptor
+		agentOAuthManager  *agentoauth.Manager
+	)
 	encKey, encErr := crypto.ResolveKey(cfg.Paths.DataDir)
 	if encErr != nil {
-		logger.Warn(ctx, "Failed to resolve encryption key for remote node store", tag.Error(encErr))
+		logger.Warn(ctx, "Failed to resolve encryption key for encrypted stores", tag.Error(encErr))
 	}
 	if encErr == nil {
-		enc, encErr := crypto.NewEncryptor(encKey)
+		encryptor, encErr = crypto.NewEncryptor(encKey)
 		if encErr != nil {
-			logger.Warn(ctx, "Failed to create encryptor for remote node store", tag.Error(encErr))
+			logger.Warn(ctx, "Failed to create encryptor for encrypted stores", tag.Error(encErr))
 		} else {
-			rnStore, rnErr := fileremotenode.New(cfg.Paths.RemoteNodesDir, enc)
+			rnStore, rnErr := fileremotenode.New(cfg.Paths.RemoteNodesDir, encryptor)
 			if rnErr != nil {
 				logger.Warn(ctx, "Failed to create remote node store", tag.Error(rnErr))
 			} else {
@@ -348,6 +354,16 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		remoteNodes = names
 	}
 
+	if encryptor != nil {
+		store, err := fileagentoauth.New(filepath.Join(cfg.Paths.DataDir, "agent", "oauth"), encryptor)
+		if err != nil {
+			logger.Warn(ctx, "Failed to create agent OAuth store", tag.Error(err))
+		} else {
+			agentOAuthManager = agentoauth.NewManager(store)
+			apiOpts = append(apiOpts, apiv1.WithAgentOAuthManager(agentOAuthManager))
+		}
+	}
+
 	// Initialize workspace store
 	wsStore, wsErr := fileworkspace.New(cfg.Paths.WorkspacesDir)
 	if wsErr != nil {
@@ -358,7 +374,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -730,7 +746,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -753,6 +769,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		DAGStore:           dagStore,
 		Hooks:              hooks,
 		MemoryStore:        memoryStore,
+		OAuthManager:       oauthManager,
 		RemoteNodeResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,

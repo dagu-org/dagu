@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { ProviderAuthCard } from '@/features/agent/components/ProviderAuthCard';
+import { useAgentAuthProviders } from '@/features/agent/hooks/useAgentAuthProviders';
 import { useClient } from '@/hooks/api';
 import { components, CreateModelConfigRequestProvider } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,7 @@ type ModelPreset = components['schemas']['ModelPreset'];
 const PROVIDERS = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
+  { value: 'openai-codex', label: 'OpenAI Codex' },
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'zai', label: 'Z.AI' },
 ] as const;
@@ -71,7 +74,18 @@ export default function SetupPage() {
 
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
+  const {
+    providerMap,
+    isLoading: authLoading,
+    error: authError,
+    startLogin,
+    completeLogin,
+    disconnect,
+  } = useAgentAuthProviders();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const codexProvider = providerMap['openai-codex'] || null;
+  const usesCodexSubscription = selectedProvider === 'openai-codex';
+  const codexConnected = codexProvider?.connected ?? false;
 
   // Redirect away if setup is already complete (e.g., user navigated here directly).
   // Skip if we just completed setup ourselves — we handle navigation manually.
@@ -162,7 +176,12 @@ export default function SetupPage() {
       return;
     }
 
-    if (!apiKey.trim()) {
+    if (selectedProvider === 'openai-codex' && !codexConnected) {
+      setStep2Error('Connect OpenAI Codex before completing setup');
+      return;
+    }
+
+    if (selectedProvider !== 'openai-codex' && !apiKey.trim()) {
       setStep2Error('Please enter an API key');
       return;
     }
@@ -189,6 +208,7 @@ export default function SetupPage() {
       const supportedProviders = [
         CreateModelConfigRequestProvider.anthropic,
         CreateModelConfigRequestProvider.openai,
+        CreateModelConfigRequestProvider.openaiCodex,
         CreateModelConfigRequestProvider.gemini,
         CreateModelConfigRequestProvider.zai,
       ] as const;
@@ -206,7 +226,7 @@ export default function SetupPage() {
             name: preset.name,
             provider: preset.provider,
             model: preset.model,
-            apiKey: apiKey.trim(),
+            apiKey: preset.provider === 'openai-codex' ? undefined : apiKey.trim(),
             description: preset.description || undefined,
             contextWindow: preset.contextWindow || undefined,
             maxOutputTokens: preset.maxOutputTokens || undefined,
@@ -256,6 +276,12 @@ export default function SetupPage() {
   // Reset model selection when provider changes
   useEffect(() => {
     setSelectedModel('');
+  }, [selectedProvider]);
+
+  useEffect(() => {
+    if (selectedProvider === 'openai-codex') {
+      setApiKey('');
+    }
   }, [selectedProvider]);
 
   return (
@@ -471,21 +497,44 @@ export default function SetupPage() {
                         )}
                       </div>
 
-                      {/* API Key */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="api-key" className="text-sm">
-                          API Key
-                        </Label>
-                        <Input
-                          id="api-key"
-                          type="password"
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          placeholder="Enter your API key"
-                          autoComplete="off"
-                          className="h-9"
-                        />
-                      </div>
+                      {usesCodexSubscription ? (
+                        <div className="space-y-2">
+                          {authError && (
+                            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                              {authError}
+                            </div>
+                          )}
+                          {codexProvider ? (
+                            <ProviderAuthCard
+                              provider={codexProvider}
+                              compact
+                              isLoading={authLoading}
+                              onStartLogin={startLogin}
+                              onCompleteLogin={completeLogin}
+                              onDisconnect={disconnect}
+                            />
+                          ) : (
+                            <div className="rounded-md border border-dashed border-border/80 p-3 text-sm text-muted-foreground">
+                              {authLoading ? 'Loading OpenAI Codex connection...' : 'OpenAI Codex connection status is unavailable.'}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <Label htmlFor="api-key" className="text-sm">
+                            API Key
+                          </Label>
+                          <Input
+                            id="api-key"
+                            type="password"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="Enter your API key"
+                            autoComplete="off"
+                            className="h-9"
+                          />
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -496,7 +545,7 @@ export default function SetupPage() {
                 <Button
                   type="submit"
                   className="w-full h-9"
-                  disabled={step2Loading || (agentEnabled && presetsLoading)}
+                  disabled={step2Loading || (agentEnabled && presetsLoading) || (agentEnabled && usesCodexSubscription && !codexConnected)}
                 >
                   {step2Loading ? (
                     <>

@@ -15,6 +15,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
@@ -71,6 +72,7 @@ type API struct {
 	agentMemoryStore    agent.MemoryStore
 	agentSkillStore     agent.SkillStore
 	agentSoulStore      agent.SoulStore
+	agentOAuthManager   *agentoauth.Manager
 	agentAPI            *agent.API
 	docStore            agent.DocStore
 	baseConfigStore     baseconfig.Store
@@ -185,6 +187,13 @@ func WithAgentSkillStore(store agent.SkillStore) APIOption {
 func WithAgentSoulStore(store agent.SoulStore) APIOption {
 	return func(a *API) {
 		a.agentSoulStore = store
+	}
+}
+
+// WithAgentOAuthManager returns an APIOption that sets the API's agent OAuth manager.
+func WithAgentOAuthManager(manager *agentoauth.Manager) APIOption {
+	return func(a *API) {
+		a.agentOAuthManager = manager
 	}
 }
 

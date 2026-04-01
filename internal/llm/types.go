@@ -5,7 +5,10 @@
 // Large Language Model providers.
 package llm
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Role represents the role of a message sender in a session.
 type Role string
@@ -115,12 +118,28 @@ type Usage struct {
 	TotalTokens int `json:"total_tokens"`
 }
 
+// OAuthCredential contains dynamic bearer-auth details resolved at request time.
+type OAuthCredential struct {
+	AccessToken string
+	AccountID   string
+}
+
+// OAuthCredentialProvider resolves dynamic bearer credentials for providers that
+// cannot safely persist a static API key inside model configuration.
+type OAuthCredentialProvider interface {
+	ResolveCredential(ctx context.Context) (OAuthCredential, error)
+}
+
 // Config contains configuration for an LLM provider.
 type Config struct {
 	// APIKey is the authentication key for the provider.
 	APIKey string
+	// AccountID carries provider-specific account metadata when required.
+	AccountID string
 	// BaseURL is the API endpoint URL. If empty, the provider's default is used.
 	BaseURL string
+	// OAuthCredentialProvider resolves dynamic bearer credentials on demand.
+	OAuthCredentialProvider OAuthCredentialProvider
 	// Timeout is the maximum time to wait for a response.
 	// Default is 60 seconds if not specified.
 	Timeout time.Duration

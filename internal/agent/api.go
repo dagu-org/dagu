@@ -16,6 +16,7 @@ import (
 	"time"
 
 	api "github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
@@ -96,6 +97,7 @@ type API struct {
 	memoryStore        MemoryStore
 	soulStore          SoulStore
 	remoteNodeResolver RemoteNodeResolver
+	oauthManager       *agentoauth.Manager
 }
 
 // APIConfig contains configuration for the API.
@@ -112,6 +114,7 @@ type APIConfig struct {
 	Hooks              *Hooks
 	MemoryStore        MemoryStore
 	RemoteNodeResolver RemoteNodeResolver
+	OAuthManager       *agentoauth.Manager
 }
 
 // SessionWithState is a session with its current state.
@@ -158,6 +161,7 @@ func NewAPI(cfg APIConfig) *API {
 		hooks:              cfg.Hooks,
 		memoryStore:        cfg.MemoryStore,
 		remoteNodeResolver: cfg.RemoteNodeResolver,
+		oauthManager:       cfg.OAuthManager,
 	}
 }
 
@@ -291,7 +295,9 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 		return nil, nil, err
 	}
 
-	provider, _, err := a.providers.GetOrCreate(model.ToLLMConfig())
+	provider, _, err := a.providers.GetOrCreate(model.ToLLMConfig(), ProviderDeps{
+		OAuthManager: a.oauthManager,
+	})
 	if err != nil {
 		return nil, nil, err
 	}

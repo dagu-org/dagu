@@ -7,9 +7,11 @@ import (
 	"context"
 	"sort"
 	"testing"
+	"time"
 
 	apigen "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/runtime"
@@ -47,6 +49,33 @@ func newAgentTestSetup(t *testing.T) *agentTestSetup {
 		modelStore:  ms,
 		configStore: cs,
 	}
+}
+
+func newAgentTestSetupWithOAuth(t *testing.T, connected bool) *agentTestSetup {
+	t.Helper()
+
+	setup := newAgentTestSetup(t)
+	store := &mockOAuthStore{creds: make(map[string]*agentoauth.Credential)}
+	if connected {
+		store.creds[agentoauth.ProviderOpenAICodex] = &agentoauth.Credential{
+			Provider:     agentoauth.ProviderOpenAICodex,
+			AccessToken:  "token",
+			RefreshToken: "refresh",
+			ExpiresAt:    time.Now().Add(30 * time.Minute),
+			AccountID:    "acct-1",
+		}
+	}
+
+	setup.api = apiV1.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		apiV1.WithAgentModelStore(setup.modelStore),
+		apiV1.WithAgentConfigStore(setup.configStore),
+		apiV1.WithAgentOAuthManager(agentoauth.NewManager(store)),
+	)
+	return setup
 }
 
 func adminCtx() context.Context {
@@ -141,6 +170,39 @@ func (m *mockAgentConfigStore) IsEnabled(_ context.Context) bool {
 }
 
 var _ agent.ConfigStore = (*mockAgentConfigStore)(nil)
+
+type mockOAuthStore struct {
+	creds map[string]*agentoauth.Credential
+}
+
+func (m *mockOAuthStore) Get(_ context.Context, provider string) (*agentoauth.Credential, error) {
+	cred, ok := m.creds[provider]
+	if !ok {
+		return nil, agentoauth.ErrCredentialNotFound
+	}
+	copy := *cred
+	return &copy, nil
+}
+
+func (m *mockOAuthStore) Set(_ context.Context, cred *agentoauth.Credential) error {
+	copy := *cred
+	m.creds[cred.Provider] = &copy
+	return nil
+}
+
+func (m *mockOAuthStore) Delete(_ context.Context, provider string) error {
+	delete(m.creds, provider)
+	return nil
+}
+
+func (m *mockOAuthStore) List(_ context.Context) ([]*agentoauth.Credential, error) {
+	result := make([]*agentoauth.Credential, 0, len(m.creds))
+	for _, cred := range m.creds {
+		copy := *cred
+		result = append(result, &copy)
+	}
+	return result, nil
+}
 
 func TestListAgentModels(t *testing.T) {
 	t.Parallel()
@@ -343,6 +405,41 @@ func TestCreateAgentModel(t *testing.T) {
 		})
 		require.Error(t, err)
 	})
+
+	t.Run("openai-codex requires connected provider", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetupWithOAuth(t, false)
+
+		_, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Name:     "Codex",
+				Provider: "openai-codex",
+				Model:    "gpt-5.4",
+			},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("openai-codex clears api key and base url", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetupWithOAuth(t, true)
+		customURL := "https://example.com"
+		customKey := "sk-should-not-stick"
+
+		resp, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Name:     "Codex",
+				Provider: "openai-codex",
+				Model:    "gpt-5.4",
+				ApiKey:   &customKey,
+				BaseUrl:  &customURL,
+			},
+		})
+		require.Error(t, err)
+		assert.Nil(t, resp)
+	})
 }
 
 func TestUpdateAgentModel(t *testing.T) {
@@ -423,6 +520,35 @@ func TestUpdateAgentModel(t *testing.T) {
 			},
 		})
 		require.Error(t, err)
+	})
+
+	t.Run("switching to openai-codex clears direct credentials", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetupWithOAuth(t, true)
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID:       "model-1",
+			Name:     "Test",
+			Provider: "openai",
+			Model:    "gpt-4",
+			APIKey:   "sk-old",
+			BaseURL:  "https://example.com",
+		})
+
+		provider := apigen.UpdateModelConfigRequestProvider("openai-codex")
+		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
+			ModelId: "model-1",
+			Body: &apigen.UpdateModelConfigRequest{
+				Provider: &provider,
+			},
+		})
+		require.NoError(t, err)
+
+		updateResp, ok := resp.(apigen.UpdateAgentModel200JSONResponse)
+		require.True(t, ok)
+		assert.Equal(t, apigen.ModelConfigResponseProvider("openai-codex"), updateResp.Provider)
+		assert.Nil(t, updateResp.ApiKeyConfigured)
+		assert.Nil(t, updateResp.BaseUrl)
 	})
 }
 
@@ -514,6 +640,25 @@ func TestSetDefaultAgentModel(t *testing.T) {
 		_, err := setup.api.SetDefaultAgentModel(adminCtx(), apigen.SetDefaultAgentModelRequestObject{
 			Body: &apigen.SetDefaultAgentModelJSONRequestBody{
 				ModelId: "nonexistent",
+			},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("openai-codex default requires active connection", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetupWithOAuth(t, false)
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID:       "model-1",
+			Name:     "Codex",
+			Provider: "openai-codex",
+			Model:    "gpt-5.4",
+		})
+
+		_, err := setup.api.SetDefaultAgentModel(adminCtx(), apigen.SetDefaultAgentModelRequestObject{
+			Body: &apigen.SetDefaultAgentModelJSONRequestBody{
+				ModelId: "model-1",
 			},
 		})
 		require.Error(t, err)
