@@ -365,6 +365,89 @@ steps:
 		require.Equal(t, core.Succeeded, retriedStatus.Status)
 		require.Equal(t, "10.43.0.1|443|", workerStatusOutputValue(t, retriedStatus, "RESULT"))
 	})
+
+	t.Run("HandleTaskStartPreservesConfiguredEnvPassthrough", func(t *testing.T) {
+		t.Setenv("DAGU_ENV_PASSTHROUGH", "WORKER_TASK_EXACT_ENV")
+		t.Setenv("DAGU_ENV_PASSTHROUGH_PREFIXES", "WORKER_TASK_PREFIX_")
+		t.Setenv("WORKER_TASK_EXACT_ENV", "exact-value")
+		t.Setenv("WORKER_TASK_PREFIX_TOKEN", "prefix-value")
+		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
+
+		dagContent := `steps:
+  - name: capture
+    command: printf '%s|%s|%s' "${WORKER_TASK_EXACT_ENV:-}" "${WORKER_TASK_PREFIX_TOKEN:-}" "${WORKER_TASK_HOST_ONLY_ENV:-}"
+    output: RESULT
+`
+		dag := th.DAG(t, dagContent)
+		runID := uuid.Must(uuid.NewV7()).String()
+		task := runtimeexec.CreateTask(
+			dag.Name,
+			dagContent,
+			coordinatorv1.Operation_OPERATION_START,
+			runID,
+		)
+
+		handler := NewTaskHandler(th.Config)
+		err := handler.Handle(th.Context, task)
+		require.NoError(t, err)
+
+		status, err := th.DAGRunMgr.GetCurrentStatus(th.Context, dag.DAG, runID)
+		require.NoError(t, err)
+		require.NotNil(t, status)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.Equal(t, "exact-value|prefix-value|", workerStatusOutputValue(t, status, "RESULT"))
+	})
+
+	t.Run("HandleTaskRetryPreservesConfiguredEnvPassthrough", func(t *testing.T) {
+		t.Setenv("DAGU_ENV_PASSTHROUGH", "WORKER_TASK_EXACT_ENV")
+		t.Setenv("DAGU_ENV_PASSTHROUGH_PREFIXES", "WORKER_TASK_PREFIX_")
+		t.Setenv("WORKER_TASK_EXACT_ENV", "exact-value")
+		t.Setenv("WORKER_TASK_PREFIX_TOKEN", "prefix-value")
+		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
+
+		dagContent := `steps:
+  - name: capture
+    command: printf '%s|%s|%s' "${WORKER_TASK_EXACT_ENV:-}" "${WORKER_TASK_PREFIX_TOKEN:-}" "${WORKER_TASK_HOST_ONLY_ENV:-}"
+    output: RESULT
+`
+		dag := th.DAG(t, dagContent)
+		runID := uuid.Must(uuid.NewV7()).String()
+		handler := NewTaskHandler(th.Config)
+
+		startTask := runtimeexec.CreateTask(
+			dag.Name,
+			dagContent,
+			coordinatorv1.Operation_OPERATION_START,
+			runID,
+		)
+		err := handler.Handle(th.Context, startTask)
+		require.NoError(t, err)
+
+		initialAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, runID))
+		require.NoError(t, err)
+		initialStatus, err := initialAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, "exact-value|prefix-value|", workerStatusOutputValue(t, initialStatus, "RESULT"))
+
+		retryTask := runtimeexec.CreateTask(
+			dag.Name,
+			dagContent,
+			coordinatorv1.Operation_OPERATION_RETRY,
+			runID,
+			runtimeexec.WithPreviousStatus(initialStatus),
+		)
+		err = handler.Handle(th.Context, retryTask)
+		require.NoError(t, err)
+
+		retriedAttempt, err := th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, runID))
+		require.NoError(t, err)
+		require.NotEqual(t, initialAttempt.ID(), retriedAttempt.ID())
+
+		retriedStatus, err := retriedAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, retriedStatus.Status)
+		require.Equal(t, "exact-value|prefix-value|", workerStatusOutputValue(t, retriedStatus, "RESULT"))
+	})
 }
 
 func TestCreateTempDAGFile(t *testing.T) {

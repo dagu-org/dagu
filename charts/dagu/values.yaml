@@ -7,6 +7,16 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+# Top-level Dagu config additions rendered into dagu.yaml
+config:
+  envPassthrough: []
+  envPassthroughPrefixes: []
+
+# Extra container environment variables applied to all Dagu deployments.
+# Use this together with config.envPassthrough/config.envPassthroughPrefixes
+# when steps need access to runtime env such as proxies or custom CA paths.
+extraEnv: []
+
 # Scheduler configuration
 scheduler:
   replicas: 1

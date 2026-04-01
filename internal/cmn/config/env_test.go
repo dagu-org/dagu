@@ -4,6 +4,7 @@
 package config_test
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -54,6 +55,37 @@ func TestBaseEnv_AsSlice(t *testing.T) {
 
 	baseEnv := config.NewBaseEnv([]string{"A=1", "B=2"})
 	require.Equal(t, []string{"A=1", "B=2"}, baseEnv.AsSlice())
+}
+
+func TestLoadBaseEnvWithExtras_ExactNamesAndPrefixes(t *testing.T) {
+	t.Setenv("EXTRA_ALLOWED_NAME", "name-value")
+	t.Setenv("EXTRA_ALLOWED_PREFIX_ONE", "prefix-value")
+	t.Setenv("EXTRA_BLOCKED", "blocked-value")
+
+	baseEnv := config.LoadBaseEnvWithExtras(
+		[]string{" EXTRA_ALLOWED_NAME ", "EXTRA_ALLOWED_NAME", ""},
+		[]string{" EXTRA_ALLOWED_PREFIX_", "EXTRA_ALLOWED_PREFIX_", ""},
+	)
+	envMap := parseEnvSlice(baseEnv.AsSlice())
+
+	require.Equal(t, "name-value", envMap["EXTRA_ALLOWED_NAME"])
+	require.Equal(t, "prefix-value", envMap["EXTRA_ALLOWED_PREFIX_ONE"])
+	_, found := envMap["EXTRA_BLOCKED"]
+	require.False(t, found)
+}
+
+func TestLoadBaseEnvWithExtras_PrefixMatchingHonorsPlatformCaseRules(t *testing.T) {
+	t.Setenv("CASE_MATCH_ENV", "matched")
+
+	baseEnv := config.LoadBaseEnvWithExtras(nil, []string{"case_"})
+	envMap := parseEnvSlice(baseEnv.AsSlice())
+
+	_, found := envMap["CASE_MATCH_ENV"]
+	if runtime.GOOS == "windows" {
+		require.True(t, found)
+	} else {
+		require.False(t, found)
+	}
 }
 
 func parseEnvSlice(envSlice []string) map[string]string {
