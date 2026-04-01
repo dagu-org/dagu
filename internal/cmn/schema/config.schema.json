@@ -56,6 +56,20 @@
       "type": "string",
       "description": "Timezone for scheduling and display (e.g., 'America/New_York')."
     },
+    "env_passthrough": {
+      "type": "array",
+      "description": "Additional exact environment variable names to forward from the Dagu process environment to step execution.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "env_passthrough_prefixes": {
+      "type": "array",
+      "description": "Additional environment variable prefixes to forward from the Dagu process environment to step execution.",
+      "items": {
+        "type": "string"
+      }
+    },
     "auth": {
       "$ref": "#/definitions/AuthDef"
     },
