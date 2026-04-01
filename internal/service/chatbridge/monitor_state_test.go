@@ -124,7 +124,7 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 	)
 	secondTransport := &fakeNotificationTransport{
 		destinations: []string{"dest-1"},
-		flushFn: func(_ context.Context, destination string, batch NotificationBatch, allowLLM bool) bool {
+		flushFn: func(_ context.Context, destination string, batch NotificationBatch, _ bool) bool {
 			mu.Lock()
 			defer mu.Unlock()
 			assert.Equal(t, "dest-1", destination)

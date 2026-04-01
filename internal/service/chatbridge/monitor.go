@@ -313,7 +313,6 @@ func (m *NotificationMonitor) enqueueEvents(ctx context.Context, destinations []
 					continue
 				}
 				delete(destState.Pending, pendingKey)
-				changed = true
 			}
 
 			destState.Pending[event.Key] = NotificationEvent{

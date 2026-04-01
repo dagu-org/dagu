@@ -146,6 +146,8 @@ func IsNotificationEventType(kind EventKind, eventType EventType) bool {
 	switch eventType {
 	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 		return true
+	case TypeLLMUsageRecorded:
+		return false
 	default:
 		return false
 	}

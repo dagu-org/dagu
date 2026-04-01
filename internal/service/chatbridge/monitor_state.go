@@ -68,7 +68,7 @@ func newNotificationStateStore(path string) *notificationStateStore {
 	return &notificationStateStore{path: path}
 }
 
-func (s *notificationStateStore) Load(ctx context.Context) (notificationMonitorState, error) {
+func (s *notificationStateStore) Load(_ context.Context) (notificationMonitorState, error) {
 	state := newNotificationMonitorState()
 	if s == nil {
 		return state, nil
