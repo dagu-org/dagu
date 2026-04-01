@@ -78,14 +78,15 @@ func TestLoad_Env(t *testing.T) {
 	testPaths := filepath.Join(tempDir, "test")
 
 	testEnvs := map[string]string{
-		"DAGU_LOG_FORMAT":   "json",
-		"DAGU_BASE_PATH":    "/test/base",
-		"DAGU_API_BASE_URL": "/test/api",
-		"DAGU_TZ":           "Europe/Berlin",
-		"DAGU_HOST":         "test.example.com",
-		"DAGU_PORT":         "9876",
-		"DAGU_DEBUG":        "true",
-		"DAGU_HEADLESS":     "true",
+		"DAGU_LOG_FORMAT":    "json",
+		"DAGU_BASE_PATH":     "/test/base",
+		"DAGU_API_BASE_URL":  "/test/api",
+		"DAGU_TZ":            "Europe/Berlin",
+		"DAGU_HOST":          "test.example.com",
+		"DAGU_PORT":          "9876",
+		"DAGU_DEBUG":         "true",
+		"DAGU_HEADLESS":      "true",
+		"DAGU_CHECK_UPDATES": "false",
 
 		"DAGU_DEFAULT_SHELL":         "/bin/zsh",
 		"DAGU_SECRETS_VAULT_ADDRESS": "https://vault.example.com",
@@ -184,12 +185,13 @@ func TestLoad_Env(t *testing.T) {
 			BaseEnv:                cfg.Core.BaseEnv,     // Dynamic, copy from actual
 		},
 		Server: Server{
-			Host:        "test.example.com",
-			Port:        9876,
-			BasePath:    "/test/base",
-			APIBasePath: "/test/api",
-			Headless:    true,
-			AccessLog:   AccessLogNone,
+			Host:         "test.example.com",
+			Port:         9876,
+			BasePath:     "/test/base",
+			APIBasePath:  "/test/api",
+			Headless:     true,
+			CheckUpdates: false,
+			AccessLog:    AccessLogNone,
 			Auth: Auth{
 				Mode:  AuthModeBasic, // Explicit basic mode from env
 				Basic: AuthBasic{Username: "testuser", Password: "testpass"},
@@ -494,6 +496,7 @@ api_base_path: "/api/v1"
 tz: "UTC"
 log_format: "json"
 headless: true
+check_updates: false
 latest_status_today: true
 default_shell: "/bin/bash"
 skip_examples: true
@@ -602,6 +605,7 @@ scheduler:
 			BasePath:          "/dagu",
 			APIBasePath:       "/api/v1",
 			Headless:          true,
+			CheckUpdates:      false,
 			AccessLog:         AccessLogAll,
 			LatestStatusToday: true,
 			Auth: Auth{
@@ -1684,6 +1688,43 @@ terminal:
 		})
 		assert.True(t, cfg.Server.Terminal.Enabled)
 		assert.Equal(t, 9, cfg.Server.Terminal.MaxSessions)
+	})
+}
+
+func TestLoad_CheckUpdates(t *testing.T) {
+	t.Run("CheckUpdatesDefault", func(t *testing.T) {
+		cfg := loadFromYAML(t, "# empty")
+		assert.True(t, cfg.Server.CheckUpdates)
+	})
+
+	t.Run("CheckUpdatesDisabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+check_updates: false
+`)
+		assert.False(t, cfg.Server.CheckUpdates)
+	})
+
+	t.Run("CheckUpdatesEnabled", func(t *testing.T) {
+		cfg := loadFromYAML(t, `
+check_updates: true
+`)
+		assert.True(t, cfg.Server.CheckUpdates)
+	})
+
+	t.Run("CheckUpdatesDisabledFromEnv", func(t *testing.T) {
+		cfg := loadWithEnv(t, "# empty", map[string]string{
+			"DAGU_CHECK_UPDATES": "false",
+		})
+		assert.False(t, cfg.Server.CheckUpdates)
+	})
+
+	t.Run("CheckUpdatesEnvOverridesYAML", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+check_updates: true
+`, map[string]string{
+			"DAGU_CHECK_UPDATES": "false",
+		})
+		assert.False(t, cfg.Server.CheckUpdates)
 	})
 }
 

@@ -34,6 +34,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agentoauth"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
@@ -386,9 +387,17 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		}
 	}
 
-	upgradeStore, err := fileupgradecheck.New(cfg.Paths.DataDir)
-	if err != nil {
-		logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
+	var (
+		upgradeStore      upgrade.CacheStore
+		updateInfoChecker UpdateChecker
+	)
+	if cfg.Server.CheckUpdates {
+		upgradeStore, err = fileupgradecheck.New(cfg.Paths.DataDir)
+		if err != nil {
+			logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
+		} else {
+			updateInfoChecker = &updateChecker{store: upgradeStore}
+		}
 	}
 
 	// Note: SSO/OIDC gating is applied after opts are processed (see below)
@@ -424,7 +433,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			GitSyncEnabled:        cfg.GitSync.Enabled,
 			WorkspaceStore:        wsStore,
 			SetupRequiredChecker:  &setupChecker{authSvc: authSvc, fallback: setupRequired},
-			UpdateChecker:         &updateChecker{store: upgradeStore},
+			UpdateChecker:         updateInfoChecker,
 			AgentEnabledChecker:   agentConfigStore,
 		},
 	}
@@ -993,7 +1002,7 @@ func (srv *Server) startPeriodicUpdateCheck(ctx context.Context) {
 		return
 	}
 	go func() {
-		_, _ = upgrade.CheckAndUpdateCache(srv.upgradeStore, config.Version)
+		srv.runAutomaticUpdateCheck(ctx)
 
 		ticker := time.NewTicker(upgrade.CacheTTL)
 		defer ticker.Stop()
@@ -1002,10 +1011,17 @@ func (srv *Server) startPeriodicUpdateCheck(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_, _ = upgrade.CheckAndUpdateCache(srv.upgradeStore, config.Version)
+				srv.runAutomaticUpdateCheck(ctx)
 			}
 		}
 	}()
+}
+
+func (srv *Server) runAutomaticUpdateCheck(ctx context.Context) {
+	retryCtx := backoff.WithRetryFailureLogLevel(ctx, slog.LevelDebug)
+	if _, err := upgrade.CheckAndUpdateCache(retryCtx, srv.upgradeStore, config.Version); err != nil {
+		logger.Debug(ctx, "Automatic update check failed", tag.Error(err))
+	}
 }
 
 func (srv *Server) configureAPIPath(_ context.Context) string {
