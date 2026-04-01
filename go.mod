@@ -35,6 +35,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mholt/archives v0.1.5
 	github.com/minio/minio-go/v7 v7.0.98
+	github.com/moby/moby/api v1.54.0
 	github.com/nektos/act v0.2.86
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.0
@@ -46,7 +47,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/slog-multi v1.6.0
 	github.com/segmentio/golines v0.12.2
-	github.com/shirou/gopsutil/v4 v4.25.11
+	github.com/shirou/gopsutil/v4 v4.26.2
 	github.com/slack-go/slack v0.19.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.20.1
@@ -115,7 +116,7 @@ require (
 	github.com/docker/docker-credential-helpers v0.8.2 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ebitengine/purego v0.9.1 // indirect
+	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/gaissmai/bart v0.18.0 // indirect
@@ -175,7 +176,6 @@ require (
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
-	github.com/moby/moby/api v1.54.0 // indirect
 	github.com/moby/moby/client v0.3.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
@@ -469,6 +469,6 @@ require (
 	github.com/samber/lo v1.52.0
 	golang.org/x/crypto v0.47.0
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sys v0.40.0
+	golang.org/x/sys v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
