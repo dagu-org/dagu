@@ -653,10 +653,13 @@
           "$ref": "#/definitions/dagParamLegacyMap"
         },
         {
+          "$ref": "#/definitions/dagParamInlineSchema"
+        },
+        {
           "$ref": "#/definitions/dagParamExternalSchema"
         }
       ],
-      "description": "Default parameters that can be overridden when triggering the DAG. Supports four formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where each definition is an object with a required 'name' field plus optional fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Schema validation format: object with 'schema' (JSON Schema path/URL, inline object, or boolean schema) and optional 'values' (parameter values) for runtime validation and defaults."
+      "description": "Default parameters that can be overridden when triggering the DAG. Supports five formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array/Object format: named parameters as key-value pairs accessible as ${KEY}. 3) Inline rich definitions in array form, where each definition is an object with a required 'name' field plus optional fields such as type, default, enum, minimum, maximum, min_length, max_length, pattern, description, and required. 4) Top-level inline JSON Schema format using `type: object` plus `properties`. 5) Schema validation format: object with 'schema' (JSON Schema path/URL, inline object, or boolean schema) and optional 'values' (parameter values) for runtime validation and defaults."
     },
     "container": {
       "$ref": "#/definitions/container",
@@ -1036,13 +1039,34 @@
     },
     "dagParamLegacyMap": {
       "type": "object",
-      "additionalProperties": {
-        "$ref": "#/definitions/paramScalar"
-      },
+      "additionalProperties": true,
       "not": {
-        "$ref": "#/definitions/dagParamExternalSchema"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/dagParamExternalSchema"
+          },
+          {
+            "$ref": "#/definitions/dagParamInlineSchema"
+          }
+        ]
       },
-      "description": "Legacy named DAG parameters as a map of key-value pairs, accessible as ${KEY}."
+      "description": "Legacy named DAG parameters as a map of key-value pairs, accessible as ${KEY}. Non-scalar YAML values are accepted and will be stringified by the loader."
+    },
+    "dagParamInlineSchema": {
+      "type": "object",
+      "required": ["type", "properties"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "object"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true,
+      "description": "Top-level inline JSON Schema for DAG params. This form is recognized only when `type` is `object` and `properties` is present."
     },
     "secretRef": {
       "type": "object",
