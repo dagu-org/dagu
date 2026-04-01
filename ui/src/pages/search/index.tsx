@@ -316,7 +316,7 @@ function Search() {
               )}
 
               {!hasMore && pages.length > 0 && size > 0 && (
-                <div className="text-center text-xs text-muted-foreground">
+                <div className="mb-6 text-center text-xs text-muted-foreground">
                   End of results
                 </div>
               )}
