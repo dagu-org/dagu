@@ -4429,6 +4429,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /settings/agent/provider-metadata/discover:
+    post:
+      summary: "Discover provider metadata"
+      description: "Best-effort provider metadata discovery for AI agent model configuration. Requires admin role."
+      operationId: "discoverAgentProviderMetadata"
+      tags:
+        - "agent"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverProviderMetadataRequest"
+      responses:
+        "200":
+          description: "Discovery result"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverProviderMetadataResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Requires admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /settings/agent/default-model:
     put:
       summary: "Set default agent model"
@@ -9206,6 +9253,74 @@ components:
           items:
             $ref: "#/components/schemas/ModelConfigResponse"
         defaultModelId:
+          type: string
+
+    DiscoveredProviderModel:
+      type: object
+      required:
+        - id
+      description: "Model metadata discovered from a provider inventory endpoint"
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        contextWindow:
+          type: integer
+          minimum: 0
+        maxOutputTokens:
+          type: integer
+          minimum: 0
+        supportsThinking:
+          type: boolean
+        inputCostPer1M:
+          type: number
+          format: double
+          minimum: 0
+        outputCostPer1M:
+          type: number
+          format: double
+          minimum: 0
+        description:
+          type: string
+
+    DiscoverProviderMetadataRequest:
+      type: object
+      required:
+        - provider
+      description: "Request to discover provider metadata from provider settings"
+      properties:
+        provider:
+          type: string
+          enum: [anthropic, openai, gemini, openrouter, local, zai]
+        baseUrl:
+          type: string
+        apiKey:
+          type: string
+          writeOnly: true
+
+    DiscoverProviderMetadataResponse:
+      type: object
+      required:
+        - success
+        - supported
+        - models
+        - warnings
+      description: "Best-effort provider metadata discovery response"
+      properties:
+        success:
+          type: boolean
+        supported:
+          type: boolean
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscoveredProviderModel"
+        warnings:
+          type: array
+          items:
+            type: string
+        error:
           type: string
 
     SkillResponse:

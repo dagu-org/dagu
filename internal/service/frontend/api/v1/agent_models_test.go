@@ -5,7 +5,11 @@ package api_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"sort"
+	"sync"
 	"testing"
 
 	apigen "github.com/dagu-org/dagu/api/v1"
@@ -759,5 +763,323 @@ func TestResetDefaultIfNeeded(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "model-b", setup.configStore.config.DefaultModelID, "default should not change")
+	})
+}
+
+func TestDiscoverAgentProviderMetadata(t *testing.T) {
+	t.Parallel()
+
+	t.Run("discovers local models from ollama tags and forwards auth", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		var mu sync.Mutex
+		var paths []string
+		authHeader := ""
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			paths = append(paths, r.URL.Path)
+			authHeader = r.Header.Get("Authorization")
+			mu.Unlock()
+
+			require.Equal(t, "/api/tags", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"models": []map[string]string{
+					{"name": "llama3.2:latest", "model": "llama3.2:latest"},
+					{"name": "gemma3:latest", "model": "gemma3:latest"},
+				},
+			}))
+		}))
+		defer server.Close()
+
+		resp, err := setup.api.DiscoverAgentProviderMetadata(adminCtx(), apigen.DiscoverAgentProviderMetadataRequestObject{
+			Body: &apigen.DiscoverProviderMetadataRequest{
+				Provider: apigen.DiscoverProviderMetadataRequestProviderLocal,
+				BaseUrl:  new(server.URL),
+				ApiKey:   new("local-token"),
+			},
+		})
+		require.NoError(t, err)
+
+		discoveryResp, ok := resp.(apigen.DiscoverAgentProviderMetadata200JSONResponse)
+		require.True(t, ok)
+		assert.True(t, discoveryResp.Success)
+		assert.True(t, discoveryResp.Supported)
+		require.Len(t, discoveryResp.Models, 2)
+		assert.Equal(t, "gemma3:latest", discoveryResp.Models[0].Id)
+		assert.Equal(t, "llama3.2:latest", discoveryResp.Models[1].Id)
+		assert.Empty(t, discoveryResp.Warnings)
+
+		mu.Lock()
+		defer mu.Unlock()
+		assert.Equal(t, []string{"/api/tags"}, paths)
+		assert.Equal(t, "Bearer local-token", authHeader)
+	})
+
+	t.Run("strips v1 from local discovery tags endpoint", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		var requestedPath string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestedPath = r.URL.Path
+			w.Header().Set("Content-Type", "application/json")
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"models": []map[string]string{
+					{"name": "llama3.2:latest", "model": "llama3.2:latest"},
+				},
+			}))
+		}))
+		defer server.Close()
+
+		resp, err := setup.api.DiscoverAgentProviderMetadata(adminCtx(), apigen.DiscoverAgentProviderMetadataRequestObject{
+			Body: &apigen.DiscoverProviderMetadataRequest{
+				Provider: apigen.DiscoverProviderMetadataRequestProviderLocal,
+				BaseUrl:  new(server.URL + "/v1"),
+			},
+		})
+		require.NoError(t, err)
+
+		discoveryResp, ok := resp.(apigen.DiscoverAgentProviderMetadata200JSONResponse)
+		require.True(t, ok)
+		assert.True(t, discoveryResp.Success)
+		assert.Equal(t, "/api/tags", requestedPath)
+	})
+
+	t.Run("falls back to v1 models when tags endpoint fails", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		var paths []string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			paths = append(paths, r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+
+			switch r.URL.Path {
+			case "/api/tags":
+				http.Error(w, "not found", http.StatusNotFound)
+			case "/v1/models":
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"data": []map[string]string{
+						{"id": "llama3.2"},
+						{"id": "gemma3"},
+					},
+				}))
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer server.Close()
+
+		resp, err := setup.api.DiscoverAgentProviderMetadata(adminCtx(), apigen.DiscoverAgentProviderMetadataRequestObject{
+			Body: &apigen.DiscoverProviderMetadataRequest{
+				Provider: apigen.DiscoverProviderMetadataRequestProviderLocal,
+				BaseUrl:  new(server.URL),
+			},
+		})
+		require.NoError(t, err)
+
+		discoveryResp, ok := resp.(apigen.DiscoverAgentProviderMetadata200JSONResponse)
+		require.True(t, ok)
+		assert.True(t, discoveryResp.Success)
+		assert.True(t, discoveryResp.Supported)
+		require.Len(t, discoveryResp.Models, 2)
+		assert.Equal(t, []string{"/api/tags", "/v1/models"}, paths)
+		require.Len(t, discoveryResp.Warnings, 1)
+		assert.Contains(t, discoveryResp.Warnings[0], "/api/tags")
+	})
+
+	t.Run("returns failure for invalid base url", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		resp, err := setup.api.DiscoverAgentProviderMetadata(adminCtx(), apigen.DiscoverAgentProviderMetadataRequestObject{
+			Body: &apigen.DiscoverProviderMetadataRequest{
+				Provider: apigen.DiscoverProviderMetadataRequestProviderLocal,
+				BaseUrl:  new("://bad url"),
+			},
+		})
+		require.NoError(t, err)
+
+		discoveryResp, ok := resp.(apigen.DiscoverAgentProviderMetadata200JSONResponse)
+		require.True(t, ok)
+		assert.False(t, discoveryResp.Success)
+		assert.True(t, discoveryResp.Supported)
+		require.NotNil(t, discoveryResp.Error)
+		assert.Contains(t, *discoveryResp.Error, "invalid base URL")
+	})
+
+	t.Run("returns failure when provider cannot be reached", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		resp, err := setup.api.DiscoverAgentProviderMetadata(adminCtx(), apigen.DiscoverAgentProviderMetadataRequestObject{
+			Body: &apigen.DiscoverProviderMetadataRequest{
+				Provider: apigen.DiscoverProviderMetadataRequestProviderLocal,
+				BaseUrl:  new("http://127.0.0.1:1"),
+			},
+		})
+		require.NoError(t, err)
+
+		discoveryResp, ok := resp.(apigen.DiscoverAgentProviderMetadata200JSONResponse)
+		require.True(t, ok)
+		assert.False(t, discoveryResp.Success)
+		assert.True(t, discoveryResp.Supported)
+		assert.Empty(t, discoveryResp.Models)
+		require.NotNil(t, discoveryResp.Error)
+		assert.Contains(t, *discoveryResp.Error, "Failed to discover local models")
+		require.Len(t, discoveryResp.Warnings, 1)
+	})
+
+	t.Run("returns failure for malformed discovery responses", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("{not-json"))
+		}))
+		defer server.Close()
+
+		resp, err := setup.api.DiscoverAgentProviderMetadata(adminCtx(), apigen.DiscoverAgentProviderMetadataRequestObject{
+			Body: &apigen.DiscoverProviderMetadataRequest{
+				Provider: apigen.DiscoverProviderMetadataRequestProviderLocal,
+				BaseUrl:  new(server.URL),
+			},
+		})
+		require.NoError(t, err)
+
+		discoveryResp, ok := resp.(apigen.DiscoverAgentProviderMetadata200JSONResponse)
+		require.True(t, ok)
+		assert.False(t, discoveryResp.Success)
+		assert.True(t, discoveryResp.Supported)
+		require.NotNil(t, discoveryResp.Error)
+		assert.Contains(t, *discoveryResp.Error, "invalid response body")
+	})
+
+	t.Run("returns unsupported shape for providers without adapters", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		resp, err := setup.api.DiscoverAgentProviderMetadata(adminCtx(), apigen.DiscoverAgentProviderMetadataRequestObject{
+			Body: &apigen.DiscoverProviderMetadataRequest{
+				Provider: apigen.DiscoverProviderMetadataRequestProviderOpenai,
+				BaseUrl:  new("https://api.openai.com/v1"),
+			},
+		})
+		require.NoError(t, err)
+
+		discoveryResp, ok := resp.(apigen.DiscoverAgentProviderMetadata200JSONResponse)
+		require.True(t, ok)
+		assert.False(t, discoveryResp.Success)
+		assert.False(t, discoveryResp.Supported)
+		assert.Empty(t, discoveryResp.Models)
+		require.Len(t, discoveryResp.Warnings, 1)
+		assert.Contains(t, discoveryResp.Warnings[0], "not supported")
+		assert.Nil(t, discoveryResp.Error)
+	})
+}
+
+func TestAgentModelSaveNormalizesLocalBaseURL(t *testing.T) {
+	t.Parallel()
+
+	t.Run("create normalizes only local root urls", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+
+		createLocalResp, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Name:     "Local Root",
+				Provider: apigen.CreateModelConfigRequestProviderLocal,
+				Model:    "llama3.2",
+				BaseUrl:  new("http://localhost:11434"),
+			},
+		})
+		require.NoError(t, err)
+
+		localModel, ok := createLocalResp.(apigen.CreateAgentModel201JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, localModel.BaseUrl)
+		assert.Equal(t, "http://localhost:11434/v1", *localModel.BaseUrl)
+
+		createPreservedResp, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Name:     "Local Custom Path",
+				Provider: apigen.CreateModelConfigRequestProviderLocal,
+				Model:    "llama3.2",
+				BaseUrl:  new("http://localhost:11434/custom"),
+			},
+		})
+		require.NoError(t, err)
+
+		preservedModel, ok := createPreservedResp.(apigen.CreateAgentModel201JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, preservedModel.BaseUrl)
+		assert.Equal(t, "http://localhost:11434/custom", *preservedModel.BaseUrl)
+
+		createOpenAIResp, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Name:     "OpenAI Root",
+				Provider: apigen.CreateModelConfigRequestProviderOpenai,
+				Model:    "gpt-5",
+				BaseUrl:  new("https://api.openai.com"),
+			},
+		})
+		require.NoError(t, err)
+
+		openAIModel, ok := createOpenAIResp.(apigen.CreateAgentModel201JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, openAIModel.BaseUrl)
+		assert.Equal(t, "https://api.openai.com", *openAIModel.BaseUrl)
+	})
+
+	t.Run("update normalizes only local root urls", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID: "local-model", Name: "Local Model", Provider: "local", Model: "llama3.2",
+		})
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID: "openai-model", Name: "OpenAI Model", Provider: "openai", Model: "gpt-5",
+		})
+
+		localRoot := "http://localhost:11434"
+		localResp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
+			ModelId: "local-model",
+			Body: &apigen.UpdateModelConfigRequest{
+				BaseUrl: &localRoot,
+			},
+		})
+		require.NoError(t, err)
+
+		updatedLocal, ok := localResp.(apigen.UpdateAgentModel200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, updatedLocal.BaseUrl)
+		assert.Equal(t, "http://localhost:11434/v1", *updatedLocal.BaseUrl)
+
+		openAIRoot := "https://api.openai.com"
+		openAIResp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
+			ModelId: "openai-model",
+			Body: &apigen.UpdateModelConfigRequest{
+				BaseUrl: &openAIRoot,
+			},
+		})
+		require.NoError(t, err)
+
+		updatedOpenAI, ok := openAIResp.(apigen.UpdateAgentModel200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, updatedOpenAI.BaseUrl)
+		assert.Equal(t, "https://api.openai.com", *updatedOpenAI.BaseUrl)
 	})
 }

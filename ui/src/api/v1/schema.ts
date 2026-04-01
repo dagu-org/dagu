@@ -1862,6 +1862,26 @@ export interface paths {
         patch: operations["updateAgentModel"];
         trace?: never;
     };
+    "/settings/agent/provider-metadata/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discover provider metadata
+         * @description Best-effort provider metadata discovery for AI agent model configuration. Requires admin role.
+         */
+        post: operations["discoverAgentProviderMetadata"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/agent/default-model": {
         parameters: {
             query?: never;
@@ -3915,6 +3935,34 @@ export interface components {
         ListModelsResponse: {
             models: components["schemas"]["ModelConfigResponse"][];
             defaultModelId?: string;
+        };
+        /** @description Model metadata discovered from a provider inventory endpoint */
+        DiscoveredProviderModel: {
+            id: string;
+            displayName?: string;
+            contextWindow?: number;
+            maxOutputTokens?: number;
+            supportsThinking?: boolean;
+            /** Format: double */
+            inputCostPer1M?: number;
+            /** Format: double */
+            outputCostPer1M?: number;
+            description?: string;
+        };
+        /** @description Request to discover provider metadata from provider settings */
+        DiscoverProviderMetadataRequest: {
+            /** @enum {string} */
+            provider: DiscoverProviderMetadataRequestProvider;
+            baseUrl?: string;
+            apiKey?: string;
+        };
+        /** @description Best-effort provider metadata discovery response */
+        DiscoverProviderMetadataResponse: {
+            success: boolean;
+            supported: boolean;
+            models: components["schemas"]["DiscoveredProviderModel"][];
+            warnings: string[];
+            error?: string;
         };
         /** @description Skill configuration */
         SkillResponse: {
@@ -9848,6 +9896,69 @@ export interface operations {
             };
         };
     };
+    discoverAgentProviderMetadata: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscoverProviderMetadataRequest"];
+            };
+        };
+        responses: {
+            /** @description Discovery result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoverProviderMetadataResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     setDefaultAgentModel: {
         parameters: {
             query?: {
@@ -12580,6 +12691,14 @@ export enum CreateModelConfigRequestProvider {
     zai = "zai"
 }
 export enum UpdateModelConfigRequestProvider {
+    anthropic = "anthropic",
+    openai = "openai",
+    gemini = "gemini",
+    openrouter = "openrouter",
+    local = "local",
+    zai = "zai"
+}
+export enum DiscoverProviderMetadataRequestProvider {
     anthropic = "anthropic",
     openai = "openai",
     gemini = "gemini",

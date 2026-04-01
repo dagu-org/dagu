@@ -5,10 +5,15 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
@@ -23,6 +28,8 @@ const (
 	auditActionModelUpdate = "agent_model_update"
 	auditActionModelDelete = "agent_model_delete"
 	auditActionModelSetDef = "agent_model_set_default"
+
+	providerDiscoveryTimeout = 5 * time.Second
 )
 
 var (
@@ -129,13 +136,18 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 		}
 	}
 
+	baseURL, err := normalizeProviderBaseURL(string(body.Provider), valueOf(body.BaseUrl))
+	if err != nil {
+		return nil, err
+	}
+
 	model := &agent.ModelConfig{
 		ID:               id,
 		Name:             body.Name,
 		Provider:         string(body.Provider),
 		Model:            body.Model,
 		APIKey:           valueOf(body.ApiKey),
-		BaseURL:          valueOf(body.BaseUrl),
+		BaseURL:          baseURL,
 		ContextWindow:    valueOf(body.ContextWindow),
 		MaxOutputTokens:  valueOf(body.MaxOutputTokens),
 		InputCostPer1M:   valueOf(body.InputCostPer1M),
@@ -194,6 +206,11 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 	}
 
 	applyModelUpdates(existing, body)
+
+	existing.BaseURL, err = normalizeProviderBaseURL(existing.Provider, existing.BaseURL)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := a.agentModelStore.Update(ctx, existing); err != nil {
 		if errors.Is(err, agent.ErrModelAlreadyExists) || errors.Is(err, agent.ErrModelNameAlreadyExists) {
@@ -302,11 +319,46 @@ func (a *API) ListModelPresets(ctx context.Context, _ api.ListModelPresetsReques
 	return api.ListModelPresets200JSONResponse{Presets: presets}, nil
 }
 
+// DiscoverAgentProviderMetadata performs best-effort metadata discovery for supported providers.
+func (a *API) DiscoverAgentProviderMetadata(ctx context.Context, request api.DiscoverAgentProviderMetadataRequestObject) (api.DiscoverAgentProviderMetadataResponseObject, error) {
+	if err := a.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+
+	body := request.Body
+	provider := string(body.Provider)
+	if err := validateProvider(provider); err != nil {
+		return nil, err
+	}
+
+	baseURL, err := normalizeProviderBaseURL(provider, valueOf(body.BaseUrl))
+	if err != nil {
+		return discoveryFailureResponse(true, err.Error(), nil), nil
+	}
+
+	switch provider {
+	case string(llm.ProviderLocal):
+		return api.DiscoverAgentProviderMetadata200JSONResponse(discoverLocalProviderMetadata(ctx, baseURL, valueOf(body.ApiKey))), nil
+	default:
+		return api.DiscoverAgentProviderMetadata200JSONResponse{
+			Success:   false,
+			Supported: false,
+			Models:    []api.DiscoveredProviderModel{},
+			Warnings: []string{
+				fmt.Sprintf("Provider metadata discovery is not supported for provider %q yet.", provider),
+			},
+		}, nil
+	}
+}
+
 func validateProvider(provider string) error {
 	if _, err := llm.ParseProviderType(provider); err != nil {
 		return &Error{
 			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", provider),
+			Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local, zai", provider),
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
@@ -414,4 +466,230 @@ func (a *API) resetDefaultIfNeeded(ctx context.Context, deletedModelID string) {
 	if err := a.agentConfigStore.Save(ctx, cfg); err != nil {
 		logger.Error(ctx, "Failed to reset default model after deletion", tag.Error(err))
 	}
+}
+
+func normalizeProviderBaseURL(provider, rawBaseURL string) (string, error) {
+	baseURL := strings.TrimSpace(rawBaseURL)
+	if provider != string(llm.ProviderLocal) || baseURL == "" {
+		return baseURL, nil
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("invalid base URL for local provider: %q", rawBaseURL),
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+
+	if parsed.Path == "" || parsed.Path == "/" {
+		parsed.Path = "/v1"
+	}
+
+	return parsed.String(), nil
+}
+
+func discoveryFailureResponse(supported bool, message string, warnings []string) api.DiscoverAgentProviderMetadata200JSONResponse {
+	return api.DiscoverAgentProviderMetadata200JSONResponse{
+		Success:   false,
+		Supported: supported,
+		Models:    []api.DiscoveredProviderModel{},
+		Warnings:  append([]string(nil), warnings...),
+		Error:     ptrOf(message),
+	}
+}
+
+func discoverLocalProviderMetadata(ctx context.Context, baseURL, apiKey string) api.DiscoverProviderMetadataResponse {
+	if baseURL == "" {
+		return api.DiscoverProviderMetadataResponse{
+			Success:   false,
+			Supported: true,
+			Models:    []api.DiscoveredProviderModel{},
+			Warnings:  []string{},
+			Error:     ptrOf("base URL is required for local provider discovery"),
+		}
+	}
+
+	discoveryCtx, cancel := context.WithTimeout(ctx, providerDiscoveryTimeout)
+	defer cancel()
+
+	tagModels, err := fetchLocalOllamaTagModels(discoveryCtx, baseURL, apiKey)
+	if err == nil {
+		return api.DiscoverProviderMetadataResponse{
+			Success:   true,
+			Supported: true,
+			Models:    tagModels,
+			Warnings:  []string{},
+		}
+	}
+
+	warnings := []string{
+		fmt.Sprintf("Failed to load installed models from /api/tags: %v", err),
+	}
+
+	compatModels, compatErr := fetchLocalCompatibleModels(discoveryCtx, baseURL, apiKey)
+	if compatErr == nil {
+		return api.DiscoverProviderMetadataResponse{
+			Success:   true,
+			Supported: true,
+			Models:    compatModels,
+			Warnings:  warnings,
+		}
+	}
+
+	return api.DiscoverProviderMetadataResponse{
+		Success:   false,
+		Supported: true,
+		Models:    []api.DiscoveredProviderModel{},
+		Warnings:  warnings,
+		Error: ptrOf(
+			fmt.Sprintf("Failed to discover local models via /api/tags and /v1/models: %v", compatErr),
+		),
+	}
+}
+
+func fetchLocalOllamaTagModels(ctx context.Context, baseURL, apiKey string) ([]api.DiscoveredProviderModel, error) {
+	type ollamaTagModel struct {
+		Model string `json:"model"`
+		Name  string `json:"name"`
+	}
+	type ollamaTagResponse struct {
+		Models []ollamaTagModel `json:"models"`
+	}
+
+	inventoryBaseURL := trimLocalV1Suffix(baseURL)
+	tagsURL, err := joinProviderURLPath(inventoryBaseURL, "/api/tags")
+	if err != nil {
+		return nil, err
+	}
+
+	var payload ollamaTagResponse
+	if err := getProviderJSON(ctx, tagsURL, apiKey, &payload); err != nil {
+		return nil, err
+	}
+
+	models := make([]api.DiscoveredProviderModel, 0, len(payload.Models))
+	for _, item := range payload.Models {
+		id := strings.TrimSpace(item.Model)
+		if id == "" {
+			id = strings.TrimSpace(item.Name)
+		}
+		if id == "" {
+			continue
+		}
+
+		model := api.DiscoveredProviderModel{Id: id}
+		if displayName := strings.TrimSpace(item.Name); displayName != "" && displayName != id {
+			model.DisplayName = &displayName
+		}
+		models = append(models, model)
+	}
+
+	sortDiscoveredProviderModels(models)
+	return models, nil
+}
+
+func fetchLocalCompatibleModels(ctx context.Context, baseURL, apiKey string) ([]api.DiscoveredProviderModel, error) {
+	type openAIModel struct {
+		Id string `json:"id"`
+	}
+	type openAIModelListResponse struct {
+		Data []openAIModel `json:"data"`
+	}
+
+	modelsURL, err := joinProviderURLPath(baseURL, "/models")
+	if err != nil {
+		return nil, err
+	}
+
+	var payload openAIModelListResponse
+	if err := getProviderJSON(ctx, modelsURL, apiKey, &payload); err != nil {
+		return nil, err
+	}
+
+	models := make([]api.DiscoveredProviderModel, 0, len(payload.Data))
+	for _, item := range payload.Data {
+		id := strings.TrimSpace(item.Id)
+		if id == "" {
+			continue
+		}
+		models = append(models, api.DiscoveredProviderModel{Id: id})
+	}
+
+	sortDiscoveredProviderModels(models)
+	return models, nil
+}
+
+func getProviderJSON(ctx context.Context, urlString, apiKey string, target any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlString, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("received HTTP %d", resp.StatusCode)
+	}
+
+	decoder := json.NewDecoder(io.LimitReader(resp.Body, 1<<20))
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("invalid response body: %w", err)
+	}
+	return nil
+}
+
+func joinProviderURLPath(baseURL, suffix string) (string, error) {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid base URL %q", baseURL)
+	}
+
+	basePath := strings.TrimSuffix(parsed.Path, "/")
+	parsed.Path = basePath + "/" + strings.TrimPrefix(suffix, "/")
+	return parsed.String(), nil
+}
+
+func trimLocalV1Suffix(baseURL string) string {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return baseURL
+	}
+
+	switch parsed.Path {
+	case "/v1", "/v1/":
+		parsed.Path = ""
+		return parsed.String()
+	default:
+		return baseURL
+	}
+}
+
+func sortDiscoveredProviderModels(models []api.DiscoveredProviderModel) {
+	sort.Slice(models, func(i, j int) bool {
+		leftLabel := valueOf(models[i].DisplayName)
+		if leftLabel == "" {
+			leftLabel = models[i].Id
+		}
+		rightLabel := valueOf(models[j].DisplayName)
+		if rightLabel == "" {
+			rightLabel = models[j].Id
+		}
+		if leftLabel == rightLabel {
+			return models[i].Id < models[j].Id
+		}
+		return leftLabel < rightLabel
+	})
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect, useContext } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v1/schema';
@@ -15,6 +16,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -24,6 +26,10 @@ import { getAuthHeaders } from '@/lib/authHeaders';
 
 type ModelConfig = components['schemas']['ModelConfigResponse'];
 type ModelPreset = components['schemas']['ModelPreset'];
+type DiscoveredProviderModel = components['schemas']['DiscoveredProviderModel'];
+type DiscoverProviderMetadataResponse = components['schemas']['DiscoverProviderMetadataResponse'];
+
+const LOCAL_DISCOVERY_DEBOUNCE_MS = 400;
 
 // Mirrors internal/agent/store.go:GenerateSlugID
 function generateSlugId(name: string): string {
@@ -51,6 +57,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
   const isEditing = !!model;
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   const [configId, setConfigId] = useState('');
   const [customId, setCustomId] = useState(false);
@@ -67,9 +74,24 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
   const [supportsThinking, setSupportsThinking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveryWarnings, setDiscoveryWarnings] = useState<string[]>([]);
+  const [discoveredModels, setDiscoveredModels] = useState<DiscoveredProviderModel[]>([]);
+  const [modelTouched, setModelTouched] = useState(false);
+
+  const discoveryRequestIdRef = useRef(0);
+  const discoveryAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (open && model) {
+    if (!open) {
+      resetForm();
+      resetDiscoveryState(false);
+      setError(null);
+      return;
+    }
+
+    if (model) {
       setConfigId(model.id);
       setName(model.name);
       setProvider(model.provider);
@@ -82,13 +104,109 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       setOutputCostPer1M(model.outputCostPer1M ?? '');
       setSupportsThinking(model.supportsThinking ?? false);
       setApiKey('');
-    } else if (open && !model) {
+      resetDiscoveryState(true);
+    } else {
       resetForm();
+      resetDiscoveryState(false);
     }
-    if (open) {
-      setError(null);
-    }
+    setError(null);
   }, [open, model]);
+
+  useEffect(() => {
+    if (!open || provider !== 'local') {
+      cancelDiscoveryRequest();
+      clearDiscoveryState();
+      return;
+    }
+
+    const trimmedBaseUrl = baseUrl.trim();
+    if (!trimmedBaseUrl || !isValidDiscoveryBaseUrl(trimmedBaseUrl)) {
+      cancelDiscoveryRequest();
+      clearDiscoveryState();
+      return;
+    }
+
+    const controller = new AbortController();
+    const requestId = discoveryRequestIdRef.current + 1;
+    discoveryRequestIdRef.current = requestId;
+    discoveryAbortRef.current?.abort();
+    discoveryAbortRef.current = controller;
+
+    setIsDiscovering(true);
+    setDiscoveryError(null);
+    setDiscoveryWarnings([]);
+    setDiscoveredModels([]);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `${config.apiURL}/settings/agent/provider-metadata/discover?remoteNode=${encodeURIComponent(remoteNode)}`,
+          {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              provider,
+              baseUrl: trimmedBaseUrl,
+              apiKey: apiKey || undefined,
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        const data = (await response.json().catch(() => ({}))) as
+          | DiscoverProviderMetadataResponse
+          | { message?: string };
+
+        if (requestId !== discoveryRequestIdRef.current || controller.signal.aborted) {
+          return;
+        }
+
+        if (!response.ok) {
+          setDiscoveryError(data.message || 'Failed to discover local models');
+          setDiscoveredModels([]);
+          setDiscoveryWarnings([]);
+          return;
+        }
+
+        const discoveryResponse = data as DiscoverProviderMetadataResponse;
+        setDiscoveredModels(discoveryResponse.models || []);
+        setDiscoveryWarnings(discoveryResponse.warnings || []);
+        setDiscoveryError(discoveryResponse.error || null);
+      } catch (err) {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+          return;
+        }
+        if (requestId !== discoveryRequestIdRef.current) {
+          return;
+        }
+        setDiscoveryError(err instanceof Error ? err.message : 'Failed to discover local models');
+        setDiscoveredModels([]);
+        setDiscoveryWarnings([]);
+      } finally {
+        if (requestId === discoveryRequestIdRef.current && !controller.signal.aborted) {
+          setIsDiscovering(false);
+        }
+      }
+    }, LOCAL_DISCOVERY_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+      if (discoveryAbortRef.current === controller) {
+        discoveryAbortRef.current = null;
+      }
+    };
+  }, [apiKey, baseUrl, config.apiURL, open, provider, remoteNode]);
+
+  useEffect(() => {
+    if (!open || provider !== 'local') {
+      return;
+    }
+    if (modelTouched || modelId.trim() !== '' || discoveredModels.length !== 1) {
+      return;
+    }
+    setModelId(discoveredModels[0].id);
+  }, [discoveredModels, modelId, modelTouched, open, provider]);
 
   function resetForm() {
     setConfigId('');
@@ -106,6 +224,25 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
     setSupportsThinking(false);
   }
 
+  function cancelDiscoveryRequest() {
+    discoveryAbortRef.current?.abort();
+    discoveryAbortRef.current = null;
+    discoveryRequestIdRef.current += 1;
+  }
+
+  function clearDiscoveryState() {
+    setIsDiscovering(false);
+    setDiscoveryError(null);
+    setDiscoveryWarnings([]);
+    setDiscoveredModels([]);
+  }
+
+  function resetDiscoveryState(initialModelTouched: boolean) {
+    cancelDiscoveryRequest();
+    clearDiscoveryState();
+    setModelTouched(initialModelTouched);
+  }
+
   const handlePresetSelect = (presetName: string) => {
     const preset = presets.find((p) => p.name === presetName);
     if (preset) {
@@ -120,6 +257,7 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       setInputCostPer1M(preset.inputCostPer1M ?? '');
       setOutputCostPer1M(preset.outputCostPer1M ?? '');
       setSupportsThinking(preset.supportsThinking ?? false);
+      setModelTouched(true);
     }
   };
 
@@ -129,8 +267,6 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
     setError(null);
 
     try {
-      const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
-
       const body: Record<string, unknown> = {
         id: !isEditing && configId ? configId : undefined,
         name,
@@ -150,8 +286,8 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       }
 
       const url = isEditing
-        ? `${config.apiURL}/settings/agent/models/${model.id}?remoteNode=${remoteNode}`
-        : `${config.apiURL}/settings/agent/models?remoteNode=${remoteNode}`;
+        ? `${config.apiURL}/settings/agent/models/${model.id}?remoteNode=${encodeURIComponent(remoteNode)}`
+        : `${config.apiURL}/settings/agent/models?remoteNode=${encodeURIComponent(remoteNode)}`;
 
       const response = await fetch(url, {
         method: isEditing ? 'PATCH' : 'POST',
@@ -174,11 +310,34 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
     }
   };
 
+  const hasValidDiscoveryBaseUrl = isValidDiscoveryBaseUrl(baseUrl.trim());
+  const discoveredModelValue = discoveredModels.some((candidate) => candidate.id === modelId)
+    ? modelId
+    : undefined;
+  const showNoDiscoveredModels =
+    open &&
+    provider === 'local' &&
+    hasValidDiscoveryBaseUrl &&
+    !isDiscovering &&
+    !discoveryError &&
+    discoveredModels.length === 0;
+  const combinedDiscoveryWarning = discoveryWarnings.join(' ');
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Model' : 'Add Model'}</DialogTitle>
+          <DialogDescription>
+            Configure a model provider and choose the model identifier used by the agent.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-3 py-3">
@@ -266,11 +425,40 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
               <Input
                 id="model-id"
                 value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
+                onChange={(e) => {
+                  setModelTouched(true);
+                  setModelId(e.target.value);
+                }}
                 placeholder="claude-sonnet-4-5"
                 className="h-8"
                 required
               />
+              {provider === 'local' && discoveredModels.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Discovered Models</Label>
+                  <Select
+                    value={discoveredModelValue}
+                    onValueChange={(value) => {
+                      setModelTouched(true);
+                      setModelId(value);
+                    }}
+                  >
+                    <SelectTrigger className="h-8" aria-label="Discovered Models">
+                      <SelectValue placeholder="Select a discovered model..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {discoveredModels.map((discoveredModel) => (
+                        <SelectItem key={discoveredModel.id} value={discoveredModel.id}>
+                          {discoveredModel.displayName || discoveredModel.id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Selecting a discovered model fills the Model field. Manual entry still works.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -299,6 +487,23 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
                 placeholder="Custom API endpoint"
                 className="h-8"
               />
+              {provider === 'local' && isDiscovering && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Discovering local models...
+                </div>
+              )}
+              {provider === 'local' && !isDiscovering && discoveryError && (
+                <p className="text-xs text-destructive">{discoveryError}</p>
+              )}
+              {provider === 'local' && !isDiscovering && !discoveryError && combinedDiscoveryWarning && (
+                <p className="text-xs text-muted-foreground">{combinedDiscoveryWarning}</p>
+              )}
+              {provider === 'local' && showNoDiscoveredModels && (
+                <p className="text-xs text-muted-foreground">
+                  No models were discovered for this Base URL. You can still enter a model manually.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -390,4 +595,17 @@ export function ModelFormModal({ open, model, presets, onClose, onSuccess }: Mod
       </DialogContent>
     </Dialog>
   );
+}
+
+function isValidDiscoveryBaseUrl(value: string): boolean {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(value);
+    return Boolean(parsed.host) && (parsed.protocol === 'http:' || parsed.protocol === 'https:');
+  } catch {
+    return false;
+  }
 }
