@@ -10,18 +10,16 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/containerd/platforms"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -89,7 +87,7 @@ func TestSSHExecutorIntegration(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
@@ -536,15 +534,11 @@ func startSSHServer(t *testing.T, th test.Helper, dockerClient *client.Client) *
 	ctx := th.Context
 
 	// Get Docker info for platform
-	info, err := dockerClient.Info(ctx)
+	platform, err := currentDockerPlatform(ctx, dockerClient)
 	require.NoError(t, err, "failed to get docker info")
 
-	var platform specs.Platform
-	platform.Architecture = info.Architecture
-	platform.OS = info.OSType
-
 	// Pull the image
-	pullOpts := image.PullOptions{Platform: platforms.Format(platform)}
+	pullOpts := client.ImagePullOptions{Platforms: []specs.Platform{platform}}
 	reader, err := dockerClient.ImagePull(ctx, sshServerImage, pullOpts)
 	require.NoError(t, err, "failed to pull ssh server image")
 	_, _ = io.Copy(io.Discard, reader)
@@ -593,38 +587,36 @@ exec /usr/sbin/sshd -D -e
 `, sshTestUser, sshTestPass, string(pubKey))
 
 	// Create container
-	created, err := dockerClient.ContainerCreate(
-		ctx,
-		&container.Config{
+	created, err := dockerClient.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
 			Image: sshServerImage,
 			Cmd:   []string{"/bin/sh", "-c", setupScript},
-			ExposedPorts: nat.PortSet{
-				"22/tcp": struct{}{},
+			ExposedPorts: network.PortSet{
+				network.MustParsePort("22/tcp"): struct{}{},
 			},
 		},
-		&container.HostConfig{
+		HostConfig: &container.HostConfig{
 			AutoRemove: true,
-			PortBindings: nat.PortMap{
-				"22/tcp": []nat.PortBinding{
-					{HostIP: "127.0.0.1", HostPort: "0"}, // Random port
+			PortBindings: network.PortMap{
+				network.MustParsePort("22/tcp"): []network.PortBinding{
+					{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "0"}, // Random port
 				},
 			},
 		},
-		&network.NetworkingConfig{},
-		nil,
-		containerName,
-	)
+		NetworkingConfig: &network.NetworkingConfig{},
+		Name:             containerName,
+	})
 	require.NoError(t, err, "failed to create SSH server container")
 
 	// Start container
-	err = dockerClient.ContainerStart(ctx, created.ID, container.StartOptions{})
+	_, err = dockerClient.ContainerStart(ctx, created.ID, client.ContainerStartOptions{})
 	require.NoError(t, err, "failed to start SSH server container")
 
 	// Get the assigned port
-	inspect, err := dockerClient.ContainerInspect(ctx, created.ID)
+	inspect, err := inspectContainer(ctx, dockerClient, created.ID)
 	require.NoError(t, err, "failed to inspect SSH server container")
 
-	hostPort := inspect.NetworkSettings.Ports["22/tcp"][0].HostPort
+	hostPort := inspect.NetworkSettings.Ports[network.MustParsePort("22/tcp")][0].HostPort
 
 	return &sshServerContainer{
 		containerID: created.ID,
@@ -665,8 +657,9 @@ func generateSSHKey(t *testing.T, keyPath, pubKeyPath string) {
 func stopSSHServer(t *testing.T, th test.Helper, dockerClient *client.Client, server *sshServerContainer) {
 	t.Helper()
 
-	_ = dockerClient.ContainerStop(th.Context, server.containerID, container.StopOptions{Timeout: new(5)})
-	_ = dockerClient.ContainerRemove(th.Context, server.containerID, container.RemoveOptions{Force: true})
+	timeout := 5
+	_, _ = dockerClient.ContainerStop(th.Context, server.containerID, client.ContainerStopOptions{Timeout: &timeout})
+	_, _ = dockerClient.ContainerRemove(th.Context, server.containerID, client.ContainerRemoveOptions{Force: true})
 }
 
 // waitForSSHReady waits for the SSH server to be ready to accept connections

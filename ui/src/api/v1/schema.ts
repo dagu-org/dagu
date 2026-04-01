@@ -1858,6 +1858,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/agent/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agent auth providers
+         * @description Returns subscription-backed agent auth provider status for the selected node. Requires admin role.
+         */
+        get: operations["listAgentAuthProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/auth/providers/{providerId}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start agent auth provider login
+         * @description Starts a manual OAuth login flow for the selected provider. Requires admin role.
+         */
+        post: operations["startAgentAuthProviderLogin"];
+        /**
+         * Disconnect agent auth provider login
+         * @description Removes the stored OAuth credential for the selected provider. Requires admin role.
+         */
+        delete: operations["disconnectAgentAuthProviderLogin"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/agent/auth/providers/{providerId}/login/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete agent auth provider login
+         * @description Completes a manual OAuth login flow using the pasted redirect URL or authorization code. Requires admin role.
+         */
+        post: operations["completeAgentAuthProviderLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/agent/models/{modelId}": {
         parameters: {
             query?: never;
@@ -3934,6 +3998,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: ModelConfigResponseThinkingEffort;
             description?: string;
         };
         /** @description Request to create a new model configuration */
@@ -3953,6 +4019,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: CreateModelConfigRequestThinkingEffort;
             description?: string;
         };
         /** @description Request to update a model configuration */
@@ -3970,6 +4038,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: UpdateModelConfigRequestThinkingEffort;
             description?: string;
         };
         /** @description Request to set the default model */
@@ -3985,6 +4055,37 @@ export interface components {
         ListModelsResponse: {
             models: components["schemas"]["ModelConfigResponse"][];
             defaultModelId?: string;
+        };
+        /** @description Connection status for one subscription-backed agent auth provider */
+        AgentAuthProviderStatus: {
+            id: string;
+            name: string;
+            connected: boolean;
+            /** Format: date-time */
+            expiresAt?: string;
+            canRefresh?: boolean;
+            accountId?: string;
+        };
+        /** @description List of subscription-backed auth providers */
+        ListAgentAuthProvidersResponse: {
+            providers: components["schemas"]["AgentAuthProviderStatus"][];
+        };
+        /** @description Manual OAuth login flow information */
+        StartAgentAuthProviderLoginResponse: {
+            flowId: string;
+            authUrl: string;
+            instructions?: string;
+        };
+        /** @description Complete a manual OAuth login flow */
+        CompleteAgentAuthProviderLoginRequest: {
+            flowId: string;
+            /** Format: uri */
+            redirectUrl?: string;
+            code?: string;
+        } | unknown | unknown;
+        /** @description Updated provider status after login completion */
+        CompleteAgentAuthProviderLoginResponse: {
+            provider: components["schemas"]["AgentAuthProviderStatus"];
         };
         /** @description Skill configuration */
         SkillResponse: {
@@ -4167,6 +4268,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: ModelPresetThinkingEffort;
             description?: string;
         };
         /** @description List of model presets */
@@ -9869,6 +9972,235 @@ export interface operations {
             };
         };
     };
+    listAgentAuthProviders: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of auth providers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentAuthProvidersResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    startAgentAuthProviderLogin: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Auth provider ID */
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Login flow started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartAgentAuthProviderLoginResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    disconnectAgentAuthProviderLogin: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Auth provider ID */
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider disconnected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    completeAgentAuthProviderLogin: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Auth provider ID */
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteAgentAuthProviderLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Login completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompleteAgentAuthProviderLoginResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Requires admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     deleteAgentModel: {
         parameters: {
             query?: {
@@ -12722,26 +13054,47 @@ export enum AgentBashRuleAction {
 export enum ModelConfigResponseProvider {
     anthropic = "anthropic",
     openai = "openai",
+    openai_codex = "openai-codex",
     gemini = "gemini",
     openrouter = "openrouter",
     local = "local",
     zai = "zai"
+}
+export enum ModelConfigResponseThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
 }
 export enum CreateModelConfigRequestProvider {
     anthropic = "anthropic",
     openai = "openai",
+    openai_codex = "openai-codex",
     gemini = "gemini",
     openrouter = "openrouter",
     local = "local",
     zai = "zai"
 }
+export enum CreateModelConfigRequestThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
+}
 export enum UpdateModelConfigRequestProvider {
     anthropic = "anthropic",
     openai = "openai",
+    openai_codex = "openai-codex",
     gemini = "gemini",
     openrouter = "openrouter",
     local = "local",
     zai = "zai"
+}
+export enum UpdateModelConfigRequestThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
 }
 export enum SkillResponseType {
     builtin = "builtin",
@@ -12754,10 +13107,17 @@ export enum DocTreeNodeResponseType {
 export enum ModelPresetProvider {
     anthropic = "anthropic",
     openai = "openai",
+    openai_codex = "openai-codex",
     gemini = "gemini",
     openrouter = "openrouter",
     local = "local",
     zai = "zai"
+}
+export enum ModelPresetThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
 }
 export enum AgentUserPromptPromptType {
     general = "general",

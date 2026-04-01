@@ -10,7 +10,10 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/docker/docker/api/types/registry"
+	"github.com/moby/moby/api/pkg/authconfig"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -228,7 +231,7 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 		assert.NotEmpty(t, header)
 
 		// Decode and verify
-		decoded, err := registry.DecodeAuthConfig(header)
+		decoded, err := authconfig.Decode(header)
 		require.NoError(t, err)
 		assert.Equal(t, "user", decoded.Username)
 		assert.Equal(t, "pass", decoded.Password)
@@ -252,7 +255,7 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 		assert.NotEmpty(t, header)
 
 		// Decode and verify
-		decoded, err := registry.DecodeAuthConfig(header)
+		decoded, err := authconfig.Decode(header)
 		require.NoError(t, err)
 		assert.Equal(t, "_json_key", decoded.Username)
 		assert.Equal(t, "key", decoded.Password)
@@ -274,7 +277,7 @@ func TestRegistryAuthManager_GetAuthHeader(t *testing.T) {
 		assert.NotEmpty(t, header)
 
 		// Decode and verify
-		decoded, err := registry.DecodeAuthConfig(header)
+		decoded, err := authconfig.Decode(header)
 		require.NoError(t, err)
 		assert.Equal(t, "dGVzdDp0ZXN0", decoded.Auth)
 		assert.Equal(t, "ghcr.io", decoded.ServerAddress)
@@ -315,13 +318,16 @@ func TestRegistryAuthManager_GetPullOptions(t *testing.T) {
 		},
 	})
 
-	opts, err := manager.GetPullOptions("alpine:latest", "linux/amd64")
+	opts, err := manager.GetPullOptions("alpine:latest", specs.Platform{OS: "linux", Architecture: "amd64"})
 	require.NoError(t, err)
-	assert.Equal(t, "linux/amd64", opts.Platform)
+	assert.Equal(t, client.ImagePullOptions{
+		Platforms:    []specs.Platform{{OS: "linux", Architecture: "amd64"}},
+		RegistryAuth: opts.RegistryAuth,
+	}, opts)
 	assert.NotEmpty(t, opts.RegistryAuth)
 
 	// Verify the auth header is valid
-	decoded, err := registry.DecodeAuthConfig(opts.RegistryAuth)
+	decoded, err := authconfig.Decode(opts.RegistryAuth)
 	require.NoError(t, err)
 	assert.Equal(t, "user", decoded.Username)
 	assert.Equal(t, "pass", decoded.Password)
@@ -354,7 +360,7 @@ func TestRegistryAuthManager_ComplexJSONAuth(t *testing.T) {
 	assert.NotEmpty(t, header)
 
 	// Decode and verify
-	decoded, err := registry.DecodeAuthConfig(header)
+	decoded, err := authconfig.Decode(header)
 	require.NoError(t, err)
 	assert.Equal(t, "myuser", decoded.Username)
 	assert.Equal(t, "mypass", decoded.Password)

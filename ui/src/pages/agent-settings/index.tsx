@@ -34,6 +34,9 @@ import {
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useUpdateConfig } from '@/contexts/ConfigContext';
+import { ProviderAuthCard } from '@/features/agent/components/ProviderAuthCard';
+import { useAgentAuthProviders } from '@/features/agent/hooks/useAgentAuthProviders';
+import { getAgentModelProviderLabel } from '@/features/agent/modelProviders';
 import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { ModelFormModal } from './ModelFormModal';
@@ -43,6 +46,7 @@ type ModelPreset = components['schemas']['ModelPreset'];
 type AgentToolPolicy = components['schemas']['AgentToolPolicy'];
 type AgentBashRule = components['schemas']['AgentBashRule'];
 type UpdateAgentConfigRequest = components['schemas']['UpdateAgentConfigRequest'];
+type AgentAuthProviderStatus = components['schemas']['AgentAuthProviderStatus'];
 
 type SoulOption = {
   id: string;
@@ -117,6 +121,14 @@ export default function AgentSettingsPage(): ReactNode {
   const isAdmin = useIsAdmin();
   const updateConfig = useUpdateConfig();
   const appBarContext = useContext(AppBarContext);
+  const {
+    providerMap,
+    isLoading: authLoading,
+    error: authError,
+    startLogin,
+    completeLogin,
+    disconnect,
+  } = useAgentAuthProviders();
   const [toolMetas, setToolMetas] = useState<ToolMeta[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -142,6 +154,7 @@ export default function AgentSettingsPage(): ReactNode {
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const codexProvider = (providerMap['openai-codex'] as AgentAuthProviderStatus | undefined) || null;
   const bashRuleIdCounter = useRef(0);
 
   const nextBashRuleId = useCallback((): string => {
@@ -620,6 +633,34 @@ export default function AgentSettingsPage(): ReactNode {
         )}
       </div>
 
+      {/* Subscription Providers */}
+      <div className="space-y-3 max-w-3xl">
+        <div>
+          <h2 className="text-sm font-medium">Subscription Providers</h2>
+          <p className="text-xs text-muted-foreground">
+            Connect browser-based subscriptions that do not use API keys.
+          </p>
+        </div>
+
+        {authError ? (
+          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {authError}
+          </div>
+        ) : codexProvider ? (
+          <ProviderAuthCard
+            provider={codexProvider}
+            isLoading={authLoading}
+            onStartLogin={startLogin}
+            onCompleteLogin={completeLogin}
+            onDisconnect={disconnect}
+          />
+        ) : (
+          <div className="rounded-md border border-dashed border-border/80 px-3 py-6 text-sm text-muted-foreground">
+            {authLoading ? 'Loading provider connections...' : 'No subscription providers are available.'}
+          </div>
+        )}
+      </div>
+
       {/* Tool Permissions */}
       <div className="card-obsidian p-4 space-y-4">
         <div className="flex items-center gap-2 text-sm font-medium">
@@ -799,7 +840,7 @@ export default function AgentSettingsPage(): ReactNode {
                 <TableHead className="w-[140px]">ID</TableHead>
                 <TableHead className="w-[120px]">Provider</TableHead>
                 <TableHead className="w-[180px]">Model</TableHead>
-                <TableHead className="w-[100px]">API Key</TableHead>
+                <TableHead className="w-[100px]">Credential</TableHead>
                 <TableHead className="w-[80px]">Default</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
@@ -833,8 +874,8 @@ export default function AgentSettingsPage(): ReactNode {
                       </code>
                     </TableCell>
                     <TableCell>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
-                        {m.provider}
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {getAgentModelProviderLabel(m.provider)}
                       </span>
                     </TableCell>
                     <TableCell className="max-w-[180px]">
@@ -843,9 +884,31 @@ export default function AgentSettingsPage(): ReactNode {
                       </code>
                     </TableCell>
                     <TableCell>
-                      <span className={`text-xs ${m.apiKeyConfigured ? 'text-green-600' : 'text-muted-foreground'}`}>
-                        {m.apiKeyConfigured ? 'Configured' : 'Not set'}
-                      </span>
+                      {m.provider === 'openai-codex' ? (
+                        <span
+                          className={`text-xs ${
+                            authLoading
+                              ? 'text-muted-foreground'
+                              : authError
+                                ? 'text-amber-600'
+                                : codexProvider?.connected
+                                  ? 'text-green-600'
+                                  : 'text-muted-foreground'
+                          }`}
+                        >
+                          {authLoading
+                            ? 'Checking...'
+                            : authError
+                              ? 'Unavailable'
+                              : codexProvider?.connected
+                                ? 'Subscription'
+                                : 'Not connected'}
+                        </span>
+                      ) : (
+                        <span className={`text-xs ${m.apiKeyConfigured ? 'text-green-600' : 'text-muted-foreground'}`}>
+                          {m.apiKeyConfigured ? 'Configured' : 'Not set'}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {m.id === defaultModelId && (
@@ -895,6 +958,11 @@ export default function AgentSettingsPage(): ReactNode {
       <ModelFormModal
         open={showCreateModal}
         presets={presets}
+        codexProvider={codexProvider}
+        codexAuthLoading={authLoading}
+        onStartProviderLogin={startLogin}
+        onCompleteProviderLogin={completeLogin}
+        onDisconnectProvider={disconnect}
         onClose={() => setShowCreateModal(false)}
         onSuccess={() => {
           setShowCreateModal(false);
@@ -907,6 +975,11 @@ export default function AgentSettingsPage(): ReactNode {
         open={!!editingModel}
         model={editingModel || undefined}
         presets={presets}
+        codexProvider={codexProvider}
+        codexAuthLoading={authLoading}
+        onStartProviderLogin={startLogin}
+        onCompleteProviderLogin={completeLogin}
+        onDisconnectProvider={disconnect}
         onClose={() => setEditingModel(null)}
         onSuccess={() => {
           setEditingModel(null);

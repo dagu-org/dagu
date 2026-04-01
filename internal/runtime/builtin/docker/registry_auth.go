@@ -11,8 +11,10 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/registry"
+	"github.com/moby/moby/api/pkg/authconfig"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // RegistryAuthManager handles authentication for container registries
@@ -27,10 +29,11 @@ func NewRegistryAuthManager(auths map[string]*core.AuthConfig) *RegistryAuthMana
 	}
 }
 
-// GetPullOptions returns ImagePullOptions with authentication for the given image
-func (r *RegistryAuthManager) GetPullOptions(imageName string, platform string) (image.PullOptions, error) {
-	opts := image.PullOptions{
-		Platform: platform,
+// GetPullOptions returns ImagePullOptions with authentication for the given image.
+func (r *RegistryAuthManager) GetPullOptions(imageName string, platform specs.Platform) (client.ImagePullOptions, error) {
+	opts := client.ImagePullOptions{}
+	if platform.OS != "" {
+		opts.Platforms = []specs.Platform{platform}
 	}
 
 	authHeader, err := r.GetAuthHeader(imageName)
@@ -54,7 +57,7 @@ func (r *RegistryAuthManager) GetAuthHeader(imageName string) (string, error) {
 	}
 
 	if authConfig != nil {
-		return registry.EncodeAuthConfig(*authConfig)
+		return authconfig.Encode(*authConfig)
 	}
 
 	// Fall back to DOCKER_AUTH_CONFIG environment variable
@@ -65,7 +68,7 @@ func (r *RegistryAuthManager) GetAuthHeader(imageName string) (string, error) {
 			return "", fmt.Errorf("failed to parse DOCKER_AUTH_CONFIG: %w", err)
 		}
 		if authConfig != nil {
-			return registry.EncodeAuthConfig(*authConfig)
+			return authconfig.Encode(*authConfig)
 		}
 	}
 

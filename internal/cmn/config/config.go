@@ -149,15 +149,17 @@ type MonitoringConfig struct {
 
 // Core contains global configuration settings.
 type Core struct {
-	Debug         bool
-	LogFormat     string // "json" or "text"
-	TZ            string // e.g., "UTC", "UTC+9", "America/New_York"
-	TzOffsetInSec int
-	Location      *time.Location
-	DefaultShell  string // Platform default if empty
-	SkipExamples  bool   // Skip auto-creation of example DAGs and default base config
-	Peer          Peer
-	BaseEnv       BaseEnv
+	Debug                  bool
+	LogFormat              string // "json" or "text"
+	TZ                     string // e.g., "UTC", "UTC+9", "America/New_York"
+	TzOffsetInSec          int
+	Location               *time.Location
+	DefaultShell           string // Platform default if empty
+	SkipExamples           bool   // Skip auto-creation of example DAGs and default base config
+	EnvPassthrough         []string
+	EnvPassthroughPrefixes []string
+	Peer                   Peer
+	BaseEnv                BaseEnv
 }
 
 // Server contains the API server configuration.
@@ -167,6 +169,7 @@ type Server struct {
 	BasePath          string // URL path for reverse proxy subpath hosting
 	APIBasePath       string
 	Headless          bool
+	CheckUpdates      bool
 	AccessLog         AccessLogMode // "all" (default), "non-public", or "none"
 	LatestStatusToday bool
 	TLS               *TLSConfig

@@ -12,6 +12,7 @@ import (
 	_ "github.com/dagu-org/dagu/internal/llm/providers/gemini"
 	_ "github.com/dagu-org/dagu/internal/llm/providers/local"
 	_ "github.com/dagu-org/dagu/internal/llm/providers/openai"
+	_ "github.com/dagu-org/dagu/internal/llm/providers/openaicodex"
 	_ "github.com/dagu-org/dagu/internal/llm/providers/openrouter"
 	_ "github.com/dagu-org/dagu/internal/llm/providers/zai"
 )

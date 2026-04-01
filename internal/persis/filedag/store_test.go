@@ -134,6 +134,37 @@ steps:
 	assert.Contains(t, err.Error(), "failed to locate DAG non-existent")
 }
 
+func TestGetMetadata_InlineSchemaParamsPreserveMetadata(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-get-metadata-inline-schema")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	dagContent := `name: inline-schema-dag
+params:
+  type: object
+  properties:
+    batch_size:
+      type: integer
+      default: 10
+    debug:
+      type: boolean
+      default: false
+steps:
+  - name: step1
+    command: echo "hello"`
+	err := os.WriteFile(filepath.Join(tmpDir, "inline-schema-dag.yaml"), []byte(dagContent), 0600)
+	require.NoError(t, err)
+
+	dag, err := store.GetMetadata(ctx, "inline-schema-dag")
+	require.NoError(t, err)
+	require.Len(t, dag.ParamDefs, 2)
+	assert.Equal(t, `batch_size="10" debug="false"`, dag.DefaultParams)
+}
+
 func TestGetDetails(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-get-details")
 	defer func() {

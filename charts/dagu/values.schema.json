@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "config": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "envPassthrough": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "envPassthroughPrefixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "extraEnv": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "valueFrom": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  }
+}

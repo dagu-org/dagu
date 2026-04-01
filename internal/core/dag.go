@@ -224,6 +224,10 @@ type DAG struct {
 	// Steps with type: redis inherit this configuration.
 	// Excluded from JSON: may contain password.
 	Redis *RedisConfig `json:"-"`
+	// Kubernetes contains the default Kubernetes executor configuration for the DAG.
+	// Steps with type: k8s or type: kubernetes inherit this configuration.
+	// Excluded from JSON: may contain secret references.
+	Kubernetes KubernetesConfig `json:"-"`
 	// Secrets contains references to external secrets to be resolved at runtime.
 	Secrets []SecretRef `json:"secrets,omitempty"`
 	// dotenvOnce ensures LoadDotEnv is called only once, even with concurrent calls.
@@ -299,6 +303,9 @@ func (d *DAG) Clone() *DAG {
 	clone.dotenvOnce = sync.Once{}
 	if d.PresolvedBuildEnv != nil {
 		clone.PresolvedBuildEnv = maps.Clone(d.PresolvedBuildEnv)
+	}
+	if d.Kubernetes != nil {
+		clone.Kubernetes = cloneKubernetesConfig(d.Kubernetes)
 	}
 	return &clone
 }
@@ -675,6 +682,48 @@ type RedisConfig struct {
 	ClusterAddrs []string `json:"clusterAddrs,omitempty"`
 	// MaxRetries is the maximum number of retries.
 	MaxRetries int `json:"maxRetries,omitempty"`
+}
+
+// KubernetesConfig contains default Kubernetes executor configuration for the DAG.
+// It stores the raw executor config map so step-level overrides can be merged
+// using executor-specific semantics during DAG build.
+type KubernetesConfig map[string]any
+
+func cloneKubernetesConfig(cfg KubernetesConfig) KubernetesConfig {
+	if cfg == nil {
+		return nil
+	}
+
+	cloned := make(KubernetesConfig, len(cfg))
+	for key, value := range cfg {
+		cloned[key] = cloneKubernetesValue(value)
+	}
+	return cloned
+}
+
+func cloneKubernetesValue(value any) any {
+	switch v := value.(type) {
+	case KubernetesConfig:
+		return cloneKubernetesConfig(v)
+	case map[string]any:
+		return map[string]any(cloneKubernetesConfig(v))
+	case []any:
+		cloned := make([]any, len(v))
+		for i := range v {
+			cloned[i] = cloneKubernetesValue(v[i])
+		}
+		return cloned
+	case []string:
+		return append([]string(nil), v...)
+	case []map[string]any:
+		cloned := make([]map[string]any, len(v))
+		for i := range v {
+			cloned[i] = map[string]any(cloneKubernetesConfig(v[i]))
+		}
+		return cloned
+	default:
+		return value
+	}
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.

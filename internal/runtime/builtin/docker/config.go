@@ -9,10 +9,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 // Config holds the configuration for creating or using a container.
@@ -26,17 +27,17 @@ type Config struct {
 	// Pull is the image pull policy for new containers.
 	Pull core.PullPolicy
 	// Container is the container configuration for new containers.
-	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
+	// See https://pkg.go.dev/github.com/moby/moby/api/types/container#Config
 	Container *container.Config
 	// Host is the host configuration for new containers.
-	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
+	// See https://pkg.go.dev/github.com/moby/moby/api/types/container#HostConfig
 	Host *container.HostConfig
 	// Network is the network configuration for new containers.
-	// See https://pkg.go.dev/github.com/docker/docker@v27.5.1+incompatible/api/types/network#NetworkingConfig
+	// See https://pkg.go.dev/github.com/moby/moby/api/types/network#NetworkingConfig
 	Network *network.NetworkingConfig
 	// ExecOptions are the options for executing a command in the container.
-	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
-	ExecOptions *container.ExecOptions
+	// See https://pkg.go.dev/github.com/moby/moby/client#ExecCreateOptions
+	ExecOptions *client.ExecCreateOptions
 	// AutoRemove indicates whether to automatically remove the container after it exits.
 	AutoRemove bool
 	// AuthManager is responsible for managing registry authentication.
@@ -62,7 +63,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 		Container     container.Config         `mapstructure:"container"`
 		Host          container.HostConfig     `mapstructure:"host"`
 		Network       network.NetworkingConfig `mapstructure:"network"`
-		Exec          container.ExecOptions    `mapstructure:"exec"`
+		Exec          client.ExecCreateOptions `mapstructure:"exec"`
 		AutoRemove    any                      `mapstructure:"auto_remove"`
 		Pull          any                      `mapstructure:"pull"`
 		Platform      string                   `mapstructure:"platform"`
@@ -175,7 +176,7 @@ func LoadConfigFromMap(data map[string]any, registryAuths map[string]*core.AuthC
 func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*core.AuthConfig) (*Config, error) {
 	// Handle exec mode (exec into existing container)
 	if ct.IsExecMode() {
-		execOpts := &container.ExecOptions{
+		execOpts := &client.ExecCreateOptions{
 			User:       ct.User,
 			WorkingDir: ct.GetWorkingDir(),
 			Env:        ct.Env,
@@ -213,7 +214,7 @@ func LoadConfig(workDir string, ct core.Container, registryAuths map[string]*cor
 
 	hostConfig := &container.HostConfig{}
 	networkConfig := &network.NetworkingConfig{}
-	execOptions := &container.ExecOptions{}
+	execOptions := &client.ExecCreateOptions{}
 
 	// Parse volumes
 	if len(ct.Volumes) > 0 {

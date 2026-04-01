@@ -5,6 +5,9 @@ package schema
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -87,6 +90,21 @@ steps:
 `,
 		},
 		{
+			name: "TopLevelInlineSchemaMode",
+			spec: `
+params:
+  type: object
+  properties:
+    batch_size:
+      type: integer
+    debug:
+      type: boolean
+  additionalProperties: false
+steps:
+  - command: echo done
+`,
+		},
+		{
 			name: "ExternalInlineSchemaMode",
 			spec: `
 params:
@@ -154,6 +172,17 @@ params:
   region: us
 steps:
   - command: echo "${schema} ${region}"
+`,
+		},
+		{
+			name: "LegacyMapAllowsPropertiesObjectWithoutTypeObject",
+			spec: `
+params:
+  properties:
+    foo: bar
+  region: us
+steps:
+  - command: echo "${region}"
 `,
 		},
 	}
@@ -475,6 +504,287 @@ steps:
 	err := resolved.Validate(doc)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "steps")
+}
+
+func TestDAGSchemaKubernetes(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "RootDefaultsAllowOmittedImage",
+			spec: `
+kubernetes:
+  namespace: batch
+  service_account: dagu-runner
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+    command: echo hello
+`,
+		},
+		{
+			name: "StepConfigAllowsImageOmittedWhenRootDefaultsProvideIt",
+			spec: `
+kubernetes:
+  image: alpine:3.20
+  namespace: batch
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      cleanup_policy: keep
+    command: echo hello
+`,
+		},
+		{
+			name: "StepConfigSupportsKubernetesAlias",
+			spec: `
+steps:
+  - id: report
+    type: kubernetes
+    config:
+      image: alpine:3.20
+      namespace: batch
+      cleanup_policy: keep
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+      volumes:
+        - name: scratch
+          empty_dir:
+            size_limit: 256Mi
+      volume_mounts:
+        - name: scratch
+          mount_path: /tmp/work
+    command: [sh, -c, "echo hello"]
+`,
+		},
+		{
+			name: "SupportsExtendedKubernetesConfig",
+			spec: `
+kubernetes:
+  pod_security_context:
+    run_as_non_root: true
+
+steps:
+  - id: report
+    type: kubernetes
+    config:
+      image: alpine:3.20
+      security_context:
+        run_as_non_root: true
+        capabilities:
+          drop: [ALL]
+        seccomp_profile:
+          type: RuntimeDefault
+      pod_security_context:
+        fs_group: 2000
+        fs_group_change_policy: OnRootMismatch
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: "0"
+      affinity:
+        node_affinity:
+          required_during_scheduling_ignored_during_execution:
+            node_selector_terms:
+              - match_expressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values: [amd64]
+        pod_anti_affinity:
+          required_during_scheduling_ignored_during_execution:
+            - topology_key: kubernetes.io/hostname
+              label_selector:
+                match_labels:
+                  app: dagu
+      termination_grace_period_seconds: 30
+      priority_class_name: batch-high
+      pod_failure_policy:
+        rules:
+          - action: Count
+            on_exit_codes:
+              operator: In
+              values: [42]
+          - action: Ignore
+            on_pod_conditions:
+              - type: DisruptionTarget
+    command: echo hello
+`,
+		},
+		{
+			name: "AllowsClearingInheritedExtendedConfig",
+			spec: `
+kubernetes:
+  affinity:
+    node_affinity:
+      required_during_scheduling_ignored_during_execution:
+        node_selector_terms:
+          - match_expressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values: [amd64]
+  pod_failure_policy:
+    rules:
+      - action: Count
+        on_exit_codes:
+          operator: In
+          values: [42]
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      affinity: {}
+      pod_failure_policy: {}
+    command: echo hello
+`,
+		},
+		{
+			name: "RejectUnknownRootField",
+			spec: `
+kubernetes:
+  unknown_field: true
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+    command: echo hello
+`,
+			wantErr: "kubernetes",
+		},
+		{
+			name: "RejectInvalidEnvEntry",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      env:
+        - value: missing-name
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectInvalidEnvFromEntry",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      env_from:
+        - prefix: APP_
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectInvalidSeccompLocalhostProfile",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      security_context:
+        seccomp_profile:
+          localhost_profile: profiles/custom.json
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectUnsupportedPodFailureAction",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      pod_failure_policy:
+        rules:
+          - action: FailIndex
+            on_exit_codes:
+              operator: In
+              values: [42]
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectUnknownStepField",
+			spec: `
+steps:
+  - id: report
+    type: kubernetes
+    config:
+      image: alpine:3.20
+      unknown_field: true
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectMultipleVolumeSources",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      volumes:
+        - name: data
+          empty_dir: {}
+          secret:
+            secret_name: app-secret
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestDAGSchemaRepoCopyMatchesEmbeddedSchema(t *testing.T) {
+	t.Parallel()
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+
+	repoSchemaPath := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "schemas", "dag.schema.json")
+	repoSchemaJSON, err := os.ReadFile(repoSchemaPath)
+	require.NoError(t, err)
+	require.Equal(t, string(DAGSchemaJSON), string(repoSchemaJSON))
 }
 
 func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {

@@ -4,20 +4,28 @@
 package docker
 
 import (
+	"net/netip"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func mustPort(s string) network.Port {
+	return network.MustParsePort(s)
+}
+
+func mustAddr(s string) netip.Addr {
+	return netip.MustParseAddr(s)
+}
 
 // TestLoadConfigFromMap covers LoadConfigFromMap with 92.7% coverage.
 // The uncovered lines (7.3%) are error handling for mapstructure.NewDecoder failures
@@ -42,7 +50,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -56,7 +64,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
-				ExecOptions:   &container.ExecOptions{},
+				ExecOptions:   &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -104,7 +112,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Network: &network.NetworkingConfig{
 					EndpointsConfig: map[string]*network.EndpointSettings{},
 				},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -123,7 +131,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{
+				ExecOptions: &client.ExecCreateOptions{
 					User:       "root",
 					WorkingDir: "/tmp",
 					Env:        []string{"BAR=baz"},
@@ -147,7 +155,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 					AutoRemove: false,
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -168,7 +176,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 					AutoRemove: false,
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -184,7 +192,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -200,7 +208,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -216,7 +224,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -232,7 +240,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -265,7 +273,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -280,7 +288,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -295,7 +303,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -310,7 +318,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -325,7 +333,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -362,7 +370,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -416,7 +424,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -452,7 +460,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -466,7 +474,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
-				ExecOptions:   &container.ExecOptions{},
+				ExecOptions:   &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -480,7 +488,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -498,7 +506,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -513,7 +521,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -528,7 +536,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -544,7 +552,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -560,7 +568,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:   &container.Config{},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -576,7 +584,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
-				ExecOptions:   &container.ExecOptions{},
+				ExecOptions:   &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -592,7 +600,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				Container:     &container.Config{},
 				Host:          &container.HostConfig{},
 				Network:       &network.NetworkingConfig{},
-				ExecOptions:   &container.ExecOptions{},
+				ExecOptions:   &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -609,7 +617,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -626,7 +634,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 					Binds: []string{"/host/path:/container/path", "/data:/data:ro"},
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -646,7 +654,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 					Binds: []string{"$PWD:/work"},
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -666,7 +674,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -686,7 +694,7 @@ func TestLoadConfigFromMap(t *testing.T) {
 					Binds: []string{"/existing:/existing", "/new:/new"},
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 	}
@@ -748,7 +756,7 @@ func TestLoadConfig(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -783,9 +791,9 @@ func TestLoadConfig(t *testing.T) {
 					Env:        []string{"FOO=bar", "BAZ=qux"},
 					User:       "1000:1000",
 					WorkingDir: "/workspace",
-					ExposedPorts: nat.PortSet{
-						"80/tcp":   {},
-						"9090/tcp": {},
+					ExposedPorts: network.PortSet{
+						mustPort("80/tcp"):   {},
+						mustPort("9090/tcp"): {},
 					},
 				},
 				Host: &container.HostConfig{
@@ -798,10 +806,10 @@ func TestLoadConfig(t *testing.T) {
 							ReadOnly: false,
 						},
 					},
-					PortBindings: nat.PortMap{
-						"80/tcp": []nat.PortBinding{
+					PortBindings: network.PortMap{
+						mustPort("80/tcp"): []network.PortBinding{
 							{
-								HostIP:   "0.0.0.0",
+								HostIP:   mustAddr("0.0.0.0"),
 								HostPort: "8080",
 							},
 						},
@@ -813,7 +821,7 @@ func TestLoadConfig(t *testing.T) {
 						"mynetwork": {},
 					},
 				},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -832,7 +840,7 @@ func TestLoadConfig(t *testing.T) {
 					NetworkMode: "host",
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -851,7 +859,7 @@ func TestLoadConfig(t *testing.T) {
 					NetworkMode: "container:myapp",
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -870,7 +878,7 @@ func TestLoadConfig(t *testing.T) {
 					Binds: []string{"/host/path:/container/path:rw"},
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -893,7 +901,7 @@ func TestLoadConfig(t *testing.T) {
 						Binds: []string{resolvedPath + ":/data:ro"},
 					},
 					Network:     &network.NetworkingConfig{},
-					ExecOptions: &container.ExecOptions{},
+					ExecOptions: &client.ExecCreateOptions{},
 				}
 			}(),
 		},
@@ -917,7 +925,7 @@ func TestLoadConfig(t *testing.T) {
 						Binds: []string{resolvedPath + ":/data:rw"},
 					},
 					Network:     &network.NetworkingConfig{},
-					ExecOptions: &container.ExecOptions{},
+					ExecOptions: &client.ExecCreateOptions{},
 				}
 			}(),
 		},
@@ -932,22 +940,22 @@ func TestLoadConfig(t *testing.T) {
 				AutoRemove: true,
 				Container: &container.Config{
 					Image: "nginx",
-					ExposedPorts: nat.PortSet{
-						"80/tcp": {},
+					ExposedPorts: network.PortSet{
+						mustPort("80/tcp"): {},
 					},
 				},
 				Host: &container.HostConfig{
-					PortBindings: nat.PortMap{
-						"80/tcp": []nat.PortBinding{
+					PortBindings: network.PortMap{
+						mustPort("80/tcp"): []network.PortBinding{
 							{
-								HostIP:   "127.0.0.1",
+								HostIP:   mustAddr("127.0.0.1"),
 								HostPort: "8080",
 							},
 						},
 					},
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -961,22 +969,22 @@ func TestLoadConfig(t *testing.T) {
 				AutoRemove: true,
 				Container: &container.Config{
 					Image: "dns-server",
-					ExposedPorts: nat.PortSet{
-						"53/udp": {},
+					ExposedPorts: network.PortSet{
+						mustPort("53/udp"): {},
 					},
 				},
 				Host: &container.HostConfig{
-					PortBindings: nat.PortMap{
-						"53/udp": []nat.PortBinding{
+					PortBindings: network.PortMap{
+						mustPort("53/udp"): []network.PortBinding{
 							{
-								HostIP:   "0.0.0.0",
+								HostIP:   mustAddr("0.0.0.0"),
 								HostPort: "53",
 							},
 						},
 					},
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1044,13 +1052,13 @@ func TestLoadConfig(t *testing.T) {
 				AutoRemove: true,
 				Container: &container.Config{
 					Image: "sctp-server",
-					ExposedPorts: nat.PortSet{
-						"132/sctp": {},
+					ExposedPorts: network.PortSet{
+						mustPort("132/sctp"): {},
 					},
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1064,22 +1072,22 @@ func TestLoadConfig(t *testing.T) {
 				AutoRemove: true,
 				Container: &container.Config{
 					Image: "nginx",
-					ExposedPorts: nat.PortSet{
-						"80/tcp": {},
+					ExposedPorts: network.PortSet{
+						mustPort("80/tcp"): {},
 					},
 				},
 				Host: &container.HostConfig{
-					PortBindings: nat.PortMap{
-						"80/tcp": []nat.PortBinding{
+					PortBindings: network.PortMap{
+						mustPort("80/tcp"): []network.PortBinding{
 							{
-								HostIP:   "0.0.0.0",
+								HostIP:   mustAddr("0.0.0.0"),
 								HostPort: "8080",
 							},
 						},
 					},
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1098,7 +1106,7 @@ func TestLoadConfig(t *testing.T) {
 					NetworkMode: "", // Empty string for default
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1117,7 +1125,7 @@ func TestLoadConfig(t *testing.T) {
 					NetworkMode: "bridge",
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1136,7 +1144,7 @@ func TestLoadConfig(t *testing.T) {
 					NetworkMode: "none",
 				},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1153,7 +1161,7 @@ func TestLoadConfig(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1170,7 +1178,7 @@ func TestLoadConfig(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1188,7 +1196,7 @@ func TestLoadConfig(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1206,7 +1214,7 @@ func TestLoadConfig(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1224,7 +1232,7 @@ func TestLoadConfig(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 		{
@@ -1241,7 +1249,7 @@ func TestLoadConfig(t *testing.T) {
 				},
 				Host:        &container.HostConfig{},
 				Network:     &network.NetworkingConfig{},
-				ExecOptions: &container.ExecOptions{},
+				ExecOptions: &client.ExecCreateOptions{},
 			},
 		},
 	}
@@ -1488,7 +1496,7 @@ func TestWrapCommandWithShell(t *testing.T) {
 func TestDockerClientRespectsDockerHostEnv(t *testing.T) {
 	t.Setenv("DOCKER_HOST", "tcp://test-host:2375")
 
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := client.New(client.FromEnv)
 	require.NoError(t, err)
 	defer cli.Close()
 

@@ -297,17 +297,22 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 }
 
 func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
-	baseEnv := LoadBaseEnv()
+	envPassthrough := normalizeEnvEntries(parseStringList(l.v.Get("env_passthrough")))
+	envPassthroughPrefixes := normalizeEnvEntries(parseStringList(l.v.Get("env_passthrough_prefixes")))
+
+	baseEnv := LoadBaseEnvWithExtras(envPassthrough, envPassthroughPrefixes)
 	baseEnv.variables = append(baseEnv.variables, l.additionalBaseEnv...)
 
 	cfg.Core = Core{
-		Debug:        def.Debug,
-		LogFormat:    def.LogFormat,
-		TZ:           def.TZ,
-		DefaultShell: def.DefaultShell,
-		SkipExamples: l.v.GetBool("skip_examples"),
-		BaseEnv:      baseEnv,
-		Peer:         l.loadPeerConfig(def.Peer),
+		Debug:                  def.Debug,
+		LogFormat:              def.LogFormat,
+		TZ:                     def.TZ,
+		DefaultShell:           def.DefaultShell,
+		SkipExamples:           l.v.GetBool("skip_examples"),
+		EnvPassthrough:         envPassthrough,
+		EnvPassthroughPrefixes: envPassthroughPrefixes,
+		BaseEnv:                baseEnv,
+		Peer:                   l.loadPeerConfig(def.Peer),
 	}
 
 	if err := setTimezone(&cfg.Core); err != nil {
@@ -628,6 +633,7 @@ func (l *ConfigLoader) warnIfWeakValue(value string, weakList []string, msg stri
 
 func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
+	cfg.Server.CheckUpdates = l.v.GetBool("check_updates")
 
 	cfg.Server.Metrics = MetricsAccessPrivate
 	if def.Metrics != nil {
@@ -1444,6 +1450,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("debug", false)
 	l.v.SetDefault("base_path", "")
 	l.v.SetDefault("api_base_path", "/api/v1")
+	l.v.SetDefault("check_updates", true)
 	l.v.SetDefault("latest_status_today", false)
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
@@ -1525,6 +1532,7 @@ var envBindings = []envBinding{
 	{key: "port", env: "PORT"},
 	{key: "debug", env: "DEBUG"},
 	{key: "headless", env: "HEADLESS"},
+	{key: "check_updates", env: "CHECK_UPDATES"},
 	{key: "latest_status_today", env: "LATEST_STATUS_TODAY"},
 	{key: "metrics", env: "SERVER_METRICS"},
 	{key: "cache", env: "CACHE"},
@@ -1545,6 +1553,8 @@ var envBindings = []envBinding{
 	// Core
 	{key: "default_shell", env: "DEFAULT_SHELL"},
 	{key: "skip_examples", env: "SKIP_EXAMPLES"},
+	{key: "env_passthrough", env: "ENV_PASSTHROUGH"},
+	{key: "env_passthrough_prefixes", env: "ENV_PASSTHROUGH_PREFIXES"},
 
 	// Secrets
 	{key: "secrets.vault.address", env: "SECRETS_VAULT_ADDRESS"},

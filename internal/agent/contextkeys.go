@@ -3,7 +3,11 @@
 
 package agent
 
-import "context"
+import (
+	"context"
+
+	"github.com/dagu-org/dagu/internal/agentoauth"
+)
 
 // Context keys for agent stores.
 // These allow agent stores to be injected into Go contexts without
@@ -15,6 +19,7 @@ type memoryStoreKey struct{}
 type skillStoreKey struct{}
 type soulStoreKey struct{}
 type remoteNodeResolverKey struct{}
+type oauthManagerKey struct{}
 
 // WithConfigStore injects a ConfigStore into the context.
 func WithConfigStore(ctx context.Context, s ConfigStore) context.Context {
@@ -86,4 +91,15 @@ func WithRemoteNodeResolver(ctx context.Context, r RemoteNodeResolver) context.C
 func GetRemoteNodeResolver(ctx context.Context) RemoteNodeResolver {
 	r, _ := ctx.Value(remoteNodeResolverKey{}).(RemoteNodeResolver)
 	return r
+}
+
+// WithOAuthManager injects the OAuth manager into the context.
+func WithOAuthManager(ctx context.Context, m *agentoauth.Manager) context.Context {
+	return context.WithValue(ctx, oauthManagerKey{}, m)
+}
+
+// GetOAuthManager retrieves the OAuth manager from the context.
+func GetOAuthManager(ctx context.Context) *agentoauth.Manager {
+	m, _ := ctx.Value(oauthManagerKey{}).(*agentoauth.Manager)
+	return m
 }

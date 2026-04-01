@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -24,7 +24,7 @@ func TestSFTPExecutorIntegration(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 

@@ -7,20 +7,23 @@ package config
 // Fields are organized into logical groups for clarity.
 type Definition struct {
 	// Server settings
-	Host        string  `mapstructure:"host"`
-	Port        int     `mapstructure:"port"`
-	BasePath    string  `mapstructure:"base_path"`
-	APIBasePath string  `mapstructure:"api_base_path"`
-	APIBaseURL  string  `mapstructure:"api_base_url"` // Deprecated: use APIBasePath
-	Headless    *bool   `mapstructure:"headless"`
-	TLS         *TLSDef `mapstructure:"tls"`
+	Host         string  `mapstructure:"host"`
+	Port         int     `mapstructure:"port"`
+	BasePath     string  `mapstructure:"base_path"`
+	APIBasePath  string  `mapstructure:"api_base_path"`
+	APIBaseURL   string  `mapstructure:"api_base_url"` // Deprecated: use APIBasePath
+	Headless     *bool   `mapstructure:"headless"`
+	CheckUpdates *bool   `mapstructure:"check_updates"`
+	TLS          *TLSDef `mapstructure:"tls"`
 
 	// Core settings
-	Debug        bool    `mapstructure:"debug"`
-	DefaultShell string  `mapstructure:"default_shell"`
-	LogFormat    string  `mapstructure:"log_format"`      // "json" or "text"
-	AccessLog    *string `mapstructure:"access_log_mode"` // "all" (default), "non-public", or "none"
-	TZ           string  `mapstructure:"tz"`
+	Debug                  bool     `mapstructure:"debug"`
+	DefaultShell           string   `mapstructure:"default_shell"`
+	LogFormat              string   `mapstructure:"log_format"`      // "json" or "text"
+	AccessLog              *string  `mapstructure:"access_log_mode"` // "all" (default), "non-public", or "none"
+	TZ                     string   `mapstructure:"tz"`
+	EnvPassthrough         []string `mapstructure:"env_passthrough"`
+	EnvPassthroughPrefixes []string `mapstructure:"env_passthrough_prefixes"`
 
 	// Authentication
 	Auth *AuthDef `mapstructure:"auth"`

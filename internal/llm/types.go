@@ -5,7 +5,11 @@
 // Large Language Model providers.
 package llm
 
-import "time"
+import (
+	"context"
+	"fmt"
+	"time"
+)
 
 // Role represents the role of a message sender in a session.
 type Role string
@@ -35,6 +39,19 @@ const (
 	// Note: Not all providers support this level.
 	ThinkingEffortXHigh ThinkingEffort = "xhigh"
 )
+
+// ParseThinkingEffort validates and returns a ThinkingEffort from a string.
+// Returns empty string for empty input (no effort specified).
+func ParseThinkingEffort(s string) (ThinkingEffort, error) {
+	switch ThinkingEffort(s) {
+	case "":
+		return "", nil
+	case ThinkingEffortLow, ThinkingEffortMedium, ThinkingEffortHigh, ThinkingEffortXHigh:
+		return ThinkingEffort(s), nil
+	default:
+		return "", fmt.Errorf("invalid thinking effort %q: must be one of: low, medium, high, xhigh", s)
+	}
+}
 
 // ParseRole converts a string to a Role, with support for common aliases.
 func ParseRole(s string) Role {
@@ -115,12 +132,28 @@ type Usage struct {
 	TotalTokens int `json:"total_tokens"`
 }
 
+// OAuthCredential contains dynamic bearer-auth details resolved at request time.
+type OAuthCredential struct {
+	AccessToken string
+	AccountID   string
+}
+
+// OAuthCredentialProvider resolves dynamic bearer credentials for providers that
+// cannot safely persist a static API key inside model configuration.
+type OAuthCredentialProvider interface {
+	ResolveCredential(ctx context.Context) (OAuthCredential, error)
+}
+
 // Config contains configuration for an LLM provider.
 type Config struct {
 	// APIKey is the authentication key for the provider.
 	APIKey string
+	// AccountID carries provider-specific account metadata when required.
+	AccountID string
 	// BaseURL is the API endpoint URL. If empty, the provider's default is used.
 	BaseURL string
+	// OAuthCredentialProvider resolves dynamic bearer credentials on demand.
+	OAuthCredentialProvider OAuthCredentialProvider
 	// Timeout is the maximum time to wait for a response.
 	// Default is 60 seconds if not specified.
 	Timeout time.Duration

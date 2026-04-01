@@ -4,12 +4,16 @@
 package backoff
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -151,5 +155,57 @@ func TestRetry(t *testing.T) {
 		assert.Equal(t, int32(3), atomic.LoadInt32(&attempts))
 		// With jitter, timing is unpredictable but should be relatively quick
 		assert.Less(t, elapsed, 200*time.Millisecond)
+	})
+}
+
+func TestRetryFailureLogLevelOverride(t *testing.T) {
+	runRetryExhausted := func(ctx context.Context) {
+		policy := NewConstantBackoffPolicy(time.Millisecond)
+		policy.MaxRetries = 1
+		_ = Retry(ctx, func(context.Context) error {
+			return errors.New("boom")
+		}, policy, nil)
+	}
+
+	t.Run("DefaultWarnRemainsVisible", func(t *testing.T) {
+		var buf bytes.Buffer
+		ctx := logger.WithLogger(context.Background(), logger.NewLogger(
+			logger.WithFormat("text"),
+			logger.WithWriter(&buf),
+			logger.WithQuiet(),
+		))
+
+		runRetryExhausted(ctx)
+
+		assert.Contains(t, buf.String(), "Retry attempts exhausted")
+	})
+
+	t.Run("DebugOverrideSuppressesFailureLogOutsideDebugMode", func(t *testing.T) {
+		var buf bytes.Buffer
+		ctx := logger.WithLogger(context.Background(), logger.NewLogger(
+			logger.WithFormat("text"),
+			logger.WithWriter(&buf),
+			logger.WithQuiet(),
+		))
+		ctx = WithRetryFailureLogLevel(ctx, slog.LevelDebug)
+
+		runRetryExhausted(ctx)
+
+		assert.NotContains(t, buf.String(), "Retry attempts exhausted")
+	})
+
+	t.Run("DebugOverrideStillLogsInDebugMode", func(t *testing.T) {
+		var buf bytes.Buffer
+		ctx := logger.WithLogger(context.Background(), logger.NewLogger(
+			logger.WithDebug(),
+			logger.WithFormat("text"),
+			logger.WithWriter(&buf),
+			logger.WithQuiet(),
+		))
+		ctx = WithRetryFailureLogLevel(ctx, slog.LevelDebug)
+
+		runRetryExhausted(ctx)
+
+		assert.True(t, strings.Contains(buf.String(), "Retry attempts exhausted"))
 	})
 }

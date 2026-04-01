@@ -152,7 +152,12 @@ func TestNotificationBatcher_DiscardDestinationsRemovesReadyAndBufferedBatches(t
 		Status:    core.Failed,
 	})))
 
-	time.Sleep(30 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		batcher.mu.Lock()
+		defer batcher.mu.Unlock()
+		return len(batcher.ready) == 2
+	}, time.Second, 10*time.Millisecond)
+
 	batcher.DiscardDestinations([]string{"ready-remove", "buffered-remove"})
 
 	ready := batcher.TakeReady()
