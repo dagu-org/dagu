@@ -54,6 +54,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filedoc"
+	"github.com/dagu-org/dagu/internal/persis/fileeventstore"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
@@ -67,6 +68,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
@@ -191,6 +193,10 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	auditSvc, auditStore, err := initAuditService(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
+	}
+	eventSvc, err := initEventService(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize event service: %w", err)
 	}
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
@@ -358,7 +364,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -442,6 +448,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	// Add audit service to API only if licensed (or no license manager)
 	if srv.auditService != nil {
 		apiOpts = append(apiOpts, apiv1.WithAuditService(srv.auditService))
+	}
+	if eventSvc != nil {
+		apiOpts = append(apiOpts, apiv1.WithEventService(eventSvc))
 	}
 
 	// Pass license manager to API
@@ -730,7 +739,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -752,6 +761,7 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		SessionStore:       sessStore,
 		DAGStore:           dagStore,
 		Hooks:              hooks,
+		EventService:       eventSvc,
 		MemoryStore:        memoryStore,
 		RemoteNodeResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
@@ -771,6 +781,17 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	logger.Info(ctx, "Agent API initialized")
 
 	return api, nil
+}
+
+func initEventService(cfg *config.Config) (*eventstore.Service, error) {
+	if cfg == nil || !cfg.EventStore.Enabled {
+		return nil, nil
+	}
+	store, err := fileeventstore.New(cfg.Paths.EventStoreDir)
+	if err != nil {
+		return nil, err
+	}
+	return eventstore.New(store), nil
 }
 
 // newAgentAuditHook returns a hook that logs agent tool executions to the audit service.

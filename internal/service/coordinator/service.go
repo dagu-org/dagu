@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc"
@@ -81,6 +82,10 @@ func (srv *Service) Start(ctx context.Context) (err error) {
 
 	// Create an internal context that can be cancelled by Stop()
 	internalCtx, cancel := context.WithCancel(ctx)
+	internalCtx = eventstore.WithContext(internalCtx, srv.handler.eventService, eventstore.Source{
+		Service:  eventstore.SourceServiceCoordinator,
+		Instance: srv.handler.eventSourceInstance,
+	})
 	srv.mu.Lock()
 	srv.stopCancel = cancel
 	srv.mu.Unlock()

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
@@ -198,6 +199,7 @@ func (s *Store) readEntriesFromFile(filePath string, filter audit.QueryFilter) (
 
 	var entries []*audit.Entry
 	scanner := bufio.NewScanner(f)
+	fileutil.ConfigureScanner(scanner)
 	lineNum := 0
 
 	for scanner.Scan() {

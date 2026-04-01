@@ -775,7 +775,7 @@ export default function GitSyncPage() {
 
       {/* Items Table */}
       <div className="bg-card border border-border rounded-md overflow-hidden shadow-sm">
-        <Table className="text-xs">
+        <Table className="text-xs [&_table]:table-fixed">
           <TableHeader>
             <TableRow>
               <TableHead className="w-8">
@@ -790,7 +790,7 @@ export default function GitSyncPage() {
               <TableHead>DAG</TableHead>
               <TableHead className="w-24">Status</TableHead>
               <TableHead className="w-28">Synced</TableHead>
-              <TableHead className="w-16"></TableHead>
+              <TableHead className="w-28"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -817,9 +817,9 @@ export default function GitSyncPage() {
                       aria-label={`Select ${itemId}`}
                     />
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono">
+                  <TableCell className="max-w-0 overflow-hidden">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-mono truncate" title={item.displayName}>
                         {item.displayName}
                       </span>
                       {kind === 'memory' && (
@@ -851,7 +851,7 @@ export default function GitSyncPage() {
                     {item.lastSyncedAt ? dayjs(item.lastSyncedAt).fromNow() : '-'}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center justify-end gap-0.5">
                       <Button
                         variant="ghost"
                         size="sm"

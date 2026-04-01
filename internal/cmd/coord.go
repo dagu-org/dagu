@@ -4,7 +4,6 @@
 package cmd
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -17,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/dagu-org/dagu/internal/service/healthcheck"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -93,29 +93,30 @@ var coordinatorFlags = []commandLineFlag{
 }
 
 func runCoordinator(ctx *Context, _ []string) error {
+	coordCtx := ctx.WithEventSource(eventstore.SourceServiceCoordinator)
 	svc, _, err := newCoordinator(
-		ctx,
-		ctx.Config,
-		ctx.ServiceRegistry,
-		ctx.DAGRunStore,
-		ctx.DispatchTaskStore,
-		ctx.WorkerHeartbeatStore,
-		ctx.DAGRunLeaseStore,
-		ctx.ActiveDistributedRunStore,
+		coordCtx,
+		coordCtx.Config,
+		coordCtx.ServiceRegistry,
+		coordCtx.DAGRunStore,
+		coordCtx.DispatchTaskStore,
+		coordCtx.WorkerHeartbeatStore,
+		coordCtx.DAGRunLeaseStore,
+		coordCtx.ActiveDistributedRunStore,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize coordinator: %w", err)
 	}
 
-	if err := svc.Start(ctx); err != nil {
+	if err := svc.Start(coordCtx); err != nil {
 		return fmt.Errorf("failed to start coordinator: %w", err)
 	}
 
 	// Wait for context cancellation
-	<-ctx.Done()
-	logger.Info(ctx, "Coordinator shutting down")
+	<-coordCtx.Done()
+	logger.Info(coordCtx, "Coordinator shutting down")
 
-	if err := svc.Stop(ctx); err != nil {
+	if err := svc.Stop(coordCtx); err != nil {
 		return fmt.Errorf("failed to stop coordinator: %w", err)
 	}
 
@@ -132,7 +133,7 @@ func runCoordinator(ctx *Context, _ []string) error {
 // to cfg.Coordinator.Host:cfg.Coordinator.Port and returns an initialized coordinator.Service.
 // It returns an error if any part of setup (TLS loading, listener binding, etc.) fails.
 func newCoordinator(
-	ctx context.Context,
+	ctx *Context,
 	cfg *config.Config,
 	registry exec.ServiceRegistry,
 	dagRunStore exec.DAGRunStore,
@@ -226,6 +227,8 @@ func newCoordinator(
 		WorkerHeartbeatStore:      workerHeartbeatStore,
 		DAGRunLeaseStore:          dagRunLeaseStore,
 		ActiveDistributedRunStore: activeDistributedRunStore,
+		EventService:              ctx.EventService,
+		EventSourceInstance:       ctx.EventSourceInstance,
 	})
 
 	// Create and return service with advertise address for service registry
