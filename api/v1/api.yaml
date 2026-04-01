@@ -3523,7 +3523,7 @@ paths:
         - $ref: "#/components/parameters/LogStartTime"
         - $ref: "#/components/parameters/LogEndTime"
         - $ref: "#/components/parameters/EventLogLimit"
-        - $ref: "#/components/parameters/LogOffset"
+        - $ref: "#/components/parameters/EventLogCursor"
       responses:
         "200":
           description: "List of event log entries"
@@ -6478,6 +6478,14 @@ components:
         minimum: 1
         maximum: 500
 
+    EventLogCursor:
+      name: cursor
+      in: query
+      description: "Opaque cursor for loading older event log entries"
+      required: false
+      schema:
+        type: string
+
     LogOffset:
       name: offset
       in: query
@@ -6740,12 +6748,11 @@ components:
           items:
             $ref: "#/components/schemas/EventLogEntry"
           description: "List of event log entries"
-        total:
-          type: integer
-          description: "Total number of entries matching the filter (before pagination)"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of older entries"
       required:
         - entries
-        - total
 
     ApproveStepRequest:
       type: object

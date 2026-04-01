@@ -22,6 +22,8 @@ import (
 
 const SchemaVersion = 1
 
+var ErrInvalidQueryCursor = errors.New("eventstore: invalid query cursor")
+
 type EventKind string
 
 const (
@@ -144,12 +146,12 @@ type QueryFilter struct {
 	StartTime time.Time
 	EndTime   time.Time
 	Limit     int
-	Offset    int
+	Cursor    string
 }
 
 type QueryResult struct {
-	Entries []*Event
-	Total   int
+	Entries    []*Event
+	NextCursor string
 }
 
 type Store interface {

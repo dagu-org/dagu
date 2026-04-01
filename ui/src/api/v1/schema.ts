@@ -2569,8 +2569,8 @@ export interface components {
         EventLogsResponse: {
             /** @description List of event log entries */
             entries: components["schemas"]["EventLogEntry"][];
-            /** @description Total number of entries matching the filter (before pagination) */
-            total: number;
+            /** @description Opaque cursor for loading the next page of older entries */
+            nextCursor?: string;
         };
         /** @description Request body for approving a waiting step */
         ApproveStepRequest: {
@@ -4469,6 +4469,8 @@ export interface components {
         AuditLogLimit: number;
         /** @description Maximum number of entries to return (default 50) */
         EventLogLimit: number;
+        /** @description Opaque cursor for loading older event log entries */
+        EventLogCursor: string;
         /** @description Number of entries to skip (for pagination) */
         LogOffset: number;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
@@ -8779,8 +8781,8 @@ export interface operations {
                 endTime?: components["parameters"]["LogEndTime"];
                 /** @description Maximum number of entries to return (default 50) */
                 limit?: components["parameters"]["EventLogLimit"];
-                /** @description Number of entries to skip (for pagination) */
-                offset?: components["parameters"]["LogOffset"];
+                /** @description Opaque cursor for loading older event log entries */
+                cursor?: components["parameters"]["EventLogCursor"];
             };
             header?: never;
             path?: never;

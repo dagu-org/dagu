@@ -9,11 +9,12 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
-import { useQuery } from '@/hooks/api';
+import { useClient, useQuery } from '@/hooks/api';
 import EventLogsPage from '../index';
 
 vi.mock('@/hooks/api', () => ({
   useQuery: vi.fn(),
+  useClient: vi.fn(),
 }));
 
 type QueryCall = {
@@ -25,6 +26,10 @@ const useQueryMock = useQuery as unknown as {
   mockImplementation: (
     fn: (path: string, init: unknown) => unknown
   ) => void;
+};
+
+const useClientMock = useClient as unknown as {
+  mockReturnValue: (value: unknown) => void;
 };
 
 function makeConfig(overrides: Partial<Config> = {}): Config {
@@ -117,7 +122,7 @@ function mockQueryResult(overrides: Record<string, unknown> = {}) {
   return {
     data: {
       entries: [],
-      total: 0,
+      nextCursor: undefined,
     },
     error: undefined,
     isLoading: false,
@@ -133,9 +138,15 @@ function latestEventLogsCall(calls: QueryCall[]): QueryCall | undefined {
 }
 
 describe('EventLogsPage', () => {
+  const clientGetMock = vi.fn();
+
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    clientGetMock.mockReset();
+    useClientMock.mockReturnValue({
+      GET: clientGetMock,
+    });
   });
 
   afterEach(() => {
@@ -175,7 +186,6 @@ describe('EventLogsPage', () => {
               remoteNode: 'remote-a',
               kind: 'dag_run',
               limit: 50,
-              offset: 0,
             }),
           },
         })
@@ -191,8 +201,7 @@ describe('EventLogsPage', () => {
     });
 
     renderPage({
-      initialEntry:
-        '/event-logs?dagName=payments&type=dag.run.failed&page=2',
+      initialEntry: '/event-logs?dagName=payments&type=dag.run.failed',
     });
 
     await waitFor(() => {
@@ -203,7 +212,6 @@ describe('EventLogsPage', () => {
             query: expect.objectContaining({
               dagName: 'payments',
               type: 'dag.run.failed',
-              offset: 50,
             }),
           },
         })
@@ -235,7 +243,7 @@ describe('EventLogsPage', () => {
               },
             },
           ],
-          total: 1,
+          nextCursor: undefined,
         },
       });
     });
@@ -271,5 +279,68 @@ describe('EventLogsPage', () => {
     expect(await screen.findByText('Raw Event')).toBeInTheDocument();
     expect(screen.getByText(/"id": "evt-1"/)).toBeInTheDocument();
     expect(screen.getByText(/"reason": "boom"/)).toBeInTheDocument();
+  });
+
+  it('loads older events using the opaque cursor', async () => {
+    const calls: QueryCall[] = [];
+    clientGetMock.mockResolvedValue({
+      data: {
+        entries: [
+          {
+            id: 'evt-2',
+            schemaVersion: 1,
+            occurredAt: '2026-04-01T00:00:10Z',
+            recordedAt: '2026-04-01T00:00:11Z',
+            kind: 'dag_run',
+            type: 'dag.run.succeeded',
+            sourceService: 'scheduler',
+            dagName: 'demo',
+            dagRunId: 'run-2',
+            attemptId: 'attempt-2',
+          },
+        ],
+      },
+      error: undefined,
+    });
+    useQueryMock.mockImplementation((path, init) => {
+      calls.push({ path, init });
+      return mockQueryResult({
+        data: {
+          entries: [
+            {
+              id: 'evt-1',
+              schemaVersion: 1,
+              occurredAt: '2026-04-01T00:01:00Z',
+              recordedAt: '2026-04-01T00:01:01Z',
+              kind: 'dag_run',
+              type: 'dag.run.failed',
+              sourceService: 'scheduler',
+              dagName: 'demo',
+              dagRunId: 'run-1',
+              attemptId: 'attempt-1',
+            },
+          ],
+          nextCursor: 'cursor-1',
+        },
+      });
+    });
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load More' }));
+
+    await waitFor(() => {
+      expect(clientGetMock).toHaveBeenCalledWith('/event-logs', {
+        params: {
+          query: expect.objectContaining({
+            kind: 'dag_run',
+            limit: 50,
+            cursor: 'cursor-1',
+          }),
+        },
+      });
+    });
+
+    expect(await screen.findByText('run-2')).toBeInTheDocument();
   });
 });

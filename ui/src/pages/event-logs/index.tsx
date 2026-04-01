@@ -31,7 +31,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useCanViewEventLogs } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useSearchState } from '@/contexts/SearchStateContext';
-import { useQuery } from '@/hooks/api';
+import { useClient, useQuery } from '@/hooks/api';
 import { FetchError } from '@/lib/fetchJson';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
@@ -46,6 +46,7 @@ import * as React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 type EventLogEntry = components['schemas']['EventLogEntry'];
+type EventLogsResponse = components['schemas']['EventLogsResponse'];
 
 type DateRangeMode = 'preset' | 'specific' | 'custom';
 type SpecificPeriod = 'date' | 'month' | 'year';
@@ -63,9 +64,7 @@ type EventLogFilters = {
   specificValue: string;
 };
 
-type StoredEventLogState = EventLogFilters & {
-  page: number;
-};
+type StoredEventLogState = EventLogFilters;
 
 const PAGE_SIZE = 50;
 const DEFAULT_DATE_PRESET = 'last7days';
@@ -149,7 +148,44 @@ function hasQueryParams(params: URLSearchParams): boolean {
   return Array.from(params.keys()).length > 0;
 }
 
+function appendUniqueEntries(
+  current: EventLogEntry[],
+  next: EventLogEntry[]
+): EventLogEntry[] {
+  if (next.length === 0) {
+    return current;
+  }
+  const seen = new Set(current.map((entry) => entry.id));
+  const merged = [...current];
+  for (const entry of next) {
+    if (seen.has(entry.id)) {
+      continue;
+    }
+    seen.add(entry.id);
+    merged.push(entry);
+  }
+  return merged;
+}
+
+function mergeUniqueEntries(
+  head: EventLogEntry[],
+  older: EventLogEntry[]
+): EventLogEntry[] {
+  return appendUniqueEntries(head, older);
+}
+
+function getClientErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object') {
+    const maybeMessage = (error as { message?: unknown }).message;
+    if (typeof maybeMessage === 'string' && maybeMessage) {
+      return maybeMessage;
+    }
+  }
+  return fallback;
+}
+
 export default function EventLogsPage() {
+  const client = useClient();
   const config = useConfig();
   const canViewEventLogs = useCanViewEventLogs();
   const appBarContext = React.useContext(AppBarContext);
@@ -157,6 +193,10 @@ export default function EventLogsPage() {
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
   const [searchParams, setSearchParams] = useSearchParams();
   const searchKey = searchParams.toString();
+  const locationSearchParams = React.useMemo(
+    () => new URLSearchParams(searchKey),
+    [searchKey]
+  );
 
   const getPresetDates = React.useCallback(
     (preset: string): { from: string; to?: string } => {
@@ -309,16 +349,21 @@ export default function EventLogsPage() {
   const [appliedFilters, setAppliedFilters] = React.useState<EventLogFilters>(
     defaultFilters
   );
-  const [page, setPage] = React.useState(1);
   const [autoRefresh, setAutoRefresh] = React.useState(true);
   const [selectedEvent, setSelectedEvent] = React.useState<EventLogEntry | null>(
     null
   );
   const [lastUpdatedAt, setLastUpdatedAt] = React.useState<Date | null>(null);
   const [hydratedKey, setHydratedKey] = React.useState('');
+  const [olderEntries, setOlderEntries] = React.useState<EventLogEntry[]>([]);
+  const [continuationCursorOverride, setContinuationCursorOverride] =
+    React.useState<string | null | undefined>(undefined);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
+  const activeFeedKeyRef = React.useRef('');
 
   const buildLocationParams = React.useCallback(
-    (filters: EventLogFilters, nextPage: number): URLSearchParams => {
+    (filters: EventLogFilters): URLSearchParams => {
       const params = new URLSearchParams();
       if (filters.type && filters.type !== 'all') {
         params.set('type', filters.type);
@@ -342,34 +387,17 @@ export default function EventLogsPage() {
       params.set('preset', filters.datePreset);
       params.set('specificPeriod', filters.specificPeriod);
       params.set('specificValue', filters.specificValue);
-      if (nextPage > 1) {
-        params.set('page', String(nextPage));
-      }
       return params;
     },
     []
   );
 
-  const parsePageParam = React.useCallback((value: string | null): number => {
-    if (!value) {
-      return 1;
-    }
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 1) {
-      return 1;
-    }
-    return Math.floor(parsed);
-  }, []);
-
   const parseLocationState = React.useCallback(
     (params: URLSearchParams): StoredEventLogState => {
-      const persisted = searchState.readState<StoredEventLogState>(
-        SEARCH_STATE_KEY,
-        remoteKey
-      );
+      const persisted =
+        searchState.readState<StoredEventLogState>(SEARCH_STATE_KEY, remoteKey);
       const base: StoredEventLogState = {
         ...defaultFilters,
-        page: 1,
         ...persisted,
       };
 
@@ -377,10 +405,7 @@ export default function EventLogsPage() {
         return base;
       }
 
-      const next: StoredEventLogState = {
-        ...base,
-        page: parsePageParam(params.get('page')),
-      };
+      const next: StoredEventLogState = { ...base };
 
       if (params.has('type')) {
         next.type = params.get('type') || 'all';
@@ -434,7 +459,7 @@ export default function EventLogsPage() {
 
       return next;
     },
-    [defaultFilters, parseDateFromUrl, parsePageParam, remoteKey, searchState]
+    [defaultFilters, parseDateFromUrl, remoteKey, searchState]
   );
 
   React.useEffect(() => {
@@ -442,29 +467,18 @@ export default function EventLogsPage() {
   }, [appBarContext]);
 
   React.useEffect(() => {
-    const next = parseLocationState(searchParams);
-    const { page: nextPage, ...nextFilters } = next;
-    setDraftFilters(nextFilters);
-    setAppliedFilters(nextFilters);
-    setPage(nextPage);
+    const next = parseLocationState(locationSearchParams);
+    setDraftFilters(next);
+    setAppliedFilters(next);
     setHydratedKey(`${remoteKey}:${searchKey}`);
-  }, [parseLocationState, remoteKey, searchKey, searchParams]);
+  }, [locationSearchParams, parseLocationState, remoteKey, searchKey]);
 
   React.useEffect(() => {
     if (hydratedKey !== `${remoteKey}:${searchKey}`) {
       return;
     }
-    searchState.writeState(SEARCH_STATE_KEY, remoteKey, {
-      ...draftFilters,
-      page,
-    });
-  }, [draftFilters, hydratedKey, page, remoteKey, searchKey, searchState]);
-
-  React.useEffect(() => {
-    if (page > 1 && autoRefresh) {
-      setAutoRefresh(false);
-    }
-  }, [autoRefresh, page]);
+    searchState.writeState(SEARCH_STATE_KEY, remoteKey, draftFilters);
+  }, [draftFilters, hydratedKey, remoteKey, searchKey, searchState]);
 
   const query = React.useMemo(() => {
     return {
@@ -477,9 +491,10 @@ export default function EventLogsPage() {
       startTime: formatDateForApi(appliedFilters.fromDate),
       endTime: formatDateForApi(appliedFilters.toDate),
       limit: PAGE_SIZE,
-      offset: (page - 1) * PAGE_SIZE,
     };
-  }, [appliedFilters, formatDateForApi, page, remoteKey]);
+  }, [appliedFilters, formatDateForApi, remoteKey]);
+
+  const feedKey = React.useMemo(() => JSON.stringify(query), [query]);
 
   const isReady = hydratedKey === `${remoteKey}:${searchKey}`;
 
@@ -493,11 +508,20 @@ export default function EventLogsPage() {
         }
       : null,
     {
-      refreshInterval: autoRefresh && page === 1 ? 5000 : 0,
+      refreshInterval: autoRefresh ? 5000 : 0,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
     }
   );
+
+  React.useEffect(() => {
+    activeFeedKeyRef.current = feedKey;
+    setOlderEntries([]);
+    setContinuationCursorOverride(undefined);
+    setLoadMoreError(null);
+    setIsLoadingMore(false);
+    setAutoRefresh(true);
+  }, [feedKey]);
 
   const updateDraftFilters = React.useCallback(
     (patch: Partial<EventLogFilters>) => {
@@ -512,8 +536,7 @@ export default function EventLogsPage() {
   const applyFilters = React.useCallback(
     (nextFilters: EventLogFilters) => {
       setAppliedFilters(nextFilters);
-      setPage(1);
-      setSearchParams(buildLocationParams(nextFilters, 1));
+      setSearchParams(buildLocationParams(nextFilters));
     },
     [buildLocationParams, setSearchParams]
   );
@@ -525,8 +548,7 @@ export default function EventLogsPage() {
   const handleClearFilters = React.useCallback(() => {
     setDraftFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
-    setPage(1);
-    setSearchParams(buildLocationParams(defaultFilters, 1));
+    setSearchParams(buildLocationParams(defaultFilters));
   }, [buildLocationParams, defaultFilters, setSearchParams]);
 
   const handleDatePresetChange = React.useCallback(
@@ -615,14 +637,6 @@ export default function EventLogsPage() {
     [draftFilters.specificValue, handleSpecificPeriodChange]
   );
 
-  const handlePageChange = React.useCallback(
-    (nextPage: number) => {
-      setPage(nextPage);
-      setSearchParams(buildLocationParams(appliedFilters, nextPage));
-    },
-    [appliedFilters, buildLocationParams, setSearchParams]
-  );
-
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
@@ -633,25 +647,33 @@ export default function EventLogsPage() {
     [handleApplyFilters]
   );
 
-  const total = data?.total ?? 0;
-  const entries = data?.entries ?? [];
+  const headEntries = data?.entries ?? [];
+  const entries = React.useMemo(
+    () => mergeUniqueEntries(headEntries, olderEntries),
+    [headEntries, olderEntries]
+  );
   const firstEntryID = entries[0]?.id ?? '';
   const lastEntryID =
     entries.length > 0 ? entries[entries.length - 1]?.id ?? '' : '';
-  const currentPage = page;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentNextCursor =
+    continuationCursorOverride === undefined
+      ? data?.nextCursor ?? null
+      : continuationCursorOverride;
+  const hasLoadedMore = continuationCursorOverride !== undefined;
+  const hasMoreEntries = currentNextCursor !== null;
+  const hasHeadResponse = data !== undefined;
   const rawEventJson = React.useMemo(
     () => (selectedEvent ? safeStringify(selectedEvent) : ''),
     [selectedEvent]
   );
   const tzLabel = formatTimezoneOffset();
-  const isAutoRefreshAvailable = page === 1;
+  const isAutoRefreshAvailable = !hasLoadedMore;
 
   React.useEffect(() => {
-    if (data) {
+    if (hasHeadResponse) {
       setLastUpdatedAt(new Date());
     }
-  }, [firstEntryID, lastEntryID, total]);
+  }, [currentNextCursor, firstEntryID, hasHeadResponse, lastEntryID]);
 
   let errorMessage: string | null = null;
   if (error instanceof FetchError) {
@@ -661,6 +683,52 @@ export default function EventLogsPage() {
   } else if (error) {
     errorMessage = 'Failed to load event logs';
   }
+
+  const handleRefresh = React.useCallback(async () => {
+    setOlderEntries([]);
+    setContinuationCursorOverride(undefined);
+    setLoadMoreError(null);
+    setIsLoadingMore(false);
+    setAutoRefresh(true);
+    await mutate();
+  }, [mutate]);
+
+  const handleLoadMore = React.useCallback(async () => {
+    if (isLoadingMore || !currentNextCursor) {
+      return;
+    }
+
+    const requestFeedKey = activeFeedKeyRef.current;
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    setAutoRefresh(false);
+
+    const response = await client.GET('/event-logs', {
+      params: {
+        query: {
+          ...query,
+          cursor: currentNextCursor,
+        },
+      },
+    });
+
+    if (activeFeedKeyRef.current != requestFeedKey) {
+      return;
+    }
+
+    setIsLoadingMore(false);
+
+    if (response.error) {
+      setLoadMoreError(
+        getClientErrorMessage(response.error, 'Failed to load older events')
+      );
+      return;
+    }
+
+    const pageData = (response.data ?? { entries: [] }) as EventLogsResponse;
+    setOlderEntries((prev) => appendUniqueEntries(prev, pageData.entries ?? []));
+    setContinuationCursorOverride(pageData.nextCursor ?? null);
+  }, [client, currentNextCursor, isLoadingMore, query]);
 
   if (!canViewEventLogs) {
     return (
@@ -689,7 +757,7 @@ export default function EventLogsPage() {
                 ? ' • Refreshing every 5 seconds'
                 : ''}
               {!isAutoRefreshAvailable
-                ? ' • Auto-refresh is only available on page 1'
+                ? ' • Auto-refresh is disabled after loading older events'
                 : ''}
             </p>
           </div>
@@ -706,7 +774,7 @@ export default function EventLogsPage() {
               title={
                 isAutoRefreshAvailable
                   ? `Toggle auto-refresh (currently ${autoRefresh ? 'ON' : 'OFF'})`
-                  : 'Auto-refresh is only available on the first page'
+                  : 'Auto-refresh is disabled after loading older events'
               }
             >
               <Activity
@@ -717,9 +785,7 @@ export default function EventLogsPage() {
               />
               Auto: {autoRefresh && isAutoRefreshAvailable ? 'ON' : 'OFF'}
             </Button>
-            <RefreshButton onRefresh={async () => {
-              await mutate();
-            }} />
+            <RefreshButton onRefresh={handleRefresh} />
           </div>
         </div>
 
@@ -887,11 +953,11 @@ export default function EventLogsPage() {
             <div>
               <h2 className="text-sm font-semibold">Event Feed</h2>
               <p className="text-xs text-muted-foreground">
-                Showing {entries.length} of {total} matching events
+                Loaded {entries.length} event{entries.length === 1 ? '' : 's'}
               </p>
             </div>
             <div className="text-xs text-muted-foreground">
-              Page {currentPage} of {totalPages}
+              {hasMoreEntries ? 'More events available' : 'End of feed'}
             </div>
           </div>
 
@@ -1006,27 +1072,25 @@ export default function EventLogsPage() {
 
           <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0">
             <p className="text-xs text-muted-foreground">
-              Results are ordered by event time, newest first.
+              Results follow committed log order, newest committed entries first.
             </p>
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => handlePageChange(Math.max(1, page - 1))}
-                disabled={page <= 1}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => handlePageChange(page + 1)}
-                disabled={page >= totalPages}
-              >
-                Next
-              </Button>
+              {loadMoreError ? (
+                <p className="text-xs text-destructive">{loadMoreError}</p>
+              ) : null}
+              {hasMoreEntries ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    void handleLoadMore();
+                  }}
+                  disabled={isLoadingMore}
+                >
+                  {isLoadingMore ? 'Loading...' : 'Load More'}
+                </Button>
+              ) : null}
             </div>
           </div>
         </div>
