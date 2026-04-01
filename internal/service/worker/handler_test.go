@@ -372,6 +372,7 @@ steps:
 		t.Setenv("WORKER_TASK_EXACT_ENV", "exact-value")
 		t.Setenv("WORKER_TASK_PREFIX_TOKEN", "prefix-value")
 		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
+		th := test.Setup(t, test.WithBuiltExecutable())
 
 		dagContent := `steps:
   - name: capture
@@ -404,6 +405,7 @@ steps:
 		t.Setenv("WORKER_TASK_EXACT_ENV", "exact-value")
 		t.Setenv("WORKER_TASK_PREFIX_TOKEN", "prefix-value")
 		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
+		th := test.Setup(t, test.WithBuiltExecutable())
 
 		dagContent := `steps:
   - name: capture

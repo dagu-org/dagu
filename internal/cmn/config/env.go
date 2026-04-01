@@ -6,7 +6,6 @@ package config
 import (
 	"maps"
 	"os"
-	"slices"
 	"strings"
 )
 
@@ -134,11 +133,13 @@ func normalizeEnvEntries(values []string) []string {
 }
 
 func dedupePreserveOrder(values []string) []string {
-	var deduped []string
+	deduped := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
-		if slices.Contains(deduped, value) {
+		if _, ok := seen[value]; ok {
 			continue
 		}
+		seen[value] = struct{}{}
 		deduped = append(deduped, value)
 	}
 	return deduped
