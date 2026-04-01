@@ -115,7 +115,7 @@
     "react-diff-viewer-continued": "^3.4.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.7.1",
+    "react-router-dom": "^7.13.2",
     "recharts": "^3.1.0",
     "remark-gfm": "^4.0.1",
     "swr": "^2.3.4",
