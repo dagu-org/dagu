@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -177,74 +178,7 @@ func schemaDisallowsAdditionalProperties(root *jsonschema.Schema) bool {
 }
 
 func isEmptySchema(s *jsonschema.Schema) bool {
-	if s == nil {
-		return false
-	}
-	return s.ID == "" &&
-		s.Schema == "" &&
-		s.Ref == "" &&
-		s.Comment == "" &&
-		len(s.Defs) == 0 &&
-		len(s.Definitions) == 0 &&
-		len(s.DependencySchemas) == 0 &&
-		len(s.DependencyStrings) == 0 &&
-		s.Anchor == "" &&
-		s.DynamicAnchor == "" &&
-		s.DynamicRef == "" &&
-		len(s.Vocabulary) == 0 &&
-		s.Title == "" &&
-		s.Description == "" &&
-		len(s.Default) == 0 &&
-		!s.Deprecated &&
-		!s.ReadOnly &&
-		!s.WriteOnly &&
-		len(s.Examples) == 0 &&
-		s.Type == "" &&
-		len(s.Types) == 0 &&
-		len(s.Enum) == 0 &&
-		s.Const == nil &&
-		s.MultipleOf == nil &&
-		s.Minimum == nil &&
-		s.Maximum == nil &&
-		s.ExclusiveMinimum == nil &&
-		s.ExclusiveMaximum == nil &&
-		s.MinLength == nil &&
-		s.MaxLength == nil &&
-		s.Pattern == "" &&
-		len(s.PrefixItems) == 0 &&
-		s.Items == nil &&
-		len(s.ItemsArray) == 0 &&
-		s.MinItems == nil &&
-		s.MaxItems == nil &&
-		s.AdditionalItems == nil &&
-		!s.UniqueItems &&
-		s.Contains == nil &&
-		s.MinContains == nil &&
-		s.MaxContains == nil &&
-		s.UnevaluatedItems == nil &&
-		s.MinProperties == nil &&
-		s.MaxProperties == nil &&
-		len(s.Required) == 0 &&
-		len(s.DependentRequired) == 0 &&
-		len(s.Properties) == 0 &&
-		len(s.PatternProperties) == 0 &&
-		s.AdditionalProperties == nil &&
-		s.PropertyNames == nil &&
-		s.UnevaluatedProperties == nil &&
-		len(s.AllOf) == 0 &&
-		len(s.AnyOf) == 0 &&
-		len(s.OneOf) == 0 &&
-		s.Not == nil &&
-		s.If == nil &&
-		s.Then == nil &&
-		s.Else == nil &&
-		len(s.DependentSchemas) == 0 &&
-		s.ContentEncoding == "" &&
-		s.ContentMediaType == "" &&
-		s.ContentSchema == nil &&
-		s.Format == "" &&
-		len(s.Extra) == 0 &&
-		len(s.PropertyOrder) == 0
+	return s != nil && reflect.ValueOf(*s).IsZero()
 }
 
 func sortStrings(values []string) {
