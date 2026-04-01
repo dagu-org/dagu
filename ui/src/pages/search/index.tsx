@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SearchResult from '@/features/search/components/SearchResult';
@@ -357,6 +360,7 @@ function Search() {
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
   const inputRef = useRef<HTMLInputElement>(null);
+  const didHydrateFromSessionRef = useRef(false);
 
   const queryParams = useMemo(
     () => new URLSearchParams(location.search),
@@ -379,11 +383,14 @@ function Search() {
 
   useEffect(() => {
     const hasUrlState = queryParams.has('q') || queryParams.has('scope');
-    const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
+    if (!didHydrateFromSessionRef.current) {
+      didHydrateFromSessionRef.current = true;
+      const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
 
-    if (!hasUrlState && stored) {
-      setSearchParams(buildSearchParams(stored), { replace: true });
-      return;
+      if (!hasUrlState && stored) {
+        setSearchParams(buildSearchParams(stored), { replace: true });
+        return;
+      }
     }
 
     searchState.writeState('searchPage', remoteKey, currentFilters);
@@ -433,13 +440,13 @@ function Search() {
               }}
               type="search"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchVal.trim()) {
+                if (e.key === 'Enter') {
                   onSubmit(searchVal);
                 }
               }}
             />
             <Button
-              disabled={!searchVal.trim()}
+              disabled={!searchVal.trim() && !submittedQuery}
               onClick={() => {
                 onSubmit(searchVal);
               }}
@@ -455,7 +462,7 @@ function Search() {
               groupValue={currentFilters.scope}
               onClick={() => {
                 syncFilters({
-                  searchVal: currentFilters.searchVal,
+                  searchVal,
                   scope: 'dags',
                 });
               }}
@@ -467,7 +474,7 @@ function Search() {
               groupValue={currentFilters.scope}
               onClick={() => {
                 syncFilters({
-                  searchVal: currentFilters.searchVal,
+                  searchVal,
                   scope: 'docs',
                 });
               }}

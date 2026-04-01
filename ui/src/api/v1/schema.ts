@@ -3441,20 +3441,20 @@ export interface components {
             name: string;
             dag: components["schemas"]["DAG"];
             /** @description Details of where matches were found */
-            matches: components["schemas"]["SearchDAGsMatchItem"][];
+            matches: components["schemas"]["SearchMatchItem"][];
         };
         /** @description Lightweight cursor-based search result item for a DAG */
         DAGSearchPageItem: {
             /** @description DAG file name without extension */
             fileName: string;
-            /** @description Display name for the DAG result */
+            /** @description Display label for the DAG result; file-backed search currently mirrors fileName */
             name: string;
             /** @description Whether additional snippets are available beyond the preview */
             hasMoreMatches: boolean;
             /** @description Opaque cursor for loading more snippets for this DAG result */
             nextMatchesCursor?: string;
             /** @description Preview snippets for the result */
-            matches: components["schemas"]["SearchDAGsMatchItem"][];
+            matches: components["schemas"]["SearchMatchItem"][];
         };
         /** @description Cursor-based DAG search results */
         DAGSearchFeedResponse: {
@@ -3471,7 +3471,7 @@ export interface components {
             /** @description Opaque cursor for loading more snippets for this document result */
             nextMatchesCursor?: string;
             /** @description Preview snippets for the result */
-            matches: components["schemas"]["SearchDAGsMatchItem"][];
+            matches: components["schemas"]["SearchMatchItem"][];
         };
         /** @description Cursor-based document search results */
         DocSearchFeedResponse: {
@@ -3479,8 +3479,8 @@ export interface components {
             hasMore: boolean;
             nextCursor?: string;
         };
-        /** @description Details of a search match within a DAG definition */
-        SearchDAGsMatchItem: {
+        /** @description Details of a search match within a search result */
+        SearchMatchItem: {
             /** @description Matching line content */
             line: string;
             /** @description Line number where match was found */
@@ -3490,7 +3490,7 @@ export interface components {
         };
         /** @description Cursor-based search match snippets */
         SearchMatchesResponse: {
-            matches: components["schemas"]["SearchDAGsMatchItem"][];
+            matches: components["schemas"]["SearchMatchItem"][];
             hasMore: boolean;
             nextCursor?: string;
         };
@@ -4337,7 +4337,7 @@ export interface components {
         DocSearchResultItem: {
             id: string;
             title: string;
-            matches?: components["schemas"]["SearchDAGsMatchItem"][];
+            matches?: components["schemas"]["SearchMatchItem"][];
         };
         /** @description Search results */
         DocSearchResponse: {

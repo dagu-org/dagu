@@ -8444,7 +8444,7 @@ components:
           type: array
           description: "Details of where matches were found"
           items:
-            $ref: "#/components/schemas/SearchDAGsMatchItem"
+            $ref: "#/components/schemas/SearchMatchItem"
       required:
         - name
         - dag
@@ -8459,7 +8459,7 @@ components:
           description: "DAG file name without extension"
         name:
           type: string
-          description: "Display name for the DAG result"
+          description: "Display label for the DAG result; file-backed search currently mirrors fileName"
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
@@ -8470,7 +8470,7 @@ components:
           type: array
           description: "Preview snippets for the result"
           items:
-            $ref: "#/components/schemas/SearchDAGsMatchItem"
+            $ref: "#/components/schemas/SearchMatchItem"
       required:
         - fileName
         - name
@@ -8511,7 +8511,7 @@ components:
           type: array
           description: "Preview snippets for the result"
           items:
-            $ref: "#/components/schemas/SearchDAGsMatchItem"
+            $ref: "#/components/schemas/SearchMatchItem"
       required:
         - id
         - title
@@ -8534,9 +8534,9 @@ components:
         - results
         - hasMore
 
-    SearchDAGsMatchItem:
+    SearchMatchItem:
       type: object
-      description: "Details of a search match within a DAG definition"
+      description: "Details of a search match within a search result"
       properties:
         line:
           type: string
@@ -8559,7 +8559,7 @@ components:
         matches:
           type: array
           items:
-            $ref: "#/components/schemas/SearchDAGsMatchItem"
+            $ref: "#/components/schemas/SearchMatchItem"
         hasMore:
           type: boolean
         nextCursor:
@@ -10226,7 +10226,7 @@ components:
         matches:
           type: array
           items:
-            $ref: "#/components/schemas/SearchDAGsMatchItem"
+            $ref: "#/components/schemas/SearchMatchItem"
 
     DocSearchResponse:
       type: object

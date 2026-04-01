@@ -215,7 +215,7 @@ const DAGPagination = ({
   pageChange,
   pageLimit,
   onPageLimitChange,
-  showPageLimitSelector = true,
+  showPageLimitSelector = !!onPageLimitChange,
 }: DAGPaginationProps) => {
   // State for the input field value
   const [inputValue, setInputValue] = React.useState(pageLimit.toString());
@@ -267,7 +267,7 @@ const DAGPagination = ({
       </Pagination>
 
       {/* Items per page selector - hidden on very small screens */}
-      {showPageLimitSelector && (
+      {showPageLimitSelector && onPageLimitChange && (
         <div className="hidden sm:flex items-center gap-1">
           <span className="text-xs text-muted-foreground">{pageLimit}</span>
           <div className="relative group">
@@ -298,7 +298,7 @@ const DAGPagination = ({
                 <div
                   key={limit}
                   className={`px-2 py-1 text-xs cursor-pointer hover:bg-muted transition-colors ${pageLimit === limit ? 'bg-primary/15 text-primary font-medium' : ''}`}
-                  onClick={() => onPageLimitChange?.(limit)}
+                  onClick={() => onPageLimitChange(limit)}
                 >
                   {limit}
                 </div>

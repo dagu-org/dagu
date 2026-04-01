@@ -12,10 +12,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/google/jsonschema-go/jsonschema"
 )
+
+const schemaHTTPTimeout = 30 * time.Second
 
 // resolveSchemaFromParams extracts a schema declaration from params and resolves it.
 // Returns (nil, nil) if no schema is declared.
@@ -109,7 +112,10 @@ func loadSchemaFromURL(schemaURL string) (data []byte, err error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	client := newSchemaHTTPClient()
+	defer closeSchemaHTTPClient(client)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +131,27 @@ func loadSchemaFromURL(schemaURL string) (data []byte, err error) {
 
 	data, err = io.ReadAll(resp.Body)
 	return data, err
+}
+
+func newSchemaHTTPClient() *http.Client {
+	transport := http.DefaultTransport
+	if baseTransport, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport = baseTransport.Clone()
+	}
+
+	return &http.Client{
+		Timeout:   schemaHTTPTimeout,
+		Transport: transport,
+	}
+}
+
+func closeSchemaHTTPClient(client *http.Client) {
+	if client == nil || client.Transport == nil {
+		return
+	}
+	if transport, ok := client.Transport.(interface{ CloseIdleConnections() }); ok {
+		transport.CloseIdleConnections()
+	}
 }
 
 // loadSchemaFromFile loads a JSON schema from a file path.

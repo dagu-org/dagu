@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "description": "Schema for Dagu configuration file (base.yaml). Configures server settings, authentication, paths, UI, services, and features.",
+  "description": "Schema for Dagu configuration file (config.yaml). Configures server settings, authentication, paths, UI, services, and features.",
   "additionalProperties": false,
   "properties": {
     "host": {
@@ -29,6 +29,11 @@
     "headless": {
       "type": "boolean",
       "description": "Run in headless mode without the web UI."
+    },
+    "check_updates": {
+      "type": "boolean",
+      "description": "Enable automatic update checks for web UI notifications. Manual 'dagu upgrade' checks are unaffected.",
+      "default": true
     },
     "tls": {
       "$ref": "#/definitions/TLSDef"

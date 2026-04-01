@@ -1,4 +1,7 @@
-import { render, screen } from '@testing-library/react';
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -37,6 +40,7 @@ class IntersectionObserverMock {
 }
 
 beforeEach(() => {
+  cleanup();
   vi.clearAllMocks();
   Object.defineProperty(window, 'IntersectionObserver', {
     writable: true,
@@ -110,5 +114,46 @@ describe('SearchPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Retry load more' }));
 
     expect(mutate).toHaveBeenCalled();
+  });
+
+  it('allows clearing a previously submitted search', async () => {
+    mockUseInfinite.mockReturnValue({
+      data: [],
+      error: undefined,
+      isLoading: false,
+      isValidating: false,
+      setSize: vi.fn(),
+      mutate: vi.fn(),
+    } as never);
+
+    renderSearchPage('/search?q=needle&scope=dags');
+
+    const input = screen.getByRole('searchbox');
+    await userEvent.clear(input);
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(
+      screen.getByText('Enter a search term and press Enter or click Search')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the draft query when switching scope', async () => {
+    mockUseInfinite.mockReturnValue({
+      data: [],
+      error: undefined,
+      isLoading: false,
+      isValidating: false,
+      setSize: vi.fn(),
+      mutate: vi.fn(),
+    } as never);
+
+    renderSearchPage('/search?q=needle&scope=dags');
+
+    const input = screen.getByRole('searchbox');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'draft');
+    await userEvent.click(screen.getByRole('button', { name: 'Docs' }));
+
+    expect(screen.getByRole('searchbox')).toHaveValue('draft');
   });
 });

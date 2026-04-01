@@ -15,11 +15,28 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: quarterly
+      interval: monthly
+    groups:
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: quarterly
+      interval: monthly
+    groups:
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
     ignore:
       - dependency-name: "*"
         update-types:
@@ -31,7 +48,13 @@ updates:
       - npm/*
       - ui
     schedule:
-      interval: quarterly
+      interval: monthly
+    groups:
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
     ignore:
       - dependency-name: "*"
         update-types:

@@ -674,6 +674,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		}
 
 		item := exec.SearchDAGResult{
+			Name:           fileName,
 			FileName:       fileName,
 			Matches:        window.Matches,
 			HasMoreMatches: window.HasMore,

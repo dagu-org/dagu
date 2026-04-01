@@ -195,9 +195,9 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 			Title: r.Title,
 		}
 		if len(r.Matches) > 0 {
-			matches := make([]api.SearchDAGsMatchItem, 0, len(r.Matches))
+			matches := make([]api.SearchMatchItem, 0, len(r.Matches))
 			for _, m := range r.Matches {
-				matches = append(matches, api.SearchDAGsMatchItem{
+				matches = append(matches, api.SearchMatchItem{
 					Line:       m.Line,
 					LineNumber: m.LineNumber,
 					StartLine:  m.StartLine,

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
@@ -25,8 +26,19 @@ var (
 	ErrPermanent = errors.New("permanent error")
 )
 
+type retryFailureLogLevelKey struct{}
+
 func PermanentError(err error) error {
 	return fmt.Errorf("%w: %v", ErrPermanent, err)
+}
+
+// WithRetryFailureLogLevel overrides the log level used for terminal retry
+// failures such as exhausted retries and non-retriable errors.
+func WithRetryFailureLogLevel(ctx context.Context, level slog.Level) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, retryFailureLogLevelKey{}, level)
 }
 
 // Retry executes the operation with retry logic based on the provided policy.
@@ -46,7 +58,7 @@ func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable Is
 		attempt++
 
 		if err := ctx.Err(); err != nil {
-			logger.Warn(ctx, "Retry aborted due to context error",
+			logRetryFailure(ctx, "Retry aborted due to context error",
 				tag.Attempt(attempt),
 				tag.Error(err))
 			return err
@@ -59,7 +71,7 @@ func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable Is
 		}
 
 		if !isRetriable(err) {
-			logger.Warn(ctx, "Retryable operation failed with non-retriable error",
+			logRetryFailure(ctx, "Retryable operation failed with non-retriable error",
 				tag.Attempt(attempt),
 				tag.Error(err))
 			return err
@@ -67,7 +79,7 @@ func Retry(ctx context.Context, op Operation, policy RetryPolicy, isRetriable Is
 
 		interval, retryErr := retrier.Next(err)
 		if retryErr != nil {
-			logger.Warn(ctx, "Retry attempts exhausted",
+			logRetryFailure(ctx, "Retry attempts exhausted",
 				tag.Attempt(attempt),
 				tag.Error(err))
 			return err
@@ -103,6 +115,29 @@ func logRetryIfNeeded(ctx context.Context, attempt int, interval time.Duration, 
 	}
 }
 
+func logRetryFailure(ctx context.Context, msg string, tags ...slog.Attr) {
+	switch retryFailureLogLevel(ctx) {
+	case slog.LevelDebug:
+		logger.Debug(ctx, msg, tags...)
+	case slog.LevelInfo:
+		logger.Info(ctx, msg, tags...)
+	case slog.LevelWarn:
+		logger.Warn(ctx, msg, tags...)
+	case slog.LevelError:
+		logger.Error(ctx, msg, tags...)
+	default:
+		logger.Warn(ctx, msg, tags...)
+	}
+}
+
+func retryFailureLogLevel(ctx context.Context) slog.Level {
+	level, ok := ctx.Value(retryFailureLogLevelKey{}).(slog.Level)
+	if !ok {
+		return slog.LevelWarn
+	}
+	return level
+}
+
 func waitWithContext(ctx context.Context, interval time.Duration, attempt int) error {
 	timer := time.NewTimer(interval)
 	defer timer.Stop()
@@ -111,7 +146,7 @@ func waitWithContext(ctx context.Context, interval time.Duration, attempt int) e
 	case <-timer.C:
 		return nil
 	case <-ctx.Done():
-		logger.Warn(ctx, "Retry aborted during backoff wait",
+		logRetryFailure(ctx, "Retry aborted during backoff wait",
 			tag.Attempt(attempt),
 			tag.Error(ctx.Err()))
 		return ctx.Err()

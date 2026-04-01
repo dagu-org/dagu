@@ -36,6 +36,7 @@ import { useIsAdmin } from '@/contexts/AuthContext';
 import { useUpdateConfig } from '@/contexts/ConfigContext';
 import { ProviderAuthCard } from '@/features/agent/components/ProviderAuthCard';
 import { useAgentAuthProviders } from '@/features/agent/hooks/useAgentAuthProviders';
+import { getAgentModelProviderLabel } from '@/features/agent/modelProviders';
 import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { ModelFormModal } from './ModelFormModal';
@@ -113,19 +114,6 @@ function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: Tool
       denyBehavior: normalized.bash?.denyBehavior || AgentBashPolicyDenyBehavior.ask_user,
     },
   };
-}
-
-function getProviderLabel(provider: string): string {
-  switch (provider) {
-    case 'openai-codex':
-      return 'OpenAI Codex';
-    case 'openai':
-      return 'OpenAI';
-    case 'zai':
-      return 'Z.AI';
-    default:
-      return provider.charAt(0).toUpperCase() + provider.slice(1);
-  }
 }
 
 export default function AgentSettingsPage(): ReactNode {
@@ -887,7 +875,7 @@ export default function AgentSettingsPage(): ReactNode {
                     </TableCell>
                     <TableCell>
                       <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                        {getProviderLabel(m.provider)}
+                        {getAgentModelProviderLabel(m.provider)}
                       </span>
                     </TableCell>
                     <TableCell className="max-w-[180px]">

@@ -633,6 +633,7 @@ func (l *ConfigLoader) warnIfWeakValue(value string, weakList []string, msg stri
 
 func (l *ConfigLoader) loadServerDefaults(cfg *Config, def Definition) {
 	cfg.Server.BasePath = cleanServerBasePath(cfg.Server.BasePath)
+	cfg.Server.CheckUpdates = l.v.GetBool("check_updates")
 
 	cfg.Server.Metrics = MetricsAccessPrivate
 	if def.Metrics != nil {
@@ -1449,6 +1450,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("debug", false)
 	l.v.SetDefault("base_path", "")
 	l.v.SetDefault("api_base_path", "/api/v1")
+	l.v.SetDefault("check_updates", true)
 	l.v.SetDefault("latest_status_today", false)
 	l.v.SetDefault("metrics", "private")
 	l.v.SetDefault("cache", "normal")
@@ -1530,6 +1532,7 @@ var envBindings = []envBinding{
 	{key: "port", env: "PORT"},
 	{key: "debug", env: "DEBUG"},
 	{key: "headless", env: "HEADLESS"},
+	{key: "check_updates", env: "CHECK_UPDATES"},
 	{key: "latest_status_today", env: "LATEST_STATUS_TODAY"},
 	{key: "metrics", env: "SERVER_METRICS"},
 	{key: "cache", env: "CACHE"},

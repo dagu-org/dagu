@@ -836,6 +836,30 @@ func TestApplyModelUpdates(t *testing.T) {
 		assert.Equal(t, "gpt-4", updateResp.Model)
 	})
 
+	t.Run("empty api key clears stored key", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID: "m1", Name: "Test", Provider: "local", Model: "llama3.2",
+			APIKey: "placeholder-key",
+		})
+
+		emptyKey := ""
+		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
+			ModelId: "m1",
+			Body: &apigen.UpdateModelConfigRequest{
+				ApiKey: &emptyKey,
+			},
+		})
+		require.NoError(t, err)
+
+		updateResp, ok := resp.(apigen.UpdateAgentModel200JSONResponse)
+		require.True(t, ok)
+		assert.False(t, valueOrZero(updateResp.ApiKeyConfigured))
+		assert.Empty(t, setup.modelStore.models["m1"].APIKey)
+	})
+
 	t.Run("all fields applied when set", func(t *testing.T) {
 		t.Parallel()
 

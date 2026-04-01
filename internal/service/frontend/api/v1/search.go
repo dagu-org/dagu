@@ -60,10 +60,10 @@ func optionalString(value string) *string {
 	return ptrOf(value)
 }
 
-func toSearchMatchItems(matches []*exec.Match) []api.SearchDAGsMatchItem {
-	items := make([]api.SearchDAGsMatchItem, 0, len(matches))
+func toSearchMatchItems(matches []*exec.Match) []api.SearchMatchItem {
+	items := make([]api.SearchMatchItem, 0, len(matches))
 	for _, match := range matches {
-		items = append(items, api.SearchDAGsMatchItem{
+		items = append(items, api.SearchMatchItem{
 			Line:       match.Line,
 			LineNumber: match.LineNumber,
 			StartLine:  match.StartLine,
@@ -81,9 +81,14 @@ func mapCursorItems[TIn any, TOut any](result *exec.CursorResult[TIn], mapItem f
 }
 
 func toDAGSearchPageItem(item exec.SearchDAGResult) api.DAGSearchPageItem {
+	name := item.Name
+	if name == "" {
+		// File-backed DAG search uses the DAG file name as its display label.
+		name = item.FileName
+	}
 	return api.DAGSearchPageItem{
 		FileName:          item.FileName,
-		Name:              item.FileName,
+		Name:              name,
 		HasMoreMatches:    item.HasMoreMatches,
 		NextMatchesCursor: optionalString(item.NextMatchesCursor),
 		Matches:           toSearchMatchItems(item.Matches),

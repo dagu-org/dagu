@@ -1126,6 +1126,47 @@ func TestSearchCursorFailsWhenBaseDirIsNotDirectory(t *testing.T) {
 	assert.Contains(t, err.Error(), "is not a directory")
 }
 
+func TestSearchCursorUsesStableSortedIDsAcrossNestedDocs(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "a", "needle"))
+	require.NoError(t, store.Create(ctx, "a/b", "needle"))
+
+	firstPage, err := store.SearchCursor(ctx, agent.SearchDocsOptions{
+		Query:      "needle",
+		Limit:      1,
+		MatchLimit: 1,
+	})
+	require.NoError(t, err)
+	require.Len(t, firstPage.Items, 1)
+	require.True(t, firstPage.HasMore)
+	require.NotEmpty(t, firstPage.NextCursor)
+	assert.Equal(t, "a", firstPage.Items[0].ID)
+
+	secondPage, err := store.SearchCursor(ctx, agent.SearchDocsOptions{
+		Query:      "needle",
+		Limit:      1,
+		MatchLimit: 1,
+		Cursor:     firstPage.NextCursor,
+	})
+	require.NoError(t, err)
+	require.Len(t, secondPage.Items, 1)
+	assert.Equal(t, "a/b", secondPage.Items[0].ID)
+	assert.False(t, secondPage.HasMore)
+}
+
+func TestSearchMatchesRejectsInvalidDocID(t *testing.T) {
+	store := newTestStore(t)
+
+	result, err := store.SearchMatches(context.Background(), "../bad", agent.SearchDocMatchesOptions{
+		Query: "needle",
+		Limit: 1,
+	})
+	require.Nil(t, result)
+	assert.ErrorIs(t, err, agent.ErrInvalidDocID)
+}
+
 func TestCleanEmptyParentsNonRemovable(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("cannot test permission errors as root")

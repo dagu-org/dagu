@@ -95,6 +95,7 @@ type GrepDAGsResult struct {
 
 // SearchDAGResult represents a lightweight DAG search hit for paginated UIs.
 type SearchDAGResult struct {
+	Name              string
 	FileName          string
 	Matches           []*Match
 	HasMoreMatches    bool

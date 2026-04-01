@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 
-type SearchMatch = components['schemas']['SearchDAGsMatchItem'];
+type SearchMatch = components['schemas']['SearchMatchItem'];
 type DagResult = components['schemas']['DAGSearchPageItem'];
 type DocResult = components['schemas']['DocSearchPageItem'];
 
@@ -116,16 +116,16 @@ function SearchResultItem({
   return (
     <li className="px-4 py-4">
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-4">
-          <Link to={link}>
-            <h3 className="text-lg font-semibold text-foreground">
+        <div className="flex items-start justify-between gap-4">
+          <Link to={link} className="block min-w-0">
+            <h3 className="text-lg font-semibold text-foreground whitespace-normal break-words">
               {title}
               <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
                 {kind}
               </span>
             </h3>
           </Link>
-          <span className="text-xs text-muted-foreground">
+          <span className="shrink-0 text-xs text-muted-foreground">
             {matches.length} shown
           </span>
         </div>

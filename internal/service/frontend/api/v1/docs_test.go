@@ -8,7 +8,6 @@ import (
 	"errors"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -217,6 +216,19 @@ func (m *mockDocStore) Search(_ context.Context, query string) ([]*agent.DocSear
 	return results, nil
 }
 
+type mockDocSearchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id,omitempty"`
+}
+
+type mockDocMatchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id"`
+	Offset  int    `json:"offset"`
+}
+
 func (m *mockDocStore) SearchCursor(_ context.Context, opts agent.SearchDocsOptions) (*exec.CursorResult[agent.DocSearchResult], error) {
 	results, err := m.Search(context.Background(), opts.Query)
 	if err != nil {
@@ -225,11 +237,19 @@ func (m *mockDocStore) SearchCursor(_ context.Context, opts agent.SearchDocsOpti
 	limit := max(opts.Limit, 1)
 	offset := 0
 	if opts.Cursor != "" {
+		var cursor mockDocSearchCursor
+		if err := exec.DecodeSearchCursor(opts.Cursor, &cursor); err != nil {
+			return nil, err
+		}
+		if cursor.Version != 1 || cursor.Query != opts.Query {
+			return nil, exec.ErrInvalidCursor
+		}
 		for i, item := range results {
-			if item.ID == opts.Cursor {
+			if item.ID <= cursor.ID {
 				offset = i + 1
-				break
+				continue
 			}
+			break
 		}
 	}
 	end := min(offset+limit, len(results))
@@ -242,38 +262,67 @@ func (m *mockDocStore) SearchCursor(_ context.Context, opts agent.SearchDocsOpti
 		HasMore: end < len(results),
 	}
 	if result.HasMore && len(pageItems) > 0 {
-		result.NextCursor = pageItems[len(pageItems)-1].ID
+		result.NextCursor = exec.EncodeSearchCursor(mockDocSearchCursor{
+			Version: 1,
+			Query:   opts.Query,
+			ID:      pageItems[len(pageItems)-1].ID,
+		})
 	}
 	return result, nil
 }
 
 func (m *mockDocStore) SearchMatches(_ context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.CursorResult[*exec.Match], error) {
-	results, err := m.Search(context.Background(), opts.Query)
-	if err != nil {
-		return nil, err
+	if err := agent.ValidateDocID(id); err != nil {
+		return nil, agent.ErrInvalidDocID
 	}
-	for _, result := range results {
-		if result.ID != id {
-			continue
-		}
-		limit := max(opts.Limit, 1)
-		offset := 0
-		if opts.Cursor != "" {
-			if n, err := strconv.Atoi(opts.Cursor); err == nil {
-				offset = min(len(result.Matches), n)
+
+	doc, ok := m.docs[id]
+	if !ok {
+		return nil, agent.ErrDocNotFound
+	}
+
+	var matches []*exec.Match
+	if opts.Query != "" {
+		for i, line := range strings.Split(doc.Content, "\n") {
+			if strings.Contains(line, opts.Query) {
+				matches = append(matches, &exec.Match{
+					Line:       line,
+					LineNumber: i + 1,
+					StartLine:  i + 1,
+				})
 			}
 		}
-		end := min(offset+limit, len(result.Matches))
-		cursorResult := &exec.CursorResult[*exec.Match]{
-			Items:   result.Matches[offset:end],
-			HasMore: end < len(result.Matches),
-		}
-		if cursorResult.HasMore {
-			cursorResult.NextCursor = strconv.Itoa(end)
-		}
-		return cursorResult, nil
 	}
-	return nil, agent.ErrDocNotFound
+
+	limit := max(opts.Limit, 1)
+	offset := 0
+	if opts.Cursor != "" {
+		var cursor mockDocMatchCursor
+		if err := exec.DecodeSearchCursor(opts.Cursor, &cursor); err != nil {
+			return nil, err
+		}
+		if cursor.Version != 1 || cursor.Query != opts.Query || cursor.ID != id || cursor.Offset < 0 {
+			return nil, exec.ErrInvalidCursor
+		}
+		offset = cursor.Offset
+	}
+
+	offset = max(offset, 0)
+	offset = min(offset, len(matches))
+	end := min(offset+limit, len(matches))
+	cursorResult := &exec.CursorResult[*exec.Match]{
+		Items:   matches[offset:end],
+		HasMore: end < len(matches),
+	}
+	if cursorResult.HasMore {
+		cursorResult.NextCursor = exec.EncodeSearchCursor(mockDocMatchCursor{
+			Version: 1,
+			Query:   opts.Query,
+			ID:      id,
+			Offset:  end,
+		})
+	}
+	return cursorResult, nil
 }
 
 func (m *mockDocStore) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
