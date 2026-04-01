@@ -7,14 +7,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
+	"slices"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
-// isInlineJSONSchema returns true when params is a map[string]any with a
-// "properties" key whose value is also a map[string]any.  It returns false for
-// the external-schema format (which uses a "schema" key with a file path).
+// isInlineJSONSchema returns true when params is a top-level JSON Schema object
+// using the canonical object form. This keeps legacy params maps compatible.
 func isInlineJSONSchema(input any) bool {
 	m, ok := input.(map[string]any)
 	if !ok {
@@ -22,6 +24,10 @@ func isInlineJSONSchema(input any) bool {
 	}
 	// External schema format takes precedence.
 	if _, ok := extractParamsSchemaDeclaration(input); ok {
+		return false
+	}
+	typeName, ok := m["type"].(string)
+	if !ok || strings.TrimSpace(typeName) != "object" {
 		return false
 	}
 	props, ok := m["properties"]
@@ -32,49 +38,24 @@ func isInlineJSONSchema(input any) bool {
 	return ok
 }
 
-// buildInlineSchemaParamPlan compiles the inline JSON Schema stored directly in
-// the params field and returns a dagParamPlan backed by the compiled schema.
-func buildInlineSchemaParamPlan(input any) (*dagParamPlan, error) {
-	m, ok := input.(map[string]any)
-	if !ok {
-		return nil, core.NewValidationError("params", input, fmt.Errorf("%w: expected an object for inline JSON Schema", ErrInvalidParamValue))
-	}
-
-	// Strip fields that are not understood by the JSON Schema library at the
-	// top level to avoid resolution errors.  Nested readonly fields are passed
-	// through; the library absorbs unknown keywords inside property definitions.
-	stripped := make(map[string]any, len(m))
-	maps.Copy(stripped, m)
-	delete(stripped, "readOnly")
-	delete(stripped, "readonly")
-
-	raw, err := json.Marshal(stripped)
+func buildInlineSchemaParamPlan(input any, skipValidation bool) (*dagParamPlan, error) {
+	root, resolved, err := parseInlineSchema(input, !skipValidation)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal inline param schema: %w", err)
+		return nil, err
 	}
 
-	var schema jsonschema.Schema
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		return nil, fmt.Errorf("failed to parse inline param schema: %w", err)
-	}
-
-	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve inline param schema: %w", err)
-	}
-
-	root := resolved.Schema()
 	schemaOrder := topLevelSchemaOrder(root)
 	schemaProperties := map[string]*jsonschema.Schema{}
 	if root != nil {
 		maps.Copy(schemaProperties, root.Properties)
 	}
 
-	// Start with an empty typed map and apply schema defaults.
-	typedDefaults := map[string]any{}
-	typedDefaults, err = validateSchemaMap(typedDefaults, resolved, true)
-	if err != nil {
-		return nil, err
+	typedDefaults := explicitInlineSchemaDefaults(root)
+	if !skipValidation {
+		typedDefaults, err = validateSchemaMap(typedDefaults, resolved, true)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	plan := &dagParamPlan{
@@ -82,6 +63,7 @@ func buildInlineSchemaParamPlan(input any) (*dagParamPlan, error) {
 		schema:           resolved,
 		schemaOrder:      schemaOrder,
 		schemaProperties: schemaProperties,
+		schemaClosed:     schemaDisallowsAdditionalProperties(root),
 		entries:          entriesFromTypedMap(typedDefaults, schemaOrder),
 	}
 
@@ -90,4 +72,118 @@ func buildInlineSchemaParamPlan(input any) (*dagParamPlan, error) {
 	}
 
 	return plan, nil
+}
+
+func parseInlineSchema(input any, validate bool) (*jsonschema.Schema, *jsonschema.Resolved, error) {
+	m, ok := input.(map[string]any)
+	if !ok {
+		return nil, nil, core.NewValidationError("params", input, fmt.Errorf("%w: expected an object for inline JSON Schema", ErrInvalidParamValue))
+	}
+
+	stripped := make(map[string]any, len(m))
+	maps.Copy(stripped, m)
+	delete(stripped, "readOnly")
+	delete(stripped, "readonly")
+
+	raw, err := json.Marshal(stripped)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal inline param schema: %w", err)
+	}
+
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse inline param schema: %w", err)
+	}
+	if !validate {
+		return &schema, nil, nil
+	}
+
+	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve inline param schema: %w", err)
+	}
+	return resolved.Schema(), resolved, nil
+}
+
+func explicitInlineSchemaDefaults(root *jsonschema.Schema) map[string]any {
+	if root == nil || len(root.Properties) == 0 {
+		return map[string]any{}
+	}
+
+	defaults := make(map[string]any, len(root.Properties))
+	for name, property := range root.Properties {
+		if property == nil || len(property.Default) == 0 {
+			continue
+		}
+		if _, ok := schemaScalarType(property); !ok {
+			continue
+		}
+		var value any
+		if err := json.Unmarshal(property.Default, &value); err != nil {
+			continue
+		}
+		defaults[name] = value
+	}
+	return defaults
+}
+
+func resolveInlineSchemaEntries(plan *dagParamPlan, rawParams string, paramsList []string) ([]dagParamEntry, error) {
+	if plan.schema != nil {
+		return resolveExternalSchemaEntries(plan, rawParams, paramsList)
+	}
+	return resolveInlineSchemaEntriesNoValidation(plan, rawParams, paramsList)
+}
+
+func resolveInlineSchemaEntriesNoValidation(plan *dagParamPlan, rawParams string, paramsList []string) ([]dagParamEntry, error) {
+	overridePairs, err := parseOverridePairs(rawParams, paramsList)
+	if err != nil {
+		return nil, err
+	}
+
+	values := make(map[string]any, len(plan.entries)+len(overridePairs))
+	for _, entry := range plan.entries {
+		if !entry.HasValue || entry.Name == "" {
+			continue
+		}
+		values[entry.Name] = entry.Value
+	}
+
+	for _, pair := range overridePairs {
+		if pair.Name == "" {
+			return nil, fmt.Errorf("positional parameters are not supported for schema-backed params")
+		}
+		if plan.schemaClosed {
+			if _, ok := plan.schemaProperties[pair.Name]; !ok {
+				accepted := slices.Clone(plan.schemaOrder)
+				sortStrings(accepted)
+				return nil, fmt.Errorf(
+					"unknown parameter(s): %s; accepted parameters are: %s",
+					quotedNames([]string{pair.Name}),
+					strings.Join(accepted, ", "),
+				)
+			}
+		}
+		values[pair.Name] = pair.Value
+	}
+
+	return entriesFromTypedMap(values, plan.schemaOrder), nil
+}
+
+func schemaDisallowsAdditionalProperties(root *jsonschema.Schema) bool {
+	if root == nil || root.AdditionalProperties == nil {
+		return false
+	}
+	ap := root.AdditionalProperties
+	return ap.Not != nil && isEmptySchema(ap.Not)
+}
+
+func isEmptySchema(s *jsonschema.Schema) bool {
+	return s != nil && reflect.ValueOf(*s).IsZero()
+}
+
+func sortStrings(values []string) {
+	if len(values) < 2 {
+		return
+	}
+	slices.Sort(values)
 }

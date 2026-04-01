@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,9 +87,20 @@ func TestIsInlineJSONSchema_MapWithPropertiesAndRequiredReturnsTrue(t *testing.T
 	assert.True(t, isInlineJSONSchema(input))
 }
 
+// U9: map with properties but without type=object remains a legacy params map
+func TestIsInlineJSONSchema_MapWithPropertiesWithoutObjectTypeReturnsFalse(t *testing.T) {
+	t.Parallel()
+	input := map[string]any{
+		"properties": map[string]any{
+			"foo": "bar",
+		},
+	}
+	assert.False(t, isInlineJSONSchema(input))
+}
+
 // --- buildInlineSchemaParamPlan ---
 
-// U9: defaults are extracted into entries and paramDefs
+// U10: defaults are extracted into entries and paramDefs
 func TestBuildInlineSchemaParamPlan_ExtractsDefaults(t *testing.T) {
 	t.Parallel()
 
@@ -121,7 +133,7 @@ params:
 	assert.Contains(t, dag.DefaultParams, `debug="false"`)
 }
 
-// U10: required fields appear in paramDefs
+// U11: required fields appear in paramDefs
 func TestBuildInlineSchemaParamPlan_RequiredFieldInParamDefs(t *testing.T) {
 	t.Parallel()
 
@@ -156,7 +168,7 @@ params:
 	assert.Nil(t, startDateDef.Default)
 }
 
-// U11: required field missing causes validation failure at runtime
+// U12: required field missing causes validation failure at runtime
 func TestBuildInlineSchemaParamPlan_RequiredMissingFails(t *testing.T) {
 	t.Parallel()
 
@@ -176,7 +188,7 @@ params:
 	assert.Contains(t, err.Error(), "start_date")
 }
 
-// U12: runtime override with valid typed value is accepted
+// U13: runtime override with valid typed value is accepted
 func TestBuildInlineSchemaParamPlan_RuntimeOverrideAccepted(t *testing.T) {
 	t.Parallel()
 
@@ -199,7 +211,7 @@ params:
 	assert.Contains(t, dag.Params, "debug=true")
 }
 
-// U13: runtime override with wrong type is rejected
+// U14: runtime override with wrong type is rejected
 func TestBuildInlineSchemaParamPlan_RuntimeOverrideInvalidTypeRejected(t *testing.T) {
 	t.Parallel()
 
@@ -218,7 +230,7 @@ params:
 	assert.Contains(t, err.Error(), "batch_size")
 }
 
-// U14: positional parameters are rejected for inline schema
+// U15: positional parameters are rejected for inline schema
 func TestBuildInlineSchemaParamPlan_PositionalParamRejected(t *testing.T) {
 	t.Parallel()
 
@@ -237,7 +249,7 @@ params:
 	assert.Contains(t, err.Error(), "positional")
 }
 
-// U15: readonly field is stripped at top level (does not cause a parse error)
+// U16: readonly field is stripped at top level (does not cause a parse error)
 func TestBuildInlineSchemaParamPlan_ReadonlyFieldStripped(t *testing.T) {
 	t.Parallel()
 
@@ -258,7 +270,7 @@ params:
 	assert.Equal(t, "batch_size", dag.ParamDefs[0].Name)
 }
 
-// U16: full inline schema from issue #1182 example is accepted
+// U17: full inline schema from issue #1182 example is accepted
 func TestBuildInlineSchemaParamPlan_Issue1182Example(t *testing.T) {
 	t.Parallel()
 
@@ -293,7 +305,7 @@ params:
 	assert.Contains(t, dag.Params, "debug=false")
 }
 
-// U17: string type property with no default produces no entry in DefaultParams
+// U18: string type property with no default produces no entry in DefaultParams
 func TestBuildInlineSchemaParamPlan_StringNoDefaultProducesNoEntry(t *testing.T) {
 	t.Parallel()
 
@@ -315,7 +327,7 @@ params:
 	assert.Empty(t, dag.DefaultParams)
 }
 
-// U18: unknown named override is rejected when schema uses additionalProperties: false
+// U19: unknown named override is rejected when schema uses additionalProperties: false
 func TestBuildInlineSchemaParamPlan_UnknownNamedOverrideRejectedWithAdditionalPropertiesFalse(t *testing.T) {
 	t.Parallel()
 
@@ -335,7 +347,7 @@ params:
 	assert.Contains(t, err.Error(), "unknown_param")
 }
 
-// U19: ParamsJSON is produced correctly
+// U20: ParamsJSON is produced correctly
 func TestBuildInlineSchemaParamPlan_ParamsJSONCorrect(t *testing.T) {
 	t.Parallel()
 
@@ -378,4 +390,138 @@ params:
 	dag, err := LoadYAML(context.Background(), yamlData, SkipSchemaValidation(), WithParams("batch_size=50"))
 	require.NoError(t, err)
 	assert.Contains(t, dag.Params, "batch_size=50")
+}
+
+// C2: SkipSchemaValidation still preserves inline-schema metadata.
+func TestBuildInlineSchemaParamPlan_SkipSchemaValidationPreservesMetadata(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: inline-schema-skip-metadata
+params:
+  type: object
+  properties:
+    batch_size:
+      type: integer
+      default: 10
+    debug:
+      type: boolean
+      default: false
+`)
+
+	dag, err := LoadYAML(context.Background(), yamlData, SkipSchemaValidation())
+	require.NoError(t, err)
+	require.Len(t, dag.ParamDefs, 2)
+	assert.Equal(t, `batch_size="10" debug="false"`, dag.DefaultParams)
+}
+
+// C3: SkipSchemaValidation still rejects positional params for inline schema.
+func TestBuildInlineSchemaParamPlan_SkipSchemaValidationRejectsPositionalParams(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: inline-schema-skip-positional
+params:
+  type: object
+  properties:
+    batch_size:
+      type: integer
+`)
+
+	_, err := LoadYAML(context.Background(), yamlData, SkipSchemaValidation(), WithParams("50"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "positional")
+}
+
+// C4: SkipSchemaValidation keeps additionalProperties false behavior for overrides.
+func TestBuildInlineSchemaParamPlan_SkipSchemaValidationRejectsUnknownNamedOverrideWhenClosed(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: inline-schema-skip-closed
+params:
+  type: object
+  properties:
+    batch_size:
+      type: integer
+  additionalProperties: false
+`)
+
+	_, err := LoadYAML(context.Background(), yamlData, SkipSchemaValidation(), WithParams("unknown=1"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown")
+}
+
+// C5: legacy params maps with a properties key remain legacy unless type=object is present.
+func TestBuildInlineSchemaParamPlan_LegacyPropertiesMapRemainsLegacy(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: legacy-properties-map
+params:
+  properties:
+    foo: bar
+  region: us-west-2
+`)
+
+	dag, err := LoadYAML(context.Background(), yamlData, WithoutEval())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"properties=map[foo:bar]", "region=us-west-2"}, dag.Params)
+	assert.Equal(t, `properties="map[foo:bar]" region="us-west-2"`, dag.DefaultParams)
+}
+
+func TestSchemaDisallowsAdditionalProperties(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		root *jsonschema.Schema
+		want bool
+	}{
+		{
+			name: "NilRoot",
+			root: nil,
+			want: false,
+		},
+		{
+			name: "NoAdditionalProperties",
+			root: &jsonschema.Schema{},
+			want: false,
+		},
+		{
+			name: "ClosedSchema",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			},
+			want: true,
+		},
+		{
+			name: "AdditionalPropertiesTrueLikeEmptySchema",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{},
+			},
+			want: false,
+		},
+		{
+			name: "AdditionalPropertiesWithConstraint",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{Type: "string"},
+			},
+			want: false,
+		},
+		{
+			name: "NotWithNonEmptySchema",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{Type: "string"}},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, schemaDisallowsAdditionalProperties(tt.root))
+		})
+	}
 }

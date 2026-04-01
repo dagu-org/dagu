@@ -90,6 +90,21 @@ steps:
 `,
 		},
 		{
+			name: "TopLevelInlineSchemaMode",
+			spec: `
+params:
+  type: object
+  properties:
+    batch_size:
+      type: integer
+    debug:
+      type: boolean
+  additionalProperties: false
+steps:
+  - command: echo done
+`,
+		},
+		{
 			name: "ExternalInlineSchemaMode",
 			spec: `
 params:
@@ -157,6 +172,17 @@ params:
   region: us
 steps:
   - command: echo "${schema} ${region}"
+`,
+		},
+		{
+			name: "LegacyMapAllowsPropertiesObjectWithoutTypeObject",
+			spec: `
+params:
+  properties:
+    foo: bar
+  region: us
+steps:
+  - command: echo "${region}"
 `,
 		},
 	}
