@@ -121,6 +121,8 @@ func logRetryFailure(ctx context.Context, msg string, tags ...slog.Attr) {
 		logger.Debug(ctx, msg, tags...)
 	case slog.LevelInfo:
 		logger.Info(ctx, msg, tags...)
+	case slog.LevelWarn:
+		logger.Warn(ctx, msg, tags...)
 	case slog.LevelError:
 		logger.Error(ctx, msg, tags...)
 	default:
