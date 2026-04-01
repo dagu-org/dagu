@@ -3,6 +3,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -21,6 +22,11 @@ import {
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { ProviderAuthCard } from '@/features/agent/components/ProviderAuthCard';
+import {
+  AGENT_MODEL_PROVIDERS,
+  type AgentModelProvider,
+  getAgentModelProviderMeta,
+} from '@/features/agent/modelProviders';
 import { getAuthHeaders } from '@/lib/authHeaders';
 
 type ModelConfig = components['schemas']['ModelConfigResponse'];
@@ -33,16 +39,6 @@ type CompleteAgentAuthProviderLoginRequest = components['schemas']['CompleteAgen
 function generateSlugId(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
-
-const LLM_PROVIDERS = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'openai-codex', label: 'OpenAI Codex' },
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'local', label: 'Local' },
-  { value: 'zai', label: 'Z.AI' },
-];
 
 const REASONING_DEFAULT_VALUE = '__default__';
 const REASONING_EFFORT_OPTIONS = [
@@ -88,9 +84,10 @@ export function ModelFormModal({
   const [configId, setConfigId] = useState('');
   const [customId, setCustomId] = useState(false);
   const [name, setName] = useState('');
-  const [provider, setProvider] = useState('anthropic');
+  const [provider, setProvider] = useState<AgentModelProvider>('anthropic');
   const [modelId, setModelId] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [clearStoredAPIKey, setClearStoredAPIKey] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [description, setDescription] = useState('');
   const [contextWindow, setContextWindow] = useState<number | ''>('');
@@ -101,7 +98,8 @@ export function ModelFormModal({
   const [thinkingEffort, setThinkingEffort] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const usesSubscriptionAuth = provider === 'openai-codex';
+  const providerMeta = getAgentModelProviderMeta(provider);
+  const usesSubscriptionAuth = providerMeta.authMode === 'subscription';
   const codexConnected = codexProvider?.connected ?? false;
 
   useEffect(() => {
@@ -119,6 +117,7 @@ export function ModelFormModal({
       setSupportsThinking(model.supportsThinking ?? false);
       setThinkingEffort(model.thinkingEffort ?? '');
       setApiKey('');
+      setClearStoredAPIKey(false);
     } else if (open && !model) {
       resetForm();
     }
@@ -134,6 +133,7 @@ export function ModelFormModal({
     setProvider('anthropic');
     setModelId('');
     setApiKey('');
+    setClearStoredAPIKey(false);
     setBaseUrl('');
     setDescription('');
     setContextWindow('');
@@ -160,16 +160,18 @@ export function ModelFormModal({
       setSupportsThinking(preset.supportsThinking ?? false);
       setThinkingEffort(preset.thinkingEffort ?? '');
       setApiKey('');
+      setClearStoredAPIKey(false);
       setBaseUrl('');
     }
   };
 
   useEffect(() => {
-    if (provider === 'openai-codex') {
+    if (usesSubscriptionAuth) {
       setApiKey('');
+      setClearStoredAPIKey(false);
       setBaseUrl('');
     }
-  }, [provider]);
+  }, [usesSubscriptionAuth]);
 
   useEffect(() => {
     if (!supportsThinking) {
@@ -203,12 +205,15 @@ export function ModelFormModal({
         thinkingEffort: supportsThinking ? thinkingEffort : '',
       };
 
-      if (!usesSubscriptionAuth && baseUrl) {
-        body.baseUrl = baseUrl;
+      const trimmedBaseURL = baseUrl.trim();
+      if (!usesSubscriptionAuth && trimmedBaseURL !== '') {
+        body.baseUrl = trimmedBaseURL;
       }
 
       if (!usesSubscriptionAuth && apiKey) {
         body.apiKey = apiKey;
+      } else if (!usesSubscriptionAuth && isEditing && clearStoredAPIKey) {
+        body.apiKey = '';
       }
 
       const url = isEditing
@@ -309,12 +314,15 @@ export function ModelFormModal({
 
             <div className="space-y-1.5">
               <Label htmlFor="model-provider" className="text-sm">Provider</Label>
-              <Select value={provider} onValueChange={setProvider}>
+              <Select
+                value={provider}
+                onValueChange={(value) => setProvider(value as AgentModelProvider)}
+              >
                 <SelectTrigger id="model-provider" className="h-8">
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {LLM_PROVIDERS.map((p) => (
+                  {AGENT_MODEL_PROVIDERS.map((p) => (
                     <SelectItem key={p.value} value={p.value}>
                       {p.label}
                     </SelectItem>
@@ -329,7 +337,7 @@ export function ModelFormModal({
                 id="model-id"
                 value={modelId}
                 onChange={(e) => setModelId(e.target.value)}
-                placeholder="claude-sonnet-4-5"
+                placeholder={providerMeta.modelPlaceholder}
                 className="h-8"
                 required
               />
@@ -353,18 +361,56 @@ export function ModelFormModal({
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="model-api-key" className="text-sm">API Key</Label>
+                  <Label htmlFor="model-api-key" className="text-sm">
+                    {providerMeta.apiKeyMode === 'optional'
+                      ? 'API Key (optional)'
+                      : 'API Key'}
+                  </Label>
                   <Input
                     id="model-api-key"
                     type="password"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      if (clearStoredAPIKey) {
+                        setClearStoredAPIKey(false);
+                      }
+                    }}
                     placeholder={isEditing && model?.apiKeyConfigured ? '********' : 'Enter API key'}
                     className="h-8"
+                    disabled={clearStoredAPIKey}
                   />
-                  {isEditing && model?.apiKeyConfigured && (
+                  {providerMeta.apiKeyHelperText && (
                     <p className="text-xs text-muted-foreground">
-                      Leave empty to keep existing key
+                      {providerMeta.apiKeyHelperText}
+                    </p>
+                  )}
+                  {isEditing && model?.apiKeyConfigured && !clearStoredAPIKey && (
+                    <p className="text-xs text-muted-foreground">
+                      Leave empty to keep existing key, or clear it below.
+                    </p>
+                  )}
+                  {isEditing && model?.apiKeyConfigured && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="clear-api-key"
+                        checked={clearStoredAPIKey}
+                        onCheckedChange={(checked) => {
+                          const enabled = checked === true;
+                          setClearStoredAPIKey(enabled);
+                          if (enabled) {
+                            setApiKey('');
+                          }
+                        }}
+                      />
+                      <Label htmlFor="clear-api-key" className="text-xs">
+                        Clear stored API key
+                      </Label>
+                    </div>
+                  )}
+                  {clearStoredAPIKey && (
+                    <p className="text-xs text-muted-foreground">
+                      Save changes to remove the stored key.
                     </p>
                   )}
                 </div>
@@ -375,7 +421,9 @@ export function ModelFormModal({
                     id="model-base-url"
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder="Custom API endpoint"
+                    placeholder={
+                      providerMeta.baseUrlPlaceholder ?? 'Custom API endpoint'
+                    }
                     className="h-8"
                   />
                 </div>
