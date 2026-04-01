@@ -51,7 +51,7 @@
     "eslint": "^9.32.0",
     "html-loader": "^5.1.0",
     "html-webpack-plugin": "^5.6.3",
-    "jsdom": "^28.1.0",
+    "jsdom": "^29.0.1",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "null-loader": "^4.0.1",
     "openapi-typescript": "^7.8.0",
