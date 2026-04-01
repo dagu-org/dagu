@@ -122,6 +122,39 @@ bots:
 	}
 }
 
+func TestConfigSchemaCheckUpdatesValidation(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveConfigSchema(t)
+
+	tests := []struct {
+		name string
+		spec string
+	}{
+		{
+			name: "CheckUpdatesTrue",
+			spec: `
+check_updates: true
+`,
+		},
+		{
+			name: "CheckUpdatesFalse",
+			spec: `
+check_updates: false
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			require.NoError(t, resolved.Validate(doc))
+		})
+	}
+}
+
 func TestConfigSchemaRepoCopyMatchesEmbeddedSchema(t *testing.T) {
 	t.Parallel()
 

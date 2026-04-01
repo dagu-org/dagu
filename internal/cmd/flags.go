@@ -74,6 +74,14 @@ var (
 		usage:        "Server port number (default: 8080)",
 		bindViper:    true,
 	}
+
+	checkUpdatesFlag = commandLineFlag{
+		name:      "check-updates",
+		usage:     "Enable automatic update checks for the web UI",
+		isBool:    true,
+		bindViper: true,
+		viperKey:  "check_updates",
+	}
 )
 
 // DAG execution flags

@@ -601,7 +601,7 @@ func TestCheckAndUpdateCacheDevVersion(t *testing.T) {
 	store := &mockCacheStore{}
 	devVersions := []string{"dev", "0.0.0"}
 	for _, v := range devVersions {
-		cache, err := CheckAndUpdateCache(store, v)
+		cache, err := CheckAndUpdateCache(context.Background(), store, v)
 		if err != nil {
 			t.Errorf("CheckAndUpdateCache(%s) error: %v", v, err)
 		}
@@ -620,7 +620,7 @@ func TestCheckAndUpdateCacheWithValidCache(t *testing.T) {
 	}
 	store := &mockCacheStore{cache: cache}
 
-	result, err := CheckAndUpdateCache(store, "v1.30.0")
+	result, err := CheckAndUpdateCache(context.Background(), store, "v1.30.0")
 	if err != nil {
 		t.Fatalf("CheckAndUpdateCache() error: %v", err)
 	}

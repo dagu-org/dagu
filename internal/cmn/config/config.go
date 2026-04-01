@@ -167,6 +167,7 @@ type Server struct {
 	BasePath          string // URL path for reverse proxy subpath hosting
 	APIBasePath       string
 	Headless          bool
+	CheckUpdates      bool
 	AccessLog         AccessLogMode // "all" (default), "non-public", or "none"
 	LatestStatusToday bool
 	TLS               *TLSConfig

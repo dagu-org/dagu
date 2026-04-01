@@ -32,7 +32,7 @@ func IsCacheValid(cache *UpgradeCheckCache) bool {
 
 // CheckAndUpdateCache checks for updates if cache is stale and updates the cache.
 // This function is designed to be called asynchronously.
-func CheckAndUpdateCache(store CacheStore, currentVersion string) (*UpgradeCheckCache, error) {
+func CheckAndUpdateCache(ctx context.Context, store CacheStore, currentVersion string) (*UpgradeCheckCache, error) {
 	// Skip update check for dev builds
 	if currentVersion == "dev" || currentVersion == "0.0.0" {
 		return nil, nil
@@ -51,7 +51,7 @@ func CheckAndUpdateCache(store CacheStore, currentVersion string) (*UpgradeCheck
 	}
 
 	client := NewGitHubClient()
-	release, err := client.GetLatestRelease(context.Background(), false)
+	release, err := client.GetLatestRelease(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for updates: %w", err)
 	}
