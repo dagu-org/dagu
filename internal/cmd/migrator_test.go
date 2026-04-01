@@ -90,6 +90,16 @@ func (m *mockDAGStore) Grep(_ context.Context, _ string) ([]*exec.GrepDAGsResult
 	return nil, nil, nil
 }
 
+func (m *mockDAGStore) SearchPaginated(_ context.Context, _ exec.SearchDAGsOptions) (*exec.PaginatedResult[exec.SearchDAGResult], []string, error) {
+	result := exec.NewPaginatedResult([]exec.SearchDAGResult{}, 0, exec.DefaultPaginator())
+	return &result, nil, nil
+}
+
+func (m *mockDAGStore) SearchMatches(_ context.Context, _ string, _ exec.SearchDAGMatchesOptions) (*exec.PaginatedResult[*exec.Match], error) {
+	result := exec.NewPaginatedResult([]*exec.Match{}, 0, exec.DefaultPaginator())
+	return &result, nil
+}
+
 func (m *mockDAGStore) UpdateSpec(_ context.Context, _ string, _ []byte) error {
 	return nil
 }

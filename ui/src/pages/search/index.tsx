@@ -1,123 +1,112 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DAGPagination } from '@/features/dags/components/common';
 import { Search as SearchIcon } from 'lucide-react';
-import React, { useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import SearchResult from '../../features/search/components/SearchResult';
 import { useQuery } from '../../hooks/api';
 import Title from '../../ui/Title';
 
+const SEARCH_PAGE_SIZE = 10;
+
+type SearchFilters = {
+  searchVal: string;
+  dagPage: number;
+  docPage: number;
+};
+
+function parsePage(value: string | null): number {
+  const parsed = Number.parseInt(value || '', 10);
+  return Number.isNaN(parsed) || parsed < 1 ? 1 : parsed;
+}
+
+function buildSearchParams(filters: SearchFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  const query = filters.searchVal.trim();
+
+  if (!query) {
+    return params;
+  }
+
+  params.set('q', query);
+  if (filters.dagPage > 1) {
+    params.set('dagPage', String(filters.dagPage));
+  }
+  if (filters.docPage > 1) {
+    params.set('docPage', String(filters.docPage));
+  }
+
+  return params;
+}
+
 function Search() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
 
-  type SearchFilters = {
-    searchVal: string;
-  };
-
-  const areFiltersEqual = (a: SearchFilters, b: SearchFilters) =>
-    a.searchVal === b.searchVal;
-
-  const defaultFilters = React.useMemo<SearchFilters>(
-    () => ({
-      searchVal: searchParams.get('q') || '',
-    }),
-    [searchParams]
+  const queryParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
   );
 
-  const [searchVal, setSearchVal] = React.useState(defaultFilters.searchVal);
-
-  const currentFilters = React.useMemo<SearchFilters>(
+  const currentFilters = useMemo<SearchFilters>(
     () => ({
-      searchVal,
+      searchVal: queryParams.get('q') || '',
+      dagPage: parsePage(queryParams.get('dagPage')),
+      docPage: parsePage(queryParams.get('docPage')),
     }),
-    [searchVal]
+    [queryParams]
   );
 
-  const currentFiltersRef = React.useRef(currentFilters);
-  React.useEffect(() => {
-    currentFiltersRef.current = currentFilters;
-  }, [currentFilters]);
+  const [searchVal, setSearchVal] = React.useState(currentFilters.searchVal);
 
-  const lastPersistedFiltersRef = React.useRef<SearchFilters | null>(null);
+  useEffect(() => {
+    setSearchVal(currentFilters.searchVal);
+  }, [currentFilters.searchVal]);
 
-  React.useEffect(() => {
-    const stored = searchState.readState<SearchFilters>(
-      'searchPage',
-      remoteKey
-    );
-    const hasUrl = !!searchParams.get('q');
-    let next: SearchFilters;
-    let shouldSyncUrl = false;
+  useEffect(() => {
+    const hasUrlQuery = queryParams.has('q');
+    const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
 
-    if (hasUrl) {
-      next = defaultFilters;
-    } else if (stored) {
-      next = {
-        searchVal: stored.searchVal ?? defaultFilters.searchVal,
-      };
-      shouldSyncUrl = !!stored.searchVal;
-    } else {
-      next = defaultFilters;
-      shouldSyncUrl = !!defaultFilters.searchVal;
-    }
-
-    const current = currentFiltersRef.current;
-    if (current && areFiltersEqual(current, next)) {
-      if (!stored || hasUrl) {
-        searchState.writeState('searchPage', remoteKey, next);
-      }
-      lastPersistedFiltersRef.current = next;
+    if (!hasUrlQuery && stored?.searchVal) {
+      setSearchParams(buildSearchParams(stored), { replace: true });
       return;
     }
 
-    setSearchVal(next.searchVal);
-    lastPersistedFiltersRef.current = next;
-    searchState.writeState('searchPage', remoteKey, next);
-
-    if (!hasUrl && shouldSyncUrl && next.searchVal) {
-      setSearchParams({ q: next.searchVal }, { replace: true });
-    }
-  }, [defaultFilters, remoteKey, searchParams, searchState, setSearchParams]);
-
-  React.useEffect(() => {
-    const persisted = lastPersistedFiltersRef.current;
-    if (persisted && areFiltersEqual(persisted, currentFilters)) {
-      return;
-    }
-    lastPersistedFiltersRef.current = currentFilters;
     searchState.writeState('searchPage', remoteKey, currentFilters);
-  }, [currentFilters, remoteKey, searchState]);
+  }, [currentFilters, queryParams, remoteKey, searchState, setSearchParams]);
 
-  const q = searchParams.get('q') || '';
-  // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
-  // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
-  const searchParams_ = q
+  const submittedQuery = currentFilters.searchVal.trim();
+  const dagPage = currentFilters.dagPage;
+  const docPage = currentFilters.docPage;
+
+  const requestParams = submittedQuery
     ? {
         params: {
           query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
-            q,
+            remoteNode: remoteKey,
+            q: submittedQuery,
+            dagPage,
+            docPage,
+            perPage: SEARCH_PAGE_SIZE,
           },
         },
       }
     : {};
-  const searchOpts = { refreshInterval: q ? 2000 : 0 };
 
-  const { data: dagData } = useQuery(
-    q ? '/dags/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
-    searchParams_,
-    searchOpts
-  );
-
-  const { data: docData } = useQuery(
-    q ? '/docs/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
-    searchParams_,
-    searchOpts
+  const { data, isLoading } = useQuery(
+    submittedQuery ? '/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
+    requestParams,
+    {
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
   );
 
   const ref = useRef<HTMLInputElement>(null);
@@ -126,11 +115,30 @@ function Search() {
     ref.current?.focus();
   }, []);
 
-  const onSubmit = React.useCallback((value: string) => {
-    setSearchParams({
-      q: value,
-    });
-  }, [setSearchParams]);
+  const syncFilters = React.useCallback(
+    (next: SearchFilters, replace = false) => {
+      setSearchParams(buildSearchParams(next), { replace });
+    },
+    [setSearchParams]
+  );
+
+  const onSubmit = React.useCallback(
+    (value: string) => {
+      const nextValue = value.trim();
+      syncFilters(
+        {
+          searchVal: nextValue,
+          dagPage: 1,
+          docPage: 1,
+        },
+        false
+      );
+    },
+    [syncFilters]
+  );
+
+  const dagTotal = data?.dags.pagination.totalRecords ?? 0;
+  const docTotal = data?.docs.pagination.totalRecords ?? 0;
 
   return (
     <div className="max-w-7xl">
@@ -147,16 +155,14 @@ function Search() {
             }}
             type="search"
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                if (searchVal) {
-                  onSubmit(searchVal);
-                }
+              if (e.key === 'Enter' && searchVal.trim()) {
+                onSubmit(searchVal);
               }
             }}
           />
           <Button
-            disabled={!searchVal}
-            onClick={async () => {
+            disabled={!searchVal.trim()}
+            onClick={() => {
               onSubmit(searchVal);
             }}
           >
@@ -165,54 +171,94 @@ function Search() {
           </Button>
         </div>
 
-        <div className="mt-2">
-          {(() => {
-            if (!q) {
-              return (
-                <div className="text-sm text-muted-foreground italic">
-                  Enter a search term and press Enter or click Search
-                </div>
-              );
-            }
+        <div className="mt-4">
+          {!submittedQuery && (
+            <div className="text-sm text-muted-foreground italic">
+              Enter a search term and press Enter or click Search
+            </div>
+          )}
 
-            const dagResults = dagData?.results ?? [];
-            const docResults = docData?.results ?? [];
-            const totalCount = dagResults.length + docResults.length;
+          {submittedQuery && isLoading && !data && (
+            <div className="text-sm text-muted-foreground italic">
+              Searching...
+            </div>
+          )}
 
-            if (totalCount === 0 && dagData && docData) {
-              return (
-                <div className="text-sm text-muted-foreground italic">
-                  No results found
-                </div>
-              );
-            }
+          {submittedQuery && data && dagTotal + docTotal === 0 && (
+            <div className="text-sm text-muted-foreground italic">
+              No results found
+            </div>
+          )}
 
-            return (
-              <div className="space-y-4">
-                {dagResults.length > 0 && (
-                  <div>
-                    <h2 className="text-lg font-semibold mb-2">
-                      {dagResults.length} DAG{' '}
-                      {dagResults.length === 1 ? 'result' : 'results'}
+          {submittedQuery && data && dagTotal + docTotal > 0 && (
+            <div className="space-y-6">
+              {dagTotal > 0 && (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="text-lg font-semibold">
+                      {dagTotal} DAG {dagTotal === 1 ? 'result' : 'results'}
                     </h2>
-                    <SearchResult type="dag" results={dagResults} />
+                    {data.dags.pagination.totalPages > 1 && (
+                      <DAGPagination
+                        totalPages={data.dags.pagination.totalPages}
+                        page={data.dags.pagination.currentPage}
+                        pageLimit={SEARCH_PAGE_SIZE}
+                        pageChange={(page) => {
+                          syncFilters({
+                            searchVal: submittedQuery,
+                            dagPage: page,
+                            docPage,
+                          });
+                        }}
+                        onPageLimitChange={() => {}}
+                        showPageLimitSelector={false}
+                      />
+                    )}
                   </div>
-                )}
-                {docResults.length > 0 && (
-                  <div>
-                    <h2 className="text-lg font-semibold mb-2">
-                      {docResults.length} Doc{' '}
-                      {docResults.length === 1 ? 'result' : 'results'}
+                  <SearchResult
+                    type="dag"
+                    query={submittedQuery}
+                    results={data.dags.results}
+                  />
+                </div>
+              )}
+
+              {docTotal > 0 && (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="text-lg font-semibold">
+                      {docTotal} Doc {docTotal === 1 ? 'result' : 'results'}
                     </h2>
-                    <SearchResult type="doc" results={docResults} />
+                    {data.docs.pagination.totalPages > 1 && (
+                      <DAGPagination
+                        totalPages={data.docs.pagination.totalPages}
+                        page={data.docs.pagination.currentPage}
+                        pageLimit={SEARCH_PAGE_SIZE}
+                        pageChange={(page) => {
+                          syncFilters({
+                            searchVal: submittedQuery,
+                            dagPage,
+                            docPage: page,
+                          });
+                        }}
+                        onPageLimitChange={() => {}}
+                        showPageLimitSelector={false}
+                      />
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })()}
+                  <SearchResult
+                    type="doc"
+                    query={submittedQuery}
+                    results={data.docs.results}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
 export default Search;

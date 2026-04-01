@@ -206,14 +206,55 @@ func (m *mockDocStore) Search(_ context.Context, query string) ([]*agent.DocSear
 				}
 			}
 			results = append(results, &agent.DocSearchResult{
-				ID:      doc.ID,
-				Title:   doc.Title,
-				Matches: matches,
+				ID:         doc.ID,
+				Title:      doc.Title,
+				MatchCount: len(matches),
+				Matches:    matches,
 			})
 		}
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].ID < results[j].ID })
 	return results, nil
+}
+
+func (m *mockDocStore) SearchPaginated(_ context.Context, opts agent.SearchDocsOptions) (*exec.PaginatedResult[agent.DocSearchResult], error) {
+	results, err := m.Search(context.Background(), opts.Query)
+	if err != nil {
+		return nil, err
+	}
+	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
+	offset := min(pg.Offset(), len(results))
+	end := min(offset+pg.Limit(), len(results))
+	pageItems := make([]agent.DocSearchResult, 0, end-offset)
+	for _, item := range results[offset:end] {
+		pageItems = append(pageItems, *item)
+	}
+	result := exec.NewPaginatedResult(pageItems, len(results), pg)
+	return &result, nil
+}
+
+func (m *mockDocStore) SearchMatches(_ context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.PaginatedResult[*exec.Match], error) {
+	results, err := m.Search(context.Background(), opts.Query)
+	if err != nil {
+		return nil, err
+	}
+	for _, result := range results {
+		if result.ID != id {
+			continue
+		}
+		pg := opts.Paginator
+		if pg.Limit() == 0 {
+			pg = exec.DefaultPaginator()
+		}
+		offset := min(pg.Offset(), len(result.Matches))
+		end := min(offset+pg.Limit(), len(result.Matches))
+		paginated := exec.NewPaginatedResult(result.Matches[offset:end], len(result.Matches), pg)
+		return &paginated, nil
+	}
+	return nil, agent.ErrDocNotFound
 }
 
 func (m *mockDocStore) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {

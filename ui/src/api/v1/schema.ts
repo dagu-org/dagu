@@ -549,6 +549,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search DAGs and documents
+         * @description Returns paginated, lightweight search results for the global search page.
+         */
+        get: operations["searchAll"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search/dags/{fileName}/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search DAG match snippets
+         * @description Returns paginated snippets for one matching DAG definition.
+         */
+        get: operations["searchDagMatches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search/docs/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search document match snippets
+         * @description Returns paginated snippets for one matching document.
+         */
+        get: operations["searchDocMatches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/tags": {
         parameters: {
             query?: never;
@@ -3363,6 +3423,45 @@ export interface components {
             /** @description Details of where matches were found */
             matches: components["schemas"]["SearchDAGsMatchItem"][];
         };
+        /** @description Lightweight search result item for a DAG */
+        DAGSearchPageItem: {
+            /** @description DAG file name without extension */
+            fileName: string;
+            /** @description Display name for the DAG result */
+            name: string;
+            /** @description Total number of snippets matching the query in this DAG */
+            matchCount: number;
+            /** @description Whether additional snippets are available beyond the preview */
+            hasMoreMatches: boolean;
+            /** @description Preview snippets for the result */
+            matches: components["schemas"]["SearchDAGsMatchItem"][];
+        };
+        /** @description Paginated DAG search results */
+        DAGSearchSection: {
+            results: components["schemas"]["DAGSearchPageItem"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** @description Lightweight search result item for a document */
+        DocSearchPageItem: {
+            id: string;
+            title: string;
+            /** @description Total number of snippets matching the query in this document */
+            matchCount: number;
+            /** @description Whether additional snippets are available beyond the preview */
+            hasMoreMatches: boolean;
+            /** @description Preview snippets for the result */
+            matches: components["schemas"]["SearchDAGsMatchItem"][];
+        };
+        /** @description Paginated document search results */
+        DocSearchSection: {
+            results: components["schemas"]["DocSearchPageItem"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /** @description Combined paginated search response for DAGs and documents */
+        GlobalSearchResponse: {
+            dags: components["schemas"]["DAGSearchSection"];
+            docs: components["schemas"]["DocSearchSection"];
+        };
         /** @description Details of a search match within a DAG definition */
         SearchDAGsMatchItem: {
             /** @description Matching line content */
@@ -3371,6 +3470,11 @@ export interface components {
             lineNumber: number;
             /** @description Start line for context */
             startLine: number;
+        };
+        /** @description Paginated search match snippets */
+        SearchMatchesResponse: {
+            matches: components["schemas"]["SearchDAGsMatchItem"][];
+            pagination: components["schemas"]["Pagination"];
         };
         /** @description Log information for the execution */
         Log: {
@@ -4556,6 +4660,10 @@ export interface components {
         APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
+        /** @description Number of search results to return per section (default 10, max 25) */
+        SearchPerPage: number;
+        /** @description Number of search match snippets to return (default 3, max 25) */
+        SearchMatchPerPage: number;
         /** @description the name of the DAG file */
         DAGFileName: components["schemas"]["DAGFileName"];
         /** @description name of the DAG */
@@ -6413,6 +6521,172 @@ export interface operations {
                         /** @description Errors encountered during the search */
                         errors: string[];
                     };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    searchAll: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description A search query string */
+                q: string;
+                /** @description Page number for DAG results */
+                dagPage?: number;
+                /** @description Page number for document results */
+                docPage?: number;
+                /** @description Number of search results to return per section (default 10, max 25) */
+                perPage?: components["parameters"]["SearchPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated search results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlobalSearchResponse"];
+                };
+            };
+            /** @description Missing query parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    searchDagMatches: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description A search query string */
+                q: string;
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description Number of search match snippets to return (default 3, max 25) */
+                perPage?: components["parameters"]["SearchMatchPerPage"];
+            };
+            header?: never;
+            path: {
+                /** @description the name of the DAG file */
+                fileName: components["parameters"]["DAGFileName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated DAG match snippets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchMatchesResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    searchDocMatches: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Document path (may include slashes for nested docs) */
+                path: components["schemas"]["DocPath"];
+                /** @description A search query string */
+                q: string;
+                /** @description page number of items to fetch (default is 1) */
+                page?: components["parameters"]["Page"];
+                /** @description Number of search match snippets to return (default 3, max 25) */
+                perPage?: components["parameters"]["SearchMatchPerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated document match snippets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchMatchesResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */

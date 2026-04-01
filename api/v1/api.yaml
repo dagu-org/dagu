@@ -1541,6 +1541,151 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /search:
+    get:
+      summary: "Search DAGs and documents"
+      description: "Returns paginated, lightweight search results for the global search page."
+      operationId: "searchAll"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - name: "dagPage"
+          in: "query"
+          required: false
+          description: "Page number for DAG results"
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: "docPage"
+          in: "query"
+          required: false
+          description: "Page number for document results"
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - $ref: "#/components/parameters/SearchPerPage"
+      responses:
+        "200":
+          description: "Paginated search results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlobalSearchResponse"
+        "400":
+          description: "Missing query parameter"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /search/dags/{fileName}/matches:
+    get:
+      summary: "Search DAG match snippets"
+      description: "Returns paginated snippets for one matching DAG definition."
+      operationId: "searchDagMatches"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/SearchMatchPerPage"
+      responses:
+        "200":
+          description: "Paginated DAG match snippets"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchMatchesResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /search/docs/matches:
+    get:
+      summary: "Search document match snippets"
+      description: "Returns paginated snippets for one matching document."
+      operationId: "searchDocMatches"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "path"
+          in: "query"
+          description: "Document path (may include slashes for nested docs)"
+          required: true
+          schema:
+            $ref: "#/components/schemas/DocPath"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/SearchMatchPerPage"
+      responses:
+        "200":
+          description: "Paginated document match snippets"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchMatchesResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/tags:
     get:
       summary: "List all available DAG tags"
@@ -6575,6 +6720,28 @@ components:
         maximum: 1000
         default: 50
 
+    SearchPerPage:
+      name: perPage
+      in: query
+      description: "Number of search results to return per section (default 10, max 25)"
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 25
+        default: 10
+
+    SearchMatchPerPage:
+      name: perPage
+      in: query
+      description: "Number of search match snippets to return (default 3, max 25)"
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 25
+        default: 3
+
     DAGFileName:
       name: fileName
       in: path
@@ -8253,6 +8420,100 @@ components:
         - dag
         - matches
 
+    DAGSearchPageItem:
+      type: object
+      description: "Lightweight search result item for a DAG"
+      properties:
+        fileName:
+          type: string
+          description: "DAG file name without extension"
+        name:
+          type: string
+          description: "Display name for the DAG result"
+        matchCount:
+          type: integer
+          description: "Total number of snippets matching the query in this DAG"
+        hasMoreMatches:
+          type: boolean
+          description: "Whether additional snippets are available beyond the preview"
+        matches:
+          type: array
+          description: "Preview snippets for the result"
+          items:
+            $ref: "#/components/schemas/SearchDAGsMatchItem"
+      required:
+        - fileName
+        - name
+        - matchCount
+        - hasMoreMatches
+        - matches
+
+    DAGSearchSection:
+      type: object
+      description: "Paginated DAG search results"
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DAGSearchPageItem"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - results
+        - pagination
+
+    DocSearchPageItem:
+      type: object
+      description: "Lightweight search result item for a document"
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        matchCount:
+          type: integer
+          description: "Total number of snippets matching the query in this document"
+        hasMoreMatches:
+          type: boolean
+          description: "Whether additional snippets are available beyond the preview"
+        matches:
+          type: array
+          description: "Preview snippets for the result"
+          items:
+            $ref: "#/components/schemas/SearchDAGsMatchItem"
+      required:
+        - id
+        - title
+        - matchCount
+        - hasMoreMatches
+        - matches
+
+    DocSearchSection:
+      type: object
+      description: "Paginated document search results"
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocSearchPageItem"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - results
+        - pagination
+
+    GlobalSearchResponse:
+      type: object
+      description: "Combined paginated search response for DAGs and documents"
+      properties:
+        dags:
+          $ref: "#/components/schemas/DAGSearchSection"
+        docs:
+          $ref: "#/components/schemas/DocSearchSection"
+      required:
+        - dags
+        - docs
+
     SearchDAGsMatchItem:
       type: object
       description: "Details of a search match within a DAG definition"
@@ -8270,6 +8531,20 @@ components:
         - line
         - lineNumber
         - startLine
+
+    SearchMatchesResponse:
+      type: object
+      description: "Paginated search match snippets"
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchDAGsMatchItem"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - matches
+        - pagination
 
     Log:
       type: object

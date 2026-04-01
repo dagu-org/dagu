@@ -34,6 +34,8 @@ type GrepOptions struct {
 	IsRegexp bool
 	Before   int
 	After    int
+	Offset   int
+	Limit    int
 	Matcher  Matcher
 }
 
@@ -46,21 +48,27 @@ var DefaultGrepOptions = GrepOptions{
 // Grep reads data and returns lines that match the given pattern.
 // If opts is nil, default options will be used.
 func Grep(dat []byte, pattern string, opts GrepOptions) ([]*exec.Match, error) {
+	matches, _, err := GrepWithCount(dat, pattern, opts)
+	return matches, err
+}
+
+// GrepWithCount reads data and returns matching snippets and the total match count.
+func GrepWithCount(dat []byte, pattern string, opts GrepOptions) ([]*exec.Match, int, error) {
 	if pattern == "" {
-		return nil, ErrEmptyPattern
+		return nil, 0, ErrEmptyPattern
 	}
 
 	matcher, err := getMatcher(pattern, opts)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	lines, matches, err := scanLines(dat, matcher)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return buildMatches(lines, matches, opts), nil
+	return buildMatches(lines, matches, opts), len(matches), nil
 }
 
 // getMatcher returns a matcher based on the pattern and options.
@@ -96,8 +104,16 @@ func scanLines(dat []byte, matcher Matcher) ([]string, []int, error) {
 // buildMatches constructs Match objects from matched line indices.
 func buildMatches(lines []string, matches []int, opts GrepOptions) []*exec.Match {
 	var ret []*exec.Match
+	start := max(opts.Offset, 0)
+	end := len(matches)
+	if opts.Limit > 0 && start+opts.Limit < end {
+		end = start + opts.Limit
+	}
+	if start >= len(matches) {
+		return ret
+	}
 
-	for _, m := range matches {
+	for _, m := range matches[start:end] {
 		low := lo.Max([]int{0, m - opts.Before})
 		high := lo.Min([]int{len(lines), m + opts.After + 1})
 		matchText := strings.Join(lines[low:high], "\n")

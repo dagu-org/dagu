@@ -33,6 +33,10 @@ type DAGStore interface {
 	GetDetails(ctx context.Context, fileName string, opts ...spec.LoadOption) (*core.DAG, error)
 	// Grep searches for a pattern in all DAG definitions and returns matching results
 	Grep(ctx context.Context, pattern string) (ret []*GrepDAGsResult, errs []string, err error)
+	// SearchPaginated returns lightweight, paginated search hits for DAG definitions
+	SearchPaginated(ctx context.Context, opts SearchDAGsOptions) (*PaginatedResult[SearchDAGResult], []string, error)
+	// SearchMatches paginates match snippets for a specific DAG definition
+	SearchMatches(ctx context.Context, fileName string, opts SearchDAGMatchesOptions) (*PaginatedResult[*Match], error)
 	// Rename changes a DAG's identifier from oldID to newID
 	Rename(ctx context.Context, oldID, newID string) error
 	// GetSpec retrieves the raw YAML specification of a DAG
@@ -67,11 +71,31 @@ type ListDAGsResult struct {
 	Errors []string    // Any errors encountered during listing
 }
 
+// SearchDAGsOptions contains parameters for paginated DAG search.
+type SearchDAGsOptions struct {
+	Paginator  Paginator
+	Query      string
+	MatchLimit int
+}
+
+// SearchDAGMatchesOptions contains parameters for paginated snippet loading.
+type SearchDAGMatchesOptions struct {
+	Paginator Paginator
+	Query     string
+}
+
 // GrepDAGsResult represents the result of a pattern search within a DAG definition
 type GrepDAGsResult struct {
 	Name    string    // Name of the DAG
 	DAG     *core.DAG // The DAG object
 	Matches []*Match  // Matching lines and their context
+}
+
+// SearchDAGResult represents a lightweight DAG search hit for paginated UIs.
+type SearchDAGResult struct {
+	FileName   string
+	MatchCount int
+	Matches    []*Match
 }
 
 // Match contains matched line number and line content.

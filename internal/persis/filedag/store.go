@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -491,6 +492,10 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 	return result, errList, nil
 }
 
+func dagSearchPattern(query string) string {
+	return fmt.Sprintf("(?i)%s", regexp.QuoteMeta(query))
+}
+
 // Grep searches for a pattern in all DAGs.
 func (store *Storage) Grep(ctx context.Context, pattern string) (
 	ret []*exec.GrepDAGsResult, errs []string, err error,
@@ -548,6 +553,119 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 		}
 	}
 	return ret, errs, nil
+}
+
+// SearchPaginated returns lightweight, paginated DAG search hits.
+func (store *Storage) SearchPaginated(ctx context.Context, opts exec.SearchDAGsOptions) (
+	*exec.PaginatedResult[exec.SearchDAGResult], []string, error,
+) {
+	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
+	if opts.Query == "" {
+		result := exec.NewPaginatedResult([]exec.SearchDAGResult{}, 0, pg)
+		return &result, nil, nil
+	}
+	if err := store.ensureDirExist(); err != nil {
+		return nil, []string{fmt.Sprintf("failed to create DAGs directory %s", store.baseDir)}, nil
+	}
+
+	entries, err := os.ReadDir(store.baseDir)
+	if err != nil {
+		logger.Error(ctx, "Failed to read directory", tag.Dir(store.baseDir), tag.Error(err))
+	}
+
+	pattern := dagSearchPattern(opts.Query)
+	pageStart := pg.Offset()
+	pageEnd := pageStart + pg.Limit()
+	total := 0
+	results := make([]exec.SearchDAGResult, 0, pg.Limit())
+	var errs []string
+
+	for _, entry := range entries {
+		if !fileutil.IsYAMLFile(entry.Name()) {
+			continue
+		}
+
+		filePath := filepath.Join(store.baseDir, entry.Name())
+		dat, err := os.ReadFile(filePath) //nolint:gosec
+		if err != nil {
+			logger.Error(ctx, "Failed to read DAG file", tag.File(entry.Name()), tag.Error(err))
+			continue
+		}
+
+		matches, matchCount, err := grep.GrepWithCount(dat, pattern, grep.GrepOptions{
+			IsRegexp: true,
+			Before:   grep.DefaultGrepOptions.Before,
+			After:    grep.DefaultGrepOptions.After,
+			Limit:    opts.MatchLimit,
+		})
+		if err != nil {
+			if errors.Is(err, grep.ErrNoMatch) {
+				continue
+			}
+			errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
+			continue
+		}
+
+		if total >= pageStart && total < pageEnd {
+			results = append(results, exec.SearchDAGResult{
+				FileName:   strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
+				MatchCount: matchCount,
+				Matches:    matches,
+			})
+		}
+		total++
+	}
+
+	result := exec.NewPaginatedResult(results, total, pg)
+	return &result, errs, nil
+}
+
+// SearchMatches paginates snippets for one DAG definition.
+func (store *Storage) SearchMatches(ctx context.Context, fileName string, opts exec.SearchDAGMatchesOptions) (
+	*exec.PaginatedResult[*exec.Match], error,
+) {
+	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
+	if opts.Query == "" {
+		result := exec.NewPaginatedResult([]*exec.Match{}, 0, pg)
+		return &result, nil
+	}
+
+	filePath, err := store.locateDAG(fileName)
+	if err != nil {
+		return nil, exec.ErrDAGNotFound
+	}
+
+	dat, err := os.ReadFile(filePath) //nolint:gosec
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, exec.ErrDAGNotFound
+		}
+		return nil, err
+	}
+
+	matches, matchCount, err := grep.GrepWithCount(dat, dagSearchPattern(opts.Query), grep.GrepOptions{
+		IsRegexp: true,
+		Before:   grep.DefaultGrepOptions.Before,
+		After:    grep.DefaultGrepOptions.After,
+		Offset:   pg.Offset(),
+		Limit:    pg.Limit(),
+	})
+	if err != nil {
+		if errors.Is(err, grep.ErrNoMatch) {
+			result := exec.NewPaginatedResult([]*exec.Match{}, 0, pg)
+			return &result, nil
+		}
+		return nil, err
+	}
+
+	result := exec.NewPaginatedResult(matches, matchCount, pg)
+	return &result, nil
 }
 
 // ToggleSuspend toggles the suspension state of a DAG.

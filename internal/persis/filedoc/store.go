@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -591,9 +592,10 @@ func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchRes
 		}
 
 		results = append(results, &agent.DocSearchResult{
-			ID:      id,
-			Title:   title,
-			Matches: matches,
+			ID:         id,
+			Title:      title,
+			MatchCount: len(matches),
+			Matches:    matches,
 		})
 		return nil
 	})
@@ -606,6 +608,127 @@ func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchRes
 	})
 
 	return results, nil
+}
+
+func docSearchPattern(query string) string {
+	return fmt.Sprintf("(?i)%s", regexp.QuoteMeta(query))
+}
+
+// SearchPaginated returns lightweight, paginated document search hits.
+func (s *Store) SearchPaginated(ctx context.Context, opts agent.SearchDocsOptions) (*exec.PaginatedResult[agent.DocSearchResult], error) {
+	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
+	if opts.Query == "" {
+		result := exec.NewPaginatedResult([]agent.DocSearchResult{}, 0, pg)
+		return &result, nil
+	}
+
+	pattern := docSearchPattern(opts.Query)
+	pageStart := pg.Offset()
+	pageEnd := pageStart + pg.Limit()
+	total := 0
+	results := make([]agent.DocSearchResult, 0, pg.Limit())
+
+	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() || filepath.Ext(path) != ".md" {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(s.baseDir, path)
+		if err != nil {
+			return nil
+		}
+		id := strings.TrimSuffix(filepath.ToSlash(relPath), ".md")
+
+		if err := agent.ValidateDocID(id); err != nil {
+			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
+			return nil
+		}
+
+		data, err := os.ReadFile(path) //nolint:gosec // path constructed from baseDir
+		if err != nil {
+			return nil
+		}
+
+		matches, matchCount, err := grep.GrepWithCount(data, pattern, grep.GrepOptions{
+			IsRegexp: true,
+			Before:   grep.DefaultGrepOptions.Before,
+			After:    grep.DefaultGrepOptions.After,
+			Limit:    opts.MatchLimit,
+		})
+		if err != nil {
+			return nil
+		}
+
+		if total >= pageStart && total < pageEnd {
+			doc, parseErr := parseDocFile(data, id)
+			title := id
+			if parseErr == nil {
+				title = doc.Title
+			}
+			results = append(results, agent.DocSearchResult{
+				ID:         id,
+				Title:      title,
+				MatchCount: matchCount,
+				Matches:    matches,
+			})
+		}
+		total++
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("filedoc: failed to search: %w", err)
+	}
+
+	result := exec.NewPaginatedResult(results, total, pg)
+	return &result, nil
+}
+
+// SearchMatches paginates snippets for one document.
+func (s *Store) SearchMatches(ctx context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.PaginatedResult[*exec.Match], error) {
+	pg := opts.Paginator
+	if pg.Limit() == 0 {
+		pg = exec.DefaultPaginator()
+	}
+	if opts.Query == "" {
+		result := exec.NewPaginatedResult([]*exec.Match{}, 0, pg)
+		return &result, nil
+	}
+
+	path, err := s.docFilePath(id)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path) //nolint:gosec // validated path within baseDir
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, agent.ErrDocNotFound
+		}
+		return nil, err
+	}
+
+	matches, matchCount, err := grep.GrepWithCount(data, docSearchPattern(opts.Query), grep.GrepOptions{
+		IsRegexp: true,
+		Before:   grep.DefaultGrepOptions.Before,
+		After:    grep.DefaultGrepOptions.After,
+		Offset:   pg.Offset(),
+		Limit:    pg.Limit(),
+	})
+	if err != nil {
+		if err == grep.ErrNoMatch {
+			result := exec.NewPaginatedResult([]*exec.Match{}, 0, pg)
+			return &result, nil
+		}
+		return nil, err
+	}
+
+	result := exec.NewPaginatedResult(matches, matchCount, pg)
+	return &result, nil
 }
 
 // normalizeSortParams returns validated sort field and order with defaults.

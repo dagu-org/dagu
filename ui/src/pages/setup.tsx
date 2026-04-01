@@ -208,7 +208,7 @@ export default function SetupPage() {
       const supportedProviders = [
         CreateModelConfigRequestProvider.anthropic,
         CreateModelConfigRequestProvider.openai,
-        CreateModelConfigRequestProvider.openaiCodex,
+        CreateModelConfigRequestProvider.openai_codex,
         CreateModelConfigRequestProvider.gemini,
         CreateModelConfigRequestProvider.zai,
       ] as const;
