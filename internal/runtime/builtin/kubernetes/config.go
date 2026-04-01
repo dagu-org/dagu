@@ -6,6 +6,7 @@ package kubernetes
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -1269,9 +1270,7 @@ func toK8sLabelSelector(selector *LabelSelector) *metav1.LabelSelector {
 	k8sSelector := &metav1.LabelSelector{}
 	if len(selector.MatchLabels) > 0 {
 		k8sSelector.MatchLabels = make(map[string]string, len(selector.MatchLabels))
-		for key, value := range selector.MatchLabels {
-			k8sSelector.MatchLabels[key] = value
-		}
+		maps.Copy(k8sSelector.MatchLabels, selector.MatchLabels)
 	}
 	if len(selector.MatchExpressions) > 0 {
 		k8sSelector.MatchExpressions = make([]metav1.LabelSelectorRequirement, 0, len(selector.MatchExpressions))
@@ -1747,7 +1746,7 @@ var kubernetesPodFailurePolicySchema = closedObjectSchema(map[string]*jsonschema
 	"rules": {
 		Type:        "array",
 		Items:       kubernetesPodFailurePolicyRuleSchema,
-		MaxItems:    intPtr(20),
+		MaxItems:    new(20),
 		Description: "Pod failure policy rules",
 	},
 })
@@ -1771,8 +1770,8 @@ var kubernetesPodFailurePolicyRuleSchema = &jsonschema.Schema{
 			"on_pod_conditions": {
 				Type:        "array",
 				Items:       kubernetesPodFailurePolicyOnPodConditionSchema,
-				MinItems:    intPtr(1),
-				MaxItems:    intPtr(20),
+				MinItems:    new(1),
+				MaxItems:    new(20),
 				Description: "Pod conditions to match",
 			},
 		}, "action", "on_pod_conditions"),
@@ -1790,8 +1789,8 @@ var kubernetesPodFailurePolicyOnExitCodesSchema = closedObjectSchema(map[string]
 	"values": {
 		Type:        "array",
 		Items:       &jsonschema.Schema{Type: "integer"},
-		MinItems:    intPtr(1),
-		MaxItems:    intPtr(255),
+		MinItems:    new(1),
+		MaxItems:    new(255),
 		UniqueItems: true,
 		Description: "Exit codes to compare against",
 	},
@@ -1941,8 +1940,8 @@ func nonNegativeIntegerArraySchema(description string) *jsonschema.Schema {
 func boundedIntegerSchema(min, max float64, description string) *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Type:        "integer",
-		Minimum:     floatPtr(min),
-		Maximum:     floatPtr(max),
+		Minimum:     new(min),
+		Maximum:     new(max),
 		Description: description,
 	}
 }
@@ -1954,10 +1953,10 @@ func stringArrayWithBoundsSchema(minItems, maxItems int, description string) *js
 		Description: description,
 	}
 	if minItems > 0 || maxItems >= 0 {
-		schema.MinItems = intPtr(minItems)
+		schema.MinItems = new(minItems)
 	}
 	if maxItems >= 0 {
-		schema.MaxItems = intPtr(maxItems)
+		schema.MaxItems = new(maxItems)
 	}
 	return schema
 }
@@ -1968,10 +1967,12 @@ func constSchema(value any) *jsonschema.Schema {
 	}
 }
 
+//go:fix inline
 func intPtr(v int) *int {
-	return &v
+	return new(v)
 }
 
+//go:fix inline
 func floatPtr(v float64) *float64 {
-	return &v
+	return new(v)
 }

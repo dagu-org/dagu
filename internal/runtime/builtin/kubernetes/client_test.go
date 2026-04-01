@@ -256,9 +256,9 @@ func TestBuildJobAppliesExtendedKubernetesConfig(t *testing.T) {
 		Image:        "alpine:3.20",
 		BackoffLimit: int32Ptr(0),
 		SecurityContext: &SecurityContext{
-			RunAsNonRoot:             boolPtr(true),
-			ReadOnlyRootFilesystem:   boolPtr(true),
-			AllowPrivilegeEscalation: boolPtr(false),
+			RunAsNonRoot:             new(true),
+			ReadOnlyRootFilesystem:   new(true),
+			AllowPrivilegeEscalation: new(false),
 			Capabilities: &Capabilities{
 				Drop: []string{"ALL"},
 			},
@@ -269,7 +269,7 @@ func TestBuildJobAppliesExtendedKubernetesConfig(t *testing.T) {
 		PodSecurityContext: &PodSecurityContext{
 			RunAsUser:           int64Ptr(1000),
 			RunAsGroup:          int64Ptr(1000),
-			RunAsNonRoot:        boolPtr(true),
+			RunAsNonRoot:        new(true),
 			FSGroup:             int64Ptr(2000),
 			FSGroupChangePolicy: "OnRootMismatch",
 			SupplementalGroups:  []int64{3000},
@@ -390,14 +390,17 @@ func TestBuildJobAppliesExtendedKubernetesConfig(t *testing.T) {
 	assert.Equal(t, corev1.ConditionTrue, job.Spec.PodFailurePolicy.Rules[1].OnPodConditions[0].Status)
 }
 
+//go:fix inline
 func boolPtr(v bool) *bool {
-	return &v
+	return new(v)
 }
 
+//go:fix inline
 func int64Ptr(v int64) *int64 {
-	return &v
+	return new(v)
 }
 
+//go:fix inline
 func int32Ptr(v int32) *int32 {
-	return &v
+	return new(v)
 }
