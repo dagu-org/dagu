@@ -1471,7 +1471,7 @@ var kubernetesConfigProperties = map[string]*jsonschema.Schema{
 	"affinity":             kubernetesAffinitySchema,
 	"termination_grace_period_seconds": {
 		Type:        "integer",
-		Minimum:     floatPtr(0),
+		Minimum:     new(float64(0)),
 		Description: "Grace period in seconds before the Pod is forcefully terminated",
 	},
 	"priority_class_name": {Type: "string", Description: "Kubernetes priority class name"},
@@ -1479,9 +1479,9 @@ var kubernetesConfigProperties = map[string]*jsonschema.Schema{
 	"annotations":         stringMapSchema("Annotations for Job and Pod"),
 	"volumes":             {Type: "array", Items: kubernetesVolumeSchema, Description: "Pod volumes"},
 	"volume_mounts":       {Type: "array", Items: kubernetesVolumeMountSchema, Description: "Container volume mounts"},
-	"active_deadline":     {Type: "integer", Minimum: floatPtr(0), Description: "Job timeout in seconds"},
-	"backoff_limit":       {Type: "integer", Minimum: floatPtr(0), Description: "Number of retries (default: 0)"},
-	"ttl_after_finished":  {Type: "integer", Minimum: floatPtr(0), Description: "TTL for automatic cleanup in seconds"},
+	"active_deadline":     {Type: "integer", Minimum: new(float64(0)), Description: "Job timeout in seconds"},
+	"backoff_limit":       {Type: "integer", Minimum: new(float64(0)), Description: "Number of retries (default: 0)"},
+	"ttl_after_finished":  {Type: "integer", Minimum: new(float64(0)), Description: "TTL for automatic cleanup in seconds"},
 	"cleanup_policy":      {Type: "string", Description: "delete (default) or keep"},
 	"pod_failure_policy":  kubernetesPodFailurePolicySchema,
 }
@@ -1924,7 +1924,7 @@ func stringMapSchema(description string) *jsonschema.Schema {
 func nonNegativeIntegerSchema(description string) *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Type:        "integer",
-		Minimum:     floatPtr(0),
+		Minimum:     new(float64(0)),
 		Description: description,
 	}
 }

@@ -254,7 +254,7 @@ func TestBuildJobAppliesExtendedKubernetesConfig(t *testing.T) {
 	cfg := &Config{
 		Namespace:    "default",
 		Image:        "alpine:3.20",
-		BackoffLimit: int32Ptr(0),
+		BackoffLimit: new(int32(0)),
 		SecurityContext: &SecurityContext{
 			RunAsNonRoot:             new(true),
 			ReadOnlyRootFilesystem:   new(true),
@@ -267,10 +267,10 @@ func TestBuildJobAppliesExtendedKubernetesConfig(t *testing.T) {
 			},
 		},
 		PodSecurityContext: &PodSecurityContext{
-			RunAsUser:           int64Ptr(1000),
-			RunAsGroup:          int64Ptr(1000),
+			RunAsUser:           new(int64(1000)),
+			RunAsGroup:          new(int64(1000)),
 			RunAsNonRoot:        new(true),
-			FSGroup:             int64Ptr(2000),
+			FSGroup:             new(int64(2000)),
 			FSGroupChangePolicy: "OnRootMismatch",
 			SupplementalGroups:  []int64{3000},
 			Sysctls: []Sysctl{{
@@ -313,7 +313,7 @@ func TestBuildJobAppliesExtendedKubernetesConfig(t *testing.T) {
 				}},
 			},
 		},
-		TerminationGracePeriodSeconds: int64Ptr(30),
+		TerminationGracePeriodSeconds: new(int64(30)),
 		PriorityClassName:             "batch-high",
 		PodFailurePolicy: &PodFailurePolicy{
 			Rules: []PodFailurePolicyRule{
