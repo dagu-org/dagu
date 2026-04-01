@@ -131,6 +131,9 @@ type dag struct {
 	// Redis is the default Redis configuration for all redis steps in this DAG.
 	// Steps can override this configuration by specifying their own config fields.
 	Redis *redisConfig `yaml:"redis,omitempty"`
+	// Kubernetes is the default Kubernetes configuration for explicit k8s steps in this DAG.
+	// Steps can override this configuration by specifying their own config fields.
+	Kubernetes map[string]any `yaml:"kubernetes,omitempty"`
 	// Secrets contains references to external secrets.
 	Secrets []secretRef `yaml:"secrets,omitempty"`
 	// Defaults defines default values for step configuration fields.
@@ -448,6 +451,7 @@ var fullTransformers = []transform{
 	{"s3", newTransformer("S3", buildS3)},
 	{"llm", newTransformer("LLM", buildLLM)},
 	{"redis", newTransformer("Redis", buildRedis)},
+	{"kubernetes", newTransformer("Kubernetes", buildKubernetes)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
 	{"dotenv", newTransformer("Dotenv", buildDotenv)},
 	{"smtp", newTransformer("SMTP", buildSMTPConfig)},

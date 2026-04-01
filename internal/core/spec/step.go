@@ -1263,6 +1263,9 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	if result.ExecutorConfig.Type == "redis" && ctx.dag != nil && ctx.dag.Redis != nil {
 		mergeRedisConfig(ctx.dag.Redis, result.ExecutorConfig.Config)
 	}
+	if isKubernetesExecutorType(result.ExecutorConfig.Type) && ctx.dag != nil && ctx.dag.Kubernetes != nil {
+		result.ExecutorConfig.Config = mergeKubernetesExecutorConfig(ctx.dag.Kubernetes, result.ExecutorConfig.Config)
+	}
 
 	return nil
 }

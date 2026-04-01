@@ -17,6 +17,7 @@ type dagParamKind uint8
 const (
 	dagParamKindLegacy dagParamKind = iota
 	dagParamKindExternalSchema
+	dagParamKindInlineSchema
 )
 
 type dagParamPlan struct {
@@ -92,6 +93,15 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 			}
 			finalPairs = runtimePairsFromEntries(finalEntries)
 		}
+
+	case dagParamKindInlineSchema:
+		if resolveRuntimeParams {
+			finalEntries, err := resolveExternalSchemaEntries(plan, ctx.opts.Parameters, ctx.opts.ParametersList)
+			if err != nil {
+				return nil, err
+			}
+			finalPairs = runtimePairsFromEntries(finalEntries)
+		}
 	}
 
 	defaultParts := make([]string, 0, len(defaultPairs))
@@ -141,6 +151,12 @@ func buildDAGParamPlan(ctx BuildContext, d *dag) (*dagParamPlan, error) {
 			return buildLegacyParamPlan(extractSchemaValues(d.Params))
 		}
 		return buildExternalSchemaParamPlan(d.Params, d.WorkingDir, ctx.file)
+	}
+	if isInlineJSONSchema(d.Params) {
+		if ctx.opts.Has(BuildFlagSkipSchemaValidation) {
+			return &dagParamPlan{kind: dagParamKindLegacy}, nil
+		}
+		return buildInlineSchemaParamPlan(d.Params)
 	}
 	return buildLegacyParamPlan(d.Params)
 }

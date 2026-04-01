@@ -5,13 +5,14 @@ package docker
 
 import (
 	"fmt"
+	"net/netip"
 	"path/filepath"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
 )
 
 // volumeSpec represents a parsed volume specification
@@ -88,9 +89,9 @@ func parseVolumes(workDir string, volumes []string) ([]string, []mount.Mount, er
 }
 
 // parsePorts parses port specifications into ExposedPorts and PortBindings
-func parsePorts(ports []string) (nat.PortSet, nat.PortMap, error) {
-	exposedPorts := make(nat.PortSet)
-	portBindings := make(nat.PortMap)
+func parsePorts(ports []string) (network.PortSet, network.PortMap, error) {
+	exposedPorts := make(network.PortSet)
+	portBindings := make(network.PortMap)
 
 	for _, portSpec := range ports {
 		// Remove any whitespace
@@ -135,11 +136,13 @@ func parsePorts(ports []string) (nat.PortSet, nat.PortMap, error) {
 			return nil, nil, fmt.Errorf("%w: invalid protocol %s in %s", ErrInvalidPortFormat, proto, portSpec)
 		}
 
-		// Create the nat.Port
-		natPort := nat.Port(containerPort + "/" + proto)
+		parsedPort, err := network.ParsePort(containerPort + "/" + proto)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%w: invalid container port %s in %s", ErrInvalidPortFormat, containerPort, portSpec)
+		}
 
 		// Add to exposed ports
-		exposedPorts[natPort] = struct{}{}
+		exposedPorts[parsedPort] = struct{}{}
 
 		// Add to port bindings if host port is specified
 		if hostPort != "" {
@@ -147,9 +150,14 @@ func parsePorts(ports []string) (nat.PortSet, nat.PortMap, error) {
 				hostIP = "0.0.0.0" // Default to all interfaces
 			}
 
-			portBindings[natPort] = []nat.PortBinding{
+			addr, err := netip.ParseAddr(hostIP)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%w: invalid host IP %s in %s", ErrInvalidPortFormat, hostIP, portSpec)
+			}
+
+			portBindings[parsedPort] = []network.PortBinding{
 				{
-					HostIP:   hostIP,
+					HostIP:   addr,
 					HostPort: hostPort,
 				},
 			}

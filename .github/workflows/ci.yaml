@@ -45,6 +45,10 @@ jobs:
 
       - name: Codespell
         uses: codespell-project/actions-codespell@v2
+        with:
+          check_hidden: true
+          skip: ./.git,*.svg,go.mod,go.sum,*.gen.go,pnpm-lock.yaml,*.lock,*.css,.codespellrc,.codespell-ignore-words,CHANGELOG.md
+          ignore_words_file: .codespell-ignore-words
 
   # Lint Go code
   golint:
@@ -121,7 +125,7 @@ jobs:
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage.out
         env:

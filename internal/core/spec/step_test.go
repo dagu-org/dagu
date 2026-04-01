@@ -40,6 +40,10 @@ func TestMain(m *testing.M) {
 	// jq and http: support command and script
 	core.RegisterExecutorCapabilities("jq", core.ExecutorCapabilities{Command: true, Script: true})
 	core.RegisterExecutorCapabilities("http", core.ExecutorCapabilities{Command: true, Script: true})
+	// kubernetes: supports a single command only
+	for _, t := range []string{"kubernetes", "k8s"} {
+		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{Command: true})
+	}
 	// archive and gha: support command only
 	for _, t := range []string{"archive", "github_action", "github-action", "gha"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{Command: true})
@@ -1967,6 +1971,24 @@ func TestValidateMultipleCommands(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:         "MultipleCommands_KubernetesExecutor",
+			executorType: "kubernetes",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: true,
+		},
+		{
+			name:         "MultipleCommands_K8sExecutor",
+			executorType: "k8s",
+			commands: []core.CommandEntry{
+				{Command: "echo", Args: []string{"hello"}},
+				{Command: "echo", Args: []string{"world"}},
+			},
+			wantErr: true,
+		},
+		{
 			name:         "MultipleCommands_ArchiveExecutor",
 			executorType: "archive",
 			commands: []core.CommandEntry{
@@ -2191,6 +2213,18 @@ func TestValidateShell(t *testing.T) {
 		{
 			name:         "ShellWithHTTPExecutor",
 			executorType: "http",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		{
+			name:         "ShellWithKubernetesExecutor",
+			executorType: "kubernetes",
+			shell:        "/bin/bash",
+			wantErr:      true,
+		},
+		{
+			name:         "ShellWithK8sExecutor",
+			executorType: "k8s",
 			shell:        "/bin/bash",
 			wantErr:      true,
 		},

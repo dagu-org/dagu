@@ -120,7 +120,7 @@ func resolveExternalSchemaEntries(plan *dagParamPlan, rawParams string, paramsLi
 	}
 	for _, pair := range overridePairs {
 		if pair.Name == "" {
-			return nil, fmt.Errorf("positional parameters are not supported when params.schema is used")
+			return nil, fmt.Errorf("positional parameters are not supported for schema-backed params")
 		}
 		value, err := coerceSchemaPairValue(pair.Name, pair.Value, plan.schemaProperties[pair.Name], true)
 		if err != nil {

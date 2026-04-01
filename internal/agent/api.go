@@ -20,6 +20,7 @@ import (
 	"github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -98,6 +99,7 @@ type API struct {
 	soulStore          SoulStore
 	remoteNodeResolver RemoteNodeResolver
 	oauthManager       *agentoauth.Manager
+	eventService       *eventstore.Service
 }
 
 // APIConfig contains configuration for the API.
@@ -115,6 +117,7 @@ type APIConfig struct {
 	MemoryStore        MemoryStore
 	RemoteNodeResolver RemoteNodeResolver
 	OAuthManager       *agentoauth.Manager
+	EventService       *eventstore.Service
 }
 
 // SessionWithState is a session with its current state.
@@ -163,6 +166,7 @@ func NewAPI(cfg APIConfig) *API {
 		memoryStore:        cfg.MemoryStore,
 		remoteNodeResolver: cfg.RemoteNodeResolver,
 		oauthManager:       cfg.OAuthManager,
+		eventService:       cfg.EventService,
 	}
 }
 
@@ -386,8 +390,38 @@ func (a *API) createMessageCallback(id string) func(ctx context.Context, msg Mes
 		return nil
 	}
 	return func(ctx context.Context, msg Message) error {
-		return a.store.AddMessage(ctx, id, &msg)
+		if err := a.store.AddMessage(ctx, id, &msg); err != nil {
+			return err
+		}
+		if a.eventService != nil && msg.Type == MessageTypeAssistant && msg.Usage != nil {
+			source := eventstore.Source{
+				Service: eventstore.SourceServiceServer,
+			}
+			model, userID := a.lookupSessionEventMetadata(id)
+			if err := a.eventService.Emit(ctx, eventstore.NewLLMUsageEvent(
+				source,
+				id,
+				userID,
+				model,
+				msg.ID,
+				msg.CreatedAt,
+				msg.Usage,
+				msg.Cost,
+			)); err != nil {
+				a.logger.Warn("Failed to emit LLM usage event", "session_id", id, "error", err)
+			}
+		}
+		return nil
 	}
+}
+
+func (a *API) lookupSessionEventMetadata(id string) (model string, userID string) {
+	if val, ok := a.sessions.Load(id); ok {
+		if mgr, ok := val.(*SessionManager); ok {
+			return mgr.GetModel(), mgr.UserID()
+		}
+	}
+	return "", ""
 }
 
 // persistNewSession saves a new session to the store if configured.

@@ -30,6 +30,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
 	"github.com/dagu-org/dagu/internal/service/resource"
@@ -63,6 +64,7 @@ type API struct {
 	resourceService     *resource.Service
 	authService         AuthService
 	auditService        *audit.Service
+	eventService        *eventstore.Service
 	syncService         SyncService
 	tunnelService       *tunnel.Service
 	defaultExecMode     config.ExecutionMode
@@ -131,6 +133,13 @@ func WithAuthService(as AuthService) APIOption {
 func WithAuditService(as *audit.Service) APIOption {
 	return func(a *API) {
 		a.auditService = as
+	}
+}
+
+// WithEventService returns an APIOption that sets the API's event service.
+func WithEventService(es *eventstore.Service) APIOption {
+	return func(a *API) {
+		a.eventService = es
 	}
 }
 
@@ -720,6 +729,40 @@ func (a *API) logAudit(ctx context.Context, category audit.Category, action stri
 			slog.String("category", string(category)),
 		)
 	}
+}
+
+func (a *API) withEventContext(ctx context.Context) context.Context {
+	if a == nil || a.eventService == nil {
+		return ctx
+	}
+	return eventstore.WithContext(ctx, a.eventService, eventstore.Source{
+		Service: eventstore.SourceServiceServer,
+	})
+}
+
+func (a *API) updateDAGRunStatus(ctx context.Context, ref exec.DAGRunRef, status exec.DAGRunStatus) error {
+	if a != nil && a.dagRunStore != nil {
+		var (
+			attempt exec.DAGRunAttempt
+			err     error
+		)
+		if ref.ID == status.DAGRunID {
+			attempt, err = a.dagRunStore.FindAttempt(ctx, ref)
+		} else {
+			attempt, err = a.dagRunStore.FindSubAttempt(ctx, ref, status.DAGRunID)
+		}
+		if err != nil {
+			return err
+		}
+		latest, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return err
+		}
+		if latest != nil && latest.Status == status.Status {
+			return a.dagRunMgr.UpdateStatus(ctx, ref, status)
+		}
+	}
+	return a.dagRunMgr.UpdateStatus(a.withEventContext(ctx), ref, status)
 }
 
 // ptrOf returns a pointer to v, or nil if v is the zero value for its type.
