@@ -27,3 +27,8 @@ updates:
       - ui
     schedule:
       interval: quarterly
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
