@@ -136,6 +136,7 @@ type sessionRuntimeConfig struct {
 	enabledSkills   []string
 	soul            *Soul
 	webSearch       *llm.WebSearchRequest
+	thinkingEffort  llm.ThinkingEffort
 	inputCostPer1M  float64
 	outputCostPer1M float64
 }
@@ -454,6 +455,17 @@ func cloneWebSearchRequest(req *llm.WebSearchRequest) *llm.WebSearchRequest {
 	return &out
 }
 
+func modelThinkingEffort(modelCfg *ModelConfig) llm.ThinkingEffort {
+	if modelCfg == nil || !modelCfg.SupportsThinking {
+		return ""
+	}
+	effort, err := llm.ParseThinkingEffort(modelCfg.ThinkingEffort)
+	if err != nil {
+		return ""
+	}
+	return effort
+}
+
 func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMode bool) (sessionRuntimeConfig, error) {
 	modelID := a.getDefaultModelID(ctx)
 	if modelID == "" {
@@ -473,6 +485,7 @@ func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMod
 		enabledSkills:   enabledSkills,
 		soul:            a.loadSelectedSoul(ctx),
 		webSearch:       cloneWebSearchRequest(a.loadWebSearch(ctx)),
+		thinkingEffort:  modelThinkingEffort(modelCfg),
 		inputCostPer1M:  modelCfg.InputCostPer1M,
 		outputCostPer1M: modelCfg.OutputCostPer1M,
 	}, nil
@@ -498,6 +511,7 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 		enabledSkills:   enabledSkills,
 		soul:            mgr.soul,
 		webSearch:       cloneWebSearchRequest(mgr.webSearch),
+		thinkingEffort:  modelThinkingEffort(modelCfg),
 		inputCostPer1M:  modelCfg.InputCostPer1M,
 		outputCostPer1M: modelCfg.OutputCostPer1M,
 	}, nil
@@ -523,6 +537,7 @@ func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentit
 		SessionStore:       a.store,
 		Soul:               cfg.soul,
 		WebSearch:          cfg.webSearch,
+		ThinkingEffort:     cfg.thinkingEffort,
 		RemoteNodeResolver: a.remoteNodeResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
@@ -854,14 +869,16 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		delegates = nil
 	}
 
-	// Resolve pricing from the default model so that reactivated sessions
-	// can calculate costs for new messages immediately.
+	// Resolve pricing and default reasoning from the default model so that
+	// reactivated sessions can use current model metadata immediately.
 	var inputCost, outputCost float64
+	var thinkingEffort llm.ThinkingEffort
 	defaultModelID := a.getDefaultModelID(ctx)
 	if defaultModelID != "" {
 		if _, modelCfg, err := a.resolveProvider(ctx, defaultModelID); err == nil {
 			inputCost = modelCfg.InputCostPer1M
 			outputCost = modelCfg.OutputCostPer1M
+			thinkingEffort = modelThinkingEffort(modelCfg)
 		}
 	}
 
@@ -888,6 +905,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		SessionStore:       a.store,
 		Soul:               a.loadSelectedSoul(ctx),
 		WebSearch:          a.loadWebSearch(ctx),
+		ThinkingEffort:     thinkingEffort,
 		RemoteNodeResolver: a.remoteNodeResolver,
 		Delegates:          delegates,
 	})
@@ -1092,6 +1110,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		SessionStore:       a.store,
 		Soul:               a.loadSoulWithOverride(ctx, req.SoulID),
 		WebSearch:          a.loadWebSearch(ctx),
+		ThinkingEffort:     modelThinkingEffort(modelCfg),
 		RemoteNodeResolver: a.remoteNodeResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
@@ -1322,6 +1341,7 @@ func (a *API) prepareSessionRuntime(ctx context.Context, mgr *SessionManager, us
 
 	mgr.SetSafeMode(req.SafeMode)
 	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
+	mgr.UpdateThinkingEffort(modelThinkingEffort(modelCfg))
 	return provider, model, modelCfg.Model, nil
 }
 

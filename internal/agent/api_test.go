@@ -1057,6 +1057,77 @@ func TestAPI_SendMessage_UpdatesPricing(t *testing.T) {
 	})
 }
 
+func TestAPI_CreateSession_AppliesModelThinkingEffort(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("reasoning-model")
+	model.Model = "gpt-5.4"
+	model.SupportsThinking = true
+	model.ThinkingEffort = "high"
+
+	reqCh := make(chan *llm.ChatRequest, 1)
+	api, _ := testAPIWithModels(t, model)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("done")))
+
+	_, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello"})
+	require.NoError(t, err)
+
+	req := waitForRequest(t, reqCh, time.Second)
+	require.NotNil(t, req.Thinking)
+	assert.True(t, req.Thinking.Enabled)
+	assert.Equal(t, llm.ThinkingEffortHigh, req.Thinking.Effort)
+}
+
+func TestAPI_SendMessage_UpdatesThinkingEffort(t *testing.T) {
+	t.Parallel()
+
+	modelA := testModelConfig("model-a")
+	modelA.Model = "gpt-5.4"
+	modelA.SupportsThinking = true
+	modelA.ThinkingEffort = "high"
+
+	modelB := testModelConfig("model-b")
+	modelB.Model = "gpt-5.4"
+	modelB.SupportsThinking = true
+	modelB.ThinkingEffort = "low"
+
+	reqCh := make(chan *llm.ChatRequest, 2)
+	api, _ := testAPIWithModels(t, modelA, modelB)
+	api.providers.Set(modelA.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("a")))
+	api.providers.Set(modelB.ToLLMConfig(), newStopProvider("b"))
+
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello", Model: "model-a"})
+	require.NoError(t, err)
+	firstReq := waitForRequest(t, reqCh, time.Second)
+	require.NotNil(t, firstReq.Thinking)
+	assert.Equal(t, llm.ThinkingEffortHigh, firstReq.Thinking.Effort)
+
+	err = api.SendMessage(context.Background(), sessID, UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "followup", Model: "model-b"})
+	require.NoError(t, err)
+
+	secondReq := waitForRequest(t, reqCh, time.Second)
+	require.NotNil(t, secondReq.Thinking)
+	assert.Equal(t, llm.ThinkingEffortLow, secondReq.Thinking.Effort)
+}
+
+func TestAPI_CreateSession_OmitsThinkingWhenNoEffortConfigured(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("no-thinking-effort")
+	model.Model = "gpt-5.4"
+	model.SupportsThinking = true
+
+	reqCh := make(chan *llm.ChatRequest, 1)
+	api, _ := testAPIWithModels(t, model)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("done")))
+
+	_, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello"})
+	require.NoError(t, err)
+
+	req := waitForRequest(t, reqCh, time.Second)
+	assert.Nil(t, req.Thinking)
+}
+
 func TestAPI_GenerateAssistantMessage_UsesSessionDAGMemory(t *testing.T) {
 	t.Parallel()
 

@@ -9268,6 +9268,9 @@ components:
           minimum: 0
         supportsThinking:
           type: boolean
+        thinkingEffort:
+          type: string
+          enum: [low, medium, high, xhigh]
         description:
           type: string
 
@@ -9310,6 +9313,9 @@ components:
           minimum: 0
         supportsThinking:
           type: boolean
+        thinkingEffort:
+          type: string
+          enum: [low, medium, high, xhigh]
         description:
           type: string
 
@@ -9345,6 +9351,9 @@ components:
           minimum: 0
         supportsThinking:
           type: boolean
+        thinkingEffort:
+          type: string
+          enum: [low, medium, high, xhigh]
         description:
           type: string
 
@@ -9851,6 +9860,9 @@ components:
           minimum: 0
         supportsThinking:
           type: boolean
+        thinkingEffort:
+          type: string
+          enum: [low, medium, high, xhigh]
         description:
           type: string
 

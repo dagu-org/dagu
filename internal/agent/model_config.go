@@ -129,6 +129,7 @@ type ModelConfig struct {
 	InputCostPer1M   float64 `json:"inputCostPer1M,omitempty"`
 	OutputCostPer1M  float64 `json:"outputCostPer1M,omitempty"`
 	SupportsThinking bool    `json:"supportsThinking,omitempty"`
+	ThinkingEffort   string  `json:"thinkingEffort,omitempty"`
 	Description      string  `json:"description,omitempty"`
 }
 

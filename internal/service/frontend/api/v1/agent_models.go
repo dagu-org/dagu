@@ -149,9 +149,13 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 		InputCostPer1M:   valueOf(body.InputCostPer1M),
 		OutputCostPer1M:  valueOf(body.OutputCostPer1M),
 		SupportsThinking: valueOf(body.SupportsThinking),
+		ThinkingEffort:   string(valueOf(body.ThinkingEffort)),
 		Description:      valueOf(body.Description),
 	}
 
+	if err := normalizeModelThinkingConfig(model); err != nil {
+		return nil, err
+	}
 	if err := a.validateModelProviderConfig(ctx, model, body.ApiKey, body.BaseUrl); err != nil {
 		return nil, err
 	}
@@ -207,6 +211,9 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 
 	applyModelUpdates(existing, body)
 
+	if err := normalizeModelThinkingConfig(existing); err != nil {
+		return nil, err
+	}
 	if err := a.validateModelProviderConfig(ctx, existing, body.ApiKey, body.BaseUrl); err != nil {
 		return nil, err
 	}
@@ -315,6 +322,7 @@ func (a *API) ListModelPresets(ctx context.Context, _ api.ListModelPresetsReques
 			InputCostPer1M:   ptrOf(p.InputCostPer1M),
 			OutputCostPer1M:  ptrOf(p.OutputCostPer1M),
 			SupportsThinking: ptrOf(p.SupportsThinking),
+			ThinkingEffort:   optionalThinkingEffortPtr[api.ModelPresetThinkingEffort](p.ThinkingEffort),
 			Description:      ptrOf(p.Description),
 		})
 	}
@@ -363,6 +371,7 @@ func toModelConfigResponse(m *agent.ModelConfig) api.ModelConfigResponse {
 		InputCostPer1M:   ptrOf(m.InputCostPer1M),
 		OutputCostPer1M:  ptrOf(m.OutputCostPer1M),
 		SupportsThinking: ptrOf(m.SupportsThinking),
+		ThinkingEffort:   optionalThinkingEffortPtr[api.ModelConfigResponseThinkingEffort](m.ThinkingEffort),
 		Description:      ptrOf(m.Description),
 	}
 }
@@ -402,9 +411,40 @@ func applyModelUpdates(model *agent.ModelConfig, update *api.UpdateModelConfigRe
 	if update.SupportsThinking != nil {
 		model.SupportsThinking = *update.SupportsThinking
 	}
+	if update.ThinkingEffort != nil {
+		model.ThinkingEffort = string(*update.ThinkingEffort)
+	}
 	if update.Description != nil {
 		model.Description = *update.Description
 	}
+}
+
+func normalizeModelThinkingConfig(model *agent.ModelConfig) error {
+	if model == nil {
+		return nil
+	}
+	if !model.SupportsThinking {
+		model.ThinkingEffort = ""
+		return nil
+	}
+	effort, err := llm.ParseThinkingEffort(strings.TrimSpace(model.ThinkingEffort))
+	if err != nil {
+		return &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "thinkingEffort must be one of: low, medium, high, xhigh",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	model.ThinkingEffort = string(effort)
+	return nil
+}
+
+func optionalThinkingEffortPtr[T ~string](v string) *T {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	typed := T(v)
+	return &typed
 }
 
 func (a *API) validateModelProviderConfig(ctx context.Context, model *agent.ModelConfig, apiKeyInput, baseURLInput *string) error {

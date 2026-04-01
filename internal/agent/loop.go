@@ -69,6 +69,8 @@ type LoopConfig struct {
 	WaitUserResponse WaitUserResponseFunc
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool
+	// ThinkingEffort configures default reasoning depth for supported models.
+	ThinkingEffort llm.ThinkingEffort
 	// Hooks provides lifecycle callbacks for tool execution.
 	Hooks *Hooks
 	// User is the authenticated user's identity.
@@ -110,6 +112,7 @@ type Loop struct {
 	emitUserPrompt     EmitUserPromptFunc
 	waitUserResponse   WaitUserResponseFunc
 	safeMode           bool
+	thinkingEffort     llm.ThinkingEffort
 	hooks              *Hooks
 	user               UserIdentity
 	sessionStore       SessionStore
@@ -145,6 +148,7 @@ func NewLoop(config LoopConfig) *Loop {
 		emitUserPrompt:   config.EmitUserPrompt,
 		waitUserResponse: config.WaitUserResponse,
 		safeMode:         config.SafeMode,
+		thinkingEffort:   config.ThinkingEffort,
 		hooks:            config.Hooks,
 		user:             config.User,
 		sessionStore:     config.SessionStore,
@@ -169,6 +173,13 @@ func (l *Loop) RequestInterrupt() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.interruptRequested = true
+}
+
+// SetThinkingEffort updates the reasoning effort used for future turns.
+func (l *Loop) SetThinkingEffort(effort llm.ThinkingEffort) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.thinkingEffort = effort
 }
 
 // AppendExternalHistory injects a message into the loop's in-memory LLM history.
@@ -307,6 +318,12 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 		Messages:  messages,
 		Tools:     tools,
 		WebSearch: l.webSearch,
+	}
+	if l.thinkingEffort != "" {
+		req.Thinking = &llm.ThinkingRequest{
+			Enabled: true,
+			Effort:  l.thinkingEffort,
+		}
 	}
 
 	l.logger.Debug("sending LLM request",

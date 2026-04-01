@@ -7,6 +7,7 @@ package llm
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -38,6 +39,19 @@ const (
 	// Note: Not all providers support this level.
 	ThinkingEffortXHigh ThinkingEffort = "xhigh"
 )
+
+// ParseThinkingEffort validates and returns a ThinkingEffort from a string.
+// Returns empty string for empty input (no effort specified).
+func ParseThinkingEffort(s string) (ThinkingEffort, error) {
+	switch ThinkingEffort(s) {
+	case "":
+		return "", nil
+	case ThinkingEffortLow, ThinkingEffortMedium, ThinkingEffortHigh, ThinkingEffortXHigh:
+		return ThinkingEffort(s), nil
+	default:
+		return "", fmt.Errorf("invalid thinking effort %q: must be one of: low, medium, high, xhigh", s)
+	}
+}
 
 // ParseRole converts a string to a Role, with support for common aliases.
 func ParseRole(s string) Role {

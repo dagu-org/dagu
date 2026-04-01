@@ -3928,6 +3928,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: ModelConfigResponseThinkingEffort;
             description?: string;
         };
         /** @description Request to create a new model configuration */
@@ -3947,6 +3949,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: CreateModelConfigRequestThinkingEffort;
             description?: string;
         };
         /** @description Request to update a model configuration */
@@ -3964,6 +3968,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: UpdateModelConfigRequestThinkingEffort;
             description?: string;
         };
         /** @description Request to set the default model */
@@ -4191,6 +4197,8 @@ export interface components {
             /** Format: double */
             outputCostPer1M?: number;
             supportsThinking?: boolean;
+            /** @enum {string} */
+            thinkingEffort?: ModelPresetThinkingEffort;
             description?: string;
         };
         /** @description List of model presets */
@@ -12895,6 +12903,12 @@ export enum ModelConfigResponseProvider {
     local = "local",
     zai = "zai"
 }
+export enum ModelConfigResponseThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
+}
 export enum CreateModelConfigRequestProvider {
     anthropic = "anthropic",
     openai = "openai",
@@ -12904,6 +12918,12 @@ export enum CreateModelConfigRequestProvider {
     local = "local",
     zai = "zai"
 }
+export enum CreateModelConfigRequestThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
+}
 export enum UpdateModelConfigRequestProvider {
     anthropic = "anthropic",
     openai = "openai",
@@ -12912,6 +12932,12 @@ export enum UpdateModelConfigRequestProvider {
     openrouter = "openrouter",
     local = "local",
     zai = "zai"
+}
+export enum UpdateModelConfigRequestThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
 }
 export enum SkillResponseType {
     builtin = "builtin",
@@ -12929,6 +12955,12 @@ export enum ModelPresetProvider {
     openrouter = "openrouter",
     local = "local",
     zai = "zai"
+}
+export enum ModelPresetThinkingEffort {
+    low = "low",
+    medium = "medium",
+    high = "high",
+    xhigh = "xhigh"
 }
 export enum AgentUserPromptPromptType {
     general = "general",

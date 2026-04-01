@@ -52,6 +52,7 @@ type SessionManager struct {
 	promptsMu          sync.Mutex
 	inputCostPer1M     float64
 	outputCostPer1M    float64
+	thinkingEffort     llm.ThinkingEffort
 	totalCost          float64
 	memoryStore        MemoryStore
 	skillStore         SkillStore
@@ -98,6 +99,7 @@ type SessionManagerConfig struct {
 	Hooks           *Hooks
 	InputCostPer1M  float64
 	OutputCostPer1M float64
+	ThinkingEffort  llm.ThinkingEffort
 	MemoryStore     MemoryStore
 	SkillStore      SkillStore
 	EnabledSkills   []string
@@ -188,6 +190,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		delegates:          delegates,
 		inputCostPer1M:     cfg.InputCostPer1M,
 		outputCostPer1M:    cfg.OutputCostPer1M,
+		thinkingEffort:     cfg.ThinkingEffort,
 		totalCost:          totalCost,
 		memoryStore:        cfg.MemoryStore,
 		skillStore:         cfg.SkillStore,
@@ -224,6 +227,16 @@ func (sm *SessionManager) SetSafeMode(enabled bool) {
 	// Update active loop if one exists
 	if sm.loop != nil {
 		sm.loop.SetSafeMode(enabled)
+	}
+}
+
+// UpdateThinkingEffort updates the default reasoning effort for future turns.
+func (sm *SessionManager) UpdateThinkingEffort(effort llm.ThinkingEffort) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.thinkingEffort = effort
+	if sm.loop != nil {
+		sm.loop.SetThinkingEffort(effort)
 	}
 }
 
@@ -749,10 +762,11 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 	sm.model = modelID
 	history := sm.extractLLMHistoryLocked()
 	safeMode := sm.safeMode
+	thinkingEffort := sm.thinkingEffort
 	sm.mu.Unlock()
 
 	loopCtx, cancel := context.WithCancel(context.Background())
-	loopInstance := sm.createLoop(provider, resolvedModel, history, safeMode)
+	loopInstance := sm.createLoop(provider, resolvedModel, history, safeMode, thinkingEffort)
 
 	sm.mu.Lock()
 	if sm.loop != nil {
@@ -769,7 +783,7 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 }
 
 // createLoop creates a new Loop instance with the current configuration.
-func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool) *Loop {
+func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool, thinkingEffort llm.ThinkingEffort) *Loop {
 	memory := sm.loadMemory()
 	allowedSkills := ToSkillSet(sm.enabledSkills)
 	skillCount := len(sm.enabledSkills)
@@ -805,6 +819,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		EmitUserPrompt:   sm.createEmitUserPromptFunc(),
 		WaitUserResponse: sm.createWaitUserResponseFunc(),
 		SafeMode:         safeMode,
+		ThinkingEffort:   thinkingEffort,
 		Hooks:            sm.hooks,
 		User:             sm.user,
 		SessionStore:     sm.sessionStore,

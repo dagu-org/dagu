@@ -44,6 +44,15 @@ const LLM_PROVIDERS = [
   { value: 'zai', label: 'Z.AI' },
 ];
 
+const REASONING_DEFAULT_VALUE = '__default__';
+const REASONING_EFFORT_OPTIONS = [
+  { value: REASONING_DEFAULT_VALUE, label: 'Provider default' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'xhigh', label: 'XHigh' },
+];
+
 interface ModelFormModalProps {
   open: boolean;
   model?: ModelConfig;
@@ -89,6 +98,7 @@ export function ModelFormModal({
   const [inputCostPer1M, setInputCostPer1M] = useState<number | ''>('');
   const [outputCostPer1M, setOutputCostPer1M] = useState<number | ''>('');
   const [supportsThinking, setSupportsThinking] = useState(false);
+  const [thinkingEffort, setThinkingEffort] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const usesSubscriptionAuth = provider === 'openai-codex';
@@ -107,6 +117,7 @@ export function ModelFormModal({
       setInputCostPer1M(model.inputCostPer1M ?? '');
       setOutputCostPer1M(model.outputCostPer1M ?? '');
       setSupportsThinking(model.supportsThinking ?? false);
+      setThinkingEffort(model.thinkingEffort ?? '');
       setApiKey('');
     } else if (open && !model) {
       resetForm();
@@ -130,6 +141,7 @@ export function ModelFormModal({
     setInputCostPer1M('');
     setOutputCostPer1M('');
     setSupportsThinking(false);
+    setThinkingEffort('');
   }
 
   const handlePresetSelect = (presetName: string) => {
@@ -146,6 +158,7 @@ export function ModelFormModal({
       setInputCostPer1M(preset.inputCostPer1M ?? '');
       setOutputCostPer1M(preset.outputCostPer1M ?? '');
       setSupportsThinking(preset.supportsThinking ?? false);
+      setThinkingEffort(preset.thinkingEffort ?? '');
       setApiKey('');
       setBaseUrl('');
     }
@@ -157,6 +170,12 @@ export function ModelFormModal({
       setBaseUrl('');
     }
   }, [provider]);
+
+  useEffect(() => {
+    if (!supportsThinking) {
+      setThinkingEffort('');
+    }
+  }, [supportsThinking]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,6 +200,7 @@ export function ModelFormModal({
         inputCostPer1M: inputCostPer1M !== '' ? inputCostPer1M : undefined,
         outputCostPer1M: outputCostPer1M !== '' ? outputCostPer1M : undefined,
         supportsThinking,
+        thinkingEffort: supportsThinking ? thinkingEffort : '',
       };
 
       if (!usesSubscriptionAuth && baseUrl) {
@@ -437,6 +457,27 @@ export function ModelFormModal({
                 onCheckedChange={setSupportsThinking}
               />
             </div>
+
+            {supportsThinking && (
+              <div className="space-y-1.5">
+                <Label htmlFor="model-thinking-effort" className="text-sm">Reasoning Effort</Label>
+                <Select
+                  value={thinkingEffort || REASONING_DEFAULT_VALUE}
+                  onValueChange={(value) => setThinkingEffort(value === REASONING_DEFAULT_VALUE ? '' : value)}
+                >
+                  <SelectTrigger id="model-thinking-effort" className="h-8">
+                    <SelectValue placeholder="Select reasoning effort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REASONING_EFFORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

@@ -278,6 +278,51 @@ func TestCreateAgentModel(t *testing.T) {
 		assert.NotEmpty(t, createResp.Id)
 	})
 
+	t.Run("create stores thinking effort when thinking is enabled", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		effort := apigen.CreateModelConfigRequestThinkingEffort("high")
+		supportsThinking := true
+
+		resp, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Name:             "Reasoning Model",
+				Provider:         "openai",
+				Model:            "gpt-5.4",
+				SupportsThinking: &supportsThinking,
+				ThinkingEffort:   &effort,
+			},
+		})
+		require.NoError(t, err)
+
+		createResp, ok := resp.(apigen.CreateAgentModel201JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, createResp.ThinkingEffort)
+		assert.Equal(t, "high", string(*createResp.ThinkingEffort))
+		require.NotEmpty(t, createResp.Id)
+		assert.Equal(t, "high", setup.modelStore.models[createResp.Id].ThinkingEffort)
+	})
+
+	t.Run("invalid thinking effort returns 400", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		badEffort := apigen.CreateModelConfigRequestThinkingEffort("turbo")
+		supportsThinking := true
+
+		_, err := setup.api.CreateAgentModel(adminCtx(), apigen.CreateAgentModelRequestObject{
+			Body: &apigen.CreateModelConfigRequest{
+				Name:             "Bad Reasoning Model",
+				Provider:         "openai",
+				Model:            "gpt-5.4",
+				SupportsThinking: &supportsThinking,
+				ThinkingEffort:   &badEffort,
+			},
+		})
+		require.Error(t, err)
+	})
+
 	t.Run("invalid provider returns 400", func(t *testing.T) {
 		t.Parallel()
 
@@ -550,6 +595,35 @@ func TestUpdateAgentModel(t *testing.T) {
 		assert.Nil(t, updateResp.ApiKeyConfigured)
 		assert.Nil(t, updateResp.BaseUrl)
 	})
+
+	t.Run("disabling thinking clears thinking effort", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID:               "model-1",
+			Name:             "Reasoning",
+			Provider:         "openai",
+			Model:            "gpt-5.4",
+			SupportsThinking: true,
+			ThinkingEffort:   "high",
+		})
+
+		supportsThinking := false
+		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
+			ModelId: "model-1",
+			Body: &apigen.UpdateModelConfigRequest{
+				SupportsThinking: &supportsThinking,
+			},
+		})
+		require.NoError(t, err)
+
+		updateResp, ok := resp.(apigen.UpdateAgentModel200JSONResponse)
+		require.True(t, ok)
+		assert.False(t, valueOrZero(updateResp.SupportsThinking))
+		assert.Nil(t, updateResp.ThinkingEffort)
+		assert.Empty(t, setup.modelStore.models["model-1"].ThinkingEffort)
+	})
 }
 
 func TestDeleteAgentModel(t *testing.T) {
@@ -777,6 +851,7 @@ func TestApplyModelUpdates(t *testing.T) {
 		newInput := 5.0
 		newOutput := 25.0
 		newThinking := true
+		newThinkingEffort := apigen.UpdateModelConfigRequestThinkingEffort("xhigh")
 		newDesc := "Updated description"
 
 		resp, err := setup.api.UpdateAgentModel(adminCtx(), apigen.UpdateAgentModelRequestObject{
@@ -792,6 +867,7 @@ func TestApplyModelUpdates(t *testing.T) {
 				InputCostPer1M:   &newInput,
 				OutputCostPer1M:  &newOutput,
 				SupportsThinking: &newThinking,
+				ThinkingEffort:   &newThinkingEffort,
 				Description:      &newDesc,
 			},
 		})
@@ -802,7 +878,17 @@ func TestApplyModelUpdates(t *testing.T) {
 		assert.Equal(t, "Updated", updateResp.Name)
 		assert.Equal(t, "gpt-5", updateResp.Model)
 		assert.Equal(t, apigen.ModelConfigResponseProvider("anthropic"), updateResp.Provider)
+		require.NotNil(t, updateResp.ThinkingEffort)
+		assert.Equal(t, "xhigh", string(*updateResp.ThinkingEffort))
 	})
+}
+
+func valueOrZero[T any](v *T) T {
+	var zero T
+	if v == nil {
+		return zero
+	}
+	return *v
 }
 
 func TestAutoSetDefaultModel(t *testing.T) {
