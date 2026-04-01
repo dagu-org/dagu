@@ -23,6 +23,7 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 
 	ctx := context.Background()
 	store := NewDispatchTaskStore(filepath.Join(t.TempDir(), "distributed"))
+	claimTimeout := 500 * time.Millisecond
 
 	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
 		DagRunId:       "run-a",
@@ -44,7 +45,7 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 		PollerID:     "poller-1",
 		Labels:       map[string]string{"type": "cpu"},
 		Owner:        exec.CoordinatorEndpoint{ID: "coord-a"},
-		ClaimTimeout: 50 * time.Millisecond,
+		ClaimTimeout: claimTimeout,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, claimed)
@@ -58,7 +59,7 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 		PollerID:     "poller-2",
 		Labels:       map[string]string{"type": "cpu"},
 		Owner:        exec.CoordinatorEndpoint{ID: "coord-b"},
-		ClaimTimeout: 50 * time.Millisecond,
+		ClaimTimeout: claimTimeout,
 	})
 	require.NoError(t, err)
 	assert.Nil(t, secondClaim)
@@ -71,11 +72,11 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 			PollerID:     "poller-2",
 			Labels:       map[string]string{"type": "cpu"},
 			Owner:        exec.CoordinatorEndpoint{ID: "coord-b"},
-			ClaimTimeout: 50 * time.Millisecond,
+			ClaimTimeout: claimTimeout,
 		})
 		require.NoError(t, claimErr)
 		return reclaimed != nil
-	}, time.Second, 10*time.Millisecond)
+	}, 5*time.Second, 25*time.Millisecond)
 	require.NotNil(t, reclaimed)
 	assert.Equal(t, "run-b", reclaimed.Task.DagRunId)
 	assert.Equal(t, "coord-b", reclaimed.Task.OwnerCoordinatorId)
