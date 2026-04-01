@@ -208,7 +208,10 @@ func (l *Loop) SetSafeMode(enabled bool) {
 
 // Go runs the session loop until the context is canceled.
 func (l *Loop) Go(ctx context.Context) error {
-	if l.provider == nil {
+	l.mu.Lock()
+	provider := l.provider
+	l.mu.Unlock()
+	if provider == nil {
 		return fmt.Errorf("no LLM provider configured")
 	}
 
@@ -465,6 +468,8 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	l.mu.Lock()
 	safeMode := l.safeMode
 	user := l.user
+	provider := l.provider
+	model := l.model
 	l.mu.Unlock()
 
 	info := ToolExecInfo{
@@ -498,8 +503,8 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	var delegate *DelegateContext
 	if tc.Function.Name == delegateToolName && l.registry != nil {
 		delegate = &DelegateContext{
-			Provider:      l.provider,
-			Model:         l.model,
+			Provider:      provider,
+			Model:         model,
 			SystemPrompt:  l.systemPrompt,
 			Tools:         l.tools,
 			Hooks:         l.hooks,
