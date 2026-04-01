@@ -209,6 +209,14 @@ export function useCanViewAuditLogs(): boolean {
   return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['manager'];
 }
 
+export function useCanViewEventLogs(): boolean {
+  const { user } = useAuth();
+  const config = useConfig();
+  if (config.authMode !== 'builtin') return true;
+  if (!user) return false;
+  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['manager'];
+}
+
 export function hasRole(userRole: UserRole, requiredRole: UserRole): boolean {
   return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
 }

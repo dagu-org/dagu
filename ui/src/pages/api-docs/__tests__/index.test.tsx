@@ -136,7 +136,6 @@ describe('APIDocsPage', () => {
           spec: expect.objectContaining({
             openapi: '3.0.0',
           }),
-          preferredBearerToken: undefined,
         })
       );
     });

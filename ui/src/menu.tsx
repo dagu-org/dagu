@@ -8,6 +8,7 @@ import {
 import { UserMenu } from '@/components/UserMenu';
 import {
   useCanAccessSystemStatus,
+  useCanViewEventLogs,
   useCanManageWebhooks,
   useCanViewAuditLogs,
   useCanWrite,
@@ -356,6 +357,7 @@ export const mainListItems = React.forwardRef<
   const canWrite = useCanWrite();
   const canAccessSystemStatus = useCanAccessSystemStatus();
   const canManageWebhooks = useCanManageWebhooks();
+  const canViewEventLogs = useCanViewEventLogs();
   const canViewAuditLogs = useCanViewAuditLogs();
   const { preferences, updatePreference } = useUserPreferences();
   const { toggleChat } = useAgentChatContext();
@@ -564,7 +566,7 @@ export const mainListItems = React.forwardRef<
             )}
           </div>
 
-          {(canWrite || canAccessSystemStatus || canManageWebhooks || canViewAuditLogs) && (
+          {(canWrite || canAccessSystemStatus || canManageWebhooks || canViewEventLogs || canViewAuditLogs) && (
             <div className="space-y-0.5">
               <SectionLabel label="Settings" isOpen={isOpen} customColor={customColor} />
               {canAccessSystemStatus && (
@@ -597,11 +599,21 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
+              {canViewEventLogs && (
+                <NavItem
+                  to="/event-logs"
+                  text="Events"
+                  icon={<ScrollText size={18} />}
+                  isOpen={isOpen}
+                  onClick={onNavItemClick}
+                  customColor={customColor}
+                />
+              )}
               {canViewAuditLogs && (
                 <NavItem
                   to="/audit-logs"
                   text={hasAudit ? 'Audit Logs' : 'Audit Logs (Pro)'}
-                  icon={<ScrollText size={18} />}
+                  icon={<Shield size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}

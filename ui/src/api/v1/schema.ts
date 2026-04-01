@@ -1482,6 +1482,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/event-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List centralized event log entries
+         * @description Returns centralized event log entries matching the filter criteria. Manager or admin only.
+         */
+        get: operations["listEventLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sync/status": {
         parameters: {
             query?: never;
@@ -2499,6 +2519,56 @@ export interface components {
         AuditLogsResponse: {
             /** @description List of audit log entries */
             entries: components["schemas"]["AuditEntry"][];
+            /** @description Total number of entries matching the filter (before pagination) */
+            total: number;
+        };
+        /** @description A single centralized operational event log entry */
+        EventLogEntry: {
+            /** @description Unique identifier for this event */
+            id: string;
+            /** @description Schema version of the event envelope */
+            schemaVersion: number;
+            /**
+             * Format: date-time
+             * @description When the event occurred
+             */
+            occurredAt: string;
+            /**
+             * Format: date-time
+             * @description When the event was recorded by the producer
+             */
+            recordedAt: string;
+            /** @description High-level event kind (e.g., dag_run, llm_usage) */
+            kind: string;
+            /** @description Specific event type (e.g., dag.run.failed) */
+            type: string;
+            /** @description Service that produced the event */
+            sourceService: string;
+            /** @description Specific producer instance identifier */
+            sourceInstance?: string;
+            /** @description DAG name for DAG-run events */
+            dagName?: string;
+            /** @description DAG run ID for DAG-run events */
+            dagRunId?: string;
+            /** @description Attempt ID for DAG-run events */
+            attemptId?: string;
+            /** @description Session ID for LLM usage events */
+            sessionId?: string;
+            /** @description User ID associated with the event */
+            userId?: string;
+            /** @description Model name associated with the event */
+            model?: string;
+            /** @description Status associated with the event when applicable */
+            status?: string;
+            /** @description Small event-specific payload */
+            data?: {
+                [key: string]: unknown;
+            };
+        };
+        /** @description Response containing centralized event log entries */
+        EventLogsResponse: {
+            /** @description List of event log entries */
+            entries: components["schemas"]["EventLogEntry"][];
             /** @description Total number of entries matching the filter (before pagination) */
             total: number;
         };
@@ -4391,6 +4461,16 @@ export interface components {
         StepName: string;
         /** @description name of the remote node */
         RemoteNode: string;
+        /** @description Filter entries after this time (ISO 8601 format) */
+        LogStartTime: string;
+        /** @description Filter entries before this time (ISO 8601 format) */
+        LogEndTime: string;
+        /** @description Maximum number of entries to return (default 100) */
+        AuditLogLimit: number;
+        /** @description Maximum number of entries to return (default 50) */
+        EventLogLimit: number;
+        /** @description Number of entries to skip (for pagination) */
+        LogOffset: number;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
         DAGRunId: components["schemas"]["DAGRunId"];
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
@@ -8620,13 +8700,13 @@ export interface operations {
                 /** @description Filter by user ID */
                 userId?: string;
                 /** @description Filter entries after this time (ISO 8601 format) */
-                startTime?: string;
+                startTime?: components["parameters"]["LogStartTime"];
                 /** @description Filter entries before this time (ISO 8601 format) */
-                endTime?: string;
+                endTime?: components["parameters"]["LogEndTime"];
                 /** @description Maximum number of entries to return (default 100) */
-                limit?: number;
+                limit?: components["parameters"]["AuditLogLimit"];
                 /** @description Number of entries to skip (for pagination) */
-                offset?: number;
+                offset?: components["parameters"]["LogOffset"];
             };
             header?: never;
             path?: never;
@@ -8641,6 +8721,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditLogsResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden - requires manager or admin role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listEventLogs: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Filter by event kind (e.g., dag_run, llm_usage) */
+                kind?: string;
+                /** @description Filter by event type (e.g., dag.run.failed, llm.usage.recorded) */
+                type?: string;
+                /** @description Filter by DAG name */
+                dagName?: string;
+                /** @description Filter by DAG run ID */
+                dagRunId?: string;
+                /** @description Filter by attempt ID */
+                attemptId?: string;
+                /** @description Filter by session ID */
+                sessionId?: string;
+                /** @description Filter by user ID */
+                userId?: string;
+                /** @description Filter by model name */
+                model?: string;
+                /** @description Filter entries after this time (ISO 8601 format) */
+                startTime?: components["parameters"]["LogStartTime"];
+                /** @description Filter entries before this time (ISO 8601 format) */
+                endTime?: components["parameters"]["LogEndTime"];
+                /** @description Maximum number of entries to return (default 50) */
+                limit?: components["parameters"]["EventLogLimit"];
+                /** @description Number of entries to skip (for pagination) */
+                offset?: components["parameters"]["LogOffset"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of event log entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventLogsResponse"];
                 };
             };
             /** @description Not authenticated */
