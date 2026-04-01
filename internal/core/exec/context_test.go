@@ -237,6 +237,8 @@ func TestNewContext_AllEnvsUsesFilteredBaseEnv(t *testing.T) {
 	cfg.Core.BaseEnv = config.NewBaseEnv([]string{
 		"PATH=/usr/bin:/bin",
 		"EXEC_CONTEXT_ALLOWED=allowed",
+		"KUBERNETES_SERVICE_HOST=10.0.0.1",
+		"KUBERNETES_SERVICE_PORT=443",
 	})
 
 	ctx := config.WithConfig(context.Background(), cfg)
@@ -251,6 +253,8 @@ func TestNewContext_AllEnvsUsesFilteredBaseEnv(t *testing.T) {
 
 	assert.Contains(t, envs, "PATH=/usr/bin:/bin")
 	assert.Contains(t, envs, "EXEC_CONTEXT_ALLOWED=allowed")
+	assert.Contains(t, envs, "KUBERNETES_SERVICE_HOST=10.0.0.1")
+	assert.Contains(t, envs, "KUBERNETES_SERVICE_PORT=443")
 	assert.Contains(t, envs, "DAG_VAR=dag")
 	assert.NotContains(t, envs, "EXEC_CONTEXT_HOST_ONLY=host-value")
 }

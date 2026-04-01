@@ -27,6 +27,12 @@ func TestLoadBaseEnv(t *testing.T) {
 
 		// Docker credentials must NOT leak through the global env.
 		{"DOCKER_AUTH_CONFIG", false},
+
+		// Kubernetes in-cluster discovery vars must pass through so kubectl and
+		// client-go based tools do not fall back to localhost:8080.
+		{"KUBERNETES_SERVICE_HOST", true},
+		{"KUBERNETES_SERVICE_PORT", true},
+		{"KUBERNETES_SERVICE_PORT_HTTPS", true},
 	}
 
 	for _, tc := range testCases {

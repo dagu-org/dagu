@@ -28,6 +28,7 @@ var defaultPrefixes = []string{
 	strings.ToUpper(AppName) + "_", // e.g., "DAGU_"
 	"DAG_",                         // Special DAG-related variables
 	"LC_",                          // Locale-related variables
+	"KUBERNETES_",                  // In-cluster API discovery vars for Kubernetes clients
 }
 
 // LoadBaseEnv loads and filters current environment variables.
