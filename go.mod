@@ -25,7 +25,7 @@ require (
 	github.com/goccy/go-yaml v1.18.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golangci/golangci-lint/v2 v2.7.2
-	github.com/google/addlicense v1.1.1
+	github.com/google/addlicense v1.2.0
 	github.com/google/jsonschema-go v0.4.2
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/vault/api v1.22.0
@@ -35,6 +35,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mholt/archives v0.1.5
 	github.com/minio/minio-go/v7 v7.0.98
+	github.com/moby/moby/api v1.54.0
 	github.com/nektos/act v0.2.86
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.0
@@ -175,7 +176,6 @@ require (
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
-	github.com/moby/moby/api v1.54.0 // indirect
 	github.com/moby/moby/client v0.3.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
