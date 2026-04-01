@@ -5,6 +5,9 @@ package filedoc
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,8 +30,9 @@ import (
 var _ agent.DocStore = (*Store)(nil)
 
 const (
-	docDirPermissions = 0750
-	filePermissions   = 0600
+	docDirPermissions      = 0750
+	filePermissions        = 0600
+	docSearchCursorVersion = 1
 )
 
 // docFrontmatter holds the YAML fields in the doc file frontmatter.
@@ -592,10 +596,9 @@ func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchRes
 		}
 
 		results = append(results, &agent.DocSearchResult{
-			ID:         id,
-			Title:      title,
-			MatchCount: len(matches),
-			Matches:    matches,
+			ID:      id,
+			Title:   title,
+			Matches: matches,
 		})
 		return nil
 	})
@@ -614,26 +617,91 @@ func docSearchPattern(query string) string {
 	return fmt.Sprintf("(?i)%s", regexp.QuoteMeta(query))
 }
 
-// SearchPaginated returns lightweight, paginated document search hits.
-func (s *Store) SearchPaginated(ctx context.Context, opts agent.SearchDocsOptions) (*exec.PaginatedResult[agent.DocSearchResult], error) {
-	pg := opts.Paginator
-	if pg.Limit() == 0 {
-		pg = exec.DefaultPaginator()
+type docSearchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id,omitempty"`
+}
+
+type docMatchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id"`
+	Offset  int    `json:"offset"`
+}
+
+func encodeDocCursor(payload any) string {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return ""
 	}
+	return base64.RawURLEncoding.EncodeToString(data)
+}
+
+func decodeDocCursor(raw string, dest any) error {
+	data, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return exec.ErrInvalidCursor
+	}
+	if err := json.Unmarshal(data, dest); err != nil {
+		return exec.ErrInvalidCursor
+	}
+	return nil
+}
+
+func decodeDocSearchCursor(raw, query string) (docSearchCursor, error) {
+	if raw == "" {
+		return docSearchCursor{}, nil
+	}
+	var cursor docSearchCursor
+	if err := decodeDocCursor(raw, &cursor); err != nil {
+		return docSearchCursor{}, err
+	}
+	if cursor.Version != docSearchCursorVersion || cursor.Query != query {
+		return docSearchCursor{}, exec.ErrInvalidCursor
+	}
+	return cursor, nil
+}
+
+func decodeDocMatchCursor(raw, query, id string) (docMatchCursor, error) {
+	if raw == "" {
+		return docMatchCursor{ID: id}, nil
+	}
+	var cursor docMatchCursor
+	if err := decodeDocCursor(raw, &cursor); err != nil {
+		return docMatchCursor{}, err
+	}
+	if cursor.Version != docSearchCursorVersion || cursor.Query != query || cursor.ID != id || cursor.Offset < 0 {
+		return docMatchCursor{}, exec.ErrInvalidCursor
+	}
+	return cursor, nil
+}
+
+// SearchCursor returns lightweight, cursor-based document search hits.
+func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) (*exec.CursorResult[agent.DocSearchResult], error) {
 	if opts.Query == "" {
-		result := exec.NewPaginatedResult([]agent.DocSearchResult{}, 0, pg)
-		return &result, nil
+		return &exec.CursorResult[agent.DocSearchResult]{Items: []agent.DocSearchResult{}}, nil
 	}
 
-	pattern := docSearchPattern(opts.Query)
-	pageStart := pg.Offset()
-	pageEnd := pageStart + pg.Limit()
-	total := 0
-	results := make([]agent.DocSearchResult, 0, pg.Limit())
+	cursor, err := decodeDocSearchCursor(opts.Cursor, opts.Query)
+	if err != nil {
+		return nil, err
+	}
 
-	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
+	limit := max(opts.Limit, 1)
+	matchLimit := max(opts.MatchLimit, 1)
+	results := make([]agent.DocSearchResult, 0, limit)
+	pattern := docSearchPattern(opts.Query)
+	var hasMore bool
+	var nextCursor string
+
+	stopSearch := errors.New("stop document search")
+	err = filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 		if d.IsDir() || filepath.Ext(path) != ".md" {
 			return nil
@@ -645,6 +713,9 @@ func (s *Store) SearchPaginated(ctx context.Context, opts agent.SearchDocsOption
 		}
 		id := strings.TrimSuffix(filepath.ToSlash(relPath), ".md")
 
+		if cursor.ID != "" && id <= cursor.ID {
+			return nil
+		}
 		if err := agent.ValidateDocID(id); err != nil {
 			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
 			return nil
@@ -652,52 +723,76 @@ func (s *Store) SearchPaginated(ctx context.Context, opts agent.SearchDocsOption
 
 		data, err := os.ReadFile(path) //nolint:gosec // path constructed from baseDir
 		if err != nil {
+			logger.Warn(ctx, "Failed to read doc while searching", tag.File(relPath), tag.Error(err))
 			return nil
 		}
 
-		matches, matchCount, err := grep.GrepWithCount(data, pattern, grep.GrepOptions{
+		window, err := grep.GrepWindow(data, pattern, grep.GrepOptions{
 			IsRegexp: true,
 			Before:   grep.DefaultGrepOptions.Before,
 			After:    grep.DefaultGrepOptions.After,
-			Limit:    opts.MatchLimit,
+			Limit:    matchLimit,
 		})
 		if err != nil {
+			if errors.Is(err, grep.ErrNoMatch) {
+				return nil
+			}
+			logger.Warn(ctx, "Failed to search doc", tag.File(relPath), tag.Error(err))
 			return nil
 		}
 
-		if total >= pageStart && total < pageEnd {
-			doc, parseErr := parseDocFile(data, id)
-			title := id
-			if parseErr == nil {
-				title = doc.Title
-			}
-			results = append(results, agent.DocSearchResult{
-				ID:         id,
-				Title:      title,
-				MatchCount: matchCount,
-				Matches:    matches,
+		if len(results) == limit {
+			hasMore = true
+			nextCursor = encodeDocCursor(docSearchCursor{
+				Version: docSearchCursorVersion,
+				Query:   opts.Query,
+				ID:      results[len(results)-1].ID,
+			})
+			return stopSearch
+		}
+
+		doc, parseErr := parseDocFile(data, id)
+		title := id
+		if parseErr == nil {
+			title = doc.Title
+		}
+		item := agent.DocSearchResult{
+			ID:             id,
+			Title:          title,
+			Matches:        window.Matches,
+			HasMoreMatches: window.HasMore,
+		}
+		if window.HasMore {
+			item.NextMatchesCursor = encodeDocCursor(docMatchCursor{
+				Version: docSearchCursorVersion,
+				Query:   opts.Query,
+				ID:      id,
+				Offset:  window.NextOffset,
 			})
 		}
-		total++
+		results = append(results, item)
 		return nil
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, stopSearch) {
 		return nil, fmt.Errorf("filedoc: failed to search: %w", err)
 	}
 
-	result := exec.NewPaginatedResult(results, total, pg)
-	return &result, nil
+	return &exec.CursorResult[agent.DocSearchResult]{
+		Items:      results,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	}, nil
 }
 
-// SearchMatches paginates snippets for one document.
-func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.PaginatedResult[*exec.Match], error) {
-	pg := opts.Paginator
-	if pg.Limit() == 0 {
-		pg = exec.DefaultPaginator()
-	}
+// SearchMatches returns cursor-based snippets for one document.
+func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.CursorResult[*exec.Match], error) {
 	if opts.Query == "" {
-		result := exec.NewPaginatedResult([]*exec.Match{}, 0, pg)
-		return &result, nil
+		return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+	}
+
+	cursor, err := decodeDocMatchCursor(opts.Cursor, opts.Query, id)
+	if err != nil {
+		return nil, err
 	}
 
 	path, err := s.docFilePath(id)
@@ -712,23 +807,33 @@ func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDoc
 		return nil, err
 	}
 
-	matches, matchCount, err := grep.GrepWithCount(data, docSearchPattern(opts.Query), grep.GrepOptions{
+	window, err := grep.GrepWindow(data, docSearchPattern(opts.Query), grep.GrepOptions{
 		IsRegexp: true,
 		Before:   grep.DefaultGrepOptions.Before,
 		After:    grep.DefaultGrepOptions.After,
-		Offset:   pg.Offset(),
-		Limit:    pg.Limit(),
+		Offset:   cursor.Offset,
+		Limit:    max(opts.Limit, 1),
 	})
 	if err != nil {
-		if err == grep.ErrNoMatch {
-			result := exec.NewPaginatedResult([]*exec.Match{}, 0, pg)
-			return &result, nil
+		if errors.Is(err, grep.ErrNoMatch) {
+			return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
 		}
 		return nil, err
 	}
 
-	result := exec.NewPaginatedResult(matches, matchCount, pg)
-	return &result, nil
+	result := &exec.CursorResult[*exec.Match]{
+		Items:   window.Matches,
+		HasMore: window.HasMore,
+	}
+	if window.HasMore {
+		result.NextCursor = encodeDocCursor(docMatchCursor{
+			Version: docSearchCursorVersion,
+			Query:   opts.Query,
+			ID:      id,
+			Offset:  window.NextOffset,
+		})
+	}
+	return result, nil
 }
 
 // normalizeSortParams returns validated sort field and order with defaults.

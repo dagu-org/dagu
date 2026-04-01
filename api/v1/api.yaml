@@ -1541,11 +1541,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /search:
+  /search/dags:
     get:
-      summary: "Search DAGs and documents"
-      description: "Returns paginated, lightweight search results for the global search page."
-      operationId: "searchAll"
+      summary: "Search DAGs"
+      description: "Returns cursor-based, lightweight DAG search results for the global search page."
+      operationId: "searchDAGFeed"
       tags:
         - "search"
       parameters:
@@ -1556,32 +1556,54 @@ paths:
           schema:
             type: "string"
           description: "A search query string"
-        - name: "dagPage"
-          in: "query"
-          required: false
-          description: "Page number for DAG results"
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: "docPage"
-          in: "query"
-          required: false
-          description: "Page number for document results"
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - $ref: "#/components/parameters/SearchPerPage"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchLimit"
       responses:
         "200":
-          description: "Paginated search results"
+          description: "Cursor-based DAG search results"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GlobalSearchResponse"
+                $ref: "#/components/schemas/DAGSearchFeedResponse"
         "400":
-          description: "Missing query parameter"
+          description: "Invalid search request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /search/docs:
+    get:
+      summary: "Search documents"
+      description: "Returns cursor-based, lightweight document search results for the global search page."
+      operationId: "searchDocFeed"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchLimit"
+      responses:
+        "200":
+          description: "Cursor-based document search results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocSearchFeedResponse"
+        "400":
+          description: "Invalid request"
           content:
             application/json:
               schema:
@@ -1596,7 +1618,7 @@ paths:
   /search/dags/{fileName}/matches:
     get:
       summary: "Search DAG match snippets"
-      description: "Returns paginated snippets for one matching DAG definition."
+      description: "Returns cursor-based snippets for one matching DAG definition."
       operationId: "searchDagMatches"
       tags:
         - "search"
@@ -1609,11 +1631,11 @@ paths:
           schema:
             type: "string"
           description: "A search query string"
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/SearchMatchPerPage"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchMatchLimit"
       responses:
         "200":
-          description: "Paginated DAG match snippets"
+          description: "Cursor-based DAG match snippets"
           content:
             application/json:
               schema:
@@ -1640,7 +1662,7 @@ paths:
   /search/docs/matches:
     get:
       summary: "Search document match snippets"
-      description: "Returns paginated snippets for one matching document."
+      description: "Returns cursor-based snippets for one matching document."
       operationId: "searchDocMatches"
       tags:
         - "search"
@@ -1658,11 +1680,11 @@ paths:
           schema:
             type: "string"
           description: "A search query string"
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/SearchMatchPerPage"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchMatchLimit"
       responses:
         "200":
-          description: "Paginated document match snippets"
+          description: "Cursor-based document match snippets"
           content:
             application/json:
               schema:
@@ -6720,27 +6742,35 @@ components:
         maximum: 1000
         default: 50
 
-    SearchPerPage:
-      name: perPage
+    SearchCursor:
+      name: cursor
       in: query
-      description: "Number of search results to return per section (default 10, max 25)"
+      description: "Opaque cursor returned by the previous search response"
       required: false
       schema:
-        type: integer
-        minimum: 1
-        maximum: 25
-        default: 10
+        type: string
 
-    SearchMatchPerPage:
-      name: perPage
+    SearchLimit:
+      name: limit
       in: query
-      description: "Number of search match snippets to return (default 3, max 25)"
+      description: "Number of search results to return (default 20, max 50)"
       required: false
       schema:
         type: integer
         minimum: 1
-        maximum: 25
-        default: 3
+        maximum: 50
+        default: 20
+
+    SearchMatchLimit:
+      name: limit
+      in: query
+      description: "Number of search match snippets to return (default 5, max 50)"
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 5
 
     DAGFileName:
       name: fileName
@@ -8422,7 +8452,7 @@ components:
 
     DAGSearchPageItem:
       type: object
-      description: "Lightweight search result item for a DAG"
+      description: "Lightweight cursor-based search result item for a DAG"
       properties:
         fileName:
           type: string
@@ -8430,12 +8460,12 @@ components:
         name:
           type: string
           description: "Display name for the DAG result"
-        matchCount:
-          type: integer
-          description: "Total number of snippets matching the query in this DAG"
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
+        nextMatchesCursor:
+          type: string
+          description: "Opaque cursor for loading more snippets for this DAG result"
         matches:
           type: array
           description: "Preview snippets for the result"
@@ -8444,38 +8474,39 @@ components:
       required:
         - fileName
         - name
-        - matchCount
         - hasMoreMatches
         - matches
 
-    DAGSearchSection:
+    DAGSearchFeedResponse:
       type: object
-      description: "Paginated DAG search results"
+      description: "Cursor-based DAG search results"
       properties:
         results:
           type: array
           items:
             $ref: "#/components/schemas/DAGSearchPageItem"
-        pagination:
-          $ref: "#/components/schemas/Pagination"
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
       required:
         - results
-        - pagination
+        - hasMore
 
     DocSearchPageItem:
       type: object
-      description: "Lightweight search result item for a document"
+      description: "Lightweight cursor-based search result item for a document"
       properties:
         id:
           type: string
         title:
           type: string
-        matchCount:
-          type: integer
-          description: "Total number of snippets matching the query in this document"
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
+        nextMatchesCursor:
+          type: string
+          description: "Opaque cursor for loading more snippets for this document result"
         matches:
           type: array
           description: "Preview snippets for the result"
@@ -8484,35 +8515,24 @@ components:
       required:
         - id
         - title
-        - matchCount
         - hasMoreMatches
         - matches
 
-    DocSearchSection:
+    DocSearchFeedResponse:
       type: object
-      description: "Paginated document search results"
+      description: "Cursor-based document search results"
       properties:
         results:
           type: array
           items:
             $ref: "#/components/schemas/DocSearchPageItem"
-        pagination:
-          $ref: "#/components/schemas/Pagination"
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
       required:
         - results
-        - pagination
-
-    GlobalSearchResponse:
-      type: object
-      description: "Combined paginated search response for DAGs and documents"
-      properties:
-        dags:
-          $ref: "#/components/schemas/DAGSearchSection"
-        docs:
-          $ref: "#/components/schemas/DocSearchSection"
-      required:
-        - dags
-        - docs
+        - hasMore
 
     SearchDAGsMatchItem:
       type: object
@@ -8534,17 +8554,19 @@ components:
 
     SearchMatchesResponse:
       type: object
-      description: "Paginated search match snippets"
+      description: "Cursor-based search match snippets"
       properties:
         matches:
           type: array
           items:
             $ref: "#/components/schemas/SearchDAGsMatchItem"
-        pagination:
-          $ref: "#/components/schemas/Pagination"
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
       required:
         - matches
-        - pagination
+        - hasMore
 
     Log:
       type: object

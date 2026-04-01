@@ -71,80 +71,113 @@ func mustCreateDoc(t *testing.T, setup *searchTestSetup, id, content string) {
 	require.NoError(t, err)
 }
 
-func TestSearchAll(t *testing.T) {
+func TestSearchDAGFeed(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns paginated lightweight results with snippet previews", func(t *testing.T) {
-		t.Parallel()
+	setup := newSearchTestSetup(t, true)
 
-		setup := newSearchTestSetup(t, true)
-
-		mustCreateDAG(t, setup, "a-match", `name: a-match
+	mustCreateDAG(t, setup, "a-match", `name: a-match
 steps:
   - command: echo "Needle."
   - command: echo "needle."
-  - command: echo "needle."
-  - command: echo "needle."
   - command: echo "needle."`)
-		mustCreateDAG(t, setup, "b-match", `name: b-match
+	mustCreateDAG(t, setup, "b-match", `name: b-match
 steps:
   - command: echo "needle."`)
-		mustCreateDAG(t, setup, "c-skip", `name: c-skip
+	mustCreateDAG(t, setup, "c-skip", `name: c-skip
 steps:
   - command: echo "needleX"`)
 
-		mustCreateDoc(t, setup, "alpha", "Needle.\nneedle.\nneedle.\nneedle.")
+	limit := apigen.SearchLimit(1)
+	resp, err := setup.api.SearchDAGFeed(adminCtx(), apigen.SearchDAGFeedRequestObject{
+		Params: apigen.SearchDAGFeedParams{
+			Q:     " needle. ",
+			Limit: &limit,
+		},
+	})
+	require.NoError(t, err)
+
+	searchResp := resp.(apigen.SearchDAGFeed200JSONResponse)
+	require.Len(t, searchResp.Results, 1)
+	assert.Equal(t, "a-match", searchResp.Results[0].FileName)
+	assert.True(t, searchResp.Results[0].HasMoreMatches)
+	assert.NotNil(t, searchResp.Results[0].NextMatchesCursor)
+	assert.Len(t, searchResp.Results[0].Matches, 1)
+	assert.True(t, searchResp.HasMore)
+	require.NotNil(t, searchResp.NextCursor)
+
+	secondResp, err := setup.api.SearchDAGFeed(adminCtx(), apigen.SearchDAGFeedRequestObject{
+		Params: apigen.SearchDAGFeedParams{
+			Q:      "needle.",
+			Limit:  &limit,
+			Cursor: searchResp.NextCursor,
+		},
+	})
+	require.NoError(t, err)
+
+	secondPage := secondResp.(apigen.SearchDAGFeed200JSONResponse)
+	require.Len(t, secondPage.Results, 1)
+	assert.Equal(t, "b-match", secondPage.Results[0].FileName)
+	assert.False(t, secondPage.HasMore)
+	assert.Nil(t, secondPage.NextCursor)
+}
+
+func TestSearchDocFeed(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns cursor-based document results", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newSearchTestSetup(t, true)
+		mustCreateDoc(t, setup, "alpha", "Needle.\nneedle.\nneedle.")
 		mustCreateDoc(t, setup, "beta", "needle.")
 		mustCreateDoc(t, setup, "gamma", "needleX")
 
-		page := 2
-		docPage := 1
-		perPage := 1
-		resp, err := setup.api.SearchAll(adminCtx(), apigen.SearchAllRequestObject{
-			Params: apigen.SearchAllParams{
-				Q:       "  needle.  ",
-				DagPage: &page,
-				DocPage: &docPage,
-				PerPage: &perPage,
+		limit := apigen.SearchLimit(1)
+		resp, err := setup.api.SearchDocFeed(adminCtx(), apigen.SearchDocFeedRequestObject{
+			Params: apigen.SearchDocFeedParams{
+				Q:     "needle.",
+				Limit: &limit,
 			},
 		})
 		require.NoError(t, err)
 
-		searchResp, ok := resp.(apigen.SearchAll200JSONResponse)
-		require.True(t, ok)
+		searchResp := resp.(apigen.SearchDocFeed200JSONResponse)
+		require.Len(t, searchResp.Results, 1)
+		assert.Equal(t, "alpha", searchResp.Results[0].Id)
+		assert.True(t, searchResp.Results[0].HasMoreMatches)
+		assert.NotNil(t, searchResp.Results[0].NextMatchesCursor)
+		assert.Len(t, searchResp.Results[0].Matches, 1)
+		assert.True(t, searchResp.HasMore)
+		require.NotNil(t, searchResp.NextCursor)
 
-		require.Len(t, searchResp.Dags.Results, 1)
-		assert.Equal(t, "b-match", searchResp.Dags.Results[0].FileName)
-		assert.Equal(t, 2, searchResp.Dags.Pagination.TotalRecords)
-		assert.Equal(t, 2, searchResp.Dags.Pagination.CurrentPage)
-
-		require.Len(t, searchResp.Docs.Results, 1)
-		assert.Equal(t, "alpha", searchResp.Docs.Results[0].Id)
-		assert.Equal(t, 2, searchResp.Docs.Pagination.TotalRecords)
-
-		firstDoc := searchResp.Docs.Results[0]
-		assert.Equal(t, 4, firstDoc.MatchCount)
-		assert.Len(t, firstDoc.Matches, 3)
-		assert.True(t, firstDoc.HasMoreMatches)
-	})
-
-	t.Run("falls back to empty docs section when doc store is unavailable", func(t *testing.T) {
-		t.Parallel()
-
-		setup := newSearchTestSetup(t, false)
-		mustCreateDAG(t, setup, "only-dag", `name: only-dag
-steps:
-  - command: echo "needle."`)
-
-		resp, err := setup.api.SearchAll(adminCtx(), apigen.SearchAllRequestObject{
-			Params: apigen.SearchAllParams{Q: "needle."},
+		secondResp, err := setup.api.SearchDocFeed(adminCtx(), apigen.SearchDocFeedRequestObject{
+			Params: apigen.SearchDocFeedParams{
+				Q:      "needle.",
+				Limit:  &limit,
+				Cursor: searchResp.NextCursor,
+			},
 		})
 		require.NoError(t, err)
 
-		searchResp := resp.(apigen.SearchAll200JSONResponse)
-		assert.Len(t, searchResp.Dags.Results, 1)
-		assert.Empty(t, searchResp.Docs.Results)
-		assert.Equal(t, 0, searchResp.Docs.Pagination.TotalRecords)
+		secondPage := secondResp.(apigen.SearchDocFeed200JSONResponse)
+		require.Len(t, secondPage.Results, 1)
+		assert.Equal(t, "beta", secondPage.Results[0].Id)
+		assert.False(t, secondPage.HasMore)
+	})
+
+	t.Run("falls back to an empty response when doc search is unavailable", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newSearchTestSetup(t, false)
+		resp, err := setup.api.SearchDocFeed(adminCtx(), apigen.SearchDocFeedRequestObject{
+			Params: apigen.SearchDocFeedParams{Q: "needle."},
+		})
+		require.NoError(t, err)
+
+		searchResp := resp.(apigen.SearchDocFeed200JSONResponse)
+		assert.Empty(t, searchResp.Results)
+		assert.False(t, searchResp.HasMore)
 	})
 }
 
@@ -157,26 +190,36 @@ steps:
   - command: echo "needle."
   - command: echo "needle."
   - command: echo "needle."
-  - command: echo "needle."
   - command: echo "needle."`)
 
-	page := 2
-	perPage := 3
+	limit := apigen.SearchMatchLimit(3)
 	resp, err := setup.api.SearchDagMatches(adminCtx(), apigen.SearchDagMatchesRequestObject{
 		FileName: "match-heavy",
 		Params: apigen.SearchDagMatchesParams{
-			Q:       "needle.",
-			Page:    &page,
-			PerPage: &perPage,
+			Q:     "needle.",
+			Limit: &limit,
 		},
 	})
 	require.NoError(t, err)
 
-	matchResp, ok := resp.(apigen.SearchDagMatches200JSONResponse)
-	require.True(t, ok)
-	assert.Len(t, matchResp.Matches, 2)
-	assert.Equal(t, 5, matchResp.Pagination.TotalRecords)
-	assert.Equal(t, 2, matchResp.Pagination.CurrentPage)
+	matchResp := resp.(apigen.SearchDagMatches200JSONResponse)
+	assert.Len(t, matchResp.Matches, 3)
+	assert.True(t, matchResp.HasMore)
+	require.NotNil(t, matchResp.NextCursor)
+
+	secondResp, err := setup.api.SearchDagMatches(adminCtx(), apigen.SearchDagMatchesRequestObject{
+		FileName: "match-heavy",
+		Params: apigen.SearchDagMatchesParams{
+			Q:      "needle.",
+			Limit:  &limit,
+			Cursor: matchResp.NextCursor,
+		},
+	})
+	require.NoError(t, err)
+
+	secondPage := secondResp.(apigen.SearchDagMatches200JSONResponse)
+	assert.Len(t, secondPage.Matches, 1)
+	assert.False(t, secondPage.HasMore)
 }
 
 func TestSearchDocMatches(t *testing.T) {
@@ -185,21 +228,55 @@ func TestSearchDocMatches(t *testing.T) {
 	setup := newSearchTestSetup(t, true)
 	mustCreateDoc(t, setup, "guides/runbook", "needle.\nneedle.\nneedle.\nneedle.")
 
-	page := 2
-	perPage := 3
+	limit := apigen.SearchMatchLimit(3)
 	resp, err := setup.api.SearchDocMatches(adminCtx(), apigen.SearchDocMatchesRequestObject{
 		Params: apigen.SearchDocMatchesParams{
-			Path:    "guides/runbook",
-			Q:       "needle.",
-			Page:    &page,
-			PerPage: &perPage,
+			Path:  "guides/runbook",
+			Q:     "needle.",
+			Limit: &limit,
 		},
 	})
 	require.NoError(t, err)
 
-	matchResp, ok := resp.(apigen.SearchDocMatches200JSONResponse)
+	matchResp := resp.(apigen.SearchDocMatches200JSONResponse)
+	assert.Len(t, matchResp.Matches, 3)
+	assert.True(t, matchResp.HasMore)
+	require.NotNil(t, matchResp.NextCursor)
+
+	secondResp, err := setup.api.SearchDocMatches(adminCtx(), apigen.SearchDocMatchesRequestObject{
+		Params: apigen.SearchDocMatchesParams{
+			Path:   "guides/runbook",
+			Q:      "needle.",
+			Limit:  &limit,
+			Cursor: matchResp.NextCursor,
+		},
+	})
+	require.NoError(t, err)
+
+	secondPage := secondResp.(apigen.SearchDocMatches200JSONResponse)
+	assert.Len(t, secondPage.Matches, 1)
+	assert.False(t, secondPage.HasMore)
+}
+
+func TestSearchInvalidCursor(t *testing.T) {
+	t.Parallel()
+
+	setup := newSearchTestSetup(t, true)
+	mustCreateDAG(t, setup, "match-heavy", `name: match-heavy
+steps:
+  - command: echo "needle."`)
+
+	cursor := apigen.SearchCursor("bad-cursor")
+	resp, err := setup.api.SearchDAGFeed(adminCtx(), apigen.SearchDAGFeedRequestObject{
+		Params: apigen.SearchDAGFeedParams{
+			Q:      "needle.",
+			Cursor: &cursor,
+		},
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+
+	apiErr, ok := err.(*apiv1.Error)
 	require.True(t, ok)
-	assert.Len(t, matchResp.Matches, 1)
-	assert.Equal(t, 4, matchResp.Pagination.TotalRecords)
-	assert.Equal(t, 2, matchResp.Pagination.CurrentPage)
+	assert.Equal(t, 400, apiErr.HTTPStatus)
 }

@@ -549,7 +549,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/search": {
+    "/search/dags": {
         parameters: {
             query?: never;
             header?: never;
@@ -557,10 +557,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Search DAGs and documents
-         * @description Returns paginated, lightweight search results for the global search page.
+         * Search DAGs
+         * @description Returns cursor-based, lightweight DAG search results for the global search page.
          */
-        get: operations["searchAll"];
+        get: operations["searchDAGFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search/docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search documents
+         * @description Returns cursor-based, lightweight document search results for the global search page.
+         */
+        get: operations["searchDocFeed"];
         put?: never;
         post?: never;
         delete?: never;
@@ -578,7 +598,7 @@ export interface paths {
         };
         /**
          * Search DAG match snippets
-         * @description Returns paginated snippets for one matching DAG definition.
+         * @description Returns cursor-based snippets for one matching DAG definition.
          */
         get: operations["searchDagMatches"];
         put?: never;
@@ -598,7 +618,7 @@ export interface paths {
         };
         /**
          * Search document match snippets
-         * @description Returns paginated snippets for one matching document.
+         * @description Returns cursor-based snippets for one matching document.
          */
         get: operations["searchDocMatches"];
         put?: never;
@@ -3423,44 +3443,41 @@ export interface components {
             /** @description Details of where matches were found */
             matches: components["schemas"]["SearchDAGsMatchItem"][];
         };
-        /** @description Lightweight search result item for a DAG */
+        /** @description Lightweight cursor-based search result item for a DAG */
         DAGSearchPageItem: {
             /** @description DAG file name without extension */
             fileName: string;
             /** @description Display name for the DAG result */
             name: string;
-            /** @description Total number of snippets matching the query in this DAG */
-            matchCount: number;
             /** @description Whether additional snippets are available beyond the preview */
             hasMoreMatches: boolean;
+            /** @description Opaque cursor for loading more snippets for this DAG result */
+            nextMatchesCursor?: string;
             /** @description Preview snippets for the result */
             matches: components["schemas"]["SearchDAGsMatchItem"][];
         };
-        /** @description Paginated DAG search results */
-        DAGSearchSection: {
+        /** @description Cursor-based DAG search results */
+        DAGSearchFeedResponse: {
             results: components["schemas"]["DAGSearchPageItem"][];
-            pagination: components["schemas"]["Pagination"];
+            hasMore: boolean;
+            nextCursor?: string;
         };
-        /** @description Lightweight search result item for a document */
+        /** @description Lightweight cursor-based search result item for a document */
         DocSearchPageItem: {
             id: string;
             title: string;
-            /** @description Total number of snippets matching the query in this document */
-            matchCount: number;
             /** @description Whether additional snippets are available beyond the preview */
             hasMoreMatches: boolean;
+            /** @description Opaque cursor for loading more snippets for this document result */
+            nextMatchesCursor?: string;
             /** @description Preview snippets for the result */
             matches: components["schemas"]["SearchDAGsMatchItem"][];
         };
-        /** @description Paginated document search results */
-        DocSearchSection: {
+        /** @description Cursor-based document search results */
+        DocSearchFeedResponse: {
             results: components["schemas"]["DocSearchPageItem"][];
-            pagination: components["schemas"]["Pagination"];
-        };
-        /** @description Combined paginated search response for DAGs and documents */
-        GlobalSearchResponse: {
-            dags: components["schemas"]["DAGSearchSection"];
-            docs: components["schemas"]["DocSearchSection"];
+            hasMore: boolean;
+            nextCursor?: string;
         };
         /** @description Details of a search match within a DAG definition */
         SearchDAGsMatchItem: {
@@ -3471,10 +3488,11 @@ export interface components {
             /** @description Start line for context */
             startLine: number;
         };
-        /** @description Paginated search match snippets */
+        /** @description Cursor-based search match snippets */
         SearchMatchesResponse: {
             matches: components["schemas"]["SearchDAGsMatchItem"][];
-            pagination: components["schemas"]["Pagination"];
+            hasMore: boolean;
+            nextCursor?: string;
         };
         /** @description Log information for the execution */
         Log: {
@@ -4660,10 +4678,12 @@ export interface components {
         APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
-        /** @description Number of search results to return per section (default 10, max 25) */
-        SearchPerPage: number;
-        /** @description Number of search match snippets to return (default 3, max 25) */
-        SearchMatchPerPage: number;
+        /** @description Opaque cursor returned by the previous search response */
+        SearchCursor: string;
+        /** @description Number of search results to return (default 20, max 50) */
+        SearchLimit: number;
+        /** @description Number of search match snippets to return (default 5, max 50) */
+        SearchMatchLimit: number;
         /** @description the name of the DAG file */
         DAGFileName: components["schemas"]["DAGFileName"];
         /** @description name of the DAG */
@@ -6534,19 +6554,17 @@ export interface operations {
             };
         };
     };
-    searchAll: {
+    searchDAGFeed: {
         parameters: {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description A search query string */
                 q: string;
-                /** @description Page number for DAG results */
-                dagPage?: number;
-                /** @description Page number for document results */
-                docPage?: number;
-                /** @description Number of search results to return per section (default 10, max 25) */
-                perPage?: components["parameters"]["SearchPerPage"];
+                /** @description Opaque cursor returned by the previous search response */
+                cursor?: components["parameters"]["SearchCursor"];
+                /** @description Number of search results to return (default 20, max 50) */
+                limit?: components["parameters"]["SearchLimit"];
             };
             header?: never;
             path?: never;
@@ -6554,16 +6572,63 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Paginated search results */
+            /** @description Cursor-based DAG search results */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GlobalSearchResponse"];
+                    "application/json": components["schemas"]["DAGSearchFeedResponse"];
                 };
             };
-            /** @description Missing query parameter */
+            /** @description Invalid search request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    searchDocFeed: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description A search query string */
+                q: string;
+                /** @description Opaque cursor returned by the previous search response */
+                cursor?: components["parameters"]["SearchCursor"];
+                /** @description Number of search results to return (default 20, max 50) */
+                limit?: components["parameters"]["SearchLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cursor-based document search results */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocSearchFeedResponse"];
+                };
+            };
+            /** @description Invalid request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6590,10 +6655,10 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description A search query string */
                 q: string;
-                /** @description page number of items to fetch (default is 1) */
-                page?: components["parameters"]["Page"];
-                /** @description Number of search match snippets to return (default 3, max 25) */
-                perPage?: components["parameters"]["SearchMatchPerPage"];
+                /** @description Opaque cursor returned by the previous search response */
+                cursor?: components["parameters"]["SearchCursor"];
+                /** @description Number of search match snippets to return (default 5, max 50) */
+                limit?: components["parameters"]["SearchMatchLimit"];
             };
             header?: never;
             path: {
@@ -6604,7 +6669,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Paginated DAG match snippets */
+            /** @description Cursor-based DAG match snippets */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6651,10 +6716,10 @@ export interface operations {
                 path: components["schemas"]["DocPath"];
                 /** @description A search query string */
                 q: string;
-                /** @description page number of items to fetch (default is 1) */
-                page?: components["parameters"]["Page"];
-                /** @description Number of search match snippets to return (default 3, max 25) */
-                perPage?: components["parameters"]["SearchMatchPerPage"];
+                /** @description Opaque cursor returned by the previous search response */
+                cursor?: components["parameters"]["SearchCursor"];
+                /** @description Number of search match snippets to return (default 5, max 50) */
+                limit?: components["parameters"]["SearchMatchLimit"];
             };
             header?: never;
             path?: never;
@@ -6662,7 +6727,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Paginated document match snippets */
+            /** @description Cursor-based document match snippets */
             200: {
                 headers: {
                     [name: string]: unknown;

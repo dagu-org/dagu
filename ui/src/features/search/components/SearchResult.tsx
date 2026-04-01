@@ -1,66 +1,92 @@
 import { Button } from '@/components/ui/button';
-import React, { useEffect } from 'react';
+import { cn } from '@/lib/utils';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
-import Prism from '../../../assets/js/prism';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useClient } from '../../../hooks/api';
-import { DAGDefinition } from '../../dags/components/dag-editor';
 
 type SearchMatch = components['schemas']['SearchDAGsMatchItem'];
 type DagResult = components['schemas']['DAGSearchPageItem'];
 type DocResult = components['schemas']['DocSearchPageItem'];
 
-type BaseSearchResultItemProps = {
-  kind: 'DAG' | 'Doc';
-  title: string;
-  link: string;
-  query: string;
-  totalMatches: number;
-  initialMatches: SearchMatch[];
-  loadPage: (page: number) => Promise<{
-    error?: string;
-    matches: SearchMatch[];
-    hasMore: boolean;
-  }>;
+type LoadMoreResponse = {
+  error?: string;
+  matches: SearchMatch[];
+  hasMore: boolean;
+  nextCursor?: string;
 };
 
 type Props =
   | { type: 'dag'; query: string; results: DagResult[] }
   | { type: 'doc'; query: string; results: DocResult[] };
 
-const MATCH_PAGE_SIZE = 3;
+type SearchResultItemProps = {
+  kind: 'DAG' | 'Doc';
+  title: string;
+  link: string;
+  query: string;
+  initialMatches: SearchMatch[];
+  initialHasMoreMatches: boolean;
+  initialNextCursor?: string;
+  loadMore: (cursor?: string) => Promise<LoadMoreResponse>;
+};
+
+function SearchSnippet({ match }: { match: SearchMatch }) {
+  const lines = match.line.split('\n');
+
+  return (
+    <pre className="overflow-x-auto rounded-md border bg-muted/25 p-3 text-xs leading-5">
+      {lines.map((line, index) => {
+        const lineNumber = match.startLine + index;
+        const isHit = lineNumber === match.lineNumber;
+
+        return (
+          <div
+            key={`${match.startLine}-${lineNumber}-${index}`}
+            className={cn(
+              'grid grid-cols-[auto,1fr] gap-3 px-1',
+              isHit && 'rounded bg-primary/10'
+            )}
+          >
+            <span className="select-none text-[11px] text-muted-foreground">
+              {lineNumber}
+            </span>
+            <code className="font-mono text-foreground">
+              {line || ' '}
+            </code>
+          </div>
+        );
+      })}
+    </pre>
+  );
+}
 
 function SearchResultItem({
   kind,
   title,
   link,
   query,
-  totalMatches,
   initialMatches,
-  loadPage,
-}: BaseSearchResultItemProps) {
+  initialHasMoreMatches,
+  initialNextCursor,
+  loadMore,
+}: SearchResultItemProps) {
   const [matches, setMatches] = React.useState<SearchMatch[]>(initialMatches);
-  const [nextPage, setNextPage] = React.useState(2);
   const [hasMoreMatches, setHasMoreMatches] = React.useState(
-    totalMatches > initialMatches.length
+    initialHasMoreMatches
   );
+  const [nextCursor, setNextCursor] = React.useState(initialNextCursor);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setMatches(initialMatches);
-    setNextPage(2);
-    setHasMoreMatches(totalMatches > initialMatches.length);
+    setHasMoreMatches(initialHasMoreMatches);
+    setNextCursor(initialNextCursor);
     setIsLoadingMore(false);
     setLoadError(null);
-  }, [initialMatches, query, totalMatches]);
-
-  useEffect(() => {
-    Prism.highlightAll();
-  }, [matches]);
-
-  const remainingMatches = Math.max(totalMatches - matches.length, 0);
+  }, [initialHasMoreMatches, initialMatches, initialNextCursor, query]);
 
   const loadMoreMatches = React.useCallback(async () => {
     if (isLoadingMore || !hasMoreMatches) {
@@ -71,7 +97,7 @@ function SearchResultItem({
     setLoadError(null);
 
     try {
-      const response = await loadPage(nextPage);
+      const response = await loadMore(nextCursor);
       if (response.error) {
         setLoadError(response.error);
         return;
@@ -79,15 +105,13 @@ function SearchResultItem({
 
       setMatches((current) => [...current, ...response.matches]);
       setHasMoreMatches(response.hasMore);
-      if (response.hasMore) {
-        setNextPage((current) => current + 1);
-      }
+      setNextCursor(response.nextCursor);
     } catch {
       setLoadError('Failed to load more matches');
     } finally {
       setIsLoadingMore(false);
     }
-  }, [hasMoreMatches, isLoadingMore, loadPage, nextPage]);
+  }, [hasMoreMatches, isLoadingMore, loadMore, nextCursor]);
 
   return (
     <li className="px-4 py-4">
@@ -96,24 +120,20 @@ function SearchResultItem({
           <Link to={link}>
             <h3 className="text-lg font-semibold text-foreground">
               {title}
-              <span className="ml-2 text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
                 {kind}
               </span>
             </h3>
           </Link>
           <span className="text-xs text-muted-foreground">
-            {totalMatches} {totalMatches === 1 ? 'match' : 'matches'}
+            {matches.length} shown
           </span>
         </div>
 
         {matches.map((match, index) => (
-          <DAGDefinition
-            key={`${link}-${match.lineNumber}-${index}`}
-            value={match.line}
-            lineNumbers
-            startLine={match.startLine}
-            highlightLine={match.lineNumber - match.startLine}
-            noHighlight
+          <SearchSnippet
+            key={`${link}-${match.lineNumber}-${match.startLine}-${index}`}
+            match={match}
           />
         ))}
 
@@ -121,7 +141,7 @@ function SearchResultItem({
           <div className="text-sm text-destructive">{loadError}</div>
         )}
 
-        {remainingMatches > 0 && (
+        {hasMoreMatches && (
           <div>
             <Button
               variant="outline"
@@ -131,9 +151,7 @@ function SearchResultItem({
                 void loadMoreMatches();
               }}
             >
-              {isLoadingMore
-                ? 'Loading...'
-                : `Show ${Math.min(remainingMatches, MATCH_PAGE_SIZE)} more matches`}
+              {isLoadingMore ? 'Loading...' : 'Show more matches'}
             </Button>
           </div>
         )}
@@ -148,80 +166,82 @@ function SearchResult(props: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
+  const items =
+    type === 'dag'
+      ? results.map((result) => ({
+          key: `dag-${result.fileName}-${query}`,
+          kind: 'DAG' as const,
+          title: result.name,
+          link: `/dags/${encodeURI(result.fileName)}/spec`,
+          initialMatches: result.matches ?? [],
+          initialHasMoreMatches: result.hasMoreMatches,
+          initialNextCursor: result.nextMatchesCursor,
+          loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
+            const response = await client.GET('/search/dags/{fileName}/matches', {
+              params: {
+                path: { fileName: result.fileName },
+                query: {
+                  remoteNode,
+                  q: query,
+                  limit: 5,
+                  cursor,
+                },
+              },
+            });
+
+            return {
+              error: response.error?.message || undefined,
+              matches: response.data?.matches ?? [],
+              hasMore: response.data?.hasMore ?? false,
+              nextCursor: response.data?.nextCursor,
+            };
+          },
+        }))
+      : results.map((result) => ({
+          key: `doc-${result.id}-${query}`,
+          kind: 'Doc' as const,
+          title: result.title,
+          link: `/docs/${encodeURI(result.id)}`,
+          initialMatches: result.matches ?? [],
+          initialHasMoreMatches: result.hasMoreMatches,
+          initialNextCursor: result.nextMatchesCursor,
+          loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
+            const response = await client.GET('/search/docs/matches', {
+              params: {
+                query: {
+                  remoteNode,
+                  path: result.id,
+                  q: query,
+                  limit: 5,
+                  cursor,
+                },
+              },
+            });
+
+            return {
+              error: response.error?.message || undefined,
+              matches: response.data?.matches ?? [],
+              hasMore: response.data?.hasMore ?? false,
+              nextCursor: response.data?.nextCursor,
+            };
+          },
+        }));
+
   return (
-    <ul className="rounded-md border divide-y">
-      {type === 'dag'
-        ? results.map((result) => (
-            <SearchResultItem
-              key={`dag-${result.fileName}-${query}`}
-              kind="DAG"
-              title={result.name}
-              link={`/dags/${encodeURI(result.fileName)}/spec`}
-              query={query}
-              totalMatches={result.matchCount}
-              initialMatches={result.matches ?? []}
-              loadPage={async (page) => {
-                const response = await client.GET(
-                  '/search/dags/{fileName}/matches',
-                  {
-                    params: {
-                      path: { fileName: result.fileName },
-                      query: {
-                        remoteNode,
-                        q: query,
-                        page,
-                        perPage: MATCH_PAGE_SIZE,
-                      },
-                    },
-                  }
-                );
-
-                return {
-                  error:
-                    response.error?.message || undefined,
-                  matches: response.data?.matches ?? [],
-                  hasMore:
-                    !!response.data?.pagination &&
-                    response.data.pagination.currentPage <
-                      response.data.pagination.totalPages,
-                };
-              }}
-            />
-          ))
-        : results.map((result) => (
-            <SearchResultItem
-              key={`doc-${result.id}-${query}`}
-              kind="Doc"
-              title={result.title}
-              link={`/docs/${encodeURI(result.id)}`}
-              query={query}
-              totalMatches={result.matchCount}
-              initialMatches={result.matches ?? []}
-              loadPage={async (page) => {
-                const response = await client.GET('/search/docs/matches', {
-                  params: {
-                    query: {
-                      remoteNode,
-                      path: result.id,
-                      q: query,
-                      page,
-                      perPage: MATCH_PAGE_SIZE,
-                    },
-                  },
-                });
-
-                return {
-                  error:
-                    response.error?.message || undefined,
-                  matches: response.data?.matches ?? [],
-                  hasMore:
-                    !!response.data?.pagination &&
-                    response.data.pagination.currentPage <
-                      response.data.pagination.totalPages,
-                };
-              }}
-            />
-          ))}
+    <ul className="divide-y rounded-md border">
+      {items.map((item) => (
+        <SearchResultItem
+          key={item.key}
+          kind={item.kind}
+          title={item.title}
+          link={item.link}
+          query={query}
+          initialMatches={item.initialMatches}
+          initialHasMoreMatches={item.initialHasMoreMatches}
+          initialNextCursor={item.initialNextCursor}
+          loadMore={item.loadMore}
+        />
+      ))}
     </ul>
   );
 }
