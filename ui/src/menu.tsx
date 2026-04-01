@@ -509,7 +509,15 @@ export const mainListItems = React.forwardRef<
           </div>
 
           <div className="space-y-0.5">
-            <SectionLabel label="Workflows" isOpen={isOpen} customColor={customColor} />
+            <SectionLabel label="Definitions" isOpen={isOpen} customColor={customColor} />
+            <NavItem
+              to="/dags"
+              text="Definitions"
+              icon={<Network size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
             {config.agentEnabled && (
               <NavItem
                 to="/automata"
@@ -520,14 +528,10 @@ export const mainListItems = React.forwardRef<
                 customColor={customColor}
               />
             )}
-            <NavItem
-              to="/dags"
-              text="Definitions"
-              icon={<Network size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
+          </div>
+
+          <div className="space-y-0.5">
+            <SectionLabel label="Workflows" isOpen={isOpen} customColor={customColor} />
             <NavItem
               to="/dag-runs"
               text="Runs"
