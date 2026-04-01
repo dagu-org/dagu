@@ -5,8 +5,6 @@ package filedoc
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -630,21 +628,16 @@ type docMatchCursor struct {
 	Offset  int    `json:"offset"`
 }
 
-func encodeDocCursor(payload any) string {
-	data, err := json.Marshal(payload)
+func (s *Store) ensureSearchBaseDir() error {
+	info, err := os.Stat(s.baseDir)
 	if err != nil {
-		return ""
+		return fmt.Errorf("filedoc: failed to access docs directory %s: %w", s.baseDir, err)
 	}
-	return base64.RawURLEncoding.EncodeToString(data)
-}
-
-func decodeDocCursor(raw string, dest any) error {
-	data, err := base64.RawURLEncoding.DecodeString(raw)
-	if err != nil {
-		return exec.ErrInvalidCursor
+	if !info.IsDir() {
+		return fmt.Errorf("filedoc: docs directory %s is not a directory", s.baseDir)
 	}
-	if err := json.Unmarshal(data, dest); err != nil {
-		return exec.ErrInvalidCursor
+	if _, err := os.ReadDir(s.baseDir); err != nil {
+		return fmt.Errorf("filedoc: failed to read docs directory %s: %w", s.baseDir, err)
 	}
 	return nil
 }
@@ -654,7 +647,7 @@ func decodeDocSearchCursor(raw, query string) (docSearchCursor, error) {
 		return docSearchCursor{}, nil
 	}
 	var cursor docSearchCursor
-	if err := decodeDocCursor(raw, &cursor); err != nil {
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return docSearchCursor{}, err
 	}
 	if cursor.Version != docSearchCursorVersion || cursor.Query != query {
@@ -668,7 +661,7 @@ func decodeDocMatchCursor(raw, query, id string) (docMatchCursor, error) {
 		return docMatchCursor{ID: id}, nil
 	}
 	var cursor docMatchCursor
-	if err := decodeDocCursor(raw, &cursor); err != nil {
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return docMatchCursor{}, err
 	}
 	if cursor.Version != docSearchCursorVersion || cursor.Query != query || cursor.ID != id || cursor.Offset < 0 {
@@ -681,6 +674,9 @@ func decodeDocMatchCursor(raw, query, id string) (docMatchCursor, error) {
 func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) (*exec.CursorResult[agent.DocSearchResult], error) {
 	if opts.Query == "" {
 		return &exec.CursorResult[agent.DocSearchResult]{Items: []agent.DocSearchResult{}}, nil
+	}
+	if err := s.ensureSearchBaseDir(); err != nil {
+		return nil, err
 	}
 
 	cursor, err := decodeDocSearchCursor(opts.Cursor, opts.Query)
@@ -698,6 +694,7 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 	stopSearch := errors.New("stop document search")
 	err = filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
+			logger.Warn(ctx, "Skipping unreadable doc search entry", tag.File(path), tag.Error(err))
 			return nil
 		}
 		if ctx.Err() != nil {
@@ -743,7 +740,7 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 
 		if len(results) == limit {
 			hasMore = true
-			nextCursor = encodeDocCursor(docSearchCursor{
+			nextCursor = exec.EncodeSearchCursor(docSearchCursor{
 				Version: docSearchCursorVersion,
 				Query:   opts.Query,
 				ID:      results[len(results)-1].ID,
@@ -763,7 +760,7 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 			HasMoreMatches: window.HasMore,
 		}
 		if window.HasMore {
-			item.NextMatchesCursor = encodeDocCursor(docMatchCursor{
+			item.NextMatchesCursor = exec.EncodeSearchCursor(docMatchCursor{
 				Version: docSearchCursorVersion,
 				Query:   opts.Query,
 				ID:      id,
@@ -826,7 +823,7 @@ func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDoc
 		HasMore: window.HasMore,
 	}
 	if window.HasMore {
-		result.NextCursor = encodeDocCursor(docMatchCursor{
+		result.NextCursor = exec.EncodeSearchCursor(docMatchCursor{
 			Version: docSearchCursorVersion,
 			Query:   opts.Query,
 			ID:      id,

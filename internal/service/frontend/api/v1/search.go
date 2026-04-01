@@ -53,6 +53,13 @@ func invalidSearchCursorError() error {
 	}
 }
 
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return ptrOf(value)
+}
+
 func toSearchMatchItems(matches []*exec.Match) []api.SearchDAGsMatchItem {
 	items := make([]api.SearchDAGsMatchItem, 0, len(matches))
 	for _, match := range matches {
@@ -65,65 +72,58 @@ func toSearchMatchItems(matches []*exec.Match) []api.SearchDAGsMatchItem {
 	return items
 }
 
-func toDAGSearchFeedResponse(result *exec.CursorResult[exec.SearchDAGResult]) api.DAGSearchFeedResponse {
-	items := make([]api.DAGSearchPageItem, 0, len(result.Items))
+func mapCursorItems[TIn any, TOut any](result *exec.CursorResult[TIn], mapItem func(TIn) TOut) ([]TOut, bool, *string) {
+	items := make([]TOut, 0, len(result.Items))
 	for _, item := range result.Items {
-		resp := api.DAGSearchPageItem{
-			FileName:       item.FileName,
-			Name:           item.FileName,
-			HasMoreMatches: item.HasMoreMatches,
-			Matches:        toSearchMatchItems(item.Matches),
-		}
-		if item.NextMatchesCursor != "" {
-			resp.NextMatchesCursor = ptrOf(item.NextMatchesCursor)
-		}
-		items = append(items, resp)
+		items = append(items, mapItem(item))
 	}
+	return items, result.HasMore, optionalString(result.NextCursor)
+}
 
-	response := api.DAGSearchFeedResponse{
-		Results: items,
-		HasMore: result.HasMore,
+func toDAGSearchPageItem(item exec.SearchDAGResult) api.DAGSearchPageItem {
+	return api.DAGSearchPageItem{
+		FileName:          item.FileName,
+		Name:              item.FileName,
+		HasMoreMatches:    item.HasMoreMatches,
+		NextMatchesCursor: optionalString(item.NextMatchesCursor),
+		Matches:           toSearchMatchItems(item.Matches),
 	}
-	if result.NextCursor != "" {
-		response.NextCursor = ptrOf(result.NextCursor)
+}
+
+func toDAGSearchFeedResponse(result *exec.CursorResult[exec.SearchDAGResult]) api.DAGSearchFeedResponse {
+	items, hasMore, nextCursor := mapCursorItems(result, toDAGSearchPageItem)
+	return api.DAGSearchFeedResponse{
+		Results:    items,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
 	}
-	return response
+}
+
+func toDocSearchPageItem(item agent.DocSearchResult) api.DocSearchPageItem {
+	return api.DocSearchPageItem{
+		Id:                item.ID,
+		Title:             item.Title,
+		HasMoreMatches:    item.HasMoreMatches,
+		NextMatchesCursor: optionalString(item.NextMatchesCursor),
+		Matches:           toSearchMatchItems(item.Matches),
+	}
 }
 
 func toDocSearchFeedResponse(result *exec.CursorResult[agent.DocSearchResult]) api.DocSearchFeedResponse {
-	items := make([]api.DocSearchPageItem, 0, len(result.Items))
-	for _, item := range result.Items {
-		resp := api.DocSearchPageItem{
-			Id:             item.ID,
-			Title:          item.Title,
-			HasMoreMatches: item.HasMoreMatches,
-			Matches:        toSearchMatchItems(item.Matches),
-		}
-		if item.NextMatchesCursor != "" {
-			resp.NextMatchesCursor = ptrOf(item.NextMatchesCursor)
-		}
-		items = append(items, resp)
+	items, hasMore, nextCursor := mapCursorItems(result, toDocSearchPageItem)
+	return api.DocSearchFeedResponse{
+		Results:    items,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
 	}
-
-	response := api.DocSearchFeedResponse{
-		Results: items,
-		HasMore: result.HasMore,
-	}
-	if result.NextCursor != "" {
-		response.NextCursor = ptrOf(result.NextCursor)
-	}
-	return response
 }
 
 func toSearchMatchesResponse(result *exec.CursorResult[*exec.Match]) api.SearchMatchesResponse {
-	response := api.SearchMatchesResponse{
-		Matches: toSearchMatchItems(result.Items),
-		HasMore: result.HasMore,
+	return api.SearchMatchesResponse{
+		Matches:    toSearchMatchItems(result.Items),
+		HasMore:    result.HasMore,
+		NextCursor: optionalString(result.NextCursor),
 	}
-	if result.NextCursor != "" {
-		response.NextCursor = ptrOf(result.NextCursor)
-	}
-	return response
 }
 
 // SearchDAGFeed returns cursor-based DAG search results for the global search page.
@@ -155,16 +155,13 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 
 // SearchDocFeed returns cursor-based document search results for the global search page.
 func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedRequestObject) (api.SearchDocFeedResponseObject, error) {
-	query, err := validateSearchQuery(request.Params.Q)
-	if err != nil {
+	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
 
-	if a.docStore == nil {
-		return api.SearchDocFeed200JSONResponse(api.DocSearchFeedResponse{
-			Results: []api.DocSearchPageItem{},
-			HasMore: false,
-		}), nil
+	query, err := validateSearchQuery(request.Params.Q)
+	if err != nil {
+		return nil, err
 	}
 
 	result, err := a.docStore.SearchCursor(ctx, agent.SearchDocsOptions{

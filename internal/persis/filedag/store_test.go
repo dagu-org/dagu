@@ -281,6 +281,23 @@ func TestGenerateFilePathPreventsTraversal(t *testing.T) {
 	}
 }
 
+func TestSearchCursorFailsWhenBaseDirIsNotReadableDirectory(t *testing.T) {
+	basePath := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(basePath, []byte("x"), 0600))
+
+	store := New(basePath, WithSkipExamples(true))
+
+	result, errs, err := store.SearchCursor(context.Background(), exec.SearchDAGsOptions{
+		Query:      "needle",
+		Limit:      1,
+		MatchLimit: 1,
+	})
+	require.Nil(t, result)
+	require.Nil(t, errs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read DAGs directory")
+}
+
 func TestUpdateSpec(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-update-spec")
 	defer func() {

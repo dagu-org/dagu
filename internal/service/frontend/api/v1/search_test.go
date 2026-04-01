@@ -5,6 +5,8 @@ package api_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	apigen "github.com/dagu-org/dagu/api/v1"
@@ -26,33 +28,40 @@ type searchTestSetup struct {
 	docStore agent.DocStore
 }
 
+func newSearchAPI(dagStore exec.DAGStore, docStore agent.DocStore) *apiv1.API {
+	cfg := &config.Config{}
+
+	options := []apiv1.APIOption{}
+	if docStore != nil {
+		options = append(options, apiv1.WithDocStore(docStore))
+	}
+
+	return apiv1.New(
+		dagStore,
+		nil,
+		nil,
+		nil,
+		runtime.Manager{},
+		cfg,
+		nil,
+		nil,
+		prometheus.NewRegistry(),
+		nil,
+		options...,
+	)
+}
+
 func newSearchTestSetup(t *testing.T, withDocs bool) *searchTestSetup {
 	t.Helper()
 
 	dagStore := filedag.New(t.TempDir(), filedag.WithSkipExamples(true))
-	cfg := &config.Config{}
-
-	options := []apiv1.APIOption{}
 	var docStore agent.DocStore
 	if withDocs {
 		docStore = filedoc.New(t.TempDir())
-		options = append(options, apiv1.WithDocStore(docStore))
 	}
 
 	return &searchTestSetup{
-		api: apiv1.New(
-			dagStore,
-			nil,
-			nil,
-			nil,
-			runtime.Manager{},
-			cfg,
-			nil,
-			nil,
-			prometheus.NewRegistry(),
-			nil,
-			options...,
-		),
+		api:      newSearchAPI(dagStore, docStore),
 		dagStore: dagStore,
 		docStore: docStore,
 	}
@@ -166,18 +175,19 @@ func TestSearchDocFeed(t *testing.T) {
 		assert.False(t, secondPage.HasMore)
 	})
 
-	t.Run("falls back to an empty response when doc search is unavailable", func(t *testing.T) {
+	t.Run("returns forbidden when doc search is unavailable", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newSearchTestSetup(t, false)
 		resp, err := setup.api.SearchDocFeed(adminCtx(), apigen.SearchDocFeedRequestObject{
 			Params: apigen.SearchDocFeedParams{Q: "needle."},
 		})
-		require.NoError(t, err)
+		require.Nil(t, resp)
+		require.Error(t, err)
 
-		searchResp := resp.(apigen.SearchDocFeed200JSONResponse)
-		assert.Empty(t, searchResp.Results)
-		assert.False(t, searchResp.HasMore)
+		apiErr, ok := err.(*apiv1.Error)
+		require.True(t, ok)
+		assert.Equal(t, 403, apiErr.HTTPStatus)
 	})
 }
 
@@ -279,4 +289,43 @@ steps:
 	apiErr, ok := err.(*apiv1.Error)
 	require.True(t, ok)
 	assert.Equal(t, 400, apiErr.HTTPStatus)
+}
+
+func TestSearchDAGFeedReturnsErrorWhenSearchRootIsBroken(t *testing.T) {
+	t.Parallel()
+
+	basePath := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(basePath, []byte("x"), 0600))
+
+	api := newSearchAPI(filedag.New(basePath, filedag.WithSkipExamples(true)), nil)
+	resp, err := api.SearchDAGFeed(adminCtx(), apigen.SearchDAGFeedRequestObject{
+		Params: apigen.SearchDAGFeedParams{Q: "needle"},
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+
+	apiErr, ok := err.(*apiv1.Error)
+	require.True(t, ok)
+	assert.Equal(t, 500, apiErr.HTTPStatus)
+}
+
+func TestSearchDocFeedReturnsErrorWhenSearchRootIsBroken(t *testing.T) {
+	t.Parallel()
+
+	docBasePath := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(docBasePath, []byte("x"), 0600))
+
+	api := newSearchAPI(
+		filedag.New(t.TempDir(), filedag.WithSkipExamples(true)),
+		filedoc.New(docBasePath),
+	)
+	resp, err := api.SearchDocFeed(adminCtx(), apigen.SearchDocFeedRequestObject{
+		Params: apigen.SearchDocFeedParams{Q: "needle"},
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+
+	apiErr, ok := err.(*apiv1.Error)
+	require.True(t, ok)
+	assert.Equal(t, 500, apiErr.HTTPStatus)
 }

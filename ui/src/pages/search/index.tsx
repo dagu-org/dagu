@@ -1,23 +1,41 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
-import { components } from '@/api/v1/schema';
 import SearchResult from '@/features/search/components/SearchResult';
 import { useInfinite } from '@/hooks/api';
 import { Search as SearchIcon } from 'lucide-react';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import Title from '../../ui/Title';
-
-const SEARCH_PAGE_SIZE = 20;
 
 type SearchScope = 'dags' | 'docs';
 
 type SearchFilters = {
   searchVal: string;
   scope: SearchScope;
+};
+
+type SearchFeedPanelProps = {
+  title: string;
+  query: string;
+  hasResults: boolean;
+  isLoading: boolean;
+  initialErrorMessage: string | null;
+  loadMoreErrorMessage: string | null;
+  emptyMessage: string;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
+  onRetryLoadMore: () => void;
+  sentinelRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+};
+
+type SearchFeedProps = {
+  query: string;
+  remoteNode: string;
 };
 
 function parseScope(value: string | null): SearchScope {
@@ -41,6 +59,297 @@ function buildSearchParams(filters: SearchFilters): URLSearchParams {
   return params;
 }
 
+function getErrorStatus(error: unknown): number | undefined {
+  const err = error as { status?: number; response?: { status?: number } };
+  return err?.status ?? err?.response?.status;
+}
+
+function getErrorMessage(
+  error: unknown,
+  unavailableMessage?: string
+): string {
+  if (getErrorStatus(error) === 403 && unavailableMessage) {
+    return unavailableMessage;
+  }
+
+  return (error as { message?: string })?.message || 'Search failed. Try again.';
+}
+
+function useAutoLoadMore(
+  sentinelRef: React.RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  onLoadMore: () => void
+) {
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !enabled) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [enabled, onLoadMore, sentinelRef]);
+}
+
+function SearchFeedPanel({
+  title,
+  query,
+  hasResults,
+  isLoading,
+  initialErrorMessage,
+  loadMoreErrorMessage,
+  emptyMessage,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
+  onRetryLoadMore,
+  sentinelRef,
+  children,
+}: SearchFeedPanelProps) {
+  if (!query) {
+    return (
+      <div className="text-sm text-muted-foreground italic">
+        Enter a search term and press Enter or click Search
+      </div>
+    );
+  }
+
+  if (isLoading && !hasResults && !initialErrorMessage) {
+    return (
+      <div className="text-sm text-muted-foreground italic">
+        Searching {title.toLowerCase()}...
+      </div>
+    );
+  }
+
+  if (initialErrorMessage && !hasResults) {
+    return <div className="text-sm text-destructive">{initialErrorMessage}</div>;
+  }
+
+  if (!isLoading && !hasResults && !initialErrorMessage) {
+    return (
+      <div className="text-sm text-muted-foreground italic">{emptyMessage}</div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <span className="text-xs text-muted-foreground">Infinite results</span>
+      </div>
+
+      {children}
+
+      {loadMoreErrorMessage && (
+        <div className="flex flex-col items-center gap-3">
+          <div className="text-sm text-destructive">{loadMoreErrorMessage}</div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              onRetryLoadMore();
+            }}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? 'Retrying...' : 'Retry load more'}
+          </Button>
+        </div>
+      )}
+
+      {hasMore && !loadMoreErrorMessage && (
+        <div className="flex flex-col items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              onLoadMore();
+            }}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? 'Loading...' : 'Load more'}
+          </Button>
+          <div ref={sentinelRef} className="h-4 w-full" />
+        </div>
+      )}
+
+      {!hasMore && (
+        <div className="mb-6 text-center text-xs text-muted-foreground">
+          End of results
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DAGSearchFeed({ query, remoteNode }: SearchFeedProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
+    '/search/dags',
+    (pageIndex, previousPage) => {
+      if (!query) {
+        return null;
+      }
+      if (previousPage && !previousPage.hasMore) {
+        return null;
+      }
+
+      return {
+        params: {
+          query: {
+            remoteNode,
+            q: query,
+            cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
+          },
+        },
+      };
+    },
+    {
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateFirstPage: false,
+    }
+  );
+
+  const pages = data ?? [];
+  const results = pages.flatMap((page) => page.results ?? []);
+  const hasResults = results.length > 0;
+  const lastPage = pages[pages.length - 1];
+  const hasMore = lastPage?.hasMore ?? false;
+  const isLoadingMore = isValidating && pages.length > 0;
+  const initialErrorMessage =
+    pages.length === 0 && error ? getErrorMessage(error) : null;
+  const loadMoreErrorMessage =
+    pages.length > 0 && error ? getErrorMessage(error) : null;
+
+  const loadMoreResults = React.useCallback(() => {
+    if (!query || !hasMore || isLoadingMore || loadMoreErrorMessage) {
+      return;
+    }
+    void setSize((current) => current + 1);
+  }, [hasMore, isLoadingMore, loadMoreErrorMessage, query, setSize]);
+
+  const retryLoadMore = React.useCallback(() => {
+    void mutate();
+  }, [mutate]);
+
+  useAutoLoadMore(
+    sentinelRef,
+    !!query && hasMore && !loadMoreErrorMessage,
+    loadMoreResults
+  );
+
+  return (
+    <SearchFeedPanel
+      title="DAGs"
+      query={query}
+      hasResults={hasResults}
+      isLoading={isLoading}
+      initialErrorMessage={initialErrorMessage}
+      loadMoreErrorMessage={loadMoreErrorMessage}
+      emptyMessage="No dags found"
+      hasMore={hasMore}
+      isLoadingMore={isLoadingMore}
+      onLoadMore={loadMoreResults}
+      onRetryLoadMore={retryLoadMore}
+      sentinelRef={sentinelRef}
+    >
+      <SearchResult type="dag" query={query} results={results} />
+    </SearchFeedPanel>
+  );
+}
+
+function DocSearchFeed({ query, remoteNode }: SearchFeedProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
+    '/search/docs',
+    (pageIndex, previousPage) => {
+      if (!query) {
+        return null;
+      }
+      if (previousPage && !previousPage.hasMore) {
+        return null;
+      }
+
+      return {
+        params: {
+          query: {
+            remoteNode,
+            q: query,
+            cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
+          },
+        },
+      };
+    },
+    {
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateFirstPage: false,
+    }
+  );
+
+  const pages = data ?? [];
+  const results = pages.flatMap((page) => page.results ?? []);
+  const hasResults = results.length > 0;
+  const lastPage = pages[pages.length - 1];
+  const hasMore = lastPage?.hasMore ?? false;
+  const isLoadingMore = isValidating && pages.length > 0;
+  const unavailableMessage =
+    'Document management is not available on this server.';
+  const initialErrorMessage =
+    pages.length === 0 && error
+      ? getErrorMessage(error, unavailableMessage)
+      : null;
+  const loadMoreErrorMessage =
+    pages.length > 0 && error
+      ? getErrorMessage(error, unavailableMessage)
+      : null;
+
+  const loadMoreResults = React.useCallback(() => {
+    if (!query || !hasMore || isLoadingMore || loadMoreErrorMessage) {
+      return;
+    }
+    void setSize((current) => current + 1);
+  }, [hasMore, isLoadingMore, loadMoreErrorMessage, query, setSize]);
+
+  const retryLoadMore = React.useCallback(() => {
+    void mutate();
+  }, [mutate]);
+
+  useAutoLoadMore(
+    sentinelRef,
+    !!query && hasMore && !loadMoreErrorMessage,
+    loadMoreResults
+  );
+
+  return (
+    <SearchFeedPanel
+      title="Documents"
+      query={query}
+      hasResults={hasResults}
+      isLoading={isLoading}
+      initialErrorMessage={initialErrorMessage}
+      loadMoreErrorMessage={loadMoreErrorMessage}
+      emptyMessage="No documents found"
+      hasMore={hasMore}
+      isLoadingMore={isLoadingMore}
+      onLoadMore={loadMoreResults}
+      onRetryLoadMore={retryLoadMore}
+      sentinelRef={sentinelRef}
+    >
+      <SearchResult type="doc" query={query} results={results} />
+    </SearchFeedPanel>
+  );
+}
+
 function Search() {
   const [, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -48,7 +357,6 @@ function Search() {
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
   const inputRef = useRef<HTMLInputElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const queryParams = useMemo(
     () => new URLSearchParams(location.search),
@@ -85,10 +393,6 @@ function Search() {
     inputRef.current?.focus();
   }, []);
 
-  const submittedQuery = currentFilters.searchVal.trim();
-  const endpoint =
-    currentFilters.scope === 'docs' ? '/search/docs' : '/search/dags';
-
   const syncFilters = React.useCallback(
     (next: SearchFilters, replace = false) => {
       setSearchParams(buildSearchParams(next), { replace });
@@ -109,87 +413,8 @@ function Search() {
     [currentFilters.scope, syncFilters]
   );
 
-  const { data, error, isLoading, isValidating, size, setSize } = useInfinite(
-    endpoint,
-    (pageIndex, previousPage) => {
-      if (!submittedQuery) {
-        return null;
-      }
-      if (previousPage && !previousPage.hasMore) {
-        return null;
-      }
-
-      return {
-        params: {
-          query: {
-            remoteNode: remoteKey,
-            q: submittedQuery,
-            limit: SEARCH_PAGE_SIZE,
-            cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
-          },
-        },
-      };
-    },
-    {
-      revalidateIfStale: false,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      revalidateFirstPage: false,
-    }
-  );
-
-  type SearchPage =
-    | components['schemas']['DAGSearchFeedResponse']
-    | components['schemas']['DocSearchFeedResponse'];
-
-  const pages = (data ?? []) as SearchPage[];
-  const dagResults =
-    currentFilters.scope === 'dags'
-      ? pages.flatMap(
-          (page) =>
-            (page as components['schemas']['DAGSearchFeedResponse']).results ??
-            []
-        )
-      : [];
-  const docResults =
-    currentFilters.scope === 'docs'
-      ? pages.flatMap(
-          (page) =>
-            (page as components['schemas']['DocSearchFeedResponse']).results ??
-            []
-        )
-      : [];
-  const hasResults =
-    currentFilters.scope === 'docs' ? docResults.length > 0 : dagResults.length > 0;
-  const lastPage = pages[pages.length - 1];
-  const hasMore = lastPage?.hasMore ?? false;
-  const isLoadingMore = isValidating && pages.length > 0;
-
-  const loadMoreResults = React.useCallback(() => {
-    if (!submittedQuery || !hasMore || isLoadingMore) {
-      return;
-    }
-    void setSize((current) => current + 1);
-  }, [hasMore, isLoadingMore, setSize, submittedQuery]);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !submittedQuery || !hasMore) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          loadMoreResults();
-        }
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMore, loadMoreResults, submittedQuery]);
-  const scopeTitle = currentFilters.scope === 'docs' ? 'Documents' : 'DAGs';
+  const submittedQuery = currentFilters.searchVal.trim();
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   return (
     <div className="max-w-5xl">
@@ -253,74 +478,10 @@ function Search() {
         </div>
 
         <div className="mt-4 space-y-4">
-          {!submittedQuery && (
-            <div className="text-sm text-muted-foreground italic">
-              Enter a search term and press Enter or click Search
-            </div>
-          )}
-
-          {submittedQuery && isLoading && !pages.length && (
-            <div className="text-sm text-muted-foreground italic">
-              Searching {scopeTitle.toLowerCase()}...
-            </div>
-          )}
-
-          {submittedQuery && error && !pages.length && (
-            <div className="text-sm text-destructive">
-              Search failed. Try again.
-            </div>
-          )}
-
-          {submittedQuery && !isLoading && !hasResults && !error && (
-            <div className="text-sm text-muted-foreground italic">
-              No {scopeTitle.toLowerCase()} found
-            </div>
-          )}
-
-          {submittedQuery && hasResults && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">{scopeTitle}</h2>
-                <span className="text-xs text-muted-foreground">
-                  Infinite results
-                </span>
-              </div>
-
-              {currentFilters.scope === 'docs' ? (
-                <SearchResult
-                  type="doc"
-                  query={submittedQuery}
-                  results={docResults}
-                />
-              ) : (
-                <SearchResult
-                  type="dag"
-                  query={submittedQuery}
-                  results={dagResults}
-                />
-              )}
-
-              {hasMore && (
-                <div className="flex flex-col items-center gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      loadMoreResults();
-                    }}
-                    disabled={isLoadingMore}
-                  >
-                    {isLoadingMore ? 'Loading...' : 'Load more'}
-                  </Button>
-                  <div ref={sentinelRef} className="h-4 w-full" />
-                </div>
-              )}
-
-              {!hasMore && pages.length > 0 && size > 0 && (
-                <div className="mb-6 text-center text-xs text-muted-foreground">
-                  End of results
-                </div>
-              )}
-            </div>
+          {currentFilters.scope === 'docs' ? (
+            <DocSearchFeed query={submittedQuery} remoteNode={remoteNode} />
+          ) : (
+            <DAGSearchFeed query={submittedQuery} remoteNode={remoteNode} />
           )}
         </div>
       </div>

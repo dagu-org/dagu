@@ -1110,6 +1110,22 @@ func TestSearchMissingBaseDir(t *testing.T) {
 	assert.Empty(t, results)
 }
 
+func TestSearchCursorFailsWhenBaseDirIsNotDirectory(t *testing.T) {
+	basePath := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(basePath, []byte("x"), 0600))
+
+	store := New(basePath)
+
+	result, err := store.SearchCursor(context.Background(), agent.SearchDocsOptions{
+		Query:      "needle",
+		Limit:      1,
+		MatchLimit: 1,
+	})
+	require.Nil(t, result)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is not a directory")
+}
+
 func TestCleanEmptyParentsNonRemovable(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("cannot test permission errors as root")

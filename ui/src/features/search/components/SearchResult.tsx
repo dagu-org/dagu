@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/button';
+import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import { useClient } from '../../../hooks/api';
 
 type SearchMatch = components['schemas']['SearchDAGsMatchItem'];
 type DagResult = components['schemas']['DAGSearchPageItem'];
@@ -183,7 +183,6 @@ function SearchResult(props: Props) {
                 query: {
                   remoteNode,
                   q: query,
-                  limit: 5,
                   cursor,
                 },
               },
@@ -212,7 +211,6 @@ function SearchResult(props: Props) {
                   remoteNode,
                   path: result.id,
                   q: query,
-                  limit: 5,
                   cursor,
                 },
               },

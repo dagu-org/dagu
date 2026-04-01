@@ -5,8 +5,6 @@ package filedag
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -513,31 +511,12 @@ type dagMatchCursor struct {
 	Offset   int    `json:"offset"`
 }
 
-func encodeCursor(payload any) string {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return ""
-	}
-	return base64.RawURLEncoding.EncodeToString(data)
-}
-
-func decodeCursor(raw string, dest any) error {
-	data, err := base64.RawURLEncoding.DecodeString(raw)
-	if err != nil {
-		return exec.ErrInvalidCursor
-	}
-	if err := json.Unmarshal(data, dest); err != nil {
-		return exec.ErrInvalidCursor
-	}
-	return nil
-}
-
 func decodeDAGSearchCursor(raw, query string) (dagSearchCursor, error) {
 	if raw == "" {
 		return dagSearchCursor{}, nil
 	}
 	var cursor dagSearchCursor
-	if err := decodeCursor(raw, &cursor); err != nil {
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return dagSearchCursor{}, err
 	}
 	if cursor.Version != dagSearchCursorVersion || cursor.Query != query {
@@ -551,7 +530,7 @@ func decodeDAGMatchCursor(raw, query, fileName string) (dagMatchCursor, error) {
 		return dagMatchCursor{FileName: fileName}, nil
 	}
 	var cursor dagMatchCursor
-	if err := decodeCursor(raw, &cursor); err != nil {
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return dagMatchCursor{}, err
 	}
 	if cursor.Version != dagSearchCursorVersion || cursor.Query != query || cursor.FileName != fileName || cursor.Offset < 0 {
@@ -627,7 +606,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		return &exec.CursorResult[exec.SearchDAGResult]{Items: []exec.SearchDAGResult{}}, nil, nil
 	}
 	if err := store.ensureDirExist(); err != nil {
-		return nil, []string{fmt.Sprintf("failed to create DAGs directory %s", store.baseDir)}, nil
+		return nil, nil, fmt.Errorf("failed to create DAGs directory %s: %w", store.baseDir, err)
 	}
 
 	cursor, err := decodeDAGSearchCursor(opts.Cursor, opts.Query)
@@ -638,6 +617,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 	entries, err := os.ReadDir(store.baseDir)
 	if err != nil {
 		logger.Error(ctx, "Failed to read directory", tag.Dir(store.baseDir), tag.Error(err))
+		return nil, nil, fmt.Errorf("failed to read DAGs directory %s: %w", store.baseDir, err)
 	}
 
 	limit := max(opts.Limit, 1)
@@ -685,7 +665,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 
 		if len(results) == limit {
 			hasMore = true
-			nextCursor = encodeCursor(dagSearchCursor{
+			nextCursor = exec.EncodeSearchCursor(dagSearchCursor{
 				Version:  dagSearchCursorVersion,
 				Query:    opts.Query,
 				FileName: results[len(results)-1].FileName,
@@ -699,7 +679,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 			HasMoreMatches: window.HasMore,
 		}
 		if window.HasMore {
-			item.NextMatchesCursor = encodeCursor(dagMatchCursor{
+			item.NextMatchesCursor = exec.EncodeSearchCursor(dagMatchCursor{
 				Version:  dagSearchCursorVersion,
 				Query:    opts.Query,
 				FileName: fileName,
@@ -761,7 +741,7 @@ func (store *Storage) SearchMatches(_ context.Context, fileName string, opts exe
 		HasMore: window.HasMore,
 	}
 	if window.HasMore {
-		result.NextCursor = encodeCursor(dagMatchCursor{
+		result.NextCursor = exec.EncodeSearchCursor(dagMatchCursor{
 			Version:  dagSearchCursorVersion,
 			Query:    opts.Query,
 			FileName: fileName,
