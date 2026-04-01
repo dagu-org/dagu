@@ -18,6 +18,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -31,6 +32,7 @@ import (
 	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentoauth"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
@@ -582,6 +584,7 @@ type agentStoresResult struct {
 	MemoryStore        agent.MemoryStore
 	SkillStore         agent.SkillStore
 	SoulStore          agent.SoulStore
+	OAuthManager       *agentoauth.Manager
 	RemoteNodeResolver agent.RemoteNodeResolver
 }
 
@@ -629,6 +632,13 @@ func (c *Context) agentStores() agentStoresResult {
 		return result
 	}
 	result.SoulStore = soulStore
+
+	oauthManager, err := fileagentoauth.NewManager(c.Config.Paths.DataDir)
+	if err != nil {
+		logger.Warn(c, "Failed to create agent OAuth store", tag.Error(err))
+	} else {
+		result.OAuthManager = oauthManager
+	}
 
 	// Build remote node resolver for agent step remote tools.
 	result.RemoteNodeResolver = c.buildRemoteNodeResolver()

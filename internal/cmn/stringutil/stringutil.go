@@ -4,9 +4,9 @@
 package stringutil
 
 import (
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -131,13 +131,10 @@ func KebabToCamel(s string) string {
 	return result
 }
 
-var src = rand.NewSource(time.Now().UnixNano())
-
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const (
 	letterIdxBits = 6                    // 6 bits to represent a letter index
 	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
 
 // IsMultiLine checks if the given string contains multiple lines.
@@ -401,16 +398,17 @@ func ExtractEmailDomain(email string) string {
 // RandomString generates a random string of length n using letters from letterBytes.
 func RandomString(n int) string {
 	b := make([]byte, n)
-	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = src.Int63(), letterIdxMax
+	randomByte := make([]byte, 1)
+	for i := 0; i < n; {
+		if _, err := cryptorand.Read(randomByte); err != nil {
+			panic(fmt.Sprintf("stringutil.RandomString: %v", err))
 		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			b[i] = letterBytes[idx]
-			i--
+		idx := int(randomByte[0] & letterIdxMask)
+		if idx >= len(letterBytes) {
+			continue
 		}
-		cache >>= letterIdxBits
-		remain--
+		b[i] = letterBytes[idx]
+		i++
 	}
 
 	return string(b)

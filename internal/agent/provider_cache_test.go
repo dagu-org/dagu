@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/agentoauth"
+	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,11 +24,11 @@ func TestProviderCache_GetOrCreate_CachedOnSecondCall(t *testing.T) {
 	// Pre-populate via Set so GetOrCreate does not call CreateLLMProvider.
 	cache.Set(cfg, mock)
 
-	p1, model1, err := cache.GetOrCreate(cfg)
+	p1, model1, err := cache.GetOrCreate(cfg, ProviderDeps{})
 	require.NoError(t, err)
 	assert.Equal(t, "claude-opus-4", model1)
 
-	p2, model2, err := cache.GetOrCreate(cfg)
+	p2, model2, err := cache.GetOrCreate(cfg, ProviderDeps{})
 	require.NoError(t, err)
 	assert.Equal(t, "claude-opus-4", model2)
 
@@ -43,7 +45,7 @@ func TestProviderCache_Set(t *testing.T) {
 
 	cache.Set(cfg, mock)
 
-	p, model, err := cache.GetOrCreate(cfg)
+	p, model, err := cache.GetOrCreate(cfg, ProviderDeps{})
 	require.NoError(t, err)
 	assert.Same(t, mock, p)
 	assert.Equal(t, "gpt-4", model)
@@ -59,7 +61,7 @@ func TestProviderCache_Invalidate(t *testing.T) {
 	cache.Set(cfg, mockA)
 
 	// Confirm it is cached.
-	p, _, err := cache.GetOrCreate(cfg)
+	p, _, err := cache.GetOrCreate(cfg, ProviderDeps{})
 	require.NoError(t, err)
 	assert.Same(t, mockA, p)
 
@@ -70,7 +72,7 @@ func TestProviderCache_Invalidate(t *testing.T) {
 	mockB := &mockLLMProvider{name: "provider-b"}
 	cache.Set(cfg, mockB)
 
-	p2, _, err := cache.GetOrCreate(cfg)
+	p2, _, err := cache.GetOrCreate(cfg, ProviderDeps{})
 	require.NoError(t, err)
 	assert.Same(t, mockB, p2)
 	assert.NotSame(t, mockA, p2)
@@ -96,7 +98,7 @@ func TestProviderCache_InvalidateAll(t *testing.T) {
 	// After InvalidateAll, pre-populate one entry and verify the others are gone.
 	cache.Set(configs[0], &mockLLMProvider{name: "fresh"})
 
-	p, _, err := cache.GetOrCreate(configs[0])
+	p, _, err := cache.GetOrCreate(configs[0], ProviderDeps{})
 	require.NoError(t, err)
 	assert.Equal(t, "fresh", p.Name())
 
@@ -192,7 +194,7 @@ func TestProviderCache_ConcurrentAccess(t *testing.T) {
 	for i := range goroutines {
 		go func(idx int) {
 			defer wg.Done()
-			_, _, _ = cache.GetOrCreate(configs[idx])
+			_, _, _ = cache.GetOrCreate(configs[idx], ProviderDeps{})
 		}(i)
 	}
 
@@ -249,8 +251,21 @@ func TestProviderCache_Eviction(t *testing.T) {
 	assert.Equal(t, 3, size, "cache should have 3 entries after single-entry eviction")
 
 	// The newly added entry should always be present.
-	p, model, err := cache.GetOrCreate(extraCfg)
+	p, model, err := cache.GetOrCreate(extraCfg, ProviderDeps{})
 	require.NoError(t, err)
 	assert.Equal(t, "m4", model)
 	assert.Equal(t, "m4", p.Name())
+}
+
+func TestCreateLLMProvider_OpenAICodex_UsesOAuthManager(t *testing.T) {
+	t.Parallel()
+
+	provider, err := CreateLLMProvider(LLMConfig{
+		Provider: "openai-codex",
+		Model:    "gpt-5.4",
+	}, ProviderDeps{
+		OAuthManager: agentoauth.NewManager(nil),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "openai-codex", provider.Name())
 }

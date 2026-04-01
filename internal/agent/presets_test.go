@@ -17,12 +17,13 @@ func TestGetModelPresets(t *testing.T) {
 	require.NotEmpty(t, presets)
 
 	validProviders := map[string]bool{
-		"anthropic":  true,
-		"openai":     true,
-		"gemini":     true,
-		"openrouter": true,
-		"local":      true,
-		"zai":        true,
+		"anthropic":    true,
+		"openai":       true,
+		"openai-codex": true,
+		"gemini":       true,
+		"openrouter":   true,
+		"local":        true,
+		"zai":          true,
 	}
 
 	for _, p := range presets {
