@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -467,4 +468,60 @@ params:
 	require.NoError(t, err)
 	assert.Equal(t, []string{"properties=map[foo:bar]", "region=us-west-2"}, dag.Params)
 	assert.Equal(t, `properties="map[foo:bar]" region="us-west-2"`, dag.DefaultParams)
+}
+
+func TestSchemaDisallowsAdditionalProperties(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		root *jsonschema.Schema
+		want bool
+	}{
+		{
+			name: "NilRoot",
+			root: nil,
+			want: false,
+		},
+		{
+			name: "NoAdditionalProperties",
+			root: &jsonschema.Schema{},
+			want: false,
+		},
+		{
+			name: "ClosedSchema",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{}},
+			},
+			want: true,
+		},
+		{
+			name: "AdditionalPropertiesTrueLikeEmptySchema",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{},
+			},
+			want: false,
+		},
+		{
+			name: "AdditionalPropertiesWithConstraint",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{Type: "string"},
+			},
+			want: false,
+		},
+		{
+			name: "NotWithNonEmptySchema",
+			root: &jsonschema.Schema{
+				AdditionalProperties: &jsonschema.Schema{Not: &jsonschema.Schema{Type: "string"}},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, schemaDisallowsAdditionalProperties(tt.root))
+		})
+	}
 }
