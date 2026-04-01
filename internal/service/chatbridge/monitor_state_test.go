@@ -524,6 +524,155 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 	assert.True(t, monitor.IsDelivered("dest-1", status))
 }
 
+func TestNotificationMonitor_NotifyCompletionSaveFailureDoesNotMutateLiveState(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	stateFile := filepath.Join(stateDir, "state.json")
+	monitor := NewNotificationMonitor(
+		nil,
+		stateFile,
+		&fakeNotificationTransport{destinations: []string{"dest-1"}},
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		newTestNotificationMonitorConfig(),
+	)
+	monitor.lock = nil
+	monitor.lockDir = ""
+
+	require.NoError(t, os.Chmod(stateDir, 0o500))
+	defer func() {
+		_ = os.Chmod(stateDir, 0o700)
+	}()
+
+	status := &exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-save-fail",
+		AttemptID: "attempt-save-fail",
+		Status:    core.Failed,
+		Error:     "boom",
+	}
+	require.False(t, monitor.NotifyCompletion(status))
+
+	monitor.stateMu.Lock()
+	defer monitor.stateMu.Unlock()
+	destState := monitor.state.Destinations["dest-1"]
+	require.Nil(t, destState)
+}
+
+func TestNotificationMonitor_MarkBatchDeliveredSaveFailureDoesNotMutateLiveState(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	stateFile := filepath.Join(stateDir, "state.json")
+	monitor := NewNotificationMonitor(
+		nil,
+		stateFile,
+		&fakeNotificationTransport{destinations: []string{"dest-1"}},
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		newTestNotificationMonitorConfig(),
+	)
+	monitor.lock = nil
+	monitor.lockDir = ""
+
+	status := &exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-ack-save-fail",
+		AttemptID: "attempt-ack-save-fail",
+		Status:    core.Succeeded,
+	}
+	event := NotificationEvent{
+		Key:        NotificationSeenKey(status),
+		Status:     cloneNotificationStatus(status),
+		ObservedAt: time.Now().UTC(),
+	}
+	monitor.state.Destinations["dest-1"] = &notificationDestinationState{
+		Pending: map[string]NotificationEvent{
+			event.Key: event,
+		},
+		Delivered: make(map[string]time.Time),
+	}
+
+	require.NoError(t, os.Chmod(stateDir, 0o500))
+	defer func() {
+		_ = os.Chmod(stateDir, 0o700)
+	}()
+
+	monitor.markBatchDelivered(context.Background(), "dest-1", NotificationBatch{
+		Class:  NotificationClassSuccessDigest,
+		Events: []NotificationEvent{event},
+	})
+
+	monitor.stateMu.Lock()
+	defer monitor.stateMu.Unlock()
+	destState := monitor.state.Destinations["dest-1"]
+	require.NotNil(t, destState)
+	assert.Contains(t, destState.Pending, event.Key)
+	assert.Empty(t, destState.Delivered)
+}
+
+func TestNotificationMonitor_RemovedDestinationsArePurgedOnStartup(t *testing.T) {
+	t.Parallel()
+
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	status := &exec.DAGRunStatus{
+		Name:      "briefing",
+		Status:    core.Failed,
+		DAGRunID:  "run-removed",
+		AttemptID: "attempt-removed",
+		Error:     "boom",
+	}
+	state := newNotificationMonitorState()
+	state.Bootstrapped = true
+	state.Destinations["removed-dest"] = &notificationDestinationState{
+		Pending: map[string]NotificationEvent{
+			NotificationSeenKey(status): {
+				Key:        NotificationSeenKey(status),
+				Status:     cloneNotificationStatus(status),
+				ObservedAt: time.Now().UTC(),
+			},
+		},
+		Delivered: map[string]time.Time{
+			NotificationSeenKey(status): time.Now().UTC(),
+		},
+	}
+	require.NoError(t, newNotificationStateStore(stateFile).Save(context.Background(), state))
+
+	var (
+		mu    sync.Mutex
+		calls []string
+	)
+	transport := &fakeNotificationTransport{
+		destinations: []string{"keep-dest"},
+		flushFn: func(_ context.Context, destination string, _ NotificationBatch, _ bool) bool {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, destination)
+			return true
+		},
+	}
+
+	monitor := NewNotificationMonitor(nil, stateFile, transport, slog.New(slog.NewTextHandler(io.Discard, nil)), newTestNotificationMonitorConfig())
+	stopMonitor := testutil.StartContextRunner(t, monitor)
+	defer stopMonitor()
+
+	require.Eventually(t, func() bool {
+		monitor.stateMu.Lock()
+		defer monitor.stateMu.Unlock()
+		_, removedExists := monitor.state.Destinations["removed-dest"]
+		_, keepExists := monitor.state.Destinations["keep-dest"]
+		return !removedExists && keepExists
+	}, time.Second, 10*time.Millisecond)
+
+	result := newNotificationStateStore(stateFile).Load(context.Background())
+	require.NoError(t, result.Warning)
+	assert.NotContains(t, result.State.Destinations, "removed-dest")
+	assert.Contains(t, result.State.Destinations, "keep-dest")
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Empty(t, calls)
+}
+
 func TestNotificationMonitor_LockTheftSelfFencesActiveOwner(t *testing.T) {
 	t.Parallel()
 

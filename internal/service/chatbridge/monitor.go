@@ -206,16 +206,20 @@ func (m *NotificationMonitor) initializeSession(ctx context.Context) {
 	m.loadPersistedState(ctx)
 
 	destinations := m.transport.NotificationDestinations()
+	var removed []string
 
 	m.stateMu.Lock()
-	changed := m.ensureDestinationsLocked(destinations)
-	persisted := true
-	if changed {
-		persisted = m.saveStateLocked(ctx)
-	}
+	persisted := m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+		var changed bool
+		removed, changed = reconcileDestinations(candidate, destinations)
+		return changed
+	})
 	m.stateMu.Unlock()
 	if !persisted {
 		return
+	}
+	if len(removed) > 0 {
+		m.discardPendingDestinations(removed)
 	}
 
 	m.ensureBootstrapped(ctx)
@@ -384,13 +388,21 @@ func (m *NotificationMonitor) syncPendingDestinations(ctx context.Context) {
 	}
 
 	destinations := m.transport.NotificationDestinations()
+	var removed []string
 
 	m.stateMu.Lock()
-	changed := m.ensureDestinationsLocked(destinations)
-	if changed {
-		m.saveStateLocked(ctx)
-	}
+	persisted := m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+		var changed bool
+		removed, changed = reconcileDestinations(candidate, destinations)
+		return changed
+	})
 	m.stateMu.Unlock()
+	if !persisted {
+		return
+	}
+	if len(removed) > 0 {
+		m.discardPendingDestinations(removed)
+	}
 
 	m.requeuePending(destinations)
 }
@@ -412,16 +424,14 @@ func (m *NotificationMonitor) enqueueEvents(ctx context.Context, destinations []
 
 	var queued []queuedNotification
 	accepted := false
-	persisted := true
 
 	m.stateMu.Lock()
-	changed := m.ensureDestinationsLocked(destinations)
-	var enqueueChanged bool
-	queued, enqueueChanged, accepted = enqueueNotifications(&m.state, destinations, events)
-	changed = changed || enqueueChanged
-	if changed {
-		persisted = m.saveStateLocked(ctx)
-	}
+	persisted := m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+		changed := ensureDestinations(candidate, destinations)
+		var enqueueChanged bool
+		queued, enqueueChanged, accepted = enqueueNotifications(candidate, destinations, events)
+		return changed || enqueueChanged
+	})
 	m.stateMu.Unlock()
 	if !persisted {
 		return false
@@ -558,15 +568,24 @@ func (m *NotificationMonitor) markBatchDelivered(ctx context.Context, destinatio
 	now := time.Now().UTC()
 
 	m.stateMu.Lock()
-	destState := m.destinationStateLocked(destination)
-	for _, event := range batch.Events {
-		if event.Key == "" {
-			continue
+	m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+		destState := destinationState(candidate, destination)
+		changed := false
+		for _, event := range batch.Events {
+			if event.Key == "" {
+				continue
+			}
+			if _, ok := destState.Pending[event.Key]; ok {
+				delete(destState.Pending, event.Key)
+				changed = true
+			}
+			if deliveredAt, ok := destState.Delivered[event.Key]; !ok || !deliveredAt.Equal(now) {
+				destState.Delivered[event.Key] = now
+				changed = true
+			}
 		}
-		delete(destState.Pending, event.Key)
-		destState.Delivered[event.Key] = now
-	}
-	m.saveStateLocked(ctx)
+		return changed
+	})
 	m.stateMu.Unlock()
 }
 
@@ -579,67 +598,22 @@ func (m *NotificationMonitor) evictStaleDelivered(ctx context.Context) {
 	changed := false
 
 	m.stateMu.Lock()
-	for _, destination := range m.state.Destinations {
-		if destination == nil {
-			continue
-		}
-		for key, deliveredAt := range destination.Delivered {
-			if deliveredAt.Before(cutoff) {
-				delete(destination.Delivered, key)
-				changed = true
+	m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+		changed = false
+		for _, destination := range candidate.Destinations {
+			if destination == nil {
+				continue
+			}
+			for key, deliveredAt := range destination.Delivered {
+				if deliveredAt.Before(cutoff) {
+					delete(destination.Delivered, key)
+					changed = true
+				}
 			}
 		}
-	}
-	if changed {
-		m.saveStateLocked(ctx)
-	}
+		return changed
+	})
 	m.stateMu.Unlock()
-}
-
-func (m *NotificationMonitor) ensureDestinationsLocked(destinations []string) bool {
-	changed := false
-	for _, destination := range destinations {
-		if destination == "" {
-			continue
-		}
-		if _, ok := m.state.Destinations[destination]; ok {
-			continue
-		}
-		m.state.Destinations[destination] = &notificationDestinationState{
-			Pending:   make(map[string]NotificationEvent),
-			Delivered: make(map[string]time.Time),
-		}
-		changed = true
-	}
-	return changed
-}
-
-func (m *NotificationMonitor) destinationStateLocked(destination string) *notificationDestinationState {
-	if destination == "" {
-		return &notificationDestinationState{
-			Pending:   make(map[string]NotificationEvent),
-			Delivered: make(map[string]time.Time),
-		}
-	}
-	state, ok := m.state.Destinations[destination]
-	if !ok || state == nil {
-		state = &notificationDestinationState{
-			Pending:   make(map[string]NotificationEvent),
-			Delivered: make(map[string]time.Time),
-		}
-		m.state.Destinations[destination] = state
-	}
-	if state.Pending == nil {
-		state.Pending = make(map[string]NotificationEvent)
-	}
-	if state.Delivered == nil {
-		state.Delivered = make(map[string]time.Time)
-	}
-	return state
-}
-
-func (m *NotificationMonitor) saveStateLocked(ctx context.Context) bool {
-	return m.saveCandidateStateLocked(ctx, m.state)
 }
 
 func (m *NotificationMonitor) saveCandidateStateLocked(ctx context.Context, state notificationMonitorState) bool {
@@ -656,6 +630,18 @@ func (m *NotificationMonitor) saveCandidateStateLocked(ctx context.Context, stat
 	return true
 }
 
+func (m *NotificationMonitor) applyStateTransitionLocked(ctx context.Context, mutate func(candidate *notificationMonitorState) bool) bool {
+	candidate := cloneNotificationMonitorState(m.state)
+	if !mutate(&candidate) {
+		return true
+	}
+	if !m.saveCandidateStateLocked(ctx, candidate) {
+		return false
+	}
+	m.state = candidate
+	return true
+}
+
 func (m *NotificationMonitor) ensureBootstrapped(ctx context.Context) bool {
 	if !m.canMutateNotificationState("Notification lock lost before bootstrapping notification cursor") {
 		return false
@@ -669,8 +655,6 @@ func (m *NotificationMonitor) ensureBootstrapped(ctx context.Context) bool {
 	}
 	m.stateMu.Unlock()
 
-	var candidate notificationMonitorState
-
 	if m.eventService == nil {
 		m.stateMu.Lock()
 		if m.state.Bootstrapped {
@@ -678,14 +662,15 @@ func (m *NotificationMonitor) ensureBootstrapped(ctx context.Context) bool {
 			m.stateMu.Unlock()
 			return true
 		}
-		candidate = cloneNotificationMonitorState(m.state)
-		candidate.Bootstrapped = true
-		if !m.saveCandidateStateLocked(ctx, candidate) {
+		persisted := m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+			candidate.Bootstrapped = true
+			return true
+		})
+		if !persisted {
 			m.recordBootstrapFailure("Failed to persist notification bootstrap state")
 			m.stateMu.Unlock()
 			return false
 		}
-		m.state = candidate
 		m.lastBootstrapFailure = ""
 		m.stateMu.Unlock()
 		return true
@@ -703,15 +688,16 @@ func (m *NotificationMonitor) ensureBootstrapped(ctx context.Context) bool {
 		m.stateMu.Unlock()
 		return true
 	}
-	candidate = cloneNotificationMonitorState(m.state)
-	candidate.SourceCursor = cursor.Normalize()
-	candidate.Bootstrapped = true
-	if !m.saveCandidateStateLocked(ctx, candidate) {
+	persisted := m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+		candidate.SourceCursor = cursor.Normalize()
+		candidate.Bootstrapped = true
+		return true
+	})
+	if !persisted {
 		m.recordBootstrapFailure("Failed to persist notification bootstrap state")
 		m.stateMu.Unlock()
 		return false
 	}
-	m.state = candidate
 	m.lastBootstrapFailure = ""
 	m.stateMu.Unlock()
 	return true
@@ -729,20 +715,21 @@ func (m *NotificationMonitor) commitSourceProgress(ctx context.Context, destinat
 		return nil, false
 	}
 
-	candidate := cloneNotificationMonitorState(m.state)
-	changed := ensureDestinations(&candidate, destinations)
-	cursorChanged := !candidate.SourceCursor.Equal(nextCursor)
-	candidate.SourceCursor = nextCursor.Normalize()
-
-	queued, enqueueChanged, accepted := enqueueNotifications(&candidate, destinations, events)
-	changed = changed || cursorChanged || enqueueChanged
-	if !changed {
-		return nil, true
-	}
-	if !m.saveCandidateStateLocked(ctx, candidate) {
+	var (
+		queued   []queuedNotification
+		accepted bool
+	)
+	persisted := m.applyStateTransitionLocked(ctx, func(candidate *notificationMonitorState) bool {
+		changed := ensureDestinations(candidate, destinations)
+		cursorChanged := !candidate.SourceCursor.Equal(nextCursor)
+		candidate.SourceCursor = nextCursor.Normalize()
+		var enqueueChanged bool
+		queued, enqueueChanged, accepted = enqueueNotifications(candidate, destinations, events)
+		return changed || cursorChanged || enqueueChanged
+	})
+	if !persisted {
 		return nil, false
 	}
-	m.state = candidate
 	if !accepted {
 		return nil, true
 	}
@@ -908,6 +895,7 @@ func (m *NotificationMonitor) resetInMemorySession() {
 	m.state = newNotificationMonitorState()
 	m.lastBootstrapFailure = ""
 	m.stateMu.Unlock()
+	m.resetBatcher()
 }
 
 func (m *NotificationMonitor) currentBatcher() *NotificationBatcher {
@@ -953,6 +941,13 @@ func (m *NotificationMonitor) drainAndResetBatcher() []NotificationPendingBatch 
 		return nil
 	}
 	return current.DrainAndStop()
+}
+
+func (m *NotificationMonitor) discardPendingDestinations(destinations []string) {
+	if len(destinations) == 0 {
+		return
+	}
+	m.currentBatcher().DiscardDestinations(destinations)
 }
 
 func notificationStateLockDir(stateFile string) string {
@@ -1033,6 +1028,29 @@ func ensureDestinations(state *notificationMonitorState, destinations []string) 
 		changed = true
 	}
 	return changed
+}
+
+func reconcileDestinations(state *notificationMonitorState, destinations []string) ([]string, bool) {
+	allowed := make(map[string]struct{}, len(destinations))
+	for _, destination := range destinations {
+		if destination == "" {
+			continue
+		}
+		allowed[destination] = struct{}{}
+	}
+
+	changed := ensureDestinations(state, destinations)
+	removed := make([]string, 0)
+	for destination := range state.Destinations {
+		if _, ok := allowed[destination]; ok {
+			continue
+		}
+		delete(state.Destinations, destination)
+		removed = append(removed, destination)
+		changed = true
+	}
+	slices.Sort(removed)
+	return removed, changed
 }
 
 func destinationState(state *notificationMonitorState, destination string) *notificationDestinationState {

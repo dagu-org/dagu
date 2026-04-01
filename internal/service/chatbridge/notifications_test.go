@@ -127,6 +127,42 @@ func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlu
 	})))
 }
 
+func TestNotificationBatcher_DiscardDestinationsRemovesReadyAndBufferedBatches(t *testing.T) {
+	t.Parallel()
+
+	batcher := NewNotificationBatcher(80*time.Millisecond, 20*time.Millisecond)
+	defer batcher.Stop()
+
+	require.True(t, batcher.Enqueue("ready-remove", testNotificationEvent(&exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "a1",
+		Status:    core.Succeeded,
+	})))
+	require.True(t, batcher.Enqueue("ready-keep", testNotificationEvent(&exec.DAGRunStatus{
+		Name:      "sync",
+		DAGRunID:  "run-2",
+		AttemptID: "a2",
+		Status:    core.Succeeded,
+	})))
+	require.True(t, batcher.Enqueue("buffered-remove", testNotificationEvent(&exec.DAGRunStatus{
+		Name:      "alerts",
+		DAGRunID:  "run-3",
+		AttemptID: "a3",
+		Status:    core.Failed,
+	})))
+
+	time.Sleep(30 * time.Millisecond)
+	batcher.DiscardDestinations([]string{"ready-remove", "buffered-remove"})
+
+	ready := batcher.TakeReady()
+	require.Len(t, ready, 1)
+	assert.Equal(t, "ready-keep", ready[0].Destination)
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Empty(t, batcher.TakeReady())
+}
+
 func TestGenerateNotificationMessage_UrgentSingleUsesLLMAndFallsBack(t *testing.T) {
 	t.Parallel()
 

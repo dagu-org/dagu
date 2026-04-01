@@ -65,6 +65,17 @@ type EventLogFilters = {
 };
 
 type StoredEventLogState = EventLogFilters;
+type EventLogQueryParams = {
+  remoteNode: string;
+  kind: 'dag_run';
+  type?: string;
+  dagName?: string;
+  dagRunId?: string;
+  attemptId?: string;
+  startTime?: string;
+  endTime?: string;
+  limit: number;
+};
 
 const PAGE_SIZE = 50;
 const DEFAULT_DATE_PRESET = 'last7days';
@@ -184,6 +195,153 @@ function getClientErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function areEventLogFiltersEqual(
+  a: EventLogFilters,
+  b: EventLogFilters
+): boolean {
+  return (
+    a.type === b.type &&
+    a.dagName === b.dagName &&
+    a.dagRunId === b.dagRunId &&
+    a.attemptId === b.attemptId &&
+    a.fromDate === b.fromDate &&
+    a.toDate === b.toDate &&
+    a.dateRangeMode === b.dateRangeMode &&
+    a.datePreset === b.datePreset &&
+    a.specificPeriod === b.specificPeriod &&
+    a.specificValue === b.specificValue
+  );
+}
+
+function useEventLogFeed(
+  client: ReturnType<typeof useClient>,
+  query: EventLogQueryParams,
+  isReady: boolean
+) {
+  const [autoRefresh, setAutoRefresh] = React.useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = React.useState<Date | null>(null);
+  const [olderEntries, setOlderEntries] = React.useState<EventLogEntry[]>([]);
+  const [continuationCursorOverride, setContinuationCursorOverride] =
+    React.useState<string | null | undefined>(undefined);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
+  const activeFeedKeyRef = React.useRef('');
+  const feedKey = React.useMemo(() => JSON.stringify(query), [query]);
+
+  const { data, error, isLoading, mutate } = useQuery(
+    '/event-logs',
+    isReady
+      ? {
+          params: {
+            query,
+          },
+        }
+      : null,
+    {
+      refreshInterval: autoRefresh ? 5000 : 0,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    }
+  );
+
+  React.useEffect(() => {
+    activeFeedKeyRef.current = feedKey;
+    setOlderEntries([]);
+    setContinuationCursorOverride(undefined);
+    setLoadMoreError(null);
+    setIsLoadingMore(false);
+    setAutoRefresh(true);
+  }, [feedKey]);
+
+  const headEntries = data?.entries ?? [];
+  const entries = React.useMemo(
+    () => mergeUniqueEntries(headEntries, olderEntries),
+    [headEntries, olderEntries]
+  );
+  const firstEntryID = entries[0]?.id ?? '';
+  const lastEntryID =
+    entries.length > 0 ? (entries[entries.length - 1]?.id ?? '') : '';
+  const currentNextCursor =
+    continuationCursorOverride === undefined
+      ? (data?.nextCursor ?? null)
+      : continuationCursorOverride;
+  const hasLoadedMore = continuationCursorOverride !== undefined;
+  const hasMoreEntries = currentNextCursor !== null;
+  const hasHeadResponse = data !== undefined;
+  const isAutoRefreshAvailable = !hasLoadedMore;
+
+  React.useEffect(() => {
+    if (hasHeadResponse) {
+      setLastUpdatedAt(new Date());
+    }
+  }, [currentNextCursor, firstEntryID, hasHeadResponse, lastEntryID]);
+
+  const handleRefresh = React.useCallback(async () => {
+    setOlderEntries([]);
+    setContinuationCursorOverride(undefined);
+    setLoadMoreError(null);
+    setIsLoadingMore(false);
+    setAutoRefresh(true);
+    await mutate();
+  }, [mutate]);
+
+  const handleLoadMore = React.useCallback(async () => {
+    if (isLoadingMore || !currentNextCursor) {
+      return;
+    }
+
+    const requestFeedKey = activeFeedKeyRef.current;
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    setAutoRefresh(false);
+
+    const response = await client.GET('/event-logs', {
+      params: {
+        query: {
+          ...query,
+          cursor: currentNextCursor,
+        },
+      },
+    });
+
+    if (activeFeedKeyRef.current !== requestFeedKey) {
+      return;
+    }
+
+    setIsLoadingMore(false);
+
+    if (response.error) {
+      setLoadMoreError(
+        getClientErrorMessage(response.error, 'Failed to load older events')
+      );
+      return;
+    }
+
+    const pageData = (response.data ?? { entries: [] }) as EventLogsResponse;
+    setOlderEntries((prev) =>
+      appendUniqueEntries(prev, pageData.entries ?? [])
+    );
+    setContinuationCursorOverride(pageData.nextCursor ?? null);
+  }, [client, currentNextCursor, isLoadingMore, query]);
+
+  return {
+    data,
+    error,
+    isLoading,
+    autoRefresh,
+    setAutoRefresh,
+    lastUpdatedAt,
+    entries,
+    hasLoadedMore,
+    hasMoreEntries,
+    isAutoRefreshAvailable,
+    isLoadingMore,
+    loadMoreError,
+    handleRefresh,
+    handleLoadMore,
+  };
+}
+
 export default function EventLogsPage() {
   const client = useClient();
   const config = useConfig();
@@ -237,10 +395,7 @@ export default function EventLogsPage() {
   );
 
   const getSpecificPeriodDates = React.useCallback(
-    (
-      period: SpecificPeriod,
-      value: string
-    ): { from: string; to?: string } => {
+    (period: SpecificPeriod, value: string): { from: string; to?: string } => {
       const parsedDate = dayjs(value);
       if (!parsedDate.isValid()) {
         const fallback =
@@ -263,28 +418,31 @@ export default function EventLogsPage() {
     [config.tzOffsetInSec]
   );
 
-  const parseDateFromUrl = React.useCallback((value: string | null) => {
-    if (!value) {
-      return undefined;
-    }
-
-    if (/^\d+$/.test(value)) {
-      const timestamp = Number(value);
-      if (!Number.isNaN(timestamp)) {
-        const parsed =
-          config.tzOffsetInSec !== undefined
-            ? dayjs.unix(timestamp).utcOffset(config.tzOffsetInSec / 60)
-            : dayjs.unix(timestamp);
-        return parsed.format('YYYY-MM-DDTHH:mm:ss');
+  const parseDateFromUrl = React.useCallback(
+    (value: string | null) => {
+      if (!value) {
+        return undefined;
       }
-    }
 
-    if (value.includes('T') && value.length >= 16) {
-      return value;
-    }
+      if (/^\d+$/.test(value)) {
+        const timestamp = Number(value);
+        if (!Number.isNaN(timestamp)) {
+          const parsed =
+            config.tzOffsetInSec !== undefined
+              ? dayjs.unix(timestamp).utcOffset(config.tzOffsetInSec / 60)
+              : dayjs.unix(timestamp);
+          return parsed.format('YYYY-MM-DDTHH:mm:ss');
+        }
+      }
 
-    return undefined;
-  }, [config.tzOffsetInSec]);
+      if (value.includes('T') && value.length >= 16) {
+        return value;
+      }
+
+      return undefined;
+    },
+    [config.tzOffsetInSec]
+  );
 
   const formatDateForApi = React.useCallback(
     (dateString: string | undefined): string | undefined => {
@@ -343,24 +501,16 @@ export default function EventLogsPage() {
     };
   }, [getPresetDates]);
 
-  const [draftFilters, setDraftFilters] = React.useState<EventLogFilters>(
-    defaultFilters
-  );
-  const [appliedFilters, setAppliedFilters] = React.useState<EventLogFilters>(
-    defaultFilters
-  );
-  const [autoRefresh, setAutoRefresh] = React.useState(true);
-  const [selectedEvent, setSelectedEvent] = React.useState<EventLogEntry | null>(
+  const [draftFilters, setDraftFilters] =
+    React.useState<EventLogFilters>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] =
+    React.useState<EventLogFilters>(defaultFilters);
+  const [selectedEvent, setSelectedEvent] =
+    React.useState<EventLogEntry | null>(null);
+  const [hydratedKey, setHydratedKey] = React.useState('');
+  const lastPersistedAppliedFiltersRef = React.useRef<EventLogFilters | null>(
     null
   );
-  const [lastUpdatedAt, setLastUpdatedAt] = React.useState<Date | null>(null);
-  const [hydratedKey, setHydratedKey] = React.useState('');
-  const [olderEntries, setOlderEntries] = React.useState<EventLogEntry[]>([]);
-  const [continuationCursorOverride, setContinuationCursorOverride] =
-    React.useState<string | null | undefined>(undefined);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
-  const activeFeedKeyRef = React.useRef('');
 
   const buildLocationParams = React.useCallback(
     (filters: EventLogFilters): URLSearchParams => {
@@ -394,8 +544,10 @@ export default function EventLogsPage() {
 
   const parseLocationState = React.useCallback(
     (params: URLSearchParams): StoredEventLogState => {
-      const persisted =
-        searchState.readState<StoredEventLogState>(SEARCH_STATE_KEY, remoteKey);
+      const persisted = searchState.readState<StoredEventLogState>(
+        SEARCH_STATE_KEY,
+        remoteKey
+      );
       const base: StoredEventLogState = {
         ...defaultFilters,
         ...persisted,
@@ -470,17 +622,30 @@ export default function EventLogsPage() {
     const next = parseLocationState(locationSearchParams);
     setDraftFilters(next);
     setAppliedFilters(next);
+    lastPersistedAppliedFiltersRef.current = next;
+    searchState.writeState(SEARCH_STATE_KEY, remoteKey, next);
     setHydratedKey(`${remoteKey}:${searchKey}`);
-  }, [locationSearchParams, parseLocationState, remoteKey, searchKey]);
+  }, [
+    locationSearchParams,
+    parseLocationState,
+    remoteKey,
+    searchKey,
+    searchState,
+  ]);
 
   React.useEffect(() => {
     if (hydratedKey !== `${remoteKey}:${searchKey}`) {
       return;
     }
-    searchState.writeState(SEARCH_STATE_KEY, remoteKey, draftFilters);
-  }, [draftFilters, hydratedKey, remoteKey, searchKey, searchState]);
+    const persisted = lastPersistedAppliedFiltersRef.current;
+    if (persisted && areEventLogFiltersEqual(persisted, appliedFilters)) {
+      return;
+    }
+    lastPersistedAppliedFiltersRef.current = appliedFilters;
+    searchState.writeState(SEARCH_STATE_KEY, remoteKey, appliedFilters);
+  }, [appliedFilters, hydratedKey, remoteKey, searchKey, searchState]);
 
-  const query = React.useMemo(() => {
+  const query = React.useMemo<EventLogQueryParams>(() => {
     return {
       remoteNode: remoteKey,
       kind: 'dag_run',
@@ -494,34 +659,7 @@ export default function EventLogsPage() {
     };
   }, [appliedFilters, formatDateForApi, remoteKey]);
 
-  const feedKey = React.useMemo(() => JSON.stringify(query), [query]);
-
   const isReady = hydratedKey === `${remoteKey}:${searchKey}`;
-
-  const { data, error, isLoading, mutate } = useQuery(
-    '/event-logs',
-    isReady
-      ? {
-          params: {
-            query,
-          },
-        }
-      : null,
-    {
-      refreshInterval: autoRefresh ? 5000 : 0,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-    }
-  );
-
-  React.useEffect(() => {
-    activeFeedKeyRef.current = feedKey;
-    setOlderEntries([]);
-    setContinuationCursorOverride(undefined);
-    setLoadMoreError(null);
-    setIsLoadingMore(false);
-    setAutoRefresh(true);
-  }, [feedKey]);
 
   const updateDraftFilters = React.useCallback(
     (patch: Partial<EventLogFilters>) => {
@@ -647,33 +785,27 @@ export default function EventLogsPage() {
     [handleApplyFilters]
   );
 
-  const headEntries = data?.entries ?? [];
-  const entries = React.useMemo(
-    () => mergeUniqueEntries(headEntries, olderEntries),
-    [headEntries, olderEntries]
-  );
-  const firstEntryID = entries[0]?.id ?? '';
-  const lastEntryID =
-    entries.length > 0 ? entries[entries.length - 1]?.id ?? '' : '';
-  const currentNextCursor =
-    continuationCursorOverride === undefined
-      ? data?.nextCursor ?? null
-      : continuationCursorOverride;
-  const hasLoadedMore = continuationCursorOverride !== undefined;
-  const hasMoreEntries = currentNextCursor !== null;
-  const hasHeadResponse = data !== undefined;
+  const {
+    data,
+    error,
+    isLoading,
+    autoRefresh,
+    setAutoRefresh,
+    lastUpdatedAt,
+    entries,
+    hasLoadedMore,
+    hasMoreEntries,
+    isAutoRefreshAvailable,
+    isLoadingMore,
+    loadMoreError,
+    handleRefresh,
+    handleLoadMore,
+  } = useEventLogFeed(client, query, isReady);
   const rawEventJson = React.useMemo(
     () => (selectedEvent ? safeStringify(selectedEvent) : ''),
     [selectedEvent]
   );
   const tzLabel = formatTimezoneOffset();
-  const isAutoRefreshAvailable = !hasLoadedMore;
-
-  React.useEffect(() => {
-    if (hasHeadResponse) {
-      setLastUpdatedAt(new Date());
-    }
-  }, [currentNextCursor, firstEntryID, hasHeadResponse, lastEntryID]);
 
   let errorMessage: string | null = null;
   if (error instanceof FetchError) {
@@ -683,52 +815,6 @@ export default function EventLogsPage() {
   } else if (error) {
     errorMessage = 'Failed to load event logs';
   }
-
-  const handleRefresh = React.useCallback(async () => {
-    setOlderEntries([]);
-    setContinuationCursorOverride(undefined);
-    setLoadMoreError(null);
-    setIsLoadingMore(false);
-    setAutoRefresh(true);
-    await mutate();
-  }, [mutate]);
-
-  const handleLoadMore = React.useCallback(async () => {
-    if (isLoadingMore || !currentNextCursor) {
-      return;
-    }
-
-    const requestFeedKey = activeFeedKeyRef.current;
-    setIsLoadingMore(true);
-    setLoadMoreError(null);
-    setAutoRefresh(false);
-
-    const response = await client.GET('/event-logs', {
-      params: {
-        query: {
-          ...query,
-          cursor: currentNextCursor,
-        },
-      },
-    });
-
-    if (activeFeedKeyRef.current != requestFeedKey) {
-      return;
-    }
-
-    setIsLoadingMore(false);
-
-    if (response.error) {
-      setLoadMoreError(
-        getClientErrorMessage(response.error, 'Failed to load older events')
-      );
-      return;
-    }
-
-    const pageData = (response.data ?? { entries: [] }) as EventLogsResponse;
-    setOlderEntries((prev) => appendUniqueEntries(prev, pageData.entries ?? []));
-    setContinuationCursorOverride(pageData.nextCursor ?? null);
-  }, [client, currentNextCursor, isLoadingMore, query]);
 
   if (!canViewEventLogs) {
     return (
@@ -920,8 +1006,12 @@ export default function EventLogsPage() {
                   placeholder={
                     draftFilters.specificPeriod === 'year' ? 'YYYY' : undefined
                   }
-                  min={draftFilters.specificPeriod === 'year' ? '2000' : undefined}
-                  max={draftFilters.specificPeriod === 'year' ? '2100' : undefined}
+                  min={
+                    draftFilters.specificPeriod === 'year' ? '2000' : undefined
+                  }
+                  max={
+                    draftFilters.specificPeriod === 'year' ? '2100' : undefined
+                  }
                   className="w-[140px] h-8"
                 />
               </>
@@ -932,7 +1022,9 @@ export default function EventLogsPage() {
                 onFromDateChange={(value) =>
                   updateDraftFilters({ fromDate: value })
                 }
-                onToDateChange={(value) => updateDraftFilters({ toDate: value })}
+                onToDateChange={(value) =>
+                  updateDraftFilters({ toDate: value })
+                }
                 onEnterPress={handleApplyFilters}
                 fromLabel={`From ${tzLabel}`}
                 toLabel={`To ${tzLabel}`}
@@ -977,13 +1069,19 @@ export default function EventLogsPage() {
               <TableBody>
                 {isLoading && !data ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-muted-foreground"
+                    >
                       Loading event feed...
                     </TableCell>
                   </TableRow>
                 ) : entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-muted-foreground"
+                    >
                       No events matched the current filters.
                     </TableCell>
                   </TableRow>
@@ -1072,7 +1170,8 @@ export default function EventLogsPage() {
 
           <div className="flex items-center justify-between px-4 py-3 border-t flex-shrink-0">
             <p className="text-xs text-muted-foreground">
-              Results follow committed log order, newest committed entries first.
+              Results follow committed log order, newest committed entries
+              first.
             </p>
             <div className="flex items-center gap-2">
               {loadMoreError ? (

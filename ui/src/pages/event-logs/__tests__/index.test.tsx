@@ -1,7 +1,13 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import * as React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,9 +29,7 @@ type QueryCall = {
 };
 
 const useQueryMock = useQuery as unknown as {
-  mockImplementation: (
-    fn: (path: string, init: unknown) => unknown
-  ) => void;
+  mockImplementation: (fn: (path: string, init: unknown) => unknown) => void;
 };
 
 const useClientMock = useClient as unknown as {
@@ -164,7 +168,9 @@ describe('EventLogsPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('Loading event feed...')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Loading event feed...')
+    ).toBeInTheDocument();
   });
 
   it('queries event logs with a fixed dag_run kind and the selected remote node', async () => {
@@ -250,9 +256,8 @@ describe('EventLogsPage', () => {
 
     renderPage();
 
-    const dagNameInputs = await screen.findAllByPlaceholderText(
-      'Filter by DAG name'
-    );
+    const dagNameInputs =
+      await screen.findAllByPlaceholderText('Filter by DAG name');
     const dagNameInput = dagNameInputs[dagNameInputs.length - 1];
     expect(dagNameInput).toBeDefined();
     if (!dagNameInput) {
@@ -279,6 +284,90 @@ describe('EventLogsPage', () => {
     expect(await screen.findByText('Raw Event')).toBeInTheDocument();
     expect(screen.getByText(/"id": "evt-1"/)).toBeInTheDocument();
     expect(screen.getByText(/"reason": "boom"/)).toBeInTheDocument();
+  });
+
+  it('persists only applied filters and ignores unsaved draft edits on remount', async () => {
+    const calls: QueryCall[] = [];
+    useQueryMock.mockImplementation((path, init) => {
+      calls.push({ path, init });
+      return mockQueryResult();
+    });
+
+    const firstRender = renderPage();
+    const dagNameInput =
+      await screen.findByPlaceholderText('Filter by DAG name');
+    fireEvent.change(dagNameInput, { target: { value: 'draft-only' } });
+
+    firstRender.unmount();
+    calls.length = 0;
+
+    renderPage();
+
+    await waitFor(() => {
+      const call = latestEventLogsCall(calls);
+      expect(call?.init).toEqual(
+        expect.objectContaining({
+          params: {
+            query: expect.not.objectContaining({
+              dagName: 'draft-only',
+            }),
+          },
+        })
+      );
+    });
+
+    expect(
+      await screen.findByPlaceholderText('Filter by DAG name')
+    ).toHaveValue('');
+  });
+
+  it('restores applied filters on remount', async () => {
+    const calls: QueryCall[] = [];
+    useQueryMock.mockImplementation((path, init) => {
+      calls.push({ path, init });
+      return mockQueryResult();
+    });
+
+    const firstRender = renderPage();
+    const dagNameInput =
+      await screen.findByPlaceholderText('Filter by DAG name');
+    fireEvent.change(dagNameInput, { target: { value: 'payments' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Filters' }));
+
+    await waitFor(() => {
+      const call = latestEventLogsCall(calls);
+      expect(call?.init).toEqual(
+        expect.objectContaining({
+          params: {
+            query: expect.objectContaining({
+              dagName: 'payments',
+            }),
+          },
+        })
+      );
+    });
+
+    firstRender.unmount();
+    calls.length = 0;
+
+    renderPage();
+
+    await waitFor(() => {
+      const call = latestEventLogsCall(calls);
+      expect(call?.init).toEqual(
+        expect.objectContaining({
+          params: {
+            query: expect.objectContaining({
+              dagName: 'payments',
+            }),
+          },
+        })
+      );
+    });
+
+    expect(
+      await screen.findByPlaceholderText('Filter by DAG name')
+    ).toHaveValue('payments');
   });
 
   it('loads older events using the opaque cursor', async () => {

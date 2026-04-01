@@ -264,6 +264,64 @@ func (b *NotificationBatcher) TakeReady() []NotificationPendingBatch {
 	return ready
 }
 
+// DiscardDestinations removes buffered and ready batches for destinations that
+// are no longer configured.
+func (b *NotificationBatcher) DiscardDestinations(destinations []string) {
+	if len(destinations) == 0 {
+		return
+	}
+
+	blocked := make(map[string]struct{}, len(destinations))
+	for _, destination := range destinations {
+		if destination == "" {
+			continue
+		}
+		blocked[destination] = struct{}{}
+	}
+	if len(blocked) == 0 {
+		return
+	}
+
+	b.mu.Lock()
+	if b.stopped {
+		b.mu.Unlock()
+		return
+	}
+
+	timers := make([]*time.Timer, 0)
+	for bucketKey, bucket := range b.buckets {
+		if bucket == nil {
+			continue
+		}
+		if _, ok := blocked[bucket.destination]; !ok {
+			continue
+		}
+		if bucket.timer != nil {
+			timers = append(timers, bucket.timer)
+		}
+		delete(b.buckets, bucketKey)
+		for runKey := range bucket.events {
+			delete(b.runIndex, notificationDestinationRunKey(bucket.destination, runKey))
+		}
+	}
+
+	if len(b.ready) > 0 {
+		filtered := make([]NotificationPendingBatch, 0, len(b.ready))
+		for _, pending := range b.ready {
+			if _, ok := blocked[pending.Destination]; ok {
+				continue
+			}
+			filtered = append(filtered, pending)
+		}
+		b.ready = filtered
+	}
+	b.mu.Unlock()
+
+	for _, timer := range timers {
+		timer.Stop()
+	}
+}
+
 func (b *NotificationBatcher) readyBucket(bucketKey string, bucketID uint64) {
 	b.mu.Lock()
 	if b.stopped {
