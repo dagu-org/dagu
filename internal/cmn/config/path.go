@@ -26,6 +26,8 @@ type Paths struct {
 	LogsDir string
 	// AdminLogsDir is the directory where administrative logs are kept.
 	AdminLogsDir string
+	// EventStoreDir is the directory where centralized event logs and inbox files are kept.
+	EventStoreDir string
 	// BaseConfigFile is the full path to the base configuration file.
 	BaseConfigFile string
 	// Notices collects any non-fatal informational messages encountered during path resolution.
@@ -96,6 +98,7 @@ func setXDGPaths(xdg XDGConfig, configDir string) Paths {
 		LogsDir:         filepath.Join(xdg.DataHome, AppSlug, "logs"),
 		BaseConfigFile:  filepath.Join(xdg.ConfigHome, AppSlug, "base.yaml"),
 		AdminLogsDir:    filepath.Join(xdg.DataHome, AppSlug, "logs", "admin"),
+		EventStoreDir:   filepath.Join(xdg.DataHome, AppSlug, "logs", "admin", "events"),
 		SuspendFlagsDir: filepath.Join(xdg.DataHome, AppSlug, "suspend"),
 		DAGsDir:         filepath.Join(xdg.ConfigHome, AppSlug, "dags"),
 	}
@@ -110,6 +113,7 @@ func setUnifiedPaths(configDir string) Paths {
 		LogsDir:         filepath.Join(configDir, "logs"),
 		BaseConfigFile:  filepath.Join(configDir, "base.yaml"),
 		AdminLogsDir:    filepath.Join(configDir, "logs", "admin"),
+		EventStoreDir:   filepath.Join(configDir, "logs", "admin", "events"),
 		SuspendFlagsDir: filepath.Join(configDir, "suspend"),
 		DAGsDir:         filepath.Join(configDir, "dags"),
 	}

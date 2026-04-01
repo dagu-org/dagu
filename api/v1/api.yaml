@@ -43,6 +43,8 @@ tags:
     description: "Webhook endpoints for triggering DAG execution"
   - name: "audit"
     description: "Audit log operations (admin only)"
+  - name: "events"
+    description: "Centralized operational event log operations (manager or admin only)"
   - name: "sync"
     description: "Git synchronization operations for DAGs"
   - name: "agent"
@@ -3431,37 +3433,10 @@ paths:
           required: false
           schema:
             type: string
-        - name: startTime
-          in: query
-          description: "Filter entries after this time (ISO 8601 format)"
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: endTime
-          in: query
-          description: "Filter entries before this time (ISO 8601 format)"
-          required: false
-          schema:
-            type: string
-            format: date-time
-        - name: limit
-          in: query
-          description: "Maximum number of entries to return (default 100)"
-          required: false
-          schema:
-            type: integer
-            default: 100
-            minimum: 1
-            maximum: 1000
-        - name: offset
-          in: query
-          description: "Number of entries to skip (for pagination)"
-          required: false
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
+        - $ref: "#/components/parameters/LogStartTime"
+        - $ref: "#/components/parameters/LogEndTime"
+        - $ref: "#/components/parameters/AuditLogLimit"
+        - $ref: "#/components/parameters/LogOffset"
       responses:
         "200":
           description: "List of audit log entries"
@@ -3469,6 +3444,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuditLogsResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden - requires manager or admin role"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /event-logs:
+    get:
+      summary: "List centralized event log entries"
+      description: "Returns centralized event log entries matching the filter criteria. Manager or admin only."
+      operationId: "listEventLogs"
+      tags:
+        - "events"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: kind
+          in: query
+          description: "Filter by event kind (e.g., dag_run, llm_usage)"
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: "Filter by event type (e.g., dag.run.failed, llm.usage.recorded)"
+          required: false
+          schema:
+            type: string
+        - name: dagName
+          in: query
+          description: "Filter by DAG name"
+          required: false
+          schema:
+            type: string
+        - name: dagRunId
+          in: query
+          description: "Filter by DAG run ID"
+          required: false
+          schema:
+            type: string
+        - name: attemptId
+          in: query
+          description: "Filter by attempt ID"
+          required: false
+          schema:
+            type: string
+        - name: sessionId
+          in: query
+          description: "Filter by session ID"
+          required: false
+          schema:
+            type: string
+        - name: userId
+          in: query
+          description: "Filter by user ID"
+          required: false
+          schema:
+            type: string
+        - name: model
+          in: query
+          description: "Filter by model name"
+          required: false
+          schema:
+            type: string
+        - $ref: "#/components/parameters/LogStartTime"
+        - $ref: "#/components/parameters/LogEndTime"
+        - $ref: "#/components/parameters/EventLogLimit"
+        - $ref: "#/components/parameters/LogOffset"
+      responses:
+        "200":
+          description: "List of event log entries"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventLogsResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -6376,6 +6438,56 @@ components:
         type: string
         default: "local"
 
+    LogStartTime:
+      name: startTime
+      in: query
+      description: "Filter entries after this time (ISO 8601 format)"
+      required: false
+      schema:
+        type: string
+        format: date-time
+
+    LogEndTime:
+      name: endTime
+      in: query
+      description: "Filter entries before this time (ISO 8601 format)"
+      required: false
+      schema:
+        type: string
+        format: date-time
+
+    AuditLogLimit:
+      name: limit
+      in: query
+      description: "Maximum number of entries to return (default 100)"
+      required: false
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 1000
+
+    EventLogLimit:
+      name: limit
+      in: query
+      description: "Maximum number of entries to return (default 50)"
+      required: false
+      schema:
+        type: integer
+        default: 50
+        minimum: 1
+        maximum: 500
+
+    LogOffset:
+      name: offset
+      in: query
+      description: "Number of entries to skip (for pagination)"
+      required: false
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+
     DAGRunId:
       name: dagRunId
       in: path
@@ -6548,6 +6660,86 @@ components:
           items:
             $ref: "#/components/schemas/AuditEntry"
           description: "List of audit log entries"
+        total:
+          type: integer
+          description: "Total number of entries matching the filter (before pagination)"
+      required:
+        - entries
+        - total
+
+    EventLogEntry:
+      type: object
+      description: "A single centralized operational event log entry"
+      properties:
+        id:
+          type: string
+          description: "Unique identifier for this event"
+        schemaVersion:
+          type: integer
+          description: "Schema version of the event envelope"
+        occurredAt:
+          type: string
+          format: date-time
+          description: "When the event occurred"
+        recordedAt:
+          type: string
+          format: date-time
+          description: "When the event was recorded by the producer"
+        kind:
+          type: string
+          description: "High-level event kind (e.g., dag_run, llm_usage)"
+        type:
+          type: string
+          description: "Specific event type (e.g., dag.run.failed)"
+        sourceService:
+          type: string
+          description: "Service that produced the event"
+        sourceInstance:
+          type: string
+          description: "Specific producer instance identifier"
+        dagName:
+          type: string
+          description: "DAG name for DAG-run events"
+        dagRunId:
+          type: string
+          description: "DAG run ID for DAG-run events"
+        attemptId:
+          type: string
+          description: "Attempt ID for DAG-run events"
+        sessionId:
+          type: string
+          description: "Session ID for LLM usage events"
+        userId:
+          type: string
+          description: "User ID associated with the event"
+        model:
+          type: string
+          description: "Model name associated with the event"
+        status:
+          type: string
+          description: "Status associated with the event when applicable"
+        data:
+          type: object
+          additionalProperties: true
+          description: "Small event-specific payload"
+      required:
+        - id
+        - schemaVersion
+        - occurredAt
+        - recordedAt
+        - kind
+        - type
+        - sourceService
+
+    EventLogsResponse:
+      type: object
+      description: "Response containing centralized event log entries"
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventLogEntry"
+          description: "List of event log entries"
         total:
           type: integer
           description: "Total number of entries matching the filter (before pagination)"

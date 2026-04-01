@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	"github.com/dagu-org/dagu/internal/service/resource"
 	daguslack "github.com/dagu-org/dagu/internal/service/slack"
@@ -229,7 +230,7 @@ func runStartAll(ctx *Context, _ []string) error {
 		logger.Info(serviceCtx, "Scheduler initialization",
 			tag.Dir(serviceCtx.Config.Paths.DAGsDir),
 		)
-		if err := scheduler.Start(serviceCtx); err != nil {
+		if err := scheduler.Start(serviceCtx.WithEventSource(eventstore.SourceServiceScheduler)); err != nil {
 			select {
 			case errCh <- fmt.Errorf("scheduler failed: %w", err):
 			default:
@@ -239,7 +240,7 @@ func runStartAll(ctx *Context, _ []string) error {
 
 	if coord != nil {
 		wg.Go(func() {
-			if err := coord.Start(serviceCtx); err != nil {
+			if err := coord.Start(serviceCtx.WithEventSource(eventstore.SourceServiceCoordinator)); err != nil {
 				select {
 				case errCh <- fmt.Errorf("coordinator failed: %w", err):
 				default:

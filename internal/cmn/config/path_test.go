@@ -32,6 +32,7 @@ func TestResolver(t *testing.T) {
 			DataDir:         filepath.Join(tmpDir, config.AppSlug, "data"),
 			LogsDir:         filepath.Join(tmpDir, config.AppSlug, "logs"),
 			AdminLogsDir:    filepath.Join(tmpDir, config.AppSlug, "logs/admin"),
+			EventStoreDir:   filepath.Join(tmpDir, config.AppSlug, "logs/admin/events"),
 			BaseConfigFile:  filepath.Join(tmpDir, config.AppSlug, "base.yaml"),
 		}, paths)
 	})
@@ -70,6 +71,7 @@ func TestResolver(t *testing.T) {
 			DataDir:         filepath.Join(legacyPath, "data"),
 			LogsDir:         filepath.Join(legacyPath, "logs"),
 			AdminLogsDir:    filepath.Join(legacyPath, "logs", "admin"),
+			EventStoreDir:   filepath.Join(legacyPath, "logs", "admin", "events"),
 			BaseConfigFile:  filepath.Join(legacyPath, "base.yaml"),
 			Notices:         []string{config.ExistingHomeDirNoticePrefix + legacyPath + "."},
 		}, paths)
@@ -95,6 +97,7 @@ func TestResolver(t *testing.T) {
 			DataDir:         filepath.Join(dataHome, config.AppSlug, "data"),
 			LogsDir:         filepath.Join(dataHome, config.AppSlug, "logs"),
 			AdminLogsDir:    filepath.Join(dataHome, config.AppSlug, "logs", "admin"),
+			EventStoreDir:   filepath.Join(dataHome, config.AppSlug, "logs", "admin", "events"),
 			BaseConfigFile:  filepath.Join(configHome, config.AppSlug, "base.yaml"),
 		}, paths)
 	})

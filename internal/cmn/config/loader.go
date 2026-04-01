@@ -253,6 +253,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		return nil, err
 	}
 	l.loadSecretsConfig(&cfg, def)
+	l.loadEventStoreConfig(&cfg, def)
 
 	// Load service-specific sections
 	sectionLoaders := []struct {
@@ -372,6 +373,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		{"DataDir", &cfg.Paths.DataDir, def.Paths.DataDir},
 		{"LogDir", &cfg.Paths.LogDir, def.Paths.LogDir},
 		{"AdminLogsDir", &cfg.Paths.AdminLogsDir, def.Paths.AdminLogsDir},
+		{"EventStoreDir", &cfg.Paths.EventStoreDir, def.Paths.EventStoreDir},
 		{"BaseConfig", &cfg.Paths.BaseConfig, def.Paths.BaseConfig},
 		{"Executable", &cfg.Paths.Executable, def.Paths.Executable},
 		{"DAGRunsDir", &cfg.Paths.DAGRunsDir, def.Paths.DAGRunsDir},
@@ -405,6 +407,17 @@ func (l *ConfigLoader) loadSecretsConfig(cfg *Config, def Definition) {
 	cfg.Secrets.Vault = VaultSecretsConfig{
 		Address: def.Secrets.Vault.Address,
 		Token:   def.Secrets.Vault.Token,
+	}
+}
+
+func (l *ConfigLoader) loadEventStoreConfig(cfg *Config, def Definition) {
+	cfg.EventStore.Enabled = true
+	if def.EventStore != nil && def.EventStore.Enabled != nil {
+		cfg.EventStore.Enabled = *def.EventStore.Enabled
+	}
+	cfg.EventStore.RetentionDays = l.v.GetInt("event_store.retention_days")
+	if def.EventStore != nil && def.EventStore.RetentionDays != nil {
+		cfg.EventStore.RetentionDays = *def.EventStore.RetentionDays
 	}
 }
 
@@ -1259,6 +1272,10 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 		cfg.Paths.SessionsDir = filepath.Join(cfg.Paths.DataDir, "agent", "sessions")
 	}
 
+	if cfg.Paths.EventStoreDir == "" {
+		cfg.Paths.EventStoreDir = filepath.Join(cfg.Paths.AdminLogsDir, "events")
+	}
+
 	if cfg.Paths.DocsDir == "" {
 		cfg.Paths.DocsDir = filepath.Join(cfg.Paths.DAGsDir, "docs")
 	}
@@ -1305,6 +1322,7 @@ func (l *ConfigLoader) loadLegacyPaths(cfg *Config, def Definition) error {
 		{"legacy DataDir", &cfg.Paths.DataDir, def.DataDir},
 		{"legacy SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.SuspendFlagsDir},
 		{"legacy AdminLogsDir", &cfg.Paths.AdminLogsDir, def.AdminLogsDir},
+		{"legacy EventStoreDir", &cfg.Paths.EventStoreDir, def.EventStoreDir},
 		{"legacy BaseConfig", &cfg.Paths.BaseConfig, def.BaseConfig},
 	}
 
@@ -1370,6 +1388,11 @@ func (l *ConfigLoader) loadLegacyEnv(cfg *Config) {
 			setter:   func(c *Config, v string) { c.Paths.AdminLogsDir = fileutil.ResolvePathOrBlank(v) },
 			requires: SectionNone,
 		},
+		"DAGU__EVENT_STORE_DIR": {
+			newKey:   "DAGU_EVENT_STORE_DIR",
+			setter:   func(c *Config, v string) { c.Paths.EventStoreDir = fileutil.ResolvePathOrBlank(v) },
+			requires: SectionNone,
+		},
 	}
 
 	for oldKey, mapping := range legacyEnvs {
@@ -1412,6 +1435,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("paths.data_dir", paths.DataDir)
 	l.v.SetDefault("paths.log_dir", paths.LogsDir)
 	l.v.SetDefault("paths.admin_logs_dir", paths.AdminLogsDir)
+	l.v.SetDefault("paths.event_store_dir", paths.EventStoreDir)
 	l.v.SetDefault("paths.base_config", paths.BaseConfigFile)
 
 	// Server
@@ -1462,6 +1486,10 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	// Audit
 	l.v.SetDefault("audit.retention_days", 7)
 
+	// Event store
+	l.v.SetDefault("event_store.enabled", true)
+	l.v.SetDefault("event_store.retention_days", 3)
+
 	// Terminal
 	l.v.SetDefault("terminal.max_sessions", 5)
 
@@ -1505,6 +1533,8 @@ var envBindings = []envBinding{
 	{key: "terminal.max_sessions", env: "TERMINAL_MAX_SESSIONS"},
 	{key: "audit.enabled", env: "AUDIT_ENABLED"},
 	{key: "audit.retention_days", env: "AUDIT_RETENTION_DAYS"},
+	{key: "event_store.enabled", env: "EVENT_STORE_ENABLED"},
+	{key: "event_store.retention_days", env: "EVENT_STORE_RETENTION_DAYS"},
 	{key: "session.max_per_user", env: "SESSION_MAX_PER_USER"},
 	{key: "sse.max_topics_per_connection", env: "SSE_MAX_TOPICS_PER_CONNECTION"},
 	{key: "sse.max_clients", env: "SSE_MAX_CLIENTS"},
@@ -1591,6 +1621,7 @@ var envBindings = []envBinding{
 	{key: "paths.data_dir", env: "DATA_DIR", isPath: true},
 	{key: "paths.suspend_flags_dir", env: "SUSPEND_FLAGS_DIR", isPath: true},
 	{key: "paths.admin_logs_dir", env: "ADMIN_LOG_DIR", isPath: true},
+	{key: "paths.event_store_dir", env: "EVENT_STORE_DIR", isPath: true},
 	{key: "paths.base_config", env: "BASE_CONFIG", isPath: true},
 	{key: "paths.dag_runs_dir", env: "DAG_RUNS_DIR", isPath: true},
 	{key: "paths.proc_dir", env: "PROC_DIR", isPath: true},

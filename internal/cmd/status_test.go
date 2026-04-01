@@ -411,7 +411,7 @@ steps:
 	})
 
 	t.Run("StatusSubDAGRun", func(t *testing.T) {
-		th := test.SetupCommand(t)
+		th := test.SetupCommand(t, test.WithBuiltExecutable())
 		dagFile := th.DAG(t, `steps:
   - name: run-child
     call: child-dag
