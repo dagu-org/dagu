@@ -7,9 +7,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestContext_StringParam(t *testing.T) {
@@ -92,31 +89,6 @@ func TestContext_StringParam(t *testing.T) {
 					t.Errorf("Expected %q, got %q", tt.expected, val)
 				}
 			}
-		})
-	}
-}
-
-func TestCheckUpdatesFlagBindingUsesSnakeCaseConfigKey(t *testing.T) {
-	tests := []struct {
-		name  string
-		cmd   *cobra.Command
-		flags []commandLineFlag
-	}{
-		{name: "server", cmd: Server(), flags: serverFlags},
-		{name: "start-all", cmd: StartAll(), flags: startAllFlags},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v := viper.New()
-			v.SetDefault("check_updates", true)
-			bindFlags(v, tt.cmd, tt.flags...)
-
-			require.NotNil(t, tt.cmd.Flags().Lookup("check-updates"))
-			assert.True(t, v.GetBool("check_updates"))
-
-			require.NoError(t, tt.cmd.Flags().Set("check-updates", "false"))
-			assert.False(t, v.GetBool("check_updates"))
 		})
 	}
 }

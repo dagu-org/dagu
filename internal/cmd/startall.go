@@ -77,7 +77,6 @@ var startAllFlags = []commandLineFlag{
 	dagsFlag,
 	hostFlag,
 	portFlag,
-	checkUpdatesFlag,
 	coordinatorHostFlag,
 	coordinatorPortFlag,
 	coordinatorAdvertiseFlag,

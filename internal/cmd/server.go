@@ -49,7 +49,7 @@ Example:
 	)
 }
 
-var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag, checkUpdatesFlag, tunnelFlag, tunnelTokenFlag, tunnelFunnelFlag, tunnelHTTPSFlag}
+var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag, tunnelFlag, tunnelTokenFlag, tunnelFunnelFlag, tunnelHTTPSFlag}
 
 // runServer initializes and runs the web UI server and its resource monitoring service.
 // It logs startup info, starts the resource service (deferring its shutdown and logging any stop errors),
