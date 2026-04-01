@@ -15,7 +15,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: quarterly
+      interval: monthly
     groups:
       patch:
         patterns:
@@ -30,7 +30,7 @@ updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: quarterly
+      interval: monthly
     groups:
       patch:
         patterns:
@@ -48,7 +48,7 @@ updates:
       - npm/*
       - ui
     schedule:
-      interval: quarterly
+      interval: monthly
     groups:
       patch:
         patterns:
