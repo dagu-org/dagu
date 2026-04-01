@@ -482,8 +482,11 @@ func TestCreateAgentModel(t *testing.T) {
 				BaseUrl:  &customURL,
 			},
 		})
-		require.Error(t, err)
-		assert.Nil(t, resp)
+		require.NoError(t, err)
+		createResp, ok := resp.(apigen.CreateAgentModel201JSONResponse)
+		require.True(t, ok)
+		assert.Empty(t, setup.modelStore.models[createResp.Id].APIKey)
+		assert.Empty(t, setup.modelStore.models[createResp.Id].BaseURL)
 	})
 }
 

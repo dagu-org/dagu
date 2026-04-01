@@ -129,8 +129,9 @@ type ModelConfig struct {
 	InputCostPer1M   float64 `json:"inputCostPer1M,omitempty"`
 	OutputCostPer1M  float64 `json:"outputCostPer1M,omitempty"`
 	SupportsThinking bool    `json:"supportsThinking,omitempty"`
-	ThinkingEffort   string  `json:"thinkingEffort,omitempty"`
-	Description      string  `json:"description,omitempty"`
+	// ThinkingEffort accepts "low", "medium", "high", or "xhigh"; empty uses the provider default.
+	ThinkingEffort string `json:"thinkingEffort,omitempty"`
+	Description    string `json:"description,omitempty"`
 }
 
 // ToLLMConfig converts a ModelConfig to an LLMConfig for provider creation.

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -172,33 +173,52 @@ func (m *Manager) Logout(ctx context.Context, provider string) error {
 // Status returns the known connection status for each supported provider.
 func (m *Manager) Status(ctx context.Context) ([]ProviderStatus, error) {
 	statuses := make([]ProviderStatus, 0, len(m.providers))
-	for _, provider := range []string{ProviderOpenAICodex} {
-		prov, err := m.lookupProvider(provider)
+	providers := make([]string, 0, len(m.providers))
+	for provider := range m.providers {
+		providers = append(providers, provider)
+	}
+	sort.Strings(providers)
+	for _, provider := range providers {
+		status, err := m.ProviderStatus(ctx, provider, nil)
 		if err != nil {
-			continue
-		}
-		status := ProviderStatus{
-			ID:   prov.ID(),
-			Name: prov.Name(),
-		}
-		if m.store != nil {
-			cred, err := m.store.Get(ctx, provider)
-			switch {
-			case err == nil && cred != nil:
-				status.Connected = true
-				status.AccountID = cred.AccountID
-				status.CanRefresh = strings.TrimSpace(cred.RefreshToken) != ""
-				if !cred.ExpiresAt.IsZero() {
-					expiresAt := cred.ExpiresAt
-					status.ExpiresAt = &expiresAt
-				}
-			case err != nil && !errors.Is(err, ErrCredentialNotFound):
-				return nil, err
-			}
+			return nil, err
 		}
 		statuses = append(statuses, status)
 	}
 	return statuses, nil
+}
+
+// ProviderStatus returns the connection status for a single provider.
+func (m *Manager) ProviderStatus(ctx context.Context, provider string, cred *Credential) (ProviderStatus, error) {
+	prov, err := m.lookupProvider(provider)
+	if err != nil {
+		return ProviderStatus{}, err
+	}
+
+	status := ProviderStatus{
+		ID:   prov.ID(),
+		Name: prov.Name(),
+	}
+	if cred == nil && m.store != nil {
+		cred, err = m.store.Get(ctx, provider)
+		switch {
+		case err == nil:
+		case errors.Is(err, ErrCredentialNotFound):
+			cred = nil
+		default:
+			return ProviderStatus{}, err
+		}
+	}
+	if cred != nil {
+		status.Connected = true
+		status.AccountID = cred.AccountID
+		status.CanRefresh = strings.TrimSpace(cred.RefreshToken) != ""
+		if !cred.ExpiresAt.IsZero() {
+			expiresAt := cred.ExpiresAt
+			status.ExpiresAt = &expiresAt
+		}
+	}
+	return status, nil
 }
 
 // EnsureValid returns a valid credential for the provider, refreshing it if needed.

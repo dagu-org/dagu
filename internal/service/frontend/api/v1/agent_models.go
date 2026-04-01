@@ -457,20 +457,6 @@ func (a *API) validateModelProviderConfig(ctx context.Context, model *agent.Mode
 	if err := a.requireAgentAuthManagement(); err != nil {
 		return err
 	}
-	if apiKeyInput != nil && strings.TrimSpace(*apiKeyInput) != "" {
-		return &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "apiKey is not supported for provider 'openai-codex'; connect the provider instead",
-			HTTPStatus: http.StatusBadRequest,
-		}
-	}
-	if baseURLInput != nil && strings.TrimSpace(*baseURLInput) != "" {
-		return &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "baseUrl is not supported for provider 'openai-codex'",
-			HTTPStatus: http.StatusBadRequest,
-		}
-	}
 
 	model.APIKey = ""
 	model.BaseURL = ""

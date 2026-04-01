@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/agentoauth"
+	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -253,4 +255,17 @@ func TestProviderCache_Eviction(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "m4", model)
 	assert.Equal(t, "m4", p.Name())
+}
+
+func TestCreateLLMProvider_OpenAICodex_UsesOAuthManager(t *testing.T) {
+	t.Parallel()
+
+	provider, err := CreateLLMProvider(LLMConfig{
+		Provider: "openai-codex",
+		Model:    "gpt-5.4",
+	}, ProviderDeps{
+		OAuthManager: agentoauth.NewManager(nil),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "openai-codex", provider.Name())
 }

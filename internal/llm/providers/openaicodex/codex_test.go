@@ -14,6 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNew_RequiresAccountIDForDirectToken(t *testing.T) {
+	t.Parallel()
+
+	_, err := New(llm.Config{APIKey: "token"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "account ID")
+}
+
 func TestConvertMessages(t *testing.T) {
 	t.Parallel()
 

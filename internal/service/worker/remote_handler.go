@@ -16,7 +16,6 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
@@ -281,25 +280,7 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		}
 	}
 
-	encKey, err := crypto.ResolveKey(h.config.Paths.DataDir)
-	if err != nil {
-		logger.Warn(ctx, "Failed to resolve encryption key for agent OAuth store", tag.Error(err))
-		return agentStoreBundle{
-			configStore: acs,
-			modelStore:  ams,
-			memoryStore: ms,
-		}
-	}
-	enc, err := crypto.NewEncryptor(encKey)
-	if err != nil {
-		logger.Warn(ctx, "Failed to create encryptor for agent OAuth store", tag.Error(err))
-		return agentStoreBundle{
-			configStore: acs,
-			modelStore:  ams,
-			memoryStore: ms,
-		}
-	}
-	store, err := fileagentoauth.New(filepath.Join(h.config.Paths.DataDir, "agent", "oauth"), enc)
+	oauthManager, err := fileagentoauth.NewManager(h.config.Paths.DataDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create agent OAuth store", tag.Error(err))
 		return agentStoreBundle{
@@ -313,7 +294,7 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		configStore:  acs,
 		modelStore:   ams,
 		memoryStore:  ms,
-		oauthManager: agentoauth.NewManager(store),
+		oauthManager: oauthManager,
 	}
 }
 

@@ -160,6 +160,8 @@ type Session struct {
 	ParentSessionID string `json:"parent_session_id,omitempty"`
 	// DelegateTask is the task description given to the sub-agent.
 	DelegateTask string `json:"delegate_task,omitempty"`
+	// Model stores the selected model configuration ID for this session.
+	Model string `json:"model,omitempty"`
 }
 
 // SessionState represents the current state of a session.

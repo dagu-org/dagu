@@ -82,7 +82,7 @@ func (a *API) CompleteAgentAuthProviderLogin(ctx context.Context, request api.Co
 		return nil, ErrInvalidRequestBody
 	}
 
-	_, err := a.agentOAuthManager.CompleteLogin(ctx, request.ProviderId, agentoauth.CompleteLoginInput{
+	cred, err := a.agentOAuthManager.CompleteLogin(ctx, request.ProviderId, agentoauth.CompleteLoginInput{
 		FlowID:      request.Body.FlowId,
 		RedirectURL: valueOf(request.Body.RedirectUrl),
 		Code:        valueOf(request.Body.Code),
@@ -91,7 +91,7 @@ func (a *API) CompleteAgentAuthProviderLogin(ctx context.Context, request api.Co
 		return nil, toAgentAuthError(ctx, "complete login", err)
 	}
 
-	status, err := a.providerStatus(ctx, request.ProviderId)
+	status, err := a.providerStatusFromCredential(ctx, request.ProviderId, cred)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +103,26 @@ func (a *API) CompleteAgentAuthProviderLogin(ctx context.Context, request api.Co
 	return api.CompleteAgentAuthProviderLogin200JSONResponse{
 		Provider: status,
 	}, nil
+}
+
+func (a *API) providerStatusFromCredential(ctx context.Context, providerID string, cred *agentoauth.Credential) (api.AgentAuthProviderStatus, error) {
+	status, err := a.agentOAuthManager.ProviderStatus(ctx, providerID, cred)
+	if err != nil {
+		if errors.Is(err, agentoauth.ErrUnsupportedProvider) {
+			return api.AgentAuthProviderStatus{}, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "Unsupported auth provider",
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
+		logger.Error(ctx, "Failed to load agent auth provider status", tag.Error(err), slog.String("provider", providerID))
+		return api.AgentAuthProviderStatus{}, &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    "Failed to load provider status",
+			HTTPStatus: http.StatusInternalServerError,
+		}
+	}
+	return toAgentAuthProviderStatus(status), nil
 }
 
 // DisconnectAgentAuthProviderLogin deletes the stored OAuth credential. Requires admin role.
@@ -126,8 +146,15 @@ func (a *API) DisconnectAgentAuthProviderLogin(ctx context.Context, request api.
 }
 
 func (a *API) providerStatus(ctx context.Context, providerID string) (api.AgentAuthProviderStatus, error) {
-	statuses, err := a.agentOAuthManager.Status(ctx)
+	status, err := a.agentOAuthManager.ProviderStatus(ctx, providerID, nil)
 	if err != nil {
+		if errors.Is(err, agentoauth.ErrUnsupportedProvider) {
+			return api.AgentAuthProviderStatus{}, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "Unsupported auth provider",
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
 		logger.Error(ctx, "Failed to load agent auth provider status", tag.Error(err), slog.String("provider", providerID))
 		return api.AgentAuthProviderStatus{}, &Error{
 			Code:       api.ErrorCodeInternalError,
@@ -135,16 +162,7 @@ func (a *API) providerStatus(ctx context.Context, providerID string) (api.AgentA
 			HTTPStatus: http.StatusInternalServerError,
 		}
 	}
-	for _, status := range statuses {
-		if status.ID == providerID {
-			return toAgentAuthProviderStatus(status), nil
-		}
-	}
-	return api.AgentAuthProviderStatus{}, &Error{
-		Code:       api.ErrorCodeBadRequest,
-		Message:    "Unsupported auth provider",
-		HTTPStatus: http.StatusBadRequest,
-	}
+	return toAgentAuthProviderStatus(status), nil
 }
 
 func toAgentAuthProviderStatus(status agentoauth.ProviderStatus) api.AgentAuthProviderStatus {

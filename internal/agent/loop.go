@@ -182,6 +182,14 @@ func (l *Loop) SetThinkingEffort(effort llm.ThinkingEffort) {
 	l.thinkingEffort = effort
 }
 
+// SetProviderModel updates the provider and resolved model for future turns.
+func (l *Loop) SetProviderModel(provider llm.Provider, model string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.provider = provider
+	l.model = model
+}
+
 // AppendExternalHistory injects a message into the loop's in-memory LLM history.
 // This keeps future turns consistent when assistant content is appended outside
 // the loop itself, such as bot notifications seeded into an active session.
@@ -312,24 +320,30 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	history := l.copyHistory()
 	messages := l.buildMessages(history)
 	tools := l.buildToolDefinitions()
+	l.mu.Lock()
+	provider := l.provider
+	model := l.model
+	thinkingEffort := l.thinkingEffort
+	webSearch := l.webSearch
+	l.mu.Unlock()
 
 	req := &llm.ChatRequest{
-		Model:     l.model,
+		Model:     model,
 		Messages:  messages,
 		Tools:     tools,
-		WebSearch: l.webSearch,
+		WebSearch: webSearch,
 	}
-	if l.thinkingEffort != "" {
+	if thinkingEffort != "" {
 		req.Thinking = &llm.ThinkingRequest{
 			Enabled: true,
-			Effort:  l.thinkingEffort,
+			Effort:  thinkingEffort,
 		}
 	}
 
 	l.logger.Debug("sending LLM request",
 		"message_count", len(messages),
 		"tool_count", len(tools),
-		"model", l.model)
+		"model", model)
 
 	l.setWorking(true)
 
@@ -338,7 +352,7 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	stopHeartbeat := startHeartbeatPump(llmCtx, loopHeartbeatInterval, l.onHeartbeat)
 	defer stopHeartbeat()
 
-	resp, err := llm.ChatWithRetry(llmCtx, l.provider, req, llm.DefaultLogicalRetryConfig())
+	resp, err := llm.ChatWithRetry(llmCtx, provider, req, llm.DefaultLogicalRetryConfig())
 	if err != nil {
 		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
 		l.setWorking(false)

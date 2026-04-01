@@ -25,6 +25,7 @@ const (
 	openAICodexRedirectURI  = "http://localhost:1455/auth/callback"
 	openAICodexScope        = "openid profile email offline_access"
 	openAICodexJWTClaimPath = "https://api.openai.com/auth"
+	openAICodexHTTPTimeout  = 30 * time.Second
 )
 
 type openAICodexProvider struct{}
@@ -158,7 +159,7 @@ func exchangeToken(ctx context.Context, form url.Values) (*Credential, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: openAICodexHTTPTimeout}).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("exchange OAuth token: %w", err)
 	}

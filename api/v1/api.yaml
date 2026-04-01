@@ -9630,14 +9630,21 @@ components:
       type: object
       required:
         - flowId
+      anyOf:
+        - required: [redirectUrl]
+        - required: [code]
       description: "Complete a manual OAuth login flow"
       properties:
         flowId:
           type: string
+          minLength: 1
         redirectUrl:
           type: string
+          format: uri
+          minLength: 1
         code:
           type: string
+          minLength: 1
 
     CompleteAgentAuthProviderLoginResponse:
       type: object

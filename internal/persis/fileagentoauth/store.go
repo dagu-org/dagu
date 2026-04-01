@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -219,11 +220,15 @@ func (s *Store) decryptStored(stored *storedCredential) (*agentoauth.Credential,
 	if stored.ExpiresAt != "" {
 		if expiresAt, err := parseTime(stored.ExpiresAt); err == nil {
 			cred.ExpiresAt = expiresAt
+		} else {
+			slog.Warn("fileagentoauth: failed to parse timestamp", slog.String("field", "expiresAt"), slog.String("value", stored.ExpiresAt), slog.Any("error", err))
 		}
 	}
 	if stored.UpdatedAt != "" {
 		if updatedAt, err := parseTime(stored.UpdatedAt); err == nil {
 			cred.UpdatedAt = updatedAt
+		} else {
+			slog.Warn("fileagentoauth: failed to parse timestamp", slog.String("field", "updatedAt"), slog.String("value", stored.UpdatedAt), slog.Any("error", err))
 		}
 	}
 	return cred, nil

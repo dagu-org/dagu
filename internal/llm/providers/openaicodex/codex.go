@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -37,6 +38,9 @@ type Provider struct {
 func New(cfg llm.Config) (llm.Provider, error) {
 	if cfg.OAuthCredentialProvider == nil && strings.TrimSpace(cfg.APIKey) == "" {
 		return nil, llm.ErrNoAPIKey
+	}
+	if cfg.OAuthCredentialProvider == nil && strings.TrimSpace(cfg.AccountID) == "" {
+		return nil, fmt.Errorf("openai-codex account ID is required when using a direct access token")
 	}
 	return &Provider{
 		config:     cfg,
@@ -237,6 +241,7 @@ func (p *Provider) streamResponse(ctx context.Context, body io.ReadCloser, event
 
 		var event responseEvent
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			slog.Debug("failed to unmarshal Codex response", slog.String("provider", providerName), slog.Any("error", err), slog.String("data", data))
 			continue
 		}
 

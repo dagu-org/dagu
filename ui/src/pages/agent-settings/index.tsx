@@ -897,8 +897,24 @@ export default function AgentSettingsPage(): ReactNode {
                     </TableCell>
                     <TableCell>
                       {m.provider === 'openai-codex' ? (
-                        <span className={`text-xs ${codexProvider?.connected ? 'text-green-600' : 'text-muted-foreground'}`}>
-                          {codexProvider?.connected ? 'Subscription' : 'Not connected'}
+                        <span
+                          className={`text-xs ${
+                            authLoading
+                              ? 'text-muted-foreground'
+                              : authError
+                                ? 'text-amber-600'
+                                : codexProvider?.connected
+                                  ? 'text-green-600'
+                                  : 'text-muted-foreground'
+                          }`}
+                        >
+                          {authLoading
+                            ? 'Checking...'
+                            : authError
+                              ? 'Unavailable'
+                              : codexProvider?.connected
+                                ? 'Subscription'
+                                : 'Not connected'}
                         </span>
                       ) : (
                         <span className={`text-xs ${m.apiKeyConfigured ? 'text-green-600' : 'text-muted-foreground'}`}>

@@ -425,7 +425,7 @@ func (a *API) lookupSessionEventMetadata(id string) (model string, userID string
 }
 
 // persistNewSession saves a new session to the store if configured.
-func (a *API) persistNewSession(ctx context.Context, id, userID, dagName string, now time.Time) {
+func (a *API) persistNewSession(ctx context.Context, id, userID, dagName, model string, now time.Time) {
 	if a.store == nil {
 		return
 	}
@@ -433,11 +433,30 @@ func (a *API) persistNewSession(ctx context.Context, id, userID, dagName string,
 		ID:        id,
 		UserID:    userID,
 		DAGName:   dagName,
+		Model:     model,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 	if err := a.store.CreateSession(ctx, sess); err != nil {
 		a.logger.Warn("Failed to persist session", "error", err)
+	}
+}
+
+func (a *API) persistSessionModel(ctx context.Context, mgr *SessionManager, model string) {
+	if mgr == nil {
+		return
+	}
+	if mgr.GetModel() == model {
+		return
+	}
+	mgr.SetModel(model)
+	if a.store == nil {
+		return
+	}
+	sess := mgr.GetSession()
+	sess.Model = model
+	if err := a.store.UpdateSession(ctx, &sess); err != nil {
+		a.logger.Warn("Failed to persist session model", "error", err, "session_id", sess.ID, "model", model)
 	}
 }
 
@@ -555,6 +574,7 @@ func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentit
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:                 id,
 		User:               user,
+		Model:              cfg.modelID,
 		Logger:             a.logger,
 		WorkingDir:         a.workingDir,
 		Title:              cfg.title,
@@ -575,11 +595,8 @@ func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentit
 		RemoteNodeResolver: a.remoteNodeResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
-	mgr.mu.Lock()
-	mgr.model = cfg.modelID
-	mgr.mu.Unlock()
 
-	a.persistNewSession(ctx, id, user.UserID, cfg.dagName, now)
+	a.persistNewSession(ctx, id, user.UserID, cfg.dagName, cfg.modelID, now)
 	a.sessions.Store(id, mgr)
 
 	return mgr
@@ -903,13 +920,12 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		delegates = nil
 	}
 
-	// Resolve pricing and default reasoning from the default model so that
-	// reactivated sessions can use current model metadata immediately.
+	// Restore pricing and reasoning from the session's persisted model.
 	var inputCost, outputCost float64
 	var thinkingEffort llm.ThinkingEffort
-	defaultModelID := a.getDefaultModelID(ctx)
-	if defaultModelID != "" {
-		if _, modelCfg, err := a.resolveProvider(ctx, defaultModelID); err == nil {
+	modelID := selectModel("", sess.Model, a.getDefaultModelID(ctx))
+	if modelID != "" {
+		if _, modelCfg, err := a.resolveProvider(ctx, modelID); err == nil {
 			inputCost = modelCfg.InputCostPer1M
 			outputCost = modelCfg.OutputCostPer1M
 			thinkingEffort = modelThinkingEffort(modelCfg)
@@ -919,6 +935,7 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:                 id,
 		User:               user,
+		Model:              modelID,
 		Logger:             a.logger,
 		WorkingDir:         a.workingDir,
 		Title:              sess.Title,
@@ -1129,6 +1146,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	mgr := NewSessionManager(SessionManagerConfig{
 		ID:                 id,
 		User:               user,
+		Model:              model,
 		Logger:             a.logger,
 		WorkingDir:         a.workingDir,
 		OnMessage:          a.createMessageCallback(id),
@@ -1148,9 +1166,6 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		RemoteNodeResolver: a.remoteNodeResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
-	mgr.mu.Lock()
-	mgr.model = model
-	mgr.mu.Unlock()
 
 	messageWithContext, err := a.prepareChatContent(ctx, id, req)
 	if err != nil {
@@ -1160,7 +1175,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 
 	// Persist session before accepting the first message so that
 	// the onMessage callback (store.AddMessage) can find the session.
-	a.persistNewSession(ctx, id, user.UserID, dagName, now)
+	a.persistNewSession(ctx, id, user.UserID, dagName, model, now)
 	a.sessions.Store(id, mgr)
 
 	if err := mgr.AcceptUserMessage(ctx, provider, model, modelCfg.Model, messageWithContext); err != nil {
@@ -1376,6 +1391,8 @@ func (a *API) prepareSessionRuntime(ctx context.Context, mgr *SessionManager, us
 	mgr.SetSafeMode(req.SafeMode)
 	mgr.UpdatePricing(modelCfg.InputCostPer1M, modelCfg.OutputCostPer1M)
 	mgr.UpdateThinkingEffort(modelThinkingEffort(modelCfg))
+	mgr.UpdateLoopProvider(provider, modelCfg.Model)
+	a.persistSessionModel(ctx, mgr, model)
 	return provider, model, modelCfg.Model, nil
 }
 

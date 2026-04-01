@@ -633,21 +633,11 @@ func (c *Context) agentStores() agentStoresResult {
 	}
 	result.SoulStore = soulStore
 
-	encKey, err := crypto.ResolveKey(c.Config.Paths.DataDir)
+	oauthManager, err := fileagentoauth.NewManager(c.Config.Paths.DataDir)
 	if err != nil {
-		logger.Warn(c, "Failed to resolve encryption key for agent OAuth store", tag.Error(err))
+		logger.Warn(c, "Failed to create agent OAuth store", tag.Error(err))
 	} else {
-		enc, err := crypto.NewEncryptor(encKey)
-		if err != nil {
-			logger.Warn(c, "Failed to create encryptor for agent OAuth store", tag.Error(err))
-		} else {
-			store, err := fileagentoauth.New(filepath.Join(c.Config.Paths.DataDir, "agent", "oauth"), enc)
-			if err != nil {
-				logger.Warn(c, "Failed to create agent OAuth store", tag.Error(err))
-			} else {
-				result.OAuthManager = agentoauth.NewManager(store)
-			}
-		}
+		result.OAuthManager = oauthManager
 	}
 
 	// Build remote node resolver for agent step remote tools.

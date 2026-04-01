@@ -85,6 +85,7 @@ type SessionSnapshot struct {
 type SessionManagerConfig struct {
 	ID              string
 	User            UserIdentity
+	Model           string
 	Logger          *slog.Logger
 	WorkingDir      string
 	Title           string
@@ -172,6 +173,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 	return &SessionManager{
 		id:                 id,
 		user:               cfg.User,
+		model:              cfg.Model,
 		title:              cfg.Title,
 		createdAt:          createdAt,
 		lastActivity:       lastActivity,
@@ -238,6 +240,16 @@ func (sm *SessionManager) UpdateThinkingEffort(effort llm.ThinkingEffort) {
 	if sm.loop != nil {
 		sm.loop.SetThinkingEffort(effort)
 	}
+}
+
+// UpdateLoopProvider updates the active loop runtime when the session is idle.
+func (sm *SessionManager) UpdateLoopProvider(provider llm.Provider, resolvedModel string) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if sm.loop == nil || sm.working {
+		return
+	}
+	sm.loop.SetProviderModel(provider, resolvedModel)
 }
 
 // copyMessages returns a shallow copy of the messages slice.
@@ -420,6 +432,13 @@ func (sm *SessionManager) GetModel() string {
 	return sm.model
 }
 
+// SetModel updates the session's selected model configuration ID.
+func (sm *SessionManager) SetModel(model string) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.model = model
+}
+
 // GetMessages returns a copy of all messages in this session.
 func (sm *SessionManager) GetMessages() []Message {
 	sm.mu.Lock()
@@ -440,6 +459,7 @@ func (sm *SessionManager) GetSession() Session {
 		Title:           sm.title,
 		ParentSessionID: sm.parentSessionID,
 		DelegateTask:    sm.delegateTask,
+		Model:           sm.model,
 		CreatedAt:       sm.createdAt,
 		UpdatedAt:       sm.lastActivity,
 	}
@@ -469,6 +489,7 @@ func (sm *SessionManager) snapshotLocked() SessionSnapshot {
 			Title:           sm.title,
 			ParentSessionID: sm.parentSessionID,
 			DelegateTask:    sm.delegateTask,
+			Model:           sm.model,
 			CreatedAt:       sm.createdAt,
 			UpdatedAt:       sm.lastActivity,
 		},
