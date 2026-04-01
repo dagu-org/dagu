@@ -16,10 +16,27 @@ updates:
     directory: /
     schedule:
       interval: quarterly
+    groups:
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: quarterly
+    groups:
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
     ignore:
       - dependency-name: "*"
         update-types:
@@ -32,6 +49,12 @@ updates:
       - ui
     schedule:
       interval: quarterly
+    groups:
+      patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
     ignore:
       - dependency-name: "*"
         update-types:
