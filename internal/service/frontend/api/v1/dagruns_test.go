@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
@@ -733,6 +736,168 @@ func TestRescheduleDAGRun(t *testing.T) {
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
+func TestRescheduleDAGRunResolvesLatest(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dagSpec := `steps:
+  - name: main
+    command: "echo reschedule latest"`
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "reschedule_latest_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post("/api/v1/dags/reschedule_latest_dag/start", api.ExecuteDAGJSONRequestBody{}).
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v1/dags/reschedule_latest_dag/dag-runs/%s", startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	rescheduleResp := server.Client().Post(
+		"/api/v1/dag-runs/reschedule_latest_dag/latest/reschedule",
+		api.RescheduleDAGRunJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var rescheduleBody api.RescheduleDAGRun200JSONResponse
+	rescheduleResp.Unmarshal(t, &rescheduleBody)
+	require.NotEmpty(t, rescheduleBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v1/dags/reschedule_latest_dag/dag-runs/%s", rescheduleBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
+func TestRetryDAGRunQueuesRetryForQueuedDAGs(t *testing.T) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "single-retry-queue", MaxActiveRuns: 1},
+		}
+	}))
+
+	dag := server.DAG(t, `
+name: single_retry_queue_dag
+queue: single-retry-queue
+steps:
+  - name: main
+    command: echo queued retry
+`)
+
+	seedLatestDAGRunStatus(t, server, dag.DAG, "queued-run", core.Failed, seedDAGRunStatusOptions{
+		errorText: "queued run failed",
+	})
+
+	server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/retry", dag.Name, "queued-run"),
+		api.RetryDAGRunJSONRequestBody{DagRunId: "queued-run"},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	attempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dag.Name, "queued-run"))
+	require.NoError(t, err)
+
+	status, err := attempt.ReadStatus(server.Context)
+	require.NoError(t, err)
+	require.Equal(t, core.Queued, status.Status)
+	require.Equal(t, core.TriggerTypeRetry, status.TriggerType)
+}
+
+func TestRetryDAGRunStartsLocalRetrySubprocess(t *testing.T) {
+	server := test.SetupServer(t)
+
+	retryCommand := `
+if [ -f "$DAG_RUN_LOG_FILE.marker" ]; then
+  echo local retry
+else
+  touch "$DAG_RUN_LOG_FILE.marker"
+  exit 1
+fi
+`
+	if runtime.GOOS == "windows" {
+		retryCommand = `
+if (Test-Path "$env:DAG_RUN_LOG_FILE.marker") {
+  Write-Output "local retry"
+} else {
+  New-Item -ItemType File -Path "$env:DAG_RUN_LOG_FILE.marker" -Force | Out-Null
+  exit 1
+}
+`
+	}
+
+	dagSpec := fmt.Sprintf(`
+steps:
+  - name: main
+    command: |
+%s
+`, indentCommandBlock(retryCommand, 6))
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "single_retry_local_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post(
+		"/api/v1/dags/single_retry_local_dag/start",
+		api.ExecuteDAGJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		resp := server.Client().Get(
+			fmt.Sprintf("/api/v1/dag-runs/%s/%s", "single_retry_local_dag", startBody.DagRunId),
+		).Send(t)
+		if resp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var details api.GetDAGRunDetails200JSONResponse
+		resp.Unmarshal(t, &details)
+		return details.DagRunDetails.Status == api.Status(core.Failed)
+	}, 15*time.Second, 200*time.Millisecond)
+
+	server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/retry", "single_retry_local_dag", startBody.DagRunId),
+		api.RetryDAGRunJSONRequestBody{DagRunId: startBody.DagRunId},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	require.Eventually(t, func() bool {
+		resp := server.Client().Get(
+			fmt.Sprintf("/api/v1/dag-runs/%s/%s", "single_retry_local_dag", startBody.DagRunId),
+		).Send(t)
+		if resp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var details api.GetDAGRunDetails200JSONResponse
+		resp.Unmarshal(t, &details)
+		return details.DagRunDetails.Status == api.Status(core.Succeeded)
+	}, 15*time.Second, 200*time.Millisecond)
+}
+
 func TestTerminateDAGRunCancelsFailedAutoRetryPendingRun(t *testing.T) {
 	server := test.SetupServer(t)
 
@@ -913,6 +1078,7 @@ type seedDAGRunStatusOptions struct {
 	autoRetryCount int
 	errorText      string
 	parentRef      exec.DAGRunRef
+	paramsList     []string
 }
 
 func seedLatestDAGRunStatus(
@@ -946,7 +1112,10 @@ func seedLatestDAGRunStatus(
 		transform.WithAutoRetryCount(opts.autoRetryCount),
 		transform.WithError(opts.errorText),
 	)
-	if len(dagRunStatus.Nodes) > 0 {
+	if len(opts.paramsList) > 0 {
+		dagRunStatus.ParamsList = append([]string(nil), opts.paramsList...)
+	}
+	if len(dagRunStatus.Nodes) > 0 && status == core.Failed {
 		dagRunStatus.Nodes[0].Status = core.NodeFailed
 		dagRunStatus.Nodes[0].FinishedAt = exec.FormatTime(time.Now().Add(-time.Minute))
 		dagRunStatus.Nodes[0].Error = opts.errorText
@@ -957,6 +1126,17 @@ func seedLatestDAGRunStatus(
 	require.NoError(t, attempt.Close(server.Context))
 
 	return ref
+}
+
+func indentCommandBlock(command string, spaces int) string {
+	trimmed := strings.Trim(command, "\n")
+	if trimmed == "" {
+		return ""
+	}
+
+	prefix := strings.Repeat(" ", spaces)
+	lines := strings.Split(trimmed, "\n")
+	return prefix + strings.Join(lines, "\n"+prefix)
 }
 
 func TestExecuteDAGSyncSingleton(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 type Config struct {
 	Core            Core
 	Server          Server
+	EventStore      EventStoreConfig
 	Paths           PathsConfig
 	Secrets         SecretsConfig
 	UI              UI
@@ -148,15 +149,17 @@ type MonitoringConfig struct {
 
 // Core contains global configuration settings.
 type Core struct {
-	Debug         bool
-	LogFormat     string // "json" or "text"
-	TZ            string // e.g., "UTC", "UTC+9", "America/New_York"
-	TzOffsetInSec int
-	Location      *time.Location
-	DefaultShell  string // Platform default if empty
-	SkipExamples  bool   // Skip auto-creation of example DAGs and default base config
-	Peer          Peer
-	BaseEnv       BaseEnv
+	Debug                  bool
+	LogFormat              string // "json" or "text"
+	TZ                     string // e.g., "UTC", "UTC+9", "America/New_York"
+	TzOffsetInSec          int
+	Location               *time.Location
+	DefaultShell           string // Platform default if empty
+	SkipExamples           bool   // Skip auto-creation of example DAGs and default base config
+	EnvPassthrough         []string
+	EnvPassthroughPrefixes []string
+	Peer                   Peer
+	BaseEnv                BaseEnv
 }
 
 // Server contains the API server configuration.
@@ -166,6 +169,7 @@ type Server struct {
 	BasePath          string // URL path for reverse proxy subpath hosting
 	APIBasePath       string
 	Headless          bool
+	CheckUpdates      bool
 	AccessLog         AccessLogMode // "all" (default), "non-public", or "none"
 	LatestStatusToday bool
 	TLS               *TLSConfig
@@ -190,6 +194,12 @@ type TerminalConfig struct {
 type AuditConfig struct {
 	Enabled       bool // Default: true
 	RetentionDays int  // Default: 7; 0 = keep forever
+}
+
+// EventStoreConfig contains configuration for the centralized event store.
+type EventStoreConfig struct {
+	Enabled       bool // Default: true
+	RetentionDays int  // Default: 3; 0 = keep forever
 }
 
 // SessionConfig contains configuration for agent session cleanup.
@@ -319,6 +329,7 @@ type PathsConfig struct {
 	DataDir            string
 	SuspendFlagsDir    string
 	AdminLogsDir       string
+	EventStoreDir      string
 	BaseConfig         string
 	AltDAGsDir         string
 	DAGRunsDir         string
@@ -504,6 +515,9 @@ func (c *Config) Validate() error {
 	if err := c.validateProc(); err != nil {
 		return err
 	}
+	if err := c.validateEventStore(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -544,6 +558,13 @@ func (c *Config) validateScheduler() error {
 	}
 	if c.Scheduler.RetryFailureWindow < 0 {
 		return fmt.Errorf("scheduler.retry_failure_window must be >= 0")
+	}
+	return nil
+}
+
+func (c *Config) validateEventStore() error {
+	if c.EventStore.RetentionDays < 0 {
+		return fmt.Errorf("event_store.retention_days must be >= 0")
 	}
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/automata"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
@@ -32,12 +33,14 @@ import (
 	"github.com/dagu-org/dagu/internal/license"
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentoauth"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filedistributed"
+	"github.com/dagu-org/dagu/internal/persis/fileeventstore"
 	"github.com/dagu-org/dagu/internal/persis/filelicense"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
@@ -50,6 +53,7 @@ import (
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/dagu-org/dagu/internal/service/frontend"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/service/resource"
@@ -68,6 +72,8 @@ type Context struct {
 	Config  *config.Config
 	Quiet   bool
 
+	EventService              *eventstore.Service
+	EventSourceInstance       string
 	DAGRunStore               exec.DAGRunStore
 	DAGRunMgr                 runtime.Manager
 	ProcStore                 exec.ProcStore
@@ -91,6 +97,8 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 		Flags:                     c.Flags,
 		Config:                    c.Config,
 		Quiet:                     c.Quiet,
+		EventService:              c.EventService,
+		EventSourceInstance:       c.EventSourceInstance,
 		DAGRunStore:               c.DAGRunStore,
 		DAGRunMgr:                 c.DAGRunMgr,
 		ProcStore:                 c.ProcStore,
@@ -103,6 +111,18 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 		Proc:                      c.Proc,
 		LicenseManager:            c.LicenseManager,
 	}
+}
+
+// WithEventSource returns a shallow copy whose context carries the given event source.
+// If the event store is not configured, the original context is preserved.
+func (c *Context) WithEventSource(service string) *Context {
+	if c == nil || c.EventService == nil {
+		return c
+	}
+	return c.WithContext(eventstore.WithContext(c.Context, c.EventService, eventstore.Source{
+		Service:  service,
+		Instance: c.EventSourceInstance,
+	}))
 }
 
 // LogToFile creates a new logger context with a file writer.
@@ -196,18 +216,37 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		logger.Warn(ctx, warning)
 	}
 
+	baseCtx := ctx
+	eventSourceInstance := eventstore.DefaultSourceInstance()
+	var eventSvc *eventstore.Service
+	sharedNothingWorker := isSharedNothingWorker(cmd, cfg)
+	if !sharedNothingWorker && cfg.EventStore.Enabled {
+		store, eventErr := fileeventstore.New(cfg.Paths.EventStoreDir)
+		if eventErr != nil {
+			logger.Warn(ctx, "Failed to initialize event store; continuing without event persistence", tag.Error(eventErr))
+		} else {
+			eventSvc = eventstore.New(store)
+			ctx = eventstore.WithContext(ctx, eventSvc, eventstore.Source{
+				Service:  eventSourceServiceForCommand(cmd.Name()),
+				Instance: eventSourceInstance,
+			})
+		}
+	}
+
 	// For shared-nothing workers, skip creating file-based stores
 	// as they only use temporary directories and push status to coordinator
-	if isSharedNothingWorker(cmd, cfg) {
+	if sharedNothingWorker {
 		logger.Debug(ctx, "Shared-nothing worker mode: skipping file-based stores",
 			slog.Any("coordinators", cfg.Worker.Coordinators),
 		)
 		return &Context{
-			Context: ctx,
-			Command: cmd,
-			Config:  cfg,
-			Quiet:   quiet,
-			Flags:   flags,
+			Context:             baseCtx,
+			Command:             cmd,
+			Config:              cfg,
+			Quiet:               quiet,
+			Flags:               flags,
+			EventService:        nil,
+			EventSourceInstance: eventSourceInstance,
 			// All stores are nil - shared-nothing workers don't need local storage
 			// Status is pushed to coordinator, DAG definitions come from task payload
 		}, nil
@@ -297,6 +336,8 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		Command:                   cmd,
 		Config:                    cfg,
 		Quiet:                     quiet,
+		EventService:              eventSvc,
+		EventSourceInstance:       eventSourceInstance,
 		DAGRunStore:               drs,
 		DAGRunMgr:                 drm,
 		Flags:                     flags,
@@ -309,6 +350,19 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		ActiveDistributedRunStore: activeDistributedRunStore,
 		LicenseManager:            licMgr,
 	}, nil
+}
+
+func eventSourceServiceForCommand(cmdName string) string {
+	switch cmdName {
+	case "scheduler":
+		return eventstore.SourceServiceScheduler
+	case "server":
+		return eventstore.SourceServiceServer
+	case "coordinator":
+		return eventstore.SourceServiceCoordinator
+	default:
+		return eventstore.SourceServiceCLI
+	}
 }
 
 // serviceForCommand determines which config.Service to load for a given command name.
@@ -451,6 +505,14 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	sched, err := scheduler.New(c.Config, m, schedulerRunMgr, schedulerRunStore, c.QueueStore, c.ProcStore, c.ServiceRegistry, coordinatorCli, wmStore)
 	if err != nil {
 		return nil, err
+	}
+	if c.EventService != nil {
+		collector, eventErr := fileeventstore.NewCollector(c.Config.Paths.EventStoreDir, c.Config.EventStore.RetentionDays)
+		if eventErr != nil {
+			logger.Warn(c, "Failed to initialize event collector; continuing without collection", tag.Error(eventErr))
+		} else {
+			sched.SetEventCollector(collector)
+		}
 	}
 	sched.SetDAGRunLeaseStore(c.DAGRunLeaseStore)
 	if automataService, err := c.newSchedulerAutomataService(dr, schedulerRunStore, schedulerRunMgr, coordinatorCli); err != nil {
@@ -598,6 +660,7 @@ type agentStoresResult struct {
 	MemoryStore        agent.MemoryStore
 	SkillStore         agent.SkillStore
 	SoulStore          agent.SoulStore
+	OAuthManager       *agentoauth.Manager
 	RemoteNodeResolver agent.RemoteNodeResolver
 }
 
@@ -645,6 +708,13 @@ func (c *Context) agentStores() agentStoresResult {
 		return result
 	}
 	result.SoulStore = soulStore
+
+	oauthManager, err := fileagentoauth.NewManager(c.Config.Paths.DataDir)
+	if err != nil {
+		logger.Warn(c, "Failed to create agent OAuth store", tag.Error(err))
+	} else {
+		result.OAuthManager = oauthManager
+	}
 
 	// Build remote node resolver for agent step remote tools.
 	result.RemoteNodeResolver = c.buildRemoteNodeResolver()

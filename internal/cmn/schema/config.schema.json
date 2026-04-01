@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "description": "Schema for Dagu configuration file (base.yaml). Configures server settings, authentication, paths, UI, services, and features.",
+  "description": "Schema for Dagu configuration file (config.yaml). Configures server settings, authentication, paths, UI, services, and features.",
   "additionalProperties": false,
   "properties": {
     "host": {
@@ -30,6 +30,11 @@
       "type": "boolean",
       "description": "Run in headless mode without the web UI."
     },
+    "check_updates": {
+      "type": "boolean",
+      "description": "Enable automatic update checks for web UI notifications. Manual 'dagu upgrade' checks are unaffected.",
+      "default": true
+    },
     "tls": {
       "$ref": "#/definitions/TLSDef"
     },
@@ -55,6 +60,20 @@
     "tz": {
       "type": "string",
       "description": "Timezone for scheduling and display (e.g., 'America/New_York')."
+    },
+    "env_passthrough": {
+      "type": "array",
+      "description": "Additional exact environment variable names to forward from the Dagu process environment to step execution.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "env_passthrough_prefixes": {
+      "type": "array",
+      "description": "Additional environment variable prefixes to forward from the Dagu process environment to step execution.",
+      "items": {
+        "type": "string"
+      }
     },
     "auth": {
       "$ref": "#/definitions/AuthDef"
@@ -97,6 +116,10 @@
     "admin_logs_dir": {
       "type": "string",
       "description": "Directory for admin log files."
+    },
+    "event_store_dir": {
+      "type": "string",
+      "description": "Directory for centralized event log files and inbox files."
     },
     "base_config": {
       "type": "string",
@@ -176,6 +199,9 @@
     },
     "audit": {
       "$ref": "#/definitions/AuditDef"
+    },
+    "event_store": {
+      "$ref": "#/definitions/EventStoreDef"
     },
     "session": {
       "$ref": "#/definitions/SessionDef"
@@ -415,6 +441,10 @@
         "admin_logs_dir": {
           "type": "string",
           "description": "Directory for admin log files."
+        },
+        "event_store_dir": {
+          "type": "string",
+          "description": "Directory for centralized event log files and inbox files."
         },
         "base_config": {
           "type": "string",
@@ -854,6 +884,22 @@
         "retention_days": {
           "type": "integer",
           "description": "Number of days to retain audit logs. Default: 7."
+        }
+      }
+    },
+    "EventStoreDef": {
+      "type": "object",
+      "description": "Centralized event store configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the centralized event store. Default: true."
+        },
+        "retention_days": {
+          "type": "integer",
+          "description": "Number of days to retain event logs. Default: 3.",
+          "minimum": 0
         }
       }
     },

@@ -194,7 +194,7 @@ steps:
 	directParts := strings.SplitN(directOutput, "|", 2)
 	require.Len(t, directParts, 2)
 	require.Equal(t, "from-host", directParts[0])
-	require.Equal(t, "from-host", directParts[1])
+	require.Empty(t, directParts[1])
 
 	queuedRunID := "queued-explicit-env-run"
 	test.RunBuiltCLI(t, f.th.Helper, []string{rawVar + "=from-host"}, "enqueue", "--run-id", queuedRunID, f.dag.Location)
@@ -226,7 +226,7 @@ steps:
 	queuedParts := strings.SplitN(queuedOutput, "|", 2)
 	require.Len(t, queuedParts, 2)
 	require.Equal(t, directParts[0], queuedParts[0])
-	require.Empty(t, queuedParts[1])
+	require.Equal(t, directParts[1], queuedParts[1])
 }
 
 func TestSchedulerRetryScanner(t *testing.T) {

@@ -23,6 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
 // Error definitions for common issues
@@ -209,6 +210,10 @@ func (att *Attempt) Write(ctx context.Context, status exec.DAGRunStatus) error {
 	// Invalidate cache after successful write
 	if att.cache != nil {
 		att.cache.Invalidate(att.file)
+	}
+
+	if err := eventstore.EmitPersistedStatusFromContext(ctx, &status); err != nil {
+		logger.Warn(ctx, "Failed to emit DAG-run event", tag.Error(err))
 	}
 
 	return nil

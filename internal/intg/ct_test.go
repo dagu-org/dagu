@@ -11,10 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/platforms"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -32,6 +30,26 @@ type dockerExecutorTest struct {
 	name            string
 	dagConfig       string
 	expectedOutputs map[string]any
+}
+
+func currentDockerPlatform(ctx context.Context, dockerClient *client.Client) (specs.Platform, error) {
+	info, err := dockerClient.Info(ctx, client.InfoOptions{})
+	if err != nil {
+		return specs.Platform{}, err
+	}
+
+	return specs.Platform{
+		Architecture: info.Info.Architecture,
+		OS:           info.Info.OSType,
+	}, nil
+}
+
+func inspectContainer(ctx context.Context, dockerClient *client.Client, containerID string) (container.InspectResponse, error) {
+	result, err := dockerClient.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if err != nil {
+		return container.InspectResponse{}, err
+	}
+	return result.Container, nil
 }
 
 func TestDockerExecutor(t *testing.T) {
@@ -474,7 +492,7 @@ steps:
 
 func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
@@ -526,16 +544,11 @@ steps:
 
 // Helper functions
 func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *client.Client, containerName string) string {
-	info, err := dockerClient.Info(th.Context)
+	platform, err := currentDockerPlatform(th.Context, dockerClient)
 	if err != nil {
-		t.Fatalf("failed to get docker info: %v", err)
+		t.Fatalf("failed to get docker platform: %v", err)
 	}
-
-	var platform specs.Platform
-	platform.Architecture = info.Architecture
-	platform.OS = info.OSType
-
-	pullOpts := image.PullOptions{Platform: platforms.Format(platform)}
+	pullOpts := client.ImagePullOptions{Platforms: []specs.Platform{platform}}
 
 	// Pull the image to ensure it exists; consume the stream so the daemon registers it
 	reader, err := dockerClient.ImagePull(th.Context, testImage, pullOpts)
@@ -551,22 +564,19 @@ func createLongRunningContainer(t *testing.T, th test.Helper, dockerClient *clie
 	}
 
 	// Create and start the container
-	created, err := dockerClient.ContainerCreate(
-		th.Context,
-		&container.Config{
+	created, err := dockerClient.ContainerCreate(th.Context, client.ContainerCreateOptions{
+		Config: &container.Config{
 			Image: testImage,
 			Cmd:   []string{"sh", "-c", "while true; do sleep 3600; done"},
 		},
-		&container.HostConfig{AutoRemove: true},
-		nil,
-		nil,
-		containerName,
-	)
+		HostConfig: &container.HostConfig{AutoRemove: true},
+		Name:       containerName,
+	})
 	if err != nil {
 		t.Fatalf("failed to create container: %v", err)
 	}
 
-	if err := dockerClient.ContainerStart(th.Context, created.ID, container.StartOptions{}); err != nil {
+	if _, err := dockerClient.ContainerStart(th.Context, created.ID, client.ContainerStartOptions{}); err != nil {
 		t.Fatalf("failed to start container: %v", err)
 	}
 
@@ -587,7 +597,7 @@ func removeContainer(t *testing.T, th test.Helper, dockerClient *client.Client, 
 	)
 
 	// Stop the container gracefully
-	if err := dockerClient.ContainerStop(th.Context, containerID, container.StopOptions{}); err != nil {
+	if _, err := dockerClient.ContainerStop(th.Context, containerID, client.ContainerStopOptions{}); err != nil {
 		t.Logf("failed to stop container %s: %v", containerID, err)
 	}
 
@@ -597,7 +607,7 @@ func removeContainer(t *testing.T, th test.Helper, dockerClient *client.Client, 
 	}
 
 	// Remove the container
-	if err := dockerClient.ContainerRemove(th.Context, containerID, container.RemoveOptions{Force: true}); err != nil {
+	if _, err := dockerClient.ContainerRemove(th.Context, containerID, client.ContainerRemoveOptions{Force: true}); err != nil {
 		t.Logf("failed to remove container %s: %v", containerID, err)
 	}
 }
@@ -610,7 +620,7 @@ func waitForContainerRunning(ctx context.Context, dockerClient *client.Client, c
 
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		inspect, err := dockerClient.ContainerInspect(ctx, containerID)
+		inspect, err := inspectContainer(ctx, dockerClient, containerID)
 		if err != nil {
 			return fmt.Errorf("failed to inspect container %s: %w", containerID, err)
 		}
@@ -627,7 +637,7 @@ func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Cli
 
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		inspect, err := dockerClient.ContainerInspect(th.Context, containerID)
+		inspect, err := inspectContainer(th.Context, dockerClient, containerID)
 		if err != nil {
 			// Container might have been removed or doesn't exist
 			return true
@@ -1066,7 +1076,7 @@ func TestContainerExecMode(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
@@ -1265,21 +1275,16 @@ func TestContainerExecNotRunning(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 
 	// Create a container but don't start it
 	containerName := fmt.Sprintf("dagu-exec-stopped-%d", time.Now().UnixNano())
 
-	info, err := dockerClient.Info(th.Context)
+	platform, err := currentDockerPlatform(th.Context, dockerClient)
 	require.NoError(t, err)
-
-	var platform specs.Platform
-	platform.Architecture = info.Architecture
-	platform.OS = info.OSType
-
-	pullOpts := image.PullOptions{Platform: platforms.Format(platform)}
+	pullOpts := client.ImagePullOptions{Platforms: []specs.Platform{platform}}
 
 	// Pull the image
 	reader, err := dockerClient.ImagePull(th.Context, testImage, pullOpts)
@@ -1288,22 +1293,18 @@ func TestContainerExecNotRunning(t *testing.T) {
 	_ = reader.Close()
 
 	// Create but do NOT start the container
-	created, err := dockerClient.ContainerCreate(
-		th.Context,
-		&container.Config{
+	created, err := dockerClient.ContainerCreate(th.Context, client.ContainerCreateOptions{
+		Config: &container.Config{
 			Image: testImage,
 			Cmd:   []string{"sh", "-c", "while true; do sleep 3600; done"},
 		},
-		nil, // no auto-remove since we're not starting it
-		nil,
-		nil,
-		containerName,
-	)
+		Name: containerName,
+	})
 	require.NoError(t, err)
 
 	// Clean up the container after the test
 	defer func() {
-		_ = dockerClient.ContainerRemove(th.Context, created.ID, container.RemoveOptions{Force: true})
+		_, _ = dockerClient.ContainerRemove(th.Context, created.ID, client.ContainerRemoveOptions{Force: true})
 	}()
 
 	dagConfig := fmt.Sprintf(`
@@ -1386,7 +1387,7 @@ func TestContainerExecVariableExpansion(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
 	defer func() { _ = dockerClient.Close() }()
 

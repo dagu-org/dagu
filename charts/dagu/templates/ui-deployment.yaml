@@ -34,6 +34,9 @@ spec:
               value: /data
             - name: DAGU_PORT
               value: {{ .Values.ui.service.port | quote }}
+{{- with include "dagu.extraEnv" . }}
+{{ . | nindent 12 }}
+{{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.ui.service.port }}

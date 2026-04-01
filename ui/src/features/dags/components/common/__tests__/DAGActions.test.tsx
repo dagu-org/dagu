@@ -103,6 +103,8 @@ describe('DAGActions', () => {
       />
     );
 
-    expect(within(view.container).getByRole('button', { name: 'Retry' })).toBeDisabled();
+    expect(
+      within(view.container).getByRole('button', { name: 'Retry' })
+    ).toBeDisabled();
   });
 });

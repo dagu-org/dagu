@@ -207,6 +207,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	cfg.Paths.UsersDir = filepath.Join(dataDir, "users")
 	cfg.Paths.SuspendFlagsDir = filepath.Join(tmpDir, "suspend-flags")
 	cfg.Paths.AdminLogsDir = filepath.Join(tmpDir, "admin-logs")
+	cfg.Paths.EventStoreDir = filepath.Join(cfg.Paths.AdminLogsDir, "events")
 	cfg.Coordinator.Enabled = false
 	cfg.Coordinator.HealthPort = 0
 	// Default to "none" in tests so auth setup (bcrypt, token generation)
@@ -317,6 +318,7 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 		"data_dir":             cfg.Paths.DataDir,
 		"suspend_flags_dir":    cfg.Paths.SuspendFlagsDir,
 		"admin_logs_dir":       cfg.Paths.AdminLogsDir,
+		"event_store_dir":      cfg.Paths.EventStoreDir,
 		"base_config":          cfg.Paths.BaseConfig,
 		"dag_runs_dir":         cfg.Paths.DAGRunsDir,
 		"queue_dir":            cfg.Paths.QueueDir,

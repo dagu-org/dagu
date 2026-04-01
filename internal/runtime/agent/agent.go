@@ -25,6 +25,7 @@ import (
 	"golang.org/x/term"
 
 	agentpkg "github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/eval"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -183,6 +184,8 @@ type Agent struct {
 	agentSkillStore agentpkg.SkillStore
 	// agentSoulStore is the agent soul store for agent step execution.
 	agentSoulStore agentpkg.SoulStore
+	// agentOAuthManager resolves subscription-backed provider credentials.
+	agentOAuthManager *agentoauth.Manager
 	// agentRemoteNodeResolver is the remote node resolver for agent step execution.
 	agentRemoteNodeResolver agentpkg.RemoteNodeResolver
 
@@ -269,6 +272,8 @@ type Options struct {
 	AgentSkillStore agentpkg.SkillStore
 	// AgentSoulStore is the agent soul store for agent step execution.
 	AgentSoulStore agentpkg.SoulStore
+	// AgentOAuthManager resolves subscription-backed provider credentials.
+	AgentOAuthManager *agentoauth.Manager
 	// AgentRemoteNodeResolver is the remote node resolver for agent step execution.
 	AgentRemoteNodeResolver agentpkg.RemoteNodeResolver
 	// ScheduleTime is the RFC 3339 timestamp of when this run was scheduled.
@@ -315,6 +320,7 @@ func New(
 		agentMemoryStore:        opts.AgentMemoryStore,
 		agentSkillStore:         opts.AgentSkillStore,
 		agentSoulStore:          opts.AgentSoulStore,
+		agentOAuthManager:       opts.AgentOAuthManager,
 		agentRemoteNodeResolver: opts.AgentRemoteNodeResolver,
 		scheduleTime:            opts.ScheduleTime,
 	}
@@ -509,6 +515,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.agentSoulStore != nil {
 		ctx = agentpkg.WithSoulStore(ctx, a.agentSoulStore)
+	}
+	if a.agentOAuthManager != nil {
+		ctx = agentpkg.WithOAuthManager(ctx, a.agentOAuthManager)
 	}
 	if a.agentRemoteNodeResolver != nil {
 		ctx = agentpkg.WithRemoteNodeResolver(ctx, a.agentRemoteNodeResolver)

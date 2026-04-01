@@ -1057,6 +1057,84 @@ func TestAPI_SendMessage_UpdatesPricing(t *testing.T) {
 	})
 }
 
+func TestAPI_CreateSession_AppliesModelThinkingEffort(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("reasoning-model")
+	model.Model = "gpt-5.4"
+	model.SupportsThinking = true
+	model.ThinkingEffort = "high"
+
+	reqCh := make(chan *llm.ChatRequest, 1)
+	api, _ := testAPIWithModels(t, model)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("done")))
+
+	_, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello"})
+	require.NoError(t, err)
+
+	req := waitForRequest(t, reqCh, time.Second)
+	require.NotNil(t, req.Thinking)
+	assert.True(t, req.Thinking.Enabled)
+	assert.Equal(t, llm.ThinkingEffortHigh, req.Thinking.Effort)
+}
+
+func TestAPI_SendMessage_UpdatesThinkingEffort(t *testing.T) {
+	t.Parallel()
+
+	modelA := testModelConfig("model-a")
+	modelA.Model = "gpt-5.4"
+	modelA.SupportsThinking = true
+	modelA.ThinkingEffort = "high"
+
+	modelB := testModelConfig("model-b")
+	modelB.Model = "gpt-5.4"
+	modelB.SupportsThinking = true
+	modelB.ThinkingEffort = "low"
+
+	reqCh := make(chan *llm.ChatRequest, 2)
+	api, _ := testAPIWithModels(t, modelA, modelB)
+	api.providers.Set(modelA.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("a")))
+	api.providers.Set(modelB.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("b")))
+
+	sessID, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello", Model: "model-a"})
+	require.NoError(t, err)
+	firstReq := waitForRequest(t, reqCh, time.Second)
+	require.NotNil(t, firstReq.Thinking)
+	assert.Equal(t, llm.ThinkingEffortHigh, firstReq.Thinking.Effort)
+	require.Eventually(t, func() bool {
+		mgr, ok := api.sessions.Load(sessID)
+		if !ok {
+			return false
+		}
+		return !mgr.(*SessionManager).IsWorking()
+	}, time.Second, 10*time.Millisecond)
+
+	err = api.SendMessage(context.Background(), sessID, UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "followup", Model: "model-b"})
+	require.NoError(t, err)
+
+	secondReq := waitForRequest(t, reqCh, time.Second)
+	require.NotNil(t, secondReq.Thinking)
+	assert.Equal(t, llm.ThinkingEffortLow, secondReq.Thinking.Effort)
+}
+
+func TestAPI_CreateSession_OmitsThinkingWhenNoEffortConfigured(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("no-thinking-effort")
+	model.Model = "gpt-5.4"
+	model.SupportsThinking = true
+
+	reqCh := make(chan *llm.ChatRequest, 1)
+	api, _ := testAPIWithModels(t, model)
+	api.providers.Set(model.ToLLMConfig(), newCapturingProvider(reqCh, simpleStopResponse("done")))
+
+	_, _, err := api.CreateSession(context.Background(), UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole}, ChatRequest{Message: "hello"})
+	require.NoError(t, err)
+
+	req := waitForRequest(t, reqCh, time.Second)
+	assert.Nil(t, req.Thinking)
+}
+
 func TestAPI_GenerateAssistantMessage_UsesSessionDAGMemory(t *testing.T) {
 	t.Parallel()
 
@@ -2294,6 +2372,49 @@ func TestAPI_ReactivateSession_HasPricing(t *testing.T) {
 
 	assert.Equal(t, 3.0, inputCost, "reactivated session should have input pricing")
 	assert.Equal(t, 15.0, outputCost, "reactivated session should have output pricing")
+}
+
+func TestAPI_ReactivateSession_UsesPersistedModelThinkingEffort(t *testing.T) {
+	t.Parallel()
+
+	defaultModel := testModelConfig("default-model")
+	defaultModel.SupportsThinking = true
+	defaultModel.ThinkingEffort = "low"
+
+	sessionModel := testModelConfig("session-model")
+	sessionModel.SupportsThinking = true
+	sessionModel.ThinkingEffort = "high"
+
+	configStore := newMockConfigStore(true)
+	configStore.config.DefaultModelID = defaultModel.ID
+	sessStore := newMockSessionStore()
+
+	api := NewAPI(APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   newMockModelStore().addModel(defaultModel).addModel(sessionModel),
+		WorkingDir:   t.TempDir(),
+		SessionStore: sessStore,
+	})
+	api.providers.Set(defaultModel.ToLLMConfig(), newStopProvider("default"))
+	api.providers.Set(sessionModel.ToLLMConfig(), newStopProvider("session"))
+
+	now := time.Now()
+	require.NoError(t, sessStore.CreateSession(context.Background(), &Session{
+		ID:        "persisted-model-session",
+		UserID:    defaultUserID,
+		Model:     sessionModel.ID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}))
+
+	mgr, ok := api.getOrReactivateSession(context.Background(), "persisted-model-session", UserIdentity{UserID: defaultUserID, Username: defaultUserID, Role: defaultUserRole})
+	require.True(t, ok)
+	assert.Equal(t, sessionModel.ID, mgr.GetModel())
+
+	mgr.mu.Lock()
+	effort := mgr.thinkingEffort
+	mgr.mu.Unlock()
+	assert.Equal(t, llm.ThinkingEffortHigh, effort)
 }
 
 func TestAPI_ListSessions_ShowsCostForInactiveSessions(t *testing.T) {

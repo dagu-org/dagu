@@ -133,3 +133,95 @@ steps:
 		t.Fatal("scheduler did not stop within 5 seconds")
 	}
 }
+
+func TestOneOffScheduleResolvesEnvSecretsWithoutLeakingSourceEnv(t *testing.T) {
+	const rawVar = "ONE_OFF_ENV_SECRET_SOURCE"
+
+	t.Setenv(rawVar, "from-host")
+
+	tmpDir := t.TempDir()
+	dagsDir := filepath.Join(tmpDir, "dags")
+	require.NoError(t, os.MkdirAll(dagsDir, 0755))
+
+	scheduledAt := time.Date(2026, 3, 29, 2, 20, 0, 0, time.UTC)
+	dagContent := fmt.Sprintf(`name: one-off-env-secret-test
+schedule:
+  start:
+    - at: "%s"
+secrets:
+  - name: EXPORTED_SECRET
+    provider: env
+    key: %s
+steps:
+  - name: capture
+    command: printf '%%s|%%s' "$EXPORTED_SECRET" "${%s:-}"
+    output: RESULT
+`, scheduledAt.Format(time.RFC3339), rawVar, rawVar)
+	require.NoError(t, os.WriteFile(filepath.Join(dagsDir, "one-off-env-secret-test.yaml"), []byte(dagContent), 0644))
+
+	th := test.SetupScheduler(t, test.WithBuiltExecutable(), test.WithDAGsDir(dagsDir))
+
+	dag, err := th.DAGStore.GetDetails(th.Context, "one-off-env-secret-test")
+	require.NoError(t, err)
+	require.Len(t, dag.Schedule, 1)
+
+	sc, err := th.NewSchedulerInstance(t)
+	require.NoError(t, err)
+	sc.SetClock(func() time.Time { return scheduledAt })
+
+	ctx, cancel := context.WithCancel(th.Context)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- sc.Start(ctx)
+	}()
+
+	var schedulerErr error
+	var schedulerStopped bool
+	pollSchedulerErr := func() error {
+		if schedulerStopped {
+			return schedulerErr
+		}
+		select {
+		case err := <-errCh:
+			schedulerStopped = true
+			if err == nil {
+				err = errors.New("scheduler exited unexpectedly before test completed")
+			}
+			schedulerErr = err
+		default:
+		}
+		return schedulerErr
+	}
+
+	require.Eventually(t, func() bool {
+		if err := pollSchedulerErr(); err != nil {
+			return true
+		}
+		statuses := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 5)
+		return len(statuses) > 0 && statuses[0].Status == core.Succeeded
+	}, 10*time.Second, 100*time.Millisecond)
+	require.NoError(t, schedulerErr)
+
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag)
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, status.Status)
+	require.Equal(t, core.TriggerTypeScheduler, status.TriggerType)
+	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
+
+	sc.Stop(context.Background())
+	cancel()
+
+	if !schedulerStopped {
+		select {
+		case err = <-errCh:
+			require.True(t,
+				err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+				"unexpected scheduler shutdown error: %v", err,
+			)
+		case <-time.After(5 * time.Second):
+			t.Fatal("scheduler did not stop within 5 seconds")
+		}
+	}
+}

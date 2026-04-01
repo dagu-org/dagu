@@ -32,6 +32,9 @@ spec:
           env:
             - name: DAGU_HOME
               value: /data
+{{- with include "dagu.extraEnv" . }}
+{{ . | nindent 12 }}
+{{- end }}
           ports:
             - name: health
               containerPort: 8090

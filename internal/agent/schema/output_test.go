@@ -22,7 +22,12 @@ func TestNavigateDeepPaths(t *testing.T) {
 		{
 			name: "root level",
 			path: "",
-			want: []string{"Properties:", "name", "steps", "schedule"},
+			want: []string{"Properties:", "name", "steps", "schedule", "kubernetes"},
+		},
+		{
+			name: "kubernetes root defaults",
+			path: "kubernetes",
+			want: []string{"object", "image", "namespace", "cleanup_policy"},
 		},
 		{
 			name: "steps (oneOf)",

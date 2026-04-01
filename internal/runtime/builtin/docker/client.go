@@ -26,12 +26,9 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/cmn/signal"
 	"github.com/dagu-org/dagu/internal/core"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -97,6 +94,14 @@ type ExecOptions struct {
 	WorkingDir string
 }
 
+func inspectContainer(ctx context.Context, cli *client.Client, containerID string) (container.InspectResponse, error) {
+	result, err := cli.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if err != nil {
+		return container.InspectResponse{}, err
+	}
+	return result.Container, nil
+}
+
 // InitializeClient creates a new container client
 func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 	logger.Debug(ctx, "Docker: InitializeClient started",
@@ -105,7 +110,7 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 		slog.Bool("autoRemove", cfg.AutoRemove),
 	)
 
-	dockerCli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerCli, err := client.New(client.FromEnv)
 	if err != nil {
 		logger.Error(ctx, "Docker: failed to create docker client", tag.Error(err))
 		return nil, err
@@ -136,24 +141,25 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 			}
 
 			// Get container ID after it's running
-			info, err := dockerCli.ContainerInspect(ctx, name)
+			info, err := inspectContainer(ctx, dockerCli, name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to inspect container %q: %w", name, err)
 			}
 			ctID = info.ID
 		} else {
 			// Image mode with name: check existing container
-			info, inspectErr := dockerCli.ContainerInspect(ctx, name)
+			info, inspectErr := inspectContainer(ctx, dockerCli, name)
 			isRunning, err := isContainerRunning(info, inspectErr)
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if container %q is running: %w", name, err)
 			}
-			if info.ContainerJSONBase != nil {
+			if info.ID != "" {
 				ctID = info.ID
 			}
 			if !isRunning {
-				// Container doesn't exist or not running - will be created
-				ctID = ""
+				// Preserve the stopped container ID so Run can remove it before re-creating
+				// the named container without hitting a Docker name conflict.
+				ctID = info.ID
 			}
 		}
 	}
@@ -173,7 +179,7 @@ func InitializeClient(ctx context.Context, cfg *Config) (*Client, error) {
 // waitForContainerRunning waits for a container to be in running state with timeout
 func waitForContainerRunning(ctx context.Context, cli *client.Client, name string) error {
 	// Check immediately before starting the polling loop
-	info, err := cli.ContainerInspect(ctx, name)
+	info, err := inspectContainer(ctx, cli, name)
 	if err == nil && info.State != nil && info.State.Running {
 		return nil
 	}
@@ -201,7 +207,7 @@ func waitForContainerRunning(ctx context.Context, cli *client.Client, name strin
 		case <-ctx.Done():
 			return newContainerWaitTimeoutError(cli, name)
 		case <-ticker.C:
-			info, err := cli.ContainerInspect(ctx, name)
+			info, err := inspectContainer(ctx, cli, name)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					// Log progress periodically
@@ -229,7 +235,7 @@ func waitForContainerRunning(ctx context.Context, cli *client.Client, name strin
 			if time.Since(lastLogTime) >= logInterval {
 				status := "unknown"
 				if info.State != nil {
-					status = info.State.Status
+					status = string(info.State.Status)
 				}
 				logger.Info(ctx, "Container not running yet, still waiting...",
 					slog.String("container", name),
@@ -243,13 +249,13 @@ func waitForContainerRunning(ctx context.Context, cli *client.Client, name strin
 
 func newContainerWaitTimeoutError(cli *client.Client, name string) error {
 	// Get final state for better error message
-	finalInfo, finalErr := cli.ContainerInspect(context.Background(), name)
+	finalInfo, finalErr := inspectContainer(context.Background(), cli, name)
 	finalStatus := getContainerStatus(finalInfo, finalErr)
 	return fmt.Errorf("timed out waiting for container to be running (current status: %s)", finalStatus)
 }
 
 // getContainerStatus returns a human-readable status string for the container
-func getContainerStatus(info types.ContainerJSON, err error) string {
+func getContainerStatus(info container.InspectResponse, err error) string {
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return "not found"
@@ -270,7 +276,7 @@ func getContainerStatus(info types.ContainerJSON, err error) string {
 	if state.ExitCode != 0 {
 		return fmt.Sprintf("%s (exit code: %d)", state.Status, state.ExitCode)
 	}
-	return state.Status
+	return string(state.Status)
 }
 
 // Close closes the container client and cleans up resources
@@ -280,7 +286,7 @@ func (c *Client) Close(ctx context.Context) {
 
 	// If we have a running container and autoRemove is set, remove it
 	if c.cfg.AutoRemove && c.started.Load() && c.containerID != "" {
-		if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
+		if _, err := c.cli.ContainerRemove(context.Background(), c.containerID, client.ContainerRemoveOptions{Force: true}); err != nil {
 			logger.Error(ctx, "Docker executor: remove container", tag.Error(err))
 		}
 	}
@@ -310,7 +316,7 @@ func (c *Client) CreateContainerKeepAlive(ctx context.Context) error {
 
 	// Check if a container with the specified name already exists
 	if name := c.cfg.ContainerName; name != "" {
-		info, err := c.cli.ContainerInspect(ctx, name)
+		info, err := inspectContainer(ctx, c.cli, name)
 		if err == nil {
 			// Container exists - fail regardless of state
 			if info.State != nil && info.State.Running {
@@ -446,7 +452,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 
 	if c.containerID != "" {
 		// Stop the container
-		if err := c.cli.ContainerStop(ctx, c.containerID, container.StopOptions{}); err != nil {
+		if _, err := c.cli.ContainerStop(ctx, c.containerID, client.ContainerStopOptions{}); err != nil {
 			logger.Error(ctx, "Docker executor: stop container", tag.Error(err))
 		}
 
@@ -457,7 +463,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 			if containerStopped.Load() {
 				return
 			}
-			if err := c.cli.ContainerKill(context.Background(), c.containerID, "SIGKILL"); err != nil {
+			if _, err := c.cli.ContainerKill(context.Background(), c.containerID, client.ContainerKillOptions{Signal: "SIGKILL"}); err != nil {
 				if errdefs.IsNotFound(err) {
 					return
 				}
@@ -472,7 +478,7 @@ func (c *Client) StopContainerKeepAlive(ctx context.Context) {
 
 	WAIT_LOOP:
 		for {
-			info, err := c.cli.ContainerInspect(context.Background(), c.containerID)
+			info, err := inspectContainer(context.Background(), c.cli, c.containerID)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					containerStopped.Store(true)
@@ -522,7 +528,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 	if ctID != "" {
 		logger.Debug(ctx, "Docker: Run checking existing container", slog.String("containerID", ctID))
 		// Check if the container is running
-		info, err := c.cli.ContainerInspect(ctx, ctID)
+		info, err := inspectContainer(ctx, c.cli, ctID)
 		if err != nil && !errdefs.IsNotFound(err) {
 			return errorExitCode, fmt.Errorf("failed to inspect container %s: %w", ctID, err)
 		}
@@ -533,6 +539,14 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		// If shouldStart is false, return error
 		if !c.cfg.ShouldStart {
 			return errorExitCode, fmt.Errorf("container %s already exists and is not running", ctID)
+		}
+		if err == nil {
+			if removeErr := removeStoppedContainer(ctx, c.cli, ctID); removeErr != nil {
+				return errorExitCode, fmt.Errorf("failed to remove stopped container %s: %w", ctID, removeErr)
+			}
+			c.mu.Lock()
+			c.containerID = ""
+			c.mu.Unlock()
 		}
 	}
 
@@ -557,7 +571,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 		}
 
 		once.Do(func() {
-			if err := c.cli.ContainerRemove(context.Background(), c.containerID, container.RemoveOptions{Force: true}); err != nil {
+			if _, err := c.cli.ContainerRemove(context.Background(), c.containerID, client.ContainerRemoveOptions{Force: true}); err != nil {
 				logger.Error(ctx, "Docker executor: remove container", tag.Error(err))
 			}
 		})
@@ -573,7 +587,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 	// Wait for container to be stopped before returning
 	logger.Debug(ctx, "Docker: Run waiting for container to stop")
 	for {
-		info, err := c.cli.ContainerInspect(context.Background(), ctID)
+		info, err := inspectContainer(context.Background(), c.cli, ctID)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
 				break
@@ -581,7 +595,7 @@ func (c *Client) Run(ctx context.Context, cmd []string, stdout, stderr io.Writer
 			return exitCode, fmt.Errorf("failed to inspect container %s: %w", ctID, err)
 		}
 		if info.State != nil && !info.State.Running {
-			logger.Debug(ctx, "Docker: Run container stopped", slog.String("status", info.State.Status))
+			logger.Debug(ctx, "Docker: Run container stopped", slog.String("status", string(info.State.Status)))
 			break
 		}
 		logger.Debug(ctx, "Docker: Run container still running, waiting...")
@@ -633,7 +647,7 @@ func (c *Client) Stop(sig os.Signal) error {
 		return nil
 	}
 
-	info, err := c.cli.ContainerInspect(context.Background(), c.containerID)
+	info, err := inspectContainer(context.Background(), c.cli, c.containerID)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return nil
@@ -649,7 +663,7 @@ func (c *Client) Stop(sig os.Signal) error {
 		sigName = signal.GetSignalName(sysSig)
 	}
 
-	if err := c.cli.ContainerStop(context.Background(), c.containerID, container.StopOptions{Signal: sigName}); err != nil {
+	if _, err := c.cli.ContainerStop(context.Background(), c.containerID, client.ContainerStopOptions{Signal: sigName}); err != nil {
 		if errdefs.IsNotFound(err) {
 			return nil
 		}
@@ -685,16 +699,16 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 		logger.Debug(ctx, "Docker: startNewContainer beginning image pull")
 
 		// Get pull options with authentication if configured
-		var pullOpts image.PullOptions
+		var pullOpts client.ImagePullOptions
 		if c.authManager != nil {
 			var err error
-			pullOpts, err = c.authManager.GetPullOptions(c.cfg.Image, platforms.Format(c.platform))
+			pullOpts, err = c.authManager.GetPullOptions(c.cfg.Image, c.platform)
 			if err != nil {
 				logger.Error(ctx, "Docker: startNewContainer failed to get pull options", tag.Error(err))
 				return "", fmt.Errorf("failed to get pull options: %w", err)
 			}
 		} else {
-			pullOpts = image.PullOptions{Platform: platforms.Format(c.platform)}
+			pullOpts = client.ImagePullOptions{Platforms: []specs.Platform{c.platform}}
 		}
 
 		logger.Debug(ctx, "Docker: startNewContainer calling ImagePull")
@@ -732,9 +746,13 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 		slog.Any("entrypoint", ctCfg.Entrypoint),
 		slog.String("workingDir", ctCfg.WorkingDir),
 	)
-	resp, err := cli.ContainerCreate(
-		ctx, &ctCfg, c.cfg.Host, c.cfg.Network, &c.platform, name,
-	)
+	resp, err := cli.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config:           &ctCfg,
+		HostConfig:       c.cfg.Host,
+		NetworkingConfig: c.cfg.Network,
+		Platform:         &c.platform,
+		Name:             name,
+	})
 	if err != nil {
 		logger.Error(ctx, "Docker: startNewContainer ContainerCreate failed", tag.Error(err))
 		return "", err
@@ -751,7 +769,7 @@ func (c *Client) startNewContainer(ctx context.Context, name string, cli *client
 	c.containerID = resp.ID
 
 	logger.Debug(ctx, "Docker: startNewContainer calling ContainerStart", slog.String("containerID", resp.ID))
-	err = cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
+	_, err = cli.ContainerStart(ctx, resp.ID, client.ContainerStartOptions{})
 	if err != nil {
 		logger.Error(ctx, "Docker: startNewContainer ContainerStart failed", tag.Error(err))
 	} else {
@@ -818,7 +836,7 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	c.mu.Unlock()
 
 	// Check if info exists and is running
-	info, err := cli.ContainerInspect(ctx, containerID)
+	info, err := inspectContainer(ctx, cli, containerID)
 	if err != nil {
 		return 1, fmt.Errorf("failed to inspect container %s: %w", containerID, err)
 	}
@@ -831,10 +849,10 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	cmd = wrapCommandWithShell(c.cfg.Shell, cmd)
 
 	// Create exec configuration
-	execOpts := container.ExecOptions{
+	execOpts := client.ExecCreateOptions{
 		User:         c.cfg.ExecOptions.User,
 		Privileged:   c.cfg.ExecOptions.Privileged,
-		Tty:          c.cfg.ExecOptions.Tty,
+		TTY:          c.cfg.ExecOptions.TTY,
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
@@ -849,13 +867,13 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	}
 
 	// Create exec instance
-	execCreateResp, err := cli.ContainerExecCreate(ctx, containerID, execOpts)
+	execCreateResp, err := cli.ExecCreate(ctx, containerID, execOpts)
 	if err != nil {
 		return 1, fmt.Errorf("failed to create exec: %w", err)
 	}
 
 	// Start exec instance
-	resp, err := cli.ContainerExecAttach(ctx, execCreateResp.ID, container.ExecAttachOptions{})
+	resp, err := cli.ExecAttach(ctx, execCreateResp.ID, client.ExecAttachOptions{TTY: c.cfg.ExecOptions.TTY})
 	if err != nil {
 		return 1, fmt.Errorf("failed to start exec: %w", err)
 	}
@@ -867,8 +885,14 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	defer wg.Wait()
 
 	go func() {
-		if _, err := stdcopy.StdCopy(stdout, stderr, resp.Reader); err != nil {
-			logger.Error(ctx, "Docker executor: stdcopy", tag.Error(err))
+		var copyErr error
+		if c.cfg.ExecOptions.TTY {
+			_, copyErr = io.Copy(stdout, resp.Reader)
+		} else {
+			_, copyErr = stdcopy.StdCopy(stdout, stderr, resp.Reader)
+		}
+		if copyErr != nil {
+			logger.Error(ctx, "Docker executor: exec output copy", tag.Error(copyErr))
 		}
 		wg.Done()
 	}()
@@ -877,7 +901,7 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 
 	// Wait for exec to complete
 	for {
-		inspectResp, err := cli.ContainerExecInspect(ctx, execCreateResp.ID)
+		inspectResp, err := cli.ExecInspect(ctx, execCreateResp.ID, client.ExecInspectOptions{})
 		if err != nil {
 			return 1, fmt.Errorf("failed to inspect exec: %w", err)
 		}
@@ -899,12 +923,22 @@ func (c *Client) execInContainer(ctx context.Context, cli *client.Client, cmd []
 	}
 }
 
+func removeStoppedContainer(ctx context.Context, cli *client.Client, containerID string) error {
+	if _, err := cli.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{}); err != nil {
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containerID string, stdout, stderr io.Writer) (int, error) {
 	logger.Debug(ctx, "Docker: attachAndWait started", slog.String("containerID", containerID))
 
 	logger.Debug(ctx, "Docker: attachAndWait calling ContainerLogs")
 	out, err := cli.ContainerLogs(
-		ctx, containerID, container.LogsOptions{
+		ctx, containerID, client.ContainerLogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     true,
@@ -934,18 +968,18 @@ func (c *Client) attachAndWait(ctx context.Context, cli *client.Client, containe
 	}()
 
 	logger.Debug(ctx, "Docker: attachAndWait calling ContainerWait")
-	statusCh, errCh := cli.ContainerWait(
-		ctx, containerID, container.WaitConditionNotRunning,
-	)
+	waitResult := cli.ContainerWait(ctx, containerID, client.ContainerWaitOptions{
+		Condition: container.WaitConditionNotRunning,
+	})
 	logger.Debug(ctx, "Docker: attachAndWait waiting for container to finish")
 	select {
-	case err := <-errCh:
+	case err := <-waitResult.Error:
 		logger.Debug(ctx, "Docker: attachAndWait received error from errCh", slog.Bool("hasError", err != nil))
 		if err != nil {
 			return 1, err
 		}
 
-	case status := <-statusCh:
+	case status := <-waitResult.Result:
 		logger.Debug(ctx, "Docker: attachAndWait received status",
 			slog.Int64("statusCode", status.StatusCode),
 		)
@@ -1010,12 +1044,12 @@ func getPlatform(ctx context.Context, cli *client.Client, cfg *Config) (specs.Pl
 			return platform, fmt.Errorf("failed to parse platform %s: %w", cfg.Platform, err)
 		}
 	} else {
-		info, err := cli.Info(ctx)
+		info, err := cli.Info(ctx, client.InfoOptions{})
 		if err != nil {
 			return platform, fmt.Errorf("failed to get current docker host info: %w", err)
 		}
-		platform.Architecture = info.Architecture
-		platform.OS = info.OSType
+		platform.Architecture = info.Info.Architecture
+		platform.OS = info.Info.OSType
 		platform = platforms.Normalize(platform)
 	}
 	return platform, nil
@@ -1031,15 +1065,14 @@ func (c *Client) shouldPullImage(ctx context.Context, cli *client.Client, platfo
 
 	// Loop through all locally available images that have the same reference with
 	// the input image to check if we have the correct platform.
-	filters := filters.NewArgs()
-	filters.Add("reference", c.cfg.Image)
+	filters := make(client.Filters).Add("reference", c.cfg.Image)
 
-	images, err := cli.ImageList(ctx, image.ListOptions{Filters: filters})
+	images, err := cli.ImageList(ctx, client.ImageListOptions{Filters: filters})
 	if err != nil {
 		return false, fmt.Errorf("failed to list local images %s: %w", c.cfg.Image, err)
 	}
 
-	for _, summary := range images {
+	for _, summary := range images.Items {
 		inspect, err := cli.ImageInspect(ctx, summary.ID)
 		if err != nil {
 			return false, fmt.Errorf("failed to inspect image %s: %w", summary.ID, err)
@@ -1087,7 +1120,7 @@ func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string)
 		case <-ctx.Done():
 			return fmt.Errorf("readiness timeout waiting for running; last state=%s: %w", last, ctx.Err())
 		case <-ticker.C:
-			info, err := cli.ContainerInspect(ctx, id)
+			info, err := inspectContainer(ctx, cli, id)
 			if err != nil {
 				return fmt.Errorf("failed to inspect container %s: %w", id, err)
 			}
@@ -1099,7 +1132,7 @@ func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string)
 				return nil
 			}
 			// If the container has already exited or is dead, fail fast
-			status := strings.ToLower(info.State.Status)
+			status := strings.ToLower(string(info.State.Status))
 			if slices.Contains(terminalContainerStatuses, status) {
 				return fmt.Errorf("container %s not running; status=%s, exitCode=%d", id, status, info.State.ExitCode)
 			}
@@ -1110,7 +1143,7 @@ func (c *Client) waitRunning(ctx context.Context, cli *client.Client, id string)
 
 // hasHealthcheck checks if the container has a healthcheck configured.
 func (c *Client) hasHealthcheck(ctx context.Context, cli *client.Client, id string) (bool, error) {
-	info, err := cli.ContainerInspect(ctx, id)
+	info, err := inspectContainer(ctx, cli, id)
 	if err != nil {
 		return false, fmt.Errorf("failed to inspect container %s: %w", id, err)
 	}
@@ -1127,12 +1160,12 @@ func (c *Client) waitHealthy(ctx context.Context, cli *client.Client, id string)
 		case <-ctx.Done():
 			return fmt.Errorf("readiness timeout waiting for healthy; last health=%s: %w", last, ctx.Err())
 		case <-ticker.C:
-			info, err := cli.ContainerInspect(ctx, id)
+			info, err := inspectContainer(ctx, cli, id)
 			if err != nil {
 				return fmt.Errorf("failed to inspect container %s: %w", id, err)
 			}
 			if info.State != nil && info.State.Health != nil {
-				status := info.State.Health.Status
+				status := string(info.State.Health.Status)
 				last = status
 				if strings.ToLower(status) == "healthy" {
 					logger.Info(ctx, "Container ready (healthy)",
@@ -1151,7 +1184,7 @@ func (c *Client) waitLogPattern(ctx context.Context, cli *client.Client, id stri
 	if err != nil {
 		return fmt.Errorf("invalid logPattern regex: %w", err)
 	}
-	reader, err := cli.ContainerLogs(ctx, id, container.LogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "all"})
+	reader, err := cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "all"})
 	if err != nil {
 		return fmt.Errorf("failed to read container logs: %w", err)
 	}

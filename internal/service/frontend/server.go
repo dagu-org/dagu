@@ -31,9 +31,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	authmodel "github.com/dagu-org/dagu/internal/auth"
 	"github.com/dagu-org/dagu/internal/auth/tokensecret"
 	"github.com/dagu-org/dagu/internal/automata"
+	"github.com/dagu-org/dagu/internal/cmn/backoff"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
@@ -49,12 +51,14 @@ import (
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders" // Register LLM providers
 	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
 	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentoauth"
 	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
 	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
 	"github.com/dagu-org/dagu/internal/persis/fileapikey"
 	"github.com/dagu-org/dagu/internal/persis/fileaudit"
 	"github.com/dagu-org/dagu/internal/persis/filebaseconfig"
 	"github.com/dagu-org/dagu/internal/persis/filedoc"
+	"github.com/dagu-org/dagu/internal/persis/fileeventstore"
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
@@ -68,6 +72,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 	authservice "github.com/dagu-org/dagu/internal/service/auth"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
 	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/dagu-org/dagu/internal/service/frontend/auth"
@@ -193,6 +198,10 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize audit service: %w", err)
 	}
+	eventSvc, err := initEventService(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize event service: %w", err)
+	}
 	syncSvc := initSyncService(ctx, cfg)
 	if syncSvc != nil {
 		apiOpts = append(apiOpts, apiv1.WithSyncService(syncSvc))
@@ -316,17 +325,21 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	}
 
 	// Initialize remote node store and resolver
-	var remoteNodeResolver *remotenode.Resolver
+	var (
+		remoteNodeResolver *remotenode.Resolver
+		encryptor          *crypto.Encryptor
+		agentOAuthManager  *agentoauth.Manager
+	)
 	encKey, encErr := crypto.ResolveKey(cfg.Paths.DataDir)
 	if encErr != nil {
-		logger.Warn(ctx, "Failed to resolve encryption key for remote node store", tag.Error(encErr))
+		logger.Warn(ctx, "Failed to resolve encryption key for encrypted stores", tag.Error(encErr))
 	}
 	if encErr == nil {
-		enc, encErr := crypto.NewEncryptor(encKey)
+		encryptor, encErr = crypto.NewEncryptor(encKey)
 		if encErr != nil {
-			logger.Warn(ctx, "Failed to create encryptor for remote node store", tag.Error(encErr))
+			logger.Warn(ctx, "Failed to create encryptor for encrypted stores", tag.Error(encErr))
 		} else {
-			rnStore, rnErr := fileremotenode.New(cfg.Paths.RemoteNodesDir, enc)
+			rnStore, rnErr := fileremotenode.New(cfg.Paths.RemoteNodesDir, encryptor)
 			if rnErr != nil {
 				logger.Warn(ctx, "Failed to create remote node store", tag.Error(rnErr))
 			} else {
@@ -349,6 +362,16 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		remoteNodes = names
 	}
 
+	if encryptor != nil {
+		store, err := fileagentoauth.New(filepath.Join(cfg.Paths.DataDir, "agent", "oauth"), encryptor)
+		if err != nil {
+			logger.Warn(ctx, "Failed to create agent OAuth store", tag.Error(err))
+		} else {
+			agentOAuthManager = agentoauth.NewManager(store)
+			apiOpts = append(apiOpts, apiv1.WithAgentOAuthManager(agentOAuthManager))
+		}
+	}
+
 	// Initialize workspace store
 	wsStore, wsErr := fileworkspace.New(cfg.Paths.WorkspacesDir)
 	if wsErr != nil {
@@ -359,15 +382,23 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
 	}
 
-	upgradeStore, err := fileupgradecheck.New(cfg.Paths.DataDir)
-	if err != nil {
-		logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
+	var (
+		upgradeStore      upgrade.CacheStore
+		updateInfoChecker UpdateChecker
+	)
+	if cfg.Server.CheckUpdates {
+		upgradeStore, err = fileupgradecheck.New(cfg.Paths.DataDir)
+		if err != nil {
+			logger.Warn(ctx, "Failed to create upgrade check store", tag.Error(err))
+		} else {
+			updateInfoChecker = &updateChecker{store: upgradeStore}
+		}
 	}
 
 	automataSessionStore, err := filesession.New(cfg.Paths.SessionsDir, filesession.WithMaxPerUser(cfg.Server.Session.MaxPerUser))
@@ -417,7 +448,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			GitSyncEnabled:        cfg.GitSync.Enabled,
 			WorkspaceStore:        wsStore,
 			SetupRequiredChecker:  &setupChecker{authSvc: authSvc, fallback: setupRequired},
-			UpdateChecker:         &updateChecker{store: upgradeStore},
+			UpdateChecker:         updateInfoChecker,
 			AgentEnabledChecker:   agentConfigStore,
 		},
 	}
@@ -457,6 +488,9 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	// Add audit service to API only if licensed (or no license manager)
 	if srv.auditService != nil {
 		apiOpts = append(apiOpts, apiv1.WithAuditService(srv.auditService))
+	}
+	if eventSvc != nil {
+		apiOpts = append(apiOpts, apiv1.WithEventService(eventSvc))
 	}
 
 	// Pass license manager to API
@@ -746,7 +780,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -768,7 +802,9 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 		SessionStore:       sessStore,
 		DAGStore:           dagStore,
 		Hooks:              hooks,
+		EventService:       eventSvc,
 		MemoryStore:        memoryStore,
+		OAuthManager:       oauthManager,
 		RemoteNodeResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
@@ -787,6 +823,17 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	logger.Info(ctx, "Agent API initialized")
 
 	return api, nil
+}
+
+func initEventService(cfg *config.Config) (*eventstore.Service, error) {
+	if cfg == nil || !cfg.EventStore.Enabled {
+		return nil, nil
+	}
+	store, err := fileeventstore.New(cfg.Paths.EventStoreDir)
+	if err != nil {
+		return nil, err
+	}
+	return eventstore.New(store), nil
 }
 
 // newAgentAuditHook returns a hook that logs agent tool executions to the audit service.
@@ -971,7 +1018,7 @@ func (srv *Server) startPeriodicUpdateCheck(ctx context.Context) {
 		return
 	}
 	go func() {
-		_, _ = upgrade.CheckAndUpdateCache(srv.upgradeStore, config.Version)
+		srv.runAutomaticUpdateCheck(ctx)
 
 		ticker := time.NewTicker(upgrade.CacheTTL)
 		defer ticker.Stop()
@@ -980,10 +1027,17 @@ func (srv *Server) startPeriodicUpdateCheck(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				_, _ = upgrade.CheckAndUpdateCache(srv.upgradeStore, config.Version)
+				srv.runAutomaticUpdateCheck(ctx)
 			}
 		}
 	}()
+}
+
+func (srv *Server) runAutomaticUpdateCheck(ctx context.Context) {
+	retryCtx := backoff.WithRetryFailureLogLevel(ctx, slog.LevelDebug)
+	if _, err := upgrade.CheckAndUpdateCache(retryCtx, srv.upgradeStore, config.Version); err != nil {
+		logger.Debug(ctx, "Automatic update check failed", tag.Error(err))
+	}
 }
 
 func (srv *Server) configureAPIPath(_ context.Context) string {

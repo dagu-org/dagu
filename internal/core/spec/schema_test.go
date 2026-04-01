@@ -5,6 +5,7 @@ package spec
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func TestExtractParamsSchemaDeclaration(t *testing.T) {
 	t.Parallel()
@@ -171,6 +178,29 @@ func TestLoadSchemaFromURL(t *testing.T) {
 		_, err := loadSchemaFromURL("http://127.0.0.1:59999/schema.json")
 		require.Error(t, err)
 	})
+}
+
+func TestLoadSchemaFromURLUsesIsolatedHTTPClient(t *testing.T) {
+	originalClient := http.DefaultClient
+	http.DefaultClient = &http.Client{
+		Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("poisoned default client")
+		}),
+	}
+	t.Cleanup(func() {
+		http.DefaultClient = originalClient
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"type":"object"}`))
+	}))
+	defer server.Close()
+
+	data, err := loadSchemaFromURL(server.URL + "/schema.json")
+	require.NoError(t, err)
+	assert.Equal(t, `{"type":"object"}`, string(data))
 }
 
 func TestLoadSchemaFromFile(t *testing.T) {

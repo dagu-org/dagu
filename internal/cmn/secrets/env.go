@@ -14,9 +14,8 @@ import (
 
 // PresolvedEnvPrefix is the env var prefix used to transport pre-resolved
 // env-provider secret values from the parent process to the subprocess.
-// The parent looks up the original env var and passes it as
-// _DAGU_PRESOLVED_SECRET_<KEY>=<value> so the subprocess can resolve
-// env secrets without needing the original variable in the whitelist.
+// When present, _DAGU_PRESOLVED_SECRET_<KEY>=<value> lets the subprocess
+// resolve env secrets without requiring the original source variable.
 const PresolvedEnvPrefix = "_DAGU_PRESOLVED_SECRET_"
 
 func init() {

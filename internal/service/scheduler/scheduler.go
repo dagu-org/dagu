@@ -23,6 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/persis/fileeventstore"
 	"github.com/dagu-org/dagu/internal/runtime"
 	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
 )
@@ -56,6 +57,7 @@ type Scheduler struct {
 	lockHeld            atomic.Bool
 	clock               Clock // Clock function for getting current time
 	automataService     *automata.Service
+	eventCollector      *fileeventstore.Collector
 }
 
 type schedulerHooks struct {
@@ -144,7 +146,7 @@ func newScheduler(
 			return len(items) > 0, nil
 		}
 		enqueueFunc = func(ctx context.Context, dag *core.DAG, runID string, triggerType core.TriggerType, scheduleTime time.Time) error {
-			return EnqueueCatchupRun(ctx, dagRunStore, queueStore, cfg.Paths.LogDir, dag, runID, triggerType, scheduleTime)
+			return EnqueueCatchupRun(ctx, dagRunStore, queueStore, cfg.Paths.LogDir, cfg.Paths.BaseConfig, dag, runID, triggerType, scheduleTime)
 		}
 	}
 
@@ -236,6 +238,15 @@ func (s *Scheduler) SetClock(clock Clock) {
 // SetAutomataService configures the Automata controller owned by the scheduler leader.
 func (s *Scheduler) SetAutomataService(service *automata.Service) {
 	s.automataService = service
+}
+
+// SetEventCollector configures the scheduler-owned collector loop.
+// This must be called before Start().
+func (s *Scheduler) SetEventCollector(collector *fileeventstore.Collector) {
+	if s == nil {
+		return
+	}
+	s.eventCollector = collector
 }
 
 // SetDAGRunLeaseStore configures the shared distributed lease store used for
@@ -511,6 +522,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	})
 
 	wg.Go(func() {
+		s.startEventCollector(ctx)
+	})
+
+	wg.Go(func() {
 		s.entryReader.Start(ctx)
 	})
 
@@ -567,6 +582,13 @@ func (s *Scheduler) startZombieDetector(ctx context.Context) {
 
 	// Start blocks, so call it after releasing the lock
 	zd.Start(ctx)
+}
+
+func (s *Scheduler) startEventCollector(ctx context.Context) {
+	if s.eventCollector == nil {
+		return
+	}
+	s.eventCollector.Start(ctx)
 }
 
 func (s *Scheduler) startHeartbeat(ctx context.Context) {

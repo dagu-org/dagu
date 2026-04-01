@@ -69,6 +69,8 @@ type LoopConfig struct {
 	WaitUserResponse WaitUserResponseFunc
 	// SafeMode enables approval prompts for dangerous commands when true.
 	SafeMode bool
+	// ThinkingEffort configures default reasoning depth for supported models.
+	ThinkingEffort llm.ThinkingEffort
 	// Hooks provides lifecycle callbacks for tool execution.
 	Hooks *Hooks
 	// User is the authenticated user's identity.
@@ -112,6 +114,7 @@ type Loop struct {
 	emitUserPrompt     EmitUserPromptFunc
 	waitUserResponse   WaitUserResponseFunc
 	safeMode           bool
+	thinkingEffort     llm.ThinkingEffort
 	hooks              *Hooks
 	user               UserIdentity
 	sessionStore       SessionStore
@@ -148,6 +151,7 @@ func NewLoop(config LoopConfig) *Loop {
 		emitUserPrompt:   config.EmitUserPrompt,
 		waitUserResponse: config.WaitUserResponse,
 		safeMode:         config.SafeMode,
+		thinkingEffort:   config.ThinkingEffort,
 		hooks:            config.Hooks,
 		user:             config.User,
 		sessionStore:     config.SessionStore,
@@ -173,6 +177,21 @@ func (l *Loop) RequestInterrupt() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.interruptRequested = true
+}
+
+// SetThinkingEffort updates the reasoning effort used for future turns.
+func (l *Loop) SetThinkingEffort(effort llm.ThinkingEffort) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.thinkingEffort = effort
+}
+
+// SetProviderModel updates the provider and resolved model for future turns.
+func (l *Loop) SetProviderModel(provider llm.Provider, model string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.provider = provider
+	l.model = model
 }
 
 // AppendExternalHistory injects a message into the loop's in-memory LLM history.
@@ -208,7 +227,10 @@ func (l *Loop) SetSafeMode(enabled bool) {
 
 // Go runs the session loop until the context is canceled.
 func (l *Loop) Go(ctx context.Context) error {
-	if l.provider == nil {
+	l.mu.Lock()
+	provider := l.provider
+	l.mu.Unlock()
+	if provider == nil {
 		return fmt.Errorf("no LLM provider configured")
 	}
 
@@ -320,18 +342,30 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	history := l.copyHistory()
 	messages := l.buildMessages(history)
 	tools := l.buildToolDefinitions()
+	l.mu.Lock()
+	provider := l.provider
+	model := l.model
+	thinkingEffort := l.thinkingEffort
+	webSearch := l.webSearch
+	l.mu.Unlock()
 
 	req := &llm.ChatRequest{
-		Model:     l.model,
+		Model:     model,
 		Messages:  messages,
 		Tools:     tools,
-		WebSearch: l.webSearch,
+		WebSearch: webSearch,
+	}
+	if thinkingEffort != "" {
+		req.Thinking = &llm.ThinkingRequest{
+			Enabled: true,
+			Effort:  thinkingEffort,
+		}
 	}
 
 	l.logger.Debug("sending LLM request",
 		"message_count", len(messages),
 		"tool_count", len(tools),
-		"model", l.model)
+		"model", model)
 
 	l.setWorking(true)
 
@@ -340,7 +374,7 @@ func (l *Loop) sendRequest(ctx context.Context) (*llm.ChatResponse, error) {
 	stopHeartbeat := startHeartbeatPump(llmCtx, loopHeartbeatInterval, l.onHeartbeat)
 	defer stopHeartbeat()
 
-	resp, err := llm.ChatWithRetry(llmCtx, l.provider, req, llm.DefaultLogicalRetryConfig())
+	resp, err := llm.ChatWithRetry(llmCtx, provider, req, llm.DefaultLogicalRetryConfig())
 	if err != nil {
 		l.recordErrorMessage(ctx, fmt.Sprintf("LLM request failed: %v", err))
 		l.setWorking(false)
@@ -453,6 +487,8 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	l.mu.Lock()
 	safeMode := l.safeMode
 	user := l.user
+	provider := l.provider
+	model := l.model
 	l.mu.Unlock()
 
 	info := ToolExecInfo{
@@ -486,8 +522,8 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	var delegate *DelegateContext
 	if tc.Function.Name == delegateToolName && l.registry != nil {
 		delegate = &DelegateContext{
-			Provider:      l.provider,
-			Model:         l.model,
+			Provider:      provider,
+			Model:         model,
 			SystemPrompt:  l.systemPrompt,
 			Tools:         l.tools,
 			Hooks:         l.hooks,

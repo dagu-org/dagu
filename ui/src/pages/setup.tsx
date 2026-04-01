@@ -3,8 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { ProviderAuthCard } from '@/features/agent/components/ProviderAuthCard';
+import { useAgentAuthProviders } from '@/features/agent/hooks/useAgentAuthProviders';
+import {
+  AGENT_MODEL_PROVIDERS,
+  type AgentModelProvider,
+  getAgentModelProviderMeta,
+  isAgentModelProvider,
+} from '@/features/agent/modelProviders';
 import { useClient } from '@/hooks/api';
-import { components, CreateModelConfigRequestProvider } from '@/api/v1/schema';
+import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,13 +34,7 @@ import {
 } from 'lucide-react';
 
 type ModelPreset = components['schemas']['ModelPreset'];
-
-const PROVIDERS = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'zai', label: 'Z.AI' },
-] as const;
+type CreateModelConfigRequest = components['schemas']['CreateModelConfigRequest'];
 
 function generateSlugId(name: string): string {
   const slug = name
@@ -61,9 +63,11 @@ export default function SetupPage() {
 
   // Step 2 state
   const [agentEnabled, setAgentEnabled] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState('anthropic');
+  const [selectedProvider, setSelectedProvider] =
+    useState<AgentModelProvider>('anthropic');
   const [selectedModel, setSelectedModel] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   const [step2Error, setStep2Error] = useState<string | null>(null);
   const [step2Loading, setStep2Loading] = useState(false);
   const [presets, setPresets] = useState<ModelPreset[]>([]);
@@ -71,7 +75,19 @@ export default function SetupPage() {
 
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
+  const {
+    providerMap,
+    isLoading: authLoading,
+    error: authError,
+    startLogin,
+    completeLogin,
+    disconnect,
+  } = useAgentAuthProviders();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const providerMeta = getAgentModelProviderMeta(selectedProvider);
+  const codexProvider = providerMap['openai-codex'] || null;
+  const usesCodexSubscription = providerMeta.authMode === 'subscription';
+  const codexConnected = codexProvider?.connected ?? false;
 
   // Redirect away if setup is already complete (e.g., user navigated here directly).
   // Skip if we just completed setup ourselves — we handle navigation manually.
@@ -157,12 +173,18 @@ export default function SetupPage() {
       return;
     }
 
-    if (!selectedModel) {
+    const manualModel = selectedModel.trim();
+    if (!manualModel) {
       setStep2Error('Please select a model');
       return;
     }
 
-    if (!apiKey.trim()) {
+    if (usesCodexSubscription && !codexConnected) {
+      setStep2Error('Connect OpenAI Codex before completing setup');
+      return;
+    }
+
+    if (providerMeta.apiKeyMode === 'required' && !apiKey.trim()) {
       setStep2Error('Please enter an API key');
       return;
     }
@@ -179,40 +201,58 @@ export default function SetupPage() {
         throw new Error(enableError.message || 'Failed to enable agent');
       }
 
-      // 2. Find the selected preset to populate model details
-      const preset = presets.find((p) => p.name === selectedModel);
-      if (!preset) {
-        throw new Error('Selected model not found');
+      const preset = filteredPresets.find((p) => p.name === selectedModel);
+      const requestedProvider = preset?.provider ?? selectedProvider;
+      if (!isAgentModelProvider(requestedProvider)) {
+        throw new Error(`Unsupported provider: ${requestedProvider}`);
       }
 
-      // 3. Create model config
-      const supportedProviders = [
-        CreateModelConfigRequestProvider.anthropic,
-        CreateModelConfigRequestProvider.openai,
-        CreateModelConfigRequestProvider.gemini,
-        CreateModelConfigRequestProvider.zai,
-      ] as const;
-      const isValidProvider = (v: string): v is CreateModelConfigRequestProvider =>
-        (supportedProviders as readonly string[]).includes(v);
-      if (!isValidProvider(preset.provider)) {
-        throw new Error(`Unsupported provider: ${preset.provider}`);
-      }
-      const { data: createdModel, error: createError } = await client.POST(
-        '/settings/agent/models',
-        {
-          params: { query: { remoteNode } },
-          body: {
+      const modelConfig: Omit<
+        CreateModelConfigRequest,
+        'apiKey' | 'baseUrl'
+      > = preset
+        ? {
             id: generateSlugId(preset.name),
             name: preset.name,
-            provider: preset.provider,
+            provider: requestedProvider as CreateModelConfigRequest['provider'],
             model: preset.model,
-            apiKey: apiKey.trim(),
             description: preset.description || undefined,
             contextWindow: preset.contextWindow || undefined,
             maxOutputTokens: preset.maxOutputTokens || undefined,
             inputCostPer1M: preset.inputCostPer1M || undefined,
             outputCostPer1M: preset.outputCostPer1M || undefined,
             supportsThinking: preset.supportsThinking || false,
+          }
+        : {
+            id: generateSlugId(manualModel),
+            name: manualModel,
+            provider: requestedProvider as CreateModelConfigRequest['provider'],
+            model: manualModel,
+            description: undefined,
+            contextWindow: undefined,
+            maxOutputTokens: undefined,
+            inputCostPer1M: undefined,
+            outputCostPer1M: undefined,
+            supportsThinking: false,
+          };
+
+      const trimmedAPIKey = apiKey.trim();
+      const trimmedBaseURL = baseUrl.trim();
+
+      const { data: createdModel, error: createError } = await client.POST(
+        '/settings/agent/models',
+        {
+          params: { query: { remoteNode } },
+          body: {
+            ...modelConfig,
+            apiKey:
+              providerMeta.apiKeyMode === 'hidden' || trimmedAPIKey === ''
+                ? undefined
+                : trimmedAPIKey,
+            baseUrl:
+              !usesManualModelConfig || trimmedBaseURL === ''
+                ? undefined
+                : trimmedBaseURL,
           },
         }
       );
@@ -221,7 +261,8 @@ export default function SetupPage() {
       }
 
       // 4. Set as default model
-      const modelId = createdModel?.id || generateSlugId(preset.name);
+      const modelId =
+        createdModel?.id ?? modelConfig.id ?? generateSlugId(modelConfig.name);
       const { error: defaultError } = await client.PUT(
         '/settings/agent/default-model',
         {
@@ -252,11 +293,20 @@ export default function SetupPage() {
   const filteredPresets = presets.filter(
     (p) => p.provider === selectedProvider
   );
+  const usesManualModelConfig =
+    !usesCodexSubscription && filteredPresets.length === 0;
 
   // Reset model selection when provider changes
   useEffect(() => {
     setSelectedModel('');
   }, [selectedProvider]);
+
+  useEffect(() => {
+    if (usesCodexSubscription) {
+      setApiKey('');
+      setBaseUrl('');
+    }
+  }, [usesCodexSubscription]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/50">
@@ -421,7 +471,7 @@ export default function SetupPage() {
                       <div className="space-y-1.5">
                         <Label className="text-sm">Provider</Label>
                         <div className="grid grid-cols-3 gap-2">
-                          {PROVIDERS.map((p) => (
+                          {AGENT_MODEL_PROVIDERS.map((p) => (
                             <button
                               key={p.value}
                               type="button"
@@ -443,7 +493,20 @@ export default function SetupPage() {
                         <Label htmlFor="model-select" className="text-sm">
                           Model
                         </Label>
-                        {filteredPresets.length > 0 ? (
+                        {usesManualModelConfig ? (
+                          <div className="space-y-1.5">
+                            <Input
+                              id="model-select"
+                              value={selectedModel}
+                              onChange={(e) => setSelectedModel(e.target.value)}
+                              placeholder={providerMeta.modelPlaceholder}
+                              className="h-9"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Enter the model ID served by {providerMeta.label}.
+                            </p>
+                          </div>
+                        ) : (
                           <Select
                             value={selectedModel}
                             onValueChange={setSelectedModel}
@@ -464,28 +527,72 @@ export default function SetupPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                        ) : (
-                          <p className="text-xs text-muted-foreground py-2">
-                            No presets available for this provider.
-                          </p>
                         )}
                       </div>
 
-                      {/* API Key */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="api-key" className="text-sm">
-                          API Key
-                        </Label>
-                        <Input
-                          id="api-key"
-                          type="password"
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          placeholder="Enter your API key"
-                          autoComplete="off"
-                          className="h-9"
-                        />
-                      </div>
+                      {usesCodexSubscription ? (
+                        <div className="space-y-2">
+                          {authError && (
+                            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                              {authError}
+                            </div>
+                          )}
+                          {codexProvider ? (
+                            <ProviderAuthCard
+                              provider={codexProvider}
+                              compact
+                              isLoading={authLoading}
+                              onStartLogin={startLogin}
+                              onCompleteLogin={completeLogin}
+                              onDisconnect={disconnect}
+                            />
+                          ) : (
+                            <div className="rounded-md border border-dashed border-border/80 p-3 text-sm text-muted-foreground">
+                              {authLoading ? 'Loading OpenAI Codex connection...' : 'OpenAI Codex connection status is unavailable.'}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="api-key" className="text-sm">
+                              {providerMeta.apiKeyMode === 'optional'
+                                ? 'API Key (optional)'
+                                : 'API Key'}
+                            </Label>
+                            <Input
+                              id="api-key"
+                              type="password"
+                              value={apiKey}
+                              onChange={(e) => setApiKey(e.target.value)}
+                              placeholder="Enter your API key"
+                              autoComplete="off"
+                              className="h-9"
+                            />
+                            {providerMeta.apiKeyHelperText && (
+                              <p className="text-xs text-muted-foreground">
+                                {providerMeta.apiKeyHelperText}
+                              </p>
+                            )}
+                          </div>
+
+                          {usesManualModelConfig && (
+                            <div className="space-y-1.5">
+                              <Label htmlFor="base-url" className="text-sm">
+                                Base URL (optional)
+                              </Label>
+                              <Input
+                                id="base-url"
+                                value={baseUrl}
+                                onChange={(e) => setBaseUrl(e.target.value)}
+                                placeholder={providerMeta.baseUrlPlaceholder}
+                                autoComplete="off"
+                                className="h-9"
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -496,7 +603,7 @@ export default function SetupPage() {
                 <Button
                   type="submit"
                   className="w-full h-9"
-                  disabled={step2Loading || (agentEnabled && presetsLoading)}
+                  disabled={step2Loading || (agentEnabled && presetsLoading) || (agentEnabled && usesCodexSubscription && !codexConnected)}
                 >
                   {step2Loading ? (
                     <>

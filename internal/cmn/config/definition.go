@@ -7,20 +7,23 @@ package config
 // Fields are organized into logical groups for clarity.
 type Definition struct {
 	// Server settings
-	Host        string  `mapstructure:"host"`
-	Port        int     `mapstructure:"port"`
-	BasePath    string  `mapstructure:"base_path"`
-	APIBasePath string  `mapstructure:"api_base_path"`
-	APIBaseURL  string  `mapstructure:"api_base_url"` // Deprecated: use APIBasePath
-	Headless    *bool   `mapstructure:"headless"`
-	TLS         *TLSDef `mapstructure:"tls"`
+	Host         string  `mapstructure:"host"`
+	Port         int     `mapstructure:"port"`
+	BasePath     string  `mapstructure:"base_path"`
+	APIBasePath  string  `mapstructure:"api_base_path"`
+	APIBaseURL   string  `mapstructure:"api_base_url"` // Deprecated: use APIBasePath
+	Headless     *bool   `mapstructure:"headless"`
+	CheckUpdates *bool   `mapstructure:"check_updates"`
+	TLS          *TLSDef `mapstructure:"tls"`
 
 	// Core settings
-	Debug        bool    `mapstructure:"debug"`
-	DefaultShell string  `mapstructure:"default_shell"`
-	LogFormat    string  `mapstructure:"log_format"`      // "json" or "text"
-	AccessLog    *string `mapstructure:"access_log_mode"` // "all" (default), "non-public", or "none"
-	TZ           string  `mapstructure:"tz"`
+	Debug                  bool     `mapstructure:"debug"`
+	DefaultShell           string   `mapstructure:"default_shell"`
+	LogFormat              string   `mapstructure:"log_format"`      // "json" or "text"
+	AccessLog              *string  `mapstructure:"access_log_mode"` // "all" (default), "non-public", or "none"
+	TZ                     string   `mapstructure:"tz"`
+	EnvPassthrough         []string `mapstructure:"env_passthrough"`
+	EnvPassthroughPrefixes []string `mapstructure:"env_passthrough_prefixes"`
 
 	// Authentication
 	Auth *AuthDef `mapstructure:"auth"`
@@ -38,6 +41,7 @@ type Definition struct {
 	DataDir         string `mapstructure:"data_dir"`
 	SuspendFlagsDir string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir    string `mapstructure:"admin_logs_dir"`
+	EventStoreDir   string `mapstructure:"event_store_dir"`
 	BaseConfig      string `mapstructure:"base_config"`
 
 	// Paths (structured)
@@ -78,6 +82,7 @@ type Definition struct {
 	Cache      *string        `mapstructure:"cache"`   // "low", "normal", or "high"
 	Terminal   *TerminalDef   `mapstructure:"terminal"`
 	Audit      *AuditDef      `mapstructure:"audit"`
+	EventStore *EventStoreDef `mapstructure:"event_store"`
 	Session    *SessionDef    `mapstructure:"session"`
 	SSE        *SSEDef        `mapstructure:"sse"`
 	GitSync    *GitSyncDef    `mapstructure:"git_sync"`
@@ -181,6 +186,7 @@ type PathsDef struct {
 	DataDir            string `mapstructure:"data_dir"`
 	SuspendFlagsDir    string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir       string `mapstructure:"admin_logs_dir"`
+	EventStoreDir      string `mapstructure:"event_store_dir"`
 	BaseConfig         string `mapstructure:"base_config"`
 	AltDagsDir         string `mapstructure:"alt_dags_dir"`
 	DAGRunsDir         string `mapstructure:"dag_runs_dir"`
@@ -342,6 +348,12 @@ type TerminalDef struct {
 type AuditDef struct {
 	Enabled       *bool `mapstructure:"enabled"`        // Default: true
 	RetentionDays *int  `mapstructure:"retention_days"` // Default: 7
+}
+
+// EventStoreDef configures the centralized event store.
+type EventStoreDef struct {
+	Enabled       *bool `mapstructure:"enabled"`        // Default: true
+	RetentionDays *int  `mapstructure:"retention_days"` // Default: 3
 }
 
 // SessionDef configures agent session storage.

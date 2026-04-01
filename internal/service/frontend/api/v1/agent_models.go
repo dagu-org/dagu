@@ -7,11 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/llm"
@@ -42,6 +44,12 @@ var (
 		Code:       api.ErrorCodeAlreadyExists,
 		Message:    "Model already exists",
 		HTTPStatus: http.StatusConflict,
+	}
+
+	errAgentAuthNotAvailable = &Error{
+		Code:       api.ErrorCodeForbidden,
+		Message:    "Agent subscription authentication is not available",
+		HTTPStatus: http.StatusForbidden,
 	}
 )
 
@@ -141,7 +149,15 @@ func (a *API) CreateAgentModel(ctx context.Context, request api.CreateAgentModel
 		InputCostPer1M:   valueOf(body.InputCostPer1M),
 		OutputCostPer1M:  valueOf(body.OutputCostPer1M),
 		SupportsThinking: valueOf(body.SupportsThinking),
+		ThinkingEffort:   string(valueOf(body.ThinkingEffort)),
 		Description:      valueOf(body.Description),
+	}
+
+	if err := normalizeModelThinkingConfig(model); err != nil {
+		return nil, err
+	}
+	if err := a.validateModelProviderConfig(ctx, model, body.ApiKey, body.BaseUrl); err != nil {
+		return nil, err
 	}
 
 	if err := a.agentModelStore.Create(ctx, model); err != nil {
@@ -194,6 +210,13 @@ func (a *API) UpdateAgentModel(ctx context.Context, request api.UpdateAgentModel
 	}
 
 	applyModelUpdates(existing, body)
+
+	if err := normalizeModelThinkingConfig(existing); err != nil {
+		return nil, err
+	}
+	if err := a.validateModelProviderConfig(ctx, existing, body.ApiKey, body.BaseUrl); err != nil {
+		return nil, err
+	}
 
 	if err := a.agentModelStore.Update(ctx, existing); err != nil {
 		if errors.Is(err, agent.ErrModelAlreadyExists) || errors.Is(err, agent.ErrModelNameAlreadyExists) {
@@ -252,11 +275,15 @@ func (a *API) SetDefaultAgentModel(ctx context.Context, request api.SetDefaultAg
 	modelID := request.Body.ModelId
 
 	// Validate model exists
-	if _, err := a.agentModelStore.GetByID(ctx, modelID); err != nil {
+	model, err := a.agentModelStore.GetByID(ctx, modelID)
+	if err != nil {
 		if errors.Is(err, agent.ErrModelNotFound) {
 			return nil, errModelNotFound
 		}
 		return nil, &Error{Code: api.ErrorCodeInternalError, Message: "Failed to validate model", HTTPStatus: http.StatusInternalServerError}
+	}
+	if err := a.validateModelProviderConfig(ctx, model, nil, nil); err != nil {
+		return nil, err
 	}
 
 	cfg, err := a.agentConfigStore.Load(ctx)
@@ -295,6 +322,7 @@ func (a *API) ListModelPresets(ctx context.Context, _ api.ListModelPresetsReques
 			InputCostPer1M:   ptrOf(p.InputCostPer1M),
 			OutputCostPer1M:  ptrOf(p.OutputCostPer1M),
 			SupportsThinking: ptrOf(p.SupportsThinking),
+			ThinkingEffort:   optionalThinkingEffortPtr[api.ModelPresetThinkingEffort](p.ThinkingEffort),
 			Description:      ptrOf(p.Description),
 		})
 	}
@@ -306,7 +334,7 @@ func validateProvider(provider string) error {
 	if _, err := llm.ParseProviderType(provider); err != nil {
 		return &Error{
 			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, gemini, openrouter, local", provider),
+			Message:    fmt.Sprintf("invalid provider '%s': valid options are anthropic, openai, openai-codex, gemini, openrouter, local, zai", provider),
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
@@ -319,6 +347,13 @@ func (a *API) requireAgentModelManagement() error {
 	}
 	if a.agentConfigStore == nil {
 		return ErrAgentConfigNotAvailable
+	}
+	return nil
+}
+
+func (a *API) requireAgentAuthManagement() error {
+	if a.agentOAuthManager == nil {
+		return errAgentAuthNotAvailable
 	}
 	return nil
 }
@@ -336,6 +371,7 @@ func toModelConfigResponse(m *agent.ModelConfig) api.ModelConfigResponse {
 		InputCostPer1M:   ptrOf(m.InputCostPer1M),
 		OutputCostPer1M:  ptrOf(m.OutputCostPer1M),
 		SupportsThinking: ptrOf(m.SupportsThinking),
+		ThinkingEffort:   optionalThinkingEffortPtr[api.ModelConfigResponseThinkingEffort](m.ThinkingEffort),
 		Description:      ptrOf(m.Description),
 	}
 }
@@ -346,6 +382,10 @@ func applyModelUpdates(model *agent.ModelConfig, update *api.UpdateModelConfigRe
 	}
 	if update.Provider != nil {
 		model.Provider = string(*update.Provider)
+		if model.Provider == agentoauth.ProviderOpenAICodex {
+			model.APIKey = ""
+			model.BaseURL = ""
+		}
 	}
 	if update.Model != nil && strings.TrimSpace(*update.Model) != "" {
 		model.Model = *update.Model
@@ -371,9 +411,74 @@ func applyModelUpdates(model *agent.ModelConfig, update *api.UpdateModelConfigRe
 	if update.SupportsThinking != nil {
 		model.SupportsThinking = *update.SupportsThinking
 	}
+	if update.ThinkingEffort != nil {
+		model.ThinkingEffort = string(*update.ThinkingEffort)
+	}
 	if update.Description != nil {
 		model.Description = *update.Description
 	}
+}
+
+func normalizeModelThinkingConfig(model *agent.ModelConfig) error {
+	if model == nil {
+		return nil
+	}
+	if !model.SupportsThinking {
+		model.ThinkingEffort = ""
+		return nil
+	}
+	effort, err := llm.ParseThinkingEffort(strings.TrimSpace(model.ThinkingEffort))
+	if err != nil {
+		return &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "thinkingEffort must be one of: low, medium, high, xhigh",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	model.ThinkingEffort = string(effort)
+	return nil
+}
+
+func optionalThinkingEffortPtr[T ~string](v string) *T {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	typed := T(v)
+	return &typed
+}
+
+func (a *API) validateModelProviderConfig(ctx context.Context, model *agent.ModelConfig, apiKeyInput, baseURLInput *string) error {
+	if model == nil {
+		return nil
+	}
+	if model.Provider != agentoauth.ProviderOpenAICodex {
+		return nil
+	}
+	if err := a.requireAgentAuthManagement(); err != nil {
+		return err
+	}
+
+	model.APIKey = ""
+	model.BaseURL = ""
+
+	if _, err := a.agentOAuthManager.EnsureValid(ctx, agentoauth.ProviderOpenAICodex); err != nil {
+		switch {
+		case errors.Is(err, agentoauth.ErrCredentialNotFound):
+			return &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "OpenAI Codex is not connected for the selected node",
+				HTTPStatus: http.StatusBadRequest,
+			}
+		default:
+			logger.Error(ctx, "Failed to validate agent auth provider", tag.Error(err), slog.String("provider", model.Provider))
+			return &Error{
+				Code:       api.ErrorCodeInternalError,
+				Message:    "Failed to validate provider authentication",
+				HTTPStatus: http.StatusInternalServerError,
+			}
+		}
+	}
+	return nil
 }
 
 func (a *API) collectModelIDs(ctx context.Context) map[string]struct{} {

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/llm"
 )
 
@@ -26,6 +27,11 @@ type ProviderCache struct {
 type cachedProvider struct {
 	provider llm.Provider
 	model    string
+}
+
+// ProviderDeps are runtime-only dependencies used during provider creation.
+type ProviderDeps struct {
+	OAuthManager *agentoauth.Manager
 }
 
 // NewProviderCache creates a new empty provider cache.
@@ -50,7 +56,7 @@ func (c *ProviderCache) Set(cfg LLMConfig, provider llm.Provider) {
 }
 
 // GetOrCreate returns a cached provider for the given config, or creates one.
-func (c *ProviderCache) GetOrCreate(cfg LLMConfig) (llm.Provider, string, error) {
+func (c *ProviderCache) GetOrCreate(cfg LLMConfig, deps ProviderDeps) (llm.Provider, string, error) {
 	hash := HashLLMConfig(cfg)
 
 	c.mu.RLock()
@@ -68,7 +74,7 @@ func (c *ProviderCache) GetOrCreate(cfg LLMConfig) (llm.Provider, string, error)
 		return entry.provider, entry.model, nil
 	}
 
-	provider, err := CreateLLMProvider(cfg)
+	provider, err := CreateLLMProvider(cfg, deps)
 	if err != nil {
 		return nil, "", err
 	}
@@ -123,7 +129,7 @@ func HashLLMConfig(cfg LLMConfig) string {
 }
 
 // CreateLLMProvider creates an LLM provider from config.
-func CreateLLMProvider(agentCfg LLMConfig) (llm.Provider, error) {
+func CreateLLMProvider(agentCfg LLMConfig, deps ProviderDeps) (llm.Provider, error) {
 	providerType, err := llm.ParseProviderType(agentCfg.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("invalid LLM provider: %w", err)
@@ -133,6 +139,9 @@ func CreateLLMProvider(agentCfg LLMConfig) (llm.Provider, error) {
 	cfg.Timeout = llmRequestTimeout
 	cfg.APIKey = cmp.Or(agentCfg.APIKey, cfg.APIKey)
 	cfg.BaseURL = cmp.Or(agentCfg.BaseURL, cfg.BaseURL)
+	if providerType == llm.ProviderOpenAICodex && deps.OAuthManager != nil {
+		cfg.OAuthCredentialProvider = deps.OAuthManager.CredentialProvider(agentoauth.ProviderOpenAICodex)
+	}
 
 	return llm.NewProvider(providerType, cfg)
 }

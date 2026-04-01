@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/spf13/cobra"
 )
 
@@ -50,14 +51,15 @@ func runScheduler(ctx *Context, _ []string) error {
 		slog.String("log-format", ctx.Config.Core.LogFormat),
 	)
 
-	scheduler, err := ctx.NewScheduler()
+	schedulerCtx := ctx.WithEventSource(eventstore.SourceServiceScheduler)
+	scheduler, err := schedulerCtx.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
 
-	defer scheduler.Stop(ctx)
+	defer scheduler.Stop(schedulerCtx)
 
-	if err := scheduler.Start(ctx); err != nil {
+	if err := scheduler.Start(schedulerCtx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
 			ctx.Config.Paths.DAGsDir, err)
 	}
