@@ -50,7 +50,7 @@
     "esbuild-loader": "^4.3.0",
     "eslint": "^9.32.0",
     "html-loader": "^5.1.0",
-    "html-webpack-plugin": "^5.6.3",
+    "html-webpack-plugin": "^5.6.6",
     "jsdom": "^28.1.0",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "null-loader": "^4.0.1",
