@@ -128,7 +128,23 @@ func (c *Client) buildJob(stepName string, command []string) (*batchv1.Job, erro
 	if err != nil {
 		return nil, err
 	}
+	securityContext, err := c.cfg.toK8sSecurityContext()
+	if err != nil {
+		return nil, err
+	}
+	podSecurityContext, err := c.cfg.toK8sPodSecurityContext()
+	if err != nil {
+		return nil, err
+	}
+	affinity, err := c.cfg.toK8sAffinity()
+	if err != nil {
+		return nil, err
+	}
 	volumes, err := c.cfg.toK8sVolumes()
+	if err != nil {
+		return nil, err
+	}
+	podFailurePolicy, err := c.cfg.toK8sPodFailurePolicy()
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +158,7 @@ func (c *Client) buildJob(stepName string, command []string) (*batchv1.Job, erro
 		EnvFrom:         c.cfg.toK8sEnvFromSources(),
 		Resources:       resources,
 		VolumeMounts:    c.cfg.toK8sVolumeMounts(),
+		SecurityContext: securityContext,
 	}
 
 	if c.cfg.WorkingDir != "" {
@@ -161,6 +178,8 @@ func (c *Client) buildJob(stepName string, command []string) (*batchv1.Job, erro
 		RestartPolicy:    corev1.RestartPolicyNever,
 		Volumes:          volumes,
 		ImagePullSecrets: c.cfg.toK8sImagePullSecrets(),
+		SecurityContext:  podSecurityContext,
+		Affinity:         affinity,
 	}
 
 	if c.cfg.ServiceAccount != "" {
@@ -172,6 +191,12 @@ func (c *Client) buildJob(stepName string, command []string) (*batchv1.Job, erro
 	if tols := c.cfg.toK8sTolerations(); len(tols) > 0 {
 		podSpec.Tolerations = tols
 	}
+	if c.cfg.TerminationGracePeriodSeconds != nil {
+		podSpec.TerminationGracePeriodSeconds = c.cfg.TerminationGracePeriodSeconds
+	}
+	if c.cfg.PriorityClassName != "" {
+		podSpec.PriorityClassName = c.cfg.PriorityClassName
+	}
 
 	// Build Job spec
 	job := &batchv1.Job{
@@ -182,7 +207,8 @@ func (c *Client) buildJob(stepName string, command []string) (*batchv1.Job, erro
 			Annotations:  c.cfg.Annotations,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: c.cfg.BackoffLimit,
+			BackoffLimit:     c.cfg.BackoffLimit,
+			PodFailurePolicy: podFailurePolicy,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      c.cfg.Labels,

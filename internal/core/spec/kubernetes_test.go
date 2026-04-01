@@ -192,6 +192,69 @@ steps:
 	assert.Equal(t, "child-ns", dag.Steps[0].ExecutorConfig.Config["namespace"])
 }
 
+func TestKubernetesInheritanceSupportsExtendedConfigAndClearing(t *testing.T) {
+	t.Parallel()
+
+	yaml := `
+kubernetes:
+  security_context:
+    run_as_non_root: true
+    capabilities:
+      drop: [ALL]
+  pod_security_context:
+    supplemental_groups: [2000, 3000]
+    seccomp_profile:
+      type: RuntimeDefault
+  affinity:
+    node_affinity:
+      required_during_scheduling_ignored_during_execution:
+        node_selector_terms:
+          - match_expressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values: [amd64]
+  pod_failure_policy:
+    rules:
+      - action: Count
+        on_exit_codes:
+          operator: In
+          values: [42]
+
+steps:
+  - name: step1
+    type: k8s
+    config:
+      image: alpine:3.20
+      security_context:
+        capabilities:
+          add: [NET_BIND_SERVICE]
+      pod_security_context:
+        supplemental_groups: []
+      affinity: {}
+      pod_failure_policy: {}
+    command: echo hello
+`
+
+	dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+
+	securityContext := mustMap(t, step.ExecutorConfig.Config["security_context"])
+	capabilities := mustMap(t, securityContext["capabilities"])
+	assert.Equal(t, []any{"NET_BIND_SERVICE"}, mustSlice(t, capabilities["add"]))
+	assert.Equal(t, []any{"ALL"}, mustSlice(t, capabilities["drop"]))
+
+	podSecurityContext := mustMap(t, step.ExecutorConfig.Config["pod_security_context"])
+	assert.Empty(t, mustSlice(t, podSecurityContext["supplemental_groups"]))
+	seccompProfile := mustMap(t, podSecurityContext["seccomp_profile"])
+	assert.Equal(t, "RuntimeDefault", seccompProfile["type"])
+
+	assert.Empty(t, mustMap(t, step.ExecutorConfig.Config["affinity"]))
+	assert.Empty(t, mustMap(t, step.ExecutorConfig.Config["pod_failure_policy"]))
+}
+
 func TestKubernetesEmptyRootClearsBaseConfig(t *testing.T) {
 	t.Parallel()
 

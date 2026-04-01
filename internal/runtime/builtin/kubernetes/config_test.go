@@ -96,6 +96,7 @@ func TestLoadConfigFromMapValidation(t *testing.T) {
 			{name: "ActiveDeadline", key: "active_deadline", want: ErrNegativeActiveDeadline},
 			{name: "BackoffLimit", key: "backoff_limit", want: ErrNegativeBackoffLimit},
 			{name: "TTLAfterFinished", key: "ttl_after_finished", want: ErrNegativeTTLAfterFinished},
+			{name: "TerminationGracePeriod", key: "termination_grace_period_seconds", want: ErrNegativeTerminationGrace},
 		}
 
 		for _, tt := range tests {
@@ -168,6 +169,116 @@ func TestLoadConfigFromMapValidation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "env_from[0]")
 		assert.Contains(t, err.Error(), "exactly one source")
+	})
+
+	t.Run("SecurityContextRejectsInvalidSeccompProfile", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"security_context": map[string]any{
+				"seccomp_profile": map[string]any{
+					"type":              "RuntimeDefault",
+					"localhost_profile": "profiles/custom.json",
+				},
+			},
+		})
+
+		require.Nil(t, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security_context.seccomp_profile.localhost_profile")
+	})
+
+	t.Run("PodSecurityContextRejectsNegativeSupplementalGroup", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"pod_security_context": map[string]any{
+				"supplemental_groups": []int{-1},
+			},
+		})
+
+		require.Nil(t, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pod_security_context.supplemental_groups[0]")
+	})
+
+	t.Run("AffinityRejectsInvalidWeight", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"affinity": map[string]any{
+				"node_affinity": map[string]any{
+					"preferred_during_scheduling_ignored_during_execution": []map[string]any{
+						{
+							"weight": 0,
+							"preference": map[string]any{
+								"match_expressions": []map[string]any{
+									{
+										"key":      "kubernetes.io/arch",
+										"operator": "In",
+										"values":   []string{"amd64"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		require.Nil(t, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "affinity.node_affinity.preferred_during_scheduling_ignored_during_execution[0].weight")
+	})
+
+	t.Run("PodFailurePolicyRejectsFailIndex", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"pod_failure_policy": map[string]any{
+				"rules": []map[string]any{
+					{
+						"action": "FailIndex",
+						"on_exit_codes": map[string]any{
+							"operator": "In",
+							"values":   []int{42},
+						},
+					},
+				},
+			},
+		})
+
+		require.Nil(t, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "FailIndex is not supported")
+	})
+
+	t.Run("PodFailurePolicyAllowsEmptyRulesForClearingDefaults", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"pod_failure_policy": map[string]any{
+				"rules": []any{},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.NotNil(t, cfg.PodFailurePolicy)
+		assert.Empty(t, cfg.PodFailurePolicy.Rules)
+	})
+
+	t.Run("AffinityAllowsEmptyRequiredNodeSelectorForClearingDefaults", func(t *testing.T) {
+		cfg, err := LoadConfigFromMap(map[string]any{
+			"image": "busybox",
+			"affinity": map[string]any{
+				"node_affinity": map[string]any{
+					"required_during_scheduling_ignored_during_execution": map[string]any{},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.NotNil(t, cfg.Affinity)
+		require.NotNil(t, cfg.Affinity.NodeAffinity)
+		require.NotNil(t, cfg.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+		assert.Empty(t, cfg.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
 	})
 }
 
@@ -243,5 +354,55 @@ func TestKubernetesDefaultsSchema(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "env_from")
+	})
+
+	t.Run("RejectsInvalidSeccompSchema", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"security_context": map[string]any{
+				"seccomp_profile": map[string]any{
+					"localhost_profile": "profiles/custom.json",
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security_context")
+	})
+
+	t.Run("RejectsUnsupportedPodFailureAction", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"pod_failure_policy": map[string]any{
+				"rules": []map[string]any{
+					{
+						"action": "FailIndex",
+						"on_exit_codes": map[string]any{
+							"operator": "In",
+							"values":   []int{42},
+						},
+					},
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pod_failure_policy")
+	})
+
+	t.Run("AllowsClearingPodFailurePolicyRules", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"pod_failure_policy": map[string]any{
+				"rules": []any{},
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("AllowsClearingRequiredNodeSelector", func(t *testing.T) {
+		err := core.ValidateExecutorConfig("kubernetes_defaults", map[string]any{
+			"affinity": map[string]any{
+				"node_affinity": map[string]any{
+					"required_during_scheduling_ignored_during_execution": map[string]any{},
+				},
+			},
+		})
+		require.NoError(t, err)
 	})
 }

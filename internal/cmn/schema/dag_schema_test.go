@@ -545,6 +545,87 @@ steps:
 `,
 		},
 		{
+			name: "SupportsExtendedKubernetesConfig",
+			spec: `
+kubernetes:
+  pod_security_context:
+    run_as_non_root: true
+
+steps:
+  - id: report
+    type: kubernetes
+    config:
+      image: alpine:3.20
+      security_context:
+        run_as_non_root: true
+        capabilities:
+          drop: [ALL]
+        seccomp_profile:
+          type: RuntimeDefault
+      pod_security_context:
+        fs_group: 2000
+        fs_group_change_policy: OnRootMismatch
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: "0"
+      affinity:
+        node_affinity:
+          required_during_scheduling_ignored_during_execution:
+            node_selector_terms:
+              - match_expressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values: [amd64]
+        pod_anti_affinity:
+          required_during_scheduling_ignored_during_execution:
+            - topology_key: kubernetes.io/hostname
+              label_selector:
+                match_labels:
+                  app: dagu
+      termination_grace_period_seconds: 30
+      priority_class_name: batch-high
+      pod_failure_policy:
+        rules:
+          - action: Count
+            on_exit_codes:
+              operator: In
+              values: [42]
+          - action: Ignore
+            on_pod_conditions:
+              - type: DisruptionTarget
+    command: echo hello
+`,
+		},
+		{
+			name: "AllowsClearingInheritedExtendedConfig",
+			spec: `
+kubernetes:
+  affinity:
+    node_affinity:
+      required_during_scheduling_ignored_during_execution:
+        node_selector_terms:
+          - match_expressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values: [amd64]
+  pod_failure_policy:
+    rules:
+      - action: Count
+        on_exit_codes:
+          operator: In
+          values: [42]
+
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      affinity: {}
+      pod_failure_policy: {}
+    command: echo hello
+`,
+		},
+		{
 			name: "RejectUnknownRootField",
 			spec: `
 kubernetes:
@@ -583,6 +664,39 @@ steps:
       image: alpine:3.20
       env_from:
         - prefix: APP_
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectInvalidSeccompLocalhostProfile",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      security_context:
+        seccomp_profile:
+          localhost_profile: profiles/custom.json
+    command: echo hello
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectUnsupportedPodFailureAction",
+			spec: `
+steps:
+  - id: report
+    type: k8s
+    config:
+      image: alpine:3.20
+      pod_failure_policy:
+        rules:
+          - action: FailIndex
+            on_exit_codes:
+              operator: In
+              values: [42]
     command: echo hello
 `,
 			wantErr: "steps",

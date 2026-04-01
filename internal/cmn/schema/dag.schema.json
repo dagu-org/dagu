@@ -3416,6 +3416,624 @@
       },
       "description": "Pod toleration entry."
     },
+    "kubernetesCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "add": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Linux capabilities to add."
+        },
+        "drop": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Linux capabilities to drop."
+        }
+      },
+      "description": "Container capability overrides."
+    },
+    "kubernetesSeccompProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["RuntimeDefault", "Unconfined", "Localhost"],
+          "description": "Seccomp profile type."
+        },
+        "localhost_profile": {
+          "type": "string",
+          "description": "Localhost seccomp profile path. Required only when type is Localhost."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "Localhost"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["localhost_profile"]
+          },
+          "else": {
+            "not": {
+              "required": ["localhost_profile"]
+            }
+          }
+        }
+      ],
+      "description": "Typed seccomp profile configuration."
+    },
+    "kubernetesSecurityContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_as_user": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Container UID."
+        },
+        "run_as_group": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Container GID."
+        },
+        "run_as_non_root": {
+          "type": "boolean",
+          "description": "Require the container to run as non-root."
+        },
+        "privileged": {
+          "type": "boolean",
+          "description": "Run the container in privileged mode."
+        },
+        "read_only_root_filesystem": {
+          "type": "boolean",
+          "description": "Mount the container root filesystem read-only."
+        },
+        "allow_privilege_escalation": {
+          "type": "boolean",
+          "description": "Allow the process to gain more privileges."
+        },
+        "capabilities": {
+          "$ref": "#/definitions/kubernetesCapabilities"
+        },
+        "seccomp_profile": {
+          "$ref": "#/definitions/kubernetesSeccompProfile"
+        }
+      },
+      "description": "Container-level Linux security settings."
+    },
+    "kubernetesSysctl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Sysctl name."
+        },
+        "value": {
+          "type": "string",
+          "description": "Sysctl value."
+        }
+      },
+      "description": "Namespaced Linux sysctl."
+    },
+    "kubernetesPodSecurityContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_as_user": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Default Pod UID."
+        },
+        "run_as_group": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Default Pod GID."
+        },
+        "run_as_non_root": {
+          "type": "boolean",
+          "description": "Require containers to run as non-root by default."
+        },
+        "fs_group": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Filesystem group for supported volumes."
+        },
+        "fs_group_change_policy": {
+          "type": "string",
+          "enum": ["Always", "OnRootMismatch"],
+          "description": "Volume ownership change policy."
+        },
+        "supplemental_groups": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Additional supplemental groups."
+        },
+        "sysctls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesSysctl"
+          },
+          "description": "Namespaced Linux sysctls."
+        },
+        "seccomp_profile": {
+          "$ref": "#/definitions/kubernetesSeccompProfile"
+        }
+      },
+      "description": "Pod-level Linux security defaults."
+    },
+    "kubernetesNodeSelectorRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "operator"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Node label key."
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["In", "NotIn", "Exists", "DoesNotExist", "Gt", "Lt"],
+          "description": "Node selector operator."
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Operator values."
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator", "values"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "In" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator", "values"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "NotIn" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "Exists" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxItems": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "DoesNotExist" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxItems": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator", "values"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "Gt" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "maxItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator", "values"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "Lt" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "maxItems": 1
+            }
+          }
+        }
+      ],
+      "description": "Node selector requirement."
+    },
+    "kubernetesNodeSelectorTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "match_expressions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesNodeSelectorRequirement"
+          },
+          "description": "Node label match expressions."
+        }
+      },
+      "description": "Node selector term."
+    },
+    "kubernetesNodeSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node_selector_terms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesNodeSelectorTerm"
+          },
+          "description": "Node selector terms."
+        }
+      },
+      "description": "Node selector. Empty object is allowed to clear inherited defaults."
+    },
+    "kubernetesPreferredSchedulingTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weight", "preference"],
+      "properties": {
+        "weight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Preference weight."
+        },
+        "preference": {
+          "$ref": "#/definitions/kubernetesNodeSelectorTerm"
+        }
+      },
+      "description": "Preferred node selector term."
+    },
+    "kubernetesNodeAffinity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_during_scheduling_ignored_during_execution": {
+          "$ref": "#/definitions/kubernetesNodeSelector"
+        },
+        "preferred_during_scheduling_ignored_during_execution": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesPreferredSchedulingTerm"
+          },
+          "description": "Preferred node selector terms."
+        }
+      },
+      "description": "Node affinity rules."
+    },
+    "kubernetesLabelSelectorRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "operator"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Label key."
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["In", "NotIn", "Exists", "DoesNotExist"],
+          "description": "Label selector operator."
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Operator values."
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator", "values"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "In" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator", "values"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "NotIn" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "Exists" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxItems": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "operator"],
+          "properties": {
+            "key": { "type": "string" },
+            "operator": { "const": "DoesNotExist" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxItems": 0
+            }
+          }
+        }
+      ],
+      "description": "Label selector requirement."
+    },
+    "kubernetesLabelSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "match_labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Exact label matches."
+        },
+        "match_expressions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesLabelSelectorRequirement"
+          },
+          "description": "Label selector requirements."
+        }
+      },
+      "description": "Typed label selector."
+    },
+    "kubernetesPodAffinityTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topology_key"],
+      "properties": {
+        "label_selector": {
+          "$ref": "#/definitions/kubernetesLabelSelector"
+        },
+        "namespaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Namespaces to match."
+        },
+        "namespace_selector": {
+          "$ref": "#/definitions/kubernetesLabelSelector"
+        },
+        "topology_key": {
+          "type": "string",
+          "description": "Topology key used for pod affinity."
+        }
+      },
+      "description": "Pod affinity or anti-affinity term."
+    },
+    "kubernetesWeightedPodAffinityTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weight", "pod_affinity_term"],
+      "properties": {
+        "weight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Preference weight."
+        },
+        "pod_affinity_term": {
+          "$ref": "#/definitions/kubernetesPodAffinityTerm"
+        }
+      },
+      "description": "Weighted pod affinity term."
+    },
+    "kubernetesPodAffinity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required_during_scheduling_ignored_during_execution": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesPodAffinityTerm"
+          },
+          "description": "Required pod affinity terms."
+        },
+        "preferred_during_scheduling_ignored_during_execution": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesWeightedPodAffinityTerm"
+          },
+          "description": "Preferred pod affinity terms."
+        }
+      },
+      "description": "Pod affinity or anti-affinity rules."
+    },
+    "kubernetesAffinity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node_affinity": {
+          "$ref": "#/definitions/kubernetesNodeAffinity"
+        },
+        "pod_affinity": {
+          "$ref": "#/definitions/kubernetesPodAffinity"
+        },
+        "pod_anti_affinity": {
+          "$ref": "#/definitions/kubernetesPodAffinity"
+        }
+      },
+      "description": "Node and pod affinity rules."
+    },
+    "kubernetesPodFailurePolicyOnExitCodes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "values"],
+      "properties": {
+        "container_name": {
+          "type": "string",
+          "description": "Optional container name filter."
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["In", "NotIn"],
+          "description": "Exit-code matching operator."
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "maxItems": 255,
+          "uniqueItems": true,
+          "description": "Exit codes to compare against."
+        }
+      },
+      "description": "Exit-code-based pod failure rule."
+    },
+    "kubernetesPodFailurePolicyOnPodCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Pod condition type."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["True", "False", "Unknown"],
+          "description": "Pod condition status. Defaults to True when omitted."
+        }
+      },
+      "description": "Pod-condition-based failure pattern."
+    },
+    "kubernetesPodFailurePolicyRule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action", "on_exit_codes"],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["FailJob", "Ignore", "Count"],
+              "description": "Action when the rule matches."
+            },
+            "on_exit_codes": {
+              "$ref": "#/definitions/kubernetesPodFailurePolicyOnExitCodes"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action", "on_pod_conditions"],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["FailJob", "Ignore", "Count"],
+              "description": "Action when the rule matches."
+            },
+            "on_pod_conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/kubernetesPodFailurePolicyOnPodCondition"
+              },
+              "minItems": 1,
+              "maxItems": 20,
+              "description": "Pod conditions to match."
+            }
+          }
+        }
+      ],
+      "description": "A single pod failure policy rule."
+    },
+    "kubernetesPodFailurePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kubernetesPodFailurePolicyRule"
+          },
+          "maxItems": 20,
+          "description": "Pod failure policy rules. Empty array is allowed to clear inherited defaults."
+        }
+      },
+      "description": "Kubernetes Job pod failure policy."
+    },
     "kubernetesEmptyDirVolume": {
       "type": "object",
       "additionalProperties": false,
@@ -3658,6 +4276,27 @@
           },
           "description": "Pod tolerations."
         },
+        "security_context": {
+          "$ref": "#/definitions/kubernetesSecurityContext",
+          "description": "Container-level Linux security settings."
+        },
+        "pod_security_context": {
+          "$ref": "#/definitions/kubernetesPodSecurityContext",
+          "description": "Pod-level Linux security defaults."
+        },
+        "affinity": {
+          "$ref": "#/definitions/kubernetesAffinity",
+          "description": "Node and pod affinity rules."
+        },
+        "termination_grace_period_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Grace period in seconds before the Pod is forcefully terminated."
+        },
+        "priority_class_name": {
+          "type": "string",
+          "description": "Kubernetes priority class name."
+        },
         "labels": {
           "type": "object",
           "additionalProperties": {
@@ -3706,6 +4345,10 @@
           "type": "string",
           "default": "delete",
           "description": "Cleanup policy after execution. Accepted values are delete or keep (case-insensitive)."
+        },
+        "pod_failure_policy": {
+          "$ref": "#/definitions/kubernetesPodFailurePolicy",
+          "description": "Kubernetes-native Job pod failure policy."
         }
       },
       "description": "Common Kubernetes configuration shared by DAG-level defaults and step-level Kubernetes executor config."
