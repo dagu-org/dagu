@@ -14,14 +14,14 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedoc"
 	"github.com/dagu-org/dagu/internal/runtime"
-	apiV1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
+	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type searchTestSetup struct {
-	api      *apiV1.API
+	api      *apiv1.API
 	dagStore exec.DAGStore
 	docStore agent.DocStore
 }
@@ -32,15 +32,15 @@ func newSearchTestSetup(t *testing.T, withDocs bool) *searchTestSetup {
 	dagStore := filedag.New(t.TempDir(), filedag.WithSkipExamples(true))
 	cfg := &config.Config{}
 
-	options := []apiV1.APIOption{}
+	options := []apiv1.APIOption{}
 	var docStore agent.DocStore
 	if withDocs {
 		docStore = filedoc.New(t.TempDir())
-		options = append(options, apiV1.WithDocStore(docStore))
+		options = append(options, apiv1.WithDocStore(docStore))
 	}
 
 	return &searchTestSetup{
-		api: apiV1.New(
+		api: apiv1.New(
 			dagStore,
 			nil,
 			nil,

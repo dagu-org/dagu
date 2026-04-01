@@ -20,7 +20,7 @@ type DAGPaginationProps = {
   /** Callback for page change */
   pageChange: (page: number) => void;
   /** Callback for page limit change */
-  onPageLimitChange: (pageLimit: number) => void;
+  onPageLimitChange?: (pageLimit: number) => void;
   /** Whether to show the page-size selector */
   showPageLimitSelector?: boolean;
 };
@@ -238,7 +238,7 @@ const DAGPagination = ({
    */
   const commitChange = () => {
     const numValue = parseInt(inputValue);
-    if (!isNaN(numValue) && numValue > 0) {
+    if (!isNaN(numValue) && numValue > 0 && onPageLimitChange) {
       onPageLimitChange(numValue);
     } else {
       // Reset to current page limit if invalid input
@@ -298,7 +298,7 @@ const DAGPagination = ({
                 <div
                   key={limit}
                   className={`px-2 py-1 text-xs cursor-pointer hover:bg-muted transition-colors ${pageLimit === limit ? 'bg-primary/15 text-primary font-medium' : ''}`}
-                  onClick={() => onPageLimitChange(limit)}
+                  onClick={() => onPageLimitChange?.(limit)}
                 >
                   {limit}
                 </div>

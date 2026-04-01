@@ -690,7 +690,7 @@ func (s *Store) SearchPaginated(ctx context.Context, opts agent.SearchDocsOption
 }
 
 // SearchMatches paginates snippets for one document.
-func (s *Store) SearchMatches(ctx context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.PaginatedResult[*exec.Match], error) {
+func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.PaginatedResult[*exec.Match], error) {
 	pg := opts.Paginator
 	if pg.Limit() == 0 {
 		pg = exec.DefaultPaginator()

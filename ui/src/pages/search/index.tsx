@@ -42,6 +42,46 @@ function buildSearchParams(filters: SearchFilters): URLSearchParams {
   return params;
 }
 
+function SearchSection({
+  title,
+  total,
+  totalPages,
+  currentPage,
+  pageChange,
+  children,
+}: {
+  title: string;
+  total: number;
+  totalPages: number;
+  currentPage: number;
+  pageChange: (page: number) => void;
+  children: React.ReactNode;
+}) {
+  if (total === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-lg font-semibold">
+          {total} {title} {total === 1 ? 'result' : 'results'}
+        </h2>
+        {totalPages > 1 && (
+          <DAGPagination
+            totalPages={totalPages}
+            page={currentPage}
+            pageLimit={SEARCH_PAGE_SIZE}
+            pageChange={pageChange}
+            showPageLimitSelector={false}
+          />
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function Search() {
   const [, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -192,67 +232,45 @@ function Search() {
 
           {submittedQuery && data && dagTotal + docTotal > 0 && (
             <div className="space-y-6">
-              {dagTotal > 0 && (
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 className="text-lg font-semibold">
-                      {dagTotal} DAG {dagTotal === 1 ? 'result' : 'results'}
-                    </h2>
-                    {data.dags.pagination.totalPages > 1 && (
-                      <DAGPagination
-                        totalPages={data.dags.pagination.totalPages}
-                        page={data.dags.pagination.currentPage}
-                        pageLimit={SEARCH_PAGE_SIZE}
-                        pageChange={(page) => {
-                          syncFilters({
-                            searchVal: submittedQuery,
-                            dagPage: page,
-                            docPage,
-                          });
-                        }}
-                        onPageLimitChange={() => {}}
-                        showPageLimitSelector={false}
-                      />
-                    )}
-                  </div>
-                  <SearchResult
-                    type="dag"
-                    query={submittedQuery}
-                    results={data.dags.results}
-                  />
-                </div>
-              )}
+              <SearchSection
+                title="DAG"
+                total={dagTotal}
+                totalPages={data.dags.pagination.totalPages}
+                currentPage={data.dags.pagination.currentPage}
+                pageChange={(page) => {
+                  syncFilters({
+                    searchVal: submittedQuery,
+                    dagPage: page,
+                    docPage,
+                  });
+                }}
+              >
+                <SearchResult
+                  type="dag"
+                  query={submittedQuery}
+                  results={data.dags.results}
+                />
+              </SearchSection>
 
-              {docTotal > 0 && (
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <h2 className="text-lg font-semibold">
-                      {docTotal} Doc {docTotal === 1 ? 'result' : 'results'}
-                    </h2>
-                    {data.docs.pagination.totalPages > 1 && (
-                      <DAGPagination
-                        totalPages={data.docs.pagination.totalPages}
-                        page={data.docs.pagination.currentPage}
-                        pageLimit={SEARCH_PAGE_SIZE}
-                        pageChange={(page) => {
-                          syncFilters({
-                            searchVal: submittedQuery,
-                            dagPage,
-                            docPage: page,
-                          });
-                        }}
-                        onPageLimitChange={() => {}}
-                        showPageLimitSelector={false}
-                      />
-                    )}
-                  </div>
-                  <SearchResult
-                    type="doc"
-                    query={submittedQuery}
-                    results={data.docs.results}
-                  />
-                </div>
-              )}
+              <SearchSection
+                title="Doc"
+                total={docTotal}
+                totalPages={data.docs.pagination.totalPages}
+                currentPage={data.docs.pagination.currentPage}
+                pageChange={(page) => {
+                  syncFilters({
+                    searchVal: submittedQuery,
+                    dagPage,
+                    docPage: page,
+                  });
+                }}
+              >
+                <SearchResult
+                  type="doc"
+                  query={submittedQuery}
+                  results={data.docs.results}
+                />
+              </SearchSection>
             </div>
           )}
         </div>

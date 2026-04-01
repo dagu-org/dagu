@@ -64,6 +64,46 @@ func toSearchMatchItems(matches []*exec.Match) []api.SearchDAGsMatchItem {
 	return items
 }
 
+func hasMoreMatches(total int, matches []*exec.Match) bool {
+	return total > len(matches)
+}
+
+func toDAGSearchSection(results *exec.PaginatedResult[exec.SearchDAGResult]) api.DAGSearchSection {
+	items := make([]api.DAGSearchPageItem, 0, len(results.Items))
+	for _, item := range results.Items {
+		items = append(items, api.DAGSearchPageItem{
+			FileName:       item.FileName,
+			Name:           item.FileName,
+			MatchCount:     item.MatchCount,
+			HasMoreMatches: hasMoreMatches(item.MatchCount, item.Matches),
+			Matches:        toSearchMatchItems(item.Matches),
+		})
+	}
+
+	return api.DAGSearchSection{
+		Results:    items,
+		Pagination: toPagination(*results),
+	}
+}
+
+func toDocSearchSection(results *exec.PaginatedResult[agent.DocSearchResult]) api.DocSearchSection {
+	items := make([]api.DocSearchPageItem, 0, len(results.Items))
+	for _, item := range results.Items {
+		items = append(items, api.DocSearchPageItem{
+			Id:             item.ID,
+			Title:          item.Title,
+			MatchCount:     item.MatchCount,
+			HasMoreMatches: hasMoreMatches(item.MatchCount, item.Matches),
+			Matches:        toSearchMatchItems(item.Matches),
+		})
+	}
+
+	return api.DocSearchSection{
+		Results:    items,
+		Pagination: toPagination(*results),
+	}
+}
+
 // SearchAll returns paginated DAG and document search results for the global search page.
 func (a *API) SearchAll(ctx context.Context, request api.SearchAllRequestObject) (api.SearchAllResponseObject, error) {
 	query, err := validateSearchQuery(request.Params.Q)
@@ -87,17 +127,6 @@ func (a *API) SearchAll(ctx context.Context, request api.SearchAllRequestObject)
 		logger.Warn(ctx, "Skipped DAG while searching", tag.Reason(dagErr))
 	}
 
-	dagItems := make([]api.DAGSearchPageItem, 0, len(dagResults.Items))
-	for _, item := range dagResults.Items {
-		dagItems = append(dagItems, api.DAGSearchPageItem{
-			FileName:       item.FileName,
-			Name:           item.FileName,
-			MatchCount:     item.MatchCount,
-			HasMoreMatches: item.MatchCount > len(item.Matches),
-			Matches:        toSearchMatchItems(item.Matches),
-		})
-	}
-
 	docSection := api.DocSearchSection{
 		Results:    []api.DocSearchPageItem{},
 		Pagination: emptyPagination(docPaginator),
@@ -113,29 +142,11 @@ func (a *API) SearchAll(ctx context.Context, request api.SearchAllRequestObject)
 			logger.Error(ctx, "Failed to search docs", tag.Error(err))
 			return nil, internalError(err)
 		}
-
-		docItems := make([]api.DocSearchPageItem, 0, len(docResults.Items))
-		for _, item := range docResults.Items {
-			docItems = append(docItems, api.DocSearchPageItem{
-				Id:             item.ID,
-				Title:          item.Title,
-				MatchCount:     item.MatchCount,
-				HasMoreMatches: item.MatchCount > len(item.Matches),
-				Matches:        toSearchMatchItems(item.Matches),
-			})
-		}
-
-		docSection = api.DocSearchSection{
-			Results:    docItems,
-			Pagination: toPagination(*docResults),
-		}
+		docSection = toDocSearchSection(docResults)
 	}
 
 	return api.SearchAll200JSONResponse{
-		Dags: api.DAGSearchSection{
-			Results:    dagItems,
-			Pagination: toPagination(*dagResults),
-		},
+		Dags: toDAGSearchSection(dagResults),
 		Docs: docSection,
 	}, nil
 }

@@ -624,7 +624,7 @@ func (store *Storage) SearchPaginated(ctx context.Context, opts exec.SearchDAGsO
 }
 
 // SearchMatches paginates snippets for one DAG definition.
-func (store *Storage) SearchMatches(ctx context.Context, fileName string, opts exec.SearchDAGMatchesOptions) (
+func (store *Storage) SearchMatches(_ context.Context, fileName string, opts exec.SearchDAGMatchesOptions) (
 	*exec.PaginatedResult[*exec.Match], error,
 ) {
 	pg := opts.Paginator
