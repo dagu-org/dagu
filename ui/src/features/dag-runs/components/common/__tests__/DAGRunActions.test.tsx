@@ -3,7 +3,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Status } from '@/api/v1/schema';
+import { Status, StatusLabel } from '@/api/v1/schema';
 import DAGRunActions from '../DAGRunActions';
 import {
   getDAGRunTerminateAction,
@@ -124,8 +124,11 @@ describe('DAGRunActions', () => {
           name: 'retry-dag',
           dagRunId: 'run-1',
           status: Status.Failed,
+          statusLabel: StatusLabel.failed,
           autoRetryCount: 1,
           autoRetryLimit: 3,
+          startedAt: '',
+          finishedAt: '',
         }}
         name="retry-dag"
         displayMode="full"
@@ -142,8 +145,11 @@ describe('DAGRunActions', () => {
           name: 'nested-dag',
           dagRunId: 'run-1',
           status: Status.Failed,
+          statusLabel: StatusLabel.failed,
           autoRetryCount: 1,
           autoRetryLimit: 3,
+          startedAt: '',
+          finishedAt: '',
         }}
         name="nested-dag"
         displayMode="full"

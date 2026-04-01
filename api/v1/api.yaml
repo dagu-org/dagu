@@ -1920,7 +1920,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "409":
-          description: "Conflict (run ID already exists or concurrency guard blocks execution)"
+          description: "Conflict (run ID already exists)"
           content:
             application/json:
               schema:

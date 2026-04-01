@@ -1,7 +1,11 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -96,16 +100,15 @@ function ConfirmModal({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Confirm the requested action.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">{children}</div>
 
         <DialogFooter>
-          <Button
-            ref={cancelButtonRef}
-            variant="ghost"
-            onClick={dismissModal}
-          >
+          <Button ref={cancelButtonRef} variant="ghost" onClick={dismissModal}>
             <X className="h-4 w-4" />
             Cancel
           </Button>

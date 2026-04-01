@@ -189,12 +189,18 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		return nil, err
 	}
 
+	if singleton {
+		if err := a.checkSingletonRunning(ctx, dag); err != nil {
+			return nil, err
+		}
+	}
+
 	tags, err := extractTagsParam(request.Body.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), singleton, tags); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), tags); err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -1749,30 +1755,103 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		return nil, err
 	}
 
-	attempt, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(request.Name, request.DagRunId))
+	retryDagRunID := request.DagRunId
+	stepName := ""
+	if request.Body != nil {
+		if request.Body.DagRunId != "" && request.DagRunId != "" && request.Body.DagRunId != request.DagRunId {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "dagRunId in the request body must match the path parameter",
+			}
+		}
+		if request.Body.DagRunId != "" {
+			retryDagRunID = request.Body.DagRunId
+		}
+		stepName = valueOf(request.Body.StepName)
+	}
+
+	if _, err := a.retryDAGRun(ctx, request.Name, request.DagRunId, retryDagRunID, stepName); err != nil {
+		return nil, err
+	}
+
+	return api.RetryDAGRun200Response{}, nil
+}
+
+type retryDAGRunResult struct {
+	queued bool
+}
+
+func (a *API) resolveAttemptForDAGRun(
+	ctx context.Context,
+	dagName, dagRunID string,
+) (exec.DAGRunAttempt, string, error) {
+	if dagRunID != "latest" {
+		attempt, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dagName, dagRunID))
+		if err != nil {
+			return nil, "", &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", dagRunID, dagName),
+			}
+		}
+		return attempt, dagRunID, nil
+	}
+
+	attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
 	if err != nil {
-		return nil, &Error{
+		return nil, "", &Error{
 			HTTPStatus: http.StatusNotFound,
 			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+			Message:    fmt.Sprintf("no dag-runs found for DAG %s", dagName),
 		}
+	}
+	if attempt == nil {
+		return nil, "", &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("no dag-runs found for DAG %s", dagName),
+		}
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read latest dag-run status: %w", err)
+	}
+	if status == nil || status.DAGRunID == "" {
+		return nil, "", fmt.Errorf("failed to read latest dag-run status: status data is nil")
+	}
+
+	return attempt, status.DAGRunID, nil
+}
+
+func (a *API) retryDAGRun(ctx context.Context, dagName, dagRunID, retryDagRunID, stepName string) (retryDAGRunResult, error) {
+	if retryDagRunID == "" {
+		retryDagRunID = dagRunID
+	}
+
+	attempt, sourceDagRunID, err := a.resolveAttemptForDAGRun(ctx, dagName, dagRunID)
+	if err != nil {
+		return retryDAGRunResult{}, err
+	}
+
+	if retryDagRunID == "" || retryDagRunID == dagRunID {
+		retryDagRunID = sourceDagRunID
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error reading DAG: %w", err)
+		return retryDAGRunResult{}, fmt.Errorf("error reading DAG: %w", err)
 	}
-
-	stepName := valueOf(request.Body.StepName)
 
 	// For DAGs using a global queue, enqueue the retry so it respects queue capacity.
 	// Step retry is not supported via queue (queue processor does not pass step name).
 	if stepName == "" && a.config.FindQueueConfig(dag.ProcGroup()) != nil {
 		if err := a.enqueueRetry(ctx, attempt, dag); err != nil {
-			return nil, err
+			return retryDAGRunResult{}, err
 		}
-		a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, false)
-		return api.RetryDAGRun200Response{}, nil
+		a.logRetryAudit(ctx, dagName, sourceDagRunID, stepName, false)
+		return retryDAGRunResult{queued: true}, nil
 	}
 
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
@@ -1780,7 +1859,7 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 		// Get previous status for retry context
 		prevStatus, err := attempt.ReadStatus(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error reading status: %w", err)
+			return retryDAGRunResult{}, fmt.Errorf("error reading status: %w", err)
 		}
 
 		// Create and dispatch retry task to coordinator
@@ -1797,43 +1876,41 @@ func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObj
 			dag.Name,
 			string(dag.YamlData),
 			coordinatorv1.Operation_OPERATION_RETRY,
-			request.Body.DagRunId,
+			retryDagRunID,
 			opts...,
 		)
 
 		if err := a.coordinatorCli.Dispatch(ctx, task); err != nil {
-			return nil, fmt.Errorf("error dispatching retry to coordinator: %w", err)
+			return retryDAGRunResult{}, fmt.Errorf("error dispatching retry to coordinator: %w", err)
 		}
 
-		// Log distributed DAG retry
-		a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, true)
-		return api.RetryDAGRun200Response{}, nil
+		a.logRetryAudit(ctx, dagName, sourceDagRunID, stepName, true)
+		return retryDAGRunResult{}, nil
 	}
 
 	// Local retry path: launch the retry subprocess asynchronously so the API
 	// returns immediately instead of blocking until the DAG run completes.
 	prevStatus, err := attempt.ReadStatus(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error reading status: %w", err)
+		return retryDAGRunResult{}, fmt.Errorf("error reading status: %w", err)
 	}
 
 	prepared, err := a.prepareRetryDAGForSubprocess(ctx, dag, prevStatus)
 	if err != nil {
-		return nil, fmt.Errorf("error preparing DAG retry env: %w", err)
+		return retryDAGRunResult{}, fmt.Errorf("error preparing DAG retry env: %w", err)
 	}
 
-	spec := a.subCmdBuilder.Retry(prepared, request.Body.DagRunId, stepName)
+	spec := a.subCmdBuilder.Retry(prepared, retryDagRunID, stepName)
 	if err := runtime.Start(ctx, spec); err != nil {
-		return nil, fmt.Errorf("error retrying DAG: %w", err)
+		return retryDAGRunResult{}, fmt.Errorf("error retrying DAG: %w", err)
 	}
 
 	// Wait briefly for the retry process to start, matching the pattern used
 	// by the start endpoint to confirm the subprocess launched successfully.
-	a.waitForRetryStarted(ctx, dag, request.Body.DagRunId)
+	a.waitForRetryStarted(ctx, dag, retryDagRunID)
 
-	// Log local DAG retry
-	a.logRetryAudit(ctx, request.Name, request.DagRunId, stepName, false)
-	return api.RetryDAGRun200Response{}, nil
+	a.logRetryAudit(ctx, dagName, sourceDagRunID, stepName, false)
+	return retryDAGRunResult{}, nil
 }
 
 // enqueueRetry enqueues the retry and persists Queued status via exec.EnqueueRetry.
@@ -2101,90 +2178,101 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		return nil, err
 	}
 
-	attempt, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(request.Name, request.DagRunId))
-	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+	var opts rescheduleDAGRunOptions
+	if body := request.Body; body != nil {
+		if body.DagName != nil {
+			opts.nameOverride = *body.DagName
+		}
+		if body.DagRunId != nil {
+			opts.newDagRunID = *body.DagRunId
 		}
 	}
-	if attempt == nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
-		}
+
+	result, err := a.rescheduleDAGRun(ctx, request.Name, request.DagRunId, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.RescheduleDAGRun200JSONResponse{
+		DagRunId: result.newDagRunID,
+		Queued:   result.queued,
+	}, nil
+}
+
+type rescheduleDAGRunOptions struct {
+	nameOverride string
+	newDagRunID  string
+}
+
+type rescheduleDAGRunResult struct {
+	newDagRunID string
+	queued      bool
+}
+
+func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, opts rescheduleDAGRunOptions) (rescheduleDAGRunResult, error) {
+	attempt, sourceDagRunID, err := a.resolveAttemptForDAGRun(ctx, dagName, dagRunID)
+	if err != nil {
+		return rescheduleDAGRunResult{}, err
 	}
 
 	status, err := attempt.ReadStatus(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read status: %w", err)
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to read status: %w", err)
 	}
 	if status == nil {
-		return nil, fmt.Errorf("failed to read status: status data is nil")
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to read status: status data is nil")
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read DAG snapshot: %w", err)
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to read DAG snapshot: %w", err)
 	}
 	if dag == nil {
-		return nil, fmt.Errorf("failed to read DAG snapshot: DAG data is nil")
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to read DAG snapshot: DAG data is nil")
 	}
 
 	dag.Params = status.ParamsList
 
-	var (
-		nameOverride string
-		newDagRunID  string
-		// Enforce singleton mode for rescheduled DAG runs to prevent duplicate runs of the same workflow execution.
-		singleton = true
-	)
-
-	if body := request.Body; body != nil {
-		if body.DagName != nil && *body.DagName != "" {
-			nameOverride = *body.DagName
-			if err := core.ValidateDAGName(nameOverride); err != nil {
-				return nil, &Error{
-					HTTPStatus: http.StatusBadRequest,
-					Code:       api.ErrorCodeBadRequest,
-					Message:    err.Error(),
-				}
+	nameOverride := strings.TrimSpace(opts.nameOverride)
+	if nameOverride != "" {
+		if err := core.ValidateDAGName(nameOverride); err != nil {
+			return rescheduleDAGRunResult{}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
 			}
-			dag.Name = nameOverride
 		}
-		if body.DagRunId != nil && *body.DagRunId != "" {
-			newDagRunID = *body.DagRunId
-		}
+		dag.Name = nameOverride
 	}
 
+	newDagRunID := strings.TrimSpace(opts.newDagRunID)
+	if err := validateDAGRunID(newDagRunID); err != nil {
+		return rescheduleDAGRunResult{}, err
+	}
 	if newDagRunID == "" {
 		id, genErr := a.dagRunMgr.GenDAGRunID(ctx)
 		if genErr != nil {
-			return nil, fmt.Errorf("error generating dag-run ID: %w", genErr)
+			return rescheduleDAGRunResult{}, fmt.Errorf("error generating dag-run ID: %w", genErr)
 		}
 		newDagRunID = id
 	}
 
 	if err := a.ensureDAGRunIDUnique(ctx, dag, newDagRunID); err != nil {
-		return nil, err
+		return rescheduleDAGRunResult{}, err
 	}
 
 	logger.Info(ctx, "Rescheduling dag-run",
 		tag.DAG(dag.Name),
-		slog.String("from-dag-run-id", request.DagRunId),
-		tag.RunID(newDagRunID),
-		slog.Bool("singleton", singleton))
+		slog.String("from-dag-run-id", sourceDagRunID),
+		tag.RunID(newDagRunID))
 
 	if err := a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		dagRunID:     newDagRunID,
 		nameOverride: nameOverride,
-		fromRunID:    request.DagRunId,
-		target:       request.Name,
-		singleton:    singleton,
+		fromRunID:    sourceDagRunID,
+		target:       dagName,
 	}); err != nil {
-		return nil, fmt.Errorf("failed to start dag-run: %w", err)
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to start dag-run: %w", err)
 	}
 
 	queued := false
@@ -2193,8 +2281,8 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	}
 
 	detailsMap := map[string]any{
-		"dag_name":        request.Name,
-		"from_dag_run_id": request.DagRunId,
+		"dag_name":        dagName,
+		"from_dag_run_id": sourceDagRunID,
 		"new_dag_run_id":  newDagRunID,
 		"queued":          queued,
 	}
@@ -2203,9 +2291,9 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 	}
 	a.logAudit(ctx, audit.CategoryDAG, "dag_reschedule", detailsMap)
 
-	return api.RescheduleDAGRun200JSONResponse{
-		DagRunId: newDagRunID,
-		Queued:   queued,
+	return rescheduleDAGRunResult{
+		newDagRunID: newDagRunID,
+		queued:      queued,
 	}, nil
 }
 

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -95,5 +95,46 @@ describe('DAGRunTable', () => {
     expect(screen.getByText('2026-03-13T10:00:00Z')).toBeInTheDocument();
     expect(screen.getByText('2026-03-13T10:00:30Z')).toBeInTheDocument();
     expect(screen.getByText('1/3 auto retries')).toBeInTheDocument();
+    expect(screen.queryByText('Select')).not.toBeInTheDocument();
+  });
+
+  it('toggles bulk selection without opening the focused run', () => {
+    const onSelectDAGRun = vi.fn();
+    const onToggleBulkSelect = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <ConfigContext.Provider value={config}>
+          <DAGRunTable
+            dagRuns={[
+              {
+                dagRunId: 'run-1',
+                name: 'bulk-dag',
+                status: Status.Failed,
+                statusLabel: StatusLabel.failed,
+                autoRetryCount: 0,
+                autoRetryLimit: 0,
+                triggerType: TriggerType.manual,
+                queuedAt: '2026-03-13T10:00:30Z',
+                startedAt: '2026-03-13T10:01:00Z',
+                finishedAt: '2026-03-13T10:02:00Z',
+              },
+            ]}
+            onSelectDAGRun={onSelectDAGRun}
+            onToggleBulkSelect={onToggleBulkSelect}
+          />
+        </ConfigContext.Provider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Select DAG run bulk-dag run-1' })
+    );
+
+    expect(onToggleBulkSelect).toHaveBeenCalledWith({
+      name: 'bulk-dag',
+      dagRunId: 'run-1',
+    });
+    expect(onSelectDAGRun).not.toHaveBeenCalled();
   });
 });

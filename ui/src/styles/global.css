@@ -945,4 +945,39 @@ select:focus-visible {
     height: 100%;
     min-height: 0;
   }
+
+  @media (min-width: 1001px) {
+    .api-docs-viewer .references-layout {
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      grid-template-rows: var(--scalar-header-height, 0px) minmax(0, 1fr) auto;
+      --full-height: 100%;
+    }
+
+    .api-docs-viewer .references-navigation,
+    .api-docs-viewer .references-rendered {
+      min-height: 0;
+      max-height: 100%;
+    }
+
+    .api-docs-viewer .references-navigation {
+      overflow: hidden;
+    }
+
+    .api-docs-viewer .references-navigation-list {
+      position: static;
+      top: auto;
+      height: 100%;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .api-docs-viewer .references-rendered {
+      height: 100%;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
 }

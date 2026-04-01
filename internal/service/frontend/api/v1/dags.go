@@ -744,7 +744,7 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton, tags); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, tags); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -837,7 +837,7 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, singleton, tags); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, tags); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -927,12 +927,11 @@ func (a *API) waitForDAGCompletion(
 	}
 }
 
-func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, singleton bool, tags string) error {
+func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride, tags string) error {
 	return a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		params:       params,
 		dagRunID:     dagRunID,
 		nameOverride: nameOverride,
-		singleton:    singleton,
 		triggerType:  core.TriggerTypeManual,
 		tags:         tags,
 	})
@@ -1003,7 +1002,6 @@ type startDAGRunOptions struct {
 	params       string
 	dagRunID     string
 	nameOverride string
-	singleton    bool
 	fromRunID    string
 	target       string
 	triggerType  core.TriggerType
