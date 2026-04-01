@@ -8,7 +8,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/coder/websocket v1.8.14
 	github.com/containerd/errdefs v1.0.0
-	github.com/containerd/platforms v1.0.0-rc.2
+	github.com/containerd/platforms v1.0.0-rc.4
 	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/creack/pty v1.1.24
 	github.com/fsnotify/fsnotify v1.9.0
