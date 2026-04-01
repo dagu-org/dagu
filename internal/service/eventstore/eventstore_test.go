@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -76,6 +77,57 @@ func TestStableIDUsesCollisionSafeFraming(t *testing.T) {
 		stableID("a", "b\x1fc"),
 		stableID("a\x1fb", "c"),
 	)
+}
+
+func TestNewDAGRunEventEmbedsNotificationSnapshot(t *testing.T) {
+	t.Parallel()
+
+	status := &exec.DAGRunStatus{
+		Name:       "briefing",
+		DAGRunID:   "run-1",
+		AttemptID:  "attempt-1",
+		Status:     core.Failed,
+		Error:      "boom",
+		Log:        "/tmp/run.log",
+		QueuedAt:   "2026-04-01T09:00:00Z",
+		StartedAt:  "2026-04-01T09:01:00Z",
+		FinishedAt: "2026-04-01T09:02:00Z",
+		Nodes: []*exec.Node{
+			{
+				Step:   core.Step{Name: "fetch"},
+				Status: core.NodeFailed,
+				Error:  "node boom",
+			},
+		},
+		OnFailure: &exec.Node{
+			Step:  core.Step{Name: "notify"},
+			Error: "handler boom",
+		},
+	}
+
+	event := NewDAGRunEvent(Source{Service: SourceServiceServer, Instance: "test"}, TypeDAGRunFailed, status, map[string]any{"reason": "boom"})
+	require.NotNil(t, event)
+	require.NotNil(t, event.Data)
+	assert.Equal(t, "boom", event.Data["reason"])
+
+	restored, err := NotificationStatusFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, restored)
+	assert.Equal(t, status.Name, restored.Name)
+	assert.Equal(t, status.DAGRunID, restored.DAGRunID)
+	assert.Equal(t, status.AttemptID, restored.AttemptID)
+	assert.Equal(t, status.Status, restored.Status)
+	assert.Equal(t, status.Error, restored.Error)
+	assert.Equal(t, status.Log, restored.Log)
+	assert.Equal(t, status.StartedAt, restored.StartedAt)
+	assert.Equal(t, status.FinishedAt, restored.FinishedAt)
+	require.Len(t, restored.Nodes, 1)
+	assert.Equal(t, "fetch", restored.Nodes[0].Step.Name)
+	assert.Equal(t, core.NodeFailed, restored.Nodes[0].Status)
+	assert.Equal(t, "node boom", restored.Nodes[0].Error)
+	require.NotNil(t, restored.OnFailure)
+	assert.Equal(t, "notify", restored.OnFailure.Step.Name)
+	assert.Equal(t, "handler boom", restored.OnFailure.Error)
 }
 
 type captureStore struct {

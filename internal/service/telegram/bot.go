@@ -16,8 +16,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/chatbridge"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -39,10 +39,11 @@ type telegramAPI interface {
 
 // Config holds configuration for the Telegram bot.
 type Config struct {
-	Token          string
-	AllowedChatIDs []int64
-	SafeMode       bool
-	DAGRunStore    exec.DAGRunStore // optional: enables DAG run monitoring
+	Token                 string
+	AllowedChatIDs        []int64
+	SafeMode              bool
+	EventService          *eventstore.Service
+	NotificationStateFile string
 }
 
 // chatState tracks the agent session state for a single Telegram chat.
@@ -57,16 +58,17 @@ type chatState struct {
 
 // Bot is a Telegram bot that forwards messages to the Dagu agent API.
 type Bot struct {
-	cfg           Config
-	agentAPI      AgentService
-	botAPI        telegramAPI
-	selfUsername  string
-	chats         sync.Map // chatID (int64) -> *chatState
-	allowedChats  map[int64]struct{}
-	dagRunStore   exec.DAGRunStore
-	logger        *slog.Logger
-	incomingDelay time.Duration
-	typingDelay   time.Duration
+	cfg                   Config
+	agentAPI              AgentService
+	botAPI                telegramAPI
+	selfUsername          string
+	chats                 sync.Map // chatID (int64) -> *chatState
+	allowedChats          map[int64]struct{}
+	eventService          *eventstore.Service
+	notificationStateFile string
+	logger                *slog.Logger
+	incomingDelay         time.Duration
+	typingDelay           time.Duration
 }
 
 // New creates a new Telegram bot instance.
@@ -89,15 +91,16 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 	}
 
 	return &Bot{
-		cfg:           cfg,
-		agentAPI:      agentAPI,
-		botAPI:        botAPI,
-		selfUsername:  botAPI.Self.UserName,
-		allowedChats:  allowed,
-		dagRunStore:   cfg.DAGRunStore,
-		logger:        logger,
-		incomingDelay: defaultIncomingBatchDelay,
-		typingDelay:   defaultTypingRefreshInterval,
+		cfg:                   cfg,
+		agentAPI:              agentAPI,
+		botAPI:                botAPI,
+		selfUsername:          botAPI.Self.UserName,
+		allowedChats:          allowed,
+		eventService:          cfg.EventService,
+		notificationStateFile: cfg.NotificationStateFile,
+		logger:                logger,
+		incomingDelay:         defaultIncomingBatchDelay,
+		typingDelay:           defaultTypingRefreshInterval,
 	}, nil
 }
 
@@ -108,10 +111,12 @@ func (b *Bot) Run(ctx context.Context) error {
 		slog.Int("allowed_chats", len(b.allowedChats)),
 	)
 
-	// Start DAG run monitor if a DAGRunStore is available
-	if b.dagRunStore != nil {
-		monitor := NewDAGRunMonitor(b.dagRunStore, b.agentAPI, b, b.logger)
+	// Start DAG run monitor if the event store is available.
+	if b.eventService != nil {
+		monitor := NewDAGRunMonitor(b.eventService, b.notificationStateFile, b.agentAPI, b, b.logger)
 		go monitor.Run(ctx)
+	} else {
+		b.logger.Warn("Event store is not configured; DAG run notifications are disabled")
 	}
 
 	u := tgbotapi.NewUpdate(0)

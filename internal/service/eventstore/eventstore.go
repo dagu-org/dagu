@@ -205,6 +205,13 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 		return nil
 	}
 	source = normalizeSource(source)
+	data = cloneData(data)
+	if snapshot := newNotificationStatusSnapshot(status); snapshot != nil {
+		if data == nil {
+			data = make(map[string]any, 1)
+		}
+		data[notificationStatusSnapshotDataKey] = snapshot
+	}
 	event := &Event{
 		ID:             DAGRunEventID(eventType, status.Name, status.DAGRunID, status.AttemptID),
 		SchemaVersion:  SchemaVersion,
@@ -218,7 +225,7 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 		DAGRunID:       status.DAGRunID,
 		AttemptID:      status.AttemptID,
 		Status:         status.Status.String(),
-		Data:           cloneData(data),
+		Data:           data,
 	}
 	event.Normalize()
 	return event

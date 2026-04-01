@@ -44,6 +44,7 @@ const (
 
 // NotificationEvent is a status snapshot buffered for delivery.
 type NotificationEvent struct {
+	Key        string
 	Status     *exec.DAGRunStatus
 	ObservedAt time.Time
 }
@@ -175,19 +176,26 @@ func (b *NotificationBatcher) DrainAndStop() []NotificationPendingBatch {
 }
 
 // Enqueue adds a status snapshot into the appropriate destination/window bucket.
-func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunStatus) bool {
-	if destination == "" || status == nil {
+func (b *NotificationBatcher) Enqueue(destination string, event NotificationEvent) bool {
+	if destination == "" || event.Status == nil || event.Key == "" {
 		return false
 	}
 
-	class, ok := NotificationClassForStatus(status.Status)
+	class, ok := NotificationClassForStatus(event.Status.Status)
 	if !ok {
 		return false
 	}
 
-	now := time.Now()
-	snapshot := cloneNotificationStatus(status)
-	runKey := NotificationRunKey(snapshot)
+	observedAt := event.ObservedAt
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	snapshot := NotificationEvent{
+		Key:        event.Key,
+		Status:     cloneNotificationStatus(event.Status),
+		ObservedAt: observedAt,
+	}
+	runKey := NotificationRunKey(snapshot.Status)
 	destRunKey := notificationDestinationRunKey(destination, runKey)
 
 	b.mu.Lock()
@@ -200,7 +208,7 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 	if existingBucketKey, ok := b.runIndex[destRunKey]; ok {
 		if existingBucket := b.buckets[existingBucketKey]; existingBucket != nil {
 			if existingEvent, exists := existingBucket.events[runKey]; exists {
-				if existingEvent.Status.Status == snapshot.Status {
+				if existingEvent.Key == snapshot.Key {
 					return true
 				}
 				delete(existingBucket.events, runKey)
@@ -223,7 +231,7 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 			id:          b.nextBucketID,
 			destination: destination,
 			class:       class,
-			windowStart: now,
+			windowStart: observedAt,
 			events:      make(map[string]NotificationEvent),
 		}
 		b.buckets[bucketKey] = bucket
@@ -234,10 +242,7 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 		})
 	}
 
-	bucket.events[runKey] = NotificationEvent{
-		Status:     snapshot,
-		ObservedAt: now,
-	}
+	bucket.events[runKey] = snapshot
 	b.runIndex[destRunKey] = bucketKey
 	return true
 }

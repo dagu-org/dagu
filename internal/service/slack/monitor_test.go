@@ -79,7 +79,7 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredSlackChannel(t *testing.T) {
 		allowedChannels: map[string]struct{}{"COK": {}, "CFAIL": {}},
 		logger:          logger,
 	}
-	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	monitor := newDAGRunMonitorWithWindows(nil, "", service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
 	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
@@ -125,7 +125,7 @@ func TestDAGRunMonitor_RunDrainsPendingSlackNotificationsWithoutLLM(t *testing.T
 		allowedChannels: map[string]struct{}{"D123": {}},
 		logger:          logger,
 	}
-	monitor := newDAGRunMonitorWithWindows(&stubNotificationDAGRunStore{}, service, bot, logger, time.Hour, time.Hour)
+	monitor := newDAGRunMonitorWithWindows(nil, "", service, bot, logger, time.Hour, time.Hour)
 
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",

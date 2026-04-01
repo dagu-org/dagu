@@ -71,7 +71,7 @@ func TestNotificationMonitor_ShutdownDrainRetriesInFlightBatchWithoutLLM(t *test
 	cfg.PollInterval = time.Hour
 	cfg.SeenEvictInterval = time.Hour
 
-	monitor := NewNotificationMonitor(nil, transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
+	monitor := NewNotificationMonitor(nil, "", transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -144,7 +144,7 @@ func TestNotificationMonitor_ShutdownDrainFlushesPendingBatchWithoutLLM(t *testi
 	cfg.PollInterval = time.Hour
 	cfg.SeenEvictInterval = time.Hour
 
-	monitor := NewNotificationMonitor(nil, transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
+	monitor := NewNotificationMonitor(nil, "", transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
