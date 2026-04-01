@@ -65,7 +65,7 @@ require (
 	k8s.io/client-go v0.35.3
 	modernc.org/sqlite v1.43.0
 	mvdan.cc/sh/v3 v3.12.0
-	tailscale.com v1.94.0
+	tailscale.com v1.94.2
 )
 
 require (
