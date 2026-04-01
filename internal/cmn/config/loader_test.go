@@ -171,15 +171,17 @@ func TestLoad_Env(t *testing.T) {
 
 	expected := &Config{
 		Core: Core{
-			Debug:         true,
-			LogFormat:     "json",
-			TZ:            "Europe/Berlin",
-			TzOffsetInSec: berlinOffset,
-			Location:      berlinLoc,
-			DefaultShell:  "/bin/zsh",
-			SkipExamples:  false,
-			Peer:          Peer{Insecure: true}, // Default is true
-			BaseEnv:       cfg.Core.BaseEnv,     // Dynamic, copy from actual
+			Debug:                  true,
+			LogFormat:              "json",
+			TZ:                     "Europe/Berlin",
+			TzOffsetInSec:          berlinOffset,
+			Location:               berlinLoc,
+			DefaultShell:           "/bin/zsh",
+			SkipExamples:           false,
+			EnvPassthrough:         []string{},
+			EnvPassthroughPrefixes: []string{},
+			Peer:                   Peer{Insecure: true}, // Default is true
+			BaseEnv:                cfg.Core.BaseEnv,     // Dynamic, copy from actual
 		},
 		Server: Server{
 			Host:        "test.example.com",
@@ -432,6 +434,53 @@ func TestLoad_BaseEnvDoesNotInjectSyntheticTZWhenTimezoneConfigUnset(t *testing.
 	require.Equal(t, expectedTZ, cfg.Core.TZ)
 }
 
+func TestLoad_BaseEnvIncludesConfiguredEnvPassthroughFromYAML(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	preserveTZEnv(t)
+	t.Setenv("CONFIG_EXACT_ENV", "exact-value")
+	t.Setenv("CONFIG_PREFIX_TOKEN", "prefix-value")
+	t.Setenv("CONFIG_BLOCKED_ENV", "blocked-value")
+	require.NoError(t, os.WriteFile(configFile, []byte(`
+env_passthrough:
+  - CONFIG_EXACT_ENV
+  - CONFIG_EXACT_ENV
+env_passthrough_prefixes:
+  - CONFIG_PREFIX_
+  - CONFIG_PREFIX_
+`), 0o600))
+
+	cfg := testLoad(t, WithConfigFile(configFile), WithAppHomeDir(tempDir))
+	baseEnv := cfg.Core.BaseEnv.AsSlice()
+
+	require.Equal(t, []string{"CONFIG_EXACT_ENV"}, cfg.Core.EnvPassthrough)
+	require.Equal(t, []string{"CONFIG_PREFIX_"}, cfg.Core.EnvPassthroughPrefixes)
+	require.Contains(t, baseEnv, "CONFIG_EXACT_ENV=exact-value")
+	require.Contains(t, baseEnv, "CONFIG_PREFIX_TOKEN=prefix-value")
+	require.NotContains(t, baseEnv, "CONFIG_BLOCKED_ENV=blocked-value")
+}
+
+func TestLoad_BaseEnvIncludesConfiguredEnvPassthroughFromEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	preserveTZEnv(t)
+	t.Setenv("EXACT_FROM_ENV", "exact-value")
+	t.Setenv("PREFIX_FROM_ENV_TOKEN", "prefix-value")
+	t.Setenv("BLOCKED_FROM_ENV", "blocked-value")
+	t.Setenv("DAGU_ENV_PASSTHROUGH", " EXACT_FROM_ENV , EXACT_FROM_ENV ,,")
+	t.Setenv("DAGU_ENV_PASSTHROUGH_PREFIXES", " PREFIX_FROM_ENV_ , PREFIX_FROM_ENV_ ,,")
+	require.NoError(t, os.WriteFile(configFile, []byte("# minimal config"), 0o600))
+
+	cfg := testLoad(t, WithConfigFile(configFile), WithAppHomeDir(tempDir))
+	baseEnv := cfg.Core.BaseEnv.AsSlice()
+
+	require.Equal(t, []string{"EXACT_FROM_ENV"}, cfg.Core.EnvPassthrough)
+	require.Equal(t, []string{"PREFIX_FROM_ENV_"}, cfg.Core.EnvPassthroughPrefixes)
+	require.Contains(t, baseEnv, "EXACT_FROM_ENV=exact-value")
+	require.Contains(t, baseEnv, "PREFIX_FROM_ENV_TOKEN=prefix-value")
+	require.NotContains(t, baseEnv, "BLOCKED_FROM_ENV=blocked-value")
+}
+
 func TestLoad_YAML(t *testing.T) {
 	cfg := loadFromYAML(t, `
 host: "0.0.0.0"
@@ -529,13 +578,15 @@ scheduler:
 
 	expected := &Config{
 		Core: Core{
-			Debug:         true,
-			LogFormat:     "json",
-			TZ:            "UTC",
-			TzOffsetInSec: 0,
-			Location:      utcLoc,
-			DefaultShell:  "/bin/bash",
-			SkipExamples:  true,
+			Debug:                  true,
+			LogFormat:              "json",
+			TZ:                     "UTC",
+			TzOffsetInSec:          0,
+			Location:               utcLoc,
+			DefaultShell:           "/bin/bash",
+			SkipExamples:           true,
+			EnvPassthrough:         []string{},
+			EnvPassthroughPrefixes: []string{},
 			Peer: Peer{
 				CertFile:      "/path/to/peer-cert.pem",
 				KeyFile:       "/path/to/peer-key.pem",

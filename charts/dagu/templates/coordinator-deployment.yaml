@@ -36,6 +36,9 @@ spec:
               value: "0.0.0.0"
             - name: DAGU_COORDINATOR_ADVERTISE
               value: "{{ include "dagu.fullname" . }}-coordinator.{{ .Release.Namespace }}.svc.cluster.local"
+{{- with include "dagu.extraEnv" . }}
+{{ . | nindent 12 }}
+{{- end }}
           ports:
             - name: grpc
               containerPort: 50055

@@ -4,6 +4,7 @@
 package config
 
 import (
+	"maps"
 	"os"
 	"strings"
 )
@@ -33,7 +34,14 @@ var defaultPrefixes = []string{
 
 // LoadBaseEnv loads and filters current environment variables.
 func LoadBaseEnv() BaseEnv {
-	return BaseEnv{variables: filterEnv(os.Environ(), defaultWhitelist, defaultPrefixes)}
+	return LoadBaseEnvWithExtras(nil, nil)
+}
+
+// LoadBaseEnvWithExtras loads and filters current environment variables using
+// the built-in allowlist plus any operator-configured exact names or prefixes.
+func LoadBaseEnvWithExtras(extraAllow []string, extraPrefixes []string) BaseEnv {
+	allow, prefixes := baseEnvPolicy(extraAllow, extraPrefixes)
+	return BaseEnv{variables: filterEnv(os.Environ(), allow, prefixes)}
 }
 
 // AsSlice returns a defensive copy of the filtered environment.
@@ -68,13 +76,14 @@ func withEnvOverrides(base []string, overrides ...string) []string {
 // case-insensitive matching on Windows).
 func filterEnv(envs []string, allow map[string]bool, prefixes []string) []string {
 	var filtered []string
+	normalizedPrefixes := normalizePrefixes(prefixes)
 	for _, e := range envs {
 		key, _, found := strings.Cut(e, "=")
 		if !found {
 			continue
 		}
 		// normalizeEnvKey handles platform differences (case-insensitive on Windows)
-		if allow[normalizeEnvKey(key)] || hasAllowedPrefix(key, prefixes) {
+		if allow[normalizeEnvKey(key)] || hasAllowedPrefix(key, normalizedPrefixes) {
 			filtered = append(filtered, e)
 		}
 	}
@@ -82,10 +91,56 @@ func filterEnv(envs []string, allow map[string]bool, prefixes []string) []string
 }
 
 func hasAllowedPrefix(k string, prefixes []string) bool {
+	key := normalizeEnvKey(k)
 	for _, p := range prefixes {
-		if strings.HasPrefix(k, p) {
+		if strings.HasPrefix(key, p) {
 			return true
 		}
 	}
 	return false
+}
+
+func baseEnvPolicy(extraAllow []string, extraPrefixes []string) (map[string]bool, []string) {
+	allow := make(map[string]bool, len(defaultWhitelist)+len(extraAllow))
+	maps.Copy(allow, defaultWhitelist)
+	for _, key := range normalizeEnvEntries(extraAllow) {
+		allow[normalizeEnvKey(key)] = true
+	}
+
+	prefixes := append([]string{}, defaultPrefixes...)
+	prefixes = append(prefixes, normalizeEnvEntries(extraPrefixes)...)
+	return allow, dedupePreserveOrder(prefixes)
+}
+
+func normalizePrefixes(prefixes []string) []string {
+	normalized := make([]string, 0, len(prefixes))
+	for _, prefix := range prefixes {
+		normalized = append(normalized, normalizeEnvKey(prefix))
+	}
+	return normalized
+}
+
+func normalizeEnvEntries(values []string) []string {
+	trimmed := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		trimmed = append(trimmed, value)
+	}
+	return dedupePreserveOrder(trimmed)
+}
+
+func dedupePreserveOrder(values []string) []string {
+	deduped := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		deduped = append(deduped, value)
+	}
+	return deduped
 }

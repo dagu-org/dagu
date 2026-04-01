@@ -48,6 +48,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+{{- with include "dagu.extraEnv" $ }}
+{{ . | nindent 12 }}
+{{- end }}
           ports:
             - name: health
               containerPort: {{ $.Values.worker.healthPort }}
