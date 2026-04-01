@@ -34,3 +34,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- join "," $pairs -}}
 {{- end }}
+
+{{- define "dagu.extraEnv" -}}
+{{- with .Values.extraEnv }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}

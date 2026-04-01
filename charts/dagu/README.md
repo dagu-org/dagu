@@ -155,6 +155,37 @@ workerSelector:
   gpu: "true"
 ```
 
+### Environment Passthrough
+
+Dagu filters host/container environment variables before exposing them to workflow steps. To allow additional runtime env vars such as proxy or certificate settings, configure both:
+
+- `extraEnv` to place the source env vars into the Dagu pods
+- `config.envPassthrough` or `config.envPassthroughPrefixes` to forward selected env vars into step execution
+
+Example:
+
+```yaml
+config:
+  envPassthrough:
+    - SSL_CERT_FILE
+  envPassthroughPrefixes:
+    - HTTP_
+    - HTTPS_
+    - NO_
+
+extraEnv:
+  - name: HTTP_PROXY
+    value: http://proxy.example.com:8080
+  - name: HTTPS_PROXY
+    value: http://proxy.example.com:8080
+  - name: NO_PROXY
+    value: 127.0.0.1,localhost,.svc
+  - name: SSL_CERT_FILE
+    value: /etc/ssl/certs/custom-ca.pem
+```
+
+`config.envPassthrough` matches exact env var names. `config.envPassthroughPrefixes` matches by prefix. Existing built-in defaults such as Kubernetes discovery env vars still apply automatically.
+
 ### Authentication
 
 By default, the chart uses builtin authentication. On first run, visit the UI to create an admin account via the setup page.

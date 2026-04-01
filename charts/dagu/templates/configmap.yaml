@@ -16,6 +16,14 @@ data:
     port: 8080
     api_base_path: "/api/v1"
     default_execution_mode: "distributed"
+{{- with .Values.config.envPassthrough }}
+    env_passthrough:
+{{ toYaml . | indent 6 }}
+{{- end }}
+{{- with .Values.config.envPassthroughPrefixes }}
+    env_passthrough_prefixes:
+{{ toYaml . | indent 6 }}
+{{- end }}
 
     # Coordinator (distributed execution)
     coordinator:

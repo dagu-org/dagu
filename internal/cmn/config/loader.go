@@ -297,17 +297,22 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 }
 
 func (l *ConfigLoader) loadCoreConfig(cfg *Config, def Definition) error {
-	baseEnv := LoadBaseEnv()
+	envPassthrough := normalizeEnvEntries(parseStringList(l.v.Get("env_passthrough")))
+	envPassthroughPrefixes := normalizeEnvEntries(parseStringList(l.v.Get("env_passthrough_prefixes")))
+
+	baseEnv := LoadBaseEnvWithExtras(envPassthrough, envPassthroughPrefixes)
 	baseEnv.variables = append(baseEnv.variables, l.additionalBaseEnv...)
 
 	cfg.Core = Core{
-		Debug:        def.Debug,
-		LogFormat:    def.LogFormat,
-		TZ:           def.TZ,
-		DefaultShell: def.DefaultShell,
-		SkipExamples: l.v.GetBool("skip_examples"),
-		BaseEnv:      baseEnv,
-		Peer:         l.loadPeerConfig(def.Peer),
+		Debug:                  def.Debug,
+		LogFormat:              def.LogFormat,
+		TZ:                     def.TZ,
+		DefaultShell:           def.DefaultShell,
+		SkipExamples:           l.v.GetBool("skip_examples"),
+		EnvPassthrough:         envPassthrough,
+		EnvPassthroughPrefixes: envPassthroughPrefixes,
+		BaseEnv:                baseEnv,
+		Peer:                   l.loadPeerConfig(def.Peer),
 	}
 
 	if err := setTimezone(&cfg.Core); err != nil {
@@ -1548,6 +1553,8 @@ var envBindings = []envBinding{
 	// Core
 	{key: "default_shell", env: "DEFAULT_SHELL"},
 	{key: "skip_examples", env: "SKIP_EXAMPLES"},
+	{key: "env_passthrough", env: "ENV_PASSTHROUGH"},
+	{key: "env_passthrough_prefixes", env: "ENV_PASSTHROUGH_PREFIXES"},
 
 	// Secrets
 	{key: "secrets.vault.address", env: "SECRETS_VAULT_ADDRESS"},
