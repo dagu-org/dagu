@@ -38,7 +38,7 @@ export function WorkspaceSelector({
   const handleCreate = useCallback(() => {
     if (createStateRef.current !== 'idle') return;
     createStateRef.current = 'submitted';
-    const name = inputRef.current?.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+    const name = inputRef.current?.value.trim().replace(/[^a-zA-Z0-9_]/g, '');
     if (name) {
       onCreate(name);
     }

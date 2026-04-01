@@ -25,7 +25,7 @@ func TestStore_CreateAndGetByID(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	ws := workspace.NewWorkspace("test-ws", "A test workspace")
+	ws := workspace.NewWorkspace("test_ws", "A test workspace")
 	require.NoError(t, store.Create(ctx, ws))
 
 	got, err := store.GetByID(ctx, ws.ID)
@@ -39,10 +39,10 @@ func TestStore_GetByName(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	ws := workspace.NewWorkspace("named-ws", "")
+	ws := workspace.NewWorkspace("named_ws", "")
 	require.NoError(t, store.Create(ctx, ws))
 
-	got, err := store.GetByName(ctx, "named-ws")
+	got, err := store.GetByName(ctx, "named_ws")
 	require.NoError(t, err)
 	assert.Equal(t, ws.ID, got.ID)
 }
@@ -51,8 +51,8 @@ func TestStore_List(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	require.NoError(t, store.Create(ctx, workspace.NewWorkspace("ws-1", "")))
-	require.NoError(t, store.Create(ctx, workspace.NewWorkspace("ws-2", "")))
+	require.NoError(t, store.Create(ctx, workspace.NewWorkspace("ws_1", "")))
+	require.NoError(t, store.Create(ctx, workspace.NewWorkspace("ws_2", "")))
 
 	list, err := store.List(ctx)
 	require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestStore_Delete(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	ws := workspace.NewWorkspace("to-delete", "")
+	ws := workspace.NewWorkspace("to_delete", "")
 	require.NoError(t, store.Create(ctx, ws))
 
 	require.NoError(t, store.Delete(ctx, ws.ID))
@@ -100,6 +100,26 @@ func TestStore_DuplicateName(t *testing.T) {
 	require.NoError(t, store.Create(ctx, workspace.NewWorkspace("dup", "")))
 	err := store.Create(ctx, workspace.NewWorkspace("dup", ""))
 	assert.ErrorIs(t, err, workspace.ErrWorkspaceAlreadyExists)
+}
+
+func TestStore_CreateRejectsInvalidName(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	err := store.Create(ctx, workspace.NewWorkspace("ops-team", ""))
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+}
+
+func TestStore_UpdateRejectsInvalidName(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	ws := workspace.NewWorkspace("ops_team", "")
+	require.NoError(t, store.Create(ctx, ws))
+
+	ws.Name = "ops-team"
+	err := store.Update(ctx, ws)
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
 }
 
 func TestStore_NotFound(t *testing.T) {

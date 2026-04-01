@@ -61,6 +61,12 @@ func (a *API) CreateWorkspace(ctx context.Context, request api.CreateWorkspaceRe
 
 	ws := workspace.NewWorkspace(body.Name, valueOf(body.Description))
 	if err := a.workspaceStore.Create(ctx, ws); err != nil {
+		if errors.Is(err, workspace.ErrInvalidWorkspaceName) {
+			return api.CreateWorkspace400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: "Workspace name may contain only letters, numbers, and underscores",
+			}, nil
+		}
 		if errors.Is(err, workspace.ErrWorkspaceAlreadyExists) {
 			return api.CreateWorkspace409JSONResponse{
 				Code:    api.ErrorCodeAlreadyExists,
@@ -129,6 +135,13 @@ func (a *API) UpdateWorkspace(ctx context.Context, request api.UpdateWorkspaceRe
 	existing.UpdatedAt = time.Now().UTC()
 
 	if err := a.workspaceStore.Update(ctx, existing); err != nil {
+		if errors.Is(err, workspace.ErrInvalidWorkspaceName) {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "Workspace name may contain only letters, numbers, and underscores",
+			}
+		}
 		if errors.Is(err, workspace.ErrWorkspaceAlreadyExists) {
 			return api.UpdateWorkspace409JSONResponse{
 				Code:    api.ErrorCodeAlreadyExists,
