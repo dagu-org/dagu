@@ -35,13 +35,14 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mholt/archives v0.1.5
 	github.com/minio/minio-go/v7 v7.0.98
+	github.com/moby/moby/api v1.54.0
 	github.com/nektos/act v0.2.86
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/sftp v1.13.10
-	github.com/redis/go-redis/v9 v9.7.3
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/rhysd/changelog-from-release/v3 v3.9.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/slog-multi v1.6.0
@@ -175,7 +176,6 @@ require (
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
-	github.com/moby/moby/api v1.54.0 // indirect
 	github.com/moby/moby/client v0.3.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
@@ -226,6 +226,7 @@ require (
 	go.augendre.info/arangolint v0.3.1 // indirect
 	go.augendre.info/fatcontext v0.9.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
