@@ -5,6 +5,7 @@ package intg_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/core"
@@ -336,6 +337,48 @@ steps:
 			"OUT4": test.NotEmpty{},
 			"OUT5": test.NotEmpty{},
 		})
+	})
+
+	t.Run("StdoutAndStderrPathsExpandPrepareTimeVars", func(t *testing.T) {
+		t.Parallel()
+
+		tempDir := t.TempDir()
+		stdoutPath := filepath.Join(tempDir, "dag_${DAG_RUN_STEP_NAME}.out")
+		stderrPath := filepath.Join(tempDir, "dag_${LOG_SUFFIX}.err")
+
+		dag := th.DAG(t, `steps:
+  - name: first
+    command: echo $DAG_RUN_STEP_NAME
+    output: FIRST_OUT
+
+  - name: second
+    env:
+      - LOG_SUFFIX=custom-error
+    stdout: "`+stdoutPath+`"
+    stderr: "`+stderrPath+`"
+    command: |
+      echo "meh"
+      echo "oops" >&2
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.Len(t, status.Nodes, 2)
+
+		firstOutput, ok := status.Nodes[0].OutputVariables.Load("FIRST_OUT")
+		require.True(t, ok)
+		require.Equal(t, "FIRST_OUT=first", firstOutput)
+		require.Equal(t, filepath.Join(tempDir, "dag_second.out"), status.Nodes[1].Step.Stdout)
+		require.Equal(t, filepath.Join(tempDir, "dag_custom-error.err"), status.Nodes[1].Step.Stderr)
+
+		stdoutContent, err := os.ReadFile(status.Nodes[1].Step.Stdout)
+		require.NoError(t, err)
+		require.Contains(t, string(stdoutContent), "meh")
+
+		stderrContent, err := os.ReadFile(status.Nodes[1].Step.Stderr)
+		require.NoError(t, err)
+		require.Contains(t, string(stderrContent), "oops")
 	})
 
 	t.Run("JQ", func(t *testing.T) {

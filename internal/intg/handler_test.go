@@ -5,6 +5,8 @@ package intg_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -790,5 +792,69 @@ steps:
 		// Verify DAG_WAITING_STEPS contains the wait step name with proper formatting
 		assert.Contains(t, outputStr, "waiting_steps:approval-gate",
 			"DAG_WAITING_STEPS should contain 'approval-gate' with correct format")
+	})
+
+	t.Run("SuccessHandler_StdoutPathExpandsDAGRunStatus", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+		tempDir := t.TempDir()
+		stdoutPath := filepath.Join(tempDir, "handler_${DAG_RUN_STATUS}.log")
+
+		dag := th.DAG(t, `
+handler_on:
+  success:
+    stdout: "`+stdoutPath+`"
+    command: echo "handler ran"
+
+steps:
+  - name: step1
+    command: "true"
+`)
+		agent := dag.Agent()
+		agent.RunSuccess(t)
+
+		status := agent.Status(th.Context)
+		require.NotNil(t, status.OnSuccess)
+		require.Equal(t, filepath.Join(tempDir, "handler_succeeded.log"), status.OnSuccess.Step.Stdout)
+
+		content, err := os.ReadFile(status.OnSuccess.Step.Stdout)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "handler ran")
+	})
+
+	t.Run("WaitHandler_StdoutPathExpandsWaitingSteps", func(t *testing.T) {
+		t.Parallel()
+		th := test.Setup(t)
+		tempDir := t.TempDir()
+		stdoutPath := filepath.Join(tempDir, "wait_${DAG_WAITING_STEPS}.log")
+
+		dag := th.DAG(t, `
+type: graph
+handler_on:
+  wait:
+    stdout: "`+stdoutPath+`"
+    command: echo "waiting handler"
+
+steps:
+  - name: setup-step
+    command: "true"
+
+  - name: approval-gate
+    command: "true"
+    approval: {}
+    depends:
+      - setup-step
+`)
+		agent := dag.Agent()
+		_ = agent.Run(th.Context)
+
+		status := agent.Status(th.Context)
+		require.Equal(t, core.Waiting, status.Status)
+		require.NotNil(t, status.OnWait)
+		require.Equal(t, filepath.Join(tempDir, "wait_approval-gate.log"), status.OnWait.Step.Stdout)
+
+		content, err := os.ReadFile(status.OnWait.Step.Stdout)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "waiting handler")
 	})
 }
