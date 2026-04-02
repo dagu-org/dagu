@@ -18,8 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//go:fix inline
 func stringPtr(v string) *string {
-	return &v
+	return new(v)
 }
 
 func TestToExecStatus_MapsRemoteFieldsExplicitly(t *testing.T) {
@@ -34,8 +35,8 @@ func TestToExecStatus_MapsRemoteFieldsExplicitly(t *testing.T) {
 		StartedAt:      "2026-04-02T00:00:00Z",
 		FinishedAt:     "",
 		Log:            "/tmp/example.log",
-		Params:         stringPtr("P1=foo"),
-		WorkerId:       stringPtr("worker-a"),
+		Params:         new("P1=foo"),
+		WorkerId:       new("worker-a"),
 		Tags:           &[]string{"env=prod"},
 		Nodes: []api.Node{
 			{
@@ -120,13 +121,13 @@ func TestEnrichRemoteHistoryStatusPopulatesErrorAndMetadata(t *testing.T) {
 		RootDAGRunName: "example",
 		RootDAGRunId:   "run-1",
 		Status:         api.Status(core.Failed),
-		WorkerId:       stringPtr("worker-a"),
+		WorkerId:       new("worker-a"),
 		Tags:           &[]string{"env=prod"},
 		Nodes: []api.Node{
 			{
 				Step:   api.Step{Name: "step-1"},
 				Status: api.NodeStatus(core.NodeFailed),
-				Error:  stringPtr("boom"),
+				Error:  new("boom"),
 			},
 		},
 	}
