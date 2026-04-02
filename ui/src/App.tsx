@@ -44,6 +44,7 @@ import DAGRunDetails from './pages/dag-runs/dag-run';
 import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
 import DocsPage from './pages/docs';
+import EventLogsPage from './pages/event-logs';
 import GitSyncPage from './pages/git-sync';
 import LicensePage from './pages/license';
 import LoginPage from './pages/login';
@@ -262,6 +263,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                         <Route path="/api-keys" element={<AdminElement><APIKeysPage /></AdminElement>} />
                                         <Route path="/webhooks" element={<DeveloperElement><WebhooksPage /></DeveloperElement>} />
                                         <Route path="/terminal" element={<AdminElement><TerminalPage /></AdminElement>} />
+                                        <Route path="/event-logs" element={<ManagerElement><EventLogsPage /></ManagerElement>} />
                                         <Route path="/audit-logs" element={<ManagerElement><LicensedRoute feature="audit"><AuditLogsPage /></LicensedRoute></ManagerElement>} />
                                         <Route path="/license" element={<AdminElement><LicensePage /></AdminElement>} />
                                         <Route path="/git-sync" element={<AdminElement><GitSyncPage /></AdminElement>} />

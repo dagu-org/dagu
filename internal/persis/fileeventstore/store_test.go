@@ -88,17 +88,27 @@ func TestStoreQuerySkipsMalformedAndPaginates(t *testing.T) {
 		mustMarshalEvent(t, eventThree),
 	})
 
-	result, err := store.Query(context.Background(), eventstore.QueryFilter{
-		DAGName: "example",
-		Limit:   1,
-		Offset:  1,
+	firstPage, err := store.Query(context.Background(), eventstore.QueryFilter{
+		DAGName:        "example",
+		Limit:          1,
+		PaginationMode: eventstore.QueryPaginationModeCursor,
 	})
 	require.NoError(t, err)
+	require.Len(t, firstPage.Entries, 1)
+	assert.Equal(t, "evt-2", firstPage.Entries[0].ID)
+	require.NotEmpty(t, firstPage.NextCursor)
 
-	require.Equal(t, 2, result.Total)
-	require.Len(t, result.Entries, 1)
-	assert.Equal(t, "evt-1", result.Entries[0].ID)
-	assert.True(t, result.Entries[0].OccurredAt.Equal(dayOne))
+	secondPage, err := store.Query(context.Background(), eventstore.QueryFilter{
+		DAGName:        "example",
+		Limit:          1,
+		Cursor:         firstPage.NextCursor,
+		PaginationMode: eventstore.QueryPaginationModeCursor,
+	})
+	require.NoError(t, err)
+	require.Len(t, secondPage.Entries, 1)
+	assert.Equal(t, "evt-1", secondPage.Entries[0].ID)
+	assert.True(t, secondPage.Entries[0].OccurredAt.Equal(dayOne))
+	assert.Empty(t, secondPage.NextCursor)
 }
 
 func TestStoreQueryIncludesLegacyDailyFilesWithinHourlyRange(t *testing.T) {
@@ -120,6 +130,37 @@ func TestStoreQueryIncludesLegacyDailyFilesWithinHourlyRange(t *testing.T) {
 
 	require.Len(t, result.Entries, 1)
 	assert.Equal(t, "evt-legacy", result.Entries[0].ID)
+	assert.Empty(t, result.NextCursor)
+}
+
+func TestStoreQuerySupportsOffsetCompatibilityPagination(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	first := testEvent("evt-1", time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC))
+	first.RecordedAt = first.OccurredAt.Add(time.Minute)
+	second := testEvent("evt-2", time.Date(2026, 3, 29, 11, 0, 0, 0, time.UTC))
+	second.RecordedAt = second.OccurredAt.Add(time.Minute)
+	writeCommittedEvents(t, store.baseDir, first.OccurredAt, [][]byte{
+		mustMarshalEvent(t, first),
+	})
+	writeCommittedEvents(t, store.baseDir, second.OccurredAt, [][]byte{
+		mustMarshalEvent(t, second),
+	})
+
+	page, err := store.Query(context.Background(), eventstore.QueryFilter{
+		DAGName: "example",
+		Limit:   1,
+		Offset:  1,
+	})
+	require.NoError(t, err)
+	require.Len(t, page.Entries, 1)
+	require.NotNil(t, page.Total)
+	assert.Equal(t, 2, *page.Total)
+	assert.Equal(t, "evt-2", page.Entries[0].ID)
+	assert.Empty(t, page.NextCursor)
 }
 
 func TestStoreQueryReadsLargeCommittedEventLine(t *testing.T) {
@@ -142,6 +183,57 @@ func TestStoreQueryReadsLargeCommittedEventLine(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Entries, 1)
 	assert.Equal(t, event.ID, result.Entries[0].ID)
+	assert.Empty(t, result.NextCursor)
+}
+
+func TestStoreQueryRejectsInvalidCursor(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	result, err := store.Query(context.Background(), eventstore.QueryFilter{
+		Cursor:         "not-a-valid-cursor",
+		PaginationMode: eventstore.QueryPaginationModeCursor,
+	})
+	require.ErrorIs(t, err, eventstore.ErrInvalidQueryCursor)
+	assert.Nil(t, result)
+}
+
+func TestStoreQueryReturnsEmptyWhenCursorFileWasRemoved(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	first := testEvent("evt-1", time.Date(2026, 3, 29, 10, 0, 0, 0, time.UTC))
+	second := testEvent("evt-2", time.Date(2026, 3, 29, 9, 0, 0, 0, time.UTC))
+	writeCommittedEvents(t, store.baseDir, first.OccurredAt, [][]byte{
+		mustMarshalEvent(t, first),
+	})
+	writeCommittedEvents(t, store.baseDir, second.OccurredAt, [][]byte{
+		mustMarshalEvent(t, second),
+	})
+
+	page, err := store.Query(context.Background(), eventstore.QueryFilter{
+		Limit:          1,
+		PaginationMode: eventstore.QueryPaginationModeCursor,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, page.NextCursor)
+
+	cursor, err := decodeQueryCursor(page.NextCursor, eventstore.QueryFilter{})
+	require.NoError(t, err)
+	require.NoError(t, os.Remove(filepath.Join(store.baseDir, cursor.File)))
+
+	resumed, err := store.Query(context.Background(), eventstore.QueryFilter{
+		Limit:          1,
+		Cursor:         page.NextCursor,
+		PaginationMode: eventstore.QueryPaginationModeCursor,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resumed.Entries)
+	assert.Empty(t, resumed.NextCursor)
 }
 
 func mustMarshalEvent(t *testing.T, event *eventstore.Event) []byte {

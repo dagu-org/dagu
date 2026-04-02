@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -91,6 +92,77 @@ func (s *Store) Query(_ context.Context, filter eventstore.QueryFilter) (*events
 		return nil, err
 	}
 
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+
+	if usesCursorPagination(filter) {
+		return s.queryWithCursor(files, filter, limit)
+	}
+	return s.queryWithOffset(files, filter, limit)
+}
+
+func usesCursorPagination(filter eventstore.QueryFilter) bool {
+	return filter.PaginationMode == eventstore.QueryPaginationModeCursor || filter.Cursor != ""
+}
+
+func (s *Store) queryWithCursor(files []string, filter eventstore.QueryFilter, limit int) (*eventstore.QueryResult, error) {
+
+	cursor, err := decodeQueryCursor(filter.Cursor, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	startIndex := 0
+	startOffset := int64(-1)
+	if cursor.File != "" {
+		found := false
+		for i, file := range files {
+			if filepath.Base(file) != cursor.File {
+				continue
+			}
+			startIndex = i
+			startOffset = cursor.Offset
+			found = true
+			break
+		}
+		if !found {
+			return &eventstore.QueryResult{Entries: []*eventstore.Event{}}, nil
+		}
+	}
+
+	matches := make([]scannedQueryEvent, 0, limit+1)
+	for i := startIndex; i < len(files) && len(matches) < limit+1; i++ {
+		offset := int64(-1)
+		if i == startIndex && cursor.File != "" {
+			offset = startOffset
+		}
+		loaded, err := s.readCommittedEventsReverse(files[i], filter, limit+1-len(matches), offset)
+		if err != nil {
+			return nil, err
+		}
+		matches = append(matches, loaded...)
+	}
+
+	entries := make([]*eventstore.Event, 0, min(limit, len(matches)))
+	for i := 0; i < len(matches) && i < limit; i++ {
+		entries = append(entries, matches[i].Event)
+	}
+
+	result := &eventstore.QueryResult{Entries: entries}
+	if len(matches) > limit {
+		nextCursor, err := encodeQueryCursor(filter, matches[limit-1].File, matches[limit-1].LineStart)
+		if err != nil {
+			return nil, err
+		}
+		result.NextCursor = nextCursor
+	}
+
+	return result, nil
+}
+
+func (s *Store) queryWithOffset(files []string, filter eventstore.QueryFilter, limit int) (*eventstore.QueryResult, error) {
 	var entries []*eventstore.Event
 	for _, file := range files {
 		loaded, err := s.readCommittedEvents(file, filter)
@@ -102,19 +174,21 @@ func (s *Store) Query(_ context.Context, filter eventstore.QueryFilter) (*events
 
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].OccurredAt.Equal(entries[j].OccurredAt) {
+			if entries[i].RecordedAt.Equal(entries[j].RecordedAt) {
+				return entries[i].ID > entries[j].ID
+			}
 			return entries[i].RecordedAt.After(entries[j].RecordedAt)
 		}
 		return entries[i].OccurredAt.After(entries[j].OccurredAt)
 	})
 
 	total := len(entries)
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 100
-	}
 	offset := max(filter.Offset, 0)
 	if offset >= total {
-		return &eventstore.QueryResult{Entries: []*eventstore.Event{}, Total: total}, nil
+		return &eventstore.QueryResult{
+			Entries: []*eventstore.Event{},
+			Total:   &total,
+		}, nil
 	}
 
 	entries = entries[offset:]
@@ -124,7 +198,7 @@ func (s *Store) Query(_ context.Context, filter eventstore.QueryFilter) (*events
 
 	return &eventstore.QueryResult{
 		Entries: entries,
-		Total:   total,
+		Total:   &total,
 	}, nil
 }
 
@@ -173,6 +247,12 @@ func (s *Store) listCommittedFiles(startTime, endTime time.Time) ([]string, erro
 	return paths, nil
 }
 
+type scannedQueryEvent struct {
+	Event     *eventstore.Event
+	File      string
+	LineStart int64
+}
+
 func (s *Store) readCommittedEvents(filePath string, filter eventstore.QueryFilter) ([]*eventstore.Event, error) {
 	f, err := os.Open(filePath) //nolint:gosec // controlled path
 	if err != nil {
@@ -212,6 +292,67 @@ func (s *Store) readCommittedEvents(filePath string, filter eventstore.QueryFilt
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("fileeventstore: scan %s: %w", filePath, err)
+	}
+	return entries, nil
+}
+
+func (s *Store) readCommittedEventsReverse(filePath string, filter eventstore.QueryFilter, limit int, offset int64) ([]scannedQueryEvent, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	f, err := os.Open(filePath) //nolint:gosec // controlled path
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("fileeventstore: open %s: %w", filePath, err)
+	}
+	defer func() { _ = f.Close() }()
+
+	reader, err := newReverseLineReader(f, offset)
+	if err != nil {
+		return nil, fmt.Errorf("fileeventstore: open reverse reader for %s: %w", filePath, err)
+	}
+
+	entries := make([]scannedQueryEvent, 0, limit)
+	for {
+		line, lineStart, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			if errors.Is(err, eventstore.ErrInvalidQueryCursor) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("fileeventstore: reverse scan %s: %w", filePath, err)
+		}
+
+		event := new(eventstore.Event)
+		if err := json.Unmarshal(line, event); err != nil {
+			slog.Warn("fileeventstore: skipping malformed event log line",
+				slog.String("file", filePath),
+				slog.String("error", err.Error()))
+			continue
+		}
+		event.Normalize()
+		if err := event.Validate(); err != nil {
+			slog.Warn("fileeventstore: skipping invalid event log line",
+				slog.String("file", filePath),
+				slog.String("error", err.Error()))
+			continue
+		}
+		if !matchesFilter(event, filter) {
+			continue
+		}
+		entries = append(entries, scannedQueryEvent{
+			Event:     event,
+			File:      filepath.Base(filePath),
+			LineStart: lineStart,
+		})
+		if len(entries) >= limit {
+			break
+		}
 	}
 	return entries, nil
 }

@@ -219,7 +219,7 @@ func TestDAGRunMonitor_FlushesSuccessDigestIntoSingleThreadAndSkipsReplay(t *tes
 		allowedChannels: map[string]struct{}{"C123": {}},
 		logger:          logger,
 	}
-	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	monitor := newDAGRunMonitorWithWindows(nil, "", service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
 	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
@@ -280,7 +280,7 @@ func TestDAGRunMonitor_FlushesUrgentSingleIntoExistingDMSession(t *testing.T) {
 		allowedChannels: map[string]struct{}{"D123": {}},
 		logger:          logger,
 	}
-	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	monitor := newDAGRunMonitorWithWindows(nil, "", service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
 	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 

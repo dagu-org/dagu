@@ -16,8 +16,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/chatbridge"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
@@ -38,12 +38,13 @@ type slackClientAPI interface {
 
 // Config holds configuration for the Slack bot.
 type Config struct {
-	BotToken          string
-	AppToken          string
-	AllowedChannelIDs []string
-	SafeMode          bool
-	RespondToAll      bool             // respond to all channel messages, not just @mentions
-	DAGRunStore       exec.DAGRunStore // optional: enables DAG run monitoring
+	BotToken              string
+	AppToken              string
+	AllowedChannelIDs     []string
+	SafeMode              bool
+	RespondToAll          bool // respond to all channel messages, not just @mentions
+	EventService          *eventstore.Service
+	NotificationStateFile string
 }
 
 // messageRef identifies a specific Slack message for reaction management.
@@ -65,16 +66,17 @@ type chatState struct {
 
 // Bot is a Slack bot that forwards messages to the Dagu agent API.
 type Bot struct {
-	cfg             Config
-	agentAPI        AgentService
-	slackClient     slackClientAPI
-	socketClient    *socketmode.Client
-	chats           sync.Map // conversationKey -> *chatState
-	activeThreads   sync.Map // "channelID:threadTS" -> true
-	allowedChannels map[string]struct{}
-	dagRunStore     exec.DAGRunStore
-	logger          *slog.Logger
-	incomingDelay   time.Duration
+	cfg                   Config
+	agentAPI              AgentService
+	slackClient           slackClientAPI
+	socketClient          *socketmode.Client
+	chats                 sync.Map // conversationKey -> *chatState
+	activeThreads         sync.Map // "channelID:threadTS" -> true
+	allowedChannels       map[string]struct{}
+	eventService          *eventstore.Service
+	notificationStateFile string
+	logger                *slog.Logger
+	incomingDelay         time.Duration
 }
 
 // New creates a new Slack bot instance.
@@ -105,14 +107,15 @@ func New(cfg Config, agentAPI AgentService, logger *slog.Logger) (*Bot, error) {
 	}
 
 	return &Bot{
-		cfg:             cfg,
-		agentAPI:        agentAPI,
-		slackClient:     slackClient,
-		socketClient:    socketClient,
-		allowedChannels: allowed,
-		dagRunStore:     cfg.DAGRunStore,
-		logger:          logger,
-		incomingDelay:   defaultIncomingBatchDelay,
+		cfg:                   cfg,
+		agentAPI:              agentAPI,
+		slackClient:           slackClient,
+		socketClient:          socketClient,
+		allowedChannels:       allowed,
+		eventService:          cfg.EventService,
+		notificationStateFile: cfg.NotificationStateFile,
+		logger:                logger,
+		incomingDelay:         defaultIncomingBatchDelay,
 	}, nil
 }
 
@@ -123,10 +126,12 @@ func (b *Bot) Run(ctx context.Context) error {
 		slog.Bool("respond_to_all", b.cfg.RespondToAll),
 	)
 
-	// Start DAG run monitor if a DAGRunStore is available
-	if b.dagRunStore != nil {
-		monitor := NewDAGRunMonitor(b.dagRunStore, b.agentAPI, b, b.logger)
+	// Start DAG run monitor if the event store is available.
+	if b.eventService != nil {
+		monitor := NewDAGRunMonitor(b.eventService, b.notificationStateFile, b.agentAPI, b, b.logger)
 		go monitor.Run(ctx)
+	} else {
+		b.logger.Warn("Event store is not configured; DAG run notifications are disabled")
 	}
 
 	// Start the socket mode client in a goroutine

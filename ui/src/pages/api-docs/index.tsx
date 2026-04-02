@@ -8,8 +8,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import fetchJson from '@/lib/fetchJson';
 import { AlertCircle, ExternalLink, RefreshCw, ShieldCheck } from 'lucide-react';
 import * as React from 'react';
-
-const ScalarViewer = React.lazy(() => import('./ScalarViewer'));
+import ScalarViewer from './ScalarViewer';
 
 type OpenAPIDocument = Record<string, unknown>;
 
@@ -101,15 +100,7 @@ export default function APIDocsPage(): React.ReactElement {
         )}
 
         {state.status === 'ready' && (
-          <React.Suspense
-            fallback={
-              <div className="flex h-full min-h-[420px] items-center justify-center text-sm text-muted-foreground">
-                Preparing the reference viewer…
-              </div>
-            }
-          >
-            <ScalarViewer spec={state.spec} preferredBearerToken={preferredBearerToken} />
-          </React.Suspense>
+          <ScalarViewer spec={state.spec} preferredBearerToken={preferredBearerToken} />
         )}
       </div>
     </div>

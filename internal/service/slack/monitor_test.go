@@ -5,7 +5,6 @@ package slack
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -17,52 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type stubNotificationDAGRunStore struct{}
-
-func (s *stubNotificationDAGRunStore) CreateAttempt(context.Context, *core.DAG, time.Time, string, exec.NewDAGRunAttemptOptions) (exec.DAGRunAttempt, error) {
-	return nil, errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) RecentAttempts(context.Context, string, int) []exec.DAGRunAttempt {
-	return nil
-}
-
-func (s *stubNotificationDAGRunStore) LatestAttempt(context.Context, string) (exec.DAGRunAttempt, error) {
-	return nil, errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) ListStatuses(context.Context, ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
-	return nil, nil
-}
-
-func (s *stubNotificationDAGRunStore) CompareAndSwapLatestAttemptStatus(context.Context, exec.DAGRunRef, string, core.Status, func(*exec.DAGRunStatus) error) (*exec.DAGRunStatus, bool, error) {
-	return nil, false, errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) FindAttempt(context.Context, exec.DAGRunRef) (exec.DAGRunAttempt, error) {
-	return nil, errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) FindSubAttempt(context.Context, exec.DAGRunRef, string) (exec.DAGRunAttempt, error) {
-	return nil, errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) CreateSubAttempt(context.Context, exec.DAGRunRef, string) (exec.DAGRunAttempt, error) {
-	return nil, errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) RemoveOldDAGRuns(context.Context, string, int, ...exec.RemoveOldDAGRunsOption) ([]string, error) {
-	return nil, errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) RenameDAGRuns(context.Context, string, string) error {
-	return errors.New("unexpected call")
-}
-
-func (s *stubNotificationDAGRunStore) RemoveDAGRun(context.Context, exec.DAGRunRef) error {
-	return errors.New("unexpected call")
-}
 
 func TestDAGRunMonitor_RetriesOnlyUndeliveredSlackChannel(t *testing.T) {
 	t.Parallel()
@@ -79,7 +32,7 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredSlackChannel(t *testing.T) {
 		allowedChannels: map[string]struct{}{"COK": {}, "CFAIL": {}},
 		logger:          logger,
 	}
-	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	monitor := newDAGRunMonitorWithWindows(nil, "", service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
 	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 
@@ -125,7 +78,7 @@ func TestDAGRunMonitor_RunDrainsPendingSlackNotificationsWithoutLLM(t *testing.T
 		allowedChannels: map[string]struct{}{"D123": {}},
 		logger:          logger,
 	}
-	monitor := newDAGRunMonitorWithWindows(&stubNotificationDAGRunStore{}, service, bot, logger, time.Hour, time.Hour)
+	monitor := newDAGRunMonitorWithWindows(nil, "", service, bot, logger, time.Hour, time.Hour)
 
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",

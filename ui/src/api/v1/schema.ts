@@ -2713,8 +2713,10 @@ export interface components {
         EventLogsResponse: {
             /** @description List of event log entries */
             entries: components["schemas"]["EventLogEntry"][];
-            /** @description Total number of entries matching the filter (before pagination) */
-            total: number;
+            /** @description Total number of entries matching the filter when using compatibility offset pagination */
+            total?: number;
+            /** @description Opaque cursor for loading the next page of older entries when using cursor pagination */
+            nextCursor?: string;
         };
         /** @description Request body for approving a waiting step */
         ApproveStepRequest: {
@@ -4700,6 +4702,10 @@ export interface components {
         AuditLogLimit: number;
         /** @description Maximum number of entries to return (default 50) */
         EventLogLimit: number;
+        /** @description Opaque cursor for loading older event log entries */
+        EventLogCursor: string;
+        /** @description Pagination mode. Use `cursor` for the event feed infinite-loading flow; omit or use `offset` for compatibility pagination. */
+        EventLogPaginationMode: ComponentsParametersEventLogPaginationMode;
         /** @description Number of entries to skip (for pagination) */
         LogOffset: number;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
@@ -9221,8 +9227,12 @@ export interface operations {
                 endTime?: components["parameters"]["LogEndTime"];
                 /** @description Maximum number of entries to return (default 50) */
                 limit?: components["parameters"]["EventLogLimit"];
+                /** @description Pagination mode. Use `cursor` for the event feed infinite-loading flow; omit or use `offset` for compatibility pagination. */
+                paginationMode?: components["parameters"]["EventLogPaginationMode"];
                 /** @description Number of entries to skip (for pagination) */
                 offset?: components["parameters"]["LogOffset"];
+                /** @description Opaque cursor for loading older event log entries */
+                cursor?: components["parameters"]["EventLogCursor"];
             };
             header?: never;
             path?: never;
@@ -9237,6 +9247,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventLogsResponse"];
+                };
+            };
+            /** @description Malformed cursor or invalid pagination parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Not authenticated */
@@ -13489,4 +13508,8 @@ export enum RemoteNodeResponseAuthType {
 export enum RemoteNodeResponseSource {
     config = "config",
     store = "store"
+}
+export enum ComponentsParametersEventLogPaginationMode {
+    offset = "offset",
+    cursor = "cursor"
 }

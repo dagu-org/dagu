@@ -36,7 +36,7 @@ func TestDAGRunMonitor_RetriesOnlyUndeliveredTelegramChat(t *testing.T) {
 	bot.setActiveSession(cs1, "session-1", "telegram:1")
 	bot.setActiveSession(cs2, "session-2", "telegram:2")
 
-	monitor := newDAGRunMonitorWithWindows(nil, service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
+	monitor := newDAGRunMonitorWithWindows(nil, "", service, bot, logger, 10*time.Millisecond, 20*time.Millisecond)
 	stopMonitor := testutil.StartContextRunner(t, monitor)
 	defer stopMonitor()
 

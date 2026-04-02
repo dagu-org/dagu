@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/service/chatbridge"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
 // DAGRunMonitor watches for DAG run completions and sends notifications via Slack.
@@ -23,9 +24,10 @@ type DAGRunMonitor struct {
 }
 
 // NewDAGRunMonitor creates a new monitor instance.
-func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI AgentService, bot *Bot, logger *slog.Logger) *DAGRunMonitor {
+func NewDAGRunMonitor(eventService *eventstore.Service, stateFile string, agentAPI AgentService, bot *Bot, logger *slog.Logger) *DAGRunMonitor {
 	return newDAGRunMonitorWithWindows(
-		dagRunStore,
+		eventService,
+		stateFile,
 		agentAPI,
 		bot,
 		logger,
@@ -35,7 +37,8 @@ func NewDAGRunMonitor(dagRunStore exec.DAGRunStore, agentAPI AgentService, bot *
 }
 
 func newDAGRunMonitorWithWindows(
-	dagRunStore exec.DAGRunStore,
+	eventService *eventstore.Service,
+	stateFile string,
 	agentAPI AgentService,
 	bot *Bot,
 	logger *slog.Logger,
@@ -49,7 +52,7 @@ func newDAGRunMonitorWithWindows(
 	cfg := chatbridge.DefaultNotificationMonitorConfig()
 	cfg.UrgentWindow = urgentWindow
 	cfg.SuccessWindow = successWindow
-	monitor.core = chatbridge.NewNotificationMonitor(dagRunStore, monitor, logger, cfg)
+	monitor.core = chatbridge.NewNotificationMonitor(eventService, stateFile, monitor, logger, cfg)
 	return monitor
 }
 

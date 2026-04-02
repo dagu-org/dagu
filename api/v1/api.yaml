@@ -3690,7 +3690,9 @@ paths:
         - $ref: "#/components/parameters/LogStartTime"
         - $ref: "#/components/parameters/LogEndTime"
         - $ref: "#/components/parameters/EventLogLimit"
+        - $ref: "#/components/parameters/EventLogPaginationMode"
         - $ref: "#/components/parameters/LogOffset"
+        - $ref: "#/components/parameters/EventLogCursor"
       responses:
         "200":
           description: "List of event log entries"
@@ -3698,6 +3700,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EventLogsResponse"
+        "400":
+          description: "Malformed cursor or invalid pagination parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           description: "Not authenticated"
           content:
@@ -6845,6 +6853,26 @@ components:
         minimum: 1
         maximum: 500
 
+    EventLogCursor:
+      name: cursor
+      in: query
+      description: "Opaque cursor for loading older event log entries"
+      required: false
+      schema:
+        type: string
+
+    EventLogPaginationMode:
+      name: paginationMode
+      in: query
+      description: "Pagination mode. Use `cursor` for the event feed infinite-loading flow; omit or use `offset` for compatibility pagination."
+      required: false
+      schema:
+        type: string
+        enum:
+          - offset
+          - cursor
+        default: offset
+
     LogOffset:
       name: offset
       in: query
@@ -7109,10 +7137,12 @@ components:
           description: "List of event log entries"
         total:
           type: integer
-          description: "Total number of entries matching the filter (before pagination)"
+          description: "Total number of entries matching the filter when using compatibility offset pagination"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of older entries when using cursor pagination"
       required:
         - entries
-        - total
 
     ApproveStepRequest:
       type: object

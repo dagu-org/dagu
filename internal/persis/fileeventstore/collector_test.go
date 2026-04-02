@@ -70,6 +70,25 @@ func TestCollectorDrainOnceQuarantinesMalformedInbox(t *testing.T) {
 	require.Len(t, entries, 1)
 }
 
+func TestCollectorDrainOnceDropsDuplicateInboxEventsWithinSinglePass(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	store, err := New(baseDir)
+	require.NoError(t, err)
+
+	event := testEvent("evt-dup", time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC))
+	require.NoError(t, store.Emit(context.Background(), event))
+	require.NoError(t, store.Emit(context.Background(), event))
+
+	collector, err := NewCollector(baseDir, 10)
+	require.NoError(t, err)
+	require.NoError(t, collector.DrainOnce(context.Background()))
+
+	assertInboxCount(t, store.inboxDir, 0)
+	assertLogLineCount(t, filepath.Join(baseDir, "_2026032912.jsonl"), 1)
+}
+
 func TestCollectorCleanupExpiredPreservesInbox(t *testing.T) {
 	t.Parallel()
 
