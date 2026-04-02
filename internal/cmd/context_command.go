@@ -62,10 +62,16 @@ func contextListCommand() *cobra.Command {
 			return err
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		fmt.Fprintln(w, "CURRENT\tNAME\tSERVER\tDESCRIPTION")
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", currentMarker(current == clicontext.LocalContextName), clicontext.LocalContextName, "-", "Built-in local context")
+		if _, err := fmt.Fprintln(w, "CURRENT\tNAME\tSERVER\tDESCRIPTION"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", currentMarker(current == clicontext.LocalContextName), clicontext.LocalContextName, "-", "Built-in local context"); err != nil {
+			return err
+		}
 		for _, item := range contexts {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", currentMarker(current == item.Name), item.Name, item.ServerURL, item.Description)
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", currentMarker(current == item.Name), item.Name, item.ServerURL, item.Description); err != nil {
+				return err
+			}
 		}
 		return w.Flush()
 	})
@@ -81,10 +87,7 @@ func contextAddCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if err := ctx.ContextStore.Create(ctx, item); err != nil {
-			return err
-		}
-		return nil
+		return ctx.ContextStore.Create(ctx, item)
 	})
 }
 
@@ -121,10 +124,7 @@ func contextUpdateCommand() *cobra.Command {
 		if !ctx.Command.Flags().Changed("timeout") {
 			item.TimeoutSeconds = current.TimeoutSeconds
 		}
-		if err := ctx.ContextStore.Update(ctx, item); err != nil {
-			return err
-		}
-		return nil
+		return ctx.ContextStore.Update(ctx, item)
 	})
 }
 

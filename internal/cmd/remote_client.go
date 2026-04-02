@@ -197,14 +197,6 @@ func (c *remoteClient) getDAGRunDetails(ctx context.Context, name, dagRunID stri
 	return &out, nil
 }
 
-func (c *remoteClient) getDAGRunSpec(ctx context.Context, name, dagRunID string) (*api.DAG, error) {
-	var out api.DAG
-	if err := c.do(ctx, http.MethodGet, dagRunPath(name, dagRunID)+"/spec", nil, &out, nil); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
 func (c *remoteClient) stopAllDAGRuns(ctx context.Context, fileName string) error {
 	return c.do(ctx, http.MethodPost, "/dags/"+url.PathEscape(fileName)+"/stop-all", nil, nil, nil)
 }
@@ -289,7 +281,9 @@ func (c *remoteClient) do(ctx context.Context, method, path string, body any, ou
 		return decodeRemoteError(resp)
 	}
 	if out == nil {
-		io.Copy(io.Discard, resp.Body)
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			return err
+		}
 		return nil
 	}
 	return json.NewDecoder(resp.Body).Decode(out)

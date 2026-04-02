@@ -482,7 +482,9 @@ func buildRemoteHistoryQuery(ctx *Context, args []string) (remoteHistoryQuery, i
 	query.Tags = parseTags(tagsStr)
 	limitStr, _ := ctx.StringParam("limit")
 	if limitStr != "" {
-		fmt.Sscanf(limitStr, "%d", &limit)
+		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+			return query, 0, fmt.Errorf("invalid limit %q: %w", limitStr, err)
+		}
 		if limit <= 0 {
 			limit = 100
 		}

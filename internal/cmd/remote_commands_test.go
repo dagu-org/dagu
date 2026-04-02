@@ -63,8 +63,3 @@ func TestRemoteStatusValueRejectsNone(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not supported")
 }
-
-//go:fix inline
-func stringPtr(v string) *string {
-	return new(v)
-}
