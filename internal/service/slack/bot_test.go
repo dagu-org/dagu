@@ -97,6 +97,9 @@ type fakeSlackAgentService struct {
 	generatedErr     error
 	enqueueResult    agent.ChatQueueResult
 	flushResult      agent.ChatQueueResult
+	createErr        error
+	cancelErr        error
+	enqueueErr       error
 }
 
 func newFakeSlackAgentService(content string) *fakeSlackAgentService {
@@ -118,6 +121,9 @@ func (s *fakeSlackAgentService) CreateSession(_ context.Context, _ agent.UserIde
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.createMessages = append(s.createMessages, req.Message)
+	if s.createErr != nil {
+		return "", "", s.createErr
+	}
 	s.nextSessionID++
 	return fmt.Sprintf("created-%d", s.nextSessionID), "", nil
 }
@@ -141,6 +147,9 @@ func (s *fakeSlackAgentService) EnqueueChatMessage(_ context.Context, sessionID 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sendMessages = append(s.sendMessages, req.Message)
+	if s.enqueueErr != nil {
+		return agent.ChatQueueResult{}, s.enqueueErr
+	}
 	result := s.enqueueResult
 	if result.SessionID == "" {
 		result.SessionID = sessionID
@@ -163,7 +172,9 @@ func (s *fakeSlackAgentService) FlushQueuedChatMessage(_ context.Context, sessio
 }
 
 func (s *fakeSlackAgentService) CancelSession(context.Context, string, string) error {
-	return nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cancelErr
 }
 
 func (s *fakeSlackAgentService) SubmitUserResponse(context.Context, string, string, agent.UserPromptResponse) error {
@@ -344,7 +355,9 @@ func TestBot_ProcessIncoming_BatchesRapidMessagesIntoSingleCreate(t *testing.T) 
 
 	cs := bot.getOrCreateChat("D123", "D123", "")
 	bot.processIncoming(context.Background(), cs, "D123", "", "first")
+	assert.Equal(t, 1, client.postCount(), "first inbound message should post a thinking indicator immediately")
 	bot.processIncoming(context.Background(), cs, "D123", "", "second")
+	assert.Equal(t, 1, client.postCount(), "batched messages should reuse the current thinking indicator")
 
 	require.Eventually(t, func() bool {
 		service.mu.Lock()
@@ -356,6 +369,71 @@ func TestBot_ProcessIncoming_BatchesRapidMessagesIntoSingleCreate(t *testing.T) 
 	defer service.mu.Unlock()
 	require.Len(t, service.createMessages, 1)
 	assert.Equal(t, "first\n\nsecond", service.createMessages[0])
+}
+
+func TestBot_ProcessIncoming_CancelClearsPreFlushThinkingWithoutSession(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeSlackClient{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		slackClient: client,
+		logger:      logger,
+	}
+	cs := bot.getOrCreateChat("D123", "D123", "")
+
+	bot.ensureThinkingIndicator(cs)
+	assert.Equal(t, 1, client.postCount(), "precondition should create a thinking indicator")
+
+	bot.processIncoming(context.Background(), cs, "D123", "", "cancel")
+
+	assert.Equal(t, 1, client.deleteCount(), "cancel without an active session should clear the visible thinking indicator")
+	assert.Equal(t, 2, client.postCount(), "cancel should still send the missing-session reply")
+}
+
+func TestBot_CreateSession_ClearsThinkingIndicatorOnError(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeSlackClient{}
+	service := newFakeSlackAgentService("ignored")
+	service.createErr = assert.AnError
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		cfg:         Config{SafeMode: true},
+		agentAPI:    service,
+		slackClient: client,
+		logger:      logger,
+	}
+	cs := bot.getOrCreateChat("D123", "D123", "")
+	bot.ensureThinkingIndicator(cs)
+
+	bot.createSession(context.Background(), cs, bot.userIdentity("D123"), "hello")
+
+	assert.Equal(t, 1, client.deleteCount(), "create failure should clear the thinking indicator before sending the error")
+	assert.Equal(t, 2, client.postCount(), "error reply should be sent after the initial thinking indicator")
+}
+
+func TestBot_SendAgentMessage_ClearsThinkingIndicatorOnError(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeSlackClient{}
+	service := newFakeSlackAgentService("ignored")
+	service.enqueueErr = assert.AnError
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		cfg:         Config{SafeMode: true},
+		agentAPI:    service,
+		slackClient: client,
+		logger:      logger,
+	}
+	cs := bot.getOrCreateChat("D123", "D123", "")
+	bot.setActiveSession(cs, "existing-session", "slack:D123")
+	bot.ensureThinkingIndicator(cs)
+
+	bot.sendAgentMessage(context.Background(), cs, bot.userIdentity("D123"), "hello")
+
+	assert.Equal(t, 1, client.deleteCount(), "enqueue failure should clear the thinking indicator before sending the error")
+	assert.Equal(t, 2, client.postCount(), "error reply should be sent after the initial thinking indicator")
 }
 
 func TestBot_ProcessStreamResponse_RestartsThinkingWhenWorkContinues(t *testing.T) {
