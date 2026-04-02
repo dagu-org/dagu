@@ -257,9 +257,10 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 	if details != nil {
 		projectionDAG := dag
 		if dag != nil {
-			dagCopy := *dag
-			dagCopy.Name = a.resolveDAGName(ctx, request.FileName)
-			projectionDAG = &dagCopy
+			projectionDAG = &core.DAG{
+				Name:     a.resolveDAGName(ctx, request.FileName),
+				Schedule: dag.Schedule,
+			}
 		}
 		details.NextRun = a.projectNextRun(ctx, projectionDAG)
 	}
