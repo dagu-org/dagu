@@ -18,7 +18,7 @@ type modelStoreKey struct{}
 type memoryStoreKey struct{}
 type skillStoreKey struct{}
 type soulStoreKey struct{}
-type remoteNodeResolverKey struct{}
+type remoteContextResolverKey struct{}
 type oauthManagerKey struct{}
 
 // WithConfigStore injects a ConfigStore into the context.
@@ -81,15 +81,15 @@ func GetSoulStore(ctx context.Context) SoulStore {
 	return s
 }
 
-// WithRemoteNodeResolver injects a RemoteNodeResolver into the context.
-func WithRemoteNodeResolver(ctx context.Context, r RemoteNodeResolver) context.Context {
-	return context.WithValue(ctx, remoteNodeResolverKey{}, r)
+// WithRemoteContextResolver injects a RemoteContextResolver into the context.
+func WithRemoteContextResolver(ctx context.Context, r RemoteContextResolver) context.Context {
+	return context.WithValue(ctx, remoteContextResolverKey{}, r)
 }
 
-// GetRemoteNodeResolver retrieves a RemoteNodeResolver from the context.
-// Returns nil if no RemoteNodeResolver is set.
-func GetRemoteNodeResolver(ctx context.Context) RemoteNodeResolver {
-	r, _ := ctx.Value(remoteNodeResolverKey{}).(RemoteNodeResolver)
+// GetRemoteContextResolver retrieves a RemoteContextResolver from the context.
+// Returns nil if no RemoteContextResolver is set.
+func GetRemoteContextResolver(ctx context.Context) RemoteContextResolver {
+	r, _ := ctx.Value(remoteContextResolverKey{}).(RemoteContextResolver)
 	return r
 }
 

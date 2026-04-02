@@ -23,13 +23,13 @@ func init() {
 	RegisterTool(ToolRegistration{
 		Name:           "remote_agent",
 		Label:          "Remote Agent",
-		Description:    "Send tasks to AI agents on remote Dagu nodes",
+		Description:    "Send tasks to AI agents through remote CLI contexts",
 		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
-			if cfg.RemoteNodeResolver == nil {
+			if cfg.RemoteContextResolver == nil {
 				return nil
 			}
-			return NewRemoteAgentTool(cfg.RemoteNodeResolver)
+			return NewRemoteAgentTool(cfg.RemoteContextResolver)
 		},
 	})
 }
@@ -66,7 +66,7 @@ var remotePollBackoff = &backoff.ExponentialBackoffPolicy{
 }
 
 type remoteAgentInput struct {
-	Node    string `json:"node"`
+	Context string `json:"context"`
 	Message string `json:"message"`
 }
 
@@ -76,34 +76,33 @@ type rejectedPrompt struct {
 	Summary    string
 }
 
-// NewRemoteAgentTool creates a tool for sending tasks to AI agents on remote Dagu nodes.
-func NewRemoteAgentTool(resolver RemoteNodeResolver) *AgentTool {
-	// Build node enum and description at factory time.
-	nodes, err := resolver.ListTokenAuthNodes(context.Background())
-	var nodeNames []any
-	var nodeDesc string
-	if err == nil && len(nodes) > 0 {
-		names := make([]string, 0, len(nodes))
-		for _, n := range nodes {
-			nodeNames = append(nodeNames, n.Name)
+// NewRemoteAgentTool creates a tool for sending tasks to AI agents through remote CLI contexts.
+func NewRemoteAgentTool(resolver RemoteContextResolver) *AgentTool {
+	contexts, err := resolver.ListRemoteContexts(context.Background())
+	var contextNames []any
+	var contextDesc string
+	if err == nil && len(contexts) > 0 {
+		names := make([]string, 0, len(contexts))
+		for _, n := range contexts {
+			contextNames = append(contextNames, n.Name)
 			names = append(names, n.Name)
 		}
-		nodeDesc = fmt.Sprintf(
-			"Send a task to an AI agent on a remote Dagu node. The remote agent runs in safe mode "+
-				"(destructive commands are auto-rejected). Available nodes: %s",
+		contextDesc = fmt.Sprintf(
+			"Send a task to an AI agent through a remote CLI context. The remote agent runs in safe mode "+
+				"(destructive commands are auto-rejected). Available contexts: %s",
 			strings.Join(names, ", "),
 		)
 	} else {
-		nodeDesc = "Send a task to an AI agent on a remote Dagu node. The remote agent runs in safe mode " +
+		contextDesc = "Send a task to an AI agent through a remote CLI context. The remote agent runs in safe mode " +
 			"(destructive commands are auto-rejected)."
 	}
 
-	nodeProp := map[string]any{
+	contextProp := map[string]any{
 		"type":        "string",
-		"description": "Name of the remote Dagu node to target",
+		"description": "Name of the remote CLI context to target",
 	}
-	if len(nodeNames) > 0 {
-		nodeProp["enum"] = nodeNames
+	if len(contextNames) > 0 {
+		contextProp["enum"] = contextNames
 	}
 
 	return &AgentTool{
@@ -111,17 +110,17 @@ func NewRemoteAgentTool(resolver RemoteNodeResolver) *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        "remote_agent",
-				Description: nodeDesc,
+				Description: contextDesc,
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"node": nodeProp,
+						"context": contextProp,
 						"message": map[string]any{
 							"type":        "string",
 							"description": "The task or message to send to the remote agent",
 						},
 					},
-					"required": []any{"node", "message"},
+					"required": []any{"context", "message"},
 				},
 			},
 		},
@@ -132,8 +131,8 @@ func NewRemoteAgentTool(resolver RemoteNodeResolver) *AgentTool {
 				var raw map[string]any
 				_ = json.Unmarshal(input, &raw)
 				details := make(map[string]any)
-				if v, ok := raw["node"]; ok {
-					details["node"] = v
+				if v, ok := raw["context"]; ok {
+					details["context"] = v
 				}
 				if v, ok := raw["message"]; ok {
 					if s, ok := v.(string); ok {
@@ -146,7 +145,7 @@ func NewRemoteAgentTool(resolver RemoteNodeResolver) *AgentTool {
 	}
 }
 
-func makeRemoteAgentRun(resolver RemoteNodeResolver) ToolFunc {
+func makeRemoteAgentRun(resolver RemoteContextResolver) ToolFunc {
 	return func(ctx ToolContext, input json.RawMessage) ToolOut {
 		if ctx.Role.IsSet() && !ctx.Role.CanExecute() {
 			return toolError("Permission denied: remote_agent requires execute permission")
@@ -157,26 +156,25 @@ func makeRemoteAgentRun(resolver RemoteNodeResolver) ToolFunc {
 			return toolError("Failed to parse input: %v", err)
 		}
 
-		if args.Node == "" {
-			return toolError("Parameter 'node' is required")
+		if args.Context == "" {
+			return toolError("Parameter 'context' is required")
 		}
 		if args.Message == "" {
 			return toolError("Parameter 'message' is required")
 		}
 
-		// Resolve the target node.
-		node, err := resolver.GetByName(ctx.Context, args.Node)
+		// Resolve the target context.
+		node, err := resolver.GetByName(ctx.Context, args.Context)
 		if err != nil {
-			// On unknown node, list available nodes.
-			available, listErr := resolver.ListTokenAuthNodes(ctx.Context)
+			available, listErr := resolver.ListRemoteContexts(ctx.Context)
 			if listErr == nil && len(available) > 0 {
 				names := make([]string, 0, len(available))
 				for _, n := range available {
 					names = append(names, n.Name)
 				}
-				return toolError("Unknown node %q. Available nodes: %s", args.Node, strings.Join(names, ", "))
+				return toolError("Unknown context %q. Available contexts: %s", args.Context, strings.Join(names, ", "))
 			}
-			return toolError("Failed to resolve node %q: %v", args.Node, err)
+			return toolError("Failed to resolve context %q: %v", args.Context, err)
 		}
 
 		// Compute overall timeout.
@@ -196,9 +194,9 @@ func makeRemoteAgentRun(resolver RemoteNodeResolver) ToolFunc {
 		// Create remote session.
 		if err := remoteCreateSession(deadlineCtx, client, &node, sessionID, args.Message); err != nil {
 			if deadlineCtx.Err() != nil {
-				return toolError("Remote agent on %q timed out during session creation (session: %s)", args.Node, sessionID)
+				return toolError("Remote agent on %q timed out during session creation (session: %s)", args.Context, sessionID)
 			}
-			return toolError("Failed to create remote session on %q (session: %s): %v", args.Node, sessionID, err)
+			return toolError("Failed to create remote session on %q (session: %s): %v", args.Context, sessionID, err)
 		}
 
 		// Poll for completion.
@@ -208,11 +206,11 @@ func makeRemoteAgentRun(resolver RemoteNodeResolver) ToolFunc {
 			if deadlineCtx.Err() != nil {
 				remoteCancelSession(context.Background(), client, &node, sessionID)
 				if ctx.Context.Err() != nil {
-					return toolError("Remote agent on %q cancelled (session: %s)", args.Node, sessionID)
+					return toolError("Remote agent on %q cancelled (session: %s)", args.Context, sessionID)
 				}
-				return toolError("Remote agent on %q timed out (session: %s)", args.Node, sessionID)
+				return toolError("Remote agent on %q timed out (session: %s)", args.Context, sessionID)
 			}
-			return toolError("Remote agent on %q failed (session: %s): %v", args.Node, sessionID, err)
+			return toolError("Remote agent on %q failed (session: %s): %v", args.Context, sessionID, err)
 		}
 
 		if result == "" {
@@ -252,8 +250,8 @@ func newRemoteHTTPClient(skipTLSVerify bool) *http.Client {
 	}
 }
 
-// remoteURL constructs a full API URL for the given node and path suffix.
-func remoteURL(node *RemoteNodeInfo, path string) string {
+// remoteURL constructs a full API URL for the given context and path suffix.
+func remoteURL(node *RemoteContextInfo, path string) string {
 	return strings.TrimRight(node.APIBaseURL, "/") + path
 }
 
@@ -261,7 +259,7 @@ func remoteURL(node *RemoteNodeInfo, path string) string {
 // On success (2xx), returns the response (caller must close Body). On failure, returns
 // an error containing the status code and up to 1KB of the response body.
 func remoteDoRequest(
-	ctx context.Context, client *http.Client, node *RemoteNodeInfo,
+	ctx context.Context, client *http.Client, node *RemoteContextInfo,
 	method, path string, body io.Reader,
 ) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, remoteURL(node, path), body)
@@ -294,8 +292,8 @@ type remoteSessionRequest struct {
 	SafeMode  bool   `json:"safeMode"`
 }
 
-// remoteCreateSession creates a new agent session on the remote node.
-func remoteCreateSession(ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID, message string) error {
+// remoteCreateSession creates a new agent session on the remote server.
+func remoteCreateSession(ctx context.Context, client *http.Client, node *RemoteContextInfo, sessionID, message string) error {
 	body, err := json.Marshal(remoteSessionRequest{
 		SessionID: sessionID,
 		Message:   message,
@@ -345,7 +343,7 @@ type remotePromptRef struct {
 // remotePollSession polls the remote session until completion or timeout.
 // Returns the last assistant message content, any auto-rejected prompts, and an error.
 func remotePollSession(
-	ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string,
+	ctx context.Context, client *http.Client, node *RemoteContextInfo, sessionID string,
 ) (string, []rejectedPrompt, error) {
 	var (
 		consecutiveFailures int
@@ -403,7 +401,7 @@ func remotePollSession(
 
 // remoteGetSession fetches the session detail from the remote node.
 func remoteGetSession(
-	ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string,
+	ctx context.Context, client *http.Client, node *RemoteContextInfo, sessionID string,
 ) (*remoteSessionDetail, error) {
 	path := fmt.Sprintf("/agent/sessions/%s", sessionID)
 	resp, err := remoteDoRequest(ctx, client, node, http.MethodGet, path, nil)
@@ -421,7 +419,7 @@ func remoteGetSession(
 
 // remoteRespondToPrompt auto-rejects a pending prompt on the remote session.
 func remoteRespondToPrompt(
-	ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string,
+	ctx context.Context, client *http.Client, node *RemoteContextInfo, sessionID string,
 	detail *remoteSessionDetail,
 ) error {
 	promptID := extractPromptID(detail)
@@ -447,7 +445,7 @@ func remoteRespondToPrompt(
 }
 
 // remoteCancelSession sends a best-effort cancel to the remote session.
-func remoteCancelSession(ctx context.Context, client *http.Client, node *RemoteNodeInfo, sessionID string) {
+func remoteCancelSession(ctx context.Context, client *http.Client, node *RemoteContextInfo, sessionID string) {
 	path := fmt.Sprintf("/agent/sessions/%s/cancel", sessionID)
 	resp, err := remoteDoRequest(ctx, client, node, http.MethodPost, path, nil)
 	if err != nil {

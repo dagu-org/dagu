@@ -1,0 +1,226 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"text/tabwriter"
+
+	"github.com/dagu-org/dagu/internal/clicontext"
+	"golang.org/x/term"
+
+	"github.com/spf13/cobra"
+)
+
+func ContextCommand() *cobra.Command {
+	cmd := NewCommand(&cobra.Command{
+		Use:   "context",
+		Short: "Manage CLI contexts for local and remote Dagu servers",
+	}, nil, func(cmd *Context, _ []string) error {
+		return cmd.Command.Help()
+	})
+
+	cmd.AddCommand(contextListCommand())
+	cmd.AddCommand(contextAddCommand())
+	cmd.AddCommand(contextUpdateCommand())
+	cmd.AddCommand(contextRemoveCommand())
+	cmd.AddCommand(contextUseCommand())
+	cmd.AddCommand(contextTestCommand())
+	return cmd
+}
+
+var contextManageFlags = []commandLineFlag{
+	contextServerFlag,
+	contextAPIKeyFlag,
+	contextDescriptionFlag,
+	contextSkipTLSVerifyFlag,
+	contextTimeoutFlag,
+}
+
+var (
+	contextServerFlag        = commandLineFlag{name: "server", usage: "Base URL of the remote Dagu server"}
+	contextAPIKeyFlag        = commandLineFlag{name: "api-key", usage: "API key to use for the context"}
+	contextDescriptionFlag   = commandLineFlag{name: "description", usage: "Optional human-readable description"}
+	contextSkipTLSVerifyFlag = commandLineFlag{name: "skip-tls-verify", usage: "Skip TLS certificate verification", isBool: true}
+	contextTimeoutFlag       = commandLineFlag{name: "timeout", usage: "HTTP timeout in seconds"}
+)
+
+func contextListCommand() *cobra.Command {
+	return NewCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List available CLI contexts",
+	}, nil, func(ctx *Context, _ []string) error {
+		contexts, err := ctx.ContextStore.List(ctx)
+		if err != nil {
+			return err
+		}
+		current, err := ctx.ContextStore.Current(ctx)
+		if err != nil {
+			return err
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+		fmt.Fprintln(w, "CURRENT\tNAME\tSERVER\tDESCRIPTION")
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", currentMarker(current == clicontext.LocalContextName), clicontext.LocalContextName, "-", "Built-in local context")
+		for _, item := range contexts {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", currentMarker(current == item.Name), item.Name, item.ServerURL, item.Description)
+		}
+		return w.Flush()
+	})
+}
+
+func contextAddCommand() *cobra.Command {
+	return NewCommand(&cobra.Command{
+		Use:   "add <name>",
+		Short: "Add a remote CLI context",
+		Args:  cobra.ExactArgs(1),
+	}, contextManageFlags, func(ctx *Context, args []string) error {
+		item, err := readContextInput(ctx, args[0], false)
+		if err != nil {
+			return err
+		}
+		if err := ctx.ContextStore.Create(ctx, item); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func contextUpdateCommand() *cobra.Command {
+	return NewCommand(&cobra.Command{
+		Use:   "update <name>",
+		Short: "Update a remote CLI context",
+		Args:  cobra.ExactArgs(1),
+	}, contextManageFlags, func(ctx *Context, args []string) error {
+		current, err := ctx.ContextStore.Get(ctx, args[0])
+		if err != nil {
+			return err
+		}
+		item, err := readContextInput(ctx, args[0], true)
+		if err != nil {
+			return err
+		}
+		if item.ServerURL == "" {
+			item.ServerURL = current.ServerURL
+		}
+		if item.APIKey == "" {
+			item.APIKey = current.APIKey
+		}
+		if item.Description == "" {
+			item.Description = current.Description
+		}
+		if !ctx.Command.Flags().Changed("skip-tls-verify") {
+			item.SkipTLSVerify = current.SkipTLSVerify
+		}
+		if !ctx.Command.Flags().Changed("timeout") {
+			item.TimeoutSeconds = current.TimeoutSeconds
+		}
+		if err := ctx.ContextStore.Update(ctx, item); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func contextRemoveCommand() *cobra.Command {
+	return NewCommand(&cobra.Command{
+		Use:   "remove <name>",
+		Short: "Remove a remote CLI context",
+		Args:  cobra.ExactArgs(1),
+	}, nil, func(ctx *Context, args []string) error {
+		return ctx.ContextStore.Delete(ctx, args[0])
+	})
+}
+
+func contextUseCommand() *cobra.Command {
+	return NewCommand(&cobra.Command{
+		Use:   "use <name|local>",
+		Short: "Set the current CLI context",
+		Args:  cobra.ExactArgs(1),
+	}, nil, func(ctx *Context, args []string) error {
+		return ctx.ContextStore.Use(ctx, args[0])
+	})
+}
+
+func contextTestCommand() *cobra.Command {
+	return NewCommand(&cobra.Command{
+		Use:   "test <name|local>",
+		Short: "Test connectivity for a CLI context",
+		Args:  cobra.ExactArgs(1),
+	}, nil, func(ctx *Context, args []string) error {
+		name := args[0]
+		item, err := ctx.ContextStore.Get(ctx, name)
+		if err != nil {
+			return err
+		}
+		if item.Name == clicontext.LocalContextName {
+			fmt.Println("local context is always available")
+			return nil
+		}
+		remote, err := newRemoteClient(item)
+		if err != nil {
+			return err
+		}
+		if err := remote.Test(ctx); err != nil {
+			return err
+		}
+		fmt.Printf("context %q is reachable\n", name)
+		return nil
+	})
+}
+
+func readContextInput(ctx *Context, name string, allowPartial bool) (*clicontext.Context, error) {
+	server, err := ctx.StringParam("server")
+	if err != nil {
+		return nil, err
+	}
+	apiKey, err := ctx.StringParam("api-key")
+	if err != nil {
+		return nil, err
+	}
+	description, err := ctx.StringParam("description")
+	if err != nil {
+		return nil, err
+	}
+	timeoutValue, err := ctx.StringParam("timeout")
+	if err != nil {
+		return nil, err
+	}
+	timeout := 0
+	if timeoutValue != "" {
+		fmt.Sscanf(timeoutValue, "%d", &timeout)
+	}
+	skipTLSVerify, err := ctx.Command.Flags().GetBool("skip-tls-verify")
+	if err != nil {
+		return nil, err
+	}
+	if apiKey == "" && !allowPartial && term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Fprint(os.Stderr, "API key: ")
+		bytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return nil, err
+		}
+		apiKey = string(bytes)
+	}
+	item := &clicontext.Context{
+		Name:           name,
+		ServerURL:      server,
+		APIKey:         apiKey,
+		Description:    description,
+		SkipTLSVerify:  skipTLSVerify,
+		TimeoutSeconds: timeout,
+	}
+	if allowPartial {
+		return item, nil
+	}
+	return item, ctx.ContextStore.ValidateContext(item)
+}
+
+func currentMarker(active bool) string {
+	if active {
+		return "*"
+	}
+	return ""
+}

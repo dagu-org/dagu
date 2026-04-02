@@ -82,42 +82,42 @@ func userIdentityFromContext(ctx context.Context) UserIdentity {
 
 // API handles HTTP requests for the agent.
 type API struct {
-	sessions           sync.Map // id -> *SessionManager (active sessions)
-	creatingIDs        sync.Map // id -> struct{} (session IDs currently being created)
-	spillMu            sync.Mutex
-	store              SessionStore
-	configStore        ConfigStore
-	modelStore         ModelStore
-	skillStore         SkillStore
-	providers          *ProviderCache
-	workingDir         string
-	logger             *slog.Logger
-	dagStore           DAGMetadataStore // For resolving DAG file paths
-	environment        EnvironmentInfo
-	hooks              *Hooks
-	memoryStore        MemoryStore
-	soulStore          SoulStore
-	remoteNodeResolver RemoteNodeResolver
-	oauthManager       *agentoauth.Manager
-	eventService       *eventstore.Service
+	sessions              sync.Map // id -> *SessionManager (active sessions)
+	creatingIDs           sync.Map // id -> struct{} (session IDs currently being created)
+	spillMu               sync.Mutex
+	store                 SessionStore
+	configStore           ConfigStore
+	modelStore            ModelStore
+	skillStore            SkillStore
+	providers             *ProviderCache
+	workingDir            string
+	logger                *slog.Logger
+	dagStore              DAGMetadataStore // For resolving DAG file paths
+	environment           EnvironmentInfo
+	hooks                 *Hooks
+	memoryStore           MemoryStore
+	soulStore             SoulStore
+	remoteContextResolver RemoteContextResolver
+	oauthManager          *agentoauth.Manager
+	eventService          *eventstore.Service
 }
 
 // APIConfig contains configuration for the API.
 type APIConfig struct {
-	ConfigStore        ConfigStore
-	ModelStore         ModelStore
-	SkillStore         SkillStore
-	SoulStore          SoulStore
-	WorkingDir         string
-	Logger             *slog.Logger
-	SessionStore       SessionStore
-	DAGStore           DAGMetadataStore // For resolving DAG file paths
-	Environment        EnvironmentInfo
-	Hooks              *Hooks
-	MemoryStore        MemoryStore
-	RemoteNodeResolver RemoteNodeResolver
-	OAuthManager       *agentoauth.Manager
-	EventService       *eventstore.Service
+	ConfigStore           ConfigStore
+	ModelStore            ModelStore
+	SkillStore            SkillStore
+	SoulStore             SoulStore
+	WorkingDir            string
+	Logger                *slog.Logger
+	SessionStore          SessionStore
+	DAGStore              DAGMetadataStore // For resolving DAG file paths
+	Environment           EnvironmentInfo
+	Hooks                 *Hooks
+	MemoryStore           MemoryStore
+	RemoteContextResolver RemoteContextResolver
+	OAuthManager          *agentoauth.Manager
+	EventService          *eventstore.Service
 }
 
 // SessionWithState is a session with its current state.
@@ -152,21 +152,21 @@ func NewAPI(cfg APIConfig) *API {
 	}
 
 	return &API{
-		configStore:        cfg.ConfigStore,
-		modelStore:         cfg.ModelStore,
-		skillStore:         cfg.SkillStore,
-		soulStore:          cfg.SoulStore,
-		providers:          NewProviderCache(),
-		workingDir:         cfg.WorkingDir,
-		logger:             logger,
-		store:              cfg.SessionStore,
-		dagStore:           cfg.DAGStore,
-		environment:        cfg.Environment,
-		hooks:              cfg.Hooks,
-		memoryStore:        cfg.MemoryStore,
-		remoteNodeResolver: cfg.RemoteNodeResolver,
-		oauthManager:       cfg.OAuthManager,
-		eventService:       cfg.EventService,
+		configStore:           cfg.ConfigStore,
+		modelStore:            cfg.ModelStore,
+		skillStore:            cfg.SkillStore,
+		soulStore:             cfg.SoulStore,
+		providers:             NewProviderCache(),
+		workingDir:            cfg.WorkingDir,
+		logger:                logger,
+		store:                 cfg.SessionStore,
+		dagStore:              cfg.DAGStore,
+		environment:           cfg.Environment,
+		hooks:                 cfg.Hooks,
+		memoryStore:           cfg.MemoryStore,
+		remoteContextResolver: cfg.RemoteContextResolver,
+		oauthManager:          cfg.OAuthManager,
+		eventService:          cfg.EventService,
 	}
 }
 
@@ -572,27 +572,27 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 
 func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentity, cfg sessionRuntimeConfig, now time.Time) *SessionManager {
 	mgr := NewSessionManager(SessionManagerConfig{
-		ID:                 id,
-		User:               user,
-		Model:              cfg.modelID,
-		Logger:             a.logger,
-		WorkingDir:         a.workingDir,
-		Title:              cfg.title,
-		OnMessage:          a.createMessageCallback(id),
-		Environment:        a.environment,
-		SafeMode:           cfg.safeMode,
-		Hooks:              a.hooks,
-		InputCostPer1M:     cfg.inputCostPer1M,
-		OutputCostPer1M:    cfg.outputCostPer1M,
-		MemoryStore:        a.memoryStore,
-		SkillStore:         a.skillStore,
-		EnabledSkills:      cfg.enabledSkills,
-		DAGName:            cfg.dagName,
-		SessionStore:       a.store,
-		Soul:               cfg.soul,
-		WebSearch:          cfg.webSearch,
-		ThinkingEffort:     cfg.thinkingEffort,
-		RemoteNodeResolver: a.remoteNodeResolver,
+		ID:                    id,
+		User:                  user,
+		Model:                 cfg.modelID,
+		Logger:                a.logger,
+		WorkingDir:            a.workingDir,
+		Title:                 cfg.title,
+		OnMessage:             a.createMessageCallback(id),
+		Environment:           a.environment,
+		SafeMode:              cfg.safeMode,
+		Hooks:                 a.hooks,
+		InputCostPer1M:        cfg.inputCostPer1M,
+		OutputCostPer1M:       cfg.outputCostPer1M,
+		MemoryStore:           a.memoryStore,
+		SkillStore:            a.skillStore,
+		EnabledSkills:         cfg.enabledSkills,
+		DAGName:               cfg.dagName,
+		SessionStore:          a.store,
+		Soul:                  cfg.soul,
+		WebSearch:             cfg.webSearch,
+		ThinkingEffort:        cfg.thinkingEffort,
+		RemoteContextResolver: a.remoteContextResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 
@@ -933,32 +933,32 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 	}
 
 	mgr := NewSessionManager(SessionManagerConfig{
-		ID:                 id,
-		User:               user,
-		Model:              modelID,
-		Logger:             a.logger,
-		WorkingDir:         a.workingDir,
-		Title:              sess.Title,
-		CreatedAt:          sess.CreatedAt,
-		LastActivity:       time.Now(),
-		OnMessage:          a.createMessageCallback(id),
-		History:            messages,
-		SequenceID:         seqID,
-		Environment:        a.environment,
-		SafeMode:           true, // Default to safe mode for reactivated sessions
-		Hooks:              a.hooks,
-		InputCostPer1M:     inputCost,
-		OutputCostPer1M:    outputCost,
-		MemoryStore:        a.memoryStore,
-		SkillStore:         a.skillStore,
-		EnabledSkills:      a.loadEnabledSkills(ctx),
-		DAGName:            sess.DAGName,
-		SessionStore:       a.store,
-		Soul:               a.loadSelectedSoul(ctx),
-		WebSearch:          a.loadWebSearch(ctx),
-		ThinkingEffort:     thinkingEffort,
-		RemoteNodeResolver: a.remoteNodeResolver,
-		Delegates:          delegates,
+		ID:                    id,
+		User:                  user,
+		Model:                 modelID,
+		Logger:                a.logger,
+		WorkingDir:            a.workingDir,
+		Title:                 sess.Title,
+		CreatedAt:             sess.CreatedAt,
+		LastActivity:          time.Now(),
+		OnMessage:             a.createMessageCallback(id),
+		History:               messages,
+		SequenceID:            seqID,
+		Environment:           a.environment,
+		SafeMode:              true, // Default to safe mode for reactivated sessions
+		Hooks:                 a.hooks,
+		InputCostPer1M:        inputCost,
+		OutputCostPer1M:       outputCost,
+		MemoryStore:           a.memoryStore,
+		SkillStore:            a.skillStore,
+		EnabledSkills:         a.loadEnabledSkills(ctx),
+		DAGName:               sess.DAGName,
+		SessionStore:          a.store,
+		Soul:                  a.loadSelectedSoul(ctx),
+		WebSearch:             a.loadWebSearch(ctx),
+		ThinkingEffort:        thinkingEffort,
+		RemoteContextResolver: a.remoteContextResolver,
+		Delegates:             delegates,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
@@ -1144,26 +1144,26 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	}
 
 	mgr := NewSessionManager(SessionManagerConfig{
-		ID:                 id,
-		User:               user,
-		Model:              model,
-		Logger:             a.logger,
-		WorkingDir:         a.workingDir,
-		OnMessage:          a.createMessageCallback(id),
-		Environment:        a.environment,
-		SafeMode:           req.SafeMode,
-		Hooks:              a.hooks,
-		InputCostPer1M:     modelCfg.InputCostPer1M,
-		OutputCostPer1M:    modelCfg.OutputCostPer1M,
-		MemoryStore:        a.memoryStore,
-		SkillStore:         a.skillStore,
-		EnabledSkills:      a.loadEnabledSkills(ctx),
-		DAGName:            dagName,
-		SessionStore:       a.store,
-		Soul:               a.loadSoulWithOverride(ctx, req.SoulID),
-		WebSearch:          a.loadWebSearch(ctx),
-		ThinkingEffort:     modelThinkingEffort(modelCfg),
-		RemoteNodeResolver: a.remoteNodeResolver,
+		ID:                    id,
+		User:                  user,
+		Model:                 model,
+		Logger:                a.logger,
+		WorkingDir:            a.workingDir,
+		OnMessage:             a.createMessageCallback(id),
+		Environment:           a.environment,
+		SafeMode:              req.SafeMode,
+		Hooks:                 a.hooks,
+		InputCostPer1M:        modelCfg.InputCostPer1M,
+		OutputCostPer1M:       modelCfg.OutputCostPer1M,
+		MemoryStore:           a.memoryStore,
+		SkillStore:            a.skillStore,
+		EnabledSkills:         a.loadEnabledSkills(ctx),
+		DAGName:               dagName,
+		SessionStore:          a.store,
+		Soul:                  a.loadSoulWithOverride(ctx, req.SoulID),
+		WebSearch:             a.loadWebSearch(ctx),
+		ThinkingEffort:        modelThinkingEffort(modelCfg),
+		RemoteContextResolver: a.remoteContextResolver,
 	})
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 

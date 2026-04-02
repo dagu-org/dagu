@@ -43,6 +43,9 @@ Example:
 var restartFlags = []commandLineFlag{dagRunIDFlagRestart, scheduleTimeFlag}
 
 func runRestart(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		return remoteRunRestart(ctx, args)
+	}
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
@@ -159,21 +162,21 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 		cli,
 		dr,
 		agent.Options{
-			Dry:                     false,
-			PreparedAttempt:         preparedAttempt,
-			DAGRunStore:             ctx.DAGRunStore,
-			ServiceRegistry:         ctx.ServiceRegistry,
-			RootDAGRun:              exec.NewDAGRunRef(dag.Name, dagRunID),
-			PeerConfig:              ctx.Config.Core.Peer,
-			DefaultExecMode:         ctx.Config.DefaultExecMode,
-			AgentConfigStore:        as.ConfigStore,
-			AgentModelStore:         as.ModelStore,
-			AgentMemoryStore:        as.MemoryStore,
-			AgentSkillStore:         as.SkillStore,
-			AgentSoulStore:          as.SoulStore,
-			AgentOAuthManager:       as.OAuthManager,
-			AgentRemoteNodeResolver: as.RemoteNodeResolver,
-			ScheduleTime:            scheduleTime,
+			Dry:                        false,
+			PreparedAttempt:            preparedAttempt,
+			DAGRunStore:                ctx.DAGRunStore,
+			ServiceRegistry:            ctx.ServiceRegistry,
+			RootDAGRun:                 exec.NewDAGRunRef(dag.Name, dagRunID),
+			PeerConfig:                 ctx.Config.Core.Peer,
+			DefaultExecMode:            ctx.Config.DefaultExecMode,
+			AgentConfigStore:           as.ConfigStore,
+			AgentModelStore:            as.ModelStore,
+			AgentMemoryStore:           as.MemoryStore,
+			AgentSkillStore:            as.SkillStore,
+			AgentSoulStore:             as.SoulStore,
+			AgentOAuthManager:          as.OAuthManager,
+			AgentRemoteContextResolver: as.ContextResolver,
+			ScheduleTime:               scheduleTime,
 		})
 
 	listenSignals(ctx, agentInstance)

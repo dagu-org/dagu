@@ -325,13 +325,13 @@ func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentSte
 		allTools["search_skills"] = agent.NewSearchSkillsTool(skillStore, allowedSkills)
 	}
 
-	remoteResolver := agent.GetRemoteNodeResolver(ctx)
+	remoteResolver := agent.GetRemoteContextResolver(ctx)
 	if remoteResolver != nil {
 		if t := agent.NewRemoteAgentTool(remoteResolver); t != nil {
 			allTools["remote_agent"] = t
 		}
-		if t := agent.NewListRemoteNodesTool(remoteResolver); t != nil {
-			allTools["list_remote_nodes"] = t
+		if t := agent.NewListContextsTool(remoteResolver); t != nil {
+			allTools["list_contexts"] = t
 		}
 	}
 

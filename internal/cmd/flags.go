@@ -48,6 +48,11 @@ var (
 		usage:  "Enable CPU profiling (saves to cpu.pprof)",
 		isBool: true,
 	}
+
+	contextFlag = commandLineFlag{
+		name:  "context",
+		usage: "Context name to use for command execution (default: current context or local)",
+	}
 )
 
 // Server and directory flags

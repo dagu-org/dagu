@@ -389,6 +389,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		{"APIKeysDir", &cfg.Paths.APIKeysDir, def.Paths.APIKeysDir},
 		{"WebhooksDir", &cfg.Paths.WebhooksDir, def.Paths.WebhooksDir},
 		{"SessionsDir", &cfg.Paths.SessionsDir, def.Paths.SessionsDir},
+		{"ContextsDir", &cfg.Paths.ContextsDir, def.Paths.ContextsDir},
 		{"RemoteNodesDir", &cfg.Paths.RemoteNodesDir, def.Paths.RemoteNodesDir},
 		{"WorkspacesDir", &cfg.Paths.WorkspacesDir, def.Paths.WorkspacesDir},
 	}
@@ -1264,6 +1265,7 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 		{&cfg.Paths.UsersDir, "users"},
 		{&cfg.Paths.APIKeysDir, "apikeys"},
 		{&cfg.Paths.WebhooksDir, "webhooks"},
+		{&cfg.Paths.ContextsDir, "contexts"},
 		{&cfg.Paths.RemoteNodesDir, "remote-nodes"},
 		{&cfg.Paths.WorkspacesDir, "workspaces"},
 	}
