@@ -3,12 +3,14 @@
  *
  * @module features/dags/components/dag-editor
  */
+import dayjs from '@/lib/dayjs';
 import { Calendar, CheckSquare, Settings, Tag } from 'lucide-react';
 import { components } from '../../../../api/v1/schema';
 import { Badge } from '../../../../components/ui/badge';
 import {
   getScheduleKey,
   getScheduleLabel,
+  parseNextRun,
 } from '../../../../lib/dagSchedule';
 
 /**
@@ -24,6 +26,8 @@ type Props = {
  * including name, schedule, description, and other properties
  */
 function DAGAttributes({ dag }: Props) {
+  const nextRun = parseNextRun(dag.nextRun);
+
   return (
     <div>
       <h2 className="text-xl font-semibold text-foreground mb-4">
@@ -49,17 +53,26 @@ function DAGAttributes({ dag }: Props) {
               No schedule defined
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {dag.schedule?.map((schedule, index) => (
-                <Badge
-                  key={getScheduleKey(schedule, index)}
-                  variant="outline"
-                  title={schedule.kind === 'at' ? schedule.at || undefined : schedule.expression || undefined}
-                  className="max-w-full justify-start bg-primary/10 px-2.5 py-1 text-primary border-primary/30 whitespace-nowrap normal-case tracking-normal"
-                >
-                  {getScheduleLabel(schedule)}
-                </Badge>
-              ))}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {dag.schedule?.map((schedule, index) => (
+                  <Badge
+                    key={getScheduleKey(schedule, index)}
+                    variant="outline"
+                    title={schedule.kind === 'at' ? schedule.at || undefined : schedule.expression || undefined}
+                    className="max-w-full justify-start bg-primary/10 px-2.5 py-1 text-primary border-primary/30 whitespace-nowrap normal-case tracking-normal"
+                  >
+                    {getScheduleLabel(schedule)}
+                  </Badge>
+                ))}
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Next run:</span>{' '}
+                {nextRun
+                  ? `${dayjs(nextRun).format('YYYY-MM-DD HH:mm:ss')} (${dayjs(nextRun).fromNow()})`
+                  : 'No upcoming run'}
+              </div>
             </div>
           )}
         </div>

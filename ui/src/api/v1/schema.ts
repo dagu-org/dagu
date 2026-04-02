@@ -3150,6 +3150,11 @@ export interface components {
         WorkerHealthStatus: WorkerHealthStatus;
         /** @description Detailed DAG configuration information */
         DAGDetails: {
+            /**
+             * Format: date-time
+             * @description Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed.
+             */
+            nextRun?: string;
             /** @description Logical grouping of related DAGs for organizational purposes */
             group?: string;
             /** @description Unique identifier for the DAG within its group */
