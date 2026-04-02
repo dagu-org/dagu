@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"text/tabwriter"
 
 	"github.com/dagu-org/dagu/internal/clicontext"
@@ -101,13 +102,17 @@ func contextUpdateCommand() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if item.ServerURL == "" {
+		if !ctx.Command.Flags().Changed("server") {
 			item.ServerURL = current.ServerURL
+		} else if item.ServerURL == "" {
+			return fmt.Errorf("--server cannot be empty")
 		}
-		if item.APIKey == "" {
+		if !ctx.Command.Flags().Changed("api-key") {
 			item.APIKey = current.APIKey
+		} else if item.APIKey == "" {
+			return fmt.Errorf("--api-key cannot be empty")
 		}
-		if item.Description == "" {
+		if !ctx.Command.Flags().Changed("description") {
 			item.Description = current.Description
 		}
 		if !ctx.Command.Flags().Changed("skip-tls-verify") {
@@ -183,13 +188,9 @@ func readContextInput(ctx *Context, name string, allowPartial bool) (*clicontext
 	if err != nil {
 		return nil, err
 	}
-	timeoutValue, err := ctx.StringParam("timeout")
+	timeout, err := parseContextTimeout(ctx)
 	if err != nil {
 		return nil, err
-	}
-	timeout := 0
-	if timeoutValue != "" {
-		fmt.Sscanf(timeoutValue, "%d", &timeout)
 	}
 	skipTLSVerify, err := ctx.Command.Flags().GetBool("skip-tls-verify")
 	if err != nil {
@@ -215,7 +216,28 @@ func readContextInput(ctx *Context, name string, allowPartial bool) (*clicontext
 	if allowPartial {
 		return item, nil
 	}
+	if item.ServerURL == "" {
+		return nil, fmt.Errorf("--server is required")
+	}
+	if item.APIKey == "" {
+		return nil, fmt.Errorf("--api-key is required")
+	}
 	return item, ctx.ContextStore.ValidateContext(item)
+}
+
+func parseContextTimeout(ctx *Context) (int, error) {
+	timeoutValue, err := ctx.StringParam("timeout")
+	if err != nil {
+		return 0, err
+	}
+	if timeoutValue == "" {
+		return 0, nil
+	}
+	timeout, err := strconv.Atoi(timeoutValue)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --timeout value %q: must be an integer", timeoutValue)
+	}
+	return timeout, nil
 }
 
 func currentMarker(active bool) string {

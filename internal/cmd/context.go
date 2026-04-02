@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"syscall"
 	"time"
 
@@ -198,13 +199,35 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 	ctx = config.WithConfig(ctx, cfg)
 
-	contextStore, err := newCLIContextStore(cfg.Paths.DataDir, cfg.Paths.ContextsDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize context store: %w", err)
-	}
-	selectedContextName, selectedContext, err := resolveCLIContext(cmd, contextStore)
+	requestedContextName, err := requestedCLIContextName(cmd)
 	if err != nil {
 		return nil, err
+	}
+	selectedContextName := clicontext.LocalContextName
+	selectedContext := &clicontext.Context{Name: clicontext.LocalContextName}
+	var (
+		contextStore        *clicontext.Store
+		contextStoreWarning error
+	)
+
+	if cmd.Name() == "context" || scope != commandScopeStatic {
+		contextStore, err = newCLIContextStore(cfg.Paths.DataDir, cfg.Paths.ContextsDir)
+		if err != nil {
+			if shouldFailForContextStoreError(cmd, scope, requestedContextName) {
+				return nil, fmt.Errorf("failed to initialize context store: %w", err)
+			}
+			contextStoreWarning = fmt.Errorf("failed to initialize context store, using local context: %w", err)
+		} else if cmd.Name() != "context" {
+			selectedContextName, selectedContext, err = resolveCLIContext(cmd, contextStore, requestedContextName)
+			if err != nil {
+				if shouldFailForContextResolutionError(scope, requestedContextName) {
+					return nil, err
+				}
+				contextStoreWarning = fmt.Errorf("failed to resolve context selection, using local context: %w", err)
+				selectedContextName = clicontext.LocalContextName
+				selectedContext = &clicontext.Context{Name: clicontext.LocalContextName}
+			}
+		}
 	}
 	if scope == commandScopeLocalOnly && selectedContextName != clicontext.LocalContextName {
 		return nil, fmt.Errorf("command %q only supports the local context", cmd.Name())
@@ -234,6 +257,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 	for _, warning := range cfg.Warnings {
 		logger.Warn(ctx, warning)
+	}
+	if contextStoreWarning != nil {
+		logger.Warn(ctx, contextStoreWarning.Error())
 	}
 
 	baseCtx := ctx
@@ -413,11 +439,17 @@ func newCLIContextStore(dataDir, contextsDir string) (*clicontext.Store, error) 
 	return clicontext.NewStore(contextsDir, enc)
 }
 
-func resolveCLIContext(cmd *cobra.Command, store *clicontext.Store) (string, *clicontext.Context, error) {
+func requestedCLIContextName(cmd *cobra.Command) (string, error) {
 	contextName, err := cmd.Flags().GetString("context")
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to get context flag: %w", err)
+		return "", fmt.Errorf("failed to get context flag: %w", err)
 	}
+	return strings.TrimSpace(contextName), nil
+}
+
+func resolveCLIContext(cmd *cobra.Command, store *clicontext.Store, requested string) (string, *clicontext.Context, error) {
+	contextName := strings.TrimSpace(requested)
+	var err error
 	if contextName == "" {
 		contextName, err = store.Current(cmd.Context())
 		if err != nil {
@@ -432,6 +464,26 @@ func resolveCLIContext(cmd *cobra.Command, store *clicontext.Store) (string, *cl
 		return "", nil, fmt.Errorf("failed to resolve context %q: %w", contextName, err)
 	}
 	return contextName, ctx, nil
+}
+
+func shouldFailForContextStoreError(cmd *cobra.Command, scope commandScope, requested string) bool {
+	if cmd.Name() == "context" {
+		return true
+	}
+	if scope == commandScopeStatic {
+		return false
+	}
+	return requested != "" && requested != clicontext.LocalContextName
+}
+
+func shouldFailForContextResolutionError(scope commandScope, requested string) bool {
+	if requested == "" {
+		return false
+	}
+	if requested == clicontext.LocalContextName {
+		return false
+	}
+	return scope != commandScopeStatic
 }
 
 func (c *Context) IsRemote() bool {
