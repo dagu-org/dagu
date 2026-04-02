@@ -738,6 +738,8 @@ type Schedule struct {
 	Parsed cron.Schedule `json:"-"`
 	// AtTime is the parsed one-off schedule time.
 	AtTime time.Time `json:"-"`
+	// Warnings contains non-fatal schedule warnings.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -750,10 +752,12 @@ func (s Schedule) MarshalJSON() ([]byte, error) {
 		Kind       ScheduleKind `json:"kind,omitempty"`
 		Expression string       `json:"expression,omitempty"`
 		At         string       `json:"at,omitempty"`
+		Warnings   []string     `json:"warnings,omitempty"`
 	}{
 		Kind:       normalized.Kind,
 		Expression: normalized.Expression,
 		At:         normalized.At,
+		Warnings:   normalized.Warnings,
 	})
 }
 
