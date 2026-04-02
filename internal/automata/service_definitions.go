@@ -152,7 +152,7 @@ func (s *Service) Delete(ctx context.Context, name string) error {
 		return err
 	}
 	_ = os.RemoveAll(filepath.Join(s.stateDir, name))
-	return nil
+	return s.removeMemoryFile(ctx, name)
 }
 
 func (s *Service) Rename(ctx context.Context, name string, req RenameRequest) error {
@@ -184,9 +184,14 @@ func (s *Service) Rename(ctx context.Context, name string, req RenameRequest) er
 	}
 
 	rollbackNewSpec := true
+	rollbackMemory := false
+	reassignedSession := false
 	defer func() {
 		if rollbackNewSpec {
 			_ = os.Remove(filepath.Clean(s.definitionPath(newName)))
+			if rollbackMemory {
+				_ = s.moveMemoryFile(ctx, newName, name)
+			}
 		}
 	}()
 
@@ -197,17 +202,32 @@ func (s *Service) Rename(ctx context.Context, name string, req RenameRequest) er
 		if err := s.reassignSessionUser(ctx, state.SessionID, newName); err != nil {
 			return err
 		}
+		reassignedSession = true
 	}
+
+	if err := s.moveMemoryFile(ctx, name, newName); err != nil {
+		if reassignedSession {
+			_ = s.reassignSessionUser(ctx, state.SessionID, name)
+		}
+		return err
+	}
+	rollbackMemory = true
 
 	oldStateDir := filepath.Join(s.stateDir, name)
 	newStateDir := filepath.Join(s.stateDir, newName)
 	movedState := false
 	if _, err := os.Stat(oldStateDir); err == nil {
 		if err := os.Rename(oldStateDir, newStateDir); err != nil {
+			if reassignedSession {
+				_ = s.reassignSessionUser(ctx, state.SessionID, name)
+			}
 			return err
 		}
 		movedState = true
 	} else if !errors.Is(err, os.ErrNotExist) {
+		if reassignedSession {
+			_ = s.reassignSessionUser(ctx, state.SessionID, name)
+		}
 		return err
 	}
 
@@ -215,9 +235,13 @@ func (s *Service) Rename(ctx context.Context, name string, req RenameRequest) er
 		if movedState {
 			_ = os.Rename(newStateDir, oldStateDir)
 		}
+		if reassignedSession {
+			_ = s.reassignSessionUser(ctx, state.SessionID, name)
+		}
 		return err
 	}
 
+	rollbackMemory = false
 	rollbackNewSpec = false
 	return nil
 }
@@ -240,7 +264,16 @@ func (s *Service) Duplicate(ctx context.Context, name string, req DuplicateReque
 	if err := s.assertAutomataTargetAvailable(newName); err != nil {
 		return err
 	}
-	return s.PutSpec(ctx, newName, spec)
+	if err := s.PutSpec(ctx, newName, spec); err != nil {
+		return err
+	}
+	if err := s.copyMemoryFile(ctx, name, newName); err != nil {
+		_ = os.Remove(filepath.Clean(s.definitionPath(newName)))
+		_ = os.RemoveAll(filepath.Join(s.stateDir, newName))
+		_ = s.removeMemoryFile(ctx, newName)
+		return err
+	}
+	return nil
 }
 
 func (s *Service) List(ctx context.Context) ([]Summary, error) {

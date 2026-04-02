@@ -38,6 +38,7 @@ type Service struct {
 	dagRunCtrl     dagRunController
 	coordinatorCli coordinatorCanceler
 	sessionStore   agent.SessionStore
+	memoryStore    agent.MemoryStore
 	agentAPI       *agent.API
 	soulStore      agent.SoulStore
 	subCmdBuilder  *runtime.SubCmdBuilder
@@ -78,6 +79,12 @@ func WithSoulStore(store agent.SoulStore) Option {
 func WithSessionStore(store agent.SessionStore) Option {
 	return func(s *Service) {
 		s.sessionStore = store
+	}
+}
+
+func WithMemoryStore(store agent.MemoryStore) Option {
+	return func(s *Service) {
+		s.memoryStore = store
 	}
 }
 

@@ -58,6 +58,7 @@ type SessionManager struct {
 	skillStore         SkillStore
 	enabledSkills      []string
 	dagName            string
+	automataName       string
 	sessionStore       SessionStore
 	parentSessionID    string
 	delegateTask       string
@@ -108,6 +109,7 @@ type SessionManagerConfig struct {
 	SkillStore      SkillStore
 	EnabledSkills   []string
 	DAGName         string
+	AutomataName    string
 	SessionStore    SessionStore
 	// ParentSessionID links this session to its parent (non-empty = sub-session).
 	ParentSessionID string
@@ -207,6 +209,7 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		skillStore:         cfg.SkillStore,
 		enabledSkills:      cfg.EnabledSkills,
 		dagName:            cfg.DAGName,
+		automataName:       cfg.AutomataName,
 		sessionStore:       cfg.SessionStore,
 		parentSessionID:    cfg.ParentSessionID,
 		delegateTask:       cfg.DelegateTask,
@@ -468,6 +471,7 @@ func (sm *SessionManager) GetSession() Session {
 		ID:              sm.id,
 		UserID:          sm.user.UserID,
 		DAGName:         sm.dagName,
+		AutomataName:    sm.automataName,
 		Title:           sm.title,
 		ParentSessionID: sm.parentSessionID,
 		DelegateTask:    sm.delegateTask,
@@ -498,6 +502,7 @@ func (sm *SessionManager) snapshotLocked() SessionSnapshot {
 			ID:              sm.id,
 			UserID:          sm.user.UserID,
 			DAGName:         sm.dagName,
+			AutomataName:    sm.automataName,
 			Title:           sm.title,
 			ParentSessionID: sm.parentSessionID,
 			DelegateTask:    sm.delegateTask,
@@ -886,6 +891,9 @@ func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
 	sm.allowedTools = append([]string(nil), opts.AllowedTools...)
 	sm.systemPromptExtra = opts.SystemPromptExtra
 	sm.automataRuntime = opts.AutomataRuntime
+	if opts.AutomataName != "" {
+		sm.automataName = opts.AutomataName
+	}
 	if opts.EnabledSkills != nil {
 		sm.enabledSkills = append([]string(nil), opts.EnabledSkills...)
 	}
@@ -918,11 +926,20 @@ func (sm *SessionManager) loadMemory() MemoryContent {
 			sm.logger.Debug("failed to load DAG memory", "error", err, "dag_name", sm.dagName)
 		}
 	}
+	var automataMem string
+	if sm.automataName != "" {
+		automataMem, err = sm.memoryStore.LoadAutomataMemory(ctx, sm.automataName)
+		if err != nil {
+			sm.logger.Debug("failed to load automata memory", "error", err, "automata_name", sm.automataName)
+		}
+	}
 	return MemoryContent{
-		GlobalMemory: global,
-		DAGMemory:    dagMem,
-		DAGName:      sm.dagName,
-		MemoryDir:    sm.memoryStore.MemoryDir(),
+		GlobalMemory:   global,
+		DAGMemory:      dagMem,
+		DAGName:        sm.dagName,
+		AutomataMemory: automataMem,
+		AutomataName:   sm.automataName,
+		MemoryDir:      sm.memoryStore.MemoryDir(),
 	}
 }
 

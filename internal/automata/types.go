@@ -240,6 +240,12 @@ type Detail struct {
 	Messages    []agent.Message  `json:"messages,omitempty"`
 }
 
+type Memory struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	Path    string `json:"path"`
+}
+
 type StartRequest struct {
 	RequestedBy string `json:"requestedBy,omitempty"`
 	Instruction string `json:"instruction,omitempty"`

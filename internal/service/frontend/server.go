@@ -412,6 +412,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		automata.WithDAGRunController(&drm),
 		automata.WithCoordinatorClient(cc),
 		automata.WithSessionStore(automataSessionStore),
+		automata.WithMemoryStore(memoryStore),
 		automata.WithEventService(eventSvc),
 		automata.WithEventSource(eventstore.Source{
 			Service: eventstore.SourceServiceServer,

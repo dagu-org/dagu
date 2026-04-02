@@ -157,6 +157,41 @@ func TestLoadDAGMemory(t *testing.T) {
 	})
 }
 
+func TestLoadAutomataMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("no file returns empty", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		content, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		require.NoError(t, err)
+		assert.Empty(t, content)
+	})
+
+	t.Run("reads existing file", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		expected := "# Automata Memory\n\nKeep the service concise."
+		automataDir := filepath.Join(store.baseDir, automataSubDir, "queue_worker")
+		require.NoError(t, os.MkdirAll(automataDir, 0750))
+		writeTestFile(t, filepath.Join(automataDir, memoryFileName), expected)
+
+		content, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		require.NoError(t, err)
+		assert.Equal(t, expected, content)
+	})
+
+	t.Run("rejects invalid automata name", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+
+		_, err := store.LoadAutomataMemory(ctx, "queue-worker")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid automataName")
+	})
+}
+
 func TestSaveGlobalMemory(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -219,12 +254,45 @@ func TestSaveDAGMemory(t *testing.T) {
 	})
 }
 
+func TestSaveAutomataMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("creates file and parent dirs", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		content := "# Automata Memory\n\nFollow the standing instruction."
+		require.NoError(t, store.SaveAutomataMemory(ctx, "queue_worker", content))
+
+		data, err := os.ReadFile(store.automataMemoryPath("queue_worker"))
+		require.NoError(t, err)
+		assert.Equal(t, content, string(data))
+	})
+
+	t.Run("rejects invalid automata name", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		err := store.SaveAutomataMemory(ctx, "queue-worker", "bad")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid automataName")
+	})
+}
+
 func TestMemoryDir(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	store, err := New(dir)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(dir, agentMemoryDir), store.MemoryDir())
+}
+
+func TestAutomataMemoryPath(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	path, err := store.AutomataMemoryPath("queue_worker")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(store.baseDir, automataSubDir, "queue_worker", memoryFileName), path)
 }
 
 func TestListDAGMemories(t *testing.T) {
@@ -264,6 +332,22 @@ func TestListDAGMemories(t *testing.T) {
 		names, err := store.ListDAGMemories(ctx)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"has-memory"}, names)
+	})
+}
+
+func TestDeleteAutomataMemory(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("removes file and directory", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveAutomataMemory(ctx, "queue_worker", "remember this"))
+
+		require.NoError(t, store.DeleteAutomataMemory(ctx, "queue_worker"))
+
+		_, err := os.Stat(filepath.Join(store.baseDir, automataSubDir, "queue_worker"))
+		assert.True(t, os.IsNotExist(err))
 	})
 }
 

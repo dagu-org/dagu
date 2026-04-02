@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { useClient, useQuery } from '@/hooks/api';
+import { AutomataMemorySection } from '@/features/automata/components/AutomataMemorySection';
 import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
@@ -601,6 +602,8 @@ export function AutomataDetailsModal({
                     </div>
                   )}
                 </div>
+
+                <AutomataMemorySection automataName={stableName} />
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="min-w-0 rounded-lg border p-4">

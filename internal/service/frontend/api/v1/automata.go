@@ -17,6 +17,11 @@ import (
 	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
+const (
+	auditActionAutomataMemoryUpdate = "memory_update"
+	auditActionAutomataMemoryDelete = "memory_delete"
+)
+
 func (a *API) ListAutomata(ctx context.Context, _ api.ListAutomataRequestObject) (api.ListAutomataResponseObject, error) {
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
@@ -52,6 +57,64 @@ func (a *API) GetAutomataSpec(ctx context.Context, request api.GetAutomataSpecRe
 		return nil, toAutomataAPIError(err)
 	}
 	return api.GetAutomataSpec200JSONResponse{Spec: spec}, nil
+}
+
+func (a *API) GetAutomataMemory(ctx context.Context, request api.GetAutomataMemoryRequestObject) (api.GetAutomataMemoryResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireAutomataMemoryStore(); err != nil {
+		return nil, err
+	}
+	item, err := a.automataService.GetMemory(ctx, string(request.Name))
+	if err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	return api.GetAutomataMemory200JSONResponse(toAPIAutomataMemory(item)), nil
+}
+
+func (a *API) UpdateAutomataMemory(ctx context.Context, request api.UpdateAutomataMemoryRequestObject) (api.UpdateAutomataMemoryResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireAutomataMemoryStore(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return nil, ErrInvalidRequestBody
+	}
+	name := string(request.Name)
+	item, err := a.automataService.SaveMemory(ctx, name, request.Body.Content)
+	if err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, auditActionAutomataMemoryUpdate, map[string]any{
+		"name": name,
+	})
+	return api.UpdateAutomataMemory200JSONResponse(toAPIAutomataMemory(item)), nil
+}
+
+func (a *API) DeleteAutomataMemory(ctx context.Context, request api.DeleteAutomataMemoryRequestObject) (api.DeleteAutomataMemoryResponseObject, error) {
+	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireAutomataMemoryStore(); err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWrite(ctx); err != nil {
+		return nil, err
+	}
+	name := string(request.Name)
+	if err := a.automataService.DeleteMemory(ctx, name); err != nil {
+		return nil, toAutomataAPIError(err)
+	}
+	a.logAudit(ctx, audit.CategoryAutomata, auditActionAutomataMemoryDelete, map[string]any{
+		"name": name,
+	})
+	return api.DeleteAutomataMemory204Response{}, nil
 }
 
 func (a *API) PutAutomataSpec(ctx context.Context, request api.PutAutomataSpecRequestObject) (api.PutAutomataSpecResponseObject, error) {
@@ -354,6 +417,17 @@ func (a *API) requireAutomataService() error {
 	return nil
 }
 
+func (a *API) requireAutomataMemoryStore() error {
+	if a.agentMemoryStore == nil {
+		return &Error{
+			Code:       api.ErrorCodeForbidden,
+			Message:    "Automata memory management is not available",
+			HTTPStatus: http.StatusForbidden,
+		}
+	}
+	return nil
+}
+
 func (a *API) currentUsername(ctx context.Context) string {
 	user, ok := auth.UserFromContext(ctx)
 	if !ok || user == nil {
@@ -416,6 +490,17 @@ func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 			tags := append([]string(nil), item.Tags...)
 			return &tags
 		}(),
+	}
+}
+
+func toAPIAutomataMemory(item *automata.Memory) api.AutomataMemoryResponse {
+	if item == nil {
+		return api.AutomataMemoryResponse{}
+	}
+	return api.AutomataMemoryResponse{
+		Content: item.Content,
+		Name:    item.Name,
+		Path:    item.Path,
 	}
 }
 

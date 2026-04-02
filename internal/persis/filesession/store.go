@@ -33,6 +33,7 @@ type SessionForStorage struct {
 	ID              string          `json:"id"`
 	UserID          string          `json:"user_id"`
 	DAGName         string          `json:"dag_name,omitempty"`
+	AutomataName    string          `json:"automata_name,omitempty"`
 	Title           string          `json:"title,omitempty"`
 	Model           string          `json:"model,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
@@ -48,6 +49,7 @@ func (c *SessionForStorage) ToSession() *agent.Session {
 		ID:              c.ID,
 		UserID:          c.UserID,
 		DAGName:         c.DAGName,
+		AutomataName:    c.AutomataName,
 		Title:           c.Title,
 		Model:           c.Model,
 		CreatedAt:       c.CreatedAt,
@@ -63,6 +65,7 @@ func FromSession(sess *agent.Session, messages []agent.Message) *SessionForStora
 		ID:              sess.ID,
 		UserID:          sess.UserID,
 		DAGName:         sess.DAGName,
+		AutomataName:    sess.AutomataName,
 		Title:           sess.Title,
 		Model:           sess.Model,
 		CreatedAt:       sess.CreatedAt,

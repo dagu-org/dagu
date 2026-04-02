@@ -382,6 +382,7 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 		EnabledSkills:     append([]string(nil), def.Agent.EnabledSkills...),
 		Soul:              soul,
 		AllowClearSoul:    def.Agent.Soul == "",
+		AutomataName:      def.Name,
 		AutomataRuntime: &controllerRuntime{
 			service: s,
 			def:     def,

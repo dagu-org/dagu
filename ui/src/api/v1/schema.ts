@@ -2334,6 +2334,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/automata/{name}/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get automata memory
+         * @description Returns the Automata-specific MEMORY.md content and resolved path.
+         */
+        get: operations["getAutomataMemory"];
+        /**
+         * Update automata memory
+         * @description Creates or updates the Automata-specific MEMORY.md content.
+         */
+        put: operations["updateAutomataMemory"];
+        post?: never;
+        /**
+         * Clear automata memory
+         * @description Deletes the Automata-specific MEMORY.md file.
+         */
+        delete: operations["deleteAutomataMemory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/automata/{name}/start": {
         parameters: {
             query?: never;
@@ -4711,6 +4739,12 @@ export interface components {
         AgentDAGMemoryResponse: {
             dagName: components["schemas"]["DAGName"];
             content: string;
+        };
+        /** @description Automata-specific memory content */
+        AutomataMemoryResponse: {
+            name: string;
+            content: string;
+            path: string;
         };
         /** @description Request to update memory content */
         UpdateAgentMemoryRequest: {
@@ -12693,6 +12727,185 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAutomataMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Automata name */
+                name: components["parameters"]["AutomataName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Automata memory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomataMemoryResponse"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Automata not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateAutomataMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Automata name */
+                name: components["parameters"]["AutomataName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentMemoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Automata memory saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomataMemoryResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Automata not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteAutomataMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Automata name */
+                name: components["parameters"]["AutomataName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Automata memory cleared */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Automata not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

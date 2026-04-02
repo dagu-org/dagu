@@ -47,14 +47,23 @@ type MemoryStore interface {
 	// LoadDAGMemory reads the MEMORY.md for a specific DAG, truncated to maxLines.
 	LoadDAGMemory(ctx context.Context, dagName string) (string, error)
 
+	// LoadAutomataMemory reads the MEMORY.md for a specific Automata, truncated to maxLines.
+	LoadAutomataMemory(ctx context.Context, automataName string) (string, error)
+
 	// SaveGlobalMemory writes content to the global MEMORY.md.
 	SaveGlobalMemory(ctx context.Context, content string) error
 
 	// SaveDAGMemory writes content to a DAG-specific MEMORY.md.
 	SaveDAGMemory(ctx context.Context, dagName string, content string) error
 
+	// SaveAutomataMemory writes content to an Automata-specific MEMORY.md.
+	SaveAutomataMemory(ctx context.Context, automataName string, content string) error
+
 	// MemoryDir returns the root memory directory path.
 	MemoryDir() string
+
+	// AutomataMemoryPath returns the resolved path to an Automata-specific MEMORY.md.
+	AutomataMemoryPath(automataName string) (string, error)
 
 	// ListDAGMemories returns the names of all DAGs that have memory files.
 	ListDAGMemories(ctx context.Context) ([]string, error)
@@ -64,6 +73,9 @@ type MemoryStore interface {
 
 	// DeleteDAGMemory removes a DAG-specific MEMORY.md file.
 	DeleteDAGMemory(ctx context.Context, dagName string) error
+
+	// DeleteAutomataMemory removes an Automata-specific MEMORY.md file.
+	DeleteAutomataMemory(ctx context.Context, automataName string) error
 }
 
 // DAGMetadataStore resolves DAG metadata used by the agent API.

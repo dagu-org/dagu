@@ -5912,6 +5912,127 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /automata/{name}/memory:
+    get:
+      summary: "Get automata memory"
+      description: "Returns the Automata-specific MEMORY.md content and resolved path."
+      operationId: "getAutomataMemory"
+      tags:
+        - "automata"
+      parameters:
+        - $ref: "#/components/parameters/AutomataName"
+      responses:
+        "200":
+          description: "Automata memory"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomataMemoryResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Automata not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      summary: "Update automata memory"
+      description: "Creates or updates the Automata-specific MEMORY.md content."
+      operationId: "updateAutomataMemory"
+      tags:
+        - "automata"
+      parameters:
+        - $ref: "#/components/parameters/AutomataName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentMemoryRequest"
+      responses:
+        "200":
+          description: "Automata memory saved"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomataMemoryResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Automata not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: "Clear automata memory"
+      description: "Deletes the Automata-specific MEMORY.md file."
+      operationId: "deleteAutomataMemory"
+      tags:
+        - "automata"
+      parameters:
+        - $ref: "#/components/parameters/AutomataName"
+      responses:
+        "204":
+          description: "Automata memory cleared"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Automata not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /automata/{name}/start:
     post:
       summary: "Start automata task"
@@ -11155,6 +11276,21 @@ components:
         dagName:
           $ref: "#/components/schemas/DAGName"
         content:
+          type: string
+
+    AutomataMemoryResponse:
+      type: object
+      required:
+        - name
+        - content
+        - path
+      description: "Automata-specific memory content"
+      properties:
+        name:
+          type: string
+        content:
+          type: string
+        path:
           type: string
 
     UpdateAgentMemoryRequest:

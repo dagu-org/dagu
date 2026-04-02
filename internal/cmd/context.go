@@ -584,6 +584,7 @@ func (c *Context) newSchedulerAutomataService(
 		dagStore,
 		dagRunStore,
 		automata.WithSessionStore(sessionStore),
+		automata.WithMemoryStore(memoryStore),
 		automata.WithDAGRunController(&dagRunMgr),
 		automata.WithAgentAPI(agentAPI),
 		automata.WithSoulStore(soulStore),

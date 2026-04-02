@@ -579,6 +579,90 @@ func TestServiceResetStatePreservesTasksAndInstruction(t *testing.T) {
 	require.ErrorIs(t, err, agent.ErrSessionNotFound)
 }
 
+func TestServiceResetStatePreservesMemory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
+	require.NoError(t, err)
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle the current assigned task.",
+	}))
+
+	require.NoError(t, svc.ResetState(ctx, "software_dev"))
+
+	memory, err := svc.GetMemory(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Contains(t, memory.Content, "Remember the standing approach.")
+}
+
+func TestServiceRenameMovesMemory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
+	require.NoError(t, err)
+
+	err = svc.Rename(ctx, "software_dev", RenameRequest{NewName: "software_ops"})
+	require.NoError(t, err)
+
+	_, err = svc.GetMemory(ctx, "software_dev")
+	require.ErrorIs(t, err, exec.ErrDAGNotFound)
+
+	memory, err := svc.GetMemory(ctx, "software_ops")
+	require.NoError(t, err)
+	require.Contains(t, memory.Content, "Remember the standing approach.")
+	require.Contains(t, memory.Path, "/automata/software_ops/MEMORY.md")
+}
+
+func TestServiceDuplicateCopiesMemory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
+	require.NoError(t, err)
+
+	err = svc.Duplicate(ctx, "software_dev", DuplicateRequest{NewName: "software_ops"})
+	require.NoError(t, err)
+
+	original, err := svc.GetMemory(ctx, "software_dev")
+	require.NoError(t, err)
+	duplicate, err := svc.GetMemory(ctx, "software_ops")
+	require.NoError(t, err)
+	require.Equal(t, original.Content, duplicate.Content)
+}
+
+func TestServiceDeleteRemovesMemory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
+	require.NoError(t, err)
+
+	err = svc.Delete(ctx, "software_dev")
+	require.NoError(t, err)
+
+	if svc.memoryStore != nil {
+		content, loadErr := svc.memoryStore.LoadAutomataMemory(ctx, "software_dev")
+		require.NoError(t, loadErr)
+		require.Empty(t, content)
+	}
+}
+
 func TestServicePauseAndResumeTask(t *testing.T) {
 	t.Parallel()
 

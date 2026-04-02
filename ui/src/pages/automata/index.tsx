@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { AutomataMemorySection } from '@/features/automata/components/AutomataMemorySection';
 import { DAGRunDetailsModal } from '@/features/dag-runs/components/dag-run-details';
 import { DAGDetailsModal } from '@/features/dags/components/dag-details';
 import { useClient, useQuery } from '@/hooks/api';
@@ -1396,6 +1397,8 @@ function AutomataPage(): React.ReactElement {
                     </div>
                   )}
                 </div>
+
+                <AutomataMemorySection automataName={detail.definition.name} />
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="min-w-0 rounded-lg border p-4">

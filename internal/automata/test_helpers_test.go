@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
+	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/require"
@@ -67,12 +68,15 @@ func newTestService(t *testing.T) (*Service, time.Time) {
 			DAGRunsDir: runsDir,
 		},
 	}
+	memoryStore, err := filememory.New(dagsDir)
+	require.NoError(t, err)
 	fixedTime := time.Date(2026, time.March, 26, 10, 0, 0, 0, time.UTC)
 	svc := New(
 		cfg,
 		filedag.New(dagsDir, filedag.WithSkipExamples(true)),
 		filedagrun.New(runsDir),
 		WithClock(func() time.Time { return fixedTime }),
+		WithMemoryStore(memoryStore),
 	)
 	return svc, fixedTime
 }
@@ -102,6 +106,8 @@ func newTestServiceWithSessionStore(t *testing.T) (*Service, time.Time) {
 
 	sessionStore, err := filesession.New(sessionDir)
 	require.NoError(t, err)
+	memoryStore, err := filememory.New(dagsDir)
+	require.NoError(t, err)
 
 	cfg := &config.Config{
 		Core: config.Core{
@@ -120,6 +126,7 @@ func newTestServiceWithSessionStore(t *testing.T) (*Service, time.Time) {
 		filedagrun.New(runsDir),
 		WithClock(func() time.Time { return fixedTime }),
 		WithSessionStore(sessionStore),
+		WithMemoryStore(memoryStore),
 	)
 	return svc, fixedTime
 }
@@ -151,6 +158,8 @@ func newTestServiceWithEventStore(t *testing.T) (*Service, time.Time, *testAutom
 			DAGRunsDir: runsDir,
 		},
 	}
+	memoryStore, err := filememory.New(dagsDir)
+	require.NoError(t, err)
 	fixedTime := time.Date(2026, time.March, 26, 10, 0, 0, 0, time.UTC)
 	store := &testAutomataEventStore{}
 	svc := New(
@@ -158,6 +167,7 @@ func newTestServiceWithEventStore(t *testing.T) (*Service, time.Time, *testAutom
 		filedag.New(dagsDir, filedag.WithSkipExamples(true)),
 		filedagrun.New(runsDir),
 		WithClock(func() time.Time { return fixedTime }),
+		WithMemoryStore(memoryStore),
 		WithEventService(eventstore.New(store)),
 		WithEventSource(eventstore.Source{Service: eventstore.SourceServiceScheduler, Instance: "test-scheduler"}),
 	)
