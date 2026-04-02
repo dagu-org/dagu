@@ -5,6 +5,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,7 +23,10 @@ func (a *RemoteContextResolverAdapter) GetByName(ctx context.Context, name strin
 	}
 	item, err := a.Store.Get(ctx, name)
 	if err != nil {
-		return RemoteContextInfo{}, fmt.Errorf("context %q not found: %w", name, err)
+		if errors.Is(err, clicontext.ErrNotFound) {
+			return RemoteContextInfo{}, fmt.Errorf("%w: %s", ErrRemoteContextNotFound, name)
+		}
+		return RemoteContextInfo{}, fmt.Errorf("resolve context %q: %w", name, err)
 	}
 	if item.Name == clicontext.LocalContextName {
 		return RemoteContextInfo{}, fmt.Errorf("context %q is local and cannot be used for remote agent execution", name)

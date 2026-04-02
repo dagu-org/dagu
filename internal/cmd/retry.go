@@ -55,6 +55,16 @@ var retryWorkerIDFlag = commandLineFlag{
 
 func runRetry(ctx *Context, args []string) error {
 	if ctx.IsRemote() {
+		for _, flag := range []commandLineFlag{
+			rootDAGRunFlag,
+			defaultWorkingDirFlag,
+			retryWorkerIDFlag,
+			attemptIDFlag,
+		} {
+			if ctx.Command.Flags().Changed(flag.name) {
+				return fmt.Errorf("--%s is not supported with --context", flag.name)
+			}
+		}
 		return remoteRunRetry(ctx, args)
 	}
 	dagRunID, _ := ctx.StringParam("run-id")

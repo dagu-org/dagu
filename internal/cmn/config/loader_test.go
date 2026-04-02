@@ -808,6 +808,15 @@ paths:
 	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
 	assert.Equal(t, "/custom/data/users", cfg.Paths.UsersDir)
 	assert.Equal(t, "/custom/data/agent/sessions", cfg.Paths.SessionsDir)
+	assert.Equal(t, "/custom/data/contexts", cfg.Paths.ContextsDir)
+}
+
+func TestLoad_EdgeCases_ContextsDirFromEnv(t *testing.T) {
+	cfg := loadWithEnv(t, "# empty", map[string]string{
+		"DAGU_CONTEXTS_DIR": "/tmp/custom-contexts",
+	})
+
+	assert.Equal(t, "/tmp/custom-contexts", cfg.Paths.ContextsDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {

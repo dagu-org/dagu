@@ -5,6 +5,8 @@ package clicontext
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
@@ -86,7 +88,16 @@ func TestStore_ValidateContext(t *testing.T) {
 				ServerURL: "https://example.com",
 				APIKey:    "dagu_test",
 			},
-			wantErr: "\"local\" is reserved",
+			wantErr: "\"local\"",
+		},
+		{
+			name: "reserved current",
+			ctx: &Context{
+				Name:      "current",
+				ServerURL: "https://example.com",
+				APIKey:    "dagu_test",
+			},
+			wantErr: "\"current\"",
 		},
 		{
 			name: "invalid url",
@@ -106,6 +117,15 @@ func TestStore_ValidateContext(t *testing.T) {
 			},
 			wantErr: "api key must use the dagu_ prefix",
 		},
+		{
+			name: "path separator",
+			ctx: &Context{
+				Name:      "prod/east",
+				ServerURL: "https://example.com",
+				APIKey:    "dagu_test",
+			},
+			wantErr: "path separators",
+		},
 	}
 
 	for _, tt := range tests {
@@ -115,4 +135,54 @@ func TestStore_ValidateContext(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
+}
+
+func TestStore_CreateNormalizesValues(t *testing.T) {
+	t.Parallel()
+
+	enc, err := crypto.NewEncryptor("test-key")
+	require.NoError(t, err)
+
+	store, err := NewStore(t.TempDir(), enc)
+	require.NoError(t, err)
+
+	item := &Context{
+		Name:      " prod ",
+		ServerURL: " https://example.com ",
+		APIKey:    " dagu_test ",
+	}
+	require.NoError(t, store.Create(context.Background(), item))
+	assert.Equal(t, "prod", item.Name)
+	assert.Equal(t, "https://example.com", item.ServerURL)
+	assert.Equal(t, "dagu_test", item.APIKey)
+
+	stored, err := store.Get(context.Background(), "prod")
+	require.NoError(t, err)
+	assert.Equal(t, "prod", stored.Name)
+	assert.Equal(t, "https://example.com", stored.ServerURL)
+	assert.Equal(t, "dagu_test", stored.APIKey)
+}
+
+func TestStore_ListReturnsPartialResultsAndErrorOnCorruptEntry(t *testing.T) {
+	t.Parallel()
+
+	enc, err := crypto.NewEncryptor("test-key")
+	require.NoError(t, err)
+
+	baseDir := t.TempDir()
+	store, err := NewStore(baseDir, enc)
+	require.NoError(t, err)
+
+	require.NoError(t, store.Create(context.Background(), &Context{
+		Name:      "prod",
+		ServerURL: "https://example.com",
+		APIKey:    "dagu_test",
+	}))
+	require.NoError(t, os.WriteFile(filepath.Join(baseDir, "broken.json"), []byte("not-json"), 0o600))
+
+	items, err := store.List(context.Background())
+	require.Error(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "prod", items[0].Name)
+	assert.Contains(t, err.Error(), "broken.json")
 }

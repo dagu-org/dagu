@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 	"maps"
+	"strconv"
 	"strings"
 	"time"
 
@@ -313,7 +314,7 @@ func remoteRunHistory(ctx *Context, args []string) error {
 	}
 	statuses := make([]*exec.DAGRunStatus, 0, len(runs))
 	for _, run := range runs {
-		statuses = append(statuses, &exec.DAGRunStatus{
+		status := &exec.DAGRunStatus{
 			Name:         run.Name,
 			DAGRunID:     run.DagRunId,
 			Status:       core.Status(run.Status),
@@ -322,7 +323,19 @@ func remoteRunHistory(ctx *Context, args []string) error {
 			QueuedAt:     derefString(run.QueuedAt),
 			ScheduleTime: derefString(run.ScheduleTime),
 			Params:       derefString(run.Params),
-		})
+			Tags:         derefStringSlice(run.Tags),
+			WorkerID:     derefString(run.WorkerId),
+		}
+		if format == "json" {
+			detail, err := ctx.Remote.getDAGRunDetails(ctx, run.Name, run.DagRunId)
+			if err != nil {
+				return err
+			}
+			if err := enrichRemoteHistoryStatus(status, detail); err != nil {
+				return err
+			}
+		}
+		statuses = append(statuses, status)
 	}
 	return renderHistory(format, statuses)
 }
@@ -482,12 +495,14 @@ func buildRemoteHistoryQuery(ctx *Context, args []string) (remoteHistoryQuery, i
 	query.Tags = parseTags(tagsStr)
 	limitStr, _ := ctx.StringParam("limit")
 	if limitStr != "" {
-		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
-			return query, 0, fmt.Errorf("invalid limit %q: %w", limitStr, err)
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			return query, 0, fmt.Errorf("invalid --limit value %q: must be an integer", limitStr)
 		}
-		if limit <= 0 {
-			limit = 100
+		if parsed <= 0 {
+			return query, 0, fmt.Errorf("--limit must be greater than 0")
 		}
+		limit = parsed
 	}
 	return query, limit, nil
 }
@@ -514,18 +529,37 @@ func remoteStatusValue(s string) (int, error) {
 }
 
 func waitForRemoteStop(ctx *Context, name, dagRunID string) error {
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
-		detail, err := ctx.Remote.getDAGRunDetails(ctx, name, dagRunID)
-		if err != nil {
-			return err
-		}
-		if core.Status(detail.Status) != core.Running {
-			return nil
-		}
-		time.Sleep(250 * time.Millisecond)
+	timeout := defaultRemoteTimeout
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = time.Until(deadline)
+	} else if ctx.Remote != nil && ctx.Remote.client != nil && ctx.Remote.client.Timeout > 0 {
+		timeout = ctx.Remote.client.Timeout
 	}
-	return fmt.Errorf("timed out waiting for remote DAG run %s to stop", dagRunID)
+	if timeout <= 0 {
+		timeout = defaultRemoteTimeout
+	}
+
+	timer := time.NewTimer(timeout)
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer timer.Stop()
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return fmt.Errorf("timed out waiting for remote DAG run %s to stop", dagRunID)
+		case <-ticker.C:
+			detail, err := ctx.Remote.getDAGRunDetails(ctx, name, dagRunID)
+			if err != nil {
+				return err
+			}
+			if core.Status(detail.Status) != core.Running {
+				return nil
+			}
+		}
+	}
 }
 
 func stringPtrOrNil(s string) *string {
@@ -570,4 +604,17 @@ func joinNonEmpty(parts []string) string {
 		}
 	}
 	return strings.Join(filtered, " ")
+}
+
+func enrichRemoteHistoryStatus(status *exec.DAGRunStatus, detail *api.DAGRunDetails) error {
+	remoteStatus, err := toExecStatus(detail)
+	if err != nil {
+		return err
+	}
+	status.Tags = remoteStatus.Tags
+	status.WorkerID = remoteStatus.WorkerID
+	if errs := remoteStatus.Errors(); len(errs) > 0 {
+		status.Error = errs[0].Error()
+	}
+	return nil
 }

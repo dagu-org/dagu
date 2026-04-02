@@ -5,9 +5,12 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
+
+var ErrRemoteContextNotFound = errors.New("remote context not found")
 
 // RemoteContextInfo contains resolved information about a remote CLI context.
 type RemoteContextInfo struct {

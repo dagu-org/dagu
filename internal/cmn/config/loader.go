@@ -1640,6 +1640,7 @@ var envBindings = []envBinding{
 	{key: "paths.queue_dir", env: "QUEUE_DIR", isPath: true},
 	{key: "paths.service_registry_dir", env: "SERVICE_REGISTRY_DIR", isPath: true},
 	{key: "paths.users_dir", env: "USERS_DIR", isPath: true},
+	{key: "paths.contexts_dir", env: "CONTEXTS_DIR", isPath: true},
 	{key: "paths.workspaces_dir", env: "WORKSPACES_DIR", isPath: true},
 
 	// Execution

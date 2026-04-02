@@ -63,14 +63,14 @@ func newRemoteClient(ctx *clicontext.Context) (*remoteClient, error) {
 		timeout = time.Duration(ctx.TimeoutSeconds) * time.Second
 	}
 	baseURL := strings.TrimRight(ctx.ServerURL, "/")
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: ctx.SkipTLSVerify} //nolint:gosec
 	return &remoteClient{
 		baseURL: baseURL,
 		apiKey:  ctx.APIKey,
 		client: &http.Client{
-			Timeout: timeout,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: ctx.SkipTLSVerify}, //nolint:gosec
-			},
+			Timeout:   timeout,
+			Transport: transport,
 		},
 	}, nil
 }

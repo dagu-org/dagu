@@ -51,6 +51,23 @@ func TestNewContext_CommandWithoutContextFlagDefaultsToLocal(t *testing.T) {
 	assert.False(t, ctx.IsRemote())
 }
 
+func TestNewContext_ContextSubcommandInitializesContextStore(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	parent := &cobra.Command{Use: "context"}
+	command := &cobra.Command{Use: "list"}
+	parent.AddCommand(command)
+	initFlags(command)
+	command.SetContext(context.Background())
+	require.NoError(t, command.Flags().Set("dagu-home", home))
+
+	ctx, err := NewContext(command, nil)
+	require.NoError(t, err)
+	require.NotNil(t, ctx.ContextStore)
+	assert.Equal(t, clicontext.LocalContextName, ctx.ContextName)
+}
+
 func TestNewContext_FallsBackToLocalWhenCurrentContextCannotResolve(t *testing.T) {
 	t.Parallel()
 

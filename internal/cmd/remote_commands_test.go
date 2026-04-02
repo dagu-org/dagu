@@ -4,13 +4,23 @@
 package cmd
 
 import (
+	"context"
+	"errors"
+	"net/http"
 	"testing"
+	"time"
 
 	api "github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func stringPtr(v string) *string {
+	return &v
+}
 
 func TestToExecStatus_MapsRemoteFieldsExplicitly(t *testing.T) {
 	t.Parallel()
@@ -24,8 +34,8 @@ func TestToExecStatus_MapsRemoteFieldsExplicitly(t *testing.T) {
 		StartedAt:      "2026-04-02T00:00:00Z",
 		FinishedAt:     "",
 		Log:            "/tmp/example.log",
-		Params:         new("P1=foo"),
-		WorkerId:       new("worker-a"),
+		Params:         stringPtr("P1=foo"),
+		WorkerId:       stringPtr("worker-a"),
 		Tags:           &[]string{"env=prod"},
 		Nodes: []api.Node{
 			{
@@ -62,4 +72,67 @@ func TestRemoteStatusValueRejectsNone(t *testing.T) {
 	_, err := remoteStatusValue("none")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not supported")
+}
+
+func TestBuildRemoteHistoryQueryRejectsMalformedLimit(t *testing.T) {
+	t.Parallel()
+
+	command := &cobra.Command{Use: "history"}
+	initFlags(command, historyFlags...)
+	require.NoError(t, command.Flags().Set("limit", "10foo"))
+
+	ctx := &Context{Command: command}
+	_, _, err := buildRemoteHistoryQuery(ctx, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be an integer")
+
+	require.NoError(t, command.Flags().Set("limit", "0"))
+	_, _, err = buildRemoteHistoryQuery(ctx, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "greater than 0")
+}
+
+func TestWaitForRemoteStopHonorsContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	ctx := &Context{
+		Context: cancelled,
+		Remote: &remoteClient{
+			client: &http.Client{Timeout: time.Minute},
+		},
+	}
+
+	err := waitForRemoteStop(ctx, "example", "run-1")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, context.Canceled))
+}
+
+func TestEnrichRemoteHistoryStatusPopulatesErrorAndMetadata(t *testing.T) {
+	t.Parallel()
+
+	status := &exec.DAGRunStatus{Name: "example", DAGRunID: "run-1"}
+	detail := &api.DAGRunDetails{
+		Name:           "example",
+		DagRunId:       "run-1",
+		RootDAGRunName: "example",
+		RootDAGRunId:   "run-1",
+		Status:         api.Status(core.Failed),
+		WorkerId:       stringPtr("worker-a"),
+		Tags:           &[]string{"env=prod"},
+		Nodes: []api.Node{
+			{
+				Step:   api.Step{Name: "step-1"},
+				Status: api.NodeStatus(core.NodeFailed),
+				Error:  stringPtr("boom"),
+			},
+		},
+	}
+
+	require.NoError(t, enrichRemoteHistoryStatus(status, detail))
+	assert.Equal(t, []string{"env=prod"}, status.Tags)
+	assert.Equal(t, "worker-a", status.WorkerID)
+	assert.Contains(t, status.Error, "boom")
 }

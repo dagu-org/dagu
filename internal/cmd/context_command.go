@@ -197,9 +197,13 @@ func readContextInput(ctx *Context, name string, allowPartial bool) (*clicontext
 		return nil, err
 	}
 	if apiKey == "" && !allowPartial && term.IsTerminal(int(os.Stdin.Fd())) {
-		fmt.Fprint(os.Stderr, "API key: ")
+		if _, err := fmt.Fprint(os.Stderr, "API key: "); err != nil {
+			return nil, err
+		}
 		bytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Fprintln(os.Stderr)
+		if _, printErr := fmt.Fprintln(os.Stderr); printErr != nil {
+			return nil, printErr
+		}
 		if err != nil {
 			return nil, err
 		}

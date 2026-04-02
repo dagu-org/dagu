@@ -159,7 +159,8 @@ func (c *Context) LogToFile(f *os.File) {
 // or other initialization steps fail.
 func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
-	scope := scopeForCommand(cmd.Name())
+	commandName := commandFamilyName(cmd)
+	scope := scopeForCommand(commandName)
 
 	v := viper.New()
 	bindFlags(v, cmd, flags...)
@@ -190,7 +191,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Set service type based on command to load only necessary config sections
-	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(cmd.Name())))
+	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(commandName)))
 
 	loader := config.NewConfigLoader(v, configLoaderOpts...)
 	cfg, err := loader.Load()
@@ -210,14 +211,14 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		contextStoreWarning error
 	)
 
-	if cmd.Name() == "context" || scope != commandScopeStatic {
+	if isContextCommand(cmd) || scope != commandScopeStatic {
 		contextStore, err = newCLIContextStore(cfg.Paths.DataDir, cfg.Paths.ContextsDir)
 		if err != nil {
 			if shouldFailForContextStoreError(cmd, scope, requestedContextName) {
 				return nil, fmt.Errorf("failed to initialize context store: %w", err)
 			}
 			contextStoreWarning = fmt.Errorf("failed to initialize context store, using local context: %w", err)
-		} else if cmd.Name() != "context" {
+		} else if !isContextCommand(cmd) {
 			selectedContextName, selectedContext, err = resolveCLIContext(cmd, contextStore, requestedContextName)
 			if err != nil {
 				if shouldFailForContextResolutionError(scope, requestedContextName) {
@@ -439,6 +440,22 @@ func newCLIContextStore(dataDir, contextsDir string) (*clicontext.Store, error) 
 	return clicontext.NewStore(contextsDir, enc)
 }
 
+func commandFamilyName(cmd *cobra.Command) string {
+	if isContextCommand(cmd) {
+		return "context"
+	}
+	return cmd.Name()
+}
+
+func isContextCommand(cmd *cobra.Command) bool {
+	for current := cmd; current != nil; current = current.Parent() {
+		if current.Name() == "context" {
+			return true
+		}
+	}
+	return false
+}
+
 func requestedCLIContextName(cmd *cobra.Command) (string, error) {
 	if cmd.Flags().Lookup("context") == nil {
 		return "", nil
@@ -470,7 +487,7 @@ func resolveCLIContext(cmd *cobra.Command, store *clicontext.Store, requested st
 }
 
 func shouldFailForContextStoreError(cmd *cobra.Command, scope commandScope, requested string) bool {
-	if cmd.Name() == "context" {
+	if isContextCommand(cmd) {
 		return true
 	}
 	if scope == commandScopeStatic {

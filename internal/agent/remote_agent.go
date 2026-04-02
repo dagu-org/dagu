@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -167,7 +168,7 @@ func makeRemoteAgentRun(resolver RemoteContextResolver) ToolFunc {
 		node, err := resolver.GetByName(ctx.Context, args.Context)
 		if err != nil {
 			available, listErr := resolver.ListRemoteContexts(ctx.Context)
-			if listErr == nil && len(available) > 0 {
+			if errors.Is(err, ErrRemoteContextNotFound) && listErr == nil && len(available) > 0 {
 				names := make([]string, 0, len(available))
 				for _, n := range available {
 					names = append(names, n.Name)

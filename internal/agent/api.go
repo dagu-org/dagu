@@ -570,8 +570,8 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 	}, nil
 }
 
-func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentity, cfg sessionRuntimeConfig, now time.Time) *SessionManager {
-	mgr := NewSessionManager(SessionManagerConfig{
+func (a *API) buildSessionManagerConfig(id string, user UserIdentity, cfg sessionRuntimeConfig) SessionManagerConfig {
+	return SessionManagerConfig{
 		ID:                    id,
 		User:                  user,
 		Model:                 cfg.modelID,
@@ -593,7 +593,11 @@ func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentit
 		WebSearch:             cfg.webSearch,
 		ThinkingEffort:        cfg.thinkingEffort,
 		RemoteContextResolver: a.remoteContextResolver,
-	})
+	}
+}
+
+func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentity, cfg sessionRuntimeConfig, now time.Time) *SessionManager {
+	mgr := NewSessionManager(a.buildSessionManagerConfig(id, user, cfg))
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 
 	a.persistNewSession(ctx, id, user.UserID, cfg.dagName, cfg.modelID, now)
@@ -932,34 +936,25 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		}
 	}
 
-	mgr := NewSessionManager(SessionManagerConfig{
-		ID:                    id,
-		User:                  user,
-		Model:                 modelID,
-		Logger:                a.logger,
-		WorkingDir:            a.workingDir,
-		Title:                 sess.Title,
-		CreatedAt:             sess.CreatedAt,
-		LastActivity:          time.Now(),
-		OnMessage:             a.createMessageCallback(id),
-		History:               messages,
-		SequenceID:            seqID,
-		Environment:           a.environment,
-		SafeMode:              true, // Default to safe mode for reactivated sessions
-		Hooks:                 a.hooks,
-		InputCostPer1M:        inputCost,
-		OutputCostPer1M:       outputCost,
-		MemoryStore:           a.memoryStore,
-		SkillStore:            a.skillStore,
-		EnabledSkills:         a.loadEnabledSkills(ctx),
-		DAGName:               sess.DAGName,
-		SessionStore:          a.store,
-		Soul:                  a.loadSelectedSoul(ctx),
-		WebSearch:             a.loadWebSearch(ctx),
-		ThinkingEffort:        thinkingEffort,
-		RemoteContextResolver: a.remoteContextResolver,
-		Delegates:             delegates,
+	cfg := a.buildSessionManagerConfig(id, user, sessionRuntimeConfig{
+		modelID:         modelID,
+		title:           sess.Title,
+		dagName:         sess.DAGName,
+		safeMode:        true, // Default to safe mode for reactivated sessions
+		enabledSkills:   a.loadEnabledSkills(ctx),
+		soul:            a.loadSelectedSoul(ctx),
+		webSearch:       a.loadWebSearch(ctx),
+		thinkingEffort:  thinkingEffort,
+		inputCostPer1M:  inputCost,
+		outputCostPer1M: outputCost,
 	})
+	cfg.CreatedAt = sess.CreatedAt
+	cfg.LastActivity = time.Now()
+	cfg.History = messages
+	cfg.SequenceID = seqID
+	cfg.Delegates = delegates
+
+	mgr := NewSessionManager(cfg)
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 	a.sessions.Store(id, mgr)
 
@@ -1143,28 +1138,17 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		dagName = resolved[0].DAGName
 	}
 
-	mgr := NewSessionManager(SessionManagerConfig{
-		ID:                    id,
-		User:                  user,
-		Model:                 model,
-		Logger:                a.logger,
-		WorkingDir:            a.workingDir,
-		OnMessage:             a.createMessageCallback(id),
-		Environment:           a.environment,
-		SafeMode:              req.SafeMode,
-		Hooks:                 a.hooks,
-		InputCostPer1M:        modelCfg.InputCostPer1M,
-		OutputCostPer1M:       modelCfg.OutputCostPer1M,
-		MemoryStore:           a.memoryStore,
-		SkillStore:            a.skillStore,
-		EnabledSkills:         a.loadEnabledSkills(ctx),
-		DAGName:               dagName,
-		SessionStore:          a.store,
-		Soul:                  a.loadSoulWithOverride(ctx, req.SoulID),
-		WebSearch:             a.loadWebSearch(ctx),
-		ThinkingEffort:        modelThinkingEffort(modelCfg),
-		RemoteContextResolver: a.remoteContextResolver,
-	})
+	mgr := NewSessionManager(a.buildSessionManagerConfig(id, user, sessionRuntimeConfig{
+		modelID:         model,
+		dagName:         dagName,
+		safeMode:        req.SafeMode,
+		enabledSkills:   a.loadEnabledSkills(ctx),
+		soul:            a.loadSoulWithOverride(ctx, req.SoulID),
+		webSearch:       a.loadWebSearch(ctx),
+		thinkingEffort:  modelThinkingEffort(modelCfg),
+		inputCostPer1M:  modelCfg.InputCostPer1M,
+		outputCostPer1M: modelCfg.OutputCostPer1M,
+	}))
 	mgr.registry = &sessionRegistry{sessions: &a.sessions, parent: mgr}
 
 	messageWithContext, err := a.prepareChatContent(ctx, id, req)

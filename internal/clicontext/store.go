@@ -104,20 +104,21 @@ func (s *Store) ValidateContext(ctx *Context) error {
 	if ctx == nil {
 		return errors.New("context is required")
 	}
-	name := strings.TrimSpace(ctx.Name)
+	normalizeContext(ctx)
+	name := ctx.Name
 	if name == "" {
 		return errors.New("context name is required")
 	}
-	if name == LocalContextName {
-		return fmt.Errorf("%q is reserved", LocalContextName)
+	if name == LocalContextName || name == currentFileName {
+		return fmt.Errorf("%q and %q are reserved", LocalContextName, currentFileName)
 	}
-	if strings.ContainsRune(name, os.PathSeparator) {
+	if strings.ContainsAny(name, `/\`) {
 		return errors.New("context name cannot contain path separators")
 	}
 	if !strings.HasPrefix(ctx.APIKey, "dagu_") {
 		return errors.New("api key must use the dagu_ prefix")
 	}
-	u, err := url.Parse(strings.TrimSpace(ctx.ServerURL))
+	u, err := url.Parse(ctx.ServerURL)
 	if err != nil {
 		return fmt.Errorf("invalid server URL: %w", err)
 	}
@@ -201,6 +202,7 @@ func (s *Store) List(_ context.Context) ([]*Context, error) {
 		return nil, err
 	}
 	var contexts []*Context
+	var readErrs []error
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != fileExtension {
 			continue
@@ -210,11 +212,15 @@ func (s *Store) List(_ context.Context) ([]*Context, error) {
 		}
 		ctx, err := s.readContext(filepath.Join(s.baseDir, entry.Name()))
 		if err != nil {
+			readErrs = append(readErrs, fmt.Errorf("read %s: %w", entry.Name(), err))
 			continue
 		}
 		contexts = append(contexts, ctx)
 	}
 	sort.Slice(contexts, func(i, j int) bool { return contexts[i].Name < contexts[j].Name })
+	if len(readErrs) > 0 {
+		return contexts, errors.Join(readErrs...)
+	}
 	return contexts, nil
 }
 
@@ -269,6 +275,15 @@ func (s *Store) readContext(path string) (*Context, error) {
 		return nil, err
 	}
 	return stored.toContext(s.encryptor)
+}
+
+func normalizeContext(ctx *Context) {
+	if ctx == nil {
+		return
+	}
+	ctx.Name = strings.TrimSpace(ctx.Name)
+	ctx.ServerURL = strings.TrimSpace(ctx.ServerURL)
+	ctx.APIKey = strings.TrimSpace(ctx.APIKey)
 }
 
 func (s *Store) currentLocked() (string, error) {
