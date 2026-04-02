@@ -13,88 +13,86 @@ import (
 
 func init() {
 	RegisterTool(ToolRegistration{
-		Name:           "list_remote_nodes",
-		Label:          "List Remote Nodes",
-		Description:    "List available remote Dagu nodes for remote_agent",
+		Name:           "list_contexts",
+		Label:          "List Contexts",
+		Description:    "List available remote CLI contexts for remote_agent",
 		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
-			if cfg.RemoteNodeResolver == nil {
+			if cfg.RemoteContextResolver == nil {
 				return nil
 			}
-			return NewListRemoteNodesTool(cfg.RemoteNodeResolver)
+			return NewListContextsTool(cfg.RemoteContextResolver)
 		},
 	})
 }
 
-type listRemoteNodesInput struct {
+type listContextsInput struct {
 	NameFilter string `json:"name_filter,omitempty"`
 }
 
-// NewListRemoteNodesTool creates a tool for listing available remote Dagu nodes.
-func NewListRemoteNodesTool(resolver RemoteNodeResolver) *AgentTool {
+func NewListContextsTool(resolver RemoteContextResolver) *AgentTool {
 	return &AgentTool{
 		Tool: llm.Tool{
 			Type: "function",
 			Function: llm.ToolFunction{
-				Name:        "list_remote_nodes",
-				Description: "List available remote Dagu nodes that can be targeted by remote_agent.",
+				Name:        "list_contexts",
+				Description: "List available remote CLI contexts that can be targeted by remote_agent.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"name_filter": map[string]any{
 							"type":        "string",
-							"description": "Optional substring filter to match node names",
+							"description": "Optional substring filter to match context names",
 						},
 					},
 				},
 			},
 		},
-		Run: makeListRemoteNodesRun(resolver),
+		Run: makeListContextsRun(resolver),
 		Audit: &AuditInfo{
-			Action:          "remote_nodes_list",
+			Action:          "contexts_list",
 			DetailExtractor: ExtractFields("name_filter"),
 		},
 	}
 }
 
-func makeListRemoteNodesRun(resolver RemoteNodeResolver) ToolFunc {
+func makeListContextsRun(resolver RemoteContextResolver) ToolFunc {
 	return func(ctx ToolContext, input json.RawMessage) ToolOut {
 		if ctx.Role.IsSet() && !ctx.Role.CanExecute() {
-			return toolError("Permission denied: list_remote_nodes requires execute permission")
+			return toolError("Permission denied: list_contexts requires execute permission")
 		}
 
-		var args listRemoteNodesInput
+		var args listContextsInput
 		if err := json.Unmarshal(input, &args); err != nil {
 			return toolError("Failed to parse input: %v", err)
 		}
 
-		nodes, err := resolver.ListTokenAuthNodes(ctx.Context)
+		contexts, err := resolver.ListRemoteContexts(ctx.Context)
 		if err != nil {
-			return toolError("Failed to list remote nodes: %v", err)
+			return toolError("Failed to list remote contexts: %v", err)
 		}
 
-		// Apply name filter if provided.
 		if args.NameFilter != "" {
 			filter := strings.ToLower(args.NameFilter)
-			var filtered []RemoteNodeInfo
-			for _, n := range nodes {
-				if strings.Contains(strings.ToLower(n.Name), filter) {
-					filtered = append(filtered, n)
+			var filtered []RemoteContextInfo
+			for _, item := range contexts {
+				if strings.Contains(strings.ToLower(item.Name), filter) {
+					filtered = append(filtered, item)
 				}
 			}
-			nodes = filtered
+			contexts = filtered
 		}
 
-		if len(nodes) == 0 {
-			return ToolOut{Content: "No remote nodes found."}
+		if len(contexts) == 0 {
+			return ToolOut{Content: "No remote contexts found."}
 		}
 
 		var sb strings.Builder
-		fmt.Fprintf(&sb, "Found %d remote node(s):\n\n", len(nodes))
-		for _, n := range nodes {
-			fmt.Fprintf(&sb, "- **%s**", n.Name)
-			if n.Description != "" {
-				fmt.Fprintf(&sb, ": %s", n.Description)
+		fmt.Fprintf(&sb, "Found %d remote context(s):\n\n", len(contexts))
+		for _, item := range contexts {
+			fmt.Fprintf(&sb, "- **%s**", item.Name)
+			if item.Description != "" {
+				fmt.Fprintf(&sb, ": %s", item.Description)
 			}
 			sb.WriteByte('\n')
 		}

@@ -47,6 +47,9 @@ var stopFlags = []commandLineFlag{
 }
 
 func runStop(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		return remoteRunStop(ctx, args)
+	}
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)

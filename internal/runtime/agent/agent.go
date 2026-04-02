@@ -186,8 +186,8 @@ type Agent struct {
 	agentSoulStore agentpkg.SoulStore
 	// agentOAuthManager resolves subscription-backed provider credentials.
 	agentOAuthManager *agentoauth.Manager
-	// agentRemoteNodeResolver is the remote node resolver for agent step execution.
-	agentRemoteNodeResolver agentpkg.RemoteNodeResolver
+	// agentRemoteContextResolver resolves remote CLI contexts for agent step execution.
+	agentRemoteContextResolver agentpkg.RemoteContextResolver
 
 	// workDir is the per-run work directory (for DAG_RUN_WORK_DIR).
 	workDir string
@@ -274,8 +274,8 @@ type Options struct {
 	AgentSoulStore agentpkg.SoulStore
 	// AgentOAuthManager resolves subscription-backed provider credentials.
 	AgentOAuthManager *agentoauth.Manager
-	// AgentRemoteNodeResolver is the remote node resolver for agent step execution.
-	AgentRemoteNodeResolver agentpkg.RemoteNodeResolver
+	// AgentRemoteContextResolver resolves remote CLI contexts for agent step execution.
+	AgentRemoteContextResolver agentpkg.RemoteContextResolver
 	// ScheduleTime is the RFC 3339 timestamp of when this run was scheduled.
 	// Set by the scheduler for cron-triggered runs; empty for manual runs.
 	ScheduleTime string
@@ -292,37 +292,37 @@ func New(
 	opts Options,
 ) *Agent {
 	a := &Agent{
-		rootDAGRun:              opts.RootDAGRun,
-		parentDAGRun:            opts.ParentDAGRun,
-		dagRunID:                dagRunID,
-		dag:                     dag,
-		dry:                     opts.Dry,
-		retryTarget:             opts.RetryTarget,
-		logDir:                  logDir,
-		logFile:                 logFile,
-		dagRunMgr:               drm,
-		dagStore:                ds,
-		dagRunStore:             opts.DAGRunStore,
-		registry:                opts.ServiceRegistry,
-		extraEnvs:               append([]string{}, opts.ExtraEnvs...),
-		stepRetry:               opts.StepRetry,
-		peerConfig:              opts.PeerConfig,
-		workerID:                opts.WorkerID,
-		statusPusher:            opts.StatusPusher,
-		logWriterFactory:        opts.LogWriterFactory,
-		queuedRun:               opts.QueuedRun,
-		attemptID:               opts.AttemptID,
-		preparedAttempt:         opts.PreparedAttempt,
-		triggerType:             opts.TriggerType,
-		defaultExecMode:         opts.DefaultExecMode,
-		agentConfigStore:        opts.AgentConfigStore,
-		agentModelStore:         opts.AgentModelStore,
-		agentMemoryStore:        opts.AgentMemoryStore,
-		agentSkillStore:         opts.AgentSkillStore,
-		agentSoulStore:          opts.AgentSoulStore,
-		agentOAuthManager:       opts.AgentOAuthManager,
-		agentRemoteNodeResolver: opts.AgentRemoteNodeResolver,
-		scheduleTime:            opts.ScheduleTime,
+		rootDAGRun:                 opts.RootDAGRun,
+		parentDAGRun:               opts.ParentDAGRun,
+		dagRunID:                   dagRunID,
+		dag:                        dag,
+		dry:                        opts.Dry,
+		retryTarget:                opts.RetryTarget,
+		logDir:                     logDir,
+		logFile:                    logFile,
+		dagRunMgr:                  drm,
+		dagStore:                   ds,
+		dagRunStore:                opts.DAGRunStore,
+		registry:                   opts.ServiceRegistry,
+		extraEnvs:                  append([]string{}, opts.ExtraEnvs...),
+		stepRetry:                  opts.StepRetry,
+		peerConfig:                 opts.PeerConfig,
+		workerID:                   opts.WorkerID,
+		statusPusher:               opts.StatusPusher,
+		logWriterFactory:           opts.LogWriterFactory,
+		queuedRun:                  opts.QueuedRun,
+		attemptID:                  opts.AttemptID,
+		preparedAttempt:            opts.PreparedAttempt,
+		triggerType:                opts.TriggerType,
+		defaultExecMode:            opts.DefaultExecMode,
+		agentConfigStore:           opts.AgentConfigStore,
+		agentModelStore:            opts.AgentModelStore,
+		agentMemoryStore:           opts.AgentMemoryStore,
+		agentSkillStore:            opts.AgentSkillStore,
+		agentSoulStore:             opts.AgentSoulStore,
+		agentOAuthManager:          opts.AgentOAuthManager,
+		agentRemoteContextResolver: opts.AgentRemoteContextResolver,
+		scheduleTime:               opts.ScheduleTime,
 	}
 
 	// Initialize progress display if enabled
@@ -519,8 +519,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.agentOAuthManager != nil {
 		ctx = agentpkg.WithOAuthManager(ctx, a.agentOAuthManager)
 	}
-	if a.agentRemoteNodeResolver != nil {
-		ctx = agentpkg.WithRemoteNodeResolver(ctx, a.agentRemoteNodeResolver)
+	if a.agentRemoteContextResolver != nil {
+		ctx = agentpkg.WithRemoteContextResolver(ctx, a.agentRemoteContextResolver)
 	}
 
 	// Add structured logging context

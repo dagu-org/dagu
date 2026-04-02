@@ -88,6 +88,9 @@ var scheduleTimeFlag = commandLineFlag{
 }
 
 func runStart(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		return remoteRunStart(ctx, args)
+	}
 	fromRunID, err := ctx.StringParam("from-run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get from-run-id: %w", err)
@@ -496,26 +499,26 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 		ctx.DAGRunMgr,
 		dr,
 		agent.Options{
-			ParentDAGRun:            parent,
-			ProgressDisplay:         shouldEnableProgress(ctx),
-			WorkerID:                workerID,
-			AttemptID:               attemptID,
-			QueuedRun:               queuedRun,
-			PreparedAttempt:         preparedAttempt,
-			DAGRunStore:             ctx.DAGRunStore,
-			ServiceRegistry:         ctx.ServiceRegistry,
-			RootDAGRun:              root,
-			PeerConfig:              ctx.Config.Core.Peer,
-			TriggerType:             triggerType,
-			DefaultExecMode:         ctx.Config.DefaultExecMode,
-			AgentConfigStore:        as.ConfigStore,
-			AgentModelStore:         as.ModelStore,
-			AgentMemoryStore:        as.MemoryStore,
-			AgentSkillStore:         as.SkillStore,
-			AgentSoulStore:          as.SoulStore,
-			AgentOAuthManager:       as.OAuthManager,
-			AgentRemoteNodeResolver: as.RemoteNodeResolver,
-			ScheduleTime:            scheduleTime,
+			ParentDAGRun:               parent,
+			ProgressDisplay:            shouldEnableProgress(ctx),
+			WorkerID:                   workerID,
+			AttemptID:                  attemptID,
+			QueuedRun:                  queuedRun,
+			PreparedAttempt:            preparedAttempt,
+			DAGRunStore:                ctx.DAGRunStore,
+			ServiceRegistry:            ctx.ServiceRegistry,
+			RootDAGRun:                 root,
+			PeerConfig:                 ctx.Config.Core.Peer,
+			TriggerType:                triggerType,
+			DefaultExecMode:            ctx.Config.DefaultExecMode,
+			AgentConfigStore:           as.ConfigStore,
+			AgentModelStore:            as.ModelStore,
+			AgentMemoryStore:           as.MemoryStore,
+			AgentSkillStore:            as.SkillStore,
+			AgentSoulStore:             as.SoulStore,
+			AgentOAuthManager:          as.OAuthManager,
+			AgentRemoteContextResolver: as.ContextResolver,
+			ScheduleTime:               scheduleTime,
 		},
 	)
 

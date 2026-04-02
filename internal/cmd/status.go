@@ -48,6 +48,9 @@ var statusFlags = []commandLineFlag{
 }
 
 func runStatus(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		return remoteRunStatus(ctx, args)
+	}
 	dagRunID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run ID: %w", err)
