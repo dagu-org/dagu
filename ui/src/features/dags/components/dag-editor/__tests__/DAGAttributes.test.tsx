@@ -4,6 +4,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { ScheduleKind } from '@/api/v1/schema';
 import dayjs from '@/lib/dayjs';
 import DAGAttributes from '../DAGAttributes';
 
@@ -19,7 +20,7 @@ describe('DAGAttributes', () => {
       <DAGAttributes
         dag={{
           name: 'scheduled-dag',
-          schedule: [{ expression: '0 12 * * *', kind: 'cron' }],
+          schedule: [{ expression: '0 12 * * *', kind: ScheduleKind.cron }],
           nextRun,
         }}
       />
@@ -38,7 +39,7 @@ describe('DAGAttributes', () => {
       <DAGAttributes
         dag={{
           name: 'scheduled-dag',
-          schedule: [{ expression: '0 12 * * *', kind: 'cron' }],
+          schedule: [{ expression: '0 12 * * *', kind: ScheduleKind.cron }],
         }}
       />
     );

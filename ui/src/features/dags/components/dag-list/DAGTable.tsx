@@ -114,6 +114,7 @@ function DAGCard({
   const description = dag.dag.description;
   const schedules = dag.dag.schedule || [];
   const hasSchedule = schedules.length > 0;
+  const nextRun = parseNextRun(dag.nextRun);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.metaKey || e.ctrlKey) {
@@ -163,6 +164,24 @@ function DAGCard({
           </span>
         )}
       </div>
+
+      {hasSchedule && !dag.suspended && (
+        <div className="text-xs text-muted-foreground mb-1.5 leading-tight">
+          {nextRun ? (
+            <Ticker intervalMs={1000}>
+              {() => {
+                const ms = nextRun.getTime() - new Date().getTime();
+                if (ms <= 0) {
+                  return <span>Due now</span>;
+                }
+                return <span>Run in {formatMs(ms)}</span>;
+              }}
+            </Ticker>
+          ) : (
+            <span>No upcoming run</span>
+          )}
+        </div>
+      )}
 
       {/* Tags */}
       {tags.length > 0 && (
