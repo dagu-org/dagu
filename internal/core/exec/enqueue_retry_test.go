@@ -332,6 +332,10 @@ func (s *stubDAGRunStore) ListStatuses(context.Context, ...exec.ListDAGRunStatus
 	return nil, nil
 }
 
+func (s *stubDAGRunStore) ListStatusesPage(context.Context, ...exec.ListDAGRunStatusesOption) (exec.DAGRunStatusPage, error) {
+	return exec.DAGRunStatusPage{}, nil
+}
+
 func (s *stubDAGRunStore) CompareAndSwapLatestAttemptStatus(
 	_ context.Context,
 	_ exec.DAGRunRef,

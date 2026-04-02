@@ -56,7 +56,7 @@ describe('useBulkDAGRunSelection', () => {
     const { result } = renderHook(() => useBulkDAGRunSelection(dagRuns));
 
     act(() => {
-      result.current.selectAllMatching();
+      result.current.selectAllLoaded();
     });
 
     expect(result.current.selectedCount).toBe(2);
@@ -83,7 +83,7 @@ describe('useBulkDAGRunSelection', () => {
     );
 
     act(() => {
-      result.current.selectAllMatching();
+      result.current.selectAllLoaded();
     });
 
     rerender({

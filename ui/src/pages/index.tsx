@@ -16,14 +16,10 @@ import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
+import { useExactDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import PathsCard from '../features/system-status/components/PathsCard';
-import { useQuery } from '../hooks/api';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGRuns,
-} from '../hooks/useAppLive';
+import { useLiveConnection } from '../hooks/useAppLive';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -178,37 +174,32 @@ function Dashboard(): React.ReactElement | null {
 
   const selectedDAGName = selectedDAGRun !== 'all' ? selectedDAGRun : undefined;
 
-  const liveState = useLiveConnection();
-
-  const { data, error, isLoading, mutate } = useQuery(
-    '/dag-runs',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-          fromDate: dateRange.startDate,
-          toDate: dateRange.endDate,
-          name: selectedDAGName,
-        },
-      },
+  useLiveConnection();
+  const {
+    data: dagRunsList,
+    error,
+    isLoading,
+    refresh,
+  } = useExactDAGRuns({
+    query: {
+      remoteNode: appBarContext.selectedRemoteNode || 'local',
+      fromDate: dateRange.startDate,
+      toDate: dateRange.endDate,
+      name: selectedDAGName,
     },
-    liveFallbackOptions(liveState, 5000)
-  );
-  useLiveDAGRuns(mutate);
+    fallbackIntervalMs: 5000,
+  });
 
   const handleRefreshAll = async () => {
-    await mutate();
+    await refresh();
   };
 
-  const dagRunsList: DAGRunSummary[] = data?.dagRuns || [];
-
   const uniqueDAGRunNames = React.useMemo(() => {
-    if (!data?.dagRuns) return [];
     const names = new Set(
-      data.dagRuns.map((dagRun) => dagRun.name).filter(Boolean)
+      dagRunsList.map((dagRun) => dagRun.name).filter(Boolean)
     );
     return Array.from(names).sort();
-  }, [data]);
+  }, [dagRunsList]);
 
   const handleDAGRunChange = (value: string) => {
     setSelectedDAGRun(value);
@@ -221,9 +212,7 @@ function Dashboard(): React.ReactElement | null {
   }, [appBarContext]);
 
   if (error) {
-    const errorData = error as components['schemas']['Error'];
-    const errorMessage =
-      errorData?.message || 'Unknown error loading dashboard';
+    const errorMessage = error.message || 'Unknown error loading dashboard';
     return <div className="p-4 text-error">Error: {errorMessage}</div>;
   }
 
@@ -245,7 +234,6 @@ function Dashboard(): React.ReactElement | null {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-h-0 gap-3 p-1">
-
         {/* Toolbar - Top */}
         <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           <Select
@@ -255,12 +243,16 @@ function Dashboard(): React.ReactElement | null {
           >
             <SelectTrigger className="h-9 w-[140px]">
               <Filter className="h-4 w-4 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder={isLoading ? 'Loading...' : 'All DAGs'} />
+              <SelectValue
+                placeholder={isLoading ? 'Loading...' : 'All DAGs'}
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All DAGs</SelectItem>
               {uniqueDAGRunNames.map((name) => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -273,7 +265,10 @@ function Dashboard(): React.ReactElement | null {
               if (!newDate) return;
               const date = dayjs(newDate);
               if (!date.isValid()) return;
-              const { startOfDay, endOfDay } = getDayBounds(date, config.tzOffsetInSec);
+              const { startOfDay, endOfDay } = getDayBounds(
+                date,
+                config.tzOffsetInSec
+              );
               handleDateChange(startOfDay.unix(), endOfDay.unix());
             }}
             className="h-9 w-[150px]"
@@ -281,7 +276,10 @@ function Dashboard(): React.ReactElement | null {
           <Button
             variant="outline"
             onClick={() => {
-              const { startOfDay, endOfDay } = getDayBounds(dayjs(), config.tzOffsetInSec);
+              const { startOfDay, endOfDay } = getDayBounds(
+                dayjs(),
+                config.tzOffsetInSec
+              );
               handleDateChange(startOfDay.unix(), endOfDay.unix());
             }}
           >
@@ -297,42 +295,60 @@ function Dashboard(): React.ReactElement | null {
         {/* Stats Row */}
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 sm:gap-x-6 text-sm text-muted-foreground flex-shrink-0">
           <div className="flex items-baseline gap-1">
-            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{totalDAGRuns}</span>
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
+              {totalDAGRuns}
+            </span>
             <span className="text-xs">runs</span>
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Success]}</span>
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
+              {metrics[Status.Success]}
+            </span>
             <span className="text-xs">ok</span>
           </div>
           <div className="flex items-baseline gap-1">
-            <span className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}>{metrics[Status.Failed]}</span>
+            <span
+              className={`text-lg sm:text-xl font-light tabular-nums ${hasFailures ? 'text-foreground' : 'text-muted-foreground/50'}`}
+            >
+              {metrics[Status.Failed]}
+            </span>
             <span className="text-xs">failed</span>
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Aborted]}</span>
+            <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
+              {metrics[Status.Aborted]}
+            </span>
             <span className="text-xs">aborted</span>
           </div>
           {hasRunning && (
             <div className="flex items-baseline gap-1">
-              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Running]}</span>
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
+                {metrics[Status.Running]}
+              </span>
               <span className="text-xs">active</span>
             </div>
           )}
           {metrics[Status.Queued] > 0 && (
             <div className="flex items-baseline gap-1">
-              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Queued]}</span>
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
+                {metrics[Status.Queued]}
+              </span>
               <span className="text-xs">queued</span>
             </div>
           )}
           {metrics[Status.Waiting] > 0 && (
             <div className="flex items-baseline gap-1">
-              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Waiting]}</span>
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
+                {metrics[Status.Waiting]}
+              </span>
               <span className="text-xs">waiting</span>
             </div>
           )}
           {metrics[Status.Rejected] > 0 && (
             <div className="flex items-baseline gap-1">
-              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">{metrics[Status.Rejected]}</span>
+              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
+                {metrics[Status.Rejected]}
+              </span>
               <span className="text-xs">rejected</span>
             </div>
           )}

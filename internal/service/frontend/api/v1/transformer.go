@@ -208,6 +208,24 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	}
 }
 
+func toDAGRunsPageResponse(page exec.DAGRunStatusPage) api.DAGRunsPageResponse {
+	dagRuns := make([]api.DAGRunSummary, 0, len(page.Items))
+	for _, item := range page.Items {
+		if item == nil {
+			continue
+		}
+		dagRuns = append(dagRuns, toDAGRunSummary(*item))
+	}
+
+	resp := api.DAGRunsPageResponse{
+		DagRuns: dagRuns,
+	}
+	if page.NextCursor != "" {
+		resp.NextCursor = &page.NextCursor
+	}
+	return resp
+}
+
 // ToDAGRunDetails converts a DAGRunStatus to its API representation.
 // This function is exported for use by the SSE package.
 func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {

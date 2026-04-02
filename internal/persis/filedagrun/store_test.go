@@ -889,3 +889,124 @@ func TestListStatuses_WithAllHistoryBypassesDefaultTodayWindow(t *testing.T) {
 	require.Len(t, statuses, 1)
 	assert.Equal(t, "old-run", statuses[0].DAGRunID)
 }
+
+func TestListStatusesPage(t *testing.T) {
+	t.Run("ForwardPaginationHasDeterministicOrderWithoutDuplicates", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		alpha := th.DAG("alpha")
+		beta := th.DAG("beta")
+
+		th.CreateAttemptWithDAG(t, base.Add(3*time.Second), "run-4", core.Succeeded, beta.DAG)
+		th.CreateAttemptWithDAG(t, base.Add(2*time.Second), "run-3", core.Succeeded, alpha.DAG)
+		th.CreateAttemptWithDAG(t, base.Add(1*time.Second), "run-2", core.Succeeded, beta.DAG)
+		th.CreateAttemptWithDAG(t, base.Add(1*time.Second), "run-1", core.Succeeded, alpha.DAG)
+		th.CreateAttemptWithDAG(t, base, "run-0", core.Succeeded, alpha.DAG)
+
+		page1, err := th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithLimit(2),
+		)
+		require.NoError(t, err)
+		require.Len(t, page1.Items, 2)
+		require.NotEmpty(t, page1.NextCursor)
+		assert.Equal(t, []string{"beta/run-4", "alpha/run-3"}, []string{
+			page1.Items[0].Name + "/" + page1.Items[0].DAGRunID,
+			page1.Items[1].Name + "/" + page1.Items[1].DAGRunID,
+		})
+
+		page2, err := th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithLimit(2),
+			exec.WithCursor(page1.NextCursor),
+		)
+		require.NoError(t, err)
+		require.Len(t, page2.Items, 2)
+		require.NotEmpty(t, page2.NextCursor)
+		assert.Equal(t, []string{"alpha/run-1", "beta/run-2"}, []string{
+			page2.Items[0].Name + "/" + page2.Items[0].DAGRunID,
+			page2.Items[1].Name + "/" + page2.Items[1].DAGRunID,
+		})
+
+		page3, err := th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithLimit(2),
+			exec.WithCursor(page2.NextCursor),
+		)
+		require.NoError(t, err)
+		require.Len(t, page3.Items, 1)
+		assert.Empty(t, page3.NextCursor)
+		assert.Equal(t, "run-0", page3.Items[0].DAGRunID)
+
+		seen := make(map[string]struct{})
+		for _, page := range [][]*exec.DAGRunStatus{page1.Items, page2.Items, page3.Items} {
+			for _, item := range page {
+				key := item.Name + "/" + item.DAGRunID
+				if _, ok := seen[key]; ok {
+					t.Fatalf("duplicate DAG run in paged results: %s", key)
+				}
+				seen[key] = struct{}{}
+			}
+		}
+	})
+
+	t.Run("CursorRejectsChangedFilters", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		ts := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		th.CreateAttempt(t, ts, "run-1", core.Succeeded)
+		th.CreateAttempt(t, ts.Add(-time.Second), "run-0", core.Succeeded)
+
+		page, err := th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithStatuses([]core.Status{core.Succeeded}),
+			exec.WithLimit(1),
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, page.NextCursor)
+
+		_, err = th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithStatuses([]core.Status{core.Failed}),
+			exec.WithLimit(1),
+			exec.WithCursor(page.NextCursor),
+		)
+		require.ErrorIs(t, err, ErrInvalidQueryCursor)
+	})
+
+	t.Run("NewerRunsAfterPageOneDoNotCorruptContinuation", func(t *testing.T) {
+		th := setupTestStore(t)
+
+		base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+		th.CreateAttempt(t, base.Add(2*time.Second), "run-2", core.Succeeded)
+		th.CreateAttempt(t, base.Add(1*time.Second), "run-1", core.Succeeded)
+		th.CreateAttempt(t, base, "run-0", core.Succeeded)
+
+		page1, err := th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithLimit(2),
+		)
+		require.NoError(t, err)
+		require.Len(t, page1.Items, 2)
+		require.NotEmpty(t, page1.NextCursor)
+
+		th.CreateAttempt(t, base.Add(3*time.Second), "run-3", core.Succeeded)
+
+		page2, err := th.Store.ListStatusesPage(
+			th.Context,
+			exec.WithAllHistory(),
+			exec.WithLimit(2),
+			exec.WithCursor(page1.NextCursor),
+		)
+		require.NoError(t, err)
+		require.Len(t, page2.Items, 1)
+		assert.Equal(t, "run-0", page2.Items[0].DAGRunID)
+	})
+}

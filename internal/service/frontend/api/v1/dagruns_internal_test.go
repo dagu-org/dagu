@@ -163,6 +163,11 @@ func (blockingDAGRunStore) ListStatuses(ctx context.Context, _ ...exec.ListDAGRu
 	return nil, ctx.Err()
 }
 
+func (blockingDAGRunStore) ListStatusesPage(ctx context.Context, _ ...exec.ListDAGRunStatusesOption) (exec.DAGRunStatusPage, error) {
+	<-ctx.Done()
+	return exec.DAGRunStatusPage{}, ctx.Err()
+}
+
 func (blockingDAGRunStore) CompareAndSwapLatestAttemptStatus(context.Context, exec.DAGRunRef, string, core.Status, func(*exec.DAGRunStatus) error) (*exec.DAGRunStatus, bool, error) {
 	panic("not implemented")
 }

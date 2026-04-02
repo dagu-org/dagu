@@ -95,26 +95,15 @@ func New(baseDir string, opts ...DAGRunStoreOption) exec.DAGRunStore {
 // ListStatuses retrieves status records based on the provided options.
 // It supports filtering by time range, status, and limiting the number of results.
 func (store *Store) ListStatuses(ctx context.Context, opts ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
-	// Apply options and set defaults
 	options, err := prepareListOptions(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare options: %w", err)
 	}
-
-	var rootDirs []DataRoot
-	if options.ExactName == "" {
-		// Get all root directories
-		d, err := store.listRoot(ctx, options.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list root directories: %w", err)
-		}
-		rootDirs = d
-	} else {
-		rootDirs = append(rootDirs, NewDataRoot(store.baseDir, options.ExactName))
+	items, _, err := store.listStatusesOrdered(ctx, options, options.Limit, false)
+	if err != nil {
+		return nil, err
 	}
-
-	// Collect and filter results
-	return store.collectStatusesFromRoots(ctx, rootDirs, options)
+	return items, nil
 }
 
 // prepareListOptions processes the provided options and sets default values.

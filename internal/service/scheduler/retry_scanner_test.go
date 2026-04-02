@@ -669,6 +669,14 @@ func (s *retryScannerStore) ListStatuses(_ context.Context, opts ...exec.ListDAG
 	return ret, nil
 }
 
+func (s *retryScannerStore) ListStatusesPage(ctx context.Context, opts ...exec.ListDAGRunStatusesOption) (exec.DAGRunStatusPage, error) {
+	items, err := s.ListStatuses(ctx, opts...)
+	if err != nil {
+		return exec.DAGRunStatusPage{}, err
+	}
+	return exec.DAGRunStatusPage{Items: items}, nil
+}
+
 func (s *retryScannerStore) CompareAndSwapLatestAttemptStatus(
 	_ context.Context,
 	dagRun exec.DAGRunRef,
