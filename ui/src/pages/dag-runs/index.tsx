@@ -23,16 +23,8 @@ import DAGRunBatchActions from '../../features/dag-runs/components/common/DAGRun
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
-import {
-  type DAGRunsPageResponse,
-  mergeUniqueDAGRuns,
-} from '../../features/dag-runs/hooks/dagRunPagination';
-import { useClient, useQuery } from '../../hooks/api';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGRuns,
-} from '../../hooks/useAppLive';
+import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
+import { useQuery } from '../../hooks/api';
 import { useBulkDAGRunSelection } from '../../features/dag-runs/hooks/useBulkDAGRunSelection';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
@@ -106,7 +98,6 @@ const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters): boolean =>
 function DAGRuns() {
   const location = useLocation();
   const appBarContext = React.useContext(AppBarContext);
-  const client = useClient();
   const config = useConfig();
   const { preferences, updatePreference } = useUserPreferences();
   const searchState = useSearchState();
@@ -422,7 +413,6 @@ function DAGRuns() {
   );
   const availableTags = tagsData?.tags ?? [];
 
-  const liveState = useLiveConnection();
   const dagRunQuery = React.useMemo(
     () => ({
       remoteNode: appBarContext.selectedRemoteNode || 'local',
@@ -444,35 +434,16 @@ function DAGRuns() {
       appBarContext.selectedRemoteNode,
     ]
   );
-  const dagRunQueryKey = React.useMemo(
-    () => JSON.stringify(dagRunQuery),
-    [dagRunQuery]
-  );
-  const { data, mutate } = useQuery(
-    '/dag-runs',
-    {
-      params: {
-        query: dagRunQuery,
-      },
-    },
-    liveFallbackOptions(liveState)
-  );
-  useLiveDAGRuns(mutate);
-  const [olderRuns, setOlderRuns] = React.useState<
-    DAGRunsPageResponse['dagRuns']
-  >([]);
-  const [continuationCursorOverride, setContinuationCursorOverride] =
-    React.useState<string | null | undefined>(undefined);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null);
-  const dagRuns = React.useMemo(
-    () => mergeUniqueDAGRuns(data?.dagRuns ?? [], olderRuns),
-    [data?.dagRuns, olderRuns]
-  );
-  const currentNextCursor =
-    continuationCursorOverride === undefined
-      ? (data?.nextCursor ?? null)
-      : continuationCursorOverride;
+  const {
+    dagRuns,
+    isLoadingMore,
+    loadMoreError,
+    hasMore,
+    refresh: refreshDagRuns,
+    loadMore: handleLoadMore,
+  } = usePaginatedDAGRuns({
+    query: dagRunQuery,
+  });
   const {
     clearSelection,
     replaceSelection,
@@ -481,57 +452,6 @@ function DAGRuns() {
     selectedRuns,
     toggleSelection,
   } = useBulkDAGRunSelection(dagRuns);
-  const refreshDagRuns = React.useCallback(async (): Promise<void> => {
-    setOlderRuns([]);
-    setContinuationCursorOverride(undefined);
-    setLoadMoreError(null);
-    setIsLoadingMore(false);
-    await mutate();
-  }, [mutate]);
-
-  React.useEffect(() => {
-    setOlderRuns([]);
-    setContinuationCursorOverride(undefined);
-    setLoadMoreError(null);
-    setIsLoadingMore(false);
-  }, [dagRunQueryKey]);
-
-  const handleLoadMore = React.useCallback(async () => {
-    if (isLoadingMore || !currentNextCursor) {
-      return;
-    }
-
-    setIsLoadingMore(true);
-    setLoadMoreError(null);
-
-    const response = await client.GET('/dag-runs', {
-      params: {
-        query: {
-          ...dagRunQuery,
-          cursor: currentNextCursor,
-        },
-      },
-    });
-
-    setIsLoadingMore(false);
-
-    if (response.error) {
-      const message =
-        response.error &&
-        typeof response.error === 'object' &&
-        'message' in response.error
-          ? String(response.error.message)
-          : 'Failed to load more DAG runs';
-      setLoadMoreError(message);
-      return;
-    }
-
-    const pageData = (response.data ?? { dagRuns: [] }) as DAGRunsPageResponse;
-    setOlderRuns((previous) =>
-      mergeUniqueDAGRuns(previous, pageData.dagRuns ?? [])
-    );
-    setContinuationCursorOverride(pageData.nextCursor ?? null);
-  }, [client, currentNextCursor, dagRunQuery, isLoadingMore]);
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -988,7 +908,7 @@ function DAGRuns() {
           {loadMoreError && (
             <div className="text-sm text-error">{loadMoreError}</div>
           )}
-          {currentNextCursor ? (
+          {hasMore ? (
             <Button
               variant="outline"
               onClick={() => void handleLoadMore()}

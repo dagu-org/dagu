@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { components, paths } from '@/api/v1/schema';
-import { useClient } from '@/hooks/api';
-import { useLiveConnection, useLiveInvalidation } from '@/hooks/useAppLive';
+import { useClient, useQuery } from '@/hooks/api';
+import {
+  liveFallbackOptions,
+  useLiveConnection,
+  useLiveDAGRuns,
+  useLiveInvalidation,
+} from '@/hooks/useAppLive';
 import { isAbortLikeError } from '@/lib/requestTimeout';
 
 export type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -88,6 +93,22 @@ type UseExactDAGRunsOptions = {
   enabled?: boolean;
   liveEnabled?: boolean;
   fallbackIntervalMs?: number;
+};
+
+type UsePaginatedDAGRunsOptions = {
+  query: DAGRunListQuery;
+  enabled?: boolean;
+};
+
+type UsePaginatedDAGRunsResult = {
+  dagRuns: DAGRunSummary[];
+  headPage: DAGRunsPageResponse | undefined;
+  isInitialLoading: boolean;
+  isLoadingMore: boolean;
+  loadMoreError: string | null;
+  hasMore: boolean;
+  refresh: () => Promise<void>;
+  loadMore: () => Promise<void>;
 };
 
 type UseExactDAGRunsResult = {
@@ -232,5 +253,109 @@ export function useExactDAGRuns({
     isLoading,
     isValidating,
     refresh,
+  };
+}
+
+export function usePaginatedDAGRuns({
+  query,
+  enabled = true,
+}: UsePaginatedDAGRunsOptions): UsePaginatedDAGRunsResult {
+  const client = useClient();
+  const liveState = useLiveConnection(enabled);
+  const [olderRuns, setOlderRuns] = useState<DAGRunSummary[]>([]);
+  const [continuationCursorOverride, setContinuationCursorOverride] = useState<
+    string | null | undefined
+  >(undefined);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
+  const queryKey = useMemo(() => JSON.stringify(query), [query]);
+  const {
+    data: headPage,
+    mutate,
+    isLoading,
+  } = useQuery(
+    '/dag-runs',
+    enabled
+      ? {
+          params: {
+            query,
+          },
+        }
+      : null,
+    liveFallbackOptions(liveState)
+  );
+  useLiveDAGRuns(mutate, enabled);
+
+  useEffect(() => {
+    setOlderRuns([]);
+    setContinuationCursorOverride(undefined);
+    setLoadMoreError(null);
+    setIsLoadingMore(false);
+  }, [queryKey]);
+
+  const dagRuns = useMemo(
+    () => mergeUniqueDAGRuns(headPage?.dagRuns ?? [], olderRuns),
+    [headPage?.dagRuns, olderRuns]
+  );
+  const nextCursor =
+    continuationCursorOverride === undefined
+      ? (headPage?.nextCursor ?? null)
+      : continuationCursorOverride;
+
+  const refresh = useCallback(async (): Promise<void> => {
+    setOlderRuns([]);
+    setContinuationCursorOverride(undefined);
+    setLoadMoreError(null);
+    setIsLoadingMore(false);
+    await mutate();
+  }, [mutate]);
+
+  const loadMore = useCallback(async (): Promise<void> => {
+    if (isLoadingMore || !nextCursor) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+
+    const response = await client.GET('/dag-runs', {
+      params: {
+        query: {
+          ...query,
+          cursor: nextCursor,
+        },
+      },
+    });
+
+    setIsLoadingMore(false);
+
+    if (response.error) {
+      const message =
+        response.error &&
+        typeof response.error === 'object' &&
+        'message' in response.error
+          ? String(response.error.message)
+          : 'Failed to load more DAG runs';
+      setLoadMoreError(message);
+      return;
+    }
+
+    const pageData = (response.data ?? { dagRuns: [] }) as DAGRunsPageResponse;
+    setOlderRuns((previous) =>
+      mergeUniqueDAGRuns(previous, pageData.dagRuns ?? [])
+    );
+    setContinuationCursorOverride(pageData.nextCursor ?? null);
+  }, [client, isLoadingMore, nextCursor, query]);
+
+  return {
+    dagRuns,
+    headPage,
+    isInitialLoading: isLoading,
+    isLoadingMore,
+    loadMoreError,
+    hasMore: nextCursor !== null,
+    refresh,
+    loadMore,
   };
 }

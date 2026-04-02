@@ -486,43 +486,16 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 }
 
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
-	opts := dagRunListOptions{
-		limit:  100,
-		max:    500,
-		cursor: nil,
-	}
-	if request.Params.Status != nil {
-		opts.query = append(opts.query, exec.WithStatuses([]core.Status{
-			core.Status(*request.Params.Status),
-		}))
-	}
-	if request.Params.FromDate != nil {
-		dt := exec.NewUTC(time.Unix(*request.Params.FromDate, 0))
-		opts.query = append(opts.query, exec.WithFrom(dt))
-	}
-	if request.Params.ToDate != nil {
-		dt := exec.NewUTC(time.Unix(*request.Params.ToDate, 0))
-		opts.query = append(opts.query, exec.WithTo(dt))
-	}
-	if request.Params.Name != nil {
-		opts.query = append(opts.query, exec.WithName(*request.Params.Name))
-	}
-	if request.Params.DagRunId != nil {
-		opts.query = append(opts.query, exec.WithDAGRunID(*request.Params.DagRunId))
-	}
-
-	if tags := parseCommaSeparatedTags(request.Params.Tags); len(tags) > 0 {
-		opts.query = append(opts.query, exec.WithTags(tags))
-	}
-	if request.Params.Limit != nil {
-		opts.limit = clampInt(*request.Params.Limit, 1, opts.max)
-	}
-	if request.Params.Cursor != nil && *request.Params.Cursor != "" {
-		opts.cursor = request.Params.Cursor
-		opts.query = append(opts.query, exec.WithCursor(*request.Params.Cursor))
-	}
-	opts.query = append(opts.query, exec.WithLimit(opts.limit))
-
+	opts := buildDAGRunListOptions(dagRunListFilterInput{
+		status:   request.Params.Status,
+		fromDate: request.Params.FromDate,
+		toDate:   request.Params.ToDate,
+		name:     request.Params.Name,
+		dagRunID: request.Params.DagRunId,
+		tags:     request.Params.Tags,
+		limit:    request.Params.Limit,
+		cursor:   request.Params.Cursor,
+	})
 	var dagName, dagRunID string
 	if request.Params.Name != nil {
 		dagName = *request.Params.Name
@@ -531,20 +504,14 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 		dagRunID = *request.Params.DagRunId
 	}
 
-	page, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+	page, err := a.readDAGRunsPage(ctx, dagRunReadRequestInfo{
 		endpoint: "/dag-runs",
 		dagName:  dagName,
 		dagRunID: dagRunID,
-	}, func(readCtx context.Context) (exec.DAGRunStatusPage, error) {
-		return a.listDAGRuns(readCtx, opts.query)
-	})
+	}, opts.query)
 	if err != nil {
-		if errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
+		if apiErr := dagRunListBadRequest(err); apiErr != nil {
+			return nil, apiErr
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
 			return api.ListDAGRunsdefaultJSONResponse{
@@ -559,58 +526,28 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 }
 
 func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNameRequestObject) (api.ListDAGRunsByNameResponseObject, error) {
-	opts := dagRunListOptions{
-		limit: 100,
-		max:   500,
-		query: []exec.ListDAGRunStatusesOption{
-			exec.WithExactName(request.Name),
-		},
-	}
-
-	if request.Params.Status != nil {
-		opts.query = append(opts.query, exec.WithStatuses([]core.Status{
-			core.Status(*request.Params.Status),
-		}))
-	}
-	if request.Params.FromDate != nil {
-		dt := exec.NewUTC(time.Unix(*request.Params.FromDate, 0))
-		opts.query = append(opts.query, exec.WithFrom(dt))
-	}
-	if request.Params.ToDate != nil {
-		dt := exec.NewUTC(time.Unix(*request.Params.ToDate, 0))
-		opts.query = append(opts.query, exec.WithTo(dt))
-	}
-	if request.Params.DagRunId != nil {
-		opts.query = append(opts.query, exec.WithDAGRunID(*request.Params.DagRunId))
-	}
-	if request.Params.Limit != nil {
-		opts.limit = clampInt(*request.Params.Limit, 1, opts.max)
-	}
-	if request.Params.Cursor != nil && *request.Params.Cursor != "" {
-		opts.cursor = request.Params.Cursor
-		opts.query = append(opts.query, exec.WithCursor(*request.Params.Cursor))
-	}
-	opts.query = append(opts.query, exec.WithLimit(opts.limit))
-
+	opts := buildDAGRunListOptions(dagRunListFilterInput{
+		status:    request.Params.Status,
+		fromDate:  request.Params.FromDate,
+		toDate:    request.Params.ToDate,
+		dagRunID:  request.Params.DagRunId,
+		limit:     request.Params.Limit,
+		cursor:    request.Params.Cursor,
+		exactName: &request.Name,
+	})
 	var dagRunID string
 	if request.Params.DagRunId != nil {
 		dagRunID = *request.Params.DagRunId
 	}
 
-	page, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+	page, err := a.readDAGRunsPage(ctx, dagRunReadRequestInfo{
 		endpoint: "/dag-runs/{name}",
 		dagName:  request.Name,
 		dagRunID: dagRunID,
-	}, func(readCtx context.Context) (exec.DAGRunStatusPage, error) {
-		return a.listDAGRuns(readCtx, opts.query)
-	})
+	}, opts.query)
 	if err != nil {
-		if errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    err.Error(),
-			}
+		if apiErr := dagRunListBadRequest(err); apiErr != nil {
+			return nil, apiErr
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
 			return api.ListDAGRunsByNamedefaultJSONResponse{
@@ -625,18 +562,89 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 }
 
 type dagRunListOptions struct {
-	query  []exec.ListDAGRunStatusesOption
-	limit  int
-	max    int
-	cursor *string
+	query []exec.ListDAGRunStatusesOption
 }
 
-func (a *API) listDAGRuns(ctx context.Context, opts []exec.ListDAGRunStatusesOption) (exec.DAGRunStatusPage, error) {
-	page, err := a.dagRunStore.ListStatusesPage(ctx, opts...)
+type dagRunListFilterInput struct {
+	status    *api.Status
+	fromDate  *int64
+	toDate    *int64
+	name      *string
+	exactName *string
+	dagRunID  *string
+	tags      *string
+	limit     *int
+	cursor    *string
+}
+
+func buildDAGRunListOptions(input dagRunListFilterInput) dagRunListOptions {
+	const (
+		defaultLimit = 100
+		maxLimit     = 500
+	)
+
+	opts := dagRunListOptions{}
+	limit := defaultLimit
+
+	if input.status != nil {
+		opts.query = append(opts.query, exec.WithStatuses([]core.Status{
+			core.Status(*input.status),
+		}))
+	}
+	if input.fromDate != nil {
+		opts.query = append(opts.query, exec.WithFrom(exec.NewUTC(time.Unix(*input.fromDate, 0))))
+	}
+	if input.toDate != nil {
+		opts.query = append(opts.query, exec.WithTo(exec.NewUTC(time.Unix(*input.toDate, 0))))
+	}
+	if input.exactName != nil && *input.exactName != "" {
+		opts.query = append(opts.query, exec.WithExactName(*input.exactName))
+	} else if input.name != nil && *input.name != "" {
+		opts.query = append(opts.query, exec.WithName(*input.name))
+	}
+	if input.dagRunID != nil && *input.dagRunID != "" {
+		opts.query = append(opts.query, exec.WithDAGRunID(*input.dagRunID))
+	}
+	if tags := parseCommaSeparatedTags(input.tags); len(tags) > 0 {
+		opts.query = append(opts.query, exec.WithTags(tags))
+	}
+	if input.limit != nil {
+		limit = clampInt(*input.limit, 1, maxLimit)
+	}
+	if input.cursor != nil && *input.cursor != "" {
+		opts.query = append(opts.query, exec.WithCursor(*input.cursor))
+	}
+	opts.query = append(opts.query, exec.WithLimit(limit))
+	return opts
+}
+
+func (a *API) readDAGRunsPage(
+	ctx context.Context,
+	info dagRunReadRequestInfo,
+	opts []exec.ListDAGRunStatusesOption,
+) (exec.DAGRunStatusPage, error) {
+	page, err := withDAGRunReadTimeout(ctx, info, func(readCtx context.Context) (exec.DAGRunStatusPage, error) {
+		page, listErr := a.dagRunStore.ListStatusesPage(readCtx, opts...)
+		if listErr != nil {
+			return exec.DAGRunStatusPage{}, fmt.Errorf("error listing dag-runs: %w", listErr)
+		}
+		return page, nil
+	})
 	if err != nil {
-		return exec.DAGRunStatusPage{}, fmt.Errorf("error listing dag-runs: %w", err)
+		return exec.DAGRunStatusPage{}, err
 	}
 	return page, nil
+}
+
+func dagRunListBadRequest(err error) *Error {
+	if !errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
+		return nil
+	}
+	return &Error{
+		HTTPStatus: http.StatusBadRequest,
+		Code:       api.ErrorCodeBadRequest,
+		Message:    err.Error(),
+	}
 }
 
 func parseCommaSeparatedTags(tagsParam *string) []string {
@@ -2879,77 +2887,12 @@ func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error
 // GetDAGRunsListData returns DAG runs list for SSE.
 // Identifier format: URL query string (e.g., "status=running&name=mydag")
 func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, error) {
-	params, err := url.ParseQuery(queryString)
+	opts, err := dagRunListOptionsFromQueryString(ctx, queryString)
 	if err != nil {
-		logger.Warn(ctx, "Failed to parse query string for DAG runs list",
-			tag.Error(err),
-			slog.String("queryString", queryString),
-		)
+		return nil, err
 	}
-	const (
-		defaultLimit = 100
-		maxLimit     = 500
-	)
-	limit := defaultLimit
-	var opts []exec.ListDAGRunStatusesOption
 
-	if status := params.Get("status"); status != "" {
-		if statusInt, err := strconv.Atoi(status); err == nil {
-			opts = append(opts, exec.WithStatuses([]core.Status{core.Status(statusInt)}))
-		} else {
-			logger.Warn(ctx, "Invalid status parameter",
-				slog.String("status", status),
-				tag.Error(err),
-			)
-		}
-	}
-	if fromDate := params.Get("fromDate"); fromDate != "" {
-		if ts, err := strconv.ParseInt(fromDate, 10, 64); err == nil {
-			opts = append(opts, exec.WithFrom(exec.NewUTC(time.Unix(ts, 0))))
-		} else {
-			logger.Warn(ctx, "Invalid fromDate parameter",
-				slog.String("fromDate", fromDate),
-				tag.Error(err),
-			)
-		}
-	}
-	if toDate := params.Get("toDate"); toDate != "" {
-		if ts, err := strconv.ParseInt(toDate, 10, 64); err == nil {
-			opts = append(opts, exec.WithTo(exec.NewUTC(time.Unix(ts, 0))))
-		} else {
-			logger.Warn(ctx, "Invalid toDate parameter",
-				slog.String("toDate", toDate),
-				tag.Error(err),
-			)
-		}
-	}
-	if name := params.Get("name"); name != "" {
-		opts = append(opts, exec.WithName(name))
-	}
-	if dagRunId := params.Get("dagRunId"); dagRunId != "" {
-		opts = append(opts, exec.WithDAGRunID(dagRunId))
-	}
-	if tags := params.Get("tags"); tags != "" {
-		if tagList := parseCommaSeparatedTags(&tags); len(tagList) > 0 {
-			opts = append(opts, exec.WithTags(tagList))
-		}
-	}
-	if rawLimit := params.Get("limit"); rawLimit != "" {
-		if parsed, err := strconv.Atoi(rawLimit); err == nil {
-			limit = clampInt(parsed, 1, maxLimit)
-		} else {
-			logger.Warn(ctx, "Invalid limit parameter",
-				slog.String("limit", rawLimit),
-				tag.Error(err),
-			)
-		}
-	}
-	if cursor := params.Get("cursor"); cursor != "" {
-		opts = append(opts, exec.WithCursor(cursor))
-	}
-	opts = append(opts, exec.WithLimit(limit))
-
-	page, err := a.dagRunStore.ListStatusesPage(ctx, opts...)
+	page, err := a.dagRunStore.ListStatusesPage(ctx, opts.query...)
 	if err != nil {
 		if errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
 			return nil, err
@@ -2958,6 +2901,79 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 	}
 
 	return toDAGRunsPageResponse(page), nil
+}
+
+func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (dagRunListOptions, error) {
+	params, err := url.ParseQuery(queryString)
+	if err != nil {
+		logger.Warn(ctx, "Failed to parse query string for DAG runs list",
+			tag.Error(err),
+			slog.String("queryString", queryString),
+		)
+	}
+
+	var (
+		statusValue *api.Status
+		fromDate    *int64
+		toDate      *int64
+		name        *string
+		dagRunID    *string
+		tags        *string
+		limit       *int
+		cursor      *string
+	)
+
+	if rawStatus := params.Get("status"); rawStatus != "" {
+		if statusInt, convErr := strconv.Atoi(rawStatus); convErr == nil {
+			statusValue = ptrOf(api.Status(statusInt))
+		} else {
+			logger.Warn(ctx, "Invalid status parameter", slog.String("status", rawStatus), tag.Error(convErr))
+		}
+	}
+	if rawFromDate := params.Get("fromDate"); rawFromDate != "" {
+		if ts, convErr := strconv.ParseInt(rawFromDate, 10, 64); convErr == nil {
+			fromDate = &ts
+		} else {
+			logger.Warn(ctx, "Invalid fromDate parameter", slog.String("fromDate", rawFromDate), tag.Error(convErr))
+		}
+	}
+	if rawToDate := params.Get("toDate"); rawToDate != "" {
+		if ts, convErr := strconv.ParseInt(rawToDate, 10, 64); convErr == nil {
+			toDate = &ts
+		} else {
+			logger.Warn(ctx, "Invalid toDate parameter", slog.String("toDate", rawToDate), tag.Error(convErr))
+		}
+	}
+	if rawName := params.Get("name"); rawName != "" {
+		name = &rawName
+	}
+	if rawDAGRunID := params.Get("dagRunId"); rawDAGRunID != "" {
+		dagRunID = &rawDAGRunID
+	}
+	if rawTags := params.Get("tags"); rawTags != "" {
+		tags = &rawTags
+	}
+	if rawLimit := params.Get("limit"); rawLimit != "" {
+		if parsed, convErr := strconv.Atoi(rawLimit); convErr == nil {
+			limit = &parsed
+		} else {
+			logger.Warn(ctx, "Invalid limit parameter", slog.String("limit", rawLimit), tag.Error(convErr))
+		}
+	}
+	if rawCursor := params.Get("cursor"); rawCursor != "" {
+		cursor = &rawCursor
+	}
+
+	return buildDAGRunListOptions(dagRunListFilterInput{
+		status:   statusValue,
+		fromDate: fromDate,
+		toDate:   toDate,
+		name:     name,
+		dagRunID: dagRunID,
+		tags:     tags,
+		limit:    limit,
+		cursor:   cursor,
+	}), nil
 }
 
 func clampInt(value, minVal, maxVal int) int {
