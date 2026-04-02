@@ -80,6 +80,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '../../../../components/ui/tooltip';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/select';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { parseTagParts } from '../../../../lib/utils';
@@ -744,6 +751,15 @@ const columnToSortField: Record<string, string> = {
 // Client-side sortable columns
 const clientSortableColumns = ['Status', 'LastRun'];
 
+const cardSortOptions = [
+  { value: 'name', label: 'Name' },
+  { value: 'nextRun', label: 'Next run' },
+] as const;
+
+function getCardSortLabel(sort: string): string {
+  return cardSortOptions.find((option) => option.value === sort)?.label ?? 'Name';
+}
+
 // --- Header Component for both Server-side and Client-side Sorting ---
 const SortableHeader = ({
   column,
@@ -1177,6 +1193,67 @@ function DAGTable({
             </div>
           )}
         </div>
+
+        {useCardView && onSortChange && (
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                Sort
+              </span>
+              <Select
+                value={sortField}
+                onValueChange={(value) => onSortChange(value, sortOrder)}
+              >
+                <SelectTrigger
+                  className="h-8 min-w-[132px] text-xs"
+                  aria-label="Sort DAG cards"
+                >
+                  <SelectValue placeholder="Sort by">
+                    {getCardSortLabel(sortField)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {cardSortOptions.map((option) => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      className="text-xs"
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Badge
+                variant="outline"
+                className="h-7 px-2 text-[11px] font-normal normal-case tracking-normal"
+              >
+                {`Sorted by: ${getCardSortLabel(sortField)}`}
+              </Badge>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() =>
+                onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')
+              }
+              aria-label={
+                sortOrder === 'asc'
+                  ? 'Switch to descending sort'
+                  : 'Switch to ascending sort'
+              }
+            >
+              {sortOrder === 'asc' ? (
+                <ArrowUp className="h-3.5 w-3.5" />
+              ) : (
+                <ArrowDown className="h-3.5 w-3.5" />
+              )}
+              <span className="ml-1">{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Desktop Table View - Hidden on mobile or when panel is narrow */}
