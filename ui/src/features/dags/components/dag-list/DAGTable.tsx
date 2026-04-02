@@ -760,6 +760,13 @@ function getCardSortLabel(sort: string): string {
   return cardSortOptions.find((option) => option.value === sort)?.label ?? 'Name';
 }
 
+function getDefaultSortOrder(field: string): string {
+  if (field === 'nextRun') {
+    return 'asc';
+  }
+  return 'asc';
+}
+
 // --- Header Component for both Server-side and Client-side Sorting ---
 const SortableHeader = ({
   column,
@@ -1195,17 +1202,22 @@ function DAGTable({
         </div>
 
         {useCardView && onSortChange && (
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 pt-1 pl-1">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                 Sort
               </span>
               <Select
                 value={sortField}
-                onValueChange={(value) => onSortChange(value, sortOrder)}
+                onValueChange={(value) =>
+                  onSortChange(
+                    value,
+                    value === sortField ? sortOrder : getDefaultSortOrder(value)
+                  )
+                }
               >
                 <SelectTrigger
-                  className="h-8 min-w-[132px] text-xs"
+                  className="h-8 min-w-[132px] max-w-full text-xs"
                   aria-label="Sort DAG cards"
                 >
                   <SelectValue placeholder="Sort by">
@@ -1224,34 +1236,28 @@ function DAGTable({
                   ))}
                 </SelectContent>
               </Select>
-              <Badge
+              <Button
+                type="button"
                 variant="outline"
-                className="h-7 px-2 text-[11px] font-normal normal-case tracking-normal"
+                size="sm"
+                className="h-7 px-2 text-xs shrink-0"
+                onClick={() =>
+                  onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')
+                }
+                aria-label={
+                  sortOrder === 'asc'
+                    ? 'Switch to descending sort'
+                    : 'Switch to ascending sort'
+                }
               >
-                {`Sorted by: ${getCardSortLabel(sortField)}`}
-              </Badge>
+                {sortOrder === 'asc' ? (
+                  <ArrowUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDown className="h-3.5 w-3.5" />
+                )}
+                <span className="ml-1">{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={() =>
-                onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')
-              }
-              aria-label={
-                sortOrder === 'asc'
-                  ? 'Switch to descending sort'
-                  : 'Switch to ascending sort'
-              }
-            >
-              {sortOrder === 'asc' ? (
-                <ArrowUp className="h-3.5 w-3.5" />
-              ) : (
-                <ArrowDown className="h-3.5 w-3.5" />
-              )}
-              <span className="ml-1">{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
-            </Button>
           </div>
         )}
       </div>
