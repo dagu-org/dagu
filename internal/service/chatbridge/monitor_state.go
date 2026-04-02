@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
-const notificationMonitorStateVersion = 1
+const notificationMonitorStateVersion = 2
 
 type notificationStateLoadResult struct {
 	State           notificationMonitorState
@@ -36,6 +36,18 @@ type notificationDestinationState struct {
 	Delivered map[string]time.Time         `json:"delivered,omitempty"`
 }
 
+type legacyNotificationMonitorState struct {
+	Version      int                                            `json:"version"`
+	Bootstrapped bool                                           `json:"bootstrapped,omitempty"`
+	SourceCursor eventstore.NotificationCursor                  `json:"source_cursor"`
+	Destinations map[string]*legacyNotificationDestinationState `json:"destinations,omitempty"`
+}
+
+type legacyNotificationDestinationState struct {
+	Pending   map[string]json.RawMessage `json:"pending,omitempty"`
+	Delivered map[string]time.Time       `json:"delivered,omitempty"`
+}
+
 func newNotificationMonitorState() notificationMonitorState {
 	return notificationMonitorState{
 		Version:      notificationMonitorStateVersion,
@@ -45,7 +57,7 @@ func newNotificationMonitorState() notificationMonitorState {
 }
 
 func (s *notificationMonitorState) normalize() {
-	if s.Version == 0 {
+	if s.Version != notificationMonitorStateVersion {
 		s.Version = notificationMonitorStateVersion
 	}
 	s.SourceCursor = s.SourceCursor.Normalize()
@@ -95,22 +107,62 @@ func (s *notificationStateStore) Load(_ context.Context) notificationStateLoadRe
 	}
 
 	state := newNotificationMonitorState()
-	if err := json.Unmarshal(data, &state); err != nil {
+	var versionProbe struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal(data, &versionProbe); err != nil {
 		result.Recovered = true
 		result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("decode notification state: %w", err))
 		return result
 	}
-	switch state.Version {
-	case 0, notificationMonitorStateVersion:
+
+	switch versionProbe.Version {
+	case 0, 1:
+		legacyState, err := migrateLegacyNotificationMonitorState(data)
+		if err != nil {
+			result.Recovered = true
+			result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("decode legacy notification state: %w", err))
+			return result
+		}
+		state = legacyState
+	case notificationMonitorStateVersion:
+		if err := json.Unmarshal(data, &state); err != nil {
+			result.Recovered = true
+			result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("decode notification state: %w", err))
+			return result
+		}
 	default:
 		result.Recovered = true
-		result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("unsupported notification state version %d", state.Version))
+		result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("unsupported notification state version %d", versionProbe.Version))
 		return result
 	}
 
 	state.normalize()
 	result.State = state
 	return result
+}
+
+func migrateLegacyNotificationMonitorState(data []byte) (notificationMonitorState, error) {
+	legacyState := legacyNotificationMonitorState{}
+	if err := json.Unmarshal(data, &legacyState); err != nil {
+		return notificationMonitorState{}, err
+	}
+
+	state := newNotificationMonitorState()
+	state.Bootstrapped = legacyState.Bootstrapped
+	state.SourceCursor = legacyState.SourceCursor.Normalize()
+	for destination, legacyDest := range legacyState.Destinations {
+		destState := &notificationDestinationState{
+			Pending:   make(map[string]NotificationEvent),
+			Delivered: make(map[string]time.Time),
+		}
+		if legacyDest != nil && legacyDest.Delivered != nil {
+			destState.Delivered = legacyDest.Delivered
+		}
+		state.Destinations[destination] = destState
+	}
+	state.normalize()
+	return state, nil
 }
 
 func (s *notificationStateStore) Save(_ context.Context, state notificationMonitorState) error {

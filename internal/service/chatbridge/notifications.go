@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
@@ -48,7 +47,6 @@ type NotificationEvent struct {
 	Key        string                                   `json:"key"`
 	Kind       eventstore.EventKind                     `json:"kind"`
 	Type       eventstore.EventType                     `json:"type,omitempty"`
-	Status     *exec.DAGRunStatus                       `json:"status,omitempty"`
 	DAGRun     *exec.DAGRunStatus                       `json:"dagRun,omitempty"`
 	Automata   *eventstore.NotificationAutomataSnapshot `json:"automata,omitempty"`
 	ObservedAt time.Time                                `json:"observedAt"`
@@ -68,314 +66,21 @@ type NotificationPendingBatch struct {
 	Batch       NotificationBatch
 }
 
-type notificationBucket struct {
-	id          uint64
-	destination string
-	class       NotificationClass
-	windowStart time.Time
-	events      map[string]NotificationEvent
-	timer       *time.Timer
-}
-
-// NotificationBatcher buffers notification subjects per destination and flush window.
-type NotificationBatcher struct {
-	mu            sync.Mutex
-	urgentWindow  time.Duration
-	successWindow time.Duration
-	nextBucketID  uint64
-	stopped       bool
-	buckets       map[string]*notificationBucket
-	runIndex      map[string]string
-	ready         []NotificationPendingBatch
-	readyCh       chan struct{}
-}
-
-// NewNotificationBatcher creates a new notification batcher.
-func NewNotificationBatcher(urgentWindow, successWindow time.Duration) *NotificationBatcher {
-	if urgentWindow <= 0 {
-		urgentWindow = DefaultUrgentNotificationWindow
-	}
-	if successWindow <= 0 {
-		successWindow = DefaultSuccessNotificationWindow
-	}
-	return &NotificationBatcher{
-		urgentWindow:  urgentWindow,
-		successWindow: successWindow,
-		buckets:       make(map[string]*notificationBucket),
-		runIndex:      make(map[string]string),
-		readyCh:       make(chan struct{}, 1),
-	}
-}
-
-// Stop prevents future flushes and stops all pending timers.
-func (b *NotificationBatcher) Stop() {
-	b.mu.Lock()
-	if b.stopped {
-		b.mu.Unlock()
-		return
-	}
-	b.stopped = true
-	timers := make([]*time.Timer, 0, len(b.buckets))
-	for _, bucket := range b.buckets {
-		if bucket.timer != nil {
-			timers = append(timers, bucket.timer)
-		}
-	}
-	b.buckets = make(map[string]*notificationBucket)
-	b.runIndex = make(map[string]string)
-	b.ready = nil
-	b.mu.Unlock()
-
-	for _, timer := range timers {
-		timer.Stop()
-	}
-}
-
-// DrainAndStop prevents future flushes, stops all pending timers, and returns
-// the currently buffered batches for synchronous shutdown delivery.
-func (b *NotificationBatcher) DrainAndStop() []NotificationPendingBatch {
-	b.mu.Lock()
-	if b.stopped {
-		b.mu.Unlock()
-		return nil
-	}
-
-	b.stopped = true
-	now := time.Now()
-	timers := make([]*time.Timer, 0, len(b.buckets))
-	drained := make([]NotificationPendingBatch, 0, len(b.ready)+len(b.buckets))
-	drained = append(drained, append([]NotificationPendingBatch(nil), b.ready...)...)
-	for _, bucket := range b.buckets {
-		if bucket.timer != nil {
-			timers = append(timers, bucket.timer)
-		}
-		batch := notificationBatchFromBucket(bucket, now)
-		if len(batch.Events) == 0 {
-			continue
-		}
-		drained = append(drained, NotificationPendingBatch{
-			Destination: bucket.destination,
-			Batch:       batch,
-		})
-	}
-	b.buckets = make(map[string]*notificationBucket)
-	b.runIndex = make(map[string]string)
-	b.ready = nil
-	b.mu.Unlock()
-
-	for _, timer := range timers {
-		timer.Stop()
-	}
-
-	sort.Slice(drained, func(i, j int) bool {
-		if drained[i].Batch.Class != drained[j].Batch.Class {
-			return drained[i].Batch.Class == NotificationClassUrgent
-		}
-		if !drained[i].Batch.WindowStart.Equal(drained[j].Batch.WindowStart) {
-			return drained[i].Batch.WindowStart.Before(drained[j].Batch.WindowStart)
-		}
-		return drained[i].Destination < drained[j].Destination
-	})
-
-	return drained
-}
-
-// Enqueue adds a notification subject into the appropriate destination/window bucket.
-func (b *NotificationBatcher) Enqueue(destination string, event NotificationEvent) bool {
-	if destination == "" || event.Key == "" {
-		return false
-	}
-
-	class, ok := NotificationClassForEvent(event)
-	if !ok {
-		return false
-	}
-
-	observedAt := event.ObservedAt
-	if observedAt.IsZero() {
-		observedAt = time.Now().UTC()
-	}
-	snapshot := cloneNotificationEvent(event)
-	snapshot.ObservedAt = observedAt
-	groupKey := NotificationGroupKey(snapshot)
-	if groupKey == "" {
-		return false
-	}
-	destRunKey := notificationDestinationRunKey(destination, groupKey)
-
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.stopped {
-		return false
-	}
-
-	if existingBucketKey, ok := b.runIndex[destRunKey]; ok {
-		if existingBucket := b.buckets[existingBucketKey]; existingBucket != nil {
-			if existingEvent, exists := existingBucket.events[groupKey]; exists {
-				if existingEvent.Key == snapshot.Key {
-					return true
-				}
-				delete(existingBucket.events, groupKey)
-				delete(b.runIndex, destRunKey)
-				if len(existingBucket.events) == 0 {
-					if existingBucket.timer != nil {
-						existingBucket.timer.Stop()
-					}
-					delete(b.buckets, existingBucketKey)
-				}
-			}
-		}
-	}
-
-	bucketKey := notificationBucketKey(destination, class)
-	bucket, ok := b.buckets[bucketKey]
-	if !ok {
-		b.nextBucketID++
-		bucket = &notificationBucket{
-			id:          b.nextBucketID,
-			destination: destination,
-			class:       class,
-			windowStart: observedAt,
-			events:      make(map[string]NotificationEvent),
-		}
-		b.buckets[bucketKey] = bucket
-		window := b.windowForClass(class)
-		bucketID := bucket.id
-		bucket.timer = time.AfterFunc(window, func() {
-			b.readyBucket(bucketKey, bucketID)
-		})
-	}
-
-	bucket.events[groupKey] = snapshot
-	b.runIndex[destRunKey] = bucketKey
-	return true
-}
-
-// ReadyC is signaled when one or more batches are ready for delivery.
-func (b *NotificationBatcher) ReadyC() <-chan struct{} {
-	return b.readyCh
-}
-
-// TakeReady returns all batches currently ready for delivery.
-func (b *NotificationBatcher) TakeReady() []NotificationPendingBatch {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if len(b.ready) == 0 {
-		return nil
-	}
-	ready := append([]NotificationPendingBatch(nil), b.ready...)
-	b.ready = nil
-	return ready
-}
-
-// DiscardDestinations removes buffered and ready batches for destinations that
-// are no longer configured.
-func (b *NotificationBatcher) DiscardDestinations(destinations []string) {
-	if len(destinations) == 0 {
-		return
-	}
-
-	blocked := make(map[string]struct{}, len(destinations))
-	for _, destination := range destinations {
-		if destination == "" {
-			continue
-		}
-		blocked[destination] = struct{}{}
-	}
-	if len(blocked) == 0 {
-		return
-	}
-
-	b.mu.Lock()
-	if b.stopped {
-		b.mu.Unlock()
-		return
-	}
-
-	timers := make([]*time.Timer, 0)
-	for bucketKey, bucket := range b.buckets {
-		if bucket == nil {
-			continue
-		}
-		if _, ok := blocked[bucket.destination]; !ok {
-			continue
-		}
-		if bucket.timer != nil {
-			timers = append(timers, bucket.timer)
-		}
-		delete(b.buckets, bucketKey)
-		for runKey := range bucket.events {
-			delete(b.runIndex, notificationDestinationRunKey(bucket.destination, runKey))
-		}
-	}
-
-	if len(b.ready) > 0 {
-		filtered := make([]NotificationPendingBatch, 0, len(b.ready))
-		for _, pending := range b.ready {
-			if _, ok := blocked[pending.Destination]; ok {
-				continue
-			}
-			filtered = append(filtered, pending)
-		}
-		b.ready = filtered
-	}
-	b.mu.Unlock()
-
-	for _, timer := range timers {
-		timer.Stop()
-	}
-}
-
-func (b *NotificationBatcher) readyBucket(bucketKey string, bucketID uint64) {
-	b.mu.Lock()
-	if b.stopped {
-		b.mu.Unlock()
-		return
-	}
-
-	bucket := b.buckets[bucketKey]
-	if bucket == nil || bucket.id != bucketID {
-		b.mu.Unlock()
-		return
-	}
-
-	delete(b.buckets, bucketKey)
-	for runKey := range bucket.events {
-		delete(b.runIndex, notificationDestinationRunKey(bucket.destination, runKey))
-	}
-	batch := notificationBatchFromBucket(bucket, time.Now())
-	if len(batch.Events) > 0 {
-		b.ready = append(b.ready, NotificationPendingBatch{
-			Destination: bucket.destination,
-			Batch:       batch,
-		})
-		select {
-		case b.readyCh <- struct{}{}:
-		default:
-		}
-	}
-	b.mu.Unlock()
-}
-
-func (b *NotificationBatcher) windowForClass(class NotificationClass) time.Duration {
-	if class == NotificationClassUrgent {
-		return b.urgentWindow
-	}
-	return b.successWindow
-}
-
 func notificationEventKind(event NotificationEvent) eventstore.EventKind {
 	if event.Kind != "" {
 		return event.Kind
 	}
-	if event.DAGRun != nil || event.Status != nil {
+	if event.DAGRun != nil {
 		return eventstore.KindDAGRun
 	}
 	if event.Automata != nil {
 		return eventstore.KindAutomata
 	}
 	return ""
+}
+
+func notificationDAGRun(event NotificationEvent) *exec.DAGRunStatus {
+	return event.DAGRun
 }
 
 // NotificationClassForStatus maps a DAG status to its notification class.
@@ -394,10 +99,7 @@ func NotificationClassForStatus(status core.Status) (NotificationClass, bool) {
 func NotificationClassForEvent(event NotificationEvent) (NotificationClass, bool) {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
+		dagRun := notificationDAGRun(event)
 		if dagRun == nil {
 			return NotificationClassUnknown, false
 		}
@@ -441,11 +143,7 @@ func NotificationSeenKeyForEvent(event NotificationEvent) string {
 	}
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
-		return NotificationSeenKey(dagRun)
+		return NotificationSeenKey(notificationDAGRun(event))
 	case eventstore.KindAutomata:
 		if event.Automata == nil {
 			return ""
@@ -462,10 +160,7 @@ func NotificationSeenKeyForEvent(event NotificationEvent) string {
 func NotificationGroupKey(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
+		dagRun := notificationDAGRun(event)
 		if dagRun == nil {
 			return ""
 		}
@@ -508,11 +203,7 @@ func NotificationBatchDAGName(batch NotificationBatch) string {
 func BuildNotificationPrompt(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
-		return buildDAGNotificationPrompt(dagRun)
+		return buildDAGNotificationPrompt(notificationDAGRun(event))
 	case eventstore.KindAutomata:
 		return buildAutomataNotificationPrompt(event)
 	case eventstore.KindLLMUsage:
@@ -545,7 +236,6 @@ func NotificationEventFromStoredEvent(event *eventstore.Event) (NotificationEven
 			return NotificationEvent{}, fmt.Errorf("dag notification snapshot is missing")
 		}
 		notification.DAGRun = payload.DAGRun.DAGRunStatus()
-		notification.Status = notification.DAGRun
 		notification.Key = NotificationSeenKey(notification.DAGRun)
 	case eventstore.KindAutomata:
 		if payload.Automata == nil {
@@ -669,236 +359,10 @@ func GenerateNotificationMessage(
 	return newNotificationMessage(FormatNotificationBatch(batch)), nil
 }
 
-// FormatNotificationBatch renders a deterministic notification message for a flushed batch.
-func FormatNotificationBatch(batch NotificationBatch) string {
-	if len(batch.Events) == 0 {
-		return "Update."
-	}
-	if batch.Class == NotificationClassUrgent && len(batch.Events) == 1 {
-		return formatSingleNotification(batch.Events[0])
-	}
-
-	groups := groupNotificationEvents(batch.Events)
-	window := batch.WindowEnd.Sub(batch.WindowStart).Round(time.Second)
-	if window <= 0 {
-		window = time.Second
-	}
-	allDAGRun := true
-	for _, event := range batch.Events {
-		if notificationEventKind(event) != eventstore.KindDAGRun {
-			allDAGRun = false
-			break
-		}
-	}
-
-	var b strings.Builder
-	switch batch.Class {
-	case NotificationClassUrgent:
-		if allDAGRun {
-			fmt.Fprintf(&b, "Urgent DAG updates (%d %s in last %s)\n", len(batch.Events), pluralize("run", len(batch.Events)), window)
-		} else {
-			fmt.Fprintf(&b, "Urgent updates (%d %s in last %s)\n", len(batch.Events), pluralize("event", len(batch.Events)), window)
-		}
-		writeNotificationGroups(&b, groups, true)
-	case NotificationClassSuccessDigest:
-		if allDAGRun {
-			fmt.Fprintf(&b, "DAG completion digest (%d %s in last %s)\n", len(batch.Events), pluralize("run", len(batch.Events)), window)
-		} else {
-			fmt.Fprintf(&b, "Completion digest (%d %s in last %s)\n", len(batch.Events), pluralize("event", len(batch.Events)), window)
-		}
-		writeNotificationGroups(&b, groups, false)
-	case NotificationClassUnknown:
-		if allDAGRun {
-			fmt.Fprintf(&b, "DAG updates (%d %s)\n", len(batch.Events), pluralize("run", len(batch.Events)))
-		} else {
-			fmt.Fprintf(&b, "Updates (%d %s)\n", len(batch.Events), pluralize("event", len(batch.Events)))
-		}
-		writeNotificationGroups(&b, groups, false)
-	}
-
-	return strings.TrimSpace(b.String())
-}
-
-type notificationGroup struct {
-	Kind             eventstore.EventKind
-	Type             eventstore.EventType
-	SubjectName      string
-	Status           string
-	Count            int
-	LatestObservedAt time.Time
-	Sample           NotificationEvent
-}
-
-func groupNotificationEvents(events []NotificationEvent) []notificationGroup {
-	type groupKey struct {
-		kind   eventstore.EventKind
-		name   string
-		status string
-		typ    eventstore.EventType
-	}
-
-	groups := make(map[groupKey]*notificationGroup)
-	for _, event := range events {
-		name := notificationSubjectName(event)
-		if name == "" {
-			continue
-		}
-		key := groupKey{
-			kind:   notificationEventKind(event),
-			name:   name,
-			status: notificationStatusLabel(event),
-			typ:    event.Type,
-		}
-		group, ok := groups[key]
-		if !ok {
-			group = &notificationGroup{
-				Kind:             notificationEventKind(event),
-				Type:             event.Type,
-				SubjectName:      name,
-				Status:           notificationStatusLabel(event),
-				LatestObservedAt: event.ObservedAt,
-				Sample:           cloneNotificationEvent(event),
-			}
-			groups[key] = group
-		}
-		group.Count++
-		if event.ObservedAt.After(group.LatestObservedAt) {
-			group.LatestObservedAt = event.ObservedAt
-			group.Sample = cloneNotificationEvent(event)
-		}
-	}
-
-	result := make([]notificationGroup, 0, len(groups))
-	for _, group := range groups {
-		result = append(result, *group)
-	}
-	sort.Slice(result, func(i, j int) bool {
-		if !result[i].LatestObservedAt.Equal(result[j].LatestObservedAt) {
-			return result[i].LatestObservedAt.After(result[j].LatestObservedAt)
-		}
-		if result[i].SubjectName != result[j].SubjectName {
-			return result[i].SubjectName < result[j].SubjectName
-		}
-		if result[i].Status != result[j].Status {
-			return result[i].Status < result[j].Status
-		}
-		return string(result[i].Type) < string(result[j].Type)
-	})
-	return result
-}
-
-func writeNotificationGroups(b *strings.Builder, groups []notificationGroup, withDetails bool) {
-	visible := groups
-	hiddenCount := 0
-	if len(groups) > maxNotificationGroups {
-		visible = groups[:maxNotificationGroups]
-		hiddenCount = len(groups) - maxNotificationGroups
-	}
-
-	for idx, group := range visible {
-		if idx > 0 {
-			b.WriteByte('\n')
-		}
-		fmt.Fprintf(b, "- %s: %s x%d", group.SubjectName, group.Status, group.Count)
-		if withDetails {
-			if detail := notificationGroupDetail(group); detail != "" {
-				fmt.Fprintf(b, ". %s", detail)
-			}
-		}
-	}
-
-	if hiddenCount > 0 {
-		if len(visible) > 0 {
-			b.WriteByte('\n')
-		}
-		allDAGRun := true
-		for _, group := range groups {
-			if group.Kind != eventstore.KindDAGRun {
-				allDAGRun = false
-				break
-			}
-		}
-		if allDAGRun {
-			fmt.Fprintf(b, "and %d more DAG groups", hiddenCount)
-		} else {
-			fmt.Fprintf(b, "and %d more groups", hiddenCount)
-		}
-	}
-}
-
-func formatSingleNotification(event NotificationEvent) string {
-	switch notificationEventKind(event) {
-	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
-		return formatSingleDAGNotification(dagRun)
-	case eventstore.KindAutomata:
-		return formatSingleAutomataNotification(event)
-	case eventstore.KindLLMUsage:
-		return "Update."
-	default:
-		return "Update."
-	}
-}
-
-func formatSingleDAGNotification(status *exec.DAGRunStatus) string {
-	if status == nil {
-		return "DAG update."
-	}
-	var b strings.Builder
-	emoji := notificationEmoji(status.Status)
-
-	switch status.Status { //nolint:exhaustive // fixed notification policy
-	case core.Waiting:
-		fmt.Fprintf(&b, "%s DAG `%s` is waiting for approval.", emoji, status.Name)
-		if detail := waitingNotificationDetail(status); detail != "" {
-			fmt.Fprintf(&b, "\n%s", detail)
-		}
-	case core.Failed:
-		fmt.Fprintf(&b, "%s DAG `%s` failed.", emoji, status.Name)
-		if detail := failureNotificationDetail(status); detail != "" {
-			fmt.Fprintf(&b, "\n%s", detail)
-		}
-	case core.Succeeded:
-		fmt.Fprintf(&b, "%s DAG `%s` completed successfully.", emoji, status.Name)
-	case core.PartiallySucceeded:
-		fmt.Fprintf(&b, "%s DAG `%s` completed with partial success.", emoji, status.Name)
-	default:
-		fmt.Fprintf(&b, "%s DAG `%s` status: %s.", emoji, status.Name, status.Status.String())
-	}
-
-	return b.String()
-}
-
-func notificationGroupDetail(group notificationGroup) string {
-	switch group.Kind {
-	case eventstore.KindDAGRun:
-		switch group.Sample.DAGRun.Status { //nolint:exhaustive // fixed notification policy
-		case core.Waiting:
-			return waitingNotificationDetail(group.Sample.DAGRun)
-		case core.Failed:
-			return failureNotificationDetail(group.Sample.DAGRun)
-		default:
-			return ""
-		}
-	case eventstore.KindAutomata:
-		return automataNotificationDetail(group.Sample)
-	case eventstore.KindLLMUsage:
-		return ""
-	default:
-		return ""
-	}
-}
-
 func notificationSubjectName(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
+		dagRun := notificationDAGRun(event)
 		if dagRun == nil {
 			return ""
 		}
@@ -922,10 +386,7 @@ func NotificationSubjectName(event NotificationEvent) string {
 func notificationStatusLabel(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
+		dagRun := notificationDAGRun(event)
 		if dagRun == nil {
 			return string(event.Type)
 		}
@@ -952,113 +413,6 @@ func notificationStatusLabel(event NotificationEvent) string {
 
 func NotificationStatusLabel(event NotificationEvent) string {
 	return notificationStatusLabel(event)
-}
-
-func formatSingleAutomataNotification(event NotificationEvent) string {
-	if event.Automata == nil {
-		return "Automata update."
-	}
-	var b strings.Builder
-	snapshot := event.Automata
-
-	switch event.Type {
-	case eventstore.TypeAutomataNeedsInput:
-		fmt.Fprintf(&b, "%s Automata `%s` needs input.", notificationTextEmoji(event), snapshot.Name)
-		if detail := automataNotificationDetail(event); detail != "" {
-			fmt.Fprintf(&b, "\n%s", detail)
-		}
-	case eventstore.TypeAutomataError:
-		fmt.Fprintf(&b, "%s Automata `%s` hit an error.", notificationTextEmoji(event), snapshot.Name)
-		if detail := automataNotificationDetail(event); detail != "" {
-			fmt.Fprintf(&b, "\n%s", detail)
-		}
-	case eventstore.TypeAutomataFinished:
-		fmt.Fprintf(&b, "%s Automata `%s` finished.", notificationTextEmoji(event), snapshot.Name)
-		if detail := automataNotificationDetail(event); detail != "" {
-			fmt.Fprintf(&b, "\n%s", detail)
-		}
-	case eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
-		fmt.Fprintf(&b, "%s Automata `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
-	default:
-		fmt.Fprintf(&b, "%s Automata `%s` event: %s.", notificationTextEmoji(event), snapshot.Name, event.Type)
-	}
-
-	return b.String()
-}
-
-func automataNotificationDetail(event NotificationEvent) string {
-	if event.Automata == nil {
-		return ""
-	}
-	snapshot := event.Automata
-	switch event.Type {
-	case eventstore.TypeAutomataNeedsInput:
-		if question := trimNotificationDetail(snapshot.PromptQuestion); question != "" {
-			return "Prompt: " + question
-		}
-		return "Action is required to continue the automata."
-	case eventstore.TypeAutomataError:
-		if detail := trimNotificationDetail(snapshot.Error); detail != "" {
-			return "Latest error: " + detail
-		}
-		return ""
-	case eventstore.TypeAutomataFinished:
-		if detail := trimNotificationDetail(snapshot.Summary); detail != "" {
-			return detail
-		}
-		return ""
-	case eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
-		return ""
-	default:
-		return ""
-	}
-}
-
-func failureNotificationDetail(status *exec.DAGRunStatus) string {
-	if status == nil {
-		return ""
-	}
-	if detail := strings.TrimSpace(status.Error); detail != "" {
-		return "Latest error: " + trimNotificationDetail(detail)
-	}
-	for _, node := range status.Nodes {
-		if node == nil || strings.TrimSpace(node.Error) == "" {
-			continue
-		}
-		return fmt.Sprintf("Latest error at %s: %s", node.Step.Name, trimNotificationDetail(node.Error))
-	}
-	for _, handler := range []*exec.Node{status.OnFailure, status.OnExit} {
-		if handler == nil || strings.TrimSpace(handler.Error) == "" {
-			continue
-		}
-		stepName := handler.Step.Name
-		if stepName == "" {
-			stepName = "handler"
-		}
-		return fmt.Sprintf("Latest error at %s: %s", stepName, trimNotificationDetail(handler.Error))
-	}
-	return ""
-}
-
-func waitingNotificationDetail(status *exec.DAGRunStatus) string {
-	if status == nil {
-		return ""
-	}
-	for _, node := range status.Nodes {
-		if node == nil || node.Status != core.NodeWaiting {
-			continue
-		}
-		if node.Step.Name != "" {
-			return fmt.Sprintf("Waiting at step %s.", node.Step.Name)
-		}
-	}
-	if status.OnWait != nil && status.OnWait.Step.Name != "" {
-		return fmt.Sprintf("Waiting at step %s.", status.OnWait.Step.Name)
-	}
-	if detail := strings.TrimSpace(status.Error); detail != "" {
-		return trimNotificationDetail(detail)
-	}
-	return "Action is required to resume the DAG."
 }
 
 func newNotificationMessage(content string) agent.Message {
@@ -1095,18 +449,13 @@ func cloneNotificationStatus(status *exec.DAGRunStatus) *exec.DAGRunStatus {
 }
 
 func cloneNotificationEvent(event NotificationEvent) NotificationEvent {
-	dagRun := event.DAGRun
-	if dagRun == nil {
-		dagRun = event.Status
-	}
 	cloned := NotificationEvent{
 		Key:        event.Key,
 		Kind:       event.Kind,
 		Type:       event.Type,
 		ObservedAt: event.ObservedAt,
-		DAGRun:     cloneNotificationStatus(dagRun),
+		DAGRun:     cloneNotificationStatus(notificationDAGRun(event)),
 	}
-	cloned.Status = cloned.DAGRun
 	if event.Automata != nil {
 		snapshot := *event.Automata
 		cloned.Automata = &snapshot
@@ -1150,45 +499,10 @@ func notificationDestinationRunKey(destination, runKey string) string {
 	return destination + "|" + runKey
 }
 
-func trimNotificationDetail(text string) string {
-	text = strings.Join(strings.Fields(strings.TrimSpace(text)), " ")
-	if text == "" {
-		return ""
-	}
-	runes := []rune(text)
-	if len(runes) <= maxNotificationDetailRunes {
-		return text
-	}
-	return string(runes[:maxNotificationDetailRunes-1]) + "…"
-}
-
-func pluralize(word string, count int) string {
-	if count == 1 {
-		return word
-	}
-	return word + "s"
-}
-
-func notificationEmoji(status core.Status) string {
-	switch status { //nolint:exhaustive // only notified statuses are handled
-	case core.Succeeded, core.PartiallySucceeded:
-		return "\u2705"
-	case core.Failed:
-		return "\u274C"
-	case core.Waiting:
-		return "\u23F3"
-	default:
-		return "\u2139\uFE0F"
-	}
-}
-
 func notificationTextEmoji(event NotificationEvent) string {
 	switch notificationEventKind(event) {
 	case eventstore.KindDAGRun:
-		dagRun := event.DAGRun
-		if dagRun == nil {
-			dagRun = event.Status
-		}
+		dagRun := notificationDAGRun(event)
 		if dagRun == nil {
 			return "\u2139\uFE0F"
 		}

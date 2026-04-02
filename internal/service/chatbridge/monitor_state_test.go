@@ -5,6 +5,7 @@ package chatbridge
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"os"
@@ -31,6 +32,20 @@ func newTestNotificationMonitorConfig() NotificationMonitorConfig {
 	cfg.UrgentWindow = 10 * time.Millisecond
 	cfg.SeenEvictInterval = time.Hour
 	return cfg
+}
+
+func requireNotificationStateWriteFailure(
+	t *testing.T,
+	store *notificationStateStore,
+	state notificationMonitorState,
+) {
+	t.Helper()
+	if store == nil {
+		t.Fatal("notification state store is required")
+	}
+	if err := store.Save(context.Background(), state); err == nil {
+		t.Skip("filesystem permissions do not block notification state writes in this environment")
+	}
 }
 
 func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvents(t *testing.T) {
@@ -65,8 +80,8 @@ func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvent
 			mu.Lock()
 			defer mu.Unlock()
 			for _, event := range batch.Events {
-				if event.Status != nil {
-					delivered = append(delivered, event.Status.DAGRunID)
+				if event.DAGRun != nil {
+					delivered = append(delivered, event.DAGRun.DAGRunID)
 				}
 			}
 			return true
@@ -128,7 +143,7 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 		Pending: map[string]NotificationEvent{
 			NotificationSeenKey(status): {
 				Key:        NotificationSeenKey(status),
-				Status:     cloneNotificationStatus(status),
+				DAGRun:     cloneNotificationStatus(status),
 				ObservedAt: time.Now().UTC(),
 			},
 		},
@@ -147,7 +162,7 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 			defer mu.Unlock()
 			assert.Equal(t, "dest-1", destination)
 			require.Len(t, batch.Events, 1)
-			assert.Equal(t, "run-1", batch.Events[0].Status.DAGRunID)
+			assert.Equal(t, "run-1", batch.Events[0].DAGRun.DAGRunID)
 			calls++
 			return true
 		},
@@ -167,6 +182,56 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 	defer mu.Unlock()
 	assert.GreaterOrEqual(t, calls, 1)
 	assert.True(t, secondMonitor.IsDelivered("dest-1", status))
+}
+
+func TestNotificationStateStore_MigratesV1ByClearingPendingAndKeepingProgress(t *testing.T) {
+	t.Parallel()
+
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	legacyState := legacyNotificationMonitorState{
+		Version:      1,
+		Bootstrapped: true,
+		SourceCursor: eventstore.NotificationCursor{
+			LastInboxFile:    "inbox-001.jsonl",
+			CommittedOffsets: map[string]int64{"inbox-001.jsonl": 42},
+		},
+		Destinations: map[string]*legacyNotificationDestinationState{
+			"dest-1": {
+				Pending: map[string]json.RawMessage{
+					"dag:run-1:attempt-1:failed": json.RawMessage(`{"key":"dag:run-1:attempt-1:failed","kind":"dag_run","type":"dag.run.failed","status":{"name":"briefing","dag_run_id":"run-1","attempt_id":"attempt-1","status":"failed"},"observedAt":"2026-04-01T00:00:00Z"}`),
+				},
+				Delivered: map[string]time.Time{
+					"dag:run-2:attempt-1:succeeded": time.Unix(1712016000, 0).UTC(),
+				},
+			},
+		},
+	}
+	data, err := json.Marshal(legacyState)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(stateFile, data, 0o600))
+
+	store := newNotificationStateStore(stateFile)
+	result := store.Load(context.Background())
+	require.NoError(t, result.Warning)
+	require.False(t, result.Recovered)
+	require.False(t, result.Missing)
+
+	state := result.State
+	require.Equal(t, notificationMonitorStateVersion, state.Version)
+	require.True(t, state.Bootstrapped)
+	require.Equal(t, legacyState.SourceCursor.Normalize(), state.SourceCursor)
+	require.Contains(t, state.Destinations, "dest-1")
+	require.Empty(t, state.Destinations["dest-1"].Pending)
+	require.Equal(t, legacyState.Destinations["dest-1"].Delivered, state.Destinations["dest-1"].Delivered)
+
+	require.NoError(t, store.Save(context.Background(), state))
+	var saved struct {
+		Version int `json:"version"`
+	}
+	raw, err := os.ReadFile(stateFile)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(raw, &saved))
+	require.Equal(t, notificationMonitorStateVersion, saved.Version)
 }
 
 func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T) {
@@ -194,8 +259,8 @@ func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T
 				mu.Lock()
 				defer mu.Unlock()
 				for _, event := range batch.Events {
-					if event.Status != nil {
-						deliveries[name] = append(deliveries[name], event.Status.DAGRunID)
+					if event.DAGRun != nil {
+						deliveries[name] = append(deliveries[name], event.DAGRun.DAGRunID)
 					}
 				}
 				return true
@@ -379,8 +444,8 @@ func TestNotificationMonitor_CorruptStateIsQuarantinedAndOnlyFutureEventsAreDeli
 			mu.Lock()
 			defer mu.Unlock()
 			for _, event := range batch.Events {
-				if event.Status != nil {
-					delivered = append(delivered, event.Status.DAGRunID)
+				if event.DAGRun != nil {
+					delivered = append(delivered, event.DAGRun.DAGRunID)
 				}
 			}
 			return true
@@ -466,8 +531,8 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			for _, event := range batch.Events {
-				if event.Status != nil {
-					delivered = append(delivered, event.Status.DAGRunID)
+				if event.DAGRun != nil {
+					delivered = append(delivered, event.DAGRun.DAGRunID)
 				}
 			}
 			return true
@@ -488,6 +553,7 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 	defer func() {
 		_ = os.Chmod(stateDir, 0o700)
 	}()
+	requireNotificationStateWriteFailure(t, monitor.stateStore, monitor.state)
 
 	status := &exec.DAGRunStatus{
 		Name:       "briefing",
@@ -544,6 +610,7 @@ func TestNotificationMonitor_NotifyCompletionSaveFailureDoesNotMutateLiveState(t
 	defer func() {
 		_ = os.Chmod(stateDir, 0o700)
 	}()
+	requireNotificationStateWriteFailure(t, monitor.stateStore, monitor.state)
 
 	status := &exec.DAGRunStatus{
 		Name:      "briefing",
@@ -583,7 +650,7 @@ func TestNotificationMonitor_MarkBatchDeliveredSaveFailureDoesNotMutateLiveState
 	}
 	event := NotificationEvent{
 		Key:        NotificationSeenKey(status),
-		Status:     cloneNotificationStatus(status),
+		DAGRun:     cloneNotificationStatus(status),
 		ObservedAt: time.Now().UTC(),
 	}
 	monitor.state.Destinations["dest-1"] = &notificationDestinationState{
@@ -597,6 +664,7 @@ func TestNotificationMonitor_MarkBatchDeliveredSaveFailureDoesNotMutateLiveState
 	defer func() {
 		_ = os.Chmod(stateDir, 0o700)
 	}()
+	requireNotificationStateWriteFailure(t, monitor.stateStore, monitor.state)
 
 	monitor.markBatchDelivered(context.Background(), "dest-1", NotificationBatch{
 		Class:  NotificationClassSuccessDigest,
@@ -628,7 +696,7 @@ func TestNotificationMonitor_RemovedDestinationsArePurgedOnStartup(t *testing.T)
 		Pending: map[string]NotificationEvent{
 			NotificationSeenKey(status): {
 				Key:        NotificationSeenKey(status),
-				Status:     cloneNotificationStatus(status),
+				DAGRun:     cloneNotificationStatus(status),
 				ObservedAt: time.Now().UTC(),
 			},
 		},
@@ -694,8 +762,8 @@ func TestNotificationMonitor_LockTheftSelfFencesActiveOwner(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			for _, event := range batch.Events {
-				if event.Status != nil {
-					delivered = append(delivered, event.Status.DAGRunID)
+				if event.DAGRun != nil {
+					delivered = append(delivered, event.DAGRun.DAGRunID)
 				}
 			}
 			return true

@@ -208,8 +208,8 @@ func TestNotificationMonitor_BootstrapFailureDoesNotReplayFromZeroCursor(t *test
 			mu.Lock()
 			defer mu.Unlock()
 			for _, event := range batch.Events {
-				if event.Status != nil {
-					delivered = append(delivered, event.Status.DAGRunID)
+				if event.DAGRun != nil {
+					delivered = append(delivered, event.DAGRun.DAGRunID)
 				}
 			}
 			return true

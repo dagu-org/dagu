@@ -182,7 +182,7 @@ func (s *Service) reconcileCurrentRun(ctx context.Context, def *Definition, stat
 			return err
 		}
 		if state.LastError != prevError {
-			s.emitErrorEvent(ctx, def, state, "child_run_missing", s.clock())
+			s.eventEmitter().error(ctx, def, state, "child_run_missing", s.clock())
 		}
 		return s.flushPendingTurnMessages(ctx, def, state)
 	}
@@ -261,7 +261,7 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 					return err
 				}
 				if state.LastError != prevError {
-					s.emitErrorEvent(ctx, def, state, "session_recreate_failed", s.clock())
+					s.eventEmitter().error(ctx, def, state, "session_recreate_failed", s.clock())
 				}
 				return nil
 			}
@@ -280,7 +280,7 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 			return err
 		}
 		if state.LastError != prevError {
-			s.emitErrorEvent(ctx, def, state, "enqueue_turn_failed", s.clock())
+			s.eventEmitter().error(ctx, def, state, "enqueue_turn_failed", s.clock())
 		}
 		return nil
 	}
@@ -295,7 +295,7 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 				return err
 			}
 			if state.LastError != prevError {
-				s.emitErrorEvent(ctx, def, state, "flush_queued_turn_failed", s.clock())
+				s.eventEmitter().error(ctx, def, state, "flush_queued_turn_failed", s.clock())
 			}
 			return nil
 		}
@@ -649,7 +649,7 @@ func (r *controllerRuntime) RequestHumanInput(ctx context.Context, prompt agent.
 	if err := r.service.saveState(ctx, r.def.Name, r.state); err != nil {
 		return err
 	}
-	r.service.emitNeedsInputEvent(ctx, r.def, r.state)
+	r.service.eventEmitter().needsInput(ctx, r.def, r.state)
 	return nil
 }
 
@@ -674,7 +674,7 @@ func (r *controllerRuntime) Finish(ctx context.Context, summary string) error {
 	if err := r.service.saveState(ctx, r.def.Name, r.state); err != nil {
 		return err
 	}
-	r.service.emitFinishedEvent(ctx, r.def, r.state)
+	r.service.eventEmitter().finished(ctx, r.def, r.state)
 	return nil
 }
 
