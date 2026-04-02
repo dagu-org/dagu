@@ -51,6 +51,20 @@ func TestNewStaticRegistry(t *testing.T) {
 		assert.Equal(t, 50055, members[0].Port) // Default port
 	})
 
+	t.Run("ipv6 address with port", func(t *testing.T) {
+		addresses := []string{"[fdbd:dc02:1a:e12::31]:50055"}
+
+		registry, err := NewStaticRegistry(addresses)
+		require.NoError(t, err)
+
+		members, err := registry.GetServiceMembers(context.Background(), exec.ServiceNameCoordinator)
+		require.NoError(t, err)
+		require.Len(t, members, 1)
+
+		assert.Equal(t, "fdbd:dc02:1a:e12::31", members[0].Host)
+		assert.Equal(t, 50055, members[0].Port)
+	})
+
 	t.Run("empty addresses list", func(t *testing.T) {
 		addresses := []string{}
 
@@ -192,6 +206,24 @@ func TestParseAddress(t *testing.T) {
 			name:     "localhost",
 			addr:     "localhost:50055",
 			wantHost: "localhost",
+			wantPort: 50055,
+		},
+		{
+			name:     "ipv6 with port",
+			addr:     "[fdbd:dc02:1a:e12::31]:50055",
+			wantHost: "fdbd:dc02:1a:e12::31",
+			wantPort: 50055,
+		},
+		{
+			name:     "ipv6 without port uses default port",
+			addr:     "fdbd:dc02:1a:e12::31",
+			wantHost: "fdbd:dc02:1a:e12::31",
+			wantPort: 50055,
+		},
+		{
+			name:     "bracketed ipv6 without port uses default port",
+			addr:     "[fdbd:dc02:1a:e12::31]",
+			wantHost: "fdbd:dc02:1a:e12::31",
 			wantPort: 50055,
 		},
 		{
