@@ -10,7 +10,7 @@
   <p>
     <a href="https://docs.dagu.sh">Docs</a> |
     <a href="https://docs.dagu.sh/writing-workflows/examples">Examples</a> |
-    <a href="https://discord.gg/gpahPUjGRk">Community</a>
+    <a href="https://discord.gg/gpahPUjGRk">Support & Community</a>
   </p>
 </div>
 
