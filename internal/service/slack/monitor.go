@@ -93,7 +93,7 @@ func (m *DAGRunMonitor) flushDirectMessage(ctx context.Context, channelID string
 	sessionID := m.currentSessionID(cs)
 
 	msg := m.buildNotificationMessage(ctx, sessionID, user, batch, allowLLM)
-	sessionID, stored, ok := m.appendNotification(ctx, cs, sessionID, user, chatbridge.NotificationBatchDAGName(batch), msg)
+	sessionID, stored, ok := m.appendNotification(ctx, cs, sessionID, user, chatbridge.NotificationBatchTopicName(batch), msg)
 	if !ok {
 		return false
 	}
@@ -119,7 +119,7 @@ func (m *DAGRunMonitor) flushChannelThread(ctx context.Context, channelID string
 	cs := m.bot.getOrCreateChat(threadKey, channelID, threadTS)
 	user := m.bot.userIdentity(threadKey)
 
-	sessionID, stored, err := chatbridge.AppendNotification(ctx, m.agentAPI, &cs.State, user, chatbridge.NotificationBatchDAGName(batch), m.bot.cfg.SafeMode, msg)
+	sessionID, stored, err := chatbridge.AppendNotification(ctx, m.agentAPI, &cs.State, user, chatbridge.NotificationBatchTopicName(batch), m.bot.cfg.SafeMode, msg)
 	if err != nil {
 		m.logger.Warn("Failed to append threaded notification message",
 			slog.String("session", sessionID),
@@ -155,10 +155,15 @@ func (m *DAGRunMonitor) buildNotificationMessage(ctx context.Context, sessionID 
 	}
 
 	msg, err := chatbridge.GenerateNotificationMessage(ctx, service, sessionID, user, batch)
-	if err != nil && len(batch.Events) > 0 && batch.Events[0].Status != nil {
+	if err != nil && len(batch.Events) > 0 {
+		subject := chatbridge.NotificationBatchTopicName(batch)
+		status := ""
+		if len(batch.Events) > 0 {
+			status = chatbridge.NotificationStatusLabel(batch.Events[0])
+		}
 		m.logger.Warn("Failed to generate AI notification, using deterministic fallback",
-			slog.String("dag", batch.Events[0].Status.Name),
-			slog.String("status", batch.Events[0].Status.Status.String()),
+			slog.String("subject", subject),
+			slog.String("status", status),
 			slog.String("error", err.Error()),
 		)
 	}

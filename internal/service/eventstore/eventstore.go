@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -28,6 +29,7 @@ type EventKind string
 
 const (
 	KindDAGRun   EventKind = "dag_run"
+	KindAutomata EventKind = "automata"
 	KindLLMUsage EventKind = "llm_usage"
 )
 
@@ -39,6 +41,10 @@ const (
 	TypeDAGRunFailed    EventType = "dag.run.failed"
 	TypeDAGRunAborted   EventType = "dag.run.aborted"
 	TypeDAGRunRejected  EventType = "dag.run.rejected"
+
+	TypeAutomataNeedsInput EventType = "automata.needs_input"
+	TypeAutomataError      EventType = "automata.error"
+	TypeAutomataFinished   EventType = "automata.finished"
 
 	TypeLLMUsageRecorded EventType = "llm.usage.recorded"
 )
@@ -57,22 +63,25 @@ type Source struct {
 }
 
 type Event struct {
-	ID             string         `json:"id"`
-	SchemaVersion  int            `json:"schema_version"`
-	OccurredAt     time.Time      `json:"occurred_at"`
-	RecordedAt     time.Time      `json:"recorded_at"`
-	Kind           EventKind      `json:"kind"`
-	Type           EventType      `json:"type"`
-	SourceService  string         `json:"source_service"`
-	SourceInstance string         `json:"source_instance,omitempty"`
-	DAGName        string         `json:"dag_name,omitempty"`
-	DAGRunID       string         `json:"dag_run_id,omitempty"`
-	AttemptID      string         `json:"attempt_id,omitempty"`
-	SessionID      string         `json:"session_id,omitempty"`
-	UserID         string         `json:"user_id,omitempty"`
-	Model          string         `json:"model,omitempty"`
-	Status         string         `json:"status,omitempty"`
-	Data           map[string]any `json:"data,omitempty"`
+	ID              string         `json:"id"`
+	SchemaVersion   int            `json:"schema_version"`
+	OccurredAt      time.Time      `json:"occurred_at"`
+	RecordedAt      time.Time      `json:"recorded_at"`
+	Kind            EventKind      `json:"kind"`
+	Type            EventType      `json:"type"`
+	SourceService   string         `json:"source_service"`
+	SourceInstance  string         `json:"source_instance,omitempty"`
+	DAGName         string         `json:"dag_name,omitempty"`
+	DAGRunID        string         `json:"dag_run_id,omitempty"`
+	AttemptID       string         `json:"attempt_id,omitempty"`
+	AutomataName    string         `json:"automata_name,omitempty"`
+	AutomataKind    string         `json:"automata_kind,omitempty"`
+	AutomataCycleID string         `json:"automata_cycle_id,omitempty"`
+	SessionID       string         `json:"session_id,omitempty"`
+	UserID          string         `json:"user_id,omitempty"`
+	Model           string         `json:"model,omitempty"`
+	Status          string         `json:"status,omitempty"`
+	Data            map[string]any `json:"data,omitempty"`
 }
 
 func (e *Event) Normalize() {
@@ -134,21 +143,24 @@ func (e *Event) Validate() error {
 }
 
 type QueryFilter struct {
-	Kind           EventKind
-	Type           EventType
-	DAGName        string
-	DAGRunID       string
-	AttemptID      string
-	SessionID      string
-	UserID         string
-	Model          string
-	Status         string
-	StartTime      time.Time
-	EndTime        time.Time
-	Limit          int
-	Offset         int
-	Cursor         string
-	PaginationMode QueryPaginationMode
+	Kind            EventKind
+	Type            EventType
+	DAGName         string
+	DAGRunID        string
+	AttemptID       string
+	AutomataName    string
+	AutomataKind    string
+	AutomataCycleID string
+	SessionID       string
+	UserID          string
+	Model           string
+	Status          string
+	StartTime       time.Time
+	EndTime         time.Time
+	Limit           int
+	Offset          int
+	Cursor          string
+	PaginationMode  QueryPaginationMode
 }
 
 type QueryResult struct {
@@ -208,6 +220,13 @@ func DAGRunEventID(eventType EventType, dagName, dagRunID, attemptID string) str
 	return "dag_" + stableID(string(eventType), dagName, dagRunID, attemptID)
 }
 
+func AutomataEventID(eventType EventType, automataName string, identityParts ...string) string {
+	parts := make([]string, 0, len(identityParts)+2)
+	parts = append(parts, string(eventType), automataName)
+	parts = append(parts, identityParts...)
+	return "automata_" + stableID(parts...)
+}
+
 func LLMUsageEventID(sessionID, messageID string) string {
 	return "llm_" + stableID(string(TypeLLMUsageRecorded), sessionID, messageID)
 }
@@ -238,6 +257,54 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 		AttemptID:      status.AttemptID,
 		Status:         status.Status.String(),
 		Data:           data,
+	}
+	event.Normalize()
+	return event
+}
+
+type AutomataEventInput struct {
+	Name                   string
+	Kind                   string
+	CycleID                string
+	SessionID              string
+	Status                 string
+	OccurredAt             time.Time
+	PromptID               string
+	PromptQuestion         string
+	Summary                string
+	Error                  string
+	CurrentTaskDescription string
+	OpenTaskCount          int
+	DoneTaskCount          int
+}
+
+func NewAutomataEvent(source Source, eventType EventType, id string, input AutomataEventInput, data map[string]any) *Event {
+	if strings.TrimSpace(input.Name) == "" || strings.TrimSpace(id) == "" {
+		return nil
+	}
+	source = normalizeSource(source)
+	data = cloneData(data)
+	if snapshot := newNotificationAutomataSnapshot(eventType, input); snapshot != nil {
+		if data == nil {
+			data = make(map[string]any, 1)
+		}
+		data[notificationAutomataSnapshotDataKey] = snapshot
+	}
+	event := &Event{
+		ID:              id,
+		SchemaVersion:   SchemaVersion,
+		OccurredAt:      automataOccurredAt(input),
+		RecordedAt:      time.Now().UTC(),
+		Kind:            KindAutomata,
+		Type:            eventType,
+		SourceService:   source.Service,
+		SourceInstance:  source.Instance,
+		AutomataName:    input.Name,
+		AutomataKind:    input.Kind,
+		AutomataCycleID: input.CycleID,
+		SessionID:       input.SessionID,
+		Status:          input.Status,
+		Data:            data,
 	}
 	event.Normalize()
 	return event
@@ -318,6 +385,13 @@ func normalizeSource(source Source) Source {
 	return source
 }
 
+func automataOccurredAt(input AutomataEventInput) time.Time {
+	if !input.OccurredAt.IsZero() {
+		return input.OccurredAt.UTC()
+	}
+	return time.Now().UTC()
+}
+
 func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time {
 	if status == nil {
 		return time.Now().UTC()
@@ -334,6 +408,8 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 			return t.UTC()
 		}
 	case TypeLLMUsageRecorded:
+		// This builder is only used for DAG-run events, but fall back safely.
+	case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished:
 		// This builder is only used for DAG-run events, but fall back safely.
 	}
 	if status.CreatedAt > 0 {

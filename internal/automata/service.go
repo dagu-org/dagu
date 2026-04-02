@@ -27,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/llm"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/google/uuid"
 )
 
@@ -50,6 +51,8 @@ type Service struct {
 	agentAPI       *agent.API
 	soulStore      agent.SoulStore
 	subCmdBuilder  *runtime.SubCmdBuilder
+	eventService   *eventstore.Service
+	eventSource    eventstore.Source
 	logger         *slog.Logger
 	clock          func() time.Time
 	reconcileEvery time.Duration
@@ -106,6 +109,18 @@ func WithSubCmdBuilder(builder *runtime.SubCmdBuilder) Option {
 	}
 }
 
+func WithEventService(service *eventstore.Service) Option {
+	return func(s *Service) {
+		s.eventService = service
+	}
+}
+
+func WithEventSource(source eventstore.Source) Option {
+	return func(s *Service) {
+		s.eventSource = source
+	}
+}
+
 func WithLogger(logger *slog.Logger) Option {
 	return func(s *Service) {
 		if logger != nil {
@@ -132,6 +147,9 @@ func New(cfg *config.Config, dagStore exec.DAGStore, dagRunStore exec.DAGRunStor
 		logger:         slog.Default(),
 		clock:          time.Now,
 		reconcileEvery: 2 * time.Second,
+		eventSource: eventstore.Source{
+			Service: eventstore.SourceServiceUnknown,
+		},
 	}
 	for _, opt := range opts {
 		opt(svc)
@@ -186,6 +204,120 @@ func (s *Service) saveState(_ context.Context, name string, state *State) error 
 		return fmt.Errorf("create state dir: %w", err)
 	}
 	return fileutil.WriteJSONAtomic(path, state, stateFilePerm)
+}
+
+func (s *Service) eventSourceForContext(ctx context.Context) eventstore.Source {
+	if source, ok := eventstore.SourceFromContext(ctx); ok {
+		return source
+	}
+	return s.eventSource
+}
+
+func (s *Service) emitAutomataEvent(ctx context.Context, event *eventstore.Event) {
+	if s == nil || s.eventService == nil || event == nil {
+		return
+	}
+	if err := s.eventService.Emit(context.WithoutCancel(ctx), event); err != nil {
+		s.logger.Warn("automata event emit failed",
+			"automata", event.AutomataName,
+			"type", event.Type,
+			"error", err,
+		)
+	}
+}
+
+func automataEventInput(def *Definition, state *State) eventstore.AutomataEventInput {
+	if def == nil || state == nil {
+		return eventstore.AutomataEventInput{}
+	}
+	return eventstore.AutomataEventInput{
+		Name:                   def.Name,
+		Kind:                   string(normalizeAutomataKind(def.Kind)),
+		CycleID:                state.CurrentCycleID,
+		SessionID:              state.SessionID,
+		Status:                 string(state.State),
+		Summary:                state.LastSummary,
+		Error:                  state.LastError,
+		CurrentTaskDescription: nextOpenTaskDescription(state.Tasks),
+		OpenTaskCount:          countTasksByState(state.Tasks, TaskStateOpen),
+		DoneTaskCount:          countTasksByState(state.Tasks, TaskStateDone),
+	}
+}
+
+func (s *Service) emitNeedsInputEvent(ctx context.Context, def *Definition, state *State) {
+	if def == nil || state == nil || state.PendingPrompt == nil {
+		return
+	}
+	input := automataEventInput(def, state)
+	input.OccurredAt = state.PendingPrompt.CreatedAt
+	input.PromptID = state.PendingPrompt.ID
+	input.PromptQuestion = state.PendingPrompt.Question
+
+	data := map[string]any{
+		"prompt_id":                state.PendingPrompt.ID,
+		"prompt_question":          state.PendingPrompt.Question,
+		"current_task_description": input.CurrentTaskDescription,
+		"open_task_count":          input.OpenTaskCount,
+		"done_task_count":          input.DoneTaskCount,
+	}
+	if len(state.PendingPrompt.Options) > 0 {
+		data["options"] = append([]agent.UserPromptOption(nil), state.PendingPrompt.Options...)
+	}
+	if state.PendingPrompt.AllowFreeText {
+		data["allow_free_text"] = true
+	}
+	if state.PendingPrompt.FreeTextPlaceholder != "" {
+		data["free_text_placeholder"] = state.PendingPrompt.FreeTextPlaceholder
+	}
+
+	s.emitAutomataEvent(ctx, eventstore.NewAutomataEvent(
+		s.eventSourceForContext(ctx),
+		eventstore.TypeAutomataNeedsInput,
+		eventstore.AutomataEventID(eventstore.TypeAutomataNeedsInput, def.Name, state.PendingPrompt.ID),
+		input,
+		data,
+	))
+}
+
+func (s *Service) emitFinishedEvent(ctx context.Context, def *Definition, state *State) {
+	if def == nil || state == nil {
+		return
+	}
+	input := automataEventInput(def, state)
+	input.OccurredAt = state.FinishedAt
+	s.emitAutomataEvent(ctx, eventstore.NewAutomataEvent(
+		s.eventSourceForContext(ctx),
+		eventstore.TypeAutomataFinished,
+		eventstore.AutomataEventID(eventstore.TypeAutomataFinished, def.Name, state.CurrentCycleID),
+		input,
+		map[string]any{
+			"summary":                  state.LastSummary,
+			"current_task_description": input.CurrentTaskDescription,
+			"open_task_count":          input.OpenTaskCount,
+			"done_task_count":          input.DoneTaskCount,
+		},
+	))
+}
+
+func (s *Service) emitErrorEvent(ctx context.Context, def *Definition, state *State, code string, occurredAt time.Time) {
+	if def == nil || state == nil || strings.TrimSpace(state.LastError) == "" {
+		return
+	}
+	input := automataEventInput(def, state)
+	input.OccurredAt = occurredAt
+	s.emitAutomataEvent(ctx, eventstore.NewAutomataEvent(
+		s.eventSourceForContext(ctx),
+		eventstore.TypeAutomataError,
+		eventstore.AutomataEventID(eventstore.TypeAutomataError, def.Name, state.CurrentCycleID, code, state.LastError),
+		input,
+		map[string]any{
+			"error":                    state.LastError,
+			"error_code":               code,
+			"current_task_description": input.CurrentTaskDescription,
+			"open_task_count":          input.OpenTaskCount,
+			"done_task_count":          input.DoneTaskCount,
+		},
+	))
 }
 
 func (s *Service) loadDefinitionFile(ctx context.Context, path string) (*Definition, error) {

@@ -18,6 +18,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedag"
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,6 +50,22 @@ func (s *testAgentConfigStore) IsEnabled(context.Context) bool {
 
 type testAgentModelStore struct {
 	models map[string]*agent.ModelConfig
+}
+
+type testAutomataEventStore struct {
+	events []*eventstore.Event
+}
+
+func (s *testAutomataEventStore) Emit(_ context.Context, event *eventstore.Event) error {
+	if event == nil {
+		return nil
+	}
+	s.events = append(s.events, event)
+	return nil
+}
+
+func (*testAutomataEventStore) Query(context.Context, eventstore.QueryFilter) (*eventstore.QueryResult, error) {
+	return &eventstore.QueryResult{}, nil
 }
 
 func (s *testAgentModelStore) Create(_ context.Context, model *agent.ModelConfig) error {
@@ -912,6 +929,35 @@ func TestControllerRuntimeRunAllowedDAGRejectsConcurrentRun(t *testing.T) {
 	require.ErrorContains(t, err, "already active")
 }
 
+func TestControllerRuntimeRequestHumanInputEmitsEvent(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime, store := newTestServiceWithEventStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	require.NoError(t, rt.RequestHumanInput(ctx, agent.AutomataHumanPrompt{
+		Question: "Approve the deployment?",
+	}))
+
+	require.Len(t, store.events, 1)
+	event := store.events[0]
+	require.Equal(t, eventstore.KindAutomata, event.Kind)
+	require.Equal(t, eventstore.TypeAutomataNeedsInput, event.Type)
+	require.Equal(t, "software_dev", event.AutomataName)
+	require.Equal(t, fixedTime, event.OccurredAt)
+	snapshot, err := eventstore.NotificationAutomataFromEvent(event)
+	require.NoError(t, err)
+	require.Equal(t, "Approve the deployment?", snapshot.PromptQuestion)
+	require.Equal(t, "workflow", snapshot.Kind)
+}
+
 func TestControllerRuntimeFinishRejectsActiveChildRun(t *testing.T) {
 	t.Parallel()
 
@@ -946,6 +992,32 @@ func TestControllerRuntimeFinishRejectsServiceAutomata(t *testing.T) {
 	rt := &controllerRuntime{service: svc, def: def, state: state}
 	err = rt.Finish(ctx, "done")
 	require.ErrorContains(t, err, "cannot finish a service automata")
+}
+
+func TestControllerRuntimeFinishEmitsEventAndAssignsCycleID(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime, store := newTestServiceWithEventStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	require.NoError(t, rt.Finish(ctx, "All checklist tasks are complete."))
+
+	require.NotEmpty(t, state.CurrentCycleID)
+	require.Len(t, store.events, 1)
+	event := store.events[0]
+	require.Equal(t, eventstore.TypeAutomataFinished, event.Type)
+	require.Equal(t, state.CurrentCycleID, event.AutomataCycleID)
+	require.Equal(t, fixedTime, event.OccurredAt)
+	snapshot, err := eventstore.NotificationAutomataFromEvent(event)
+	require.NoError(t, err)
+	require.Equal(t, "All checklist tasks are complete.", snapshot.Summary)
 }
 
 func TestServiceRuntimeOptionsExcludeFinishToolForService(t *testing.T) {
@@ -1053,6 +1125,46 @@ func newTestServiceWithSessionStore(t *testing.T) (*Service, time.Time) {
 		WithSessionStore(sessionStore),
 	)
 	return svc, fixedTime
+}
+
+func newTestServiceWithEventStore(t *testing.T) (*Service, time.Time, *testAutomataEventStore) {
+	t.Helper()
+
+	root := t.TempDir()
+	dagsDir := filepath.Join(root, "dags")
+	dataDir := filepath.Join(root, "data")
+	runsDir := filepath.Join(root, "runs")
+
+	require.NoError(t, os.MkdirAll(dagsDir, 0o750))
+	require.NoError(t, os.MkdirAll(dataDir, 0o750))
+	require.NoError(t, os.MkdirAll(runsDir, 0o750))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dagsDir, "build-app.yaml"),
+		[]byte(testDAGYAML("build-app")),
+		0o600,
+	))
+
+	cfg := &config.Config{
+		Core: config.Core{
+			Location: time.UTC,
+		},
+		Paths: config.PathsConfig{
+			DAGsDir:    dagsDir,
+			DataDir:    dataDir,
+			DAGRunsDir: runsDir,
+		},
+	}
+	fixedTime := time.Date(2026, time.March, 26, 10, 0, 0, 0, time.UTC)
+	store := &testAutomataEventStore{}
+	svc := New(
+		cfg,
+		filedag.New(dagsDir, filedag.WithSkipExamples(true)),
+		filedagrun.New(runsDir),
+		WithClock(func() time.Time { return fixedTime }),
+		WithEventService(eventstore.New(store)),
+		WithEventSource(eventstore.Source{Service: eventstore.SourceServiceScheduler, Instance: "test-scheduler"}),
+	)
+	return svc, fixedTime, store
 }
 
 func createTask(t *testing.T, svc *Service, ctx context.Context, name, description, requestedBy string) *Task {

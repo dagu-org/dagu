@@ -3643,13 +3643,13 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - name: kind
           in: query
-          description: "Filter by event kind (e.g., dag_run, llm_usage)"
+          description: "Filter by event kind (e.g., dag_run, automata, llm_usage)"
           required: false
           schema:
             type: string
         - name: type
           in: query
-          description: "Filter by event type (e.g., dag.run.failed, llm.usage.recorded)"
+          description: "Filter by event type (e.g., dag.run.failed, automata.needs_input, llm.usage.recorded)"
           required: false
           schema:
             type: string
@@ -3668,6 +3668,12 @@ paths:
         - name: attemptId
           in: query
           description: "Filter by attempt ID"
+          required: false
+          schema:
+            type: string
+        - name: automataName
+          in: query
+          description: "Filter by automata name"
           required: false
           schema:
             type: string
@@ -7792,10 +7798,10 @@ components:
           description: "When the event was recorded by the producer"
         kind:
           type: string
-          description: "High-level event kind (e.g., dag_run, llm_usage)"
+          description: "High-level event kind (e.g., dag_run, automata, llm_usage)"
         type:
           type: string
-          description: "Specific event type (e.g., dag.run.failed)"
+          description: "Specific event type (e.g., dag.run.failed, automata.error)"
         sourceService:
           type: string
           description: "Service that produced the event"
@@ -7811,6 +7817,15 @@ components:
         attemptId:
           type: string
           description: "Attempt ID for DAG-run events"
+        automataName:
+          type: string
+          description: "Automata name for automata events"
+        automataKind:
+          type: string
+          description: "Automata kind for automata events"
+        automataCycleId:
+          type: string
+          description: "Automata cycle ID for automata events"
         sessionId:
           type: string
           description: "Session ID for LLM usage events"

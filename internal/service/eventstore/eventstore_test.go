@@ -159,6 +159,46 @@ func TestNewDAGRunEventDeepClonesData(t *testing.T) {
 	assert.Equal(t, "fetch", event.Data["steps"].([]any)[0].(map[string]any)["name"])
 }
 
+func TestNewAutomataEventEmbedsNotificationSnapshot(t *testing.T) {
+	t.Parallel()
+
+	event := NewAutomataEvent(
+		Source{Service: SourceServiceScheduler, Instance: "sched-1"},
+		TypeAutomataNeedsInput,
+		AutomataEventID(TypeAutomataNeedsInput, "service_ops", "prompt-1"),
+		AutomataEventInput{
+			Name:                   "service_ops",
+			Kind:                   "service",
+			CycleID:                "cycle-1",
+			SessionID:              "session-1",
+			Status:                 "waiting",
+			OccurredAt:             time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+			PromptID:               "prompt-1",
+			PromptQuestion:         "Approve deployment?",
+			CurrentTaskDescription: "Review the release checklist",
+			OpenTaskCount:          2,
+			DoneTaskCount:          1,
+		},
+		map[string]any{"severity": "urgent"},
+	)
+	require.NotNil(t, event)
+	assert.Equal(t, KindAutomata, event.Kind)
+	assert.Equal(t, "service_ops", event.AutomataName)
+	assert.Equal(t, "service", event.AutomataKind)
+	assert.Equal(t, "cycle-1", event.AutomataCycleID)
+	assert.Equal(t, "urgent", event.Data["severity"])
+
+	snapshot, err := NotificationAutomataFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, "service_ops", snapshot.Name)
+	assert.Equal(t, "service", snapshot.Kind)
+	assert.Equal(t, "cycle-1", snapshot.CycleID)
+	assert.Equal(t, TypeAutomataNeedsInput, snapshot.EventType)
+	assert.Equal(t, "Approve deployment?", snapshot.PromptQuestion)
+	assert.Equal(t, "Review the release checklist", snapshot.CurrentTaskDescription)
+}
+
 func TestNotificationStatusFromEventRejectsInvalidSnapshot(t *testing.T) {
 	t.Parallel()
 
@@ -177,6 +217,26 @@ func TestNotificationStatusFromEventRejectsInvalidSnapshot(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, status)
 	assert.ErrorContains(t, err, "missing dag_run_id")
+}
+
+func TestNotificationAutomataFromEventRejectsInvalidSnapshot(t *testing.T) {
+	t.Parallel()
+
+	snapshot, err := NotificationAutomataFromEvent(&Event{
+		ID:            "evt-1",
+		SchemaVersion: SchemaVersion,
+		OccurredAt:    time.Now().UTC(),
+		RecordedAt:    time.Now().UTC(),
+		Kind:          KindAutomata,
+		Type:          TypeAutomataNeedsInput,
+		SourceService: SourceServiceServer,
+		Data: map[string]any{
+			notificationAutomataSnapshotDataKey: map[string]any{},
+		},
+	})
+	require.Error(t, err)
+	assert.Nil(t, snapshot)
+	assert.ErrorContains(t, err, "missing name")
 }
 
 func TestNotificationServiceNormalizesCursorAtBoundary(t *testing.T) {

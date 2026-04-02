@@ -56,10 +56,13 @@ type EventLogsResponse = components['schemas']['EventLogsResponse'];
 
 type DateRangeMode = 'preset' | 'specific' | 'custom';
 type SpecificPeriod = 'date' | 'month' | 'year';
+type EventKindFilter = 'all' | 'dag_run' | 'automata' | 'llm_usage';
 
 type EventLogFilters = {
+  kind: EventKindFilter;
   type: string;
   dagName: string;
+  automataName: string;
   dagRunId: string;
   attemptId: string;
   fromDate?: string;
@@ -73,10 +76,11 @@ type EventLogFilters = {
 type StoredEventLogState = EventLogFilters;
 type EventLogQueryParams = {
   remoteNode: string;
-  kind: 'dag_run';
+  kind?: EventKindFilter;
   paginationMode: components['parameters']['EventLogPaginationMode'];
   type?: string;
   dagName?: string;
+  automataName?: string;
   dagRunId?: string;
   attemptId?: string;
   startTime?: string;
@@ -88,16 +92,27 @@ const PAGE_SIZE = 50;
 const DEFAULT_DATE_PRESET = 'last7days';
 const SEARCH_STATE_KEY = 'eventLogs';
 
+const EVENT_KIND_OPTIONS = [
+  { value: 'all', label: 'All kinds' },
+  { value: 'dag_run', label: 'DAG runs' },
+  { value: 'automata', label: 'Automata' },
+  { value: 'llm_usage', label: 'LLM usage' },
+] as const;
+
 const EVENT_TYPE_OPTIONS = [
-  { value: 'all', label: 'All outcomes' },
+  { value: 'all', label: 'All event types' },
   { value: 'dag.run.succeeded', label: 'Succeeded' },
   { value: 'dag.run.failed', label: 'Failed' },
   { value: 'dag.run.aborted', label: 'Aborted' },
   { value: 'dag.run.waiting', label: 'Waiting' },
   { value: 'dag.run.rejected', label: 'Rejected' },
+  { value: 'automata.needs_input', label: 'Needs input' },
+  { value: 'automata.error', label: 'Automata error' },
+  { value: 'automata.finished', label: 'Automata finished' },
+  { value: 'llm.usage.recorded', label: 'LLM usage' },
 ] as const;
 
-function getOutcomeLabel(type: string, status?: string): string {
+function getEventTypeLabel(type: string, status?: string): string {
   switch (type) {
     case 'dag.run.succeeded':
       return 'Succeeded';
@@ -109,6 +124,14 @@ function getOutcomeLabel(type: string, status?: string): string {
       return 'Waiting';
     case 'dag.run.rejected':
       return 'Rejected';
+    case 'automata.needs_input':
+      return 'Needs input';
+    case 'automata.error':
+      return 'Error';
+    case 'automata.finished':
+      return 'Finished';
+    case 'llm.usage.recorded':
+      return 'Usage recorded';
     default:
       if (status) {
         return status.replace(/_/g, ' ');
@@ -117,7 +140,7 @@ function getOutcomeLabel(type: string, status?: string): string {
   }
 }
 
-function getOutcomeVariant(
+function getEventVariant(
   type: string
 ): React.ComponentProps<typeof Badge>['variant'] {
   switch (type) {
@@ -131,9 +154,45 @@ function getOutcomeVariant(
       return 'warning';
     case 'dag.run.rejected':
       return 'warning';
+    case 'automata.finished':
+      return 'success';
+    case 'automata.error':
+      return 'error';
+    case 'automata.needs_input':
+      return 'warning';
     default:
       return 'default';
   }
+}
+
+function getKindLabel(kind: string): string {
+  switch (kind) {
+    case 'dag_run':
+      return 'DAG run';
+    case 'automata':
+      return 'Automata';
+    case 'llm_usage':
+      return 'LLM usage';
+    default:
+      return kind;
+  }
+}
+
+function getSubjectName(entry: EventLogEntry): string {
+  return entry.dagName || entry.automataName || entry.sessionId || '-';
+}
+
+function getContextLabel(entry: EventLogEntry): string {
+  if (entry.kind === 'dag_run') {
+    const parts = [entry.dagRunId, entry.attemptId].filter(Boolean);
+    return parts.length > 0 ? parts.join(' / ') : '-';
+  }
+  if (entry.kind === 'automata') {
+    const parts = [entry.automataKind, entry.automataCycleId].filter(Boolean);
+    return parts.length > 0 ? parts.join(' / ') : '-';
+  }
+  const parts = [entry.model, entry.sessionId].filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : '-';
 }
 
 function safeStringify(value: unknown): string {
@@ -207,8 +266,10 @@ function areEventLogFiltersEqual(
   b: EventLogFilters
 ): boolean {
   return (
+    a.kind === b.kind &&
     a.type === b.type &&
     a.dagName === b.dagName &&
+    a.automataName === b.automataName &&
     a.dagRunId === b.dagRunId &&
     a.attemptId === b.attemptId &&
     a.fromDate === b.fromDate &&
@@ -496,8 +557,10 @@ export default function EventLogsPage() {
   const defaultFilters = React.useMemo<EventLogFilters>(() => {
     const dates = getPresetDates(DEFAULT_DATE_PRESET);
     return {
+      kind: 'all',
       type: 'all',
       dagName: '',
+      automataName: '',
       dagRunId: '',
       attemptId: '',
       fromDate: dates.from,
@@ -523,11 +586,17 @@ export default function EventLogsPage() {
   const buildLocationParams = React.useCallback(
     (filters: EventLogFilters): URLSearchParams => {
       const params = new URLSearchParams();
+      if (filters.kind && filters.kind !== 'all') {
+        params.set('kind', filters.kind);
+      }
       if (filters.type && filters.type !== 'all') {
         params.set('type', filters.type);
       }
       if (filters.dagName) {
         params.set('dagName', filters.dagName);
+      }
+      if (filters.automataName) {
+        params.set('automataName', filters.automataName);
       }
       if (filters.dagRunId) {
         params.set('dagRunId', filters.dagRunId);
@@ -567,11 +636,23 @@ export default function EventLogsPage() {
 
       const next: StoredEventLogState = { ...base };
 
+      const kind = params.get('kind');
+      if (
+        kind === 'all' ||
+        kind === 'dag_run' ||
+        kind === 'automata' ||
+        kind === 'llm_usage'
+      ) {
+        next.kind = kind;
+      }
       if (params.has('type')) {
         next.type = params.get('type') || 'all';
       }
       if (params.has('dagName')) {
         next.dagName = params.get('dagName') || '';
+      }
+      if (params.has('automataName')) {
+        next.automataName = params.get('automataName') || '';
       }
       if (params.has('dagRunId')) {
         next.dagRunId = params.get('dagRunId') || '';
@@ -656,10 +737,11 @@ export default function EventLogsPage() {
   const query = React.useMemo<EventLogQueryParams>(() => {
     return {
       remoteNode: remoteKey,
-      kind: 'dag_run',
+      kind: appliedFilters.kind !== 'all' ? appliedFilters.kind : undefined,
       paginationMode: ComponentsParametersEventLogPaginationMode.cursor,
       type: appliedFilters.type !== 'all' ? appliedFilters.type : undefined,
       dagName: appliedFilters.dagName || undefined,
+      automataName: appliedFilters.automataName || undefined,
       dagRunId: appliedFilters.dagRunId || undefined,
       attemptId: appliedFilters.attemptId || undefined,
       startTime: formatDateForApi(appliedFilters.fromDate),
@@ -842,7 +924,7 @@ export default function EventLogsPage() {
           <div>
             <h1 className="text-lg font-semibold">Events</h1>
             <p className="text-sm text-muted-foreground">
-              Recent DAG-run outcome events for the selected remote node
+              Recent operational events for the selected remote node
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {lastUpdatedAt
@@ -887,11 +969,28 @@ export default function EventLogsPage() {
         <div className="card-obsidian p-4 flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <Select
+              value={draftFilters.kind}
+              onValueChange={(value) =>
+                updateDraftFilters({ kind: value as EventKindFilter })
+              }
+            >
+              <SelectTrigger className="w-[160px] h-8">
+                <SelectValue placeholder="All kinds" />
+              </SelectTrigger>
+              <SelectContent>
+                {EVENT_KIND_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
               value={draftFilters.type}
               onValueChange={(value) => updateDraftFilters({ type: value })}
             >
               <SelectTrigger className="w-[180px] h-8">
-                <SelectValue placeholder="All outcomes" />
+                <SelectValue placeholder="All event types" />
               </SelectTrigger>
               <SelectContent>
                 {EVENT_TYPE_OPTIONS.map((option) => (
@@ -913,6 +1012,15 @@ export default function EventLogsPage() {
                 className="h-8 w-[220px] pl-7"
               />
             </div>
+            <Input
+              value={draftFilters.automataName}
+              onChange={(event) =>
+                updateDraftFilters({ automataName: event.target.value })
+              }
+              onKeyDown={handleKeyDown}
+              placeholder="Automata name"
+              className="h-8 w-[220px]"
+            />
             <Input
               value={draftFilters.dagRunId}
               onChange={(event) =>
@@ -1067,10 +1175,10 @@ export default function EventLogsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Occurred</TableHead>
-                  <TableHead>Outcome</TableHead>
-                  <TableHead>DAG</TableHead>
-                  <TableHead>Run ID</TableHead>
-                  <TableHead>Attempt</TableHead>
+                  <TableHead>Kind</TableHead>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Context</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -1103,8 +1211,11 @@ export default function EventLogsPage() {
                           {formatTimestamp(entry.occurredAt)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getOutcomeVariant(entry.type)}>
-                            {getOutcomeLabel(entry.type, entry.status)}
+                          <Badge variant="outline">{getKindLabel(entry.kind)}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getEventVariant(entry.type)}>
+                            {getEventTypeLabel(entry.type, entry.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -1113,30 +1224,18 @@ export default function EventLogsPage() {
                               to={runPath}
                               className="font-medium text-primary hover:underline underline-offset-2"
                             >
-                              {entry.dagName}
+                              {getSubjectName(entry)}
                             </Link>
-                          ) : entry.dagName ? (
-                            <span className="font-medium">{entry.dagName}</span>
+                          ) : getSubjectName(entry) !== '-' ? (
+                            <span className="font-medium">
+                              {getSubjectName(entry)}
+                            </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell className="font-mono break-all">
-                          {runPath && entry.dagRunId ? (
-                            <Link
-                              to={runPath}
-                              className="text-primary hover:underline underline-offset-2"
-                            >
-                              {entry.dagRunId}
-                            </Link>
-                          ) : entry.dagRunId ? (
-                            entry.dagRunId
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono break-all">
-                          {entry.attemptId || '-'}
+                          {getContextLabel(entry)}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">

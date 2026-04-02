@@ -14,7 +14,10 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
-const notificationStatusSnapshotDataKey = "notification_status"
+const (
+	notificationStatusSnapshotDataKey   = "notification_status"
+	notificationAutomataSnapshotDataKey = "notification_automata"
+)
 
 type NotificationCursor struct {
 	LastInboxFile    string           `json:"last_inbox_file,omitempty"`
@@ -81,6 +84,38 @@ type NotificationStatusSnapshot struct {
 	OnWait     *NotificationNodeSnapshot  `json:"on_wait,omitempty"`
 }
 
+type NotificationAutomataSnapshot struct {
+	Name                   string    `json:"name"`
+	Kind                   string    `json:"kind,omitempty"`
+	CycleID                string    `json:"cycle_id,omitempty"`
+	EventType              EventType `json:"event_type"`
+	Status                 string    `json:"status,omitempty"`
+	PromptID               string    `json:"prompt_id,omitempty"`
+	PromptQuestion         string    `json:"prompt_question,omitempty"`
+	Summary                string    `json:"summary,omitempty"`
+	Error                  string    `json:"error,omitempty"`
+	CurrentTaskDescription string    `json:"current_task_description,omitempty"`
+	OpenTaskCount          int       `json:"open_task_count,omitempty"`
+	DoneTaskCount          int       `json:"done_task_count,omitempty"`
+}
+
+func (s *NotificationAutomataSnapshot) Validate() error {
+	if s == nil {
+		return errors.New("eventstore: automata notification snapshot is nil")
+	}
+	if s.Name == "" {
+		return errors.New("eventstore: invalid automata notification snapshot: missing name")
+	}
+	switch s.EventType {
+	case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished:
+	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
+		return errors.New("eventstore: invalid automata notification snapshot: unsupported event type")
+	default:
+		return errors.New("eventstore: invalid automata notification snapshot: unsupported event type")
+	}
+	return nil
+}
+
 func (s *NotificationStatusSnapshot) Validate() error {
 	if s == nil {
 		return errors.New("eventstore: notification snapshot is nil")
@@ -133,6 +168,27 @@ func newNotificationStatusSnapshot(status *exec.DAGRunStatus) *NotificationStatu
 	}
 }
 
+func newNotificationAutomataSnapshot(eventType EventType, input AutomataEventInput) *NotificationAutomataSnapshot {
+	if input.Name == "" {
+		return nil
+	}
+	snapshot := &NotificationAutomataSnapshot{
+		Name:                   input.Name,
+		Kind:                   input.Kind,
+		CycleID:                input.CycleID,
+		EventType:              eventType,
+		Status:                 input.Status,
+		PromptID:               input.PromptID,
+		PromptQuestion:         input.PromptQuestion,
+		Summary:                input.Summary,
+		Error:                  input.Error,
+		CurrentTaskDescription: input.CurrentTaskDescription,
+		OpenTaskCount:          input.OpenTaskCount,
+		DoneTaskCount:          input.DoneTaskCount,
+	}
+	return snapshot
+}
+
 func (s *NotificationStatusSnapshot) DAGRunStatus() *exec.DAGRunStatus {
 	if s == nil {
 		return nil
@@ -160,21 +216,41 @@ func (s *NotificationStatusSnapshot) DAGRunStatus() *exec.DAGRunStatus {
 	}
 }
 
+type NotificationPayload struct {
+	Kind     EventKind
+	Type     EventType
+	DAGRun   *NotificationStatusSnapshot
+	Automata *NotificationAutomataSnapshot
+}
+
 func IsNotificationEventType(kind EventKind, eventType EventType) bool {
-	if kind != KindDAGRun {
-		return false
-	}
-	switch eventType {
-	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
-		return true
-	case TypeLLMUsageRecorded:
+	switch kind {
+	case KindDAGRun:
+		switch eventType {
+		case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
+			return true
+		case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished, TypeLLMUsageRecorded:
+			return false
+		default:
+			return false
+		}
+	case KindAutomata:
+		switch eventType {
+		case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished:
+			return true
+		case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
+			return false
+		default:
+			return false
+		}
+	case KindLLMUsage:
 		return false
 	default:
 		return false
 	}
 }
 
-func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
+func NotificationPayloadFromEvent(event *Event) (*NotificationPayload, error) {
 	if event == nil {
 		return nil, errors.New("eventstore: event is nil")
 	}
@@ -185,24 +261,74 @@ func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
 		return nil, errors.New("eventstore: notification snapshot is missing")
 	}
 
-	raw, ok := event.Data[notificationStatusSnapshotDataKey]
-	if !ok {
-		return nil, errors.New("eventstore: notification snapshot is missing")
+	payload := &NotificationPayload{
+		Kind: event.Kind,
+		Type: event.Type,
 	}
+	switch event.Kind {
+	case KindDAGRun:
+		raw, ok := event.Data[notificationStatusSnapshotDataKey]
+		if !ok {
+			return nil, errors.New("eventstore: notification snapshot is missing")
+		}
+		data, err := json.Marshal(raw)
+		if err != nil {
+			return nil, fmt.Errorf("eventstore: marshal notification snapshot: %w", err)
+		}
+		var snapshot NotificationStatusSnapshot
+		if err := json.Unmarshal(data, &snapshot); err != nil {
+			return nil, fmt.Errorf("eventstore: unmarshal notification snapshot: %w", err)
+		}
+		if err := snapshot.Validate(); err != nil {
+			return nil, err
+		}
+		payload.DAGRun = &snapshot
+		return payload, nil
+	case KindAutomata:
+		raw, ok := event.Data[notificationAutomataSnapshotDataKey]
+		if !ok {
+			return nil, errors.New("eventstore: automata notification snapshot is missing")
+		}
+		data, err := json.Marshal(raw)
+		if err != nil {
+			return nil, fmt.Errorf("eventstore: marshal automata notification snapshot: %w", err)
+		}
+		var snapshot NotificationAutomataSnapshot
+		if err := json.Unmarshal(data, &snapshot); err != nil {
+			return nil, fmt.Errorf("eventstore: unmarshal automata notification snapshot: %w", err)
+		}
+		if err := snapshot.Validate(); err != nil {
+			return nil, err
+		}
+		payload.Automata = &snapshot
+		return payload, nil
+	case KindLLMUsage:
+		return nil, fmt.Errorf("eventstore: unsupported notification kind %q", event.Kind)
+	default:
+		return nil, fmt.Errorf("eventstore: unsupported notification kind %q", event.Kind)
+	}
+}
 
-	payload, err := json.Marshal(raw)
+func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
+	payload, err := NotificationPayloadFromEvent(event)
 	if err != nil {
-		return nil, fmt.Errorf("eventstore: marshal notification snapshot: %w", err)
-	}
-
-	var snapshot NotificationStatusSnapshot
-	if err := json.Unmarshal(payload, &snapshot); err != nil {
-		return nil, fmt.Errorf("eventstore: unmarshal notification snapshot: %w", err)
-	}
-	if err := snapshot.Validate(); err != nil {
 		return nil, err
 	}
-	return snapshot.DAGRunStatus(), nil
+	if payload.DAGRun == nil {
+		return nil, errors.New("eventstore: notification payload does not contain a dag snapshot")
+	}
+	return payload.DAGRun.DAGRunStatus(), nil
+}
+
+func NotificationAutomataFromEvent(event *Event) (*NotificationAutomataSnapshot, error) {
+	payload, err := NotificationPayloadFromEvent(event)
+	if err != nil {
+		return nil, err
+	}
+	if payload.Automata == nil {
+		return nil, errors.New("eventstore: notification payload does not contain an automata snapshot")
+	}
+	return payload.Automata, nil
 }
 
 func (s *Service) NotificationHeadCursor(ctx context.Context) (NotificationCursor, error) {

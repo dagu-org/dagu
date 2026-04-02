@@ -2974,9 +2974,9 @@ export interface components {
              * @description When the event was recorded by the producer
              */
             recordedAt: string;
-            /** @description High-level event kind (e.g., dag_run, llm_usage) */
+            /** @description High-level event kind (e.g., dag_run, automata, llm_usage) */
             kind: string;
-            /** @description Specific event type (e.g., dag.run.failed) */
+            /** @description Specific event type (e.g., dag.run.failed, automata.error) */
             type: string;
             /** @description Service that produced the event */
             sourceService: string;
@@ -2988,6 +2988,12 @@ export interface components {
             dagRunId?: string;
             /** @description Attempt ID for DAG-run events */
             attemptId?: string;
+            /** @description Automata name for automata events */
+            automataName?: string;
+            /** @description Automata kind for automata events */
+            automataKind?: string;
+            /** @description Automata cycle ID for automata events */
+            automataCycleId?: string;
             /** @description Session ID for LLM usage events */
             sessionId?: string;
             /** @description User ID associated with the event */
@@ -9719,9 +9725,9 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Filter by event kind (e.g., dag_run, llm_usage) */
+                /** @description Filter by event kind (e.g., dag_run, automata, llm_usage) */
                 kind?: string;
-                /** @description Filter by event type (e.g., dag.run.failed, llm.usage.recorded) */
+                /** @description Filter by event type (e.g., dag.run.failed, automata.needs_input, llm.usage.recorded) */
                 type?: string;
                 /** @description Filter by DAG name */
                 dagName?: string;
@@ -9729,6 +9735,8 @@ export interface operations {
                 dagRunId?: string;
                 /** @description Filter by attempt ID */
                 attemptId?: string;
+                /** @description Filter by automata name */
+                automataName?: string;
                 /** @description Filter by session ID */
                 sessionId?: string;
                 /** @description Filter by user ID */

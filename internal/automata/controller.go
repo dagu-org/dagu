@@ -168,6 +168,7 @@ func (s *Service) reconcileCurrentRun(ctx context.Context, def *Definition, stat
 		return err
 	}
 	if len(statuses) == 0 {
+		prevError := state.LastError
 		state.LastError = fmt.Sprintf("child DAG run %s not found", state.CurrentRunRef.String())
 		state.LastRunRef = state.CurrentRunRef
 		state.CurrentRunRef = nil
@@ -179,6 +180,9 @@ func (s *Service) reconcileCurrentRun(ctx context.Context, def *Definition, stat
 		), s.clock())
 		if err := s.saveState(ctx, def.Name, state); err != nil {
 			return err
+		}
+		if state.LastError != prevError {
+			s.emitErrorEvent(ctx, def, state, "child_run_missing", s.clock())
 		}
 		return s.flushPendingTurnMessages(ctx, def, state)
 	}
@@ -251,8 +255,15 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 		if errors.Is(err, agent.ErrSessionNotFound) {
 			sessionID, createErr := s.agentAPI.CreateEmptySessionWithRuntime(ctx, user, "", def.Agent.SafeMode, runtimeOpts)
 			if createErr != nil {
+				prevError := state.LastError
 				state.LastError = createErr.Error()
-				return s.saveState(ctx, def.Name, state)
+				if err := s.saveState(ctx, def.Name, state); err != nil {
+					return err
+				}
+				if state.LastError != prevError {
+					s.emitErrorEvent(ctx, def, state, "session_recreate_failed", s.clock())
+				}
+				return nil
 			}
 			state.SessionID = sessionID
 			result, err = s.agentAPI.EnqueueChatMessageWithRuntime(ctx, state.SessionID, user, agent.ChatRequest{
@@ -263,16 +274,30 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 		}
 	}
 	if err != nil {
+		prevError := state.LastError
 		state.LastError = err.Error()
-		return s.saveState(ctx, def.Name, state)
+		if err := s.saveState(ctx, def.Name, state); err != nil {
+			return err
+		}
+		if state.LastError != prevError {
+			s.emitErrorEvent(ctx, def, state, "enqueue_turn_failed", s.clock())
+		}
+		return nil
 	}
 	if result.SessionID != "" {
 		state.SessionID = result.SessionID
 	}
 	if result.Queued {
 		if _, flushErr := s.flushQueuedSessionTurn(ctx, def.Name, state); flushErr != nil {
+			prevError := state.LastError
 			state.LastError = flushErr.Error()
-			return s.saveState(ctx, def.Name, state)
+			if err := s.saveState(ctx, def.Name, state); err != nil {
+				return err
+			}
+			if state.LastError != prevError {
+				s.emitErrorEvent(ctx, def, state, "flush_queued_turn_failed", s.clock())
+			}
+			return nil
 		}
 	}
 
@@ -621,7 +646,11 @@ func (r *controllerRuntime) RequestHumanInput(ctx context.Context, prompt agent.
 	r.state.PendingResponse = nil
 	r.state.State = StateWaiting
 	r.state.WaitingReason = WaitingReasonHuman
-	return r.service.saveState(ctx, r.def.Name, r.state)
+	if err := r.service.saveState(ctx, r.def.Name, r.state); err != nil {
+		return err
+	}
+	r.service.emitNeedsInputEvent(ctx, r.def, r.state)
+	return nil
 }
 
 func (r *controllerRuntime) Finish(ctx context.Context, summary string) error {
@@ -637,9 +666,16 @@ func (r *controllerRuntime) Finish(ctx context.Context, summary string) error {
 	r.state.PendingResponse = nil
 	r.state.PendingTurnMessages = nil
 	r.state.CurrentRunRef = nil
+	if r.state.CurrentCycleID == "" {
+		r.state.CurrentCycleID = nextCycleID()
+	}
 	r.state.FinishedAt = r.service.clock()
 	r.state.LastSummary = summary
-	return r.service.saveState(ctx, r.def.Name, r.state)
+	if err := r.service.saveState(ctx, r.def.Name, r.state); err != nil {
+		return err
+	}
+	r.service.emitFinishedEvent(ctx, r.def, r.state)
+	return nil
 }
 
 func summarizeRunStatus(status *exec.DAGRunStatus) string {

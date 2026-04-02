@@ -102,7 +102,7 @@ func NewNotificationMonitor(
 			StaleThreshold: DefaultNotificationLockStaleThreshold,
 			RetryInterval:  DefaultNotificationLockRetryInterval,
 			OnWait: func() {
-				logger.Info("Notification lock is held by another process; DAG run notifications are on standby",
+				logger.Info("Notification lock is held by another process; notifications are on standby",
 					slog.String("lock_dir", lockDir),
 				)
 			},
@@ -124,8 +124,8 @@ func NewNotificationMonitor(
 
 // Run starts the shared notification monitor loop.
 func (m *NotificationMonitor) Run(ctx context.Context) {
-	m.logger.Info("DAG run notification monitor started")
-	defer m.logger.Info("DAG run notification monitor stopped")
+	m.logger.Info("Notification monitor started")
+	defer m.logger.Info("Notification monitor stopped")
 
 	if m.lock == nil {
 		m.initializeSession(ctx)
@@ -175,10 +175,15 @@ func (m *NotificationMonitor) NotifyCompletion(status *exec.DAGRunStatus) bool {
 		slog.String("status", status.Status.String()),
 		slog.String("dag_run_id", status.DAGRunID),
 	)
+	eventType, _ := eventstore.PersistedDAGRunEventTypeForStatus(status.Status)
+	snapshot := cloneNotificationStatus(status)
 
 	event := NotificationEvent{
 		Key:        NotificationSeenKey(status),
-		Status:     cloneNotificationStatus(status),
+		Kind:       eventstore.KindDAGRun,
+		Type:       eventType,
+		Status:     snapshot,
+		DAGRun:     snapshot,
 		ObservedAt: time.Now().UTC(),
 	}
 	return m.enqueueEvents(context.Background(), nil, []NotificationEvent{event})
@@ -354,7 +359,7 @@ func (m *NotificationMonitor) pollSource(ctx context.Context) {
 		if event == nil {
 			continue
 		}
-		status, err := eventstore.NotificationStatusFromEvent(event)
+		notification, err := NotificationEventFromStoredEvent(event)
 		if err != nil {
 			m.logger.Warn("Failed to decode notification event payload",
 				slog.String("event_id", event.ID),
@@ -362,15 +367,7 @@ func (m *NotificationMonitor) pollSource(ctx context.Context) {
 			)
 			continue
 		}
-		observedAt := event.RecordedAt
-		if observedAt.IsZero() {
-			observedAt = time.Now().UTC()
-		}
-		pending = append(pending, NotificationEvent{
-			Key:        NotificationSeenKey(status),
-			Status:     status,
-			ObservedAt: observedAt.UTC(),
-		})
+		pending = append(pending, notification)
 	}
 
 	queued, committed := m.commitSourceProgress(ctx, destinations, nextCursor, pending)
@@ -464,7 +461,7 @@ func (m *NotificationMonitor) requeuePending(destinations []string) {
 			continue
 		}
 		for _, event := range destState.Pending {
-			if event.Status == nil || event.Key == "" {
+			if event.Key == "" {
 				continue
 			}
 			queued = append(queued, queuedNotification{
@@ -768,7 +765,7 @@ func (m *NotificationMonitor) acquireNotificationLock(ctx context.Context) bool 
 			continue
 		}
 
-		m.logger.Info("Acquired notification lock; DAG run notifications are active",
+		m.logger.Info("Acquired notification lock; notifications are active",
 			slog.String("lock_dir", m.lockDir),
 		)
 		return true
@@ -999,11 +996,7 @@ func cloneNotificationMonitorState(state notificationMonitorState) notificationM
 		}
 		pending := make(map[string]NotificationEvent, len(destState.Pending))
 		for key, event := range destState.Pending {
-			pending[key] = NotificationEvent{
-				Key:        event.Key,
-				Status:     cloneNotificationStatus(event.Status),
-				ObservedAt: event.ObservedAt,
-			}
+			pending[key] = cloneNotificationEvent(event)
 		}
 		clone.Destinations[destination] = &notificationDestinationState{
 			Pending:   pending,
@@ -1089,7 +1082,7 @@ func enqueueNotifications(state *notificationMonitorState, destinations []string
 	for _, destination := range destinations {
 		destState := destinationState(state, destination)
 		for _, event := range events {
-			if event.Status == nil || event.Key == "" {
+			if event.Key == "" {
 				continue
 			}
 			if _, ok := destState.Delivered[event.Key]; ok {
@@ -1104,22 +1097,18 @@ func enqueueNotifications(state *notificationMonitorState, destinations []string
 				continue
 			}
 
-			runKey := NotificationRunKey(event.Status)
+			groupKey := NotificationGroupKey(event)
+			if groupKey == "" {
+				continue
+			}
 			for pendingKey, pending := range destState.Pending {
-				if pending.Status == nil {
-					continue
-				}
-				if NotificationRunKey(pending.Status) != runKey || pendingKey == event.Key {
+				if NotificationGroupKey(pending) != groupKey || pendingKey == event.Key {
 					continue
 				}
 				delete(destState.Pending, pendingKey)
 			}
 
-			destState.Pending[event.Key] = NotificationEvent{
-				Key:        event.Key,
-				Status:     cloneNotificationStatus(event.Status),
-				ObservedAt: event.ObservedAt,
-			}
+			destState.Pending[event.Key] = cloneNotificationEvent(event)
 			queued = append(queued, queuedNotification{
 				destination: destination,
 				event:       event,

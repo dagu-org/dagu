@@ -186,6 +186,43 @@ func TestStoreQueryReadsLargeCommittedEventLine(t *testing.T) {
 	assert.Empty(t, result.NextCursor)
 }
 
+func TestStoreQueryFiltersByAutomataName(t *testing.T) {
+	t.Parallel()
+
+	store, err := New(t.TempDir())
+	require.NoError(t, err)
+
+	automataEvent := &eventstore.Event{
+		ID:              "evt-automata-1",
+		SchemaVersion:   eventstore.SchemaVersion,
+		OccurredAt:      time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+		RecordedAt:      time.Date(2026, 4, 1, 10, 0, 1, 0, time.UTC),
+		Kind:            eventstore.KindAutomata,
+		Type:            eventstore.TypeAutomataError,
+		SourceService:   eventstore.SourceServiceScheduler,
+		AutomataName:    "service_ops",
+		AutomataKind:    "service",
+		AutomataCycleID: "cycle-1",
+		Status:          "running",
+	}
+	otherEvent := *automataEvent
+	otherEvent.ID = "evt-automata-2"
+	otherEvent.AutomataName = "workflow_ops"
+
+	writeCommittedEvents(t, store.baseDir, automataEvent.OccurredAt, [][]byte{
+		mustMarshalEvent(t, automataEvent),
+		mustMarshalEvent(t, &otherEvent),
+	})
+
+	result, err := store.Query(context.Background(), eventstore.QueryFilter{
+		Kind:         eventstore.KindAutomata,
+		AutomataName: "service_ops",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Entries, 1)
+	assert.Equal(t, "evt-automata-1", result.Entries[0].ID)
+}
+
 func TestStoreQueryRejectsInvalidCursor(t *testing.T) {
 	t.Parallel()
 

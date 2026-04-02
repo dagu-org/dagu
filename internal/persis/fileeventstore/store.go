@@ -376,6 +376,15 @@ func matchesFilter(event *eventstore.Event, filter eventstore.QueryFilter) bool 
 	if filter.AttemptID != "" && event.AttemptID != filter.AttemptID {
 		return false
 	}
+	if filter.AutomataName != "" && event.AutomataName != filter.AutomataName {
+		return false
+	}
+	if filter.AutomataKind != "" && event.AutomataKind != filter.AutomataKind {
+		return false
+	}
+	if filter.AutomataCycleID != "" && event.AutomataCycleID != filter.AutomataCycleID {
+		return false
+	}
 	if filter.SessionID != "" && event.SessionID != filter.SessionID {
 		return false
 	}

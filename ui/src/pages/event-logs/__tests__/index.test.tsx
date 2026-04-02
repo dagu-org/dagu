@@ -173,7 +173,7 @@ describe('EventLogsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('queries event logs with a fixed dag_run kind and the selected remote node', async () => {
+  it('queries event logs with the selected remote node and cursor pagination defaults', async () => {
     const calls: QueryCall[] = [];
     useQueryMock.mockImplementation((path, init) => {
       calls.push({ path, init });
@@ -190,7 +190,6 @@ describe('EventLogsPage', () => {
           params: {
             query: expect.objectContaining({
               remoteNode: 'remote-a',
-              kind: 'dag_run',
               paginationMode: 'cursor',
               limit: 50,
             }),
@@ -425,7 +424,6 @@ describe('EventLogsPage', () => {
         params: {
           query: expect.objectContaining({
             remoteNode: 'remote-a',
-            kind: 'dag_run',
             limit: 50,
             paginationMode: 'cursor',
             cursor: 'cursor-1',
@@ -434,6 +432,6 @@ describe('EventLogsPage', () => {
       });
     });
 
-    expect(await screen.findByText('run-2')).toBeInTheDocument();
+    expect(await screen.findByText('run-2 / attempt-2')).toBeInTheDocument();
   });
 });

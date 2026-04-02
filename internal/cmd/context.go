@@ -589,6 +589,11 @@ func (c *Context) newSchedulerAutomataService(
 		automata.WithSoulStore(soulStore),
 		automata.WithCoordinatorClient(coordinatorCli),
 		automata.WithSubCmdBuilder(runtime.NewSubCmdBuilder(c.Config)),
+		automata.WithEventService(c.EventService),
+		automata.WithEventSource(eventstore.Source{
+			Service:  eventstore.SourceServiceScheduler,
+			Instance: c.EventSourceInstance,
+		}),
 		automata.WithLogger(slog.Default()),
 	), nil
 }

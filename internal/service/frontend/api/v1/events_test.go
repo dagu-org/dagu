@@ -46,6 +46,19 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 						"reason": "boom",
 					},
 				},
+				{
+					ID:              "evt-2",
+					SchemaVersion:   eventstore.SchemaVersion,
+					OccurredAt:      startTime.Add(3 * time.Hour),
+					RecordedAt:      startTime.Add(3*time.Hour + time.Minute),
+					Kind:            eventstore.KindAutomata,
+					Type:            eventstore.TypeAutomataNeedsInput,
+					SourceService:   eventstore.SourceServiceScheduler,
+					AutomataName:    "service_ops",
+					AutomataKind:    "service",
+					AutomataCycleID: "cycle-1",
+					Status:          "waiting",
+				},
 			},
 			NextCursor: "cursor-1",
 		},
@@ -108,13 +121,19 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 
 	okResp, ok := resp.(apigen.ListEventLogs200JSONResponse)
 	require.True(t, ok)
-	require.Len(t, okResp.Entries, 1)
+	require.Len(t, okResp.Entries, 2)
 	require.NotNil(t, okResp.NextCursor)
 	assert.Equal(t, "cursor-1", *okResp.NextCursor)
 	assert.Equal(t, "evt-1", okResp.Entries[0].Id)
 	assert.Equal(t, "dag.run.failed", okResp.Entries[0].Type)
 	require.NotNil(t, okResp.Entries[0].Data)
 	assert.Equal(t, "boom", (*okResp.Entries[0].Data)["reason"])
+	require.NotNil(t, okResp.Entries[1].AutomataName)
+	assert.Equal(t, "service_ops", *okResp.Entries[1].AutomataName)
+	require.NotNil(t, okResp.Entries[1].AutomataKind)
+	assert.Equal(t, "service", *okResp.Entries[1].AutomataKind)
+	require.NotNil(t, okResp.Entries[1].AutomataCycleId)
+	assert.Equal(t, "cycle-1", *okResp.Entries[1].AutomataCycleId)
 	assert.Nil(t, okResp.Total)
 }
 
@@ -152,6 +171,42 @@ func TestListEventLogsSupportsOffsetCompatibilityPagination(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, okResp.Total)
 	assert.Equal(t, total, *okResp.Total)
+}
+
+func TestListEventLogsBuildsAutomataFilter(t *testing.T) {
+	t.Parallel()
+
+	store := &mockEventStore{
+		result: &eventstore.QueryResult{Entries: []*eventstore.Event{}},
+	}
+	api := frontendapi.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		frontendapi.WithEventService(eventstore.New(store)),
+	)
+
+	kind := "automata"
+	eventType := "automata.error"
+	automataName := "service_ops"
+	resp, err := api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{
+		Params: apigen.ListEventLogsParams{
+			Kind:         &kind,
+			Type:         &eventType,
+			AutomataName: &automataName,
+		},
+	})
+	require.NoError(t, err)
+	_, ok := resp.(apigen.ListEventLogs200JSONResponse)
+	require.True(t, ok)
+	assert.Equal(t, eventstore.QueryFilter{
+		Kind:           eventstore.KindAutomata,
+		Type:           eventstore.TypeAutomataError,
+		AutomataName:   automataName,
+		Limit:          50,
+		PaginationMode: eventstore.QueryPaginationModeOffset,
+	}, store.lastFilter)
 }
 
 func TestListEventLogsReturnsServiceUnavailableWithoutStore(t *testing.T) {
