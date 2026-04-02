@@ -1543,6 +1543,173 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /search/dags:
+    get:
+      summary: "Search DAGs"
+      description: "Returns cursor-based, lightweight DAG search results for the global search page."
+      operationId: "searchDAGFeed"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchLimit"
+      responses:
+        "200":
+          description: "Cursor-based DAG search results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DAGSearchFeedResponse"
+        "400":
+          description: "Invalid search request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /search/docs:
+    get:
+      summary: "Search documents"
+      description: "Returns cursor-based, lightweight document search results for the global search page."
+      operationId: "searchDocFeed"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchLimit"
+      responses:
+        "200":
+          description: "Cursor-based document search results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocSearchFeedResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /search/dags/{fileName}/matches:
+    get:
+      summary: "Search DAG match snippets"
+      description: "Returns cursor-based snippets for one matching DAG definition."
+      operationId: "searchDagMatches"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/DAGFileName"
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchMatchLimit"
+      responses:
+        "200":
+          description: "Cursor-based DAG match snippets"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchMatchesResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /search/docs/matches:
+    get:
+      summary: "Search document match snippets"
+      description: "Returns cursor-based snippets for one matching document."
+      operationId: "searchDocMatches"
+      tags:
+        - "search"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - name: "path"
+          in: "query"
+          description: "Document path (may include slashes for nested docs)"
+          required: true
+          schema:
+            $ref: "#/components/schemas/DocPath"
+        - name: "q"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+          description: "A search query string"
+        - $ref: "#/components/parameters/SearchCursor"
+        - $ref: "#/components/parameters/SearchMatchLimit"
+      responses:
+        "200":
+          description: "Cursor-based document match snippets"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchMatchesResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/tags:
     get:
       summary: "List all available DAG tags"
@@ -3525,7 +3692,9 @@ paths:
         - $ref: "#/components/parameters/LogStartTime"
         - $ref: "#/components/parameters/LogEndTime"
         - $ref: "#/components/parameters/EventLogLimit"
+        - $ref: "#/components/parameters/EventLogPaginationMode"
         - $ref: "#/components/parameters/LogOffset"
+        - $ref: "#/components/parameters/EventLogCursor"
       responses:
         "200":
           description: "List of event log entries"
@@ -3533,6 +3702,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EventLogsResponse"
+        "400":
+          description: "Malformed cursor or invalid pagination parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           description: "Not authenticated"
           content:
@@ -7276,6 +7451,36 @@ components:
         maximum: 1000
         default: 50
 
+    SearchCursor:
+      name: cursor
+      in: query
+      description: "Opaque cursor returned by the previous search response"
+      required: false
+      schema:
+        type: string
+
+    SearchLimit:
+      name: limit
+      in: query
+      description: "Number of search results to return (default 20, max 50)"
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+
+    SearchMatchLimit:
+      name: limit
+      in: query
+      description: "Number of search match snippets to return (default 5, max 50)"
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 5
+
     DAGFileName:
       name: fileName
       in: path
@@ -7348,6 +7553,26 @@ components:
         default: 50
         minimum: 1
         maximum: 500
+
+    EventLogCursor:
+      name: cursor
+      in: query
+      description: "Opaque cursor for loading older event log entries"
+      required: false
+      schema:
+        type: string
+
+    EventLogPaginationMode:
+      name: paginationMode
+      in: query
+      description: "Pagination mode. Use `cursor` for the event feed infinite-loading flow; omit or use `offset` for compatibility pagination."
+      required: false
+      schema:
+        type: string
+        enum:
+          - offset
+          - cursor
+        default: offset
 
     LogOffset:
       name: offset
@@ -7622,10 +7847,12 @@ components:
           description: "List of event log entries"
         total:
           type: integer
-          description: "Total number of entries matching the filter (before pagination)"
+          description: "Total number of entries matching the filter when using compatibility offset pagination"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of older entries when using cursor pagination"
       required:
         - entries
-        - total
 
     ApproveStepRequest:
       type: object
@@ -8958,15 +9185,99 @@ components:
           type: array
           description: "Details of where matches were found"
           items:
-            $ref: "#/components/schemas/SearchDAGsMatchItem"
+            $ref: "#/components/schemas/SearchMatchItem"
       required:
         - name
         - dag
         - matches
 
-    SearchDAGsMatchItem:
+    DAGSearchPageItem:
       type: object
-      description: "Details of a search match within a DAG definition"
+      description: "Lightweight cursor-based search result item for a DAG"
+      properties:
+        fileName:
+          type: string
+          description: "DAG file name without extension"
+        name:
+          type: string
+          description: "Display label for the DAG result; file-backed search currently mirrors fileName"
+        hasMoreMatches:
+          type: boolean
+          description: "Whether additional snippets are available beyond the preview"
+        nextMatchesCursor:
+          type: string
+          description: "Opaque cursor for loading more snippets for this DAG result"
+        matches:
+          type: array
+          description: "Preview snippets for the result"
+          items:
+            $ref: "#/components/schemas/SearchMatchItem"
+      required:
+        - fileName
+        - name
+        - hasMoreMatches
+        - matches
+
+    DAGSearchFeedResponse:
+      type: object
+      description: "Cursor-based DAG search results"
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DAGSearchPageItem"
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
+      required:
+        - results
+        - hasMore
+
+    DocSearchPageItem:
+      type: object
+      description: "Lightweight cursor-based search result item for a document"
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        hasMoreMatches:
+          type: boolean
+          description: "Whether additional snippets are available beyond the preview"
+        nextMatchesCursor:
+          type: string
+          description: "Opaque cursor for loading more snippets for this document result"
+        matches:
+          type: array
+          description: "Preview snippets for the result"
+          items:
+            $ref: "#/components/schemas/SearchMatchItem"
+      required:
+        - id
+        - title
+        - hasMoreMatches
+        - matches
+
+    DocSearchFeedResponse:
+      type: object
+      description: "Cursor-based document search results"
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocSearchPageItem"
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
+      required:
+        - results
+        - hasMore
+
+    SearchMatchItem:
+      type: object
+      description: "Details of a search match within a search result"
       properties:
         line:
           type: string
@@ -8981,6 +9292,22 @@ components:
         - line
         - lineNumber
         - startLine
+
+    SearchMatchesResponse:
+      type: object
+      description: "Cursor-based search match snippets"
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchMatchItem"
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
+      required:
+        - matches
+        - hasMore
 
     Log:
       type: object
@@ -10640,7 +10967,7 @@ components:
         matches:
           type: array
           items:
-            $ref: "#/components/schemas/SearchDAGsMatchItem"
+            $ref: "#/components/schemas/SearchMatchItem"
 
     DocSearchResponse:
       type: object

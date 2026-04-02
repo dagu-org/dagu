@@ -72,11 +72,28 @@ type ListDocsOptions struct {
 	Order   DocSortOrder
 }
 
+// SearchDocsOptions configures a paginated document search query.
+type SearchDocsOptions struct {
+	Cursor     string
+	Limit      int
+	Query      string
+	MatchLimit int
+}
+
+// SearchDocMatchesOptions configures cursor-based snippet loading for one document.
+type SearchDocMatchesOptions struct {
+	Cursor string
+	Limit  int
+	Query  string
+}
+
 // DocSearchResult holds a doc ID/title and its grep matches.
 type DocSearchResult struct {
-	ID      string        `json:"id"`
-	Title   string        `json:"title"`
-	Matches []*exec.Match `json:"matches"`
+	ID                string        `json:"id"`
+	Title             string        `json:"title"`
+	Matches           []*exec.Match `json:"matches"`
+	HasMoreMatches    bool          `json:"hasMoreMatches"`
+	NextMatchesCursor string        `json:"nextMatchesCursor,omitempty"`
 }
 
 // DeleteError represents a single item failure in a batch delete operation.
@@ -96,6 +113,8 @@ type DocStore interface {
 	DeleteBatch(ctx context.Context, ids []string) (deleted []string, failed []DeleteError, err error)
 	Rename(ctx context.Context, oldID, newID string) error
 	Search(ctx context.Context, query string) ([]*DocSearchResult, error)
+	SearchCursor(ctx context.Context, opts SearchDocsOptions) (*exec.CursorResult[DocSearchResult], error)
+	SearchMatches(ctx context.Context, id string, opts SearchDocMatchesOptions) (*exec.CursorResult[*exec.Match], error)
 }
 
 // validDocIDRegexp matches a valid doc ID: segments separated by slashes.

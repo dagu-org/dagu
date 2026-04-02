@@ -10,8 +10,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
@@ -21,6 +21,8 @@ import (
 )
 
 const SchemaVersion = 1
+
+var ErrInvalidQueryCursor = errors.New("eventstore: invalid query cursor")
 
 type EventKind string
 
@@ -132,25 +134,35 @@ func (e *Event) Validate() error {
 }
 
 type QueryFilter struct {
-	Kind      EventKind
-	Type      EventType
-	DAGName   string
-	DAGRunID  string
-	AttemptID string
-	SessionID string
-	UserID    string
-	Model     string
-	Status    string
-	StartTime time.Time
-	EndTime   time.Time
-	Limit     int
-	Offset    int
+	Kind           EventKind
+	Type           EventType
+	DAGName        string
+	DAGRunID       string
+	AttemptID      string
+	SessionID      string
+	UserID         string
+	Model          string
+	Status         string
+	StartTime      time.Time
+	EndTime        time.Time
+	Limit          int
+	Offset         int
+	Cursor         string
+	PaginationMode QueryPaginationMode
 }
 
 type QueryResult struct {
-	Entries []*Event
-	Total   int
+	Entries    []*Event
+	Total      *int
+	NextCursor string
 }
+
+type QueryPaginationMode string
+
+const (
+	QueryPaginationModeOffset QueryPaginationMode = "offset"
+	QueryPaginationModeCursor QueryPaginationMode = "cursor"
+)
 
 type Store interface {
 	Emit(ctx context.Context, event *Event) error
@@ -205,6 +217,13 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 		return nil
 	}
 	source = normalizeSource(source)
+	data = cloneData(data)
+	if snapshot := newNotificationStatusSnapshot(status); snapshot != nil {
+		if data == nil {
+			data = make(map[string]any, 1)
+		}
+		data[notificationStatusSnapshotDataKey] = snapshot
+	}
 	event := &Event{
 		ID:             DAGRunEventID(eventType, status.Name, status.DAGRunID, status.AttemptID),
 		SchemaVersion:  SchemaVersion,
@@ -218,7 +237,7 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 		DAGRunID:       status.DAGRunID,
 		AttemptID:      status.AttemptID,
 		Status:         status.Status.String(),
-		Data:           cloneData(data),
+		Data:           data,
 	}
 	event.Normalize()
 	return event
@@ -339,6 +358,76 @@ func cloneData(data map[string]any) map[string]any {
 		return nil
 	}
 	cloned := make(map[string]any, len(data))
-	maps.Copy(cloned, data)
+	for key, value := range data {
+		cloned[key] = cloneDataValue(value)
+	}
 	return cloned
+}
+
+func cloneDataValue(value any) any {
+	if value == nil {
+		return nil
+	}
+
+	switch v := value.(type) {
+	case map[string]any:
+		return cloneData(v)
+	case []any:
+		cloned := make([]any, len(v))
+		for i, item := range v {
+			cloned[i] = cloneDataValue(item)
+		}
+		return cloned
+	}
+
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() { //nolint:exhaustive // non-container kinds are returned as-is below
+	case reflect.Map:
+		if rv.IsNil() {
+			return value
+		}
+		cloned := reflect.MakeMapWithSize(rv.Type(), rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			clonedValue := cloneDataValue(iter.Value().Interface())
+			if clonedValue == nil {
+				cloned.SetMapIndex(iter.Key(), reflect.Zero(rv.Type().Elem()))
+				continue
+			}
+			valueRV := reflect.ValueOf(clonedValue)
+			if !valueRV.Type().AssignableTo(rv.Type().Elem()) {
+				if valueRV.Type().ConvertibleTo(rv.Type().Elem()) {
+					valueRV = valueRV.Convert(rv.Type().Elem())
+				} else {
+					valueRV = iter.Value()
+				}
+			}
+			cloned.SetMapIndex(iter.Key(), valueRV)
+		}
+		return cloned.Interface()
+	case reflect.Slice:
+		if rv.IsNil() {
+			return value
+		}
+		cloned := reflect.MakeSlice(rv.Type(), rv.Len(), rv.Len())
+		for i := range rv.Len() {
+			item := cloneDataValue(rv.Index(i).Interface())
+			if item == nil {
+				cloned.Index(i).SetZero()
+				continue
+			}
+			itemRV := reflect.ValueOf(item)
+			if !itemRV.Type().AssignableTo(rv.Type().Elem()) {
+				if itemRV.Type().ConvertibleTo(rv.Type().Elem()) {
+					itemRV = itemRV.Convert(rv.Type().Elem())
+				} else {
+					itemRV = rv.Index(i)
+				}
+			}
+			cloned.Index(i).Set(itemRV)
+		}
+		return cloned.Interface()
+	default:
+		return value
+	}
 }

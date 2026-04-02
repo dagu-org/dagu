@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -168,10 +169,11 @@ func runStartAll(ctx *Context, _ []string) error {
 		case config.BotProviderTelegram:
 			tgBot, err = telegram.New(
 				telegram.Config{
-					Token:          ctx.Config.Bots.Telegram.Token,
-					AllowedChatIDs: ctx.Config.Bots.Telegram.AllowedChatIDs,
-					SafeMode:       ctx.Config.Bots.SafeMode,
-					DAGRunStore:    ctx.DAGRunStore,
+					Token:                 ctx.Config.Bots.Telegram.Token,
+					AllowedChatIDs:        ctx.Config.Bots.Telegram.AllowedChatIDs,
+					SafeMode:              ctx.Config.Bots.SafeMode,
+					EventService:          ctx.EventService,
+					NotificationStateFile: filepath.Join(ctx.Config.Paths.DataDir, "bots", "telegram", "notifications.json"),
 				},
 				agentAPI,
 				slog.Default(),
@@ -185,12 +187,13 @@ func runStartAll(ctx *Context, _ []string) error {
 		case config.BotProviderSlack:
 			slackBot, err = daguslack.New(
 				daguslack.Config{
-					BotToken:          ctx.Config.Bots.Slack.BotToken,
-					AppToken:          ctx.Config.Bots.Slack.AppToken,
-					AllowedChannelIDs: ctx.Config.Bots.Slack.AllowedChannelIDs,
-					RespondToAll:      ctx.Config.Bots.Slack.RespondToAll,
-					SafeMode:          ctx.Config.Bots.SafeMode,
-					DAGRunStore:       ctx.DAGRunStore,
+					BotToken:              ctx.Config.Bots.Slack.BotToken,
+					AppToken:              ctx.Config.Bots.Slack.AppToken,
+					AllowedChannelIDs:     ctx.Config.Bots.Slack.AllowedChannelIDs,
+					RespondToAll:          ctx.Config.Bots.Slack.RespondToAll,
+					SafeMode:              ctx.Config.Bots.SafeMode,
+					EventService:          ctx.EventService,
+					NotificationStateFile: filepath.Join(ctx.Config.Paths.DataDir, "bots", "slack", "notifications.json"),
 				},
 				agentAPI,
 				slog.Default(),

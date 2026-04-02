@@ -5,9 +5,11 @@ package filedoc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -26,8 +28,9 @@ import (
 var _ agent.DocStore = (*Store)(nil)
 
 const (
-	docDirPermissions = 0750
-	filePermissions   = 0600
+	docDirPermissions      = 0750
+	filePermissions        = 0600
+	docSearchCursorVersion = 1
 )
 
 // docFrontmatter holds the YAML fields in the doc file frontmatter.
@@ -606,6 +609,261 @@ func (s *Store) Search(ctx context.Context, query string) ([]*agent.DocSearchRes
 	})
 
 	return results, nil
+}
+
+func docSearchPattern(query string) string {
+	return fmt.Sprintf("(?i)%s", regexp.QuoteMeta(query))
+}
+
+type docSearchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id,omitempty"`
+}
+
+type docMatchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id"`
+	Offset  int    `json:"offset"`
+}
+
+type docSearchCandidate struct {
+	ID      string
+	RelPath string
+	AbsPath string
+}
+
+func (s *Store) ensureSearchBaseDir() error {
+	info, err := os.Stat(s.baseDir)
+	if err != nil {
+		return fmt.Errorf("filedoc: failed to access docs directory %s: %w", s.baseDir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("filedoc: docs directory %s is not a directory", s.baseDir)
+	}
+	if _, err := os.ReadDir(s.baseDir); err != nil {
+		return fmt.Errorf("filedoc: failed to read docs directory %s: %w", s.baseDir, err)
+	}
+	return nil
+}
+
+func (s *Store) listSearchCandidates(ctx context.Context) ([]docSearchCandidate, error) {
+	candidates := make([]docSearchCandidate, 0)
+	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			logger.Warn(ctx, "Skipping unreadable doc search entry", tag.File(path), tag.Error(err))
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if d.IsDir() || filepath.Ext(path) != ".md" {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(s.baseDir, path)
+		if err != nil {
+			logger.Warn(ctx, "Skipping doc with invalid relative path", tag.File(path), tag.Error(err))
+			return nil
+		}
+		id := strings.TrimSuffix(filepath.ToSlash(relPath), ".md")
+		if err := agent.ValidateDocID(id); err != nil {
+			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
+			return nil
+		}
+
+		candidates = append(candidates, docSearchCandidate{
+			ID:      id,
+			RelPath: filepath.ToSlash(relPath),
+			AbsPath: path,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("filedoc: failed to list searchable docs: %w", err)
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].ID < candidates[j].ID
+	})
+	return candidates, nil
+}
+
+func decodeDocSearchCursor(raw, query string) (docSearchCursor, error) {
+	if raw == "" {
+		return docSearchCursor{}, nil
+	}
+	var cursor docSearchCursor
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
+		return docSearchCursor{}, err
+	}
+	if cursor.Version != docSearchCursorVersion || cursor.Query != query {
+		return docSearchCursor{}, exec.ErrInvalidCursor
+	}
+	return cursor, nil
+}
+
+func decodeDocMatchCursor(raw, query, id string) (docMatchCursor, error) {
+	if raw == "" {
+		return docMatchCursor{ID: id}, nil
+	}
+	var cursor docMatchCursor
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
+		return docMatchCursor{}, err
+	}
+	if cursor.Version != docSearchCursorVersion || cursor.Query != query || cursor.ID != id || cursor.Offset < 0 {
+		return docMatchCursor{}, exec.ErrInvalidCursor
+	}
+	return cursor, nil
+}
+
+// SearchCursor returns lightweight, cursor-based document search hits.
+func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) (*exec.CursorResult[agent.DocSearchResult], error) {
+	if opts.Query == "" {
+		return &exec.CursorResult[agent.DocSearchResult]{Items: []agent.DocSearchResult{}}, nil
+	}
+	if err := s.ensureSearchBaseDir(); err != nil {
+		return nil, err
+	}
+
+	cursor, err := decodeDocSearchCursor(opts.Cursor, opts.Query)
+	if err != nil {
+		return nil, err
+	}
+
+	limit := max(opts.Limit, 1)
+	matchLimit := max(opts.MatchLimit, 1)
+	results := make([]agent.DocSearchResult, 0, limit)
+	pattern := docSearchPattern(opts.Query)
+	var hasMore bool
+	var nextCursor string
+
+	candidates, err := s.listSearchCandidates(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, candidate := range candidates {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if cursor.ID != "" && candidate.ID <= cursor.ID {
+			continue
+		}
+
+		data, err := os.ReadFile(candidate.AbsPath) //nolint:gosec // path constructed from baseDir
+		if err != nil {
+			logger.Warn(ctx, "Failed to read doc while searching", tag.File(candidate.RelPath), tag.Error(err))
+			continue
+		}
+
+		window, err := grep.GrepWindow(data, pattern, grep.GrepOptions{
+			IsRegexp: true,
+			Before:   grep.DefaultGrepOptions.Before,
+			After:    grep.DefaultGrepOptions.After,
+			Limit:    matchLimit,
+		})
+		if err != nil {
+			if errors.Is(err, grep.ErrNoMatch) {
+				continue
+			}
+			logger.Warn(ctx, "Failed to search doc", tag.File(candidate.RelPath), tag.Error(err))
+			continue
+		}
+
+		if len(results) == limit {
+			hasMore = true
+			nextCursor = exec.EncodeSearchCursor(docSearchCursor{
+				Version: docSearchCursorVersion,
+				Query:   opts.Query,
+				ID:      results[len(results)-1].ID,
+			})
+			break
+		}
+
+		doc, parseErr := parseDocFile(data, candidate.ID)
+		title := candidate.ID
+		if parseErr == nil {
+			title = doc.Title
+		}
+		item := agent.DocSearchResult{
+			ID:             candidate.ID,
+			Title:          title,
+			Matches:        window.Matches,
+			HasMoreMatches: window.HasMore,
+		}
+		if window.HasMore {
+			item.NextMatchesCursor = exec.EncodeSearchCursor(docMatchCursor{
+				Version: docSearchCursorVersion,
+				Query:   opts.Query,
+				ID:      candidate.ID,
+				Offset:  window.NextOffset,
+			})
+		}
+		results = append(results, item)
+	}
+
+	return &exec.CursorResult[agent.DocSearchResult]{
+		Items:      results,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+// SearchMatches returns cursor-based snippets for one document.
+func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.CursorResult[*exec.Match], error) {
+	if err := agent.ValidateDocID(id); err != nil {
+		return nil, err
+	}
+	if opts.Query == "" {
+		return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+	}
+
+	cursor, err := decodeDocMatchCursor(opts.Cursor, opts.Query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	path, err := s.docFilePath(id)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path) //nolint:gosec // validated path within baseDir
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, agent.ErrDocNotFound
+		}
+		return nil, err
+	}
+
+	window, err := grep.GrepWindow(data, docSearchPattern(opts.Query), grep.GrepOptions{
+		IsRegexp: true,
+		Before:   grep.DefaultGrepOptions.Before,
+		After:    grep.DefaultGrepOptions.After,
+		Offset:   cursor.Offset,
+		Limit:    max(opts.Limit, 1),
+	})
+	if err != nil {
+		if errors.Is(err, grep.ErrNoMatch) {
+			return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+		}
+		return nil, err
+	}
+
+	result := &exec.CursorResult[*exec.Match]{
+		Items:   window.Matches,
+		HasMore: window.HasMore,
+	}
+	if window.HasMore {
+		result.NextCursor = exec.EncodeSearchCursor(docMatchCursor{
+			Version: docSearchCursorVersion,
+			Query:   opts.Query,
+			ID:      id,
+			Offset:  window.NextOffset,
+		})
+	}
+	return result, nil
 }
 
 // normalizeSortParams returns validated sort field and order with defaults.

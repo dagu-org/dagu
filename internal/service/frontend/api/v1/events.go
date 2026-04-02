@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"net/http"
 
@@ -64,6 +65,25 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 	if request.Params.Offset != nil {
 		filter.Offset = *request.Params.Offset
 	}
+	if request.Params.Cursor != nil {
+		filter.Cursor = *request.Params.Cursor
+	}
+	if request.Params.PaginationMode != nil {
+		filter.PaginationMode = eventstore.QueryPaginationMode(*request.Params.PaginationMode)
+	}
+	if filter.Cursor != "" {
+		filter.PaginationMode = eventstore.QueryPaginationModeCursor
+	}
+	if filter.PaginationMode == "" {
+		filter.PaginationMode = eventstore.QueryPaginationModeOffset
+	}
+	if filter.PaginationMode == eventstore.QueryPaginationModeCursor && request.Params.Offset != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "offset cannot be combined with cursor pagination",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
 
 	const (
 		defaultLimit = 50
@@ -74,12 +94,15 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 	} else if filter.Limit > maxLimit {
 		filter.Limit = maxLimit
 	}
-	if filter.Offset < 0 {
-		filter.Offset = 0
-	}
-
 	result, err := a.eventService.Query(ctx, filter)
 	if err != nil {
+		if errors.Is(err, eventstore.ErrInvalidQueryCursor) {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    err.Error(),
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
 		return nil, &Error{
 			Code:       api.ErrorCodeInternalError,
 			Message:    "Failed to query event logs",
@@ -136,8 +159,14 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 		entries = append(entries, entry)
 	}
 
-	return api.ListEventLogs200JSONResponse{
+	response := api.ListEventLogs200JSONResponse{
 		Entries: entries,
-		Total:   result.Total,
-	}, nil
+	}
+	if result.Total != nil {
+		response.Total = result.Total
+	}
+	if result.NextCursor != "" {
+		response.NextCursor = &result.NextCursor
+	}
+	return response, nil
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,8 +79,132 @@ func TestStableIDUsesCollisionSafeFraming(t *testing.T) {
 	)
 }
 
+func TestNewDAGRunEventEmbedsNotificationSnapshot(t *testing.T) {
+	t.Parallel()
+
+	status := &exec.DAGRunStatus{
+		Name:       "briefing",
+		DAGRunID:   "run-1",
+		AttemptID:  "attempt-1",
+		Status:     core.Failed,
+		Error:      "boom",
+		Log:        "/tmp/run.log",
+		QueuedAt:   "2026-04-01T09:00:00Z",
+		StartedAt:  "2026-04-01T09:01:00Z",
+		FinishedAt: "2026-04-01T09:02:00Z",
+		Nodes: []*exec.Node{
+			{
+				Step:   core.Step{Name: "fetch"},
+				Status: core.NodeFailed,
+				Error:  "node boom",
+			},
+		},
+		OnFailure: &exec.Node{
+			Step:  core.Step{Name: "notify"},
+			Error: "handler boom",
+		},
+	}
+
+	event := NewDAGRunEvent(Source{Service: SourceServiceServer, Instance: "test"}, TypeDAGRunFailed, status, map[string]any{"reason": "boom"})
+	require.NotNil(t, event)
+	require.NotNil(t, event.Data)
+	assert.Equal(t, "boom", event.Data["reason"])
+
+	restored, err := NotificationStatusFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, restored)
+	assert.Equal(t, status.Name, restored.Name)
+	assert.Equal(t, status.DAGRunID, restored.DAGRunID)
+	assert.Equal(t, status.AttemptID, restored.AttemptID)
+	assert.Equal(t, status.Status, restored.Status)
+	assert.Equal(t, status.Error, restored.Error)
+	assert.Equal(t, status.Log, restored.Log)
+	assert.Equal(t, status.StartedAt, restored.StartedAt)
+	assert.Equal(t, status.FinishedAt, restored.FinishedAt)
+	require.Len(t, restored.Nodes, 1)
+	assert.Equal(t, "fetch", restored.Nodes[0].Step.Name)
+	assert.Equal(t, core.NodeFailed, restored.Nodes[0].Status)
+	assert.Equal(t, "node boom", restored.Nodes[0].Error)
+	require.NotNil(t, restored.OnFailure)
+	assert.Equal(t, "notify", restored.OnFailure.Step.Name)
+	assert.Equal(t, "handler boom", restored.OnFailure.Error)
+}
+
+func TestNewDAGRunEventDeepClonesData(t *testing.T) {
+	t.Parallel()
+
+	status := &exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "attempt-1",
+		Status:    core.Failed,
+	}
+	nested := map[string]any{
+		"details": map[string]any{"reason": "boom"},
+		"steps": []any{
+			map[string]any{"name": "fetch"},
+		},
+	}
+
+	event := NewDAGRunEvent(Source{Service: SourceServiceServer}, TypeDAGRunFailed, status, nested)
+	require.NotNil(t, event)
+	require.NotNil(t, event.Data)
+
+	nestedDetails := nested["details"].(map[string]any)
+	nestedDetails["reason"] = "changed"
+	nestedSteps := nested["steps"].([]any)
+	nestedSteps[0].(map[string]any)["name"] = "mutated"
+
+	assert.Equal(t, "boom", event.Data["details"].(map[string]any)["reason"])
+	assert.Equal(t, "fetch", event.Data["steps"].([]any)[0].(map[string]any)["name"])
+}
+
+func TestNotificationStatusFromEventRejectsInvalidSnapshot(t *testing.T) {
+	t.Parallel()
+
+	status, err := NotificationStatusFromEvent(&Event{
+		ID:            "evt-1",
+		SchemaVersion: SchemaVersion,
+		OccurredAt:    time.Now().UTC(),
+		RecordedAt:    time.Now().UTC(),
+		Kind:          KindDAGRun,
+		Type:          TypeDAGRunFailed,
+		SourceService: SourceServiceServer,
+		Data: map[string]any{
+			notificationStatusSnapshotDataKey: map[string]any{},
+		},
+	})
+	require.Error(t, err)
+	assert.Nil(t, status)
+	assert.ErrorContains(t, err, "missing dag_run_id")
+}
+
+func TestNotificationServiceNormalizesCursorAtBoundary(t *testing.T) {
+	t.Parallel()
+
+	store := &captureStore{
+		notificationHeadCursor: NotificationCursor{},
+		notificationReadCursor: NotificationCursor{
+			LastInboxFile: "inbox-1",
+		},
+	}
+	service := New(store)
+
+	head, err := service.NotificationHeadCursor(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, head.CommittedOffsets)
+
+	_, nextCursor, err := service.ReadNotificationEvents(context.Background(), NotificationCursor{})
+	require.NoError(t, err)
+	require.NotNil(t, store.lastNotificationReadCursor.CommittedOffsets)
+	require.NotNil(t, nextCursor.CommittedOffsets)
+}
+
 type captureStore struct {
-	event *Event
+	event                      *Event
+	notificationHeadCursor     NotificationCursor
+	notificationReadCursor     NotificationCursor
+	lastNotificationReadCursor NotificationCursor
 }
 
 func (c *captureStore) Emit(_ context.Context, event *Event) error {
@@ -89,4 +214,13 @@ func (c *captureStore) Emit(_ context.Context, event *Event) error {
 
 func (*captureStore) Query(context.Context, QueryFilter) (*QueryResult, error) {
 	return nil, nil
+}
+
+func (c *captureStore) NotificationHeadCursor(context.Context) (NotificationCursor, error) {
+	return c.notificationHeadCursor, nil
+}
+
+func (c *captureStore) ReadNotificationEvents(_ context.Context, cursor NotificationCursor) ([]*Event, NotificationCursor, error) {
+	c.lastNotificationReadCursor = cursor
+	return nil, c.notificationReadCursor, nil
 }

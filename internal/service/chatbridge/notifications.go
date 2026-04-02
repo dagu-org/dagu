@@ -44,6 +44,7 @@ const (
 
 // NotificationEvent is a status snapshot buffered for delivery.
 type NotificationEvent struct {
+	Key        string
 	Status     *exec.DAGRunStatus
 	ObservedAt time.Time
 }
@@ -175,19 +176,26 @@ func (b *NotificationBatcher) DrainAndStop() []NotificationPendingBatch {
 }
 
 // Enqueue adds a status snapshot into the appropriate destination/window bucket.
-func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunStatus) bool {
-	if destination == "" || status == nil {
+func (b *NotificationBatcher) Enqueue(destination string, event NotificationEvent) bool {
+	if destination == "" || event.Status == nil || event.Key == "" {
 		return false
 	}
 
-	class, ok := NotificationClassForStatus(status.Status)
+	class, ok := NotificationClassForStatus(event.Status.Status)
 	if !ok {
 		return false
 	}
 
-	now := time.Now()
-	snapshot := cloneNotificationStatus(status)
-	runKey := NotificationRunKey(snapshot)
+	observedAt := event.ObservedAt
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+	}
+	snapshot := NotificationEvent{
+		Key:        event.Key,
+		Status:     cloneNotificationStatus(event.Status),
+		ObservedAt: observedAt,
+	}
+	runKey := NotificationRunKey(snapshot.Status)
 	destRunKey := notificationDestinationRunKey(destination, runKey)
 
 	b.mu.Lock()
@@ -200,7 +208,7 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 	if existingBucketKey, ok := b.runIndex[destRunKey]; ok {
 		if existingBucket := b.buckets[existingBucketKey]; existingBucket != nil {
 			if existingEvent, exists := existingBucket.events[runKey]; exists {
-				if existingEvent.Status.Status == snapshot.Status {
+				if existingEvent.Key == snapshot.Key {
 					return true
 				}
 				delete(existingBucket.events, runKey)
@@ -223,7 +231,7 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 			id:          b.nextBucketID,
 			destination: destination,
 			class:       class,
-			windowStart: now,
+			windowStart: observedAt,
 			events:      make(map[string]NotificationEvent),
 		}
 		b.buckets[bucketKey] = bucket
@@ -234,10 +242,7 @@ func (b *NotificationBatcher) Enqueue(destination string, status *exec.DAGRunSta
 		})
 	}
 
-	bucket.events[runKey] = NotificationEvent{
-		Status:     snapshot,
-		ObservedAt: now,
-	}
+	bucket.events[runKey] = snapshot
 	b.runIndex[destRunKey] = bucketKey
 	return true
 }
@@ -257,6 +262,64 @@ func (b *NotificationBatcher) TakeReady() []NotificationPendingBatch {
 	ready := append([]NotificationPendingBatch(nil), b.ready...)
 	b.ready = nil
 	return ready
+}
+
+// DiscardDestinations removes buffered and ready batches for destinations that
+// are no longer configured.
+func (b *NotificationBatcher) DiscardDestinations(destinations []string) {
+	if len(destinations) == 0 {
+		return
+	}
+
+	blocked := make(map[string]struct{}, len(destinations))
+	for _, destination := range destinations {
+		if destination == "" {
+			continue
+		}
+		blocked[destination] = struct{}{}
+	}
+	if len(blocked) == 0 {
+		return
+	}
+
+	b.mu.Lock()
+	if b.stopped {
+		b.mu.Unlock()
+		return
+	}
+
+	timers := make([]*time.Timer, 0)
+	for bucketKey, bucket := range b.buckets {
+		if bucket == nil {
+			continue
+		}
+		if _, ok := blocked[bucket.destination]; !ok {
+			continue
+		}
+		if bucket.timer != nil {
+			timers = append(timers, bucket.timer)
+		}
+		delete(b.buckets, bucketKey)
+		for runKey := range bucket.events {
+			delete(b.runIndex, notificationDestinationRunKey(bucket.destination, runKey))
+		}
+	}
+
+	if len(b.ready) > 0 {
+		filtered := make([]NotificationPendingBatch, 0, len(b.ready))
+		for _, pending := range b.ready {
+			if _, ok := blocked[pending.Destination]; ok {
+				continue
+			}
+			filtered = append(filtered, pending)
+		}
+		b.ready = filtered
+	}
+	b.mu.Unlock()
+
+	for _, timer := range timers {
+		timer.Stop()
+	}
 }
 
 func (b *NotificationBatcher) readyBucket(bucketKey string, bucketID uint64) {

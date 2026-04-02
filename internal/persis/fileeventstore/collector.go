@@ -131,6 +131,7 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 	}
 
 	var pendingByHour = make(map[string][]pendingInboxEvent)
+	queuedIDs := make(map[string]struct{})
 	processed := 0
 	for _, entry := range entries {
 		if processed >= c.batchSize {
@@ -154,8 +155,17 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 			}
 			continue
 		}
+		if _, ok := queuedIDs[pending.event.ID]; ok {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				slog.Warn("fileeventstore: failed to delete duplicate inbox file",
+					slog.String("file", path),
+					slog.String("error", err.Error()))
+			}
+			continue
+		}
 		hour := pending.event.OccurredAt.UTC().Format(hourFormat)
 		pendingByHour[hour] = append(pendingByHour[hour], pending)
+		queuedIDs[pending.event.ID] = struct{}{}
 	}
 
 	if len(pendingByHour) == 0 {

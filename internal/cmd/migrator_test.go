@@ -90,6 +90,14 @@ func (m *mockDAGStore) Grep(_ context.Context, _ string) ([]*exec.GrepDAGsResult
 	return nil, nil, nil
 }
 
+func (m *mockDAGStore) SearchCursor(_ context.Context, _ exec.SearchDAGsOptions) (*exec.CursorResult[exec.SearchDAGResult], []string, error) {
+	return &exec.CursorResult[exec.SearchDAGResult]{Items: []exec.SearchDAGResult{}}, nil, nil
+}
+
+func (m *mockDAGStore) SearchMatches(_ context.Context, _ string, _ exec.SearchDAGMatchesOptions) (*exec.CursorResult[*exec.Match], error) {
+	return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+}
+
 func (m *mockDAGStore) UpdateSpec(_ context.Context, _ string, _ []byte) error {
 	return nil
 }

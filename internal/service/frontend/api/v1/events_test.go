@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 					},
 				},
 			},
-			Total: 1,
+			NextCursor: "cursor-1",
 		},
 	}
 
@@ -67,49 +68,90 @@ func TestListEventLogsBuildsFilterAndMapsResponse(t *testing.T) {
 	userID := "user-1"
 	model := "gpt-test"
 	limit := 700
-	offset := -5
+	cursor := "cursor-0"
+	paginationMode := apigen.ListEventLogsParamsPaginationMode("cursor")
 
 	resp, err := api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{
 		Params: apigen.ListEventLogsParams{
-			Kind:      &kind,
-			Type:      &eventType,
-			DagName:   &dagName,
-			DagRunId:  &dagRunID,
-			AttemptId: &attemptID,
-			SessionId: &sessionID,
-			UserId:    &userID,
-			Model:     &model,
-			StartTime: &startTime,
-			EndTime:   &endTime,
-			Limit:     &limit,
-			Offset:    &offset,
+			Kind:           &kind,
+			Type:           &eventType,
+			DagName:        &dagName,
+			DagRunId:       &dagRunID,
+			AttemptId:      &attemptID,
+			SessionId:      &sessionID,
+			UserId:         &userID,
+			Model:          &model,
+			StartTime:      &startTime,
+			EndTime:        &endTime,
+			Limit:          &limit,
+			Cursor:         &cursor,
+			PaginationMode: &paginationMode,
 		},
 	})
 	require.NoError(t, err)
 
 	require.Equal(t, eventstore.QueryFilter{
-		Kind:      eventstore.KindDAGRun,
-		Type:      eventstore.TypeDAGRunFailed,
-		DAGName:   dagName,
-		DAGRunID:  dagRunID,
-		AttemptID: attemptID,
-		SessionID: sessionID,
-		UserID:    userID,
-		Model:     model,
-		StartTime: startTime,
-		EndTime:   endTime,
-		Limit:     500,
-		Offset:    0,
+		Kind:           eventstore.KindDAGRun,
+		Type:           eventstore.TypeDAGRunFailed,
+		DAGName:        dagName,
+		DAGRunID:       dagRunID,
+		AttemptID:      attemptID,
+		SessionID:      sessionID,
+		UserID:         userID,
+		Model:          model,
+		StartTime:      startTime,
+		EndTime:        endTime,
+		Limit:          500,
+		Cursor:         cursor,
+		PaginationMode: eventstore.QueryPaginationModeCursor,
 	}, store.lastFilter)
 
 	okResp, ok := resp.(apigen.ListEventLogs200JSONResponse)
 	require.True(t, ok)
 	require.Len(t, okResp.Entries, 1)
-	assert.Equal(t, 1, okResp.Total)
+	require.NotNil(t, okResp.NextCursor)
+	assert.Equal(t, "cursor-1", *okResp.NextCursor)
 	assert.Equal(t, "evt-1", okResp.Entries[0].Id)
 	assert.Equal(t, "dag.run.failed", okResp.Entries[0].Type)
 	require.NotNil(t, okResp.Entries[0].Data)
 	assert.Equal(t, "boom", (*okResp.Entries[0].Data)["reason"])
+	assert.Nil(t, okResp.Total)
+}
+
+func TestListEventLogsSupportsOffsetCompatibilityPagination(t *testing.T) {
+	t.Parallel()
+
+	total := 23
+	store := &mockEventStore{
+		result: &eventstore.QueryResult{
+			Entries: []*eventstore.Event{},
+			Total:   &total,
+		},
+	}
+
+	api := frontendapi.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		frontendapi.WithEventService(eventstore.New(store)),
+	)
+
+	offset := 10
+	resp, err := api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{
+		Params: apigen.ListEventLogsParams{
+			Offset: &offset,
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, eventstore.QueryPaginationModeOffset, store.lastFilter.PaginationMode)
+	assert.Equal(t, offset, store.lastFilter.Offset)
+
+	okResp, ok := resp.(apigen.ListEventLogs200JSONResponse)
+	require.True(t, ok)
+	require.NotNil(t, okResp.Total)
+	assert.Equal(t, total, *okResp.Total)
 }
 
 func TestListEventLogsReturnsServiceUnavailableWithoutStore(t *testing.T) {
@@ -142,7 +184,6 @@ func TestListEventLogsHandlesNilResultsAndEntries(t *testing.T) {
 		frontendapi.WithEventService(eventstore.New(&mockEventStore{
 			result: &eventstore.QueryResult{
 				Entries: []*eventstore.Event{nil},
-				Total:   1,
 			},
 		})),
 	)
@@ -153,7 +194,7 @@ func TestListEventLogsHandlesNilResultsAndEntries(t *testing.T) {
 	okResp, ok := resp.(apigen.ListEventLogs200JSONResponse)
 	require.True(t, ok)
 	assert.Empty(t, okResp.Entries)
-	assert.Equal(t, 1, okResp.Total)
+	assert.Nil(t, okResp.NextCursor)
 
 	nilStoreAPI := frontendapi.New(
 		nil, nil, nil, nil, runtime.Manager{},
@@ -169,7 +210,72 @@ func TestListEventLogsHandlesNilResultsAndEntries(t *testing.T) {
 	okResp, ok = resp.(apigen.ListEventLogs200JSONResponse)
 	require.True(t, ok)
 	assert.Empty(t, okResp.Entries)
-	assert.Equal(t, 0, okResp.Total)
+	assert.Nil(t, okResp.NextCursor)
+}
+
+func TestListEventLogsReturnsBadRequestForInvalidCursor(t *testing.T) {
+	t.Parallel()
+
+	api := frontendapi.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		frontendapi.WithEventService(eventstore.New(&mockEventStore{
+			err: errors.New("boom"),
+		})),
+	)
+
+	apiWithInvalidCursor := frontendapi.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		frontendapi.WithEventService(eventstore.New(&mockEventStore{
+			err: eventstore.ErrInvalidQueryCursor,
+		})),
+	)
+
+	resp, err := apiWithInvalidCursor.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{})
+	require.Nil(t, resp)
+
+	apiErr, ok := err.(*frontendapi.Error)
+	require.True(t, ok)
+	assert.Equal(t, 400, apiErr.HTTPStatus)
+	assert.Equal(t, apigen.ErrorCodeBadRequest, apiErr.Code)
+
+	resp, err = api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{})
+	require.Nil(t, resp)
+	apiErr, ok = err.(*frontendapi.Error)
+	require.True(t, ok)
+	assert.Equal(t, 500, apiErr.HTTPStatus)
+}
+
+func TestListEventLogsRejectsOffsetWithCursorPagination(t *testing.T) {
+	t.Parallel()
+
+	api := frontendapi.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		frontendapi.WithEventService(eventstore.New(&mockEventStore{})),
+	)
+
+	offset := 0
+	mode := apigen.ListEventLogsParamsPaginationMode("cursor")
+	resp, err := api.ListEventLogs(context.Background(), apigen.ListEventLogsRequestObject{
+		Params: apigen.ListEventLogsParams{
+			Offset:         &offset,
+			PaginationMode: &mode,
+		},
+	})
+	require.Nil(t, resp)
+
+	apiErr, ok := err.(*frontendapi.Error)
+	require.True(t, ok)
+	assert.Equal(t, 400, apiErr.HTTPStatus)
+	assert.Equal(t, apigen.ErrorCodeBadRequest, apiErr.Code)
 }
 
 type mockEventStore struct {
