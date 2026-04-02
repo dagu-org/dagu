@@ -35,6 +35,22 @@ func TestNewContext_StaticCommandIgnoresBrokenContextStore(t *testing.T) {
 	assert.Equal(t, clicontext.LocalContextName, ctx.ContextName)
 }
 
+func TestNewContext_CommandWithoutContextFlagDefaultsToLocal(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+
+	command := &cobra.Command{Use: "status"}
+	initFlags(command)
+	command.SetContext(context.Background())
+	require.NoError(t, command.Flags().Set("dagu-home", home))
+
+	ctx, err := NewContext(command, nil)
+	require.NoError(t, err)
+	assert.Equal(t, clicontext.LocalContextName, ctx.ContextName)
+	assert.False(t, ctx.IsRemote())
+}
+
 func TestNewContext_FallsBackToLocalWhenCurrentContextCannotResolve(t *testing.T) {
 	t.Parallel()
 

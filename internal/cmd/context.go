@@ -440,6 +440,9 @@ func newCLIContextStore(dataDir, contextsDir string) (*clicontext.Store, error) 
 }
 
 func requestedCLIContextName(cmd *cobra.Command) (string, error) {
+	if cmd.Flags().Lookup("context") == nil {
+		return "", nil
+	}
 	contextName, err := cmd.Flags().GetString("context")
 	if err != nil {
 		return "", fmt.Errorf("failed to get context flag: %w", err)
