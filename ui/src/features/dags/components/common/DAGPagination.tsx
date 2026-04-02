@@ -20,7 +20,9 @@ type DAGPaginationProps = {
   /** Callback for page change */
   pageChange: (page: number) => void;
   /** Callback for page limit change */
-  onPageLimitChange: (pageLimit: number) => void;
+  onPageLimitChange?: (pageLimit: number) => void;
+  /** Whether to show the page-size selector */
+  showPageLimitSelector?: boolean;
 };
 
 /**
@@ -213,6 +215,7 @@ const DAGPagination = ({
   pageChange,
   pageLimit,
   onPageLimitChange,
+  showPageLimitSelector = !!onPageLimitChange,
 }: DAGPaginationProps) => {
   // State for the input field value
   const [inputValue, setInputValue] = React.useState(pageLimit.toString());
@@ -235,7 +238,7 @@ const DAGPagination = ({
    */
   const commitChange = () => {
     const numValue = parseInt(inputValue);
-    if (!isNaN(numValue) && numValue > 0) {
+    if (!isNaN(numValue) && numValue > 0 && onPageLimitChange) {
       onPageLimitChange(numValue);
     } else {
       // Reset to current page limit if invalid input
@@ -264,56 +267,58 @@ const DAGPagination = ({
       </Pagination>
 
       {/* Items per page selector - hidden on very small screens */}
-      <div className="hidden sm:flex items-center gap-1">
-        <span className="text-xs text-muted-foreground">{pageLimit}</span>
-        <div className="relative group">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 rounded-md hover:bg-muted flex items-center justify-center cursor-pointer"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-muted-foreground"
+      {showPageLimitSelector && onPageLimitChange && (
+        <div className="hidden sm:flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">{pageLimit}</span>
+          <div className="relative group">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-md hover:bg-muted flex items-center justify-center cursor-pointer"
             >
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="12" cy="5" r="1" />
-              <circle cx="12" cy="19" r="1" />
-            </svg>
-          </Button>
-          <div className="absolute right-0 mt-1 w-[100px] bg-background border border-border rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-            {[10, 25, 50, 100, 200].map((limit) => (
-              <div
-                key={limit}
-                className={`px-2 py-1 text-xs cursor-pointer hover:bg-muted transition-colors ${pageLimit === limit ? 'bg-primary/15 text-primary font-medium' : ''}`}
-                onClick={() => onPageLimitChange(limit)}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-muted-foreground"
               >
-                {limit}
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="12" cy="5" r="1" />
+                <circle cx="12" cy="19" r="1" />
+              </svg>
+            </Button>
+            <div className="absolute right-0 mt-1 w-[100px] bg-background border border-border rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+              {[10, 25, 50, 100, 200].map((limit) => (
+                <div
+                  key={limit}
+                  className={`px-2 py-1 text-xs cursor-pointer hover:bg-muted transition-colors ${pageLimit === limit ? 'bg-primary/15 text-primary font-medium' : ''}`}
+                  onClick={() => onPageLimitChange(limit)}
+                >
+                  {limit}
+                </div>
+              ))}
+              <div className="px-2 py-1 border-t border-border">
+                <Input
+                  type="number"
+                  min="1"
+                  className="h-6 text-xs"
+                  value={inputValue}
+                  onChange={handleLimitChange}
+                  onBlur={commitChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Custom"
+                />
               </div>
-            ))}
-            <div className="px-2 py-1 border-t border-border">
-              <Input
-                type="number"
-                min="1"
-                className="h-6 text-xs"
-                value={inputValue}
-                onChange={handleLimitChange}
-                onBlur={commitChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Custom"
-              />
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

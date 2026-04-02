@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -28,6 +29,8 @@ import (
 )
 
 var _ exec.DAGStore = (*Storage)(nil)
+
+const dagSearchCursorVersion = 1
 
 // Option is a functional option for configuring the DAG repository
 type Option func(*Options)
@@ -491,6 +494,51 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 	return result, errList, nil
 }
 
+func dagSearchPattern(query string) string {
+	return fmt.Sprintf("(?i)%s", regexp.QuoteMeta(query))
+}
+
+type dagSearchCursor struct {
+	Version  int    `json:"v"`
+	Query    string `json:"q"`
+	FileName string `json:"fileName,omitempty"`
+}
+
+type dagMatchCursor struct {
+	Version  int    `json:"v"`
+	Query    string `json:"q"`
+	FileName string `json:"fileName"`
+	Offset   int    `json:"offset"`
+}
+
+func decodeDAGSearchCursor(raw, query string) (dagSearchCursor, error) {
+	if raw == "" {
+		return dagSearchCursor{}, nil
+	}
+	var cursor dagSearchCursor
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
+		return dagSearchCursor{}, err
+	}
+	if cursor.Version != dagSearchCursorVersion || cursor.Query != query {
+		return dagSearchCursor{}, exec.ErrInvalidCursor
+	}
+	return cursor, nil
+}
+
+func decodeDAGMatchCursor(raw, query, fileName string) (dagMatchCursor, error) {
+	if raw == "" {
+		return dagMatchCursor{FileName: fileName}, nil
+	}
+	var cursor dagMatchCursor
+	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
+		return dagMatchCursor{}, err
+	}
+	if cursor.Version != dagSearchCursorVersion || cursor.Query != query || cursor.FileName != fileName || cursor.Offset < 0 {
+		return dagMatchCursor{}, exec.ErrInvalidCursor
+	}
+	return cursor, nil
+}
+
 // Grep searches for a pattern in all DAGs.
 func (store *Storage) Grep(ctx context.Context, pattern string) (
 	ret []*exec.GrepDAGsResult, errs []string, err error,
@@ -548,6 +596,160 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 		}
 	}
 	return ret, errs, nil
+}
+
+// SearchCursor returns lightweight, cursor-based DAG search hits.
+func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOptions) (
+	*exec.CursorResult[exec.SearchDAGResult], []string, error,
+) {
+	if opts.Query == "" {
+		return &exec.CursorResult[exec.SearchDAGResult]{Items: []exec.SearchDAGResult{}}, nil, nil
+	}
+	if err := store.ensureDirExist(); err != nil {
+		return nil, nil, fmt.Errorf("failed to create DAGs directory %s: %w", store.baseDir, err)
+	}
+
+	cursor, err := decodeDAGSearchCursor(opts.Cursor, opts.Query)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	entries, err := os.ReadDir(store.baseDir)
+	if err != nil {
+		logger.Error(ctx, "Failed to read directory", tag.Dir(store.baseDir), tag.Error(err))
+		return nil, nil, fmt.Errorf("failed to read DAGs directory %s: %w", store.baseDir, err)
+	}
+
+	limit := max(opts.Limit, 1)
+	matchLimit := max(opts.MatchLimit, 1)
+	results := make([]exec.SearchDAGResult, 0, limit)
+	pattern := dagSearchPattern(opts.Query)
+	var errs []string
+	var hasMore bool
+	var nextCursor string
+
+	for _, entry := range entries {
+		if ctx.Err() != nil {
+			return nil, errs, ctx.Err()
+		}
+		if !fileutil.IsYAMLFile(entry.Name()) {
+			continue
+		}
+
+		fileName := strings.TrimSuffix(entry.Name(), path.Ext(entry.Name()))
+		if cursor.FileName != "" && fileName <= cursor.FileName {
+			continue
+		}
+
+		filePath := filepath.Join(store.baseDir, entry.Name())
+		dat, err := os.ReadFile(filePath) //nolint:gosec
+		if err != nil {
+			logger.Error(ctx, "Failed to read DAG file", tag.File(entry.Name()), tag.Error(err))
+			errs = append(errs, fmt.Sprintf("read %s failed: %s", entry.Name(), err))
+			continue
+		}
+
+		window, err := grep.GrepWindow(dat, pattern, grep.GrepOptions{
+			IsRegexp: true,
+			Before:   grep.DefaultGrepOptions.Before,
+			After:    grep.DefaultGrepOptions.After,
+			Limit:    matchLimit,
+		})
+		if err != nil {
+			if errors.Is(err, grep.ErrNoMatch) {
+				continue
+			}
+			errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
+			continue
+		}
+
+		if len(results) == limit {
+			hasMore = true
+			nextCursor = exec.EncodeSearchCursor(dagSearchCursor{
+				Version:  dagSearchCursorVersion,
+				Query:    opts.Query,
+				FileName: results[len(results)-1].FileName,
+			})
+			break
+		}
+
+		item := exec.SearchDAGResult{
+			Name:           fileName,
+			FileName:       fileName,
+			Matches:        window.Matches,
+			HasMoreMatches: window.HasMore,
+		}
+		if window.HasMore {
+			item.NextMatchesCursor = exec.EncodeSearchCursor(dagMatchCursor{
+				Version:  dagSearchCursorVersion,
+				Query:    opts.Query,
+				FileName: fileName,
+				Offset:   window.NextOffset,
+			})
+		}
+		results = append(results, item)
+	}
+
+	return &exec.CursorResult[exec.SearchDAGResult]{
+		Items:      results,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	}, errs, nil
+}
+
+// SearchMatches returns cursor-based snippets for one DAG definition.
+func (store *Storage) SearchMatches(_ context.Context, fileName string, opts exec.SearchDAGMatchesOptions) (
+	*exec.CursorResult[*exec.Match], error,
+) {
+	if opts.Query == "" {
+		return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+	}
+
+	cursor, err := decodeDAGMatchCursor(opts.Cursor, opts.Query, fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	filePath, err := store.locateDAG(fileName)
+	if err != nil {
+		return nil, exec.ErrDAGNotFound
+	}
+
+	dat, err := os.ReadFile(filePath) //nolint:gosec
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, exec.ErrDAGNotFound
+		}
+		return nil, err
+	}
+
+	window, err := grep.GrepWindow(dat, dagSearchPattern(opts.Query), grep.GrepOptions{
+		IsRegexp: true,
+		Before:   grep.DefaultGrepOptions.Before,
+		After:    grep.DefaultGrepOptions.After,
+		Offset:   cursor.Offset,
+		Limit:    max(opts.Limit, 1),
+	})
+	if err != nil {
+		if errors.Is(err, grep.ErrNoMatch) {
+			return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+		}
+		return nil, err
+	}
+
+	result := &exec.CursorResult[*exec.Match]{
+		Items:   window.Matches,
+		HasMore: window.HasMore,
+	}
+	if window.HasMore {
+		result.NextCursor = exec.EncodeSearchCursor(dagMatchCursor{
+			Version:  dagSearchCursorVersion,
+			Query:    opts.Query,
+			FileName: fileName,
+			Offset:   window.NextOffset,
+		})
+	}
+	return result, nil
 }
 
 // ToggleSuspend toggles the suspension state of a DAG.

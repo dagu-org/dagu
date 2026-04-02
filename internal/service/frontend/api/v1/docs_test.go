@@ -16,7 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime"
-	apiV1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
+	apiv1 "github.com/dagu-org/dagu/internal/service/frontend/api/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -216,6 +216,115 @@ func (m *mockDocStore) Search(_ context.Context, query string) ([]*agent.DocSear
 	return results, nil
 }
 
+type mockDocSearchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id,omitempty"`
+}
+
+type mockDocMatchCursor struct {
+	Version int    `json:"v"`
+	Query   string `json:"q"`
+	ID      string `json:"id"`
+	Offset  int    `json:"offset"`
+}
+
+func (m *mockDocStore) SearchCursor(_ context.Context, opts agent.SearchDocsOptions) (*exec.CursorResult[agent.DocSearchResult], error) {
+	results, err := m.Search(context.Background(), opts.Query)
+	if err != nil {
+		return nil, err
+	}
+	limit := max(opts.Limit, 1)
+	offset := 0
+	if opts.Cursor != "" {
+		var cursor mockDocSearchCursor
+		if err := exec.DecodeSearchCursor(opts.Cursor, &cursor); err != nil {
+			return nil, err
+		}
+		if cursor.Version != 1 || cursor.Query != opts.Query {
+			return nil, exec.ErrInvalidCursor
+		}
+		for i, item := range results {
+			if item.ID <= cursor.ID {
+				offset = i + 1
+				continue
+			}
+			break
+		}
+	}
+	end := min(offset+limit, len(results))
+	pageItems := make([]agent.DocSearchResult, 0, end-offset)
+	for _, item := range results[offset:end] {
+		pageItems = append(pageItems, *item)
+	}
+	result := &exec.CursorResult[agent.DocSearchResult]{
+		Items:   pageItems,
+		HasMore: end < len(results),
+	}
+	if result.HasMore && len(pageItems) > 0 {
+		result.NextCursor = exec.EncodeSearchCursor(mockDocSearchCursor{
+			Version: 1,
+			Query:   opts.Query,
+			ID:      pageItems[len(pageItems)-1].ID,
+		})
+	}
+	return result, nil
+}
+
+func (m *mockDocStore) SearchMatches(_ context.Context, id string, opts agent.SearchDocMatchesOptions) (*exec.CursorResult[*exec.Match], error) {
+	if err := agent.ValidateDocID(id); err != nil {
+		return nil, agent.ErrInvalidDocID
+	}
+
+	doc, ok := m.docs[id]
+	if !ok {
+		return nil, agent.ErrDocNotFound
+	}
+
+	var matches []*exec.Match
+	if opts.Query != "" {
+		for i, line := range strings.Split(doc.Content, "\n") {
+			if strings.Contains(line, opts.Query) {
+				matches = append(matches, &exec.Match{
+					Line:       line,
+					LineNumber: i + 1,
+					StartLine:  i + 1,
+				})
+			}
+		}
+	}
+
+	limit := max(opts.Limit, 1)
+	offset := 0
+	if opts.Cursor != "" {
+		var cursor mockDocMatchCursor
+		if err := exec.DecodeSearchCursor(opts.Cursor, &cursor); err != nil {
+			return nil, err
+		}
+		if cursor.Version != 1 || cursor.Query != opts.Query || cursor.ID != id || cursor.Offset < 0 {
+			return nil, exec.ErrInvalidCursor
+		}
+		offset = cursor.Offset
+	}
+
+	offset = max(offset, 0)
+	offset = min(offset, len(matches))
+	end := min(offset+limit, len(matches))
+	cursorResult := &exec.CursorResult[*exec.Match]{
+		Items:   matches[offset:end],
+		HasMore: end < len(matches),
+	}
+	if cursorResult.HasMore {
+		cursorResult.NextCursor = exec.EncodeSearchCursor(mockDocMatchCursor{
+			Version: 1,
+			Query:   opts.Query,
+			ID:      id,
+			Offset:  end,
+		})
+	}
+	return cursorResult, nil
+}
+
 func (m *mockDocStore) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
 	m.lastListOpts = opts
 	if m.failAll {
@@ -262,7 +371,7 @@ func (m *mockDocStore) ListFlat(_ context.Context, opts agent.ListDocsOptions) (
 
 // docTestSetup contains common test infrastructure for doc API tests.
 type docTestSetup struct {
-	api   *apiV1.API
+	api   *apiv1.API
 	store *mockDocStore
 }
 
@@ -273,12 +382,12 @@ func newDocTestSetup(t *testing.T) *docTestSetup {
 	cfg.Server.Permissions = map[config.Permission]bool{
 		config.PermissionWriteDAGs: true,
 	}
-	a := apiV1.New(
+	a := apiv1.New(
 		nil, nil, nil, nil, runtime.Manager{},
 		cfg, nil, nil,
 		prometheus.NewRegistry(),
 		nil,
-		apiV1.WithDocStore(store),
+		apiv1.WithDocStore(store),
 	)
 	return &docTestSetup{api: a, store: store}
 }
@@ -333,7 +442,7 @@ func TestListDocs(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.ListDocs(adminCtx(), apigen.ListDocsRequestObject{})
 		require.Error(t, err)
@@ -474,7 +583,7 @@ func TestCreateDoc(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.CreateDoc(adminCtx(), apigen.CreateDocRequestObject{
 			Body: &apigen.CreateDocJSONRequestBody{
@@ -533,7 +642,7 @@ func TestGetDoc(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.GetDoc(adminCtx(), apigen.GetDocRequestObject{
 			Params: apigen.GetDocParams{Path: "my-doc"},
@@ -594,7 +703,7 @@ func TestSearchDocs(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.SearchDocs(adminCtx(), apigen.SearchDocsRequestObject{
 			Params: apigen.SearchDocsParams{Q: "hello"},
@@ -665,7 +774,7 @@ func TestUpdateDoc(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.UpdateDoc(adminCtx(), apigen.UpdateDocRequestObject{
 			Params: apigen.UpdateDocParams{Path: "doc1"},
@@ -723,7 +832,7 @@ func TestDeleteDoc(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.DeleteDoc(adminCtx(), apigen.DeleteDocRequestObject{
 			Params: apigen.DeleteDocParams{Path: "doc1"},
@@ -874,7 +983,7 @@ func TestRenameDoc(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.RenameDoc(adminCtx(), apigen.RenameDocRequestObject{
 			Params: apigen.RenameDocParams{Path: "old"},
@@ -933,12 +1042,12 @@ func TestListDocsTreeWithChildren(t *testing.T) {
 		cfg.Server.Permissions = map[config.Permission]bool{
 			config.PermissionWriteDAGs: true,
 		}
-		a := apiV1.New(
+		a := apiv1.New(
 			nil, nil, nil, nil, runtime.Manager{},
 			cfg, nil, nil,
 			prometheus.NewRegistry(),
 			nil,
-			apiV1.WithDocStore(dirStore),
+			apiv1.WithDocStore(dirStore),
 		)
 
 		resp, err := a.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
@@ -1014,7 +1123,7 @@ func TestGetDocContentData(t *testing.T) {
 		t.Parallel()
 
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 
 		_, err := a.GetDocContentData(adminCtx(), "doc1")
 		require.Error(t, err)
@@ -1113,7 +1222,7 @@ func TestDocStoreInternalErrors(t *testing.T) {
 func TestDocWritePermissionDenied(t *testing.T) {
 	t.Parallel()
 
-	newNoWriteSetup := func(t *testing.T) *apiV1.API {
+	newNoWriteSetup := func(t *testing.T) *apiv1.API {
 		t.Helper()
 		store := &mockDocStore{docs: make(map[string]*agent.Doc)}
 		cfg := &config.Config{}
@@ -1121,12 +1230,12 @@ func TestDocWritePermissionDenied(t *testing.T) {
 		cfg.Server.Permissions = map[config.Permission]bool{
 			config.PermissionWriteDAGs: false,
 		}
-		return apiV1.New(
+		return apiv1.New(
 			nil, nil, nil, nil, runtime.Manager{},
 			cfg, nil, nil,
 			prometheus.NewRegistry(),
 			nil,
-			apiV1.WithDocStore(store),
+			apiv1.WithDocStore(store),
 		)
 	}
 
@@ -1261,7 +1370,7 @@ func TestDeleteDocBatch(t *testing.T) {
 	t.Run("no doc store", func(t *testing.T) {
 		t.Parallel()
 		cfg := &config.Config{}
-		a := apiV1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
+		a := apiv1.New(nil, nil, nil, nil, runtime.Manager{}, cfg, nil, nil, prometheus.NewRegistry(), nil)
 		_, err := a.DeleteDocBatch(adminCtx(), apigen.DeleteDocBatchRequestObject{
 			Body: &apigen.DeleteDocBatchJSONRequestBody{Paths: []string{"test"}},
 		})

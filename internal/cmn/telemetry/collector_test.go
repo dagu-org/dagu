@@ -64,6 +64,22 @@ func (m *mockDAGStore) Grep(ctx context.Context, pattern string) ([]*exec.GrepDA
 	return args.Get(0).([]*exec.GrepDAGsResult), args.Get(1).([]string), args.Error(2)
 }
 
+func (m *mockDAGStore) SearchCursor(ctx context.Context, opts exec.SearchDAGsOptions) (*exec.CursorResult[exec.SearchDAGResult], []string, error) {
+	args := m.Called(ctx, opts)
+	if args.Get(0) == nil {
+		return nil, args.Get(1).([]string), args.Error(2)
+	}
+	return args.Get(0).(*exec.CursorResult[exec.SearchDAGResult]), args.Get(1).([]string), args.Error(2)
+}
+
+func (m *mockDAGStore) SearchMatches(ctx context.Context, fileName string, opts exec.SearchDAGMatchesOptions) (*exec.CursorResult[*exec.Match], error) {
+	args := m.Called(ctx, fileName, opts)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*exec.CursorResult[*exec.Match]), args.Error(1)
+}
+
 func (m *mockDAGStore) Rename(ctx context.Context, oldID, newID string) error {
 	args := m.Called(ctx, oldID, newID)
 	return args.Error(0)

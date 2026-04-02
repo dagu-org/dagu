@@ -1329,9 +1329,9 @@ func (a *API) SearchDAGs(ctx context.Context, request api.SearchDAGsRequestObjec
 
 	var results []api.SearchResultItem
 	for _, item := range ret {
-		var matches []api.SearchDAGsMatchItem
+		var matches []api.SearchMatchItem
 		for _, match := range item.Matches {
-			matches = append(matches, api.SearchDAGsMatchItem{
+			matches = append(matches, api.SearchMatchItem{
 				Line:       match.Line,
 				LineNumber: match.LineNumber,
 				StartLine:  match.StartLine,

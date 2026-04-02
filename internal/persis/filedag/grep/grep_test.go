@@ -149,3 +149,31 @@ func TestGrep(t *testing.T) {
 		})
 	}
 }
+
+func TestGrepWindow(t *testing.T) {
+	t.Parallel()
+
+	dat := []byte("aa\nneedle 1\nbb\nneedle 2\ncc\nneedle 3\ndd")
+	result, err := GrepWindow(dat, "needle", GrepOptions{
+		Before: 1,
+		After:  1,
+		Limit:  2,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Matches, 2)
+	require.True(t, result.HasMore)
+	require.Equal(t, 2, result.NextOffset)
+	require.Equal(t, "aa\nneedle 1\nbb", result.Matches[0].Line)
+	require.Equal(t, "bb\nneedle 2\ncc", result.Matches[1].Line)
+
+	next, err := GrepWindow(dat, "needle", GrepOptions{
+		Before: 1,
+		After:  1,
+		Offset: result.NextOffset,
+		Limit:  2,
+	})
+	require.NoError(t, err)
+	require.Len(t, next.Matches, 1)
+	require.False(t, next.HasMore)
+	require.Equal(t, "cc\nneedle 3\ndd", next.Matches[0].Line)
+}
