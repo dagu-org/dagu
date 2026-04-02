@@ -93,6 +93,8 @@ type fakeTelegramAgentService struct {
 	appendErrBySession map[string]error
 	enqueueResult      agent.ChatQueueResult
 	flushResult        agent.ChatQueueResult
+	createErr          error
+	cancelErr          error
 }
 
 func newFakeTelegramAgentService(content string) *fakeTelegramAgentService {
@@ -114,6 +116,9 @@ func (s *fakeTelegramAgentService) CreateSession(_ context.Context, _ agent.User
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.createMessages = append(s.createMessages, req.Message)
+	if s.createErr != nil {
+		return "", "", s.createErr
+	}
 	s.nextSessionID++
 	return fmt.Sprintf("created-%d", s.nextSessionID), "", nil
 }
@@ -159,7 +164,9 @@ func (s *fakeTelegramAgentService) FlushQueuedChatMessage(_ context.Context, ses
 }
 
 func (s *fakeTelegramAgentService) CancelSession(context.Context, string, string) error {
-	return nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cancelErr
 }
 
 func (s *fakeTelegramAgentService) SubmitUserResponse(context.Context, string, string, agent.UserPromptResponse) error {
@@ -330,7 +337,9 @@ func TestBot_HandleMessage_BatchesRapidMessagesIntoSingleCreate(t *testing.T) {
 	first := &tgbotapi.Message{Text: "first", Chat: &tgbotapi.Chat{ID: 123}}
 	second := &tgbotapi.Message{Text: "second", Chat: &tgbotapi.Chat{ID: 123}}
 	bot.handleMessage(context.Background(), first)
+	assert.Equal(t, 1, api.typingCount(), "first inbound message should start typing immediately")
 	bot.handleMessage(context.Background(), second)
+	assert.Equal(t, 1, api.typingCount(), "batched messages should reuse the current typing loop")
 
 	require.Eventually(t, func() bool {
 		service.mu.Lock()
@@ -342,6 +351,37 @@ func TestBot_HandleMessage_BatchesRapidMessagesIntoSingleCreate(t *testing.T) {
 	defer service.mu.Unlock()
 	require.Len(t, service.createMessages, 1)
 	assert.Equal(t, "first\n\nsecond", service.createMessages[0])
+}
+
+func TestBot_HandleCommand_CancelStopsPreFlushTypingWithoutSession(t *testing.T) {
+	t.Parallel()
+
+	api := &fakeTelegramAPI{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	bot := &Bot{
+		botAPI:       api,
+		logger:       logger,
+		allowedChats: map[int64]struct{}{123: {}},
+	}
+
+	cs := bot.getOrCreateChat(123)
+	bot.startTypingLoop(context.Background(), cs, 123)
+	require.Eventually(t, func() bool {
+		return api.typingCount() >= 1
+	}, time.Second, 10*time.Millisecond)
+
+	bot.handleCommand(context.Background(), &tgbotapi.Message{
+		Text: "/cancel",
+		Chat: &tgbotapi.Chat{ID: 123},
+		Entities: []tgbotapi.MessageEntity{{
+			Type:   "bot_command",
+			Offset: 0,
+			Length: len("/cancel"),
+		}},
+	})
+
+	assertTypingStops(t, api, "cancel without an active session should stop any pre-flush typing loop")
+	assert.Equal(t, 1, api.textCount(), "cancel should still acknowledge the missing session")
 }
 
 func TestBot_ProcessStreamResponse_RefreshesTypingWhileWorking(t *testing.T) {
