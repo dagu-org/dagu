@@ -88,6 +88,18 @@ func withOutput(output string) stepOption {
 	}
 }
 
+func withStdout(stdout string) stepOption {
+	return func(step *core.Step) {
+		step.Stdout = stdout
+	}
+}
+
+func withEnvVars(envs ...string) stepOption {
+	return func(step *core.Step) {
+		step.Env = append(step.Env, envs...)
+	}
+}
+
 // parseCommand parses a command string into a CommandEntry.
 func parseCommand(command string) core.CommandEntry {
 	cmd, args, err := cmdutil.SplitCommand(command)

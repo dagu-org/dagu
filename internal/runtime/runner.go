@@ -149,7 +149,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			logger.Debug(ctx, "Init handler execution started",
 				tag.Handler(initNode.Name()),
 			)
-			if err := r.runEventHandler(ctx, plan, initNode); err != nil {
+			if err := r.runEventHandler(ctx, plan, initNode, nil); err != nil {
 				r.setLastError(err)
 				r.setCanceled() // Fail the DAG if init fails
 			}
@@ -230,6 +230,8 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			go func(n *Node) {
 				// Set step context for all logs in this goroutine
 				ctx := logger.WithValues(ctx, tag.Step(n.Name()))
+				// Anything evaluated during Prepare must see the node's real pre-execution env.
+				ctx = r.setupVariables(ctx, plan, n)
 
 				// Ensure node is finished and wg is decremented
 				defer r.finishNode(n, &wg)
@@ -308,15 +310,14 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 		if handlerNode != nil {
 			// Set DAG_WAITING_STEPS environment variable
 			waitingSteps := strings.Join(plan.WaitingStepNames(), ",")
-			ctx = r.setupEnvironEventHandler(ctx, plan, handlerNode)
-			env := GetEnv(ctx).WithEnvVars("DAG_WAITING_STEPS", waitingSteps)
-			ctx = WithEnv(ctx, env)
 
 			logger.Info(ctx, "Executing onWait handler",
 				slog.String("waitingSteps", waitingSteps),
 			)
 
-			if err := r.runEventHandler(ctx, plan, handlerNode); err != nil {
+			if err := r.runEventHandler(ctx, plan, handlerNode, map[string]string{
+				"DAG_WAITING_STEPS": waitingSteps,
+			}); err != nil {
 				// Log error but don't fail - notification failure shouldn't block Wait status
 				logger.Error(ctx, "onWait handler failed", tag.Error(err))
 			}
@@ -350,7 +351,7 @@ func (r *Runner) Run(ctx context.Context, plan *Plan, progressCh chan *Node) err
 			logger.Debug(ctx, "Handler execution started",
 				tag.Handler(handlerNode.Name()),
 			)
-			if err := r.runEventHandler(ctx, plan, handlerNode); err != nil {
+			if err := r.runEventHandler(ctx, plan, handlerNode, nil); err != nil {
 				r.setLastError(err)
 			}
 
@@ -432,7 +433,7 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 		}()
 	}
 
-	ctx = r.setupVariables(spanCtx, plan, node)
+	ctx = spanCtx
 
 	// Check preconditions
 	logger.Debug(ctx, "Checking preconditions")
@@ -728,7 +729,12 @@ func (r *Runner) setupVariables(ctx context.Context, plan *Plan, node *Node) con
 	return WithEnv(ctx, env)
 }
 
-func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node *Node) context.Context {
+func (r *Runner) setupEnvironEventHandler(
+	ctx context.Context,
+	plan *Plan,
+	node *Node,
+	extraEnvs map[string]string,
+) context.Context {
 	// Preserve any extra env vars from the incoming context (e.g., DAG_WAITING_STEPS)
 	existingEnv := GetEnv(ctx)
 
@@ -748,6 +754,10 @@ func (r *Runner) setupEnvironEventHandler(ctx context.Context, plan *Plan, node 
 				env.Scope = env.Scope.WithEntry(k, v, eval.EnvSourceStepEnv)
 			}
 		}
+	}
+
+	for k, v := range extraEnvs {
+		env.Scope = env.Scope.WithEntry(k, v, eval.EnvSourceStepEnv)
 	}
 
 	// Load all output variables from all nodes
@@ -959,7 +969,7 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 	return true
 }
 
-func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node) error {
+func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node, extraEnvs map[string]string) error {
 	defer node.Finish()
 
 	if r.dry {
@@ -967,13 +977,16 @@ func (r *Runner) runEventHandler(ctx context.Context, plan *Plan, node *Node) er
 		return nil
 	}
 
+	// Handler stdout/stderr paths are also evaluated during Prepare, so attach the
+	// complete handler env before preparing the node.
+	ctx = r.setupEnvironEventHandler(ctx, plan, node, extraEnvs)
+
 	if err := node.Prepare(ctx, r.logDir, r.dagRunID); err != nil {
 		node.SetStatus(core.NodeFailed)
 		return nil
 	}
 	defer func() { _ = node.Teardown() }()
 
-	ctx = r.setupEnvironEventHandler(ctx, plan, node)
 	if err := node.evalPreconditions(ctx); err != nil {
 		node.SetStatus(core.NodeSkipped)
 		return nil
