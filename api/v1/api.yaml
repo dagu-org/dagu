@@ -7934,6 +7934,10 @@ components:
       type: object
       description: "Detailed DAG configuration information"
       properties:
+        nextRun:
+          type: string
+          format: date-time
+          description: "Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed."
         group:
           type: string
           description: "Logical grouping of related DAGs for organizational purposes"

@@ -253,8 +253,19 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		errs = append(errs, dag.BuildWarnings...)
 	}
 
+	details := toDAGDetails(dag)
+	if details != nil {
+		projectionDAG := dag
+		if dag != nil {
+			dagCopy := *dag
+			dagCopy.Name = a.resolveDAGName(ctx, request.FileName)
+			projectionDAG = &dagCopy
+		}
+		details.NextRun = a.projectNextRun(ctx, projectionDAG)
+	}
+
 	return &api.GetDAGSpec200JSONResponse{
-		Dag:    toDAGDetails(dag),
+		Dag:    details,
 		Spec:   yamlSpec,
 		Errors: errs,
 	}, nil
@@ -387,6 +398,9 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 	}
 
 	details := toDAGDetails(dag)
+	if details != nil {
+		details.NextRun = a.projectNextRun(ctx, dag)
+	}
 
 	localDAGs := make([]api.LocalDag, 0, len(dag.LocalDAGs))
 	for _, localDAG := range dag.LocalDAGs {
@@ -1478,19 +1492,7 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 
 func (a *API) listDAGsData(ctx context.Context, listOpts exec.ListDAGsOptions) (api.ListDAGs200JSONResponse, error) {
 	projectionTime := time.Now()
-	var schedulerState *scheduler.SchedulerState
-	if a.schedulerStateStore != nil {
-		state, loadErr := a.schedulerStateStore.Load(ctx)
-		if loadErr != nil {
-			logger.Warn(ctx, "Failed to load scheduler state for DAG list projection", tag.Error(loadErr))
-		} else {
-			schedulerState = state
-		}
-	}
-
-	nextRunProjection := func(dag *core.DAG, now time.Time) time.Time {
-		return scheduler.NextPlannedRun(dag, now, schedulerState)
-	}
+	nextRunProjection := a.nextRunProjection(ctx)
 
 	listOpts.Time = &projectionTime
 	listOpts.NextRunProjection = nextRunProjection
@@ -1529,6 +1531,30 @@ func (a *API) listDAGsData(ctx context.Context, listOpts exec.ListDAGsOptions) (
 		Errors:     errList,
 		Pagination: toPagination(result),
 	}, nil
+}
+
+func (a *API) projectNextRun(ctx context.Context, dag *core.DAG) *time.Time {
+	nextRun := a.nextRunProjection(ctx)(dag, time.Now())
+	if nextRun.IsZero() {
+		return nil
+	}
+	return &nextRun
+}
+
+func (a *API) nextRunProjection(ctx context.Context) func(*core.DAG, time.Time) time.Time {
+	var schedulerState *scheduler.SchedulerState
+	if a.schedulerStateStore != nil {
+		state, loadErr := a.schedulerStateStore.Load(ctx)
+		if loadErr != nil {
+			logger.Warn(ctx, "Failed to load scheduler state for DAG next-run projection", tag.Error(loadErr))
+		} else {
+			schedulerState = state
+		}
+	}
+
+	return func(dag *core.DAG, now time.Time) time.Time {
+		return scheduler.NextPlannedRun(dag, now, schedulerState)
+	}
 }
 
 // parseIntParam parses an integer string, returning defaultVal if parsing fails or value is <= 0.
