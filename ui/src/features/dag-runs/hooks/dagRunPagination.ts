@@ -15,6 +15,19 @@ export type DAGRunListQuery = paths['/dag-runs']['get']['parameters']['query'];
 
 const MAX_DAG_RUN_PAGE_LIMIT = 500;
 
+function normalizeDAGRunListQuery(
+  query: DAGRunListQuery | undefined
+): Record<string, unknown> {
+  const normalizedEntries = Object.entries(query ?? {})
+    .filter(([, value]) => value !== undefined)
+    .sort(([left], [right]) => left.localeCompare(right));
+  return Object.fromEntries(normalizedEntries);
+}
+
+function getDAGRunListQueryKey(query: DAGRunListQuery | undefined): string {
+  return JSON.stringify(normalizeDAGRunListQuery(query));
+}
+
 export function mergeUniqueDAGRuns(
   head: DAGRunSummary[],
   older: DAGRunSummary[]
@@ -135,9 +148,11 @@ export function useExactDAGRuns({
   const dataRef = useRef<DAGRunSummary[]>([]);
   const controllerRef = useRef<AbortController | null>(null);
   const requestIDRef = useRef(0);
-  const queryKey = useMemo(() => JSON.stringify(query), [query]);
+  const queryRef = useRef(query);
+  const queryKey = useMemo(() => getDAGRunListQueryKey(query), [query]);
 
   dataRef.current = data;
+  queryRef.current = query;
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!enabled) {
@@ -159,7 +174,11 @@ export function useExactDAGRuns({
     }
 
     try {
-      const next = await fetchAllDAGRuns(client, query, controller.signal);
+      const next = await fetchAllDAGRuns(
+        client,
+        queryRef.current,
+        controller.signal
+      );
       if (controller.signal.aborted || requestID !== requestIDRef.current) {
         return;
       }
@@ -187,7 +206,7 @@ export function useExactDAGRuns({
         setIsValidating(false);
       }
     }
-  }, [client, enabled, query]);
+  }, [client, enabled]);
 
   useEffect(() => {
     if (!enabled) {
@@ -200,6 +219,8 @@ export function useExactDAGRuns({
       return;
     }
 
+    // Trigger reloads only when the semantic query changes, not when callers
+    // allocate a fresh but equivalent query object during rerenders.
     void refresh();
 
     return () => {
@@ -269,7 +290,7 @@ export function usePaginatedDAGRuns({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
-  const queryKey = useMemo(() => JSON.stringify(query), [query]);
+  const stableQueryKey = useMemo(() => getDAGRunListQueryKey(query), [query]);
   const {
     data: headPage,
     mutate,
@@ -292,7 +313,7 @@ export function usePaginatedDAGRuns({
     setContinuationCursorOverride(undefined);
     setLoadMoreError(null);
     setIsLoadingMore(false);
-  }, [queryKey]);
+  }, [stableQueryKey]);
 
   const dagRuns = useMemo(
     () => mergeUniqueDAGRuns(headPage?.dagRuns ?? [], olderRuns),
