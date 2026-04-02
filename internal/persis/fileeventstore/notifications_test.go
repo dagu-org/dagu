@@ -52,6 +52,33 @@ func TestStoreReadNotificationEventsTracksCommittedOffsetsAndInbox(t *testing.T)
 	assert.GreaterOrEqual(t, len(nextCursor.CommittedOffsets), len(cursor.CommittedOffsets))
 }
 
+func TestStoreReadNotificationEventsSkipsMalformedInboxFiles(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	store, err := New(baseDir)
+	require.NoError(t, err)
+
+	cursor, err := store.NotificationHeadCursor(context.Background())
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(filepath.Join(store.inboxDir, "00000000000000000001-bad.json"), []byte("{"), filePermissions))
+
+	goodEvent := testEvent("evt-good", time.Date(2026, 3, 29, 10, 15, 0, 0, time.UTC))
+	require.NoError(t, store.Emit(context.Background(), goodEvent))
+
+	events, nextCursor, err := store.ReadNotificationEvents(context.Background(), cursor)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, "evt-good", events[0].ID)
+	assert.NotEmpty(t, nextCursor.LastInboxFile)
+
+	events, nextCursor, err = store.ReadNotificationEvents(context.Background(), nextCursor)
+	require.NoError(t, err)
+	assert.Empty(t, events)
+	assert.NotEmpty(t, nextCursor.LastInboxFile)
+}
+
 func notificationEventIDs(events []*eventstore.Event) []string {
 	ids := make([]string, 0, len(events))
 	for _, event := range events {

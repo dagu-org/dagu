@@ -81,11 +81,15 @@ func (s *Store) ReadNotificationEvents(_ context.Context, cursor eventstore.Noti
 		if cursor.LastInboxFile != "" && name <= cursor.LastInboxFile {
 			continue
 		}
+		nextCursor.LastInboxFile = name
 		event, err := s.readInboxNotificationEvent(name)
 		if err != nil {
-			return nil, nextCursor, err
+			slog.Warn("fileeventstore: skipping unreadable inbox notification file",
+				slog.String("file", filepath.Join(s.inboxDir, name)),
+				slog.String("cursor_last_inbox_file", cursor.LastInboxFile),
+				slog.String("error", err.Error()))
+			continue
 		}
-		nextCursor.LastInboxFile = name
 		selectNewestNotificationEvent(eventsByID, event)
 	}
 

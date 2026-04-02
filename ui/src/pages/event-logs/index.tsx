@@ -1,4 +1,10 @@
-import { components } from '@/api/v1/schema';
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import {
+  components,
+  ComponentsParametersEventLogPaginationMode,
+} from '@/api/v1/schema';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -68,6 +74,7 @@ type StoredEventLogState = EventLogFilters;
 type EventLogQueryParams = {
   remoteNode: string;
   kind: 'dag_run';
+  paginationMode: components['parameters']['EventLogPaginationMode'];
   type?: string;
   dagName?: string;
   dagRunId?: string;
@@ -258,9 +265,10 @@ function useEventLogFeed(
     () => mergeUniqueEntries(headEntries, olderEntries),
     [headEntries, olderEntries]
   );
-  const firstEntryID = entries[0]?.id ?? '';
-  const lastEntryID =
-    entries.length > 0 ? (entries[entries.length - 1]?.id ?? '') : '';
+  const headFirstEntryID = headEntries[0]?.id ?? '';
+  const headLastEntryID =
+    headEntries.length > 0 ? (headEntries[headEntries.length - 1]?.id ?? '') : '';
+  const headNextCursor = data?.nextCursor ?? '';
   const currentNextCursor =
     continuationCursorOverride === undefined
       ? (data?.nextCursor ?? null)
@@ -274,7 +282,7 @@ function useEventLogFeed(
     if (hasHeadResponse) {
       setLastUpdatedAt(new Date());
     }
-  }, [currentNextCursor, firstEntryID, hasHeadResponse, lastEntryID]);
+  }, [hasHeadResponse, headFirstEntryID, headLastEntryID, headNextCursor]);
 
   const handleRefresh = React.useCallback(async () => {
     setOlderEntries([]);
@@ -649,6 +657,7 @@ export default function EventLogsPage() {
     return {
       remoteNode: remoteKey,
       kind: 'dag_run',
+      paginationMode: ComponentsParametersEventLogPaginationMode.cursor,
       type: appliedFilters.type !== 'all' ? appliedFilters.type : undefined,
       dagName: appliedFilters.dagName || undefined,
       dagRunId: appliedFilters.dagRunId || undefined,

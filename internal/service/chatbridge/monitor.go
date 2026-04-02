@@ -579,6 +579,8 @@ func (m *NotificationMonitor) markBatchDelivered(ctx context.Context, destinatio
 				delete(destState.Pending, event.Key)
 				changed = true
 			}
+			// Refresh the delivery timestamp on each successful acknowledgement so
+			// TTL-based eviction retains recently retried deliveries.
 			if deliveredAt, ok := destState.Delivered[event.Key]; !ok || !deliveredAt.Equal(now) {
 				destState.Delivered[event.Key] = now
 				changed = true

@@ -503,11 +503,11 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 		nil,
 	)))
 
-	time.Sleep(100 * time.Millisecond)
-
-	mu.Lock()
-	assert.Empty(t, delivered)
-	mu.Unlock()
+	require.Never(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(delivered) > 0
+	}, 150*time.Millisecond, 10*time.Millisecond)
 
 	require.NoError(t, os.Chmod(stateDir, 0o700))
 
@@ -517,10 +517,11 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 		return len(delivered) == 1 && delivered[0] == "run-save-retry"
 	}, time.Second, 10*time.Millisecond)
 
-	time.Sleep(100 * time.Millisecond)
-	mu.Lock()
-	assert.Len(t, delivered, 1)
-	mu.Unlock()
+	require.Never(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(delivered) > 1
+	}, 150*time.Millisecond, 10*time.Millisecond)
 	assert.True(t, monitor.IsDelivered("dest-1", status))
 }
 

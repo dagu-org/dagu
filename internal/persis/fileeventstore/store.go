@@ -5,6 +5,7 @@
 package fileeventstore
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -96,6 +97,18 @@ func (s *Store) Query(_ context.Context, filter eventstore.QueryFilter) (*events
 		limit = 100
 	}
 
+	if usesCursorPagination(filter) {
+		return s.queryWithCursor(files, filter, limit)
+	}
+	return s.queryWithOffset(files, filter, limit)
+}
+
+func usesCursorPagination(filter eventstore.QueryFilter) bool {
+	return filter.PaginationMode == eventstore.QueryPaginationModeCursor || filter.Cursor != ""
+}
+
+func (s *Store) queryWithCursor(files []string, filter eventstore.QueryFilter, limit int) (*eventstore.QueryResult, error) {
+
 	cursor, err := decodeQueryCursor(filter.Cursor, filter)
 	if err != nil {
 		return nil, err
@@ -149,6 +162,46 @@ func (s *Store) Query(_ context.Context, filter eventstore.QueryFilter) (*events
 	return result, nil
 }
 
+func (s *Store) queryWithOffset(files []string, filter eventstore.QueryFilter, limit int) (*eventstore.QueryResult, error) {
+	var entries []*eventstore.Event
+	for _, file := range files {
+		loaded, err := s.readCommittedEvents(file, filter)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, loaded...)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].OccurredAt.Equal(entries[j].OccurredAt) {
+			if entries[i].RecordedAt.Equal(entries[j].RecordedAt) {
+				return entries[i].ID > entries[j].ID
+			}
+			return entries[i].RecordedAt.After(entries[j].RecordedAt)
+		}
+		return entries[i].OccurredAt.After(entries[j].OccurredAt)
+	})
+
+	total := len(entries)
+	offset := max(filter.Offset, 0)
+	if offset >= total {
+		return &eventstore.QueryResult{
+			Entries: []*eventstore.Event{},
+			Total:   &total,
+		}, nil
+	}
+
+	entries = entries[offset:]
+	if limit < len(entries) {
+		entries = entries[:limit]
+	}
+
+	return &eventstore.QueryResult{
+		Entries: entries,
+		Total:   &total,
+	}, nil
+}
+
 func (s *Store) listCommittedFiles(startTime, endTime time.Time) ([]string, error) {
 	entries, err := os.ReadDir(s.baseDir)
 	if err != nil {
@@ -198,6 +251,49 @@ type scannedQueryEvent struct {
 	Event     *eventstore.Event
 	File      string
 	LineStart int64
+}
+
+func (s *Store) readCommittedEvents(filePath string, filter eventstore.QueryFilter) ([]*eventstore.Event, error) {
+	f, err := os.Open(filePath) //nolint:gosec // controlled path
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("fileeventstore: open %s: %w", filePath, err)
+	}
+	defer func() { _ = f.Close() }()
+
+	var entries []*eventstore.Event
+	scanner := bufio.NewScanner(f)
+	fileutil.ConfigureScanner(scanner)
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		event := new(eventstore.Event)
+		if err := json.Unmarshal(scanner.Bytes(), event); err != nil {
+			slog.Warn("fileeventstore: skipping malformed event log line",
+				slog.String("file", filePath),
+				slog.Int("line", lineNum),
+				slog.String("error", err.Error()))
+			continue
+		}
+		event.Normalize()
+		if err := event.Validate(); err != nil {
+			slog.Warn("fileeventstore: skipping invalid event log line",
+				slog.String("file", filePath),
+				slog.Int("line", lineNum),
+				slog.String("error", err.Error()))
+			continue
+		}
+		if !matchesFilter(event, filter) {
+			continue
+		}
+		entries = append(entries, event)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("fileeventstore: scan %s: %w", filePath, err)
+	}
+	return entries, nil
 }
 
 func (s *Store) readCommittedEventsReverse(filePath string, filter eventstore.QueryFilter, limit int, offset int64) ([]scannedQueryEvent, error) {

@@ -62,8 +62,27 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 	if request.Params.Limit != nil {
 		filter.Limit = *request.Params.Limit
 	}
+	if request.Params.Offset != nil {
+		filter.Offset = *request.Params.Offset
+	}
 	if request.Params.Cursor != nil {
 		filter.Cursor = *request.Params.Cursor
+	}
+	if request.Params.PaginationMode != nil {
+		filter.PaginationMode = eventstore.QueryPaginationMode(*request.Params.PaginationMode)
+	}
+	if filter.Cursor != "" {
+		filter.PaginationMode = eventstore.QueryPaginationModeCursor
+	}
+	if filter.PaginationMode == "" {
+		filter.PaginationMode = eventstore.QueryPaginationModeOffset
+	}
+	if filter.PaginationMode == eventstore.QueryPaginationModeCursor && request.Params.Offset != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "offset cannot be combined with cursor pagination",
+			HTTPStatus: http.StatusBadRequest,
+		}
 	}
 
 	const (
@@ -142,6 +161,9 @@ func (a *API) ListEventLogs(ctx context.Context, request api.ListEventLogsReques
 
 	response := api.ListEventLogs200JSONResponse{
 		Entries: entries,
+	}
+	if result.Total != nil {
+		response.Total = result.Total
 	}
 	if result.NextCursor != "" {
 		response.NextCursor = &result.NextCursor

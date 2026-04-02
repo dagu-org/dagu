@@ -191,6 +191,7 @@ describe('EventLogsPage', () => {
             query: expect.objectContaining({
               remoteNode: 'remote-a',
               kind: 'dag_run',
+              paginationMode: 'cursor',
               limit: 50,
             }),
           },
@@ -218,6 +219,7 @@ describe('EventLogsPage', () => {
             query: expect.objectContaining({
               dagName: 'payments',
               type: 'dag.run.failed',
+              paginationMode: 'cursor',
             }),
           },
         })
@@ -422,8 +424,10 @@ describe('EventLogsPage', () => {
       expect(clientGetMock).toHaveBeenCalledWith('/event-logs', {
         params: {
           query: expect.objectContaining({
+            remoteNode: 'remote-a',
             kind: 'dag_run',
             limit: 50,
+            paginationMode: 'cursor',
             cursor: 'cursor-1',
           }),
         },

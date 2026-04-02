@@ -66,7 +66,7 @@ func (r *reverseLineReader) Next() ([]byte, int64, error) {
 		readSize := minInt64(reverseLineReaderBlockSize, r.pos)
 		r.pos -= readSize
 
-		chunk := make([]byte, readSize)
+		chunk := make([]byte, int(readSize))
 		n, err := r.file.ReadAt(chunk, r.pos)
 		if err != nil && err != io.EOF {
 			return nil, 0, fmt.Errorf("reverse read committed log: %w", err)

@@ -52,8 +52,9 @@ func (s *notificationMonitorState) normalize() {
 	if s.Destinations == nil {
 		s.Destinations = make(map[string]*notificationDestinationState)
 	}
-	for _, destination := range s.Destinations {
+	for key, destination := range s.Destinations {
 		if destination == nil {
+			delete(s.Destinations, key)
 			continue
 		}
 		if destination.Pending == nil {

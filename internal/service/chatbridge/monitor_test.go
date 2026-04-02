@@ -249,11 +249,10 @@ func TestNotificationMonitor_BootstrapFailureDoesNotReplayFromZeroCursor(t *test
 		nil,
 	)))
 
-	time.Sleep(80 * time.Millisecond)
-
-	headCalls, readCalls := store.stats()
-	assert.Greater(t, headCalls, 0)
-	assert.Equal(t, 0, readCalls)
+	require.Eventually(t, func() bool {
+		headCalls, readCalls := store.stats()
+		return headCalls > 0 && readCalls == 0
+	}, time.Second, 10*time.Millisecond)
 
 	mu.Lock()
 	assert.Empty(t, delivered)

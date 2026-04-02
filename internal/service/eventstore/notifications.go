@@ -81,6 +81,27 @@ type NotificationStatusSnapshot struct {
 	OnWait     *NotificationNodeSnapshot  `json:"on_wait,omitempty"`
 }
 
+func (s *NotificationStatusSnapshot) Validate() error {
+	if s == nil {
+		return errors.New("eventstore: notification snapshot is nil")
+	}
+	if s.DAGRunID == "" {
+		return errors.New("eventstore: invalid notification snapshot: missing dag_run_id")
+	}
+	if s.AttemptID == "" {
+		return errors.New("eventstore: invalid notification snapshot: missing attempt_id")
+	}
+	if s.Name == "" {
+		return errors.New("eventstore: invalid notification snapshot: missing name")
+	}
+	switch s.Status { //nolint:exhaustive // notification snapshots only allow persisted terminal/waiting states
+	case core.Waiting, core.Succeeded, core.PartiallySucceeded, core.Failed, core.Aborted, core.Rejected:
+	default:
+		return errors.New("eventstore: invalid notification snapshot: missing or unsupported status")
+	}
+	return nil
+}
+
 func newNotificationStatusSnapshot(status *exec.DAGRunStatus) *NotificationStatusSnapshot {
 	if status == nil {
 		return nil
@@ -178,6 +199,9 @@ func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
 	if err := json.Unmarshal(payload, &snapshot); err != nil {
 		return nil, fmt.Errorf("eventstore: unmarshal notification snapshot: %w", err)
 	}
+	if err := snapshot.Validate(); err != nil {
+		return nil, err
+	}
 	return snapshot.DAGRunStatus(), nil
 }
 
@@ -189,7 +213,11 @@ func (s *Service) NotificationHeadCursor(ctx context.Context) (NotificationCurso
 	if !ok {
 		return NotificationCursor{}, errors.New("eventstore: notification reader is not configured")
 	}
-	return reader.NotificationHeadCursor(ctx)
+	cursor, err := reader.NotificationHeadCursor(ctx)
+	if err != nil {
+		return NotificationCursor{}, err
+	}
+	return cursor.Normalize(), nil
 }
 
 func (s *Service) ReadNotificationEvents(ctx context.Context, cursor NotificationCursor) ([]*Event, NotificationCursor, error) {
@@ -200,5 +228,10 @@ func (s *Service) ReadNotificationEvents(ctx context.Context, cursor Notificatio
 	if !ok {
 		return nil, NotificationCursor{}, errors.New("eventstore: notification reader is not configured")
 	}
-	return reader.ReadNotificationEvents(ctx, cursor)
+	cursor = cursor.Normalize()
+	events, nextCursor, err := reader.ReadNotificationEvents(ctx, cursor)
+	if err != nil {
+		return nil, NotificationCursor{}, err
+	}
+	return events, nextCursor.Normalize(), nil
 }
