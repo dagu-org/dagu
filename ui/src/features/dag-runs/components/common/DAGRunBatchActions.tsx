@@ -20,11 +20,11 @@ import {
 } from '../../hooks/useDAGRunBatchSubmission';
 
 interface DAGRunBatchActionsProps {
-  matchingCount: number;
+  loadedCount: number;
   onActionComplete?: () => Promise<void>;
   onClearSelection: () => void;
   onReplaceSelection: (items: DAGRunSelectionItem[]) => void;
-  onSelectAllMatching: () => void;
+  onSelectAllLoaded: () => void;
   selectedRuns: DAGRunSelectionItem[];
 }
 
@@ -39,11 +39,11 @@ const actionVerbs: Record<BatchActionType, string> = {
 };
 
 function DAGRunBatchActions({
-  matchingCount,
+  loadedCount,
   onActionComplete,
   onClearSelection,
   onReplaceSelection,
-  onSelectAllMatching,
+  onSelectAllLoaded,
   selectedRuns,
 }: DAGRunBatchActionsProps) {
   const {
@@ -67,8 +67,8 @@ function DAGRunBatchActions({
 
   const summaryText =
     selectedCount === 0
-      ? `${matchingCount} matching`
-      : `${selectedCount} selected of ${matchingCount} matching`;
+      ? `${loadedCount} loaded`
+      : `${selectedCount} selected of ${loadedCount} loaded`;
 
   const renderResultDetails = (
     action: BatchActionType,
@@ -114,10 +114,10 @@ function DAGRunBatchActions({
           <Button
             size="sm"
             variant="outline"
-            onClick={onSelectAllMatching}
-            disabled={matchingCount === 0 || isRunning}
+            onClick={onSelectAllLoaded}
+            disabled={loadedCount === 0 || isRunning}
           >
-            Select all matching
+            Select all loaded
           </Button>
           <Button
             size="sm"

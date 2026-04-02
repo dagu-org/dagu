@@ -23,12 +23,8 @@ import DAGRunBatchActions from '../../features/dag-runs/components/common/DAGRun
 import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-details';
 import DAGRunGroupedView from '../../features/dag-runs/components/dag-run-list/DAGRunGroupedView';
 import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunTable';
+import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
 import { useQuery } from '../../hooks/api';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGRuns,
-} from '../../hooks/useAppLive';
 import { useBulkDAGRunSelection } from '../../features/dag-runs/hooks/useBulkDAGRunSelection';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
@@ -417,37 +413,45 @@ function DAGRuns() {
   );
   const availableTags = tagsData?.tags ?? [];
 
-  const liveState = useLiveConnection();
-  const { data, mutate } = useQuery(
-    '/dag-runs',
-    {
-      params: {
-        query: {
-          remoteNode: appBarContext.selectedRemoteNode || 'local',
-          name: apiSearchText || undefined,
-          dagRunId: apiDagRunId || undefined,
-          status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
-          tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
-          fromDate: formatDateForApi(apiFromDate),
-          toDate: formatDateForApi(apiToDate),
-        },
-      },
-    },
-    liveFallbackOptions(liveState)
+  const dagRunQuery = React.useMemo(
+    () => ({
+      remoteNode: appBarContext.selectedRemoteNode || 'local',
+      name: apiSearchText || undefined,
+      dagRunId: apiDagRunId || undefined,
+      status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
+      tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
+      fromDate: formatDateForApi(apiFromDate),
+      toDate: formatDateForApi(apiToDate),
+      limit: 100,
+    }),
+    [
+      apiDagRunId,
+      apiFromDate,
+      apiSearchText,
+      apiStatus,
+      apiTags,
+      apiToDate,
+      appBarContext.selectedRemoteNode,
+    ]
   );
-  useLiveDAGRuns(mutate);
-  const dagRuns = data?.dagRuns ?? [];
+  const {
+    dagRuns,
+    isLoadingMore,
+    loadMoreError,
+    hasMore,
+    refresh: refreshDagRuns,
+    loadMore: handleLoadMore,
+  } = usePaginatedDAGRuns({
+    query: dagRunQuery,
+  });
   const {
     clearSelection,
     replaceSelection,
-    selectAllMatching,
+    selectAllLoaded,
     selectedKeys,
     selectedRuns,
     toggleSelection,
   } = useBulkDAGRunSelection(dagRuns);
-  const refreshDagRuns = React.useCallback(async (): Promise<void> => {
-    await mutate();
-  }, [mutate]);
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -489,9 +493,6 @@ function DAGRuns() {
     addSearchParam('preset', datePreset);
     addSearchParam('specificValue', specificValue);
     addSearchParam('specificPeriod', specificPeriod);
-
-    // Force revalidation of the query even if parameters haven't changed
-    mutate();
   };
 
   const handleNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -514,7 +515,6 @@ function DAGRuns() {
     setSelectedTags(newTags);
     setApiTags(newTags);
     addSearchParam('tags', newTags.length > 0 ? newTags.join(',') : undefined);
-    mutate();
   };
 
   const handleViewModeChange = (value: string) => {
@@ -565,8 +565,6 @@ function DAGRuns() {
     addSearchParam('dateMode', 'preset');
     addSearchParam('fromDate', dates.from);
     addSearchParam('toDate', dates.to);
-    // Trigger search with new dates
-    mutate();
   };
 
   const getSpecificPeriodDates = (
@@ -625,8 +623,6 @@ function DAGRuns() {
     addSearchParam('dateMode', 'specific');
     addSearchParam('fromDate', dates.from);
     addSearchParam('toDate', dates.to);
-    // Trigger search with new dates
-    mutate();
   };
 
   const handleDateRangeModeChange = (
@@ -647,7 +643,6 @@ function DAGRuns() {
       addSearchParam('toDate', dates.to);
       addSearchParam('specificValue', '');
       addSearchParam('specificPeriod', '');
-      mutate();
     } else if (newMode === 'specific') {
       // Apply current specific period value
       const dates = getSpecificPeriodDates(specificPeriod, specificValue);
@@ -660,7 +655,6 @@ function DAGRuns() {
       addSearchParam('fromDate', dates.from);
       addSearchParam('toDate', dates.to);
       addSearchParam('preset', '');
-      mutate();
     } else {
       addSearchParam('preset', '');
       addSearchParam('specificValue', '');
@@ -887,8 +881,8 @@ function DAGRuns() {
         </div>
         <DAGRunBatchActions
           selectedRuns={selectedRuns}
-          matchingCount={dagRuns.length}
-          onSelectAllMatching={selectAllMatching}
+          loadedCount={dagRuns.length}
+          onSelectAllLoaded={selectAllLoaded}
           onClearSelection={clearSelection}
           onReplaceSelection={replaceSelection}
           onActionComplete={refreshDagRuns}
@@ -910,6 +904,24 @@ function DAGRuns() {
             onToggleBulkSelect={toggleSelection}
           />
         )}
+        <div className="mt-3 flex flex-col items-center gap-2">
+          {loadMoreError && (
+            <div className="text-sm text-error">{loadMoreError}</div>
+          )}
+          {hasMore ? (
+            <Button
+              variant="outline"
+              onClick={() => void handleLoadMore()}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? 'Loading...' : 'Load more'}
+            </Button>
+          ) : dagRuns.length > 0 ? (
+            <div className="text-sm text-muted-foreground">
+              All loaded DAG runs are displayed.
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* Side Modal for DAG Run Details */}

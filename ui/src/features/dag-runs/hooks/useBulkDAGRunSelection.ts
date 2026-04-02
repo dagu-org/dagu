@@ -79,7 +79,7 @@ export function useBulkDAGRunSelection(
     );
   }, []);
 
-  const selectAllMatching = React.useCallback(() => {
+  const selectAllLoaded = React.useCallback(() => {
     const next = new Set(dagRuns.map(getDAGRunSelectionKey));
     setSelectedKeys((previous) =>
       areSetsEqual(previous, next) ? previous : next
@@ -107,7 +107,7 @@ export function useBulkDAGRunSelection(
     clearSelection,
     isSelected,
     replaceSelection,
-    selectAllMatching,
+    selectAllLoaded,
     selectedCount: selectedKeys.size,
     selectedKeys,
     selectedRuns,

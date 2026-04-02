@@ -10,10 +10,6 @@ import (
 	"log/slog"
 	"path/filepath"
 	"runtime"
-	"sort"
-	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -95,26 +91,15 @@ func New(baseDir string, opts ...DAGRunStoreOption) exec.DAGRunStore {
 // ListStatuses retrieves status records based on the provided options.
 // It supports filtering by time range, status, and limiting the number of results.
 func (store *Store) ListStatuses(ctx context.Context, opts ...exec.ListDAGRunStatusesOption) ([]*exec.DAGRunStatus, error) {
-	// Apply options and set defaults
 	options, err := prepareListOptions(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare options: %w", err)
 	}
-
-	var rootDirs []DataRoot
-	if options.ExactName == "" {
-		// Get all root directories
-		d, err := store.listRoot(ctx, options.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list root directories: %w", err)
-		}
-		rootDirs = d
-	} else {
-		rootDirs = append(rootDirs, NewDataRoot(store.baseDir, options.ExactName))
+	items, _, err := store.listStatusesOrdered(ctx, options, options.Limit, false)
+	if err != nil {
+		return nil, err
 	}
-
-	// Collect and filter results
-	return store.collectStatusesFromRoots(ctx, rootDirs, options)
+	return items, nil
 }
 
 // prepareListOptions processes the provided options and sets default values.
@@ -141,116 +126,6 @@ func prepareListOptions(opts []exec.ListDAGRunStatusesOption) (exec.ListDAGRunSt
 	}
 
 	return options, nil
-}
-
-// collectStatusesFromRoots gathers statuses from root directories according to the options.
-func (store *Store) collectStatusesFromRoots(
-	parentCtx context.Context,
-	roots []DataRoot,
-	opts exec.ListDAGRunStatusesOptions,
-) ([]*exec.DAGRunStatus, error) {
-
-	if len(roots) == 0 {
-		return nil, nil
-	}
-	maxWorkers := min(store.maxWorkers, len(roots))
-
-	ctx, cancel := context.WithCancel(parentCtx)
-	defer cancel()
-
-	var (
-		resultsMu      sync.Mutex
-		results        = make([]*exec.DAGRunStatus, 0, min(max(opts.Limit, 1), len(roots)))
-		remaining      atomic.Int64
-		statusesFilter = make(map[core.Status]struct{})
-	)
-
-	for _, status := range opts.Statuses {
-		statusesFilter[status] = struct{}{}
-	}
-	hasStatusFilter := len(statusesFilter) > 0
-
-	if opts.Unlimited {
-		remaining.Store(int64(^uint64(0) >> 1))
-	} else {
-		remaining.Store(int64(opts.Limit))
-	}
-
-	jobs := make(chan DataRoot)
-	var wg sync.WaitGroup
-
-	// Pre-parse tag filters once before starting workers.
-	var tagFilters []core.TagFilter
-	if len(opts.Tags) > 0 {
-		tagFilters = make([]core.TagFilter, 0, len(opts.Tags))
-		for _, t := range opts.Tags {
-			tagFilters = append(tagFilters, core.ParseTagFilter(t))
-		}
-	}
-
-	worker := func() {
-		defer wg.Done()
-		for root := range jobs {
-			if ctx.Err() != nil || remaining.Load() <= 0 {
-				return
-			}
-
-			listOpts := &listDAGRunsInRangeOpts{}
-			if !opts.Unlimited {
-				listOpts.limit = int(remaining.Load())
-			}
-			dagRuns := root.listDAGRunsInRange(ctx, opts.From, opts.To, listOpts)
-
-			statuses := make([]*exec.DAGRunStatus, 0, len(dagRuns))
-			for _, dagRun := range dagRuns {
-				if opts.DAGRunID != "" && !strings.Contains(dagRun.dagRunID, opts.DAGRunID) {
-					continue
-				}
-
-				status := store.resolveStatus(ctx, dagRun, tagFilters, statusesFilter, hasStatusFilter)
-				if status != nil {
-					statuses = append(statuses, status)
-				}
-			}
-
-			taken := int64(len(statuses))
-			if !opts.Unlimited && remaining.Add(-taken) < 0 {
-				cancel()
-			}
-
-			resultsMu.Lock()
-			results = append(results, statuses...)
-			resultsMu.Unlock()
-		}
-	}
-
-	// Start workers
-	for range maxWorkers {
-		wg.Add(1)
-		go worker()
-	}
-
-	// Send jobs to workers
-	for _, root := range roots {
-		if ctx.Err() != nil || (!opts.Unlimited && remaining.Load() <= 0) {
-			break
-		}
-		jobs <- root
-	}
-	close(jobs)
-
-	wg.Wait()
-
-	sort.Slice(results, func(i, j int) bool {
-		if results[i].CreatedAt != results[j].CreatedAt {
-			return results[i].CreatedAt > results[j].CreatedAt
-		}
-		return results[i].DAGRunID < results[j].DAGRunID
-	})
-	if !opts.Unlimited && len(results) > opts.Limit {
-		results = results[:opts.Limit]
-	}
-	return results, nil
 }
 
 // resolveStatus resolves and filters a DAGRunStatus for a single dagRun.

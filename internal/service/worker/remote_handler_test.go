@@ -510,6 +510,10 @@ func (m *mockRemoteDAGRunStore) ListStatuses(_ context.Context, _ ...exec.ListDA
 	return nil, nil
 }
 
+func (m *mockRemoteDAGRunStore) ListStatusesPage(_ context.Context, _ ...exec.ListDAGRunStatusesOption) (exec.DAGRunStatusPage, error) {
+	return exec.DAGRunStatusPage{}, nil
+}
+
 func (m *mockRemoteDAGRunStore) CompareAndSwapLatestAttemptStatus(
 	_ context.Context,
 	_ exec.DAGRunRef,
