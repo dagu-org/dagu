@@ -173,6 +173,20 @@ function Dashboard(): React.ReactElement | null {
   };
 
   const selectedDAGName = selectedDAGRun !== 'all' ? selectedDAGRun : undefined;
+  const dagRunsQuery = React.useMemo(
+    () => ({
+      remoteNode: appBarContext.selectedRemoteNode || 'local',
+      fromDate: dateRange.startDate,
+      toDate: dateRange.endDate,
+      name: selectedDAGName,
+    }),
+    [
+      appBarContext.selectedRemoteNode,
+      dateRange.endDate,
+      dateRange.startDate,
+      selectedDAGName,
+    ]
+  );
 
   useLiveConnection();
   const {
@@ -181,12 +195,7 @@ function Dashboard(): React.ReactElement | null {
     isLoading,
     refresh,
   } = useExactDAGRuns({
-    query: {
-      remoteNode: appBarContext.selectedRemoteNode || 'local',
-      fromDate: dateRange.startDate,
-      toDate: dateRange.endDate,
-      name: selectedDAGName,
-    },
+    query: dagRunsQuery,
     fallbackIntervalMs: 5000,
   });
 

@@ -79,15 +79,19 @@ export function useDateKanbanData(
     () => dayBounds(date, tzOffsetInSec),
     [date, tzOffsetInSec]
   );
-
-  useLiveConnection(isToday);
-  const { data, error, refresh } = useExactDAGRuns({
-    query: {
+  const dagRunsQuery = useMemo(
+    () => ({
       remoteNode,
       tags: tag,
       fromDate,
       toDate,
-    },
+    }),
+    [fromDate, remoteNode, tag, toDate]
+  );
+
+  useLiveConnection(isToday);
+  const { data, error, refresh } = useExactDAGRuns({
+    query: dagRunsQuery,
     liveEnabled: isLive,
     fallbackIntervalMs: isToday ? 2000 : 0,
   });
