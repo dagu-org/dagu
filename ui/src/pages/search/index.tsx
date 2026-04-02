@@ -1,218 +1,499 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import SearchResult from '@/features/search/components/SearchResult';
+import { useInfinite } from '@/hooks/api';
 import { Search as SearchIcon } from 'lucide-react';
-import React, { useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
-import SearchResult from '../../features/search/components/SearchResult';
-import { useQuery } from '../../hooks/api';
 import Title from '../../ui/Title';
 
+type SearchScope = 'dags' | 'docs';
+
+type SearchFilters = {
+  searchVal: string;
+  scope: SearchScope;
+};
+
+type SearchFeedPanelProps = {
+  title: string;
+  query: string;
+  hasResults: boolean;
+  isLoading: boolean;
+  initialErrorMessage: string | null;
+  loadMoreErrorMessage: string | null;
+  emptyMessage: string;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
+  onRetryLoadMore: () => void;
+  sentinelRef: React.RefObject<HTMLDivElement | null>;
+  children: React.ReactNode;
+};
+
+type SearchFeedProps = {
+  query: string;
+  remoteNode: string;
+};
+
+function parseScope(value: string | null): SearchScope {
+  return value === 'docs' ? 'docs' : 'dags';
+}
+
+function buildSearchParams(filters: SearchFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  const query = filters.searchVal.trim();
+
+  if (query) {
+    params.set('q', query);
+    params.set('scope', filters.scope);
+    return params;
+  }
+
+  if (filters.scope !== 'dags') {
+    params.set('scope', filters.scope);
+  }
+
+  return params;
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  const err = error as { status?: number; response?: { status?: number } };
+  return err?.status ?? err?.response?.status;
+}
+
+function getErrorMessage(
+  error: unknown,
+  unavailableMessage?: string
+): string {
+  if (getErrorStatus(error) === 403 && unavailableMessage) {
+    return unavailableMessage;
+  }
+
+  return (error as { message?: string })?.message || 'Search failed. Try again.';
+}
+
+function useAutoLoadMore(
+  sentinelRef: React.RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  onLoadMore: () => void
+) {
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !enabled) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [enabled, onLoadMore, sentinelRef]);
+}
+
+function SearchFeedPanel({
+  title,
+  query,
+  hasResults,
+  isLoading,
+  initialErrorMessage,
+  loadMoreErrorMessage,
+  emptyMessage,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
+  onRetryLoadMore,
+  sentinelRef,
+  children,
+}: SearchFeedPanelProps) {
+  if (!query) {
+    return (
+      <div className="text-sm text-muted-foreground italic">
+        Enter a search term and press Enter or click Search
+      </div>
+    );
+  }
+
+  if (isLoading && !hasResults && !initialErrorMessage) {
+    return (
+      <div className="text-sm text-muted-foreground italic">
+        Searching {title.toLowerCase()}...
+      </div>
+    );
+  }
+
+  if (initialErrorMessage && !hasResults) {
+    return <div className="text-sm text-destructive">{initialErrorMessage}</div>;
+  }
+
+  if (!isLoading && !hasResults && !initialErrorMessage) {
+    return (
+      <div className="text-sm text-muted-foreground italic">{emptyMessage}</div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <span className="text-xs text-muted-foreground">Infinite results</span>
+      </div>
+
+      {children}
+
+      {loadMoreErrorMessage && (
+        <div className="flex flex-col items-center gap-3">
+          <div className="text-sm text-destructive">{loadMoreErrorMessage}</div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              onRetryLoadMore();
+            }}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? 'Retrying...' : 'Retry load more'}
+          </Button>
+        </div>
+      )}
+
+      {hasMore && !loadMoreErrorMessage && (
+        <div className="flex flex-col items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              onLoadMore();
+            }}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? 'Loading...' : 'Load more'}
+          </Button>
+          <div ref={sentinelRef} className="h-4 w-full" />
+        </div>
+      )}
+
+      {!hasMore && (
+        <div className="mb-6 text-center text-xs text-muted-foreground">
+          End of results
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DAGSearchFeed({ query, remoteNode }: SearchFeedProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
+    '/search/dags',
+    (pageIndex, previousPage) => {
+      if (!query) {
+        return null;
+      }
+      if (previousPage && !previousPage.hasMore) {
+        return null;
+      }
+
+      return {
+        params: {
+          query: {
+            remoteNode,
+            q: query,
+            cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
+          },
+        },
+      };
+    },
+    {
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateFirstPage: false,
+    }
+  );
+
+  const pages = data ?? [];
+  const results = pages.flatMap((page) => page.results ?? []);
+  const hasResults = results.length > 0;
+  const lastPage = pages[pages.length - 1];
+  const hasMore = lastPage?.hasMore ?? false;
+  const isLoadingMore = isValidating && pages.length > 0;
+  const initialErrorMessage =
+    pages.length === 0 && error ? getErrorMessage(error) : null;
+  const loadMoreErrorMessage =
+    pages.length > 0 && error ? getErrorMessage(error) : null;
+
+  const loadMoreResults = React.useCallback(() => {
+    if (!query || !hasMore || isLoadingMore || loadMoreErrorMessage) {
+      return;
+    }
+    void setSize((current) => current + 1);
+  }, [hasMore, isLoadingMore, loadMoreErrorMessage, query, setSize]);
+
+  const retryLoadMore = React.useCallback(() => {
+    void mutate();
+  }, [mutate]);
+
+  useAutoLoadMore(
+    sentinelRef,
+    !!query && hasMore && !loadMoreErrorMessage,
+    loadMoreResults
+  );
+
+  return (
+    <SearchFeedPanel
+      title="DAGs"
+      query={query}
+      hasResults={hasResults}
+      isLoading={isLoading}
+      initialErrorMessage={initialErrorMessage}
+      loadMoreErrorMessage={loadMoreErrorMessage}
+      emptyMessage="No dags found"
+      hasMore={hasMore}
+      isLoadingMore={isLoadingMore}
+      onLoadMore={loadMoreResults}
+      onRetryLoadMore={retryLoadMore}
+      sentinelRef={sentinelRef}
+    >
+      <SearchResult type="dag" query={query} results={results} />
+    </SearchFeedPanel>
+  );
+}
+
+function DocSearchFeed({ query, remoteNode }: SearchFeedProps) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
+    '/search/docs',
+    (pageIndex, previousPage) => {
+      if (!query) {
+        return null;
+      }
+      if (previousPage && !previousPage.hasMore) {
+        return null;
+      }
+
+      return {
+        params: {
+          query: {
+            remoteNode,
+            q: query,
+            cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
+          },
+        },
+      };
+    },
+    {
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateFirstPage: false,
+    }
+  );
+
+  const pages = data ?? [];
+  const results = pages.flatMap((page) => page.results ?? []);
+  const hasResults = results.length > 0;
+  const lastPage = pages[pages.length - 1];
+  const hasMore = lastPage?.hasMore ?? false;
+  const isLoadingMore = isValidating && pages.length > 0;
+  const unavailableMessage =
+    'Document management is not available on this server.';
+  const initialErrorMessage =
+    pages.length === 0 && error
+      ? getErrorMessage(error, unavailableMessage)
+      : null;
+  const loadMoreErrorMessage =
+    pages.length > 0 && error
+      ? getErrorMessage(error, unavailableMessage)
+      : null;
+
+  const loadMoreResults = React.useCallback(() => {
+    if (!query || !hasMore || isLoadingMore || loadMoreErrorMessage) {
+      return;
+    }
+    void setSize((current) => current + 1);
+  }, [hasMore, isLoadingMore, loadMoreErrorMessage, query, setSize]);
+
+  const retryLoadMore = React.useCallback(() => {
+    void mutate();
+  }, [mutate]);
+
+  useAutoLoadMore(
+    sentinelRef,
+    !!query && hasMore && !loadMoreErrorMessage,
+    loadMoreResults
+  );
+
+  return (
+    <SearchFeedPanel
+      title="Documents"
+      query={query}
+      hasResults={hasResults}
+      isLoading={isLoading}
+      initialErrorMessage={initialErrorMessage}
+      loadMoreErrorMessage={loadMoreErrorMessage}
+      emptyMessage="No documents found"
+      hasMore={hasMore}
+      isLoadingMore={isLoadingMore}
+      onLoadMore={loadMoreResults}
+      onRetryLoadMore={retryLoadMore}
+      sentinelRef={sentinelRef}
+    >
+      <SearchResult type="doc" query={query} results={results} />
+    </SearchFeedPanel>
+  );
+}
+
 function Search() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const inputRef = useRef<HTMLInputElement>(null);
+  const didHydrateFromSessionRef = useRef(false);
 
-  type SearchFilters = {
-    searchVal: string;
-  };
+  const queryParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
 
-  const areFiltersEqual = (a: SearchFilters, b: SearchFilters) =>
-    a.searchVal === b.searchVal;
-
-  const defaultFilters = React.useMemo<SearchFilters>(
+  const currentFilters = useMemo<SearchFilters>(
     () => ({
-      searchVal: searchParams.get('q') || '',
+      searchVal: queryParams.get('q') || '',
+      scope: parseScope(queryParams.get('scope')),
     }),
-    [searchParams]
+    [queryParams]
   );
 
-  const [searchVal, setSearchVal] = React.useState(defaultFilters.searchVal);
-
-  const currentFilters = React.useMemo<SearchFilters>(
-    () => ({
-      searchVal,
-    }),
-    [searchVal]
-  );
-
-  const currentFiltersRef = React.useRef(currentFilters);
-  React.useEffect(() => {
-    currentFiltersRef.current = currentFilters;
-  }, [currentFilters]);
-
-  const lastPersistedFiltersRef = React.useRef<SearchFilters | null>(null);
-
-  React.useEffect(() => {
-    const stored = searchState.readState<SearchFilters>(
-      'searchPage',
-      remoteKey
-    );
-    const hasUrl = !!searchParams.get('q');
-    let next: SearchFilters;
-    let shouldSyncUrl = false;
-
-    if (hasUrl) {
-      next = defaultFilters;
-    } else if (stored) {
-      next = {
-        searchVal: stored.searchVal ?? defaultFilters.searchVal,
-      };
-      shouldSyncUrl = !!stored.searchVal;
-    } else {
-      next = defaultFilters;
-      shouldSyncUrl = !!defaultFilters.searchVal;
-    }
-
-    const current = currentFiltersRef.current;
-    if (current && areFiltersEqual(current, next)) {
-      if (!stored || hasUrl) {
-        searchState.writeState('searchPage', remoteKey, next);
-      }
-      lastPersistedFiltersRef.current = next;
-      return;
-    }
-
-    setSearchVal(next.searchVal);
-    lastPersistedFiltersRef.current = next;
-    searchState.writeState('searchPage', remoteKey, next);
-
-    if (!hasUrl && shouldSyncUrl && next.searchVal) {
-      setSearchParams({ q: next.searchVal }, { replace: true });
-    }
-  }, [defaultFilters, remoteKey, searchParams, searchState, setSearchParams]);
-
-  React.useEffect(() => {
-    const persisted = lastPersistedFiltersRef.current;
-    if (persisted && areFiltersEqual(persisted, currentFilters)) {
-      return;
-    }
-    lastPersistedFiltersRef.current = currentFilters;
-    searchState.writeState('searchPage', remoteKey, currentFilters);
-  }, [currentFilters, remoteKey, searchState]);
-
-  const q = searchParams.get('q') || '';
-  // Use a conditional key pattern - this is a standard SWR pattern for conditional fetching
-  // When q is empty, we pass undefined for the first parameter, which tells SWR not to fetch
-  const searchParams_ = q
-    ? {
-        params: {
-          query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
-            q,
-          },
-        },
-      }
-    : {};
-  const searchOpts = { refreshInterval: q ? 2000 : 0 };
-
-  const { data: dagData } = useQuery(
-    q ? '/dags/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
-    searchParams_,
-    searchOpts
-  );
-
-  const { data: docData } = useQuery(
-    q ? '/docs/search' : (undefined as any), // eslint-disable-line @typescript-eslint/no-explicit-any
-    searchParams_,
-    searchOpts
-  );
-
-  const ref = useRef<HTMLInputElement>(null);
+  const [searchVal, setSearchVal] = React.useState(currentFilters.searchVal);
 
   useEffect(() => {
-    ref.current?.focus();
+    setSearchVal(currentFilters.searchVal);
+  }, [currentFilters.searchVal]);
+
+  useEffect(() => {
+    const hasUrlState = queryParams.has('q') || queryParams.has('scope');
+    if (!didHydrateFromSessionRef.current) {
+      didHydrateFromSessionRef.current = true;
+      const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
+
+      if (!hasUrlState && stored) {
+        setSearchParams(buildSearchParams(stored), { replace: true });
+        return;
+      }
+    }
+
+    searchState.writeState('searchPage', remoteKey, currentFilters);
+  }, [currentFilters, queryParams, remoteKey, searchState, setSearchParams]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
   }, []);
 
-  const onSubmit = React.useCallback((value: string) => {
-    setSearchParams({
-      q: value,
-    });
-  }, [setSearchParams]);
+  const syncFilters = React.useCallback(
+    (next: SearchFilters, replace = false) => {
+      setSearchParams(buildSearchParams(next), { replace });
+    },
+    [setSearchParams]
+  );
+
+  const onSubmit = React.useCallback(
+    (value: string) => {
+      syncFilters(
+        {
+          searchVal: value.trim(),
+          scope: currentFilters.scope,
+        },
+        false
+      );
+    },
+    [currentFilters.scope, syncFilters]
+  );
+
+  const submittedQuery = currentFilters.searchVal.trim();
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   return (
-    <div className="max-w-7xl">
+    <div className="max-w-5xl">
       <div className="w-full">
         <Title>Search</Title>
-        <div className="flex items-center gap-2 pt-2">
-          <Input
-            placeholder="Search text..."
-            className="max-w-md"
-            ref={ref}
-            value={searchVal}
-            onChange={(e) => {
-              setSearchVal(e.target.value);
-            }}
-            type="search"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                if (searchVal) {
+
+        <div className="flex flex-col gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              placeholder="Search text..."
+              className="max-w-md"
+              ref={inputRef}
+              value={searchVal}
+              onChange={(e) => {
+                setSearchVal(e.target.value);
+              }}
+              type="search"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
                   onSubmit(searchVal);
                 }
-              }
-            }}
-          />
-          <Button
-            disabled={!searchVal}
-            onClick={async () => {
-              onSubmit(searchVal);
-            }}
-          >
-            <SearchIcon className="h-4 w-4" />
-            Search
-          </Button>
+              }}
+            />
+            <Button
+              disabled={!searchVal.trim() && !submittedQuery}
+              onClick={() => {
+                onSubmit(searchVal);
+              }}
+            >
+              <SearchIcon className="h-4 w-4" />
+              Search
+            </Button>
+          </div>
+
+          <ToggleGroup aria-label="Search scope">
+            <ToggleButton
+              value="dags"
+              groupValue={currentFilters.scope}
+              onClick={() => {
+                syncFilters({
+                  searchVal,
+                  scope: 'dags',
+                });
+              }}
+            >
+              DAGs
+            </ToggleButton>
+            <ToggleButton
+              value="docs"
+              groupValue={currentFilters.scope}
+              onClick={() => {
+                syncFilters({
+                  searchVal,
+                  scope: 'docs',
+                });
+              }}
+            >
+              Docs
+            </ToggleButton>
+          </ToggleGroup>
         </div>
 
-        <div className="mt-2">
-          {(() => {
-            if (!q) {
-              return (
-                <div className="text-sm text-muted-foreground italic">
-                  Enter a search term and press Enter or click Search
-                </div>
-              );
-            }
-
-            const dagResults = dagData?.results ?? [];
-            const docResults = docData?.results ?? [];
-            const totalCount = dagResults.length + docResults.length;
-
-            if (totalCount === 0 && dagData && docData) {
-              return (
-                <div className="text-sm text-muted-foreground italic">
-                  No results found
-                </div>
-              );
-            }
-
-            return (
-              <div className="space-y-4">
-                {dagResults.length > 0 && (
-                  <div>
-                    <h2 className="text-lg font-semibold mb-2">
-                      {dagResults.length} DAG{' '}
-                      {dagResults.length === 1 ? 'result' : 'results'}
-                    </h2>
-                    <SearchResult type="dag" results={dagResults} />
-                  </div>
-                )}
-                {docResults.length > 0 && (
-                  <div>
-                    <h2 className="text-lg font-semibold mb-2">
-                      {docResults.length} Doc{' '}
-                      {docResults.length === 1 ? 'result' : 'results'}
-                    </h2>
-                    <SearchResult type="doc" results={docResults} />
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+        <div className="mt-4 space-y-4">
+          {currentFilters.scope === 'docs' ? (
+            <DocSearchFeed query={submittedQuery} remoteNode={remoteNode} />
+          ) : (
+            <DAGSearchFeed query={submittedQuery} remoteNode={remoteNode} />
+          )}
         </div>
       </div>
     </div>
   );
 }
+
 export default Search;
