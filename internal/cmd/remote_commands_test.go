@@ -18,11 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:fix inline
-func stringPtr(v string) *string {
-	return new(v)
-}
-
 func TestToExecStatus_MapsRemoteFieldsExplicitly(t *testing.T) {
 	t.Parallel()
 
