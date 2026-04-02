@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var automataAllowedTools = []string{
+var workflowAutomataAllowedTools = []string{
 	"read",
 	"think",
 	"search_skills",
@@ -29,6 +29,19 @@ var automataAllowedTools = []string{
 	"set_automata_task_done",
 	"request_human_input",
 	"finish_automata",
+}
+
+var serviceAutomataAllowedTools = []string{
+	"read",
+	"think",
+	"search_skills",
+	"use_skill",
+	"list_automata_tasks",
+	"list_allowed_dags",
+	"run_allowed_dag",
+	"retry_automata_run",
+	"set_automata_task_done",
+	"request_human_input",
 }
 
 func (s *Service) Run(ctx context.Context) {
@@ -339,7 +352,7 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 		soul = loaded
 	}
 	return &agent.SessionRuntimeOptions{
-		AllowedTools:      append([]string(nil), automataAllowedTools...),
+		AllowedTools:      allowedToolsForDefinition(def),
 		SystemPromptExtra: s.buildSystemPromptExtra(def, state, allowedDAGs),
 		EnabledSkills:     append([]string(nil), def.Agent.EnabledSkills...),
 		Soul:              soul,
@@ -352,9 +365,17 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 	}, nil
 }
 
+func allowedToolsForDefinition(def *Definition) []string {
+	if isService(def) {
+		return append([]string(nil), serviceAutomataAllowedTools...)
+	}
+	return append([]string(nil), workflowAutomataAllowedTools...)
+}
+
 func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed []AllowedDAGInfo) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "You are controlling Automata %q.\n", def.Name)
+	fmt.Fprintf(&sb, "Kind: %s\n", def.Kind)
 	fmt.Fprintf(&sb, "Goal: %s\n", def.Goal)
 	if instruction := strings.TrimSpace(state.Instruction); instruction != "" {
 		fmt.Fprintf(&sb, "Current instruction: %s\n", instruction)
@@ -391,12 +412,24 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	sb.WriteString("- Use set_automata_task_done only to check or uncheck an existing checklist task.\n")
 	sb.WriteString("- Use run_allowed_dag for execution and wait for the scheduler to resume you.\n")
 	sb.WriteString("- Use request_human_input if blocked on approval or clarification.\n")
-	sb.WriteString("- Use finish_automata only when the goal is complete.\n")
+	if isService(def) {
+		sb.WriteString("- This is a persistent service. Do not finish it when current work is done.\n")
+		sb.WriteString("- If there is nothing actionable right now, return to standby and wait for the next schedule tick or operator message.\n")
+	} else {
+		sb.WriteString("- Use finish_automata only when the goal is complete.\n")
+	}
 	sb.WriteString("- Do not ask for shell commands, file edits, or tools you do not have.\n")
 	return sb.String()
 }
 
 func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
+	if isService(def) {
+		return fmt.Sprintf(
+			"Activate service Automata %q. Current instruction: %q. Review the checklist and continue any actionable work. If work must be executed, run one allowlisted DAG. If blocked, request human input. If there is nothing actionable right now, return to standby without finishing the automata.",
+			def.Name,
+			state.Instruction,
+		)
+	}
 	return fmt.Sprintf(
 		"Continue Automata %q. Current instruction: %q. Work through the checklist toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
 		def.Name,
@@ -405,6 +438,21 @@ func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
 }
 
 func (s *Service) buildResumeMessage(def *Definition, state *State, requestedBy string) string {
+	if isService(def) {
+		if requestedBy == "" {
+			return fmt.Sprintf(
+				"Service Automata %q was resumed. Current instruction: %q. Continue any active work from the latest context. If there is nothing actionable right now, return to standby.",
+				def.Name,
+				state.Instruction,
+			)
+		}
+		return fmt.Sprintf(
+			"Service Automata %q was resumed by %s. Current instruction: %q. Continue any active work from the latest context. If there is nothing actionable right now, return to standby.",
+			def.Name,
+			requestedBy,
+			state.Instruction,
+		)
+	}
 	if requestedBy == "" {
 		return fmt.Sprintf(
 			"Automata %q was resumed. Current instruction: %q. Continue the active task from the latest context and checklist state.",
@@ -437,6 +485,15 @@ func (s *Service) buildHumanResponseMessage(prompt *Prompt, response *PromptResp
 		prompt.Question,
 		strings.Join(response.SelectedOptionIDs, ", "),
 		response.FreeTextResponse,
+	)
+}
+
+func (s *Service) buildScheduledTickMessage(def *Definition, state *State, tickTime time.Time) string {
+	return fmt.Sprintf(
+		"Scheduled wake-up for service Automata %q at %s. Current instruction: %q. Review the checklist and current context. If there is actionable work, continue it or run one allowlisted DAG. If there is nothing actionable right now, return to standby without finishing the automata.",
+		def.Name,
+		tickTime.Format(time.RFC3339),
+		state.Instruction,
 	)
 }
 
@@ -568,6 +625,9 @@ func (r *controllerRuntime) RequestHumanInput(ctx context.Context, prompt agent.
 }
 
 func (r *controllerRuntime) Finish(ctx context.Context, summary string) error {
+	if isService(r.def) {
+		return fmt.Errorf("cannot finish a service automata")
+	}
 	if r.state.CurrentRunRef != nil {
 		return fmt.Errorf("cannot finish automata while a child DAG run is active")
 	}

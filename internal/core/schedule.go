@@ -126,6 +126,27 @@ func (s Schedule) Next(now time.Time) time.Time {
 	}
 }
 
+// DueAt reports whether the schedule is due at the provided time and returns
+// the matching scheduled time when it is.
+func (s Schedule) DueAt(now time.Time) (time.Time, bool) {
+	switch s.GetKind() {
+	case ScheduleKindCron:
+		parsed, ok := s.parsedCron()
+		if !ok {
+			return time.Time{}, false
+		}
+		next := parsed.Next(now.Add(-time.Second))
+		if next.After(now) {
+			return time.Time{}, false
+		}
+		return next, true
+	case ScheduleKindAt:
+		return time.Time{}, false
+	default:
+		return time.Time{}, false
+	}
+}
+
 // Fingerprint returns the canonical schedule fingerprint used for durable state.
 func (s Schedule) Fingerprint() string {
 	normalized, err := s.normalized()

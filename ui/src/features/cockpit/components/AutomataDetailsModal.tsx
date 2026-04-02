@@ -1,7 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, X } from 'lucide-react';
-import { components, Status } from '@/api/v1/schema';
+import {
+  AutomataDisplayStatus,
+  AutomataKind,
+  components,
+  Status,
+} from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { useClient, useQuery } from '@/hooks/api';
@@ -17,22 +22,25 @@ type AutomataDetail = components['schemas']['AutomataDetailResponse'];
 type AgentMessage = components['schemas']['AgentMessage'];
 type AutomataRunSummary = components['schemas']['AutomataRunSummary'];
 type AutomataTask = components['schemas']['AutomataTask'];
+type AutomataKindValue = components['schemas']['AutomataKind'];
 
 const CLOSE_ANIMATION_MS = 150;
 
 function lifecycleClass(state?: string): string {
   switch (state) {
-    case 'running':
+    case AutomataDisplayStatus.running:
       return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200';
-    case 'waiting':
-      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200';
-    case 'paused':
+    case AutomataDisplayStatus.paused:
       return 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-100';
-    case 'finished':
+    case AutomataDisplayStatus.finished:
       return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200';
     default:
       return 'bg-muted text-muted-foreground';
   }
+}
+
+function isServiceKind(kind?: AutomataKindValue | string): boolean {
+  return kind === AutomataKind.service;
 }
 
 function dagRunStatusToStatus(status?: string): Status | undefined {
@@ -237,20 +245,30 @@ export function AutomataDetailsModal({
   }, [data?.state?.pendingPrompt?.id, stableName]);
 
   const lifecycleState = data?.state?.state ?? '';
+  const automataKind = data?.definition?.kind ?? AutomataKind.workflow;
+  const serviceKind = isServiceKind(automataKind);
+  const serviceActivated = serviceKind && !!data?.state?.activatedAt;
+  const displayStatus = data?.state?.displayStatus ?? data?.state?.state ?? '';
   const checklistSummary = React.useMemo(
     () => taskCounts(data?.state?.tasks),
     [data?.state?.tasks]
   );
-  const canStartTask =
-    lifecycleState === 'idle' || lifecycleState === 'finished';
+  const canStartTask = serviceKind
+    ? lifecycleState === 'idle' && !serviceActivated
+    : lifecycleState === 'idle' || lifecycleState === 'finished';
   const canSendOperatorMessage =
     !!data &&
-    (lifecycleState === 'running' ||
-      lifecycleState === 'waiting' ||
-      lifecycleState === 'paused') &&
-    !data.state.pendingPrompt;
-  const canPause = lifecycleState === 'running' || lifecycleState === 'waiting';
+    !data.state.pendingPrompt &&
+    (serviceKind
+      ? serviceActivated && lifecycleState !== 'paused'
+      : lifecycleState === 'running' ||
+        lifecycleState === 'waiting' ||
+        lifecycleState === 'paused');
+  const canPause = serviceKind
+    ? serviceActivated && lifecycleState !== 'paused'
+    : lifecycleState === 'running' || lifecycleState === 'waiting';
   const canResume = lifecycleState === 'paused';
+  const canStartWithoutOpenTasks = serviceKind;
 
   const refreshAfterAction = React.useCallback(async () => {
     await mutate();
@@ -465,10 +483,23 @@ export function AutomataDetailsModal({
                   <span
                     className={cn(
                       'rounded-full px-3 py-1 text-xs font-medium',
-                      lifecycleClass(data.state.state)
+                      lifecycleClass(displayStatus)
                     )}
                   >
-                    {data.state.state}
+                    {displayStatus}
+                  </span>
+                  {data.state.busy ? (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                      busy
+                    </span>
+                  ) : null}
+                  {data.state.needsInput ? (
+                    <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-900 dark:bg-rose-900/40 dark:text-rose-200">
+                      needs input
+                    </span>
+                  ) : null}
+                  <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+                    {automataKind}
                   </span>
                   <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
                     Tasks {checklistSummary.done}/
@@ -490,6 +521,10 @@ export function AutomataDetailsModal({
                           {data.definition.description}
                         </p>
                       ) : null}
+                      <p>
+                        <span className="font-medium">Kind:</span>{' '}
+                        {data.definition.kind}
+                      </p>
                       <p>
                         <span className="font-medium">Goal:</span>{' '}
                         {data.definition.goal || 'n/a'}
@@ -570,7 +605,9 @@ export function AutomataDetailsModal({
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="min-w-0 rounded-lg border p-4">
                     <h3 className="mb-3 text-sm font-semibold">
-                      {data.state.state === 'finished'
+                      {serviceKind
+                        ? 'Activate Service'
+                        : data.state.state === 'finished'
                         ? 'Start New Task'
                         : 'Start Instruction'}
                     </h3>
@@ -578,33 +615,50 @@ export function AutomataDetailsModal({
                       <Textarea
                         value={instructionDraft}
                         onChange={(e) => setInstructionDraft(e.target.value)}
-                        placeholder="Tell this Automata what task to work on before starting it."
+                        placeholder={
+                          serviceKind
+                            ? 'Define the standing instruction for this service before activating it.'
+                            : 'Tell this Automata what task to work on before starting it.'
+                        }
                         disabled={!canStartTask || !!busyAction}
                       />
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-xs text-muted-foreground">
                           {canStartTask
-                            ? checklistSummary.open > 0
-                              ? 'Automata stays idle until an instruction is provided.'
-                              : 'Add or reopen at least one checklist task before starting.'
+                            ? serviceKind
+                              ? checklistSummary.open > 0
+                                ? 'Activating this service makes it live immediately. Schedule ticks can wake it while open tasks exist.'
+                                : 'You can activate this service without open tasks. It will stay on standby until a task is opened or a message arrives.'
+                              : checklistSummary.open > 0
+                                ? 'Automata stays idle until an instruction is provided.'
+                                : 'Add or reopen at least one checklist task before starting.'
                             : data.state.state === 'paused'
-                              ? 'This Automata is paused. Resume it to continue the current task.'
-                              : 'This Automata already has an active task. Use an operator message to steer it.'}
+                              ? serviceKind
+                                ? 'This service is paused. Resume it to put it back on standby.'
+                                : 'This Automata is paused. Resume it to continue the current task.'
+                              : serviceKind
+                                ? 'This service is already live. Use an operator message, tasks, or schedule ticks to steer it.'
+                                : 'This Automata already has an active task. Use an operator message to steer it.'}
                         </div>
                         <Button
                           onClick={onStart}
                           disabled={
                             !instructionDraft.trim() ||
                             !canStartTask ||
-                            checklistSummary.open === 0 ||
+                            (!canStartWithoutOpenTasks &&
+                              checklistSummary.open === 0) ||
                             !!busyAction
                           }
                         >
                           {busyAction === 'start'
-                            ? 'Starting...'
-                            : data.state.state === 'finished'
-                              ? 'Start New Task'
-                              : 'Start'}
+                            ? serviceKind
+                              ? 'Activating...'
+                              : 'Starting...'
+                            : serviceKind
+                              ? 'Activate'
+                              : data.state.state === 'finished'
+                                ? 'Start New Task'
+                                : 'Start'}
                         </Button>
                       </div>
                     </div>
@@ -620,7 +674,11 @@ export function AutomataDetailsModal({
                         onChange={(e) =>
                           setOperatorMessageDraft(e.target.value)
                         }
-                        placeholder="Add context, change priority, or clarify the current task."
+                        placeholder={
+                          serviceKind
+                            ? 'Add context, request work, or clarify what this service should handle.'
+                            : 'Add context, change priority, or clarify the current task.'
+                        }
                         disabled={!canSendOperatorMessage || !!busyAction}
                       />
                       <div className="flex items-center justify-between gap-3">
@@ -628,12 +686,22 @@ export function AutomataDetailsModal({
                           {data.state.pendingPrompt
                             ? 'Respond to the pending prompt before sending a general operator message.'
                             : canSendOperatorMessage
-                              ? data.state.state === 'paused'
-                                ? 'This records your message now, but the Automata will stay paused until you resume it.'
-                                : data.state.currentRunRef
-                                  ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
-                                  : 'This queues a user message into the active Automata task.'
-                              : 'Operator messages are only accepted while the Automata has an active task.'}
+                              ? serviceKind
+                                ? data.state.currentRunRef
+                                  ? 'This records your message now and the service will pick it up after the current child DAG changes state.'
+                                  : data.state.busy
+                                    ? 'This queues a user message into the active service turn.'
+                                    : 'This wakes the service with a new operator message.'
+                                : data.state.state === 'paused'
+                                  ? 'This records your message now, but the Automata will stay paused until you resume it.'
+                                  : data.state.currentRunRef
+                                    ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
+                                    : 'This queues a user message into the active Automata task.'
+                              : serviceKind
+                                ? serviceActivated
+                                  ? 'This service is paused. Resume it before sending a message.'
+                                  : 'Activate this service before sending operator messages.'
+                                : 'Operator messages are only accepted while the Automata has an active task.'}
                         </div>
                         <Button
                           variant="outline"

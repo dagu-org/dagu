@@ -34,6 +34,22 @@ const (
 	WaitingReasonDAG   WaitingReason = "dag_wait"
 )
 
+type AutomataKind string
+
+const (
+	AutomataKindWorkflow AutomataKind = "workflow"
+	AutomataKindService  AutomataKind = "service"
+)
+
+type DisplayStatus string
+
+const (
+	DisplayStatusIdle     DisplayStatus = "idle"
+	DisplayStatusRunning  DisplayStatus = "running"
+	DisplayStatusPaused   DisplayStatus = "paused"
+	DisplayStatusFinished DisplayStatus = "finished"
+)
+
 type AllowedDAGs struct {
 	Names []string `json:"names,omitempty" yaml:"names,omitempty"`
 	Tags  []string `json:"tags,omitempty" yaml:"tags,omitempty"`
@@ -97,6 +113,7 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 
 type Definition struct {
 	Name        string       `json:"name"`
+	Kind        AutomataKind `json:"kind" yaml:"kind,omitempty"`
 	Description string       `json:"description,omitempty" yaml:"description,omitempty"`
 	Purpose     string       `json:"purpose,omitempty" yaml:"purpose,omitempty"`
 	Goal        string       `json:"goal" yaml:"goal"`
@@ -154,6 +171,8 @@ type State struct {
 	Instruction          string               `json:"instruction,omitempty"`
 	InstructionUpdatedAt time.Time            `json:"instructionUpdatedAt"`
 	InstructionUpdatedBy string               `json:"instructionUpdatedBy,omitempty"`
+	ActivatedAt          time.Time            `json:"activatedAt"`
+	ActivatedBy          string               `json:"activatedBy,omitempty"`
 	Tasks                []Task               `json:"tasks,omitempty"`
 	SessionID            string               `json:"sessionId,omitempty"`
 	CurrentRunRef        *exec.DAGRunRef      `json:"currentRunRef,omitempty"`
@@ -169,6 +188,7 @@ type State struct {
 	LastUpdatedAt        time.Time            `json:"lastUpdatedAt"`
 	PausedAt             time.Time            `json:"pausedAt"`
 	PausedBy             string               `json:"pausedBy,omitempty"`
+	PausedFromState      LifecycleState       `json:"pausedFromState,omitempty"`
 	FinishedAt           time.Time            `json:"finishedAt"`
 	LastSummary          string               `json:"lastSummary,omitempty"`
 	LastError            string               `json:"lastError,omitempty"`
@@ -193,12 +213,16 @@ type RunSummary struct {
 
 type Summary struct {
 	Name                string         `json:"name"`
+	Kind                AutomataKind   `json:"kind"`
 	Description         string         `json:"description,omitempty"`
 	Purpose             string         `json:"purpose"`
 	Goal                string         `json:"goal"`
 	Tags                []string       `json:"tags,omitempty"`
 	Instruction         string         `json:"instruction,omitempty"`
 	State               LifecycleState `json:"state"`
+	DisplayStatus       DisplayStatus  `json:"displayStatus"`
+	Busy                bool           `json:"busy"`
+	NeedsInput          bool           `json:"needsInput"`
 	Disabled            bool           `json:"disabled,omitempty"`
 	CurrentRun          *RunSummary    `json:"currentRun,omitempty"`
 	OpenTaskCount       int            `json:"openTaskCount"`
@@ -272,6 +296,7 @@ func nextCycleID() string {
 
 func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	type rawDefinition struct {
+		Kind             AutomataKind `yaml:"kind,omitempty"`
 		Description      string       `yaml:"description,omitempty"`
 		Purpose          string       `yaml:"purpose"`
 		Goal             string       `yaml:"goal"`
@@ -289,6 +314,7 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	d.Description = raw.Description
+	d.Kind = normalizeAutomataKind(raw.Kind)
 	d.Purpose = strings.TrimSpace(raw.Purpose)
 	d.Goal = strings.TrimSpace(raw.Goal)
 	d.Tags = append([]string(nil), raw.Tags...)
@@ -307,6 +333,7 @@ func (d *Definition) normalizeGoal() {
 	if d == nil {
 		return
 	}
+	d.Kind = normalizeAutomataKind(d.Kind)
 	d.Purpose = strings.TrimSpace(d.Purpose)
 	d.Goal = strings.TrimSpace(d.Goal)
 	switch {
@@ -315,4 +342,11 @@ func (d *Definition) normalizeGoal() {
 	case d.Goal != "" && d.Purpose == "":
 		d.Purpose = d.Goal
 	}
+}
+
+func normalizeAutomataKind(kind AutomataKind) AutomataKind {
+	if kind == AutomataKindService {
+		return AutomataKindService
+	}
+	return AutomataKindWorkflow
 }

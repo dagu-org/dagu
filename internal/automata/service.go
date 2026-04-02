@@ -210,6 +210,9 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 		return errors.New("definition is required")
 	}
 	def.normalizeGoal()
+	if err := validateAutomataKind(def.Kind); err != nil {
+		return err
+	}
 	if err := normalizeTags(&def.Tags); err != nil {
 		return err
 	}
@@ -452,6 +455,24 @@ func (s *Service) ensureState(ctx context.Context, def *Definition) (*State, err
 		state.Tasks = []Task{}
 		changed = true
 	}
+	if isService(def) {
+		if state.State == StateFinished {
+			state.State = StateIdle
+			state.FinishedAt = time.Time{}
+			changed = true
+		}
+		if state.ActivatedAt.IsZero() &&
+			(state.State == StateRunning || state.State == StateWaiting || state.State == StatePaused) {
+			state.ActivatedAt = firstNonZeroTime(state.StartRequestedAt, state.LastUpdatedAt, s.clock())
+			changed = true
+		}
+	} else {
+		if !state.ActivatedAt.IsZero() || state.ActivatedBy != "" {
+			state.ActivatedAt = time.Time{}
+			state.ActivatedBy = ""
+			changed = true
+		}
+	}
 	if changed {
 		if err := s.saveState(ctx, def.Name, state); err != nil {
 			return nil, err
@@ -543,14 +564,19 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			return nil, err
 		}
 		currentRun, _ := s.currentRunSummary(ctx, state)
+		view := DeriveView(def, state)
 		result = append(result, Summary{
 			Name:                def.Name,
+			Kind:                def.Kind,
 			Description:         def.Description,
 			Purpose:             def.Purpose,
 			Goal:                def.Goal,
 			Tags:                append([]string(nil), def.Tags...),
 			Instruction:         state.Instruction,
 			State:               state.State,
+			DisplayStatus:       view.DisplayStatus,
+			Busy:                view.Busy,
+			NeedsInput:          view.NeedsInput,
 			Disabled:            def.Disabled,
 			CurrentRun:          currentRun,
 			OpenTaskCount:       countTasksByState(state.Tasks, TaskStateOpen),
@@ -667,6 +693,67 @@ func (s *Service) recentRuns(ctx context.Context, name string) ([]RunSummary, er
 	return out, nil
 }
 
+func (s *Service) HandleScheduleTick(ctx context.Context, tickTime time.Time) error {
+	defs, err := s.ListDefinitions(ctx)
+	if err != nil {
+		return err
+	}
+	tickTime = tickTime.Truncate(time.Minute)
+	for _, def := range defs {
+		if err := s.handleScheduledServiceTick(ctx, def, tickTime); err != nil {
+			s.logger.Warn("automata schedule tick failed",
+				"automata", def.Name,
+				"error", err,
+			)
+		}
+	}
+	return nil
+}
+
+func (s *Service) handleScheduledServiceTick(ctx context.Context, def *Definition, tickTime time.Time) error {
+	if def == nil || def.Disabled || !isService(def) || len(def.Schedule) == 0 {
+		return nil
+	}
+	state, err := s.ensureState(ctx, def)
+	if err != nil {
+		return err
+	}
+	if !isServiceActivated(state) || state.State == StatePaused {
+		return nil
+	}
+	if strings.TrimSpace(state.Instruction) == "" || !hasOpenTask(state.Tasks) {
+		return nil
+	}
+	if state.PendingPrompt != nil || state.CurrentRunRef != nil || len(state.PendingTurnMessages) > 0 {
+		return nil
+	}
+	if !state.LastScheduleMinute.IsZero() && state.LastScheduleMinute.Equal(tickTime) {
+		return nil
+	}
+	if !scheduleListDueAt(def.Schedule, tickTime) {
+		return nil
+	}
+	activity := s.inspectSessionActivity(ctx, def.Name, state)
+	if activity.Working || activity.HasPendingPrompt || activity.HasQueuedInput {
+		return nil
+	}
+
+	queueTurnMessage(state, "scheduled_tick", s.buildScheduledTickMessage(def, state, tickTime), s.clock())
+	state.State = StateRunning
+	state.WaitingReason = WaitingReasonNone
+	state.LastScheduleMinute = tickTime
+	return s.saveState(ctx, def.Name, state)
+}
+
+func scheduleListDueAt(items ScheduleList, tickTime time.Time) bool {
+	for _, item := range items {
+		if _, due := item.DueAt(tickTime); due {
+			return true
+		}
+	}
+	return false
+}
+
 func toRunSummary(status *exec.DAGRunStatus) *RunSummary {
 	if status == nil {
 		return nil
@@ -694,6 +781,9 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 	state, err := s.ensureState(ctx, def)
 	if err != nil {
 		return err
+	}
+	if isService(def) {
+		return s.requestServiceStart(ctx, def, state, req)
 	}
 	if state.State == StateRunning || state.State == StateWaiting || state.State == StatePaused {
 		return errors.New("automata already has an active task")
@@ -728,6 +818,43 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 	return s.saveState(ctx, name, state)
 }
 
+func (s *Service) requestServiceStart(ctx context.Context, def *Definition, state *State, req StartRequest) error {
+	if isServiceActivated(state) {
+		return errors.New("service automata is already active")
+	}
+	instruction := strings.TrimSpace(req.Instruction)
+	if instruction == "" {
+		instruction = strings.TrimSpace(state.Instruction)
+	}
+	if instruction == "" {
+		return errors.New("instruction is required before starting automata")
+	}
+	if state.SessionID != "" {
+		if err := s.cancelAutomataSession(ctx, def.Name, state.SessionID); err != nil {
+			return err
+		}
+		if s.sessionStore != nil {
+			if err := s.sessionStore.DeleteSession(ctx, state.SessionID); err != nil && !errors.Is(err, agent.ErrSessionNotFound) {
+				return err
+			}
+		}
+	}
+	resetRuntimeState(state)
+	state.State = StateIdle
+	state.Instruction = instruction
+	state.InstructionUpdatedAt = s.clock()
+	state.InstructionUpdatedBy = req.RequestedBy
+	state.ActivatedAt = s.clock()
+	state.ActivatedBy = req.RequestedBy
+	state.WaitingReason = WaitingReasonNone
+	if hasOpenTask(state.Tasks) {
+		state.State = StateRunning
+		state.StartRequestedAt = s.clock()
+		queueTurnMessage(state, "kickoff", s.buildKickoffMessage(def, state), s.clock())
+	}
+	return s.saveState(ctx, def.Name, state)
+}
+
 func (s *Service) Pause(ctx context.Context, name, requestedBy string) error {
 	def, err := s.GetDefinition(ctx, name)
 	if err != nil {
@@ -740,9 +867,14 @@ func (s *Service) Pause(ctx context.Context, name, requestedBy string) error {
 	if state.State == StatePaused {
 		return errors.New("automata is already paused")
 	}
-	if state.State != StateRunning && state.State != StateWaiting {
+	if isService(def) {
+		if !isServiceActivated(state) {
+			return errors.New("service automata is not active")
+		}
+	} else if state.State != StateRunning && state.State != StateWaiting {
 		return errors.New("only active automata can be paused")
 	}
+	state.PausedFromState = state.State
 	state.State = StatePaused
 	state.WaitingReason = WaitingReasonNone
 	state.PausedAt = s.clock()
@@ -762,11 +894,19 @@ func (s *Service) Resume(ctx context.Context, name, requestedBy string) error {
 	if state.State != StatePaused {
 		return errors.New("automata is not paused")
 	}
+	pausedFromState := state.PausedFromState
 	state.PausedAt = time.Time{}
 	state.PausedBy = ""
+	state.PausedFromState = ""
 	if state.PendingPrompt != nil {
 		state.State = StateWaiting
 		state.WaitingReason = WaitingReasonHuman
+		return s.saveState(ctx, name, state)
+	}
+	if isService(def) && pausedFromState == StateIdle &&
+		state.CurrentRunRef == nil && len(state.PendingTurnMessages) == 0 {
+		state.State = StateIdle
+		state.WaitingReason = WaitingReasonNone
 		return s.saveState(ctx, name, state)
 	}
 	state.State = StateRunning
@@ -974,11 +1114,21 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 	if err != nil {
 		return err
 	}
+	if def.Disabled {
+		return errors.New("automata is disabled")
+	}
 	message := strings.TrimSpace(req.Message)
 	if message == "" {
 		return errors.New("message is required")
 	}
-	if state.State != StateRunning && state.State != StateWaiting && state.State != StatePaused {
+	if isService(def) {
+		if !isServiceActivated(state) {
+			return errors.New("service automata is not active")
+		}
+		if state.State == StatePaused {
+			return errors.New("service automata is paused")
+		}
+	} else if state.State != StateRunning && state.State != StateWaiting && state.State != StatePaused {
 		return errors.New("automata is not running an active task")
 	}
 	if state.PendingPrompt != nil {
@@ -986,7 +1136,7 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 	}
 	operatorMessage := buildOperatorMessage(req.RequestedBy, message)
 	turnMessage := operatorMessage
-	if state.CurrentRunRef != nil || state.State == StatePaused {
+	if state.CurrentRunRef != nil || (!isService(def) && state.State == StatePaused) {
 		if err := s.appendOperatorMessageToSession(ctx, name, state, operatorMessage); err != nil {
 			s.logger.Warn("failed to append queued operator message to automata session",
 				"automata", name,
@@ -1081,11 +1231,25 @@ func resetRuntimeState(state *State) {
 	state.CurrentRunRef = nil
 	state.LastRunRef = nil
 	state.CurrentCycleID = ""
+	state.StartRequestedAt = time.Time{}
 	state.PausedAt = time.Time{}
 	state.PausedBy = ""
+	state.PausedFromState = ""
+	state.ActivatedAt = time.Time{}
+	state.ActivatedBy = ""
 	state.FinishedAt = time.Time{}
+	state.LastScheduleMinute = time.Time{}
 	state.LastSummary = ""
 	state.LastError = ""
+}
+
+func firstNonZeroTime(values ...time.Time) time.Time {
+	for _, value := range values {
+		if !value.IsZero() {
+			return value
+		}
+	}
+	return time.Time{}
 }
 
 func (s *Service) normalizeAllowedDAGs(ctx context.Context, allowed *AllowedDAGs) error {

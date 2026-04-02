@@ -5561,7 +5561,7 @@ paths:
   /automata:
     get:
       summary: "List automata"
-      description: "Returns all Automata definitions with current lifecycle state and stage."
+      description: "Returns all Automata definitions with current lifecycle and display state."
       operationId: "listAutomata"
       tags:
         - "automata"
@@ -5734,7 +5734,7 @@ paths:
   /automata/{name}/start:
     post:
       summary: "Start automata task"
-      description: "Starts a new Automata task from idle or finished state."
+      description: "Starts a workflow Automata task or activates a service Automata."
       operationId: "startAutomata"
       tags:
         - "automata"
@@ -11222,6 +11222,22 @@ components:
         - paused
         - finished
 
+    AutomataKind:
+      type: string
+      description: "Automata kind"
+      enum:
+        - workflow
+        - service
+
+    AutomataDisplayStatus:
+      type: string
+      description: "User-facing Automata status"
+      enum:
+        - idle
+        - running
+        - paused
+        - finished
+
     AutomataWaitingReason:
       type: string
       description: "Why an Automata is waiting"
@@ -11300,9 +11316,12 @@ components:
       required:
         - name
         - goal
+        - kind
       properties:
         name:
           type: string
+        kind:
+          $ref: "#/components/schemas/AutomataKind"
         description:
           type: string
         goal:
@@ -11441,12 +11460,23 @@ components:
       properties:
         state:
           $ref: "#/components/schemas/AutomataLifecycleState"
+        displayStatus:
+          $ref: "#/components/schemas/AutomataDisplayStatus"
+        busy:
+          type: boolean
+        needsInput:
+          type: boolean
         instruction:
           type: string
         instructionUpdatedAt:
           type: string
           format: date-time
         instructionUpdatedBy:
+          type: string
+        activatedAt:
+          type: string
+          format: date-time
+        activatedBy:
           type: string
         tasks:
           type: array
@@ -11501,10 +11531,13 @@ components:
       required:
         - name
         - goal
+        - kind
         - state
       properties:
         name:
           type: string
+        kind:
+          $ref: "#/components/schemas/AutomataKind"
         description:
           type: string
         goal:
@@ -11517,6 +11550,12 @@ components:
           type: string
         state:
           $ref: "#/components/schemas/AutomataLifecycleState"
+        displayStatus:
+          $ref: "#/components/schemas/AutomataDisplayStatus"
+        busy:
+          type: boolean
+        needsInput:
+          type: boolean
         disabled:
           type: boolean
         currentRun:

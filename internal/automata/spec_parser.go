@@ -45,6 +45,7 @@ func parseDefinitionYAML(data []byte, def *Definition) error {
 
 func validateDefinitionNode(node *yaml.Node) error {
 	return validateMappingNode(node, "definition", map[string]yamlFieldRule{
+		"kind":        {},
 		"description": {},
 		"purpose":     {},
 		"goal":        {},

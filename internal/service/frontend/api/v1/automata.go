@@ -388,14 +388,24 @@ func toAutomataAPIError(err error) error {
 
 func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 	return api.AutomataSummary{
-		CurrentRun:          toAPIAutomataRunSummary(item.CurrentRun),
-		Description:         ptrOf(item.Description),
-		Disabled:            ptrOf(item.Disabled),
-		DoneTaskCount:       ptrOf(item.DoneTaskCount),
-		Goal:                item.Goal,
-		Instruction:         ptrOf(item.Instruction),
-		LastUpdatedAt:       ptrOf(item.LastUpdatedAt),
-		Name:                item.Name,
+		Busy: func() *bool {
+			v := item.Busy
+			return &v
+		}(),
+		CurrentRun:    toAPIAutomataRunSummary(item.CurrentRun),
+		Description:   ptrOf(item.Description),
+		Disabled:      ptrOf(item.Disabled),
+		DisplayStatus: ptrOf(api.AutomataDisplayStatus(item.DisplayStatus)),
+		DoneTaskCount: ptrOf(item.DoneTaskCount),
+		Goal:          item.Goal,
+		Instruction:   ptrOf(item.Instruction),
+		Kind:          api.AutomataKind(item.Kind),
+		LastUpdatedAt: ptrOf(item.LastUpdatedAt),
+		Name:          item.Name,
+		NeedsInput: func() *bool {
+			v := item.NeedsInput
+			return &v
+		}(),
 		NextTaskDescription: ptrOf(item.NextTaskDescription),
 		OpenTaskCount:       ptrOf(item.OpenTaskCount),
 		State:               api.AutomataLifecycleState(item.State),
@@ -419,7 +429,7 @@ func toAPIAutomataDetail(item *automata.Detail) api.AutomataDetailResponse {
 		AllowedDags: toAPIAutomataAllowedDAGInfos(item.AllowedDAGs),
 		CurrentRun:  toAPIAutomataRunSummary(item.CurrentRun),
 		Definition:  toAPIAutomataDefinition(item.Definition),
-		State:       toAPIAutomataState(item.State),
+		State:       toAPIAutomataState(item.Definition, item.State),
 	}
 	if len(item.RecentRuns) > 0 {
 		runs := make([]api.AutomataRunSummary, 0, len(item.RecentRuns))
@@ -446,6 +456,7 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 		Description: ptrOf(def.Description),
 		Disabled:    ptrOf(def.Disabled),
 		Goal:        def.Goal,
+		Kind:        api.AutomataKind(def.Kind),
 		Name:        def.Name,
 		AllowedDAGs: toAPIAutomataAllowedDAGs(def.AllowedDAGs),
 		Tags: func() *[]string {
@@ -513,13 +524,21 @@ func toAPIAutomataAllowedDAGInfos(items []automata.AllowedDAGInfo) []api.Automat
 	return resp
 }
 
-func toAPIAutomataState(state *automata.State) api.AutomataState {
+func toAPIAutomataState(def *automata.Definition, state *automata.State) api.AutomataState {
 	if state == nil {
 		return api.AutomataState{}
 	}
+	view := automata.DeriveView(def, state)
 	resp := api.AutomataState{
+		ActivatedAt: ptrOf(state.ActivatedAt),
+		ActivatedBy: ptrOf(state.ActivatedBy),
+		Busy: func() *bool {
+			v := view.Busy
+			return &v
+		}(),
 		CurrentCycleId:       ptrOf(state.CurrentCycleID),
 		CurrentRunRef:        toAPIAutomataRunRef(state.CurrentRunRef),
+		DisplayStatus:        ptrOf(api.AutomataDisplayStatus(view.DisplayStatus)),
 		FinishedAt:           ptrOf(state.FinishedAt),
 		Instruction:          ptrOf(state.Instruction),
 		InstructionUpdatedAt: ptrOf(state.InstructionUpdatedAt),
@@ -530,14 +549,18 @@ func toAPIAutomataState(state *automata.State) api.AutomataState {
 		LastSummary:          ptrOf(state.LastSummary),
 		LastTriggeredAt:      ptrOf(state.LastTriggeredAt),
 		LastUpdatedAt:        ptrOf(state.LastUpdatedAt),
-		PausedAt:             ptrOf(state.PausedAt),
-		PausedBy:             ptrOf(state.PausedBy),
-		PendingPrompt:        toAPIAutomataPrompt(state.PendingPrompt),
-		PendingResponse:      toAPIAutomataPromptResponse(state.PendingResponse),
-		SessionId:            ptrOf(state.SessionID),
-		StartRequestedAt:     ptrOf(state.StartRequestedAt),
-		State:                api.AutomataLifecycleState(state.State),
-		WaitingReason:        toAPIAutomataWaitingReason(state.WaitingReason),
+		NeedsInput: func() *bool {
+			v := view.NeedsInput
+			return &v
+		}(),
+		PausedAt:         ptrOf(state.PausedAt),
+		PausedBy:         ptrOf(state.PausedBy),
+		PendingPrompt:    toAPIAutomataPrompt(state.PendingPrompt),
+		PendingResponse:  toAPIAutomataPromptResponse(state.PendingResponse),
+		SessionId:        ptrOf(state.SessionID),
+		StartRequestedAt: ptrOf(state.StartRequestedAt),
+		State:            api.AutomataLifecycleState(state.State),
+		WaitingReason:    toAPIAutomataWaitingReason(state.WaitingReason),
 	}
 	if len(state.Tasks) > 0 {
 		tasks := toAPIAutomataTasks(state.Tasks)

@@ -2,10 +2,22 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Status, type components } from '@/api/v1/schema';
+import {
+  AutomataDisplayStatus,
+  AutomataKind,
+  Status,
+  type components,
+} from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { DAGRunDetailsModal } from '@/features/dag-runs/components/dag-run-details';
@@ -16,9 +28,13 @@ import LoadingIndicator from '@/ui/LoadingIndicator';
 import StatusChip from '@/ui/StatusChip';
 
 type AutomataDetail = components['schemas']['AutomataDetailResponse'];
+type AutomataSummary = components['schemas']['AutomataSummary'];
 type AutomataTask = components['schemas']['AutomataTask'];
+type AutomataKindValue = components['schemas']['AutomataKind'];
+type AutomataDisplayState = components['schemas']['AutomataDisplayStatus'];
 
 const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
+const DEFAULT_AUTOMATA_KIND: AutomataKindValue = AutomataKind.workflow;
 
 type DAGOption = {
   fileName: string;
@@ -249,6 +265,7 @@ function quoteYAML(value: string): string {
 }
 
 function buildAutomataSpec(input: {
+  kind: AutomataKindValue;
   description: string;
   goal: string;
   tags: string[];
@@ -256,6 +273,10 @@ function buildAutomataSpec(input: {
 }): string {
   const description = input.description.trim();
   const lines = [`goal: ${quoteYAML(input.goal)}`];
+
+  if (input.kind !== DEFAULT_AUTOMATA_KIND) {
+    lines.unshift(`kind: ${input.kind}`);
+  }
 
   if (description) {
     lines.unshift(`description: ${quoteYAML(description)}`);
@@ -305,19 +326,21 @@ function validateAutomataCreateForm(input: {
   return null;
 }
 
-function statusClass(state: string): string {
+function displayStatusClass(state?: AutomataDisplayState | string): string {
   switch (state) {
-    case 'running':
+    case AutomataDisplayStatus.running:
       return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200';
-    case 'waiting':
-      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200';
-    case 'paused':
+    case AutomataDisplayStatus.paused:
       return 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-100';
-    case 'finished':
+    case AutomataDisplayStatus.finished:
       return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200';
     default:
       return 'bg-muted text-muted-foreground';
   }
+}
+
+function isServiceKind(kind?: AutomataKindValue | string): boolean {
+  return kind === AutomataKind.service;
 }
 
 function taskCounts(tasks?: AutomataTask[]): { open: number; done: number } {
@@ -365,6 +388,8 @@ function AutomataPage(): React.ReactElement {
 
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [createName, setCreateName] = React.useState('');
+  const [createKind, setCreateKind] =
+    React.useState<AutomataKindValue>(DEFAULT_AUTOMATA_KIND);
   const [createDescription, setCreateDescription] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
   const [createTags, setCreateTags] = React.useState('');
@@ -468,15 +493,25 @@ function AutomataPage(): React.ReactElement {
     return items;
   }, [detail]);
   const lifecycleState = detail?.state?.state ?? '';
-  const canStartTask =
-    lifecycleState === 'idle' || lifecycleState === 'finished';
+  const automataKind = detail?.definition?.kind ?? DEFAULT_AUTOMATA_KIND;
+  const serviceKind = isServiceKind(automataKind);
+  const serviceActivated = serviceKind && !!detail?.state?.activatedAt;
+  const displayStatus =
+    detail?.state?.displayStatus ?? detail?.state?.state ?? '';
+  const canStartTask = serviceKind
+    ? lifecycleState === 'idle' && !serviceActivated
+    : lifecycleState === 'idle' || lifecycleState === 'finished';
   const canSendOperatorMessage =
     !!detail &&
-    (lifecycleState === 'running' ||
-      lifecycleState === 'waiting' ||
-      lifecycleState === 'paused') &&
-    !detail.state.pendingPrompt;
-  const canPause = lifecycleState === 'running' || lifecycleState === 'waiting';
+    !detail.state.pendingPrompt &&
+    (serviceKind
+      ? serviceActivated && lifecycleState !== 'paused'
+      : lifecycleState === 'running' ||
+        lifecycleState === 'waiting' ||
+        lifecycleState === 'paused');
+  const canPause = serviceKind
+    ? serviceActivated && lifecycleState !== 'paused'
+    : lifecycleState === 'running' || lifecycleState === 'waiting';
   const canResume = lifecycleState === 'paused';
   const taskSummary = React.useMemo(
     () => taskCounts(detail?.state?.tasks),
@@ -486,9 +521,15 @@ function AutomataPage(): React.ReactElement {
     () => nextOpenTask(detail?.state?.tasks),
     [detail?.state?.tasks]
   );
+  const canStartWithoutOpenTasks = serviceKind;
+  const startDisabled =
+    !instructionDraft.trim() ||
+    !canStartTask ||
+    (!canStartWithoutOpenTasks && taskSummary.open === 0);
   const scheduleConfigured = /(^|\n)schedule\s*:/.test(
     specQuery.data?.spec || ''
   );
+  const listItems = (listQuery.data?.automata || []) as AutomataSummary[];
 
   React.useEffect(() => {
     setInstructionDraft(detail?.state?.instruction || '');
@@ -522,6 +563,7 @@ function AutomataPage(): React.ReactElement {
 
   const resetCreateForm = () => {
     setCreateName('');
+    setCreateKind(DEFAULT_AUTOMATA_KIND);
     setCreateDescription('');
     setCreateGoal('');
     setCreateTags('');
@@ -565,6 +607,7 @@ function AutomataPage(): React.ReactElement {
           spec: buildAutomataSpec({
             description: createDescription,
             goal: createGoal,
+            kind: createKind,
             tags: parseTagInput(createTags),
             allowedDAGNames: createAllowedDAGNames,
           }),
@@ -957,7 +1000,7 @@ function AutomataPage(): React.ReactElement {
               <LoadingIndicator />
             ) : (
               <div className="p-2 md:min-h-0 md:flex-1 md:overflow-y-auto md:pl-4 md:pr-2 md:pt-4 md:pb-6">
-                {(listQuery.data?.automata || []).length === 0 ? (
+                {listItems.length === 0 ? (
                   <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
                     No Automata defined yet.
                     <div className="mt-3">
@@ -967,7 +1010,7 @@ function AutomataPage(): React.ReactElement {
                     </div>
                   </div>
                 ) : null}
-                {(listQuery.data?.automata || []).map((item) => (
+                {listItems.map((item) => (
                   <button
                     key={item.name}
                     onClick={() => {
@@ -988,9 +1031,9 @@ function AutomataPage(): React.ReactElement {
                         </div>
                       </div>
                       <span
-                        className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusClass(item.state)}`}
+                        className={`rounded-full px-2 py-1 text-[11px] font-medium ${displayStatusClass(item.displayStatus || item.state)}`}
                       >
-                        {item.state}
+                        {item.displayStatus || item.state}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
@@ -1007,6 +1050,16 @@ function AutomataPage(): React.ReactElement {
                         </StatusChip>
                       ) : null}
                     </div>
+                    {item.busy ? (
+                      <div className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                        busy
+                      </div>
+                    ) : null}
+                    {item.needsInput ? (
+                      <div className="mt-2 inline-flex rounded-full bg-rose-100 px-2 py-1 text-[11px] font-medium text-rose-900 dark:bg-rose-900/40 dark:text-rose-200">
+                        needs input
+                      </div>
+                    ) : null}
                     {item.nextTaskDescription ? (
                       <div className="mt-2 text-xs text-muted-foreground">
                         Next: {item.nextTaskDescription}
@@ -1065,6 +1118,34 @@ function AutomataPage(): React.ReactElement {
                     <div className="text-xs text-muted-foreground">
                       Must start with a letter or number. Use letters, numbers,
                       and underscores only.
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="automata-kind">Kind</Label>
+                    <Select
+                      value={createKind}
+                      onValueChange={(value) =>
+                        setCreateKind(value as AutomataKindValue)
+                      }
+                      disabled={isCreating}
+                    >
+                      <SelectTrigger id="automata-kind">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={AutomataKind.workflow}>
+                          Workflow
+                        </SelectItem>
+                        <SelectItem value={AutomataKind.service}>
+                          Service
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="text-xs text-muted-foreground">
+                      `Workflow` finishes when the current mission is complete.
+                      `Service` stays live after activation and can wake on
+                      operator messages or schedule ticks.
                     </div>
                   </div>
 
@@ -1230,9 +1311,22 @@ function AutomataPage(): React.ReactElement {
                       </Button>
                     ) : null}
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(detail.state.state)}`}
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${displayStatusClass(displayStatus)}`}
                     >
-                      {detail.state.state}
+                      {displayStatus}
+                    </span>
+                    {detail.state.busy ? (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                        busy
+                      </span>
+                    ) : null}
+                    {detail.state.needsInput ? (
+                      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-900 dark:bg-rose-900/40 dark:text-rose-200">
+                        needs input
+                      </span>
+                    ) : null}
+                    <span className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+                      {automataKind}
                     </span>
                     <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
                       Tasks {taskSummary.done}/
@@ -1308,6 +1402,10 @@ function AutomataPage(): React.ReactElement {
                     <h2 className="mb-2 text-sm font-semibold">Mission</h2>
                     <div className="space-y-2 text-sm">
                       <p>
+                        <span className="font-medium">Kind:</span>{' '}
+                        {detail.definition.kind}
+                      </p>
+                      <p>
                         <span className="font-medium">Goal:</span>{' '}
                         {detail.definition.goal}
                       </p>
@@ -1347,7 +1445,9 @@ function AutomataPage(): React.ReactElement {
 
                   <div className="min-w-0 rounded-lg border p-4">
                     <h2 className="mb-3 text-sm font-semibold">
-                      {detail.state.state === 'finished'
+                      {serviceKind
+                        ? 'Activate Service'
+                        : detail.state.state === 'finished'
                         ? 'Start New Task'
                         : 'Start Instruction'}
                     </h2>
@@ -1355,37 +1455,46 @@ function AutomataPage(): React.ReactElement {
                       <Textarea
                         value={instructionDraft}
                         onChange={(e) => setInstructionDraft(e.target.value)}
-                        placeholder="Tell this Automata what task to work on before starting it."
+                        placeholder={
+                          serviceKind
+                            ? 'Define the standing instruction for this service before activating it.'
+                            : 'Tell this Automata what task to work on before starting it.'
+                        }
                         disabled={!canStartTask}
                       />
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-xs text-muted-foreground">
                           {canStartTask
-                            ? taskSummary.open > 0
-                              ? 'Automata stays idle until an instruction is provided.'
-                              : 'Add or reopen at least one checklist task before starting.'
+                            ? serviceKind
+                              ? taskSummary.open > 0
+                                ? 'Activating this service makes it live immediately. Schedule ticks can wake it while open tasks exist.'
+                                : 'You can activate this service without open tasks. It will stay on standby until a task is opened or a message arrives.'
+                              : taskSummary.open > 0
+                                ? 'Automata stays idle until an instruction is provided.'
+                                : 'Add or reopen at least one checklist task before starting.'
                             : detail.state.state === 'paused'
-                              ? 'This Automata is paused. Resume it to continue the current task.'
-                              : 'This Automata already has an active task. Use an operator message to steer it.'}
+                              ? serviceKind
+                                ? 'This service is paused. Resume it to put it back on standby.'
+                                : 'This Automata is paused. Resume it to continue the current task.'
+                              : serviceKind
+                                ? 'This service is already live. Use an operator message, tasks, or schedule ticks to steer it.'
+                                : 'This Automata already has an active task. Use an operator message to steer it.'}
                         </div>
-                        <Button
-                          onClick={onStart}
-                          disabled={
-                            !instructionDraft.trim() ||
-                            !canStartTask ||
-                            taskSummary.open === 0
-                          }
-                        >
-                          {detail.state.state === 'finished'
+                        <Button onClick={onStart} disabled={startDisabled}>
+                          {serviceKind
+                            ? 'Activate'
+                            : detail.state.state === 'finished'
                             ? 'Start New Task'
                             : 'Start'}
                         </Button>
                       </div>
-                      {scheduleConfigured && detail.state.state === 'idle' ? (
+                      {scheduleConfigured ? (
                         <div className="text-xs text-muted-foreground">
-                          A schedule is defined in the spec, but idle Automata
-                          are not auto-started. Schedules do not create work by
-                          themselves in this MVP.
+                          {serviceKind
+                            ? serviceActivated
+                              ? 'Schedule ticks can wake this service while it is live and has open tasks.'
+                              : 'Schedule ticks stay inactive until this service is activated once.'
+                            : 'Schedules are only active for service automata.'}
                         </div>
                       ) : null}
                     </div>
@@ -1401,7 +1510,11 @@ function AutomataPage(): React.ReactElement {
                         onChange={(e) =>
                           setOperatorMessageDraft(e.target.value)
                         }
-                        placeholder="Add context, change priority, or clarify the current task."
+                        placeholder={
+                          serviceKind
+                            ? 'Add context, request work, or clarify what this service should handle.'
+                            : 'Add context, change priority, or clarify the current task.'
+                        }
                         disabled={!canSendOperatorMessage}
                       />
                       <div className="flex items-center justify-between gap-3">
@@ -1409,12 +1522,22 @@ function AutomataPage(): React.ReactElement {
                           {detail.state.pendingPrompt
                             ? 'Respond to the pending prompt before sending a general operator message.'
                             : canSendOperatorMessage
-                              ? detail.state.state === 'paused'
-                                ? 'This records your message now, but the Automata will stay paused until you resume it.'
-                                : detail.state.currentRunRef
-                                  ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
-                                  : 'This queues a user message into the active Automata task.'
-                              : 'Operator messages are only accepted while the Automata has an active task.'}
+                              ? serviceKind
+                                ? detail.state.currentRunRef
+                                  ? 'This records your message now and the service will pick it up after the current child DAG changes state.'
+                                  : detail.state.busy
+                                    ? 'This queues a user message into the active service turn.'
+                                    : 'This wakes the service with a new operator message.'
+                                : detail.state.state === 'paused'
+                                  ? 'This records your message now, but the Automata will stay paused until you resume it.'
+                                  : detail.state.currentRunRef
+                                    ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
+                                    : 'This queues a user message into the active Automata task.'
+                              : serviceKind
+                                ? serviceActivated
+                                  ? 'This service is paused. Resume it before sending a message.'
+                                  : 'Activate this service before sending operator messages.'
+                                : 'Operator messages are only accepted while the Automata has an active task.'}
                         </div>
                         <Button
                           variant="outline"

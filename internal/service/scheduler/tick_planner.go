@@ -721,14 +721,7 @@ func computePrevExecTime(next time.Time, schedule core.Schedule) time.Time {
 // scheduleDueAt returns the next fire time if the schedule is due at the given
 // time, or the zero value if the schedule should not fire.
 func scheduleDueAt(schedule core.Schedule, now time.Time) (time.Time, bool) {
-	if schedule.Parsed == nil {
-		return time.Time{}, false
-	}
-	next := schedule.Parsed.Next(now.Add(-time.Second))
-	if next.After(now) {
-		return time.Time{}, false
-	}
-	return next, true
+	return schedule.DueAt(now)
 }
 
 // createPlannedRun generates a run ID and constructs a PlannedRun.

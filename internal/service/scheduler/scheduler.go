@@ -667,6 +667,11 @@ func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 			for _, run := range s.planner.Plan(ctx, tickTime) {
 				s.dispatchRun(ctx, run)
 			}
+			if s.automataService != nil {
+				if err := s.automataService.HandleScheduleTick(ctx, tickTime); err != nil {
+					logger.Warn(ctx, "Automata schedule tick failed", tag.Error(err))
+				}
+			}
 			s.planner.Advance(tickTime)
 
 			tickTime = s.NextTick(tickTime)

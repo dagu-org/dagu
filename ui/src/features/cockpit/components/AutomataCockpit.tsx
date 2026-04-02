@@ -1,7 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Clock3, PauseCircle, PlayCircle, Waypoints } from 'lucide-react';
-import { components, Status } from '@/api/v1/schema';
+import { Bot, PauseCircle, PlayCircle, Waypoints } from 'lucide-react';
+import {
+  AutomataDisplayStatus,
+  components,
+  Status,
+} from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@/hooks/api';
@@ -14,12 +18,11 @@ import { AutomataDetailsModal } from './AutomataDetailsModal';
 type AutomataSummary = components['schemas']['AutomataSummary'];
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
-type LifecycleState = 'running' | 'waiting' | 'paused' | 'idle' | 'finished';
+type LifecycleState = 'running' | 'paused' | 'idle' | 'finished';
 
 const STATE_ORDER: LifecycleState[] = [
   'idle',
   'running',
-  'waiting',
   'paused',
   'finished',
 ];
@@ -30,13 +33,8 @@ const STATE_META: Record<
 > = {
   running: {
     label: 'Running',
-    description: 'Actively executing a task.',
+    description: 'Live and available, including standby services.',
     icon: <PlayCircle size={16} />,
-  },
-  waiting: {
-    label: 'Waiting',
-    description: 'Blocked on approval or user input.',
-    icon: <Clock3 size={16} />,
   },
   paused: {
     label: 'Paused',
@@ -57,13 +55,11 @@ const STATE_META: Record<
 
 function getLifecycleClass(state: string): string {
   switch (state) {
-    case 'running':
+    case AutomataDisplayStatus.running:
       return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200';
-    case 'waiting':
-      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200';
-    case 'paused':
+    case AutomataDisplayStatus.paused:
       return 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-100';
-    case 'finished':
+    case AutomataDisplayStatus.finished:
       return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200';
     default:
       return 'bg-muted text-muted-foreground';
@@ -263,13 +259,12 @@ export function AutomataCockpit({
   const stateBuckets = React.useMemo(() => {
     const buckets: Record<LifecycleState, AutomataSummary[]> = {
       running: [],
-      waiting: [],
       paused: [],
       idle: [],
       finished: [],
     };
     for (const item of automata) {
-      const state = item.state as LifecycleState;
+      const state = (item.displayStatus || item.state) as LifecycleState;
       if (state in buckets) {
         buckets[state].push(item);
       }
@@ -332,7 +327,7 @@ export function AutomataCockpit({
           <p className="mt-1 text-sm text-muted-foreground">
             {selectedWorkspace
               ? `Showing Automata tagged for workspace ${selectedWorkspace}, with workspace-tagged activity overlaid on their lifecycle state.`
-              : 'Idle, running, waiting, paused, and finished Automata across the workspace environment.'}
+              : 'Idle, running, paused, and finished Automata across the workspace environment.'}
           </p>
         </div>
         <Button asChild size="sm" variant="outline">
@@ -424,14 +419,24 @@ export function AutomataCockpit({
                             <span
                               className={cn(
                                 'rounded-full px-2 py-1 text-[11px] font-medium',
-                                getLifecycleClass(item.state)
+                                getLifecycleClass(item.displayStatus || item.state)
                               )}
                             >
-                              {item.state}
+                              {item.displayStatus || item.state}
                             </span>
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                            {item.busy ? (
+                              <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                                busy
+                              </span>
+                            ) : null}
+                            {item.needsInput ? (
+                              <span className="rounded-full bg-rose-100 px-2 py-1 font-medium text-rose-900 dark:bg-rose-900/40 dark:text-rose-200">
+                                needs input
+                              </span>
+                            ) : null}
                             <span className="rounded-full border px-2 py-1 text-muted-foreground">
                               Tasks: {item.doneTaskCount || 0}/
                               {(item.doneTaskCount || 0) +

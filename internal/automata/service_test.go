@@ -381,6 +381,57 @@ func TestServiceRequestStartRejectsWhenAllTasksDone(t *testing.T) {
 	require.ErrorContains(t, err, "at least one open task is required")
 }
 
+func TestServiceRequestStartActivatesServiceWithoutOpenTasks(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+
+	err := svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle inbound work continuously.",
+	})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "queue_worker")
+	require.NoError(t, err)
+	require.Equal(t, AutomataKindService, detail.Definition.Kind)
+	require.Equal(t, StateIdle, detail.State.State)
+	require.Equal(t, "Handle inbound work continuously.", detail.State.Instruction)
+	require.Equal(t, fixedTime, detail.State.ActivatedAt)
+	require.Equal(t, "tester", detail.State.ActivatedBy)
+	require.Empty(t, detail.State.PendingTurnMessages)
+
+	items, err := svc.List(ctx)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, AutomataKindService, items[0].Kind)
+	require.Equal(t, DisplayStatusRunning, items[0].DisplayStatus)
+	require.False(t, items[0].Busy)
+	require.False(t, items[0].NeedsInput)
+}
+
+func TestServiceRequestStartRejectsSecondServiceActivation(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle inbound work continuously.",
+	}))
+
+	err := svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Different instruction",
+	})
+	require.ErrorContains(t, err, "service automata is already active")
+}
+
 func TestServiceSubmitOperatorMessageRequiresActiveTask(t *testing.T) {
 	t.Parallel()
 
@@ -395,6 +446,33 @@ func TestServiceSubmitOperatorMessageRequiresActiveTask(t *testing.T) {
 		Message:     "Please prioritize the flaky test first.",
 	})
 	require.ErrorContains(t, err, "not running an active task")
+}
+
+func TestServiceSubmitOperatorMessageAllowsIdleActiveService(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle inbound work continuously.",
+	}))
+
+	err := svc.SubmitOperatorMessage(ctx, "queue_worker", OperatorMessageRequest{
+		RequestedBy: "tester",
+		Message:     "Watch for failed builds first.",
+	})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "queue_worker")
+	require.NoError(t, err)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[0].Kind)
+	require.Equal(t, fixedTime, detail.State.PendingTurnMessages[0].CreatedAt)
+	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "Watch for failed builds first.")
 }
 
 func TestServiceSubmitOperatorMessageQueuesMessage(t *testing.T) {
@@ -576,6 +654,38 @@ func TestServiceResumePausedPromptReturnsWaiting(t *testing.T) {
 	require.Equal(t, WaitingReasonHuman, detail.State.WaitingReason)
 }
 
+func TestServicePauseAndResumeStandbyService(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle inbound work continuously.",
+	}))
+
+	err := svc.Pause(ctx, "queue_worker", "tester")
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "queue_worker")
+	require.NoError(t, err)
+	require.Equal(t, StatePaused, detail.State.State)
+	require.Equal(t, fixedTime, detail.State.PausedAt)
+	require.Equal(t, "tester", detail.State.PausedBy)
+
+	err = svc.Resume(ctx, "queue_worker", "tester")
+	require.NoError(t, err)
+
+	detail, err = svc.Detail(ctx, "queue_worker")
+	require.NoError(t, err)
+	require.Equal(t, StateIdle, detail.State.State)
+	require.True(t, detail.State.PausedAt.IsZero())
+	require.Empty(t, detail.State.PausedBy)
+	require.Empty(t, detail.State.PendingTurnMessages)
+}
+
 func TestServiceSubmitHumanResponseWhilePausedQueuesWithoutResuming(t *testing.T) {
 	t.Parallel()
 
@@ -633,6 +743,69 @@ func TestServiceReconcileOnceDoesNotWakeIdleScheduledAutomata(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StateIdle, detail.State.State)
 	require.Equal(t, "Keep shipping queued work.", detail.State.Instruction)
+	require.Empty(t, detail.State.PendingTurnMessages)
+}
+
+func TestServiceHandleScheduleTickQueuesTurnForActiveService(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpecWithSchedule("build-app", "* * * * *")))
+	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle inbound work continuously.",
+	}))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
+
+	require.NoError(t, svc.HandleScheduleTick(ctx, fixedTime))
+
+	detail, err := svc.Detail(ctx, "queue_worker")
+	require.NoError(t, err)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.Equal(t, fixedTime, detail.State.LastScheduleMinute)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "scheduled_tick", detail.State.PendingTurnMessages[0].Kind)
+}
+
+func TestServiceHandleScheduleTickIgnoresInactiveOrTasklessService(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpecWithSchedule("build-app", "* * * * *")))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
+
+	require.NoError(t, svc.HandleScheduleTick(ctx, fixedTime))
+
+	detail, err := svc.Detail(ctx, "queue_worker")
+	require.NoError(t, err)
+	require.Equal(t, StateIdle, detail.State.State)
+	require.True(t, detail.State.LastScheduleMinute.IsZero())
+	require.Empty(t, detail.State.PendingTurnMessages)
+
+	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle inbound work continuously.",
+	}))
+
+	def, err := svc.GetDefinition(ctx, "queue_worker")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateIdle
+	state.PendingTurnMessages = nil
+	state.Tasks = nil
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	require.NoError(t, svc.HandleScheduleTick(ctx, fixedTime))
+
+	detail, err = svc.Detail(ctx, "queue_worker")
+	require.NoError(t, err)
+	require.Equal(t, StateIdle, detail.State.State)
+	require.True(t, detail.State.LastScheduleMinute.IsZero())
 	require.Empty(t, detail.State.PendingTurnMessages)
 }
 
@@ -758,6 +931,41 @@ func TestControllerRuntimeFinishRejectsActiveChildRun(t *testing.T) {
 	require.ErrorContains(t, err, "while a child DAG run is active")
 }
 
+func TestControllerRuntimeFinishRejectsServiceAutomata(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "queue_worker")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	err = rt.Finish(ctx, "done")
+	require.ErrorContains(t, err, "cannot finish a service automata")
+}
+
+func TestServiceRuntimeOptionsExcludeFinishToolForService(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "queue_worker")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	opts, err := svc.runtimeOptions(ctx, def, state)
+	require.NoError(t, err)
+	require.NotContains(t, opts.AllowedTools, "finish_automata")
+	require.Contains(t, opts.AllowedTools, "request_human_input")
+}
+
 func newTestService(t *testing.T) (*Service, time.Time) {
 	t.Helper()
 
@@ -878,6 +1086,27 @@ allowed_dags:
 
 func automataSpecWithSchedule(allowedDAG, schedule string) string {
 	return `description: Software development automata
+goal: Complete the assigned software work
+schedule: "` + schedule + `"
+allowed_dags:
+  names:
+    - ` + allowedDAG + `
+`
+}
+
+func serviceAutomataSpec(allowedDAG string) string {
+	return `kind: service
+description: Software development automata
+goal: Complete the assigned software work
+allowed_dags:
+  names:
+    - ` + allowedDAG + `
+`
+}
+
+func serviceAutomataSpecWithSchedule(allowedDAG, schedule string) string {
+	return `kind: service
+description: Software development automata
 goal: Complete the assigned software work
 schedule: "` + schedule + `"
 allowed_dags:

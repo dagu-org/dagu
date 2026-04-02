@@ -2195,7 +2195,7 @@ export interface paths {
         };
         /**
          * List automata
-         * @description Returns all Automata definitions with current lifecycle state and stage.
+         * @description Returns all Automata definitions with current lifecycle and display state.
          */
         get: operations["listAutomata"];
         put?: never;
@@ -2265,7 +2265,7 @@ export interface paths {
         put?: never;
         /**
          * Start automata task
-         * @description Starts a new Automata task from idle or finished state.
+         * @description Starts a workflow Automata task or activates a service Automata.
          */
         post: operations["startAutomata"];
         delete?: never;
@@ -4759,6 +4759,16 @@ export interface components {
          */
         AutomataLifecycleState: AutomataLifecycleState;
         /**
+         * @description Automata kind
+         * @enum {string}
+         */
+        AutomataKind: AutomataKind;
+        /**
+         * @description User-facing Automata status
+         * @enum {string}
+         */
+        AutomataDisplayStatus: AutomataDisplayStatus;
+        /**
          * @description Why an Automata is waiting
          * @enum {string}
          */
@@ -4798,6 +4808,7 @@ export interface components {
         /** @description Automata definition */
         AutomataDefinition: {
             name: string;
+            kind: components["schemas"]["AutomataKind"];
             description?: string;
             goal: string;
             tags?: string[];
@@ -4857,10 +4868,16 @@ export interface components {
         /** @description Current runtime state for an Automata */
         AutomataState: {
             state: components["schemas"]["AutomataLifecycleState"];
+            displayStatus?: components["schemas"]["AutomataDisplayStatus"];
+            busy?: boolean;
+            needsInput?: boolean;
             instruction?: string;
             /** Format: date-time */
             instructionUpdatedAt?: string;
             instructionUpdatedBy?: string;
+            /** Format: date-time */
+            activatedAt?: string;
+            activatedBy?: string;
             tasks?: components["schemas"]["AutomataTask"][];
             sessionId?: string;
             currentRunRef?: components["schemas"]["AutomataRunRef"];
@@ -4889,11 +4906,15 @@ export interface components {
         /** @description Summary row for an Automata */
         AutomataSummary: {
             name: string;
+            kind: components["schemas"]["AutomataKind"];
             description?: string;
             goal: string;
             tags?: string[];
             instruction?: string;
             state: components["schemas"]["AutomataLifecycleState"];
+            displayStatus?: components["schemas"]["AutomataDisplayStatus"];
+            busy?: boolean;
+            needsInput?: boolean;
             disabled?: boolean;
             currentRun?: components["schemas"]["AutomataRunSummary"];
             openTaskCount?: number;
@@ -14635,6 +14656,16 @@ export enum AutomataLifecycleState {
     idle = "idle",
     running = "running",
     waiting = "waiting",
+    paused = "paused",
+    finished = "finished"
+}
+export enum AutomataKind {
+    workflow = "workflow",
+    service = "service"
+}
+export enum AutomataDisplayStatus {
+    idle = "idle",
+    running = "running",
     paused = "paused",
     finished = "finished"
 }
