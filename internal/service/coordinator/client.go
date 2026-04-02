@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -391,7 +393,7 @@ func (cli *clientImpl) createClient(member exec.HostInfo) (*client, error) {
 	}
 
 	// Construct address from host and port
-	address := fmt.Sprintf("%s:%d", member.Host, member.Port)
+	address := net.JoinHostPort(member.Host, strconv.Itoa(member.Port))
 
 	// Create gRPC connection
 	conn, err := grpc.NewClient(address, dialOpts...)
