@@ -25,29 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestNotificationMonitorConfig() NotificationMonitorConfig {
-	cfg := DefaultNotificationMonitorConfig()
-	cfg.PollInterval = 10 * time.Millisecond
-	cfg.SuccessWindow = 10 * time.Millisecond
-	cfg.UrgentWindow = 10 * time.Millisecond
-	cfg.SeenEvictInterval = time.Hour
-	return cfg
-}
-
-func requireNotificationStateWriteFailure(
-	t *testing.T,
-	store *notificationStateStore,
-	state notificationMonitorState,
-) {
-	t.Helper()
-	if store == nil {
-		t.Fatal("notification state store is required")
-	}
-	if err := store.Save(context.Background(), state); err == nil {
-		t.Skip("filesystem permissions do not block notification state writes in this environment")
-	}
-}
-
 func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvents(t *testing.T) {
 	t.Parallel()
 
@@ -184,45 +161,53 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 	assert.True(t, secondMonitor.IsDelivered("dest-1", status))
 }
 
-func TestNotificationStateStore_MigratesV1ByClearingPendingAndKeepingProgress(t *testing.T) {
+func TestNotificationStateStore_RejectsV1AndQuarantinesState(t *testing.T) {
 	t.Parallel()
 
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	legacyState := legacyNotificationMonitorState{
+	data, err := json.Marshal(struct {
+		Version      int                           `json:"version"`
+		Bootstrapped bool                          `json:"bootstrapped,omitempty"`
+		SourceCursor eventstore.NotificationCursor `json:"source_cursor"`
+		Destinations map[string]map[string]any     `json:"destinations,omitempty"`
+	}{
 		Version:      1,
 		Bootstrapped: true,
 		SourceCursor: eventstore.NotificationCursor{
 			LastInboxFile:    "inbox-001.jsonl",
 			CommittedOffsets: map[string]int64{"inbox-001.jsonl": 42},
 		},
-		Destinations: map[string]*legacyNotificationDestinationState{
+		Destinations: map[string]map[string]any{
 			"dest-1": {
-				Pending: map[string]json.RawMessage{
-					"dag:run-1:attempt-1:failed": json.RawMessage(`{"key":"dag:run-1:attempt-1:failed","kind":"dag_run","type":"dag.run.failed","status":{"name":"briefing","dag_run_id":"run-1","attempt_id":"attempt-1","status":"failed"},"observedAt":"2026-04-01T00:00:00Z"}`),
+				"pending": map[string]any{
+					"dag:run-1:attempt-1:failed": map[string]any{
+						"key":        "dag:run-1:attempt-1:failed",
+						"kind":       "dag_run",
+						"type":       "dag.run.failed",
+						"observedAt": "2026-04-01T00:00:00Z",
+					},
 				},
-				Delivered: map[string]time.Time{
-					"dag:run-2:attempt-1:succeeded": time.Unix(1712016000, 0).UTC(),
+				"delivered": map[string]string{
+					"dag:run-2:attempt-1:succeeded": time.Unix(1712016000, 0).UTC().Format(time.RFC3339),
 				},
 			},
 		},
-	}
-	data, err := json.Marshal(legacyState)
+	})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(stateFile, data, 0o600))
 
 	store := newNotificationStateStore(stateFile)
 	result := store.Load(context.Background())
-	require.NoError(t, result.Warning)
-	require.False(t, result.Recovered)
+	require.ErrorContains(t, result.Warning, "unsupported notification state version 1")
+	require.True(t, result.Recovered)
 	require.False(t, result.Missing)
+	require.NotEmpty(t, result.QuarantinedPath)
 
 	state := result.State
 	require.Equal(t, notificationMonitorStateVersion, state.Version)
-	require.True(t, state.Bootstrapped)
-	require.Equal(t, legacyState.SourceCursor.Normalize(), state.SourceCursor)
-	require.Contains(t, state.Destinations, "dest-1")
-	require.Empty(t, state.Destinations["dest-1"].Pending)
-	require.Equal(t, legacyState.Destinations["dest-1"].Delivered, state.Destinations["dest-1"].Delivered)
+	require.False(t, state.Bootstrapped)
+	require.Empty(t, state.SourceCursor.CommittedOffsets)
+	require.Empty(t, state.Destinations)
 
 	require.NoError(t, store.Save(context.Background(), state))
 	var saved struct {
@@ -232,6 +217,8 @@ func TestNotificationStateStore_MigratesV1ByClearingPendingAndKeepingProgress(t 
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(raw, &saved))
 	require.Equal(t, notificationMonitorStateVersion, saved.Version)
+	_, err = os.Stat(result.QuarantinedPath)
+	require.NoError(t, err)
 }
 
 func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T) {

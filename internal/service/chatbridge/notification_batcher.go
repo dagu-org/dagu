@@ -168,6 +168,9 @@ func (b *NotificationBatcher) Enqueue(destination string, event NotificationEven
 			}
 		}
 	}
+	if replaceReadyEvent(b.ready, destination, groupKey, snapshot) {
+		return true
+	}
 
 	bucketKey := notificationBucketKey(destination, class)
 	bucket, ok := b.buckets[bucketKey]
@@ -304,4 +307,24 @@ func (b *NotificationBatcher) windowForClass(class NotificationClass) time.Durat
 		return b.urgentWindow
 	}
 	return b.successWindow
+}
+
+func replaceReadyEvent(ready []NotificationPendingBatch, destination, groupKey string, snapshot NotificationEvent) bool {
+	for batchIndex := range ready {
+		if ready[batchIndex].Destination != destination {
+			continue
+		}
+		for eventIndex := range ready[batchIndex].Batch.Events {
+			existing := ready[batchIndex].Batch.Events[eventIndex]
+			if NotificationGroupKey(existing) != groupKey {
+				continue
+			}
+			if existing.Key == snapshot.Key {
+				return true
+			}
+			ready[batchIndex].Batch.Events[eventIndex] = snapshot
+			return true
+		}
+	}
+	return false
 }

@@ -6,6 +6,7 @@ package chatbridge
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,16 +37,12 @@ type notificationDestinationState struct {
 	Delivered map[string]time.Time         `json:"delivered,omitempty"`
 }
 
-type legacyNotificationMonitorState struct {
-	Version      int                                            `json:"version"`
-	Bootstrapped bool                                           `json:"bootstrapped,omitempty"`
-	SourceCursor eventstore.NotificationCursor                  `json:"source_cursor"`
-	Destinations map[string]*legacyNotificationDestinationState `json:"destinations,omitempty"`
+type unsupportedNotificationStateVersionError struct {
+	Version int
 }
 
-type legacyNotificationDestinationState struct {
-	Pending   map[string]json.RawMessage `json:"pending,omitempty"`
-	Delivered map[string]time.Time       `json:"delivered,omitempty"`
+func (e unsupportedNotificationStateVersionError) Error() string {
+	return fmt.Sprintf("unsupported notification state version %d", e.Version)
 }
 
 func newNotificationMonitorState() notificationMonitorState {
@@ -107,62 +104,20 @@ func (s *notificationStateStore) Load(_ context.Context) notificationStateLoadRe
 	}
 
 	state := newNotificationMonitorState()
-	var versionProbe struct {
-		Version int `json:"version"`
-	}
-	if err := json.Unmarshal(data, &versionProbe); err != nil {
+	if err := unmarshalNotificationState(data, &state); err != nil {
+		if unsupportedVersionError(err) {
+			result.Recovered = true
+			result.QuarantinedPath, result.Warning = s.recoverUnreadableState(err)
+			return result
+		}
 		result.Recovered = true
 		result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("decode notification state: %w", err))
-		return result
-	}
-
-	switch versionProbe.Version {
-	case 0, 1:
-		legacyState, err := migrateLegacyNotificationMonitorState(data)
-		if err != nil {
-			result.Recovered = true
-			result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("decode legacy notification state: %w", err))
-			return result
-		}
-		state = legacyState
-	case notificationMonitorStateVersion:
-		if err := json.Unmarshal(data, &state); err != nil {
-			result.Recovered = true
-			result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("decode notification state: %w", err))
-			return result
-		}
-	default:
-		result.Recovered = true
-		result.QuarantinedPath, result.Warning = s.recoverUnreadableState(fmt.Errorf("unsupported notification state version %d", versionProbe.Version))
 		return result
 	}
 
 	state.normalize()
 	result.State = state
 	return result
-}
-
-func migrateLegacyNotificationMonitorState(data []byte) (notificationMonitorState, error) {
-	legacyState := legacyNotificationMonitorState{}
-	if err := json.Unmarshal(data, &legacyState); err != nil {
-		return notificationMonitorState{}, err
-	}
-
-	state := newNotificationMonitorState()
-	state.Bootstrapped = legacyState.Bootstrapped
-	state.SourceCursor = legacyState.SourceCursor.Normalize()
-	for destination, legacyDest := range legacyState.Destinations {
-		destState := &notificationDestinationState{
-			Pending:   make(map[string]NotificationEvent),
-			Delivered: make(map[string]time.Time),
-		}
-		if legacyDest != nil && legacyDest.Delivered != nil {
-			destState.Delivered = legacyDest.Delivered
-		}
-		state.Destinations[destination] = destState
-	}
-	state.normalize()
-	return state, nil
 }
 
 func (s *notificationStateStore) Save(_ context.Context, state notificationMonitorState) error {
@@ -232,4 +187,25 @@ func (s *notificationStateStore) recoverUnreadableState(err error) (string, erro
 		return "", fmt.Errorf("%w (quarantine failed: %v)", err, quarantineErr)
 	}
 	return quarantinedPath, err
+}
+
+func unmarshalNotificationState(data []byte, state *notificationMonitorState) error {
+	if state == nil {
+		return errors.New("notification state target is nil")
+	}
+	var versionProbe struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal(data, &versionProbe); err != nil {
+		return err
+	}
+	if versionProbe.Version != notificationMonitorStateVersion {
+		return unsupportedNotificationStateVersionError{Version: versionProbe.Version}
+	}
+	return json.Unmarshal(data, state)
+}
+
+func unsupportedVersionError(err error) bool {
+	var target unsupportedNotificationStateVersionError
+	return errors.As(err, &target)
 }

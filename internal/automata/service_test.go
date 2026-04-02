@@ -5,31 +5,15 @@ package automata
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
-	"github.com/dagu-org/dagu/internal/persis/filedag"
-	"github.com/dagu-org/dagu/internal/persis/filedagrun"
-	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/require"
 )
-
-func init() {
-	core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{
-		Command:          true,
-		MultipleCommands: true,
-		Script:           true,
-		Shell:            true,
-	})
-}
 
 type testAgentConfigStore struct {
 	cfg *agent.Config
@@ -50,22 +34,6 @@ func (s *testAgentConfigStore) IsEnabled(context.Context) bool {
 
 type testAgentModelStore struct {
 	models map[string]*agent.ModelConfig
-}
-
-type testAutomataEventStore struct {
-	events []*eventstore.Event
-}
-
-func (s *testAutomataEventStore) Emit(_ context.Context, event *eventstore.Event) error {
-	if event == nil {
-		return nil
-	}
-	s.events = append(s.events, event)
-	return nil
-}
-
-func (*testAutomataEventStore) Query(context.Context, eventstore.QueryFilter) (*eventstore.QueryResult, error) {
-	return &eventstore.QueryResult{}, nil
 }
 
 func (s *testAgentModelStore) Create(_ context.Context, model *agent.ModelConfig) error {
@@ -1036,212 +1004,4 @@ func TestServiceRuntimeOptionsExcludeFinishToolForService(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, opts.AllowedTools, "finish_automata")
 	require.Contains(t, opts.AllowedTools, "request_human_input")
-}
-
-func newTestService(t *testing.T) (*Service, time.Time) {
-	t.Helper()
-
-	root := t.TempDir()
-	dagsDir := filepath.Join(root, "dags")
-	dataDir := filepath.Join(root, "data")
-	runsDir := filepath.Join(root, "runs")
-
-	require.NoError(t, os.MkdirAll(dagsDir, 0o750))
-	require.NoError(t, os.MkdirAll(dataDir, 0o750))
-	require.NoError(t, os.MkdirAll(runsDir, 0o750))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(dagsDir, "build-app.yaml"),
-		[]byte(testDAGYAML("build-app")),
-		0o600,
-	))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(dagsDir, "run-tests.yaml"),
-		[]byte(testDAGYAML("run-tests")),
-		0o600,
-	))
-
-	cfg := &config.Config{
-		Core: config.Core{
-			Location: time.UTC,
-		},
-		Paths: config.PathsConfig{
-			DAGsDir:    dagsDir,
-			DataDir:    dataDir,
-			DAGRunsDir: runsDir,
-		},
-	}
-	fixedTime := time.Date(2026, time.March, 26, 10, 0, 0, 0, time.UTC)
-	svc := New(
-		cfg,
-		filedag.New(dagsDir, filedag.WithSkipExamples(true)),
-		filedagrun.New(runsDir),
-		WithClock(func() time.Time { return fixedTime }),
-	)
-	return svc, fixedTime
-}
-
-func newTestServiceWithSessionStore(t *testing.T) (*Service, time.Time) {
-	t.Helper()
-
-	root := t.TempDir()
-	dagsDir := filepath.Join(root, "dags")
-	dataDir := filepath.Join(root, "data")
-	runsDir := filepath.Join(root, "runs")
-	sessionDir := filepath.Join(root, "sessions")
-
-	require.NoError(t, os.MkdirAll(dagsDir, 0o750))
-	require.NoError(t, os.MkdirAll(dataDir, 0o750))
-	require.NoError(t, os.MkdirAll(runsDir, 0o750))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(dagsDir, "build-app.yaml"),
-		[]byte(testDAGYAML("build-app")),
-		0o600,
-	))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(dagsDir, "run-tests.yaml"),
-		[]byte(testDAGYAML("run-tests")),
-		0o600,
-	))
-
-	sessionStore, err := filesession.New(sessionDir)
-	require.NoError(t, err)
-
-	cfg := &config.Config{
-		Core: config.Core{
-			Location: time.UTC,
-		},
-		Paths: config.PathsConfig{
-			DAGsDir:    dagsDir,
-			DataDir:    dataDir,
-			DAGRunsDir: runsDir,
-		},
-	}
-	fixedTime := time.Date(2026, time.March, 26, 10, 0, 0, 0, time.UTC)
-	svc := New(
-		cfg,
-		filedag.New(dagsDir, filedag.WithSkipExamples(true)),
-		filedagrun.New(runsDir),
-		WithClock(func() time.Time { return fixedTime }),
-		WithSessionStore(sessionStore),
-	)
-	return svc, fixedTime
-}
-
-func newTestServiceWithEventStore(t *testing.T) (*Service, time.Time, *testAutomataEventStore) {
-	t.Helper()
-
-	root := t.TempDir()
-	dagsDir := filepath.Join(root, "dags")
-	dataDir := filepath.Join(root, "data")
-	runsDir := filepath.Join(root, "runs")
-
-	require.NoError(t, os.MkdirAll(dagsDir, 0o750))
-	require.NoError(t, os.MkdirAll(dataDir, 0o750))
-	require.NoError(t, os.MkdirAll(runsDir, 0o750))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(dagsDir, "build-app.yaml"),
-		[]byte(testDAGYAML("build-app")),
-		0o600,
-	))
-
-	cfg := &config.Config{
-		Core: config.Core{
-			Location: time.UTC,
-		},
-		Paths: config.PathsConfig{
-			DAGsDir:    dagsDir,
-			DataDir:    dataDir,
-			DAGRunsDir: runsDir,
-		},
-	}
-	fixedTime := time.Date(2026, time.March, 26, 10, 0, 0, 0, time.UTC)
-	store := &testAutomataEventStore{}
-	svc := New(
-		cfg,
-		filedag.New(dagsDir, filedag.WithSkipExamples(true)),
-		filedagrun.New(runsDir),
-		WithClock(func() time.Time { return fixedTime }),
-		WithEventService(eventstore.New(store)),
-		WithEventSource(eventstore.Source{Service: eventstore.SourceServiceScheduler, Instance: "test-scheduler"}),
-	)
-	return svc, fixedTime, store
-}
-
-func createTask(t *testing.T, svc *Service, ctx context.Context, name, description, requestedBy string) *Task {
-	t.Helper()
-	task, err := svc.CreateTask(ctx, name, CreateTaskRequest{
-		Description: description,
-		RequestedBy: requestedBy,
-	})
-	require.NoError(t, err)
-	return task
-}
-
-func automataSpec(allowedDAG string) string {
-	return `description: Software development automata
-goal: Complete the assigned software work
-allowed_dags:
-  names:
-    - ` + allowedDAG + `
-`
-}
-
-func automataSpecMultiDAGs() string {
-	return `description: Software development automata
-goal: Complete the assigned software work
-allowed_dags:
-  names:
-    - build-app
-    - run-tests
-`
-}
-
-func automataSpecWithSchedule(allowedDAG, schedule string) string {
-	return `description: Software development automata
-goal: Complete the assigned software work
-schedule: "` + schedule + `"
-allowed_dags:
-  names:
-    - ` + allowedDAG + `
-`
-}
-
-func serviceAutomataSpec(allowedDAG string) string {
-	return `kind: service
-description: Software development automata
-goal: Complete the assigned software work
-allowed_dags:
-  names:
-    - ` + allowedDAG + `
-`
-}
-
-func serviceAutomataSpecWithSchedule(allowedDAG, schedule string) string {
-	return `kind: service
-description: Software development automata
-goal: Complete the assigned software work
-schedule: "` + schedule + `"
-allowed_dags:
-  names:
-    - ` + allowedDAG + `
-`
-}
-
-func allowedDAGNames(items []AllowedDAGInfo) []string {
-	names := make([]string, 0, len(items))
-	for _, item := range items {
-		names = append(names, item.Name)
-	}
-	return names
-}
-
-func testDAGYAML(name string) string {
-	return `name: ` + name + `
-description: Example DAG
-tags:
-  - dev
-steps:
-  - name: echo
-    command: echo hello
-`
 }

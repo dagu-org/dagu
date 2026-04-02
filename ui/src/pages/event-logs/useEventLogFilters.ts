@@ -1,28 +1,31 @@
-import { ComponentsParametersEventLogPaginationMode } from '@/api/v1/schema';
 import dayjs from '@/lib/dayjs';
 import * as React from 'react';
 import {
-  DEFAULT_DATE_PRESET,
-  PAGE_SIZE,
-  SEARCH_STATE_KEY,
-  type DateRangeMode,
-  type EventKindFilter,
-  type EventLogFilters,
-  type EventLogQueryParams,
-  type SpecificPeriod,
-  type StoredEventLogState,
-} from './types';
+  createDefaultEventLogFilters,
+  formatTimestamp,
+  formatTimezoneOffset,
+  getPresetDates,
+  getSpecificPeriodDates,
+} from './date_range';
+import {
+  buildEventLogQuery,
+  buildLocationParams,
+  parseLocationState,
+  sanitizeFilters,
+  type SearchStateStore,
+} from './filter_state';
 import {
   getEventTypeOptions,
   isEventKindFilter,
   sanitizeEventTypeForKind,
 } from './options';
-import { areEventLogFiltersEqual, hasQueryParams } from './utils';
-
-type SearchStateStore = {
-  readState<T>(pageKey: string, remoteKey?: string): T | undefined;
-  writeState<T>(pageKey: string, remoteKey: string | undefined, value: T): void;
-};
+import {
+  type DateRangeMode,
+  type EventLogFilters,
+  SEARCH_STATE_KEY,
+  type SpecificPeriod,
+} from './types';
+import { areEventLogFiltersEqual } from './utils';
 
 type UseEventLogFiltersArgs = {
   tzOffsetInSec?: number;
@@ -33,13 +36,6 @@ type UseEventLogFiltersArgs = {
   setSearchParams: (next: URLSearchParams) => void;
 };
 
-function sanitizeFilters(filters: EventLogFilters): EventLogFilters {
-  return {
-    ...filters,
-    type: sanitizeEventTypeForKind(filters.kind, filters.type),
-  };
-}
-
 export function useEventLogFilters({
   tzOffsetInSec,
   remoteKey,
@@ -48,152 +44,10 @@ export function useEventLogFilters({
   searchState,
   setSearchParams,
 }: UseEventLogFiltersArgs) {
-  const getPresetDates = React.useCallback(
-    (preset: string): { from: string; to?: string } => {
-      const now = dayjs();
-      const startOfDay =
-        tzOffsetInSec !== undefined
-          ? now.utcOffset(tzOffsetInSec / 60).startOf('day')
-          : now.startOf('day');
-
-      switch (preset) {
-        case 'today':
-          return { from: startOfDay.format('YYYY-MM-DDTHH:mm:ss') };
-        case 'yesterday':
-          return {
-            from: startOfDay.subtract(1, 'day').format('YYYY-MM-DDTHH:mm:ss'),
-            to: startOfDay.format('YYYY-MM-DDTHH:mm:ss'),
-          };
-        case 'last30days':
-          return {
-            from: startOfDay.subtract(30, 'day').format('YYYY-MM-DDTHH:mm:ss'),
-          };
-        case 'thisWeek':
-          return {
-            from: startOfDay.startOf('week').format('YYYY-MM-DDTHH:mm:ss'),
-          };
-        case 'thisMonth':
-          return {
-            from: startOfDay.startOf('month').format('YYYY-MM-DDTHH:mm:ss'),
-          };
-        case 'last7days':
-        default:
-          return {
-            from: startOfDay.subtract(7, 'day').format('YYYY-MM-DDTHH:mm:ss'),
-          };
-      }
-    },
+  const defaultFilters = React.useMemo<EventLogFilters>(
+    () => createDefaultEventLogFilters(tzOffsetInSec),
     [tzOffsetInSec]
   );
-
-  const getSpecificPeriodDates = React.useCallback(
-    (period: SpecificPeriod, value: string): { from: string; to?: string } => {
-      const parsedDate = dayjs(value);
-      if (!parsedDate.isValid()) {
-        const fallback =
-          tzOffsetInSec !== undefined
-            ? dayjs().utcOffset(tzOffsetInSec / 60)
-            : dayjs();
-        return { from: fallback.startOf('day').format('YYYY-MM-DDTHH:mm:ss') };
-      }
-
-      const date =
-        tzOffsetInSec !== undefined
-          ? parsedDate.utcOffset(tzOffsetInSec / 60)
-          : parsedDate;
-      const unit = period === 'date' ? 'day' : period;
-      return {
-        from: date.startOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
-        to: date.endOf(unit).format('YYYY-MM-DDTHH:mm:ss'),
-      };
-    },
-    [tzOffsetInSec]
-  );
-
-  const parseDateFromUrl = React.useCallback(
-    (value: string | null) => {
-      if (!value) {
-        return undefined;
-      }
-
-      if (/^\d+$/.test(value)) {
-        const timestamp = Number(value);
-        if (!Number.isNaN(timestamp)) {
-          const parsed =
-            tzOffsetInSec !== undefined
-              ? dayjs.unix(timestamp).utcOffset(tzOffsetInSec / 60)
-              : dayjs.unix(timestamp);
-          return parsed.format('YYYY-MM-DDTHH:mm:ss');
-        }
-      }
-
-      if (value.includes('T') && value.length >= 16) {
-        return value;
-      }
-
-      return undefined;
-    },
-    [tzOffsetInSec]
-  );
-
-  const formatDateForApi = React.useCallback(
-    (dateString: string | undefined): string | undefined => {
-      if (!dateString) {
-        return undefined;
-      }
-      const dateWithSeconds =
-        dateString.split(':').length < 3 ? `${dateString}:00` : dateString;
-      if (tzOffsetInSec !== undefined) {
-        return dayjs(dateWithSeconds)
-          .utcOffset(tzOffsetInSec / 60, true)
-          .toISOString();
-      }
-      return dayjs(dateWithSeconds).toISOString();
-    },
-    [tzOffsetInSec]
-  );
-
-  const formatTimestamp = React.useCallback(
-    (timestamp: string): string => {
-      const parsed =
-        tzOffsetInSec !== undefined
-          ? dayjs(timestamp).utcOffset(tzOffsetInSec / 60)
-          : dayjs(timestamp);
-      return parsed.format('YYYY-MM-DD HH:mm:ss');
-    },
-    [tzOffsetInSec]
-  );
-
-  const formatTimezoneOffset = React.useCallback((): string => {
-    if (tzOffsetInSec === undefined) {
-      return '';
-    }
-    const offsetInMinutes = tzOffsetInSec / 60;
-    const hours = Math.floor(Math.abs(offsetInMinutes) / 60);
-    const minutes = Math.abs(offsetInMinutes) % 60;
-    const sign = offsetInMinutes >= 0 ? '+' : '-';
-    return `(${sign}${hours.toString().padStart(2, '0')}:${minutes
-      .toString()
-      .padStart(2, '0')})`;
-  }, [tzOffsetInSec]);
-
-  const defaultFilters = React.useMemo<EventLogFilters>(() => {
-    const dates = getPresetDates(DEFAULT_DATE_PRESET);
-    return {
-      kind: 'all',
-      type: 'all',
-      dagName: '',
-      automataName: '',
-      dagRunId: '',
-      attemptId: '',
-      fromDate: dates.from,
-      toDate: dates.to,
-      dateRangeMode: 'preset',
-      datePreset: DEFAULT_DATE_PRESET,
-      specificPeriod: 'date',
-      specificValue: dayjs().format('YYYY-MM-DD'),
-    };
-  }, [getPresetDates]);
 
   const [draftFilters, setDraftFilters] =
     React.useState<EventLogFilters>(defaultFilters);
@@ -204,120 +58,13 @@ export function useEventLogFilters({
     null
   );
 
-  const buildLocationParams = React.useCallback((filters: EventLogFilters) => {
-    const nextFilters = sanitizeFilters(filters);
-    const params = new URLSearchParams();
-    if (nextFilters.kind !== 'all') {
-      params.set('kind', nextFilters.kind);
-    }
-    if (nextFilters.type !== 'all') {
-      params.set('type', nextFilters.type);
-    }
-    if (nextFilters.dagName) {
-      params.set('dagName', nextFilters.dagName);
-    }
-    if (nextFilters.automataName) {
-      params.set('automataName', nextFilters.automataName);
-    }
-    if (nextFilters.dagRunId) {
-      params.set('dagRunId', nextFilters.dagRunId);
-    }
-    if (nextFilters.attemptId) {
-      params.set('attemptId', nextFilters.attemptId);
-    }
-    if (nextFilters.fromDate) {
-      params.set('fromDate', nextFilters.fromDate);
-    }
-    if (nextFilters.toDate) {
-      params.set('toDate', nextFilters.toDate);
-    }
-    params.set('dateMode', nextFilters.dateRangeMode);
-    params.set('preset', nextFilters.datePreset);
-    params.set('specificPeriod', nextFilters.specificPeriod);
-    params.set('specificValue', nextFilters.specificValue);
-    return params;
-  }, []);
-
-  const parseLocationState = React.useCallback(
-    (params: URLSearchParams): StoredEventLogState => {
-      const persisted = searchState.readState<StoredEventLogState>(
-        SEARCH_STATE_KEY,
-        remoteKey
-      );
-      const base = sanitizeFilters({
-        ...defaultFilters,
-        ...persisted,
-      });
-
-      if (!hasQueryParams(params)) {
-        return base;
-      }
-
-      const next: StoredEventLogState = { ...base };
-      const kind = params.get('kind');
-      if (isEventKindFilter(kind)) {
-        next.kind = kind;
-      }
-      if (params.has('type')) {
-        next.type = params.get('type') || 'all';
-      }
-      if (params.has('dagName')) {
-        next.dagName = params.get('dagName') || '';
-      }
-      if (params.has('automataName')) {
-        next.automataName = params.get('automataName') || '';
-      }
-      if (params.has('dagRunId')) {
-        next.dagRunId = params.get('dagRunId') || '';
-      }
-      if (params.has('attemptId')) {
-        next.attemptId = params.get('attemptId') || '';
-      }
-
-      const parsedFrom = parseDateFromUrl(params.get('fromDate'));
-      if (params.has('fromDate')) {
-        next.fromDate = parsedFrom;
-      }
-      const parsedTo = parseDateFromUrl(params.get('toDate'));
-      if (params.has('toDate')) {
-        next.toDate = parsedTo;
-      }
-
-      const dateMode = params.get('dateMode');
-      if (
-        dateMode === 'preset' ||
-        dateMode === 'specific' ||
-        dateMode === 'custom'
-      ) {
-        next.dateRangeMode = dateMode;
-      }
-
-      const datePreset = params.get('preset');
-      if (datePreset) {
-        next.datePreset = datePreset;
-      }
-
-      const specificPeriod = params.get('specificPeriod');
-      if (
-        specificPeriod === 'date' ||
-        specificPeriod === 'month' ||
-        specificPeriod === 'year'
-      ) {
-        next.specificPeriod = specificPeriod;
-      }
-
-      const specificValue = params.get('specificValue');
-      if (specificValue) {
-        next.specificValue = specificValue;
-      }
-
-      return sanitizeFilters(next);
-    },
-    [defaultFilters, parseDateFromUrl, remoteKey, searchState]
-  );
-
   React.useEffect(() => {
-    const next = parseLocationState(locationSearchParams);
+    const next = parseLocationState({
+      params: locationSearchParams,
+      remoteKey,
+      searchState,
+      tzOffsetInSec,
+    });
     setDraftFilters(next);
     setAppliedFilters(next);
     lastPersistedAppliedFiltersRef.current = next;
@@ -325,10 +72,10 @@ export function useEventLogFilters({
     setHydratedKey(`${remoteKey}:${searchKey}`);
   }, [
     locationSearchParams,
-    parseLocationState,
     remoteKey,
     searchKey,
     searchState,
+    tzOffsetInSec,
   ]);
 
   React.useEffect(() => {
@@ -337,31 +84,22 @@ export function useEventLogFilters({
     }
     const nextAppliedFilters = sanitizeFilters(appliedFilters);
     const persisted = lastPersistedAppliedFiltersRef.current;
-    if (
-      persisted &&
-      areEventLogFiltersEqual(persisted, nextAppliedFilters)
-    ) {
+    if (persisted && areEventLogFiltersEqual(persisted, nextAppliedFilters)) {
       return;
     }
     lastPersistedAppliedFiltersRef.current = nextAppliedFilters;
     searchState.writeState(SEARCH_STATE_KEY, remoteKey, nextAppliedFilters);
   }, [appliedFilters, hydratedKey, remoteKey, searchKey, searchState]);
 
-  const query = React.useMemo<EventLogQueryParams>(() => {
-    return {
-      remoteNode: remoteKey,
-      kind: appliedFilters.kind !== 'all' ? appliedFilters.kind : undefined,
-      paginationMode: ComponentsParametersEventLogPaginationMode.cursor,
-      type: appliedFilters.type !== 'all' ? appliedFilters.type : undefined,
-      dagName: appliedFilters.dagName || undefined,
-      automataName: appliedFilters.automataName || undefined,
-      dagRunId: appliedFilters.dagRunId || undefined,
-      attemptId: appliedFilters.attemptId || undefined,
-      startTime: formatDateForApi(appliedFilters.fromDate),
-      endTime: formatDateForApi(appliedFilters.toDate),
-      limit: PAGE_SIZE,
-    };
-  }, [appliedFilters, formatDateForApi, remoteKey]);
+  const query = React.useMemo(
+    () =>
+      buildEventLogQuery({
+        filters: appliedFilters,
+        remoteKey,
+        tzOffsetInSec,
+      }),
+    [appliedFilters, remoteKey, tzOffsetInSec]
+  );
 
   const isReady = hydratedKey === `${remoteKey}:${searchKey}`;
 
@@ -396,7 +134,7 @@ export function useEventLogFilters({
       setAppliedFilters(sanitized);
       setSearchParams(buildLocationParams(sanitized));
     },
-    [buildLocationParams, setSearchParams]
+    [setSearchParams]
   );
 
   const handleApplyFilters = React.useCallback(() => {
@@ -407,24 +145,24 @@ export function useEventLogFilters({
     setDraftFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
     setSearchParams(buildLocationParams(defaultFilters));
-  }, [buildLocationParams, defaultFilters, setSearchParams]);
+  }, [defaultFilters, setSearchParams]);
 
   const handleDatePresetChange = React.useCallback(
     (preset: string) => {
-      const dates = getPresetDates(preset);
+      const dates = getPresetDates(preset, tzOffsetInSec);
       updateDraftFilters({
         datePreset: preset,
         fromDate: dates.from,
         toDate: dates.to,
       });
     },
-    [getPresetDates, updateDraftFilters]
+    [tzOffsetInSec, updateDraftFilters]
   );
 
   const handleSpecificPeriodChange = React.useCallback(
     (value: string, period?: SpecificPeriod) => {
       const nextPeriod = period || draftFilters.specificPeriod;
-      const dates = getSpecificPeriodDates(nextPeriod, value);
+      const dates = getSpecificPeriodDates(nextPeriod, value, tzOffsetInSec);
       updateDraftFilters({
         specificValue: value,
         specificPeriod: nextPeriod,
@@ -432,13 +170,13 @@ export function useEventLogFilters({
         toDate: dates.to,
       });
     },
-    [draftFilters.specificPeriod, getSpecificPeriodDates, updateDraftFilters]
+    [draftFilters.specificPeriod, tzOffsetInSec, updateDraftFilters]
   );
 
   const handleDateRangeModeChange = React.useCallback(
     (nextMode: DateRangeMode) => {
       if (nextMode === 'preset') {
-        const dates = getPresetDates(draftFilters.datePreset);
+        const dates = getPresetDates(draftFilters.datePreset, tzOffsetInSec);
         updateDraftFilters({
           dateRangeMode: nextMode,
           fromDate: dates.from,
@@ -449,7 +187,8 @@ export function useEventLogFilters({
       if (nextMode === 'specific') {
         const dates = getSpecificPeriodDates(
           draftFilters.specificPeriod,
-          draftFilters.specificValue
+          draftFilters.specificValue,
+          tzOffsetInSec
         );
         updateDraftFilters({
           dateRangeMode: nextMode,
@@ -464,8 +203,7 @@ export function useEventLogFilters({
       draftFilters.datePreset,
       draftFilters.specificPeriod,
       draftFilters.specificValue,
-      getPresetDates,
-      getSpecificPeriodDates,
+      tzOffsetInSec,
       updateDraftFilters,
     ]
   );
@@ -515,7 +253,13 @@ export function useEventLogFilters({
     handleSpecificPeriodChange,
     handleDateRangeModeChange,
     handleSpecificPeriodSelect,
-    formatTimestamp,
-    formatTimezoneOffset,
+    formatTimestamp: React.useCallback(
+      (timestamp: string) => formatTimestamp(timestamp, tzOffsetInSec),
+      [tzOffsetInSec]
+    ),
+    formatTimezoneOffset: React.useCallback(
+      () => formatTimezoneOffset(tzOffsetInSec),
+      [tzOffsetInSec]
+    ),
   };
 }
