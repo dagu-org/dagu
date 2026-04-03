@@ -28,7 +28,7 @@ import { useClient, useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/ui/LoadingIndicator';
 import StatusChip from '@/ui/StatusChip';
-import { updateAutomataDescriptionInSpec } from './spec';
+import { updateAutomataMetadataInSpec } from './spec';
 
 type AutomataDetail = components['schemas']['AutomataDetailResponse'];
 type AutomataSummary = components['schemas']['AutomataSummary'];
@@ -465,8 +465,10 @@ function AutomataPage(): React.ReactElement {
   const [instructionDraft, setInstructionDraft] = React.useState('');
   const [operatorMessageDraft, setOperatorMessageDraft] = React.useState('');
   const [newTaskDescription, setNewTaskDescription] = React.useState('');
+  const [iconUrlDraft, setIconUrlDraft] = React.useState('');
   const [descriptionDraft, setDescriptionDraft] = React.useState('');
-  const [isEditingDescription, setIsEditingDescription] = React.useState(false);
+  const [goalDraft, setGoalDraft] = React.useState('');
+  const [isEditingMetadata, setIsEditingMetadata] = React.useState(false);
   const [freeTextResponse, setFreeTextResponse] = React.useState('');
   const [selectedOptions, setSelectedOptions] = React.useState<string[]>([]);
   const [error, setError] = React.useState('');
@@ -475,6 +477,7 @@ function AutomataPage(): React.ReactElement {
   const [specDraft, setSpecDraft] = React.useState('');
   const [specError, setSpecError] = React.useState('');
   const [isSavingSpec, setIsSavingSpec] = React.useState(false);
+  const instructionTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [selectedDAGRun, setSelectedDAGRun] = React.useState<{
     name: string;
     dagRunId: string;
@@ -593,10 +596,19 @@ function AutomataPage(): React.ReactElement {
   );
   const descriptionChanged =
     descriptionDraft.trim() !== (detail?.definition?.description || '').trim();
-  const descriptionSaveDisabled =
+  const iconUrlChanged =
+    iconUrlDraft.trim() !== (detail?.definition?.iconUrl || '').trim();
+  const goalChanged = goalDraft.trim() !== (detail?.definition?.goal || '').trim();
+  const metadataChanged = descriptionChanged || iconUrlChanged || goalChanged;
+  const metadataValidationError =
+    !goalDraft.trim() ||
+    !isValidAutomataIconUrl(iconUrlDraft) ||
+    iconUrlDraft.trim().length > MAX_AUTOMATA_ICON_URL_LENGTH;
+  const metadataSaveDisabled =
     !name ||
     !detail ||
-    !descriptionChanged ||
+    !metadataChanged ||
+    metadataValidationError ||
     !!managementBusy ||
     isSavingSpec ||
     isEditingSpec;
@@ -607,15 +619,31 @@ function AutomataPage(): React.ReactElement {
   }, [detail?.state?.instruction, name]);
 
   React.useEffect(() => {
+    const node = instructionTextareaRef.current;
+    if (!node) {
+      return;
+    }
+    node.style.height = '0px';
+    node.style.height = `${node.scrollHeight}px`;
+  }, [instructionDraft]);
+
+  React.useEffect(() => {
     setOperatorMessageDraft('');
     setNewTaskDescription('');
   }, [name]);
 
   React.useEffect(() => {
-    if (!isEditingDescription) {
+    if (!isEditingMetadata) {
       setDescriptionDraft(detail?.definition?.description || '');
+      setIconUrlDraft(detail?.definition?.iconUrl || '');
+      setGoalDraft(detail?.definition?.goal || '');
     }
-  }, [detail?.definition?.description, isEditingDescription]);
+  }, [
+    detail?.definition?.description,
+    detail?.definition?.iconUrl,
+    detail?.definition?.goal,
+    isEditingMetadata,
+  ]);
 
   React.useEffect(() => {
     setSelectedDAGRun(null);
@@ -1066,8 +1094,8 @@ function AutomataPage(): React.ReactElement {
     }
   };
 
-  const onSaveDescription = async () => {
-    if (!name || !detail || descriptionSaveDisabled) return;
+  const onSaveMetadata = async () => {
+    if (!name || !detail || metadataSaveDisabled) return;
     const currentSpec = specQuery.data?.spec;
     if (!currentSpec) {
       setError('Automata spec is not loaded yet.');
@@ -1075,37 +1103,43 @@ function AutomataPage(): React.ReactElement {
     }
 
     setError('');
-    setManagementBusy('description');
+    setManagementBusy('metadata');
     try {
-      const nextSpec = updateAutomataDescriptionInSpec(
+      const nextSpec = updateAutomataMetadataInSpec(
         currentSpec,
-        descriptionDraft
+        {
+          description: descriptionDraft,
+          iconUrl: iconUrlDraft,
+          goal: goalDraft,
+        }
       );
       const { error: apiError } = await client.PUT('/automata/{name}/spec', {
         params: { path: { name } },
         body: { spec: nextSpec },
       });
       if (apiError) {
-        throw new Error(apiError.message || 'Failed to save description');
+        throw new Error(apiError.message || 'Failed to save metadata');
       }
       await Promise.all([
         detailQuery.mutate(),
         listQuery.mutate(),
         specQuery.mutate(),
       ]);
-      setIsEditingDescription(false);
+      setIsEditingMetadata(false);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to save description'
+        err instanceof Error ? err.message : 'Failed to save metadata'
       );
     } finally {
       setManagementBusy(null);
     }
   };
 
-  const onCancelDescription = () => {
+  const onCancelMetadata = () => {
     setDescriptionDraft(detail?.definition?.description || '');
-    setIsEditingDescription(false);
+    setIconUrlDraft(detail?.definition?.iconUrl || '');
+    setGoalDraft(detail?.definition?.goal || '');
+    setIsEditingMetadata(false);
   };
 
   return (
@@ -1599,8 +1633,62 @@ function AutomataPage(): React.ReactElement {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="min-w-0 rounded-lg border p-4">
-                    <h2 className="mb-2 text-sm font-semibold">Mission</h2>
+                    <h2 className="mb-2 text-sm font-semibold">Metadata</h2>
                     <div className="space-y-2 text-sm">
+                      <p>
+                        <span className="font-medium">Kind:</span>{' '}
+                        {detail.definition.kind}
+                      </p>
+                      <div className="grid gap-2">
+                        <Label htmlFor="automata-detail-goal">Goal</Label>
+                        <Textarea
+                          id="automata-detail-goal"
+                          value={goalDraft}
+                          onChange={(e) => {
+                            setGoalDraft(e.target.value);
+                            setIsEditingMetadata(true);
+                          }}
+                          placeholder="Complete the assigned task and leave it ready for review"
+                          disabled={!!managementBusy || isSavingSpec || isEditingSpec}
+                        />
+                        {!goalDraft.trim() ? (
+                          <div className="text-xs text-destructive">
+                            Goal is required.
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="automata-detail-icon-url">
+                          Image URL
+                        </Label>
+                        <Input
+                          id="automata-detail-icon-url"
+                          value={iconUrlDraft}
+                          onChange={(e) => {
+                            setIconUrlDraft(e.target.value);
+                            setIsEditingMetadata(true);
+                          }}
+                          placeholder="https://cdn.example.com/automata/build-captain.png"
+                          disabled={!!managementBusy || isSavingSpec || isEditingSpec}
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Optional. Use an absolute http(s) URL or a root-relative
+                          path like /assets/automata/build-captain.png.
+                        </div>
+                        {!isValidAutomataIconUrl(iconUrlDraft) ? (
+                          <div className="text-xs text-destructive">
+                            Icon URL must be an absolute http(s) URL or a
+                            root-relative path.
+                          </div>
+                        ) : null}
+                        {iconUrlDraft.trim().length >
+                        MAX_AUTOMATA_ICON_URL_LENGTH ? (
+                          <div className="text-xs text-destructive">
+                            Icon URL must be {MAX_AUTOMATA_ICON_URL_LENGTH}{' '}
+                            characters or fewer.
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="grid gap-2">
                         <Label htmlFor="automata-detail-description">
                           Description
@@ -1610,7 +1698,7 @@ function AutomataPage(): React.ReactElement {
                           value={descriptionDraft}
                           onChange={(e) => {
                             setDescriptionDraft(e.target.value);
-                            setIsEditingDescription(true);
+                            setIsEditingMetadata(true);
                           }}
                           placeholder="Optional description"
                           disabled={!!managementBusy || isSavingSpec || isEditingSpec}
@@ -1622,12 +1710,12 @@ function AutomataPage(): React.ReactElement {
                               : 'This updates the top-level description field in the Automata spec.'}
                           </div>
                           <div className="flex items-center gap-2">
-                            {descriptionChanged ? (
+                            {metadataChanged ? (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={onCancelDescription}
+                                onClick={onCancelMetadata}
                                 disabled={!!managementBusy || isSavingSpec}
                               >
                                 Cancel
@@ -1636,24 +1724,16 @@ function AutomataPage(): React.ReactElement {
                             <Button
                               type="button"
                               size="sm"
-                              onClick={onSaveDescription}
-                              disabled={descriptionSaveDisabled}
+                              onClick={onSaveMetadata}
+                              disabled={metadataSaveDisabled}
                             >
-                              {managementBusy === 'description'
+                              {managementBusy === 'metadata'
                                 ? 'Saving...'
-                                : 'Save Description'}
+                                : 'Save Metadata'}
                             </Button>
                           </div>
                         </div>
                       </div>
-                      <p>
-                        <span className="font-medium">Kind:</span>{' '}
-                        {detail.definition.kind}
-                      </p>
-                      <p>
-                        <span className="font-medium">Goal:</span>{' '}
-                        {detail.definition.goal}
-                      </p>
                       {detail.definition.tags?.length ? (
                         <div>
                           <span className="font-medium">Tags:</span>
@@ -1669,10 +1749,6 @@ function AutomataPage(): React.ReactElement {
                           </div>
                         </div>
                       ) : null}
-                      <p>
-                        <span className="font-medium">Instruction:</span>{' '}
-                        {detail.state.instruction || 'None yet'}
-                      </p>
                       {detail.state.lastSummary ? (
                         <p>
                           <span className="font-medium">Last Summary:</span>{' '}
@@ -1698,8 +1774,10 @@ function AutomataPage(): React.ReactElement {
                     </h2>
                     <div className="space-y-3">
                       <Textarea
+                        ref={instructionTextareaRef}
                         value={instructionDraft}
                         onChange={(e) => setInstructionDraft(e.target.value)}
+                        className="min-h-24 overflow-hidden resize-none"
                         placeholder={
                           serviceKind
                             ? 'Define the standing instruction for this service before activating it.'

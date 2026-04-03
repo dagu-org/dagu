@@ -3,13 +3,17 @@
 
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { updateAutomataDescriptionInSpec } from '../spec';
+import { updateAutomataMetadataInSpec } from '../spec';
 
-describe('updateAutomataDescriptionInSpec', () => {
+describe('updateAutomataMetadataInSpec', () => {
   it('adds description when missing', () => {
-    const next = updateAutomataDescriptionInSpec(
+    const next = updateAutomataMetadataInSpec(
       'goal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
-      'Handles delivery work'
+      {
+        description: 'Handles delivery work',
+        iconUrl: '',
+        goal: 'Ship it',
+      }
     );
 
     expect(parse(next)).toMatchObject({
@@ -20,9 +24,13 @@ describe('updateAutomataDescriptionInSpec', () => {
   });
 
   it('updates an existing description', () => {
-    const next = updateAutomataDescriptionInSpec(
+    const next = updateAutomataMetadataInSpec(
       'description: "Automata workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
-      'Handles delivery work'
+      {
+        description: 'Handles delivery work',
+        iconUrl: '',
+        goal: 'Ship it',
+      }
     );
 
     expect(parse(next)).toMatchObject({
@@ -32,9 +40,13 @@ describe('updateAutomataDescriptionInSpec', () => {
   });
 
   it('removes description when blank', () => {
-    const next = updateAutomataDescriptionInSpec(
+    const next = updateAutomataMetadataInSpec(
       'description: "Automata workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
-      '   '
+      {
+        description: '   ',
+        iconUrl: '',
+        goal: 'Ship it',
+      }
     );
 
     expect(parse(next)).toMatchObject({
@@ -45,7 +57,7 @@ describe('updateAutomataDescriptionInSpec', () => {
   });
 
   it('preserves unrelated fields', () => {
-    const next = updateAutomataDescriptionInSpec(
+    const next = updateAutomataMetadataInSpec(
       [
         'goal: "Ship it"',
         'tags:',
@@ -59,17 +71,57 @@ describe('updateAutomataDescriptionInSpec', () => {
         'disabled: false',
         '',
       ].join('\n'),
-      'Handles delivery work'
+      {
+        description: 'Handles delivery work',
+        iconUrl: 'https://cdn.example.com/icon.png',
+        goal: 'Ship it',
+      }
     );
 
     expect(parse(next)).toMatchObject({
       description: 'Handles delivery work',
+      icon_url: 'https://cdn.example.com/icon.png',
       goal: 'Ship it',
       tags: ['team=platform'],
       schedule: '* * * * *',
       allowed_dags: { names: ['build'] },
       agent: { safeMode: true },
       disabled: false,
+    });
+  });
+
+  it('removes icon url when blank', () => {
+    const next = updateAutomataMetadataInSpec(
+      'description: "Automata workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      {
+        description: 'Automata workflow',
+        iconUrl: ' ',
+        goal: 'Ship it',
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      description: 'Automata workflow',
+      goal: 'Ship it',
+    });
+    expect(parse(next)).not.toHaveProperty('icon_url');
+  });
+
+  it('updates goal while preserving other metadata', () => {
+    const next = updateAutomataMetadataInSpec(
+      'description: "Automata workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      {
+        description: 'Handles delivery work',
+        iconUrl: 'https://cdn.example.com/new.png',
+        goal: 'Handle triage and delivery',
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      description: 'Handles delivery work',
+      icon_url: 'https://cdn.example.com/new.png',
+      goal: 'Handle triage and delivery',
+      allowed_dags: { names: ['build'] },
     });
   });
 });

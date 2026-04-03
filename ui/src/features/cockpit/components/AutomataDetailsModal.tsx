@@ -182,6 +182,7 @@ export function AutomataDetailsModal({
   const [selectedRun, setSelectedRun] =
     React.useState<AutomataRunSummary | null>(null);
   const [instructionDraft, setInstructionDraft] = React.useState('');
+  const instructionTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [operatorMessageDraft, setOperatorMessageDraft] = React.useState('');
   const [selectedOptions, setSelectedOptions] = React.useState<string[]>([]);
   const [freeTextResponse, setFreeTextResponse] = React.useState('');
@@ -247,6 +248,15 @@ export function AutomataDetailsModal({
   React.useEffect(() => {
     setInstructionDraft(data?.state?.instruction || '');
   }, [data?.state?.instruction, stableName]);
+
+  React.useEffect(() => {
+    const node = instructionTextareaRef.current;
+    if (!node) {
+      return;
+    }
+    node.style.height = '0px';
+    node.style.height = `${node.scrollHeight}px`;
+  }, [instructionDraft]);
 
   React.useEffect(() => {
     setSelectedOptions([]);
@@ -541,13 +551,8 @@ export function AutomataDetailsModal({
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="min-w-0 rounded-lg border p-4">
-                    <h3 className="mb-3 text-sm font-semibold">Mission</h3>
+                    <h3 className="mb-3 text-sm font-semibold">Metadata</h3>
                     <div className="space-y-2 text-sm">
-                      {data.definition.description ? (
-                        <p className="text-muted-foreground">
-                          {data.definition.description}
-                        </p>
-                      ) : null}
                       <p>
                         <span className="font-medium">Kind:</span>{' '}
                         {data.definition.kind}
@@ -556,6 +561,11 @@ export function AutomataDetailsModal({
                         <span className="font-medium">Goal:</span>{' '}
                         {data.definition.goal || 'n/a'}
                       </p>
+                      {data.definition.description ? (
+                        <p className="text-muted-foreground">
+                          {data.definition.description}
+                        </p>
+                      ) : null}
                       {data.definition.tags?.length ? (
                         <div>
                           <span className="font-medium">Tags:</span>
@@ -571,10 +581,6 @@ export function AutomataDetailsModal({
                           </div>
                         </div>
                       ) : null}
-                      <p>
-                        <span className="font-medium">Instruction:</span>{' '}
-                        {data.state.instruction || 'No active instruction'}
-                      </p>
                     </div>
                   </div>
 
@@ -642,8 +648,10 @@ export function AutomataDetailsModal({
                     </h3>
                     <div className="space-y-3">
                       <Textarea
+                        ref={instructionTextareaRef}
                         value={instructionDraft}
                         onChange={(e) => setInstructionDraft(e.target.value)}
+                        className="min-h-24 overflow-hidden resize-none"
                         placeholder={
                           serviceKind
                             ? 'Define the standing instruction for this service before activating it.'
