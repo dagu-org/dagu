@@ -3044,6 +3044,13 @@ export interface components {
             /** @description Opaque cursor for loading the next page of older entries when using cursor pagination */
             nextCursor?: string;
         };
+        /** @description Forward-only paginated DAG-run list response */
+        DAGRunsPageResponse: {
+            /** @description List of DAG-runs with their status and metadata */
+            dagRuns: components["schemas"]["DAGRunSummary"][];
+            /** @description Opaque cursor for loading the next page of older DAG-runs */
+            nextCursor?: string;
+        };
         /** @description Request body for approving a waiting step */
         ApproveStepRequest: {
             /** @description Key-value parameters to provide. These will be available as environment variables in subsequent steps. */
@@ -3469,6 +3476,11 @@ export interface components {
         WorkerHealthStatus: WorkerHealthStatus;
         /** @description Detailed DAG configuration information */
         DAGDetails: {
+            /**
+             * Format: date-time
+             * @description Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed.
+             */
+            nextRun?: string;
             /** @description Logical grouping of related DAGs for organizational purposes */
             group?: string;
             /** @description Unique identifier for the DAG within its group */
@@ -5260,6 +5272,10 @@ export interface components {
         EventLogLimit: number;
         /** @description Opaque cursor for loading older event log entries */
         EventLogCursor: string;
+        /** @description Maximum number of DAG-runs to return (default 100) */
+        DAGRunListLimit: number;
+        /** @description Opaque cursor for loading the next page of older DAG-runs */
+        DAGRunListCursor: string;
         /** @description Pagination mode. Use `cursor` for the event feed infinite-loading flow; omit or use `offset` for compatibility pagination. */
         EventLogPaginationMode: ComponentsParametersEventLogPaginationMode;
         /** @description Number of entries to skip (for pagination) */
@@ -7372,6 +7388,10 @@ export interface operations {
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId?: components["parameters"]["DAGRunIdSearch"];
+                /** @description Maximum number of DAG-runs to return (default 100) */
+                limit?: components["parameters"]["DAGRunListLimit"];
+                /** @description Opaque cursor for loading the next page of older DAG-runs */
+                cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAG-runs by name */
@@ -7391,10 +7411,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** @description List of DAG-runs with their status and metadata */
-                        dagRuns: components["schemas"]["DAGRunSummary"][];
-                    };
+                    "application/json": components["schemas"]["DAGRunsPageResponse"];
+                };
+            };
+            /** @description Malformed cursor or invalid pagination parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */
@@ -7561,6 +7587,10 @@ export interface operations {
                 toDate?: components["parameters"]["DateTimeTo"];
                 /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
                 dagRunId?: components["parameters"]["DAGRunIdSearch"];
+                /** @description Maximum number of DAG-runs to return (default 100) */
+                limit?: components["parameters"]["DAGRunListLimit"];
+                /** @description Opaque cursor for loading the next page of older DAG-runs */
+                cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
             };
@@ -7579,10 +7609,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** @description List of DAG-runs with their status and metadata */
-                        dagRuns: components["schemas"]["DAGRunSummary"][];
-                    };
+                    "application/json": components["schemas"]["DAGRunsPageResponse"];
+                };
+            };
+            /** @description Malformed cursor or invalid pagination parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Generic error response */

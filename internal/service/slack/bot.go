@@ -318,6 +318,7 @@ func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, convKey
 		return
 	}
 
+	b.ensureThinkingIndicator(cs)
 	gen := cs.EnqueuePendingMessage(text)
 
 	delay := b.incomingDelay
@@ -354,6 +355,7 @@ func (b *Bot) handleTextCommand(ctx context.Context, cs *chatState, cmd string) 
 		b.sendReply(cs, "Session cleared. Send a message to start a new conversation.")
 
 	case "cancel":
+		b.clearPendingIndicators(cs)
 		sid, ownerUID := cs.ActiveSession()
 
 		if sid == "" {
@@ -388,6 +390,7 @@ func (b *Bot) handleSlashCommand(ctx context.Context, cmd slack.SlashCommand) {
 
 	case "/dagu-cancel":
 		b.clearPendingMessages(cs)
+		b.clearPendingIndicators(cs)
 		sid, ownerUID := cs.ActiveSession()
 
 		if sid == "" {
@@ -480,6 +483,7 @@ func (b *Bot) createSession(ctx context.Context, cs *chatState, user agent.UserI
 
 	sessionID, _, err := b.agentAPI.CreateSession(ctx, user, req)
 	if err != nil {
+		b.clearPendingIndicators(cs)
 		b.logger.Error("Failed to create session", slog.String("error", err.Error()))
 		b.sendReply(cs, "Failed to start session: "+err.Error())
 		return
@@ -498,6 +502,7 @@ func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, user agent.Us
 
 	result, err := chatbridge.EnqueueMessage(ctx, b.agentAPI, &cs.State, user, req)
 	if err != nil {
+		b.clearPendingIndicators(cs)
 		b.logger.Error("Failed to enqueue message", slog.String("error", err.Error()))
 		b.sendReply(cs, "Failed to send message: "+err.Error())
 		return
@@ -875,9 +880,7 @@ func (b *Bot) resetChat(cs *chatState) {
 	if cancel := cs.Reset(); cancel != nil {
 		cancel()
 	}
-	cs.thinkingMu.Lock()
-	cs.thinkingMessage = nil
-	cs.thinkingMu.Unlock()
+	b.clearPendingIndicators(cs)
 }
 
 // userIdentity creates a UserIdentity scoped to a specific conversation.

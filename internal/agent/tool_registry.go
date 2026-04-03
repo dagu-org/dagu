@@ -33,9 +33,9 @@ type ToolConfig struct {
 	// AllowedSkills restricts which skill IDs the use_skill tool can load.
 	// Nil means all skills in the store are allowed.
 	AllowedSkills map[string]struct{}
-	// RemoteNodeResolver provides access to remote nodes for remote_agent tools.
-	// Nil means remote node tools are not available.
-	RemoteNodeResolver RemoteNodeResolver
+	// RemoteContextResolver provides access to remote CLI contexts for remote_agent tools.
+	// Nil means remote context tools are not available.
+	RemoteContextResolver RemoteContextResolver
 	// AutomataRuntime provides Automata-specific workflow control tools.
 	// Nil means Automata tools are not available.
 	AutomataRuntime AutomataRuntime

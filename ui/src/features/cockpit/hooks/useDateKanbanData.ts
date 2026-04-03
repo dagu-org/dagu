@@ -1,14 +1,10 @@
 import { useContext, useMemo } from 'react';
-import { useQuery } from '@/hooks/api';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGRuns,
-} from '@/hooks/useAppLive';
+import { useLiveConnection } from '@/hooks/useAppLive';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
 import { components, Status } from '@/api/v1/schema';
+import { useExactDAGRuns } from '@/features/dag-runs/hooks/dagRunPagination';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
@@ -35,7 +31,13 @@ function dayBounds(
 }
 
 function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
-  const columns: KanbanColumns = { queued: [], running: [], review: [], done: [], failed: [] };
+  const columns: KanbanColumns = {
+    queued: [],
+    running: [],
+    review: [],
+    done: [],
+    failed: [],
+  };
   for (const run of runs) {
     switch (run.status) {
       case Status.Queued:
@@ -77,33 +79,22 @@ export function useDateKanbanData(
     () => dayBounds(date, tzOffsetInSec),
     [date, tzOffsetInSec]
   );
-
-  const liveState = useLiveConnection(isToday);
-
-  const { data, error, mutate } = useQuery(
-    '/dag-runs',
-    {
-      params: {
-        query: {
-          remoteNode,
-          tags: tag,
-          fromDate,
-          toDate,
-        },
-      },
-    },
-    {
-      ...(isToday
-        ? liveFallbackOptions(liveState)
-        : {
-            refreshInterval: 0,
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnMount: true,
-          }),
-    }
+  const dagRunsQuery = useMemo(
+    () => ({
+      remoteNode,
+      tags: tag,
+      fromDate,
+      toDate,
+    }),
+    [fromDate, remoteNode, tag, toDate]
   );
-  useLiveDAGRuns(mutate, isLive);
+
+  useLiveConnection(isToday);
+  const { data, error, refresh } = useExactDAGRuns({
+    query: dagRunsQuery,
+    liveEnabled: isLive,
+    fallbackIntervalMs: isToday ? 2000 : 0,
+  });
 
   const typedError = useMemo(() => {
     if (!error) {
@@ -115,10 +106,7 @@ export function useDateKanbanData(
     return new Error('Failed to load runs');
   }, [error]);
 
-  const columns = useMemo(
-    () => groupByStatus(data?.dagRuns ?? []),
-    [data?.dagRuns]
-  );
+  const columns = useMemo(() => groupByStatus(data), [data]);
 
   const isEmpty =
     columns.queued.length === 0 &&
@@ -130,8 +118,8 @@ export function useDateKanbanData(
   return {
     columns,
     error: typedError,
-    isLoading: !data && !typedError,
+    isLoading: data.length === 0 && !typedError,
     isEmpty,
-    retry: mutate,
+    retry: refresh,
   };
 }

@@ -785,7 +785,7 @@ func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore)
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteNodeResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteContextResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -798,19 +798,19 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
-		ConfigStore:        store,
-		ModelStore:         modelStore,
-		SkillStore:         skillStore,
-		SoulStore:          soulStore,
-		WorkingDir:         paths.DAGsDir,
-		Logger:             slog.Default(),
-		SessionStore:       sessStore,
-		DAGStore:           dagStore,
-		Hooks:              hooks,
-		EventService:       eventSvc,
-		MemoryStore:        memoryStore,
-		OAuthManager:       oauthManager,
-		RemoteNodeResolver: remoteResolver,
+		ConfigStore:           store,
+		ModelStore:            modelStore,
+		SkillStore:            skillStore,
+		SoulStore:             soulStore,
+		WorkingDir:            paths.DAGsDir,
+		Logger:                slog.Default(),
+		SessionStore:          sessStore,
+		DAGStore:              dagStore,
+		Hooks:                 hooks,
+		EventService:          eventSvc,
+		MemoryStore:           memoryStore,
+		OAuthManager:          oauthManager,
+		RemoteContextResolver: remoteResolver,
 		Environment: agent.EnvironmentInfo{
 			DAGsDir:        paths.DAGsDir,
 			DocsDir:        paths.DocsDir,

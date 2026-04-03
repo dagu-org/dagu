@@ -6,6 +6,7 @@ package core
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,10 +41,12 @@ func NewCronSchedule(expr string) (Schedule, error) {
 	if err != nil {
 		return Schedule{}, err
 	}
+	warnings := checkMisleadingStepValues(normalized)
 	return Schedule{
 		Kind:       ScheduleKindCron,
 		Expression: normalized,
 		Parsed:     parsed,
+		Warnings:   warnings,
 	}, nil
 }
 
@@ -283,6 +286,82 @@ func parseCronExpression(expr string) (cron.Schedule, string, error) {
 		return nil, "", fmt.Errorf("invalid cron expression %q: %w", normalized, err)
 	}
 	return parsed, normalized, nil
+}
+
+func checkMisleadingStepValues(expr string) []string {
+	fields := strings.Fields(expr)
+	if len(fields) != 5 {
+		return nil
+	}
+
+	type checkRule struct {
+		fieldIndex int
+		fieldName  string
+		base       int
+		unit       string
+	}
+
+	rules := []checkRule{
+		{fieldIndex: 0, fieldName: "minute", base: 60, unit: "minutes"},
+		{fieldIndex: 1, fieldName: "hour", base: 24, unit: "hours"},
+	}
+
+	warnings := make([]string, 0, len(rules))
+	for _, rule := range rules {
+		field := fields[rule.fieldIndex]
+		if !strings.HasPrefix(field, "*/") {
+			continue
+		}
+
+		step, err := strconv.Atoi(strings.TrimPrefix(field, "*/"))
+		if err != nil || step <= 1 {
+			continue
+		}
+		if isExpectedStepValue(rule.fieldName, rule.base, step) {
+			continue
+		}
+
+		firesAt := make([]string, 0, rule.base/step+1)
+		for i := 0; i < rule.base; i += step {
+			firesAt = append(firesAt, strconv.Itoa(i))
+		}
+
+		divisors := make([]string, 0, rule.base)
+		for i := 2; i < rule.base; i++ {
+			if rule.base%i == 0 {
+				divisors = append(divisors, strconv.Itoa(i))
+			}
+		}
+
+		warnings = append(warnings, fmt.Sprintf(
+			"schedule %q: %s in %s field fires at %s %s, not every %d %s. Divisors of %d that work as expected: %s",
+			expr,
+			field,
+			rule.fieldName,
+			strings.Join(firesAt, ", "),
+			rule.unit,
+			step,
+			rule.unit,
+			rule.base,
+			strings.Join(divisors, ", "),
+		))
+	}
+
+	return warnings
+}
+
+func isExpectedStepValue(fieldName string, base, step int) bool {
+	if base%step == 0 {
+		return true
+	}
+
+	// Common pattern: "*/5" in the hour field is often intentional, even
+	// though the final interval in each day is shorter at the day boundary.
+	if fieldName == "hour" && step == 5 {
+		return true
+	}
+
+	return false
 }
 
 func parseOneOffTime(raw string) (time.Time, string, error) {

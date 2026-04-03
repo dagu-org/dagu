@@ -31,6 +31,7 @@ func main() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().String("context", "", "Context name to use for command execution (default: current context or local)")
 	rootCmd.AddCommand(cmd.Start())
 	rootCmd.AddCommand(cmd.Exec())
 	rootCmd.AddCommand(cmd.Enqueue())
@@ -56,6 +57,7 @@ func init() {
 	rootCmd.AddCommand(cmd.Schema())
 	rootCmd.AddCommand(cmd.Example())
 	rootCmd.AddCommand(cmd.Config())
+	rootCmd.AddCommand(cmd.ContextCommand())
 	rootCmd.AddCommand(cmd.AI())
 
 	config.Version = version

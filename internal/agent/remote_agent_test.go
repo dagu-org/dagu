@@ -122,7 +122,7 @@ func TestRemoteGetSession_CamelCaseRoundTrip(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	node := &RemoteNodeInfo{
+	node := &RemoteContextInfo{
 		Name:       "test-node",
 		APIBaseURL: srv.URL,
 		AuthToken:  "test-token",
@@ -153,7 +153,7 @@ func TestRemoteRespondToPrompt_SendsCamelCase(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	node := &RemoteNodeInfo{
+	node := &RemoteContextInfo{
 		Name:       "test-node",
 		APIBaseURL: srv.URL,
 		AuthToken:  "test-token",
@@ -187,7 +187,7 @@ func TestRemoteCreateSession_SendsCamelCase(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	node := &RemoteNodeInfo{
+	node := &RemoteContextInfo{
 		Name:       "test-node",
 		APIBaseURL: srv.URL,
 		AuthToken:  "test-token",
@@ -232,7 +232,7 @@ func TestRemotePollSession_FullRoundTrip(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	node := &RemoteNodeInfo{
+	node := &RemoteContextInfo{
 		Name:       "test-node",
 		APIBaseURL: srv.URL,
 		AuthToken:  "test-token",
@@ -289,7 +289,7 @@ func TestRemotePollSession_AutoRejectsPrompt(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	node := &RemoteNodeInfo{
+	node := &RemoteContextInfo{
 		Name:       "test-node",
 		APIBaseURL: srv.URL,
 		AuthToken:  "test-token",
@@ -318,7 +318,7 @@ func TestRemoteDoRequest_SetsContentTypeForPOST(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	node := &RemoteNodeInfo{Name: "n", APIBaseURL: srv.URL, AuthToken: "tok"}
+	node := &RemoteContextInfo{Name: "n", APIBaseURL: srv.URL, AuthToken: "tok"}
 
 	// GET request — no Content-Type.
 	resp, err := remoteDoRequest(context.Background(), srv.Client(), node, http.MethodGet, "/test", nil)
@@ -344,7 +344,7 @@ func TestRemoteDoRequest_ReturnsErrorOnNon2xx(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	node := &RemoteNodeInfo{Name: "n", APIBaseURL: srv.URL}
+	node := &RemoteContextInfo{Name: "n", APIBaseURL: srv.URL}
 
 	_, err := remoteDoRequest(context.Background(), srv.Client(), node, http.MethodGet, "/test", nil)
 	require.Error(t, err)
@@ -392,17 +392,17 @@ func TestAppendRejectionSummary(t *testing.T) {
 func TestRemoteURL(t *testing.T) {
 	t.Parallel()
 
-	node := &RemoteNodeInfo{APIBaseURL: "https://example.com/"}
+	node := &RemoteContextInfo{APIBaseURL: "https://example.com/"}
 	assert.Equal(t, "https://example.com/api/v1/agent/sessions", remoteURL(node, "/api/v1/agent/sessions"))
 
-	node2 := &RemoteNodeInfo{APIBaseURL: "https://example.com"}
+	node2 := &RemoteContextInfo{APIBaseURL: "https://example.com"}
 	assert.Equal(t, "https://example.com/api/v1/agent/sessions", remoteURL(node2, "/api/v1/agent/sessions"))
 }
 
 func TestNewRemoteAgentTool_PopulatesEnum(t *testing.T) {
 	t.Parallel()
 
-	resolver := &testRemoteNodeResolver{}
+	resolver := &testRemoteContextResolver{}
 	// The test resolver returns empty, so no enum but tool should still be created.
 	tool := NewRemoteAgentTool(resolver)
 	require.NotNil(t, tool)
@@ -416,17 +416,17 @@ func TestNewRemoteAgentTool_NilResolverReturnsNil(t *testing.T) {
 	require.NotNil(t, reg)
 
 	tool := reg.Factory(ToolConfig{})
-	assert.Nil(t, tool, "factory should return nil when RemoteNodeResolver is nil")
+	assert.Nil(t, tool, "factory should return nil when RemoteContextResolver is nil")
 }
 
-func TestNewListRemoteNodesTool_NilResolverReturnsNil(t *testing.T) {
+func TestNewListContextsTool_NilResolverReturnsNil(t *testing.T) {
 	t.Parallel()
 
-	reg := findRegistration("list_remote_nodes")
+	reg := findRegistration("list_contexts")
 	require.NotNil(t, reg)
 
 	tool := reg.Factory(ToolConfig{})
-	assert.Nil(t, tool, "factory should return nil when RemoteNodeResolver is nil")
+	assert.Nil(t, tool, "factory should return nil when RemoteContextResolver is nil")
 }
 
 // findRegistration looks up a tool registration by name.

@@ -6,6 +6,7 @@ package coordinator
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +22,7 @@ type StaticRegistry struct {
 }
 
 // NewStaticRegistry creates a new StaticRegistry from a list of address strings.
-// Each address should be in the format "host:port" (e.g., "coordinator-1:50055").
+// Each address should be in the format "host[:port]" or "[ipv6]:port".
 func NewStaticRegistry(addresses []string) (*StaticRegistry, error) {
 	hosts := make([]exec.HostInfo, 0, len(addresses))
 
@@ -51,33 +52,56 @@ func NewStaticRegistry(addresses []string) (*StaticRegistry, error) {
 	return &StaticRegistry{coordinators: hosts}, nil
 }
 
-// parseAddress parses a "host:port" address string.
+// parseAddress parses a "host[:port]" or "[ipv6]:port" address string.
 func parseAddress(addr string) (host string, port int, err error) {
-	// Handle addresses with or without port
-	parts := strings.Split(addr, ":")
-	if len(parts) > 2 {
-		return "", 0, fmt.Errorf("invalid address format, expected host:port")
-	}
-
-	host = parts[0]
-	if host == "" {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
 		return "", 0, fmt.Errorf("host cannot be empty")
 	}
 
-	// Default port for coordinator
-	port = 50055
-	if len(parts) == 2 {
-		p, err := strconv.Atoi(parts[1])
+	if host, portStr, err := net.SplitHostPort(addr); err == nil {
+		p, err := strconv.Atoi(portStr)
 		if err != nil {
 			return "", 0, fmt.Errorf("invalid port: %w", err)
 		}
 		if p <= 0 || p > 65535 {
 			return "", 0, fmt.Errorf("port must be between 1 and 65535")
 		}
-		port = p
+		if host == "" {
+			return "", 0, fmt.Errorf("host cannot be empty")
+		}
+		return host, p, nil
 	}
 
-	return host, port, nil
+	if strings.HasPrefix(addr, "[") && strings.HasSuffix(addr, "]") {
+		host = strings.TrimSuffix(strings.TrimPrefix(addr, "["), "]")
+		if !isIPv6Host(host) {
+			return "", 0, fmt.Errorf("invalid address format, expected host[:port] or [ipv6]:port")
+		}
+		if host == "" {
+			return "", 0, fmt.Errorf("host cannot be empty")
+		}
+		return host, 50055, nil
+	}
+
+	if !strings.Contains(addr, ":") || isIPv6Host(addr) {
+		if addr == "" {
+			return "", 0, fmt.Errorf("host cannot be empty")
+		}
+		return addr, 50055, nil
+	}
+
+	return "", 0, fmt.Errorf("invalid address format, expected host[:port] or [ipv6]:port")
+}
+
+func isIPv6Host(host string) bool {
+	if strings.Count(host, ":") < 2 {
+		return false
+	}
+	if i := strings.LastIndex(host, "%"); i >= 0 {
+		host = host[:i]
+	}
+	return net.ParseIP(host) != nil
 }
 
 // Register is a no-op for StaticRegistry since we don't support registration.

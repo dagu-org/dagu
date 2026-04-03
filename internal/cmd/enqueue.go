@@ -35,6 +35,9 @@ Examples:
 var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, tagsFlag, defaultWorkingDirFlag, triggerTypeFlag, scheduleTimeFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		return remoteRunEnqueue(ctx, args)
+	}
 	runID, err := ctx.StringParam("run-id")
 	if err != nil {
 		return fmt.Errorf("failed to get Run ID: %w", err)

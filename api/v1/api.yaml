@@ -1745,6 +1745,8 @@ paths:
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/DAGRunIdSearch"
+        - $ref: "#/components/parameters/DAGRunListLimit"
+        - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
         - name: "name"
           in: "query"
@@ -1764,15 +1766,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  dagRuns:
-                    type: array
-                    description: "List of DAG-runs with their status and metadata"
-                    items:
-                      $ref: "#/components/schemas/DAGRunSummary"
-                required:
-                  - dagRuns
+                $ref: "#/components/schemas/DAGRunsPageResponse"
+        "400":
+          description: "Malformed cursor or invalid pagination parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
@@ -1939,6 +1939,8 @@ paths:
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/DAGRunName"
         - $ref: "#/components/parameters/DAGRunIdSearch"
+        - $ref: "#/components/parameters/DAGRunListLimit"
+        - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
       responses:
         "200":
@@ -1946,15 +1948,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  dagRuns:
-                    type: array
-                    description: "List of DAG-runs with their status and metadata"
-                    items:
-                      $ref: "#/components/schemas/DAGRunSummary"
-                required:
-                  - dagRuns
+                $ref: "#/components/schemas/DAGRunsPageResponse"
+        "400":
+          description: "Malformed cursor or invalid pagination parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Generic error response"
           content:
@@ -7689,6 +7689,25 @@ components:
       schema:
         type: string
 
+    DAGRunListLimit:
+      name: limit
+      in: query
+      description: "Maximum number of DAG-runs to return (default 100)"
+      required: false
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 500
+
+    DAGRunListCursor:
+      name: cursor
+      in: query
+      description: "Opaque cursor for loading the next page of older DAG-runs"
+      required: false
+      schema:
+        type: string
+
     EventLogPaginationMode:
       name: paginationMode
       in: query
@@ -7989,6 +8008,21 @@ components:
           description: "Opaque cursor for loading the next page of older entries when using cursor pagination"
       required:
         - entries
+
+    DAGRunsPageResponse:
+      type: object
+      description: "Forward-only paginated DAG-run list response"
+      properties:
+        dagRuns:
+          type: array
+          description: "List of DAG-runs with their status and metadata"
+          items:
+            $ref: "#/components/schemas/DAGRunSummary"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of older DAG-runs"
+      required:
+        - dagRuns
 
     ApproveStepRequest:
       type: object
@@ -8747,6 +8781,10 @@ components:
       type: object
       description: "Detailed DAG configuration information"
       properties:
+        nextRun:
+          type: string
+          format: date-time
+          description: "Scheduler-aware next planned run time. Pending overdue one-offs remain visible until consumed."
         group:
           type: string
           description: "Logical grouping of related DAGs for organizational purposes"

@@ -5,55 +5,58 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
-	"github.com/dagu-org/dagu/internal/remotenode"
+	"github.com/dagu-org/dagu/internal/clicontext"
 )
 
-// RemoteNodeResolverAdapter adapts *remotenode.Resolver to RemoteNodeResolver.
-// It filters to token-auth nodes only, since basic-auth nodes cannot be
-// used for remote agent operations.
-type RemoteNodeResolverAdapter struct {
-	Resolver *remotenode.Resolver
+// RemoteContextResolverAdapter adapts the CLI context store to RemoteContextResolver.
+type RemoteContextResolverAdapter struct {
+	Store *clicontext.Store
 }
 
-// GetByName returns a remote node by name, rejecting non-token-auth nodes.
-func (a *RemoteNodeResolverAdapter) GetByName(ctx context.Context, name string) (RemoteNodeInfo, error) {
-	node, err := a.Resolver.GetByName(ctx, name)
+func (a *RemoteContextResolverAdapter) GetByName(ctx context.Context, name string) (RemoteContextInfo, error) {
+	if a == nil || a.Store == nil {
+		return RemoteContextInfo{}, fmt.Errorf("remote context store is not configured")
+	}
+	item, err := a.Store.Get(ctx, name)
 	if err != nil {
-		return RemoteNodeInfo{}, fmt.Errorf("node %q not found: %w", name, err)
+		if errors.Is(err, clicontext.ErrNotFound) {
+			return RemoteContextInfo{}, fmt.Errorf("%w: %s", ErrRemoteContextNotFound, name)
+		}
+		return RemoteContextInfo{}, fmt.Errorf("resolve context %q: %w", name, err)
 	}
-	if node.AuthType != remotenode.AuthTypeToken {
-		return RemoteNodeInfo{}, fmt.Errorf(
-			"node %q uses %s auth (only token auth is supported for remote agent)", name, node.AuthType,
-		)
+	if item.Name == clicontext.LocalContextName {
+		return RemoteContextInfo{}, fmt.Errorf("context %q is local and cannot be used for remote agent execution", name)
 	}
-	return toRemoteNodeInfo(node), nil
+	return toRemoteContextInfo(item), nil
 }
 
-// ListTokenAuthNodes returns all remote nodes that use token authentication.
-func (a *RemoteNodeResolverAdapter) ListTokenAuthNodes(ctx context.Context) ([]RemoteNodeInfo, error) {
-	all, err := a.Resolver.ListAll(ctx)
+func (a *RemoteContextResolverAdapter) ListRemoteContexts(ctx context.Context) ([]RemoteContextInfo, error) {
+	if a == nil || a.Store == nil {
+		return nil, nil
+	}
+	items, err := a.Store.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var result []RemoteNodeInfo
-	for _, rn := range all {
-		if rn.AuthType == remotenode.AuthTypeToken {
-			result = append(result, toRemoteNodeInfo(rn.RemoteNode))
-		}
+	out := make([]RemoteContextInfo, 0, len(items))
+	for _, item := range items {
+		out = append(out, toRemoteContextInfo(item))
 	}
-	return result, nil
+	return out, nil
 }
 
-// toRemoteNodeInfo converts a domain RemoteNode to an agent RemoteNodeInfo.
-func toRemoteNodeInfo(n *remotenode.RemoteNode) RemoteNodeInfo {
-	return RemoteNodeInfo{
-		Name:          n.Name,
-		Description:   n.Description,
-		APIBaseURL:    n.APIBaseURL,
-		AuthToken:     n.AuthToken,
-		SkipTLSVerify: n.SkipTLSVerify,
-		Timeout:       n.Timeout,
+func toRemoteContextInfo(item *clicontext.Context) RemoteContextInfo {
+	timeout := time.Duration(item.TimeoutSeconds) * time.Second
+	return RemoteContextInfo{
+		Name:          item.Name,
+		Description:   item.Description,
+		APIBaseURL:    item.ServerURL,
+		AuthToken:     item.APIKey,
+		SkipTLSVerify: item.SkipTLSVerify,
+		Timeout:       timeout,
 	}
 }

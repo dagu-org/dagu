@@ -33,6 +33,9 @@ Example:
 var dequeueFlags = []commandLineFlag{paramsFlag, dagRunFlagDequeue}
 
 func runDequeue(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		return remoteRunDequeue(ctx, args)
+	}
 	queueName := args[0]
 
 	// Get dag-run reference from the context

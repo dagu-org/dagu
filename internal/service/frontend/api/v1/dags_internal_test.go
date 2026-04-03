@@ -90,3 +90,71 @@ steps:
 	require.NotNil(t, sseResp.Dags[0].NextRun)
 	require.True(t, listResp.Dags[0].NextRun.Equal(*sseResp.Dags[0].NextRun))
 }
+
+func TestGetDAGDetailsAndSpecIncludeNextRun(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	scheduledAt := time.Now().UTC().Truncate(time.Minute).Add(-10 * time.Minute)
+	dag := helper.DAG(t, fmt.Sprintf(`
+name: dag-details-next-run
+schedule:
+  - at: "%s"
+steps:
+  - command: echo hi
+`, scheduledAt.Format(time.RFC3339)))
+
+	state := &scheduler.SchedulerState{
+		Version: scheduler.SchedulerStateVersion,
+		DAGs: map[string]scheduler.DAGWatermark{
+			dag.Name: {
+				OneOffs: map[string]scheduler.OneOffScheduleState{
+					dag.Schedule[0].Fingerprint(): {
+						ScheduledTime: scheduledAt,
+						Status:        scheduler.OneOffStatusPending,
+					},
+				},
+			},
+		},
+	}
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+		localapi.WithSchedulerStateStore(stubSchedulerStateStore{state: state}),
+	)
+
+	detailsRespObj, err := api.GetDAGDetails(context.Background(), openapi.GetDAGDetailsRequestObject{
+		FileName: dag.FileName(),
+	})
+	require.NoError(t, err)
+
+	detailsResp, ok := detailsRespObj.(openapi.GetDAGDetails200JSONResponse)
+	require.True(t, ok)
+	require.NotNil(t, detailsResp.Dag)
+	require.NotNil(t, detailsResp.Dag.NextRun)
+	require.True(t, scheduledAt.Equal(*detailsResp.Dag.NextRun))
+
+	specRespObj, err := api.GetDAGSpec(context.Background(), openapi.GetDAGSpecRequestObject{
+		FileName: dag.FileName(),
+	})
+	require.NoError(t, err)
+
+	specResp, ok := specRespObj.(*openapi.GetDAGSpec200JSONResponse)
+	if !ok {
+		valueResp, valueOK := specRespObj.(openapi.GetDAGSpec200JSONResponse)
+		require.True(t, valueOK)
+		specResp = &valueResp
+	}
+	require.NotNil(t, specResp.Dag)
+	require.NotNil(t, specResp.Dag.NextRun)
+	require.True(t, scheduledAt.Equal(*specResp.Dag.NextRun))
+}

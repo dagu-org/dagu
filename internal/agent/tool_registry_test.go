@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testRemoteNodeResolver is a minimal resolver for tests.
-type testRemoteNodeResolver struct{}
+// testRemoteContextResolver is a minimal resolver for tests.
+type testRemoteContextResolver struct{}
 
-func (r *testRemoteNodeResolver) GetByName(_ context.Context, _ string) (RemoteNodeInfo, error) {
-	return RemoteNodeInfo{}, nil
+func (r *testRemoteContextResolver) GetByName(_ context.Context, _ string) (RemoteContextInfo, error) {
+	return RemoteContextInfo{}, nil
 }
 
-func (r *testRemoteNodeResolver) ListTokenAuthNodes(_ context.Context) ([]RemoteNodeInfo, error) {
+func (r *testRemoteContextResolver) ListRemoteContexts(_ context.Context) ([]RemoteContextInfo, error) {
 	return nil, nil
 }
 
@@ -59,7 +59,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 		"bash", "read", "patch", "think",
 		"navigate", "ask_user",
 		"delegate", "use_skill", "search_skills",
-		"remote_agent", "list_remote_nodes",
+		"remote_agent", "list_contexts",
 		"list_automata_tasks",
 		"list_allowed_dags", "run_allowed_dag", "retry_automata_run",
 		"set_automata_task_done", "request_human_input", "finish_automata",
@@ -117,10 +117,10 @@ func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 	t.Parallel()
 
 	cfg := ToolConfig{
-		DAGsDir:            "/tmp/test-dags",
-		SkillStore:         &testSkillStore{},
-		RemoteNodeResolver: &testRemoteNodeResolver{},
-		AutomataRuntime:    &testAutomataRuntime{},
+		DAGsDir:               "/tmp/test-dags",
+		SkillStore:            &testSkillStore{},
+		RemoteContextResolver: &testRemoteContextResolver{},
+		AutomataRuntime:       &testAutomataRuntime{},
 	}
 	for _, reg := range RegisteredTools() {
 		t.Run(reg.Name, func(t *testing.T) {
@@ -140,10 +140,10 @@ func TestCreateTools_UsesRegistry(t *testing.T) {
 	t.Parallel()
 
 	tools := CreateTools(ToolConfig{
-		DAGsDir:            "/tmp/dags",
-		SkillStore:         &testSkillStore{},
-		RemoteNodeResolver: &testRemoteNodeResolver{},
-		AutomataRuntime:    &testAutomataRuntime{},
+		DAGsDir:               "/tmp/dags",
+		SkillStore:            &testSkillStore{},
+		RemoteContextResolver: &testRemoteContextResolver{},
+		AutomataRuntime:       &testAutomataRuntime{},
 	})
 	regs := RegisteredTools()
 

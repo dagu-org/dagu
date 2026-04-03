@@ -180,17 +180,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 // handleCommand processes bot commands.
 func (b *Bot) handleCommand(ctx context.Context, msg *tgbotapi.Message) {
 	chatID := msg.Chat.ID
+	cs := b.getOrCreateChat(chatID)
 
 	switch msg.Command() {
 	case "new":
-		cs := b.getOrCreateChat(chatID)
 		b.clearPendingMessages(cs)
 		b.resetChat(cs)
 		b.sendText(chatID, "Session cleared. Send a message to start a new conversation.")
 
 	case "cancel":
-		cs := b.getOrCreateChat(chatID)
 		b.clearPendingMessages(cs)
+		b.stopTypingLoop(cs)
 		sid, ownerUID := cs.ActiveSession()
 
 		if sid == "" {
@@ -218,6 +218,7 @@ func (b *Bot) enqueueIncomingMessage(ctx context.Context, cs *chatState, chatID 
 		return
 	}
 
+	b.startTypingLoop(ctx, cs, chatID)
 	gen := cs.EnqueuePendingMessage(text)
 
 	delay := b.incomingDelay

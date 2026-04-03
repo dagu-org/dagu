@@ -800,6 +800,68 @@ func TestRunner(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
+	t.Run("StdoutPathExpandsStepNameBeforePrepare", func(t *testing.T) {
+		r := setupRunner(t)
+		stdoutPath := filepath.Join(t.TempDir(), "dag_${DAG_RUN_STEP_NAME}_out.log")
+
+		plan := r.newPlan(t,
+			newStep("second",
+				withCommand("echo meh"),
+				withStdout(stdoutPath),
+			),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+		node := result.nodeByName(t, "second")
+
+		require.Equal(t, strings.ReplaceAll(stdoutPath, "${DAG_RUN_STEP_NAME}", "second"), node.Step().Stdout)
+		content, err := os.ReadFile(node.Step().Stdout)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "meh")
+	})
+	t.Run("StdoutPathExpandsStepEnvBeforePrepare", func(t *testing.T) {
+		r := setupRunner(t)
+		stdoutPath := filepath.Join(t.TempDir(), "${LOG_NAME}.log")
+
+		plan := r.newPlan(t,
+			newStep("writer",
+				withCommand("echo meh"),
+				withEnvVars("LOG_NAME=prepared-output"),
+				withStdout(stdoutPath),
+			),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+		node := result.nodeByName(t, "writer")
+
+		require.Equal(t, strings.ReplaceAll(stdoutPath, "${LOG_NAME}", "prepared-output"), node.Step().Stdout)
+	})
+	t.Run("StdoutPathExpandsUpstreamStepRefBeforePrepare", func(t *testing.T) {
+		r := setupRunner(t)
+		stdoutPath := "${first.stdout}.copy"
+
+		plan := r.newPlan(t,
+			newStep("first",
+				withID("first"),
+				withCommand("echo upstream"),
+			),
+			newStep("second",
+				withDepends("first"),
+				withCommand("echo downstream"),
+				withStdout(stdoutPath),
+			),
+		)
+
+		result := plan.assertRun(t, core.Succeeded)
+		first := result.nodeByName(t, "first")
+		second := result.nodeByName(t, "second")
+
+		expected := first.GetStdout() + ".copy"
+		require.Equal(t, expected, second.Step().Stdout)
+		content, err := os.ReadFile(expected)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "downstream")
+	})
 
 	t.Run("DAGRunStatusNotAvailableToMainSteps", func(t *testing.T) {
 		r := setupRunner(t)

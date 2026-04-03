@@ -5,14 +5,15 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
 
-// RemoteNodeInfo contains resolved information about a remote Dagu node
-// for use by agent tools. This type is intentionally separate from
-// remotenode.RemoteNode to avoid circular dependencies.
-type RemoteNodeInfo struct {
+var ErrRemoteContextNotFound = errors.New("remote context not found")
+
+// RemoteContextInfo contains resolved information about a remote CLI context.
+type RemoteContextInfo struct {
 	Name          string
 	Description   string
 	APIBaseURL    string
@@ -23,20 +24,15 @@ type RemoteNodeInfo struct {
 
 // ApplyAuth adds the Bearer token header to the request.
 // If the token is empty, no header is set.
-func (n *RemoteNodeInfo) ApplyAuth(req *http.Request) {
+func (n *RemoteContextInfo) ApplyAuth(req *http.Request) {
 	if n.AuthToken != "" {
 		req.Header.Set("Authorization", "Bearer "+n.AuthToken)
 	}
 }
 
-// RemoteNodeResolver resolves remote node information for agent tools.
-// Implementations filter to only token-auth nodes (basic-auth nodes
-// cannot be used for remote agent operations).
-type RemoteNodeResolver interface {
-	// GetByName returns a remote node by name.
-	// Returns an error if the node is not found or not token-auth.
-	GetByName(ctx context.Context, name string) (RemoteNodeInfo, error)
+// RemoteContextResolver resolves remote CLI contexts for remote agent tools.
+type RemoteContextResolver interface {
+	GetByName(ctx context.Context, name string) (RemoteContextInfo, error)
 
-	// ListTokenAuthNodes returns all remote nodes that use token authentication.
-	ListTokenAuthNodes(ctx context.Context) ([]RemoteNodeInfo, error)
+	ListRemoteContexts(ctx context.Context) ([]RemoteContextInfo, error)
 }

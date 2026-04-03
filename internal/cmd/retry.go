@@ -54,6 +54,19 @@ var retryWorkerIDFlag = commandLineFlag{
 }
 
 func runRetry(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		for _, flag := range []commandLineFlag{
+			rootDAGRunFlag,
+			defaultWorkingDirFlag,
+			retryWorkerIDFlag,
+			attemptIDFlag,
+		} {
+			if ctx.Command.Flags().Changed(flag.name) {
+				return fmt.Errorf("--%s is not supported with --context", flag.name)
+			}
+		}
+		return remoteRunRetry(ctx, args)
+	}
 	dagRunID, _ := ctx.StringParam("run-id")
 	stepName, _ := ctx.StringParam("step")
 	rootRefStr, _ := ctx.StringParam("root")
@@ -270,26 +283,26 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 		ctx.DAGRunMgr,
 		dr,
 		agent.Options{
-			RetryTarget:             status,
-			ParentDAGRun:            status.Parent,
-			ProgressDisplay:         shouldEnableProgress(ctx),
-			StepRetry:               stepName,
-			WorkerID:                workerID,
-			AttemptID:               attemptID,
-			PreparedAttempt:         preparedAttempt,
-			DAGRunStore:             ctx.DAGRunStore,
-			ServiceRegistry:         ctx.ServiceRegistry,
-			RootDAGRun:              rootRun,
-			PeerConfig:              ctx.Config.Core.Peer,
-			TriggerType:             triggerType,
-			DefaultExecMode:         ctx.Config.DefaultExecMode,
-			AgentConfigStore:        as.ConfigStore,
-			AgentModelStore:         as.ModelStore,
-			AgentMemoryStore:        as.MemoryStore,
-			AgentSkillStore:         as.SkillStore,
-			AgentSoulStore:          as.SoulStore,
-			AgentOAuthManager:       as.OAuthManager,
-			AgentRemoteNodeResolver: as.RemoteNodeResolver,
+			RetryTarget:                status,
+			ParentDAGRun:               status.Parent,
+			ProgressDisplay:            shouldEnableProgress(ctx),
+			StepRetry:                  stepName,
+			WorkerID:                   workerID,
+			AttemptID:                  attemptID,
+			PreparedAttempt:            preparedAttempt,
+			DAGRunStore:                ctx.DAGRunStore,
+			ServiceRegistry:            ctx.ServiceRegistry,
+			RootDAGRun:                 rootRun,
+			PeerConfig:                 ctx.Config.Core.Peer,
+			TriggerType:                triggerType,
+			DefaultExecMode:            ctx.Config.DefaultExecMode,
+			AgentConfigStore:           as.ConfigStore,
+			AgentModelStore:            as.ModelStore,
+			AgentMemoryStore:           as.MemoryStore,
+			AgentSkillStore:            as.SkillStore,
+			AgentSoulStore:             as.SoulStore,
+			AgentOAuthManager:          as.OAuthManager,
+			AgentRemoteContextResolver: as.ContextResolver,
 		},
 	)
 

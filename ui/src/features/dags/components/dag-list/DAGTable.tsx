@@ -80,6 +80,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '../../../../components/ui/tooltip';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/select';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { parseTagParts } from '../../../../lib/utils';
@@ -114,6 +121,7 @@ function DAGCard({
   const description = dag.dag.description;
   const schedules = dag.dag.schedule || [];
   const hasSchedule = schedules.length > 0;
+  const nextRun = parseNextRun(dag.nextRun);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.metaKey || e.ctrlKey) {
@@ -163,6 +171,24 @@ function DAGCard({
           </span>
         )}
       </div>
+
+      {hasSchedule && !dag.suspended && (
+        <div className="text-xs text-muted-foreground mb-1.5 leading-tight">
+          {nextRun ? (
+            <Ticker intervalMs={1000}>
+              {() => {
+                const ms = nextRun.getTime() - new Date().getTime();
+                if (ms <= 0) {
+                  return <span>Due now</span>;
+                }
+                return <span>Run in {formatMs(ms)}</span>;
+              }}
+            </Ticker>
+          ) : (
+            <span>No upcoming run</span>
+          )}
+        </div>
+      )}
 
       {/* Tags */}
       {tags.length > 0 && (
@@ -725,6 +751,22 @@ const columnToSortField: Record<string, string> = {
 // Client-side sortable columns
 const clientSortableColumns = ['Status', 'LastRun'];
 
+const cardSortOptions = [
+  { value: 'name', label: 'Name' },
+  { value: 'nextRun', label: 'Next run' },
+] as const;
+
+function getCardSortLabel(sort: string): string {
+  return cardSortOptions.find((option) => option.value === sort)?.label ?? 'Name';
+}
+
+function getDefaultSortOrder(field: string): string {
+  if (field === 'nextRun') {
+    return 'asc';
+  }
+  return 'asc';
+}
+
 // --- Header Component for both Server-side and Client-side Sorting ---
 const SortableHeader = ({
   column,
@@ -1158,6 +1200,66 @@ function DAGTable({
             </div>
           )}
         </div>
+
+        {useCardView && onSortChange && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 pl-1">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                Sort
+              </span>
+              <Select
+                value={sortField}
+                onValueChange={(value) =>
+                  onSortChange(
+                    value,
+                    value === sortField ? sortOrder : getDefaultSortOrder(value)
+                  )
+                }
+              >
+                <SelectTrigger
+                  className="h-8 min-w-[132px] max-w-full text-xs"
+                  aria-label="Sort DAG cards"
+                >
+                  <SelectValue placeholder="Sort by">
+                    {getCardSortLabel(sortField)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {cardSortOptions.map((option) => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      className="text-xs"
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs shrink-0"
+                onClick={() =>
+                  onSortChange(sortField, sortOrder === 'asc' ? 'desc' : 'asc')
+                }
+                aria-label={
+                  sortOrder === 'asc'
+                    ? 'Switch to descending sort'
+                    : 'Switch to ascending sort'
+                }
+              >
+                {sortOrder === 'asc' ? (
+                  <ArrowUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDown className="h-3.5 w-3.5" />
+                )}
+                <span className="ml-1">{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Desktop Table View - Hidden on mobile or when panel is narrow */}

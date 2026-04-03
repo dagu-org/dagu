@@ -76,8 +76,8 @@ describe('DAGRunBatchActions', () => {
             { name: 'alpha', dagRunId: 'run-1' },
             { name: 'beta', dagRunId: 'run-2' },
           ]}
-          matchingCount={2}
-          onSelectAllMatching={vi.fn()}
+          loadedCount={2}
+          onSelectAllLoaded={vi.fn()}
           onClearSelection={vi.fn()}
           onReplaceSelection={onReplaceSelection}
           onActionComplete={onActionComplete}
@@ -181,8 +181,8 @@ describe('DAGRunBatchActions', () => {
       <AppBarContext.Provider value={appBarContextValue}>
         <DAGRunBatchActions
           selectedRuns={[{ name: 'alpha', dagRunId: 'run-1' }]}
-          matchingCount={1}
-          onSelectAllMatching={vi.fn()}
+          loadedCount={1}
+          onSelectAllLoaded={vi.fn()}
           onClearSelection={vi.fn()}
           onReplaceSelection={onReplaceSelection}
           onActionComplete={vi.fn().mockResolvedValue(undefined)}
@@ -226,8 +226,8 @@ describe('DAGRunBatchActions', () => {
       <AppBarContext.Provider value={appBarContextValue}>
         <DAGRunBatchActions
           selectedRuns={[{ name: 'alpha', dagRunId: 'run-1' }]}
-          matchingCount={1}
-          onSelectAllMatching={vi.fn()}
+          loadedCount={1}
+          onSelectAllLoaded={vi.fn()}
           onClearSelection={vi.fn()}
           onReplaceSelection={vi.fn()}
           onActionComplete={vi.fn().mockResolvedValue(undefined)}

@@ -10,8 +10,7 @@
   <p>
     <a href="https://docs.dagu.sh">Docs</a> |
     <a href="https://docs.dagu.sh/writing-workflows/examples">Examples</a> |
-    <a href="https://discord.gg/gpahPUjGRk">Discord</a> |
-    <a href="https://github.com/dagu-org/dagu">GitHub</a>
+    <a href="https://discord.gg/gpahPUjGRk">Support & Community</a>
   </p>
 </div>
 
@@ -447,7 +446,7 @@ Full documentation at [docs.dagu.sh](https://docs.dagu.sh/).
 
 ## Community
 
-- Chat with us on [Discord](https://discord.gg/gpahPUjGRk)
+- Join the community on [Discord](https://discord.gg/gpahPUjGRk)
 - File bugs and feature requests on [GitHub Issues](https://github.com/dagu-org/dagu/issues)
 - Follow us on [Bluesky](https://bsky.app/profile/dagu-org.bsky.social)
 

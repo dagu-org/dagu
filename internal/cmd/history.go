@@ -78,6 +78,9 @@ var historyFlags = []commandLineFlag{
 }
 
 func runHistory(ctx *Context, args []string) error {
+	if ctx.IsRemote() {
+		return remoteRunHistory(ctx, args)
+	}
 	// Validate format early
 	format, err := ctx.StringParam("format")
 	if err != nil {

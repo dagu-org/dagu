@@ -60,6 +60,8 @@ type DAGRunStore interface {
 	LatestAttempt(ctx context.Context, name string) (DAGRunAttempt, error)
 	// ListStatuses returns a list of statuses.
 	ListStatuses(ctx context.Context, opts ...ListDAGRunStatusesOption) ([]*DAGRunStatus, error)
+	// ListStatusesPage returns one forward-only page of statuses in canonical list order.
+	ListStatusesPage(ctx context.Context, opts ...ListDAGRunStatusesOption) (DAGRunStatusPage, error)
 	// CompareAndSwapLatestAttemptStatus atomically updates the latest attempt status
 	// when both the latest attempt ID and status still match the expected values.
 	CompareAndSwapLatestAttemptStatus(
@@ -100,6 +102,7 @@ type ListDAGRunStatusesOptions struct {
 	To         TimeInUTC
 	Statuses   []core.Status
 	Limit      int
+	Cursor     string
 	Tags       []string // Filter by DAG tags (AND logic - all tags must match)
 	Unlimited  bool
 	AllHistory bool
@@ -164,6 +167,13 @@ func WithLimit(limit int) ListDAGRunStatusesOption {
 	}
 }
 
+// WithCursor sets the opaque cursor for forward-only DAG-run pagination.
+func WithCursor(cursor string) ListDAGRunStatusesOption {
+	return func(o *ListDAGRunStatusesOptions) {
+		o.Cursor = cursor
+	}
+}
+
 // WithoutLimit disables the default 1000-item cap for internal callers that
 // need to scan the full recent result set.
 func WithoutLimit() ListDAGRunStatusesOption {
@@ -178,6 +188,12 @@ func WithAllHistory() ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.AllHistory = true
 	}
+}
+
+// DAGRunStatusPage is one forward-only page of DAG-run statuses.
+type DAGRunStatusPage struct {
+	Items      []*DAGRunStatus
+	NextCursor string
 }
 
 // RemoveOldDAGRunsOptions contains options for removing old dag-runs

@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/pprof"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/agentoauth"
 	"github.com/dagu-org/dagu/internal/automata"
+	"github.com/dagu-org/dagu/internal/clicontext"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/crypto"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -45,11 +47,9 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filememory"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
 	"github.com/dagu-org/dagu/internal/persis/filequeue"
-	"github.com/dagu-org/dagu/internal/persis/fileremotenode"
 	"github.com/dagu-org/dagu/internal/persis/fileserviceregistry"
 	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/dagu-org/dagu/internal/persis/filewatermark"
-	"github.com/dagu-org/dagu/internal/remotenode"
 	"github.com/dagu-org/dagu/internal/runtime"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
 	"github.com/dagu-org/dagu/internal/service/coordinator"
@@ -71,6 +71,7 @@ type Context struct {
 	Flags   []commandLineFlag
 	Config  *config.Config
 	Quiet   bool
+	Scope   commandScope
 
 	EventService              *eventstore.Service
 	EventSourceInstance       string
@@ -86,6 +87,10 @@ type Context struct {
 
 	Proc           exec.ProcHandle
 	LicenseManager *license.Manager
+	ContextStore   *clicontext.Store
+	CLIContext     *clicontext.Context
+	ContextName    string
+	Remote         *remoteClient
 }
 
 // WithContext returns a new Context with a different underlying context.Context.
@@ -110,6 +115,11 @@ func (c *Context) WithContext(ctx context.Context) *Context {
 		ActiveDistributedRunStore: c.ActiveDistributedRunStore,
 		Proc:                      c.Proc,
 		LicenseManager:            c.LicenseManager,
+		ContextStore:              c.ContextStore,
+		CLIContext:                c.CLIContext,
+		ContextName:               c.ContextName,
+		Remote:                    c.Remote,
+		Scope:                     c.Scope,
 	}
 }
 
@@ -151,6 +161,8 @@ func (c *Context) LogToFile(f *os.File) {
 // or other initialization steps fail.
 func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	ctx := cmd.Context()
+	commandName := commandFamilyName(cmd)
+	scope := scopeForCommand(commandName)
 
 	v := viper.New()
 	bindFlags(v, cmd, flags...)
@@ -181,7 +193,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	}
 
 	// Set service type based on command to load only necessary config sections
-	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(cmd.Name())))
+	configLoaderOpts = append(configLoaderOpts, config.WithService(serviceForCommand(commandName)))
 
 	loader := config.NewConfigLoader(v, configLoaderOpts...)
 	cfg, err := loader.Load()
@@ -189,6 +201,40 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		return nil, err
 	}
 	ctx = config.WithConfig(ctx, cfg)
+
+	requestedContextName, err := requestedCLIContextName(cmd)
+	if err != nil {
+		return nil, err
+	}
+	selectedContextName := clicontext.LocalContextName
+	selectedContext := &clicontext.Context{Name: clicontext.LocalContextName}
+	var (
+		contextStore        *clicontext.Store
+		contextStoreWarning error
+	)
+
+	if isContextCommand(cmd) || scope != commandScopeStatic {
+		contextStore, err = newCLIContextStore(cfg.Paths.DataDir, cfg.Paths.ContextsDir)
+		if err != nil {
+			if shouldFailForContextStoreError(cmd, scope, requestedContextName) {
+				return nil, fmt.Errorf("failed to initialize context store: %w", err)
+			}
+			contextStoreWarning = fmt.Errorf("failed to initialize context store, using local context: %w", err)
+		} else if !isContextCommand(cmd) {
+			selectedContextName, selectedContext, err = resolveCLIContext(cmd, contextStore, requestedContextName)
+			if err != nil {
+				if shouldFailForContextResolutionError(scope, requestedContextName) {
+					return nil, err
+				}
+				contextStoreWarning = fmt.Errorf("failed to resolve context selection, using local context: %w", err)
+				selectedContextName = clicontext.LocalContextName
+				selectedContext = &clicontext.Context{Name: clicontext.LocalContextName}
+			}
+		}
+	}
+	if scope == commandScopeLocalOnly && selectedContextName != clicontext.LocalContextName {
+		return nil, fmt.Errorf("command %q only supports the local context", cmd.Name())
+	}
 
 	// Create a logger context based on config and quiet mode
 	var opts []logger.Option
@@ -215,6 +261,9 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 	for _, warning := range cfg.Warnings {
 		logger.Warn(ctx, warning)
 	}
+	if contextStoreWarning != nil {
+		logger.Warn(ctx, contextStoreWarning.Error())
+	}
 
 	baseCtx := ctx
 	eventSourceInstance := eventstore.DefaultSourceInstance()
@@ -233,6 +282,27 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		}
 	}
 
+	if scope == commandScopeContextAware && selectedContextName != clicontext.LocalContextName {
+		remote, err := newRemoteClient(selectedContext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize remote context %q: %w", selectedContextName, err)
+		}
+		return &Context{
+			Context:             ctx,
+			Command:             cmd,
+			Config:              cfg,
+			Quiet:               quiet,
+			Flags:               flags,
+			EventService:        eventSvc,
+			EventSourceInstance: eventSourceInstance,
+			ContextStore:        contextStore,
+			CLIContext:          selectedContext,
+			ContextName:         selectedContextName,
+			Remote:              remote,
+			Scope:               scope,
+		}, nil
+	}
+
 	// For shared-nothing workers, skip creating file-based stores
 	// as they only use temporary directories and push status to coordinator
 	if sharedNothingWorker {
@@ -247,6 +317,10 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 			Flags:               flags,
 			EventService:        nil,
 			EventSourceInstance: eventSourceInstance,
+			ContextStore:        contextStore,
+			CLIContext:          selectedContext,
+			ContextName:         selectedContextName,
+			Scope:               scope,
 			// All stores are nil - shared-nothing workers don't need local storage
 			// Status is pushed to coordinator, DAG definitions come from task payload
 		}, nil
@@ -349,7 +423,93 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 		DAGRunLeaseStore:          dagRunLeaseStore,
 		ActiveDistributedRunStore: activeDistributedRunStore,
 		LicenseManager:            licMgr,
+		ContextStore:              contextStore,
+		CLIContext:                selectedContext,
+		ContextName:               selectedContextName,
+		Scope:                     scope,
 	}, nil
+}
+
+func newCLIContextStore(dataDir, contextsDir string) (*clicontext.Store, error) {
+	encKey, err := crypto.ResolveKey(dataDir)
+	if err != nil {
+		return nil, err
+	}
+	enc, err := crypto.NewEncryptor(encKey)
+	if err != nil {
+		return nil, err
+	}
+	return clicontext.NewStore(contextsDir, enc)
+}
+
+func commandFamilyName(cmd *cobra.Command) string {
+	if isContextCommand(cmd) {
+		return "context"
+	}
+	return cmd.Name()
+}
+
+func isContextCommand(cmd *cobra.Command) bool {
+	for current := cmd; current != nil; current = current.Parent() {
+		if current.Name() == "context" {
+			return true
+		}
+	}
+	return false
+}
+
+func requestedCLIContextName(cmd *cobra.Command) (string, error) {
+	if cmd.Flags().Lookup("context") == nil {
+		return "", nil
+	}
+	contextName, err := cmd.Flags().GetString("context")
+	if err != nil {
+		return "", fmt.Errorf("failed to get context flag: %w", err)
+	}
+	return strings.TrimSpace(contextName), nil
+}
+
+func resolveCLIContext(cmd *cobra.Command, store *clicontext.Store, requested string) (string, *clicontext.Context, error) {
+	contextName := strings.TrimSpace(requested)
+	var err error
+	if contextName == "" {
+		contextName, err = store.Current(cmd.Context())
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to resolve current context: %w", err)
+		}
+	}
+	if contextName == "" {
+		contextName = clicontext.LocalContextName
+	}
+	ctx, err := store.Get(cmd.Context(), contextName)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to resolve context %q: %w", contextName, err)
+	}
+	return contextName, ctx, nil
+}
+
+func shouldFailForContextStoreError(cmd *cobra.Command, scope commandScope, requested string) bool {
+	if isContextCommand(cmd) {
+		return true
+	}
+	if scope == commandScopeStatic {
+		return false
+	}
+	return requested != "" && requested != clicontext.LocalContextName
+}
+
+func shouldFailForContextResolutionError(scope commandScope, requested string) bool {
+	if requested == "" {
+		return false
+	}
+	if requested == clicontext.LocalContextName {
+		return false
+	}
+	return scope != commandScopeStatic
+}
+
+func (c *Context) IsRemote() bool {
+	return c != nil && c.Remote != nil && c.ContextName != clicontext.LocalContextName
 }
 
 func eventSourceServiceForCommand(cmdName string) string {
@@ -661,13 +821,13 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 
 // agentStoresResult holds the agent stores created by agentStores().
 type agentStoresResult struct {
-	ConfigStore        agent.ConfigStore
-	ModelStore         agent.ModelStore
-	MemoryStore        agent.MemoryStore
-	SkillStore         agent.SkillStore
-	SoulStore          agent.SoulStore
-	OAuthManager       *agentoauth.Manager
-	RemoteNodeResolver agent.RemoteNodeResolver
+	ConfigStore     agent.ConfigStore
+	ModelStore      agent.ModelStore
+	MemoryStore     agent.MemoryStore
+	SkillStore      agent.SkillStore
+	SoulStore       agent.SoulStore
+	OAuthManager    *agentoauth.Manager
+	ContextResolver agent.RemoteContextResolver
 }
 
 // agentStores creates the agent config, model, memory, and skill stores from the config paths.
@@ -722,34 +882,18 @@ func (c *Context) agentStores() agentStoresResult {
 		result.OAuthManager = oauthManager
 	}
 
-	// Build remote node resolver for agent step remote tools.
-	result.RemoteNodeResolver = c.buildRemoteNodeResolver()
+	// Build context resolver for agent step remote tools.
+	result.ContextResolver = c.buildRemoteContextResolver()
 
 	return result
 }
 
-// buildRemoteNodeResolver creates a RemoteNodeResolver from config and store.
-func (c *Context) buildRemoteNodeResolver() agent.RemoteNodeResolver {
-	var rnStore remotenode.Store
-	encKey, err := crypto.ResolveKey(c.Config.Paths.DataDir)
-	if err != nil {
-		logger.Warn(c, "Failed to resolve encryption key for remote nodes", tag.Error(err))
-	} else {
-		enc, err := crypto.NewEncryptor(encKey)
-		if err != nil {
-			logger.Warn(c, "Failed to create encryptor for remote nodes", tag.Error(err))
-		} else {
-			s, err := fileremotenode.New(c.Config.Paths.RemoteNodesDir, enc)
-			if err != nil {
-				logger.Warn(c, "Failed to create remote node store", tag.Error(err))
-			} else {
-				rnStore = s
-			}
-		}
+// buildRemoteContextResolver creates a RemoteContextResolver from the CLI context store.
+func (c *Context) buildRemoteContextResolver() agent.RemoteContextResolver {
+	if c.ContextStore == nil {
+		return nil
 	}
-
-	resolver := remotenode.NewResolver(c.Config.Server.RemoteNodes, rnStore)
-	return &agent.RemoteNodeResolverAdapter{Resolver: resolver}
+	return &agent.RemoteContextResolverAdapter{Store: c.ContextStore}
 }
 
 // OpenLogFile creates and opens a log file for a given dag-run.
