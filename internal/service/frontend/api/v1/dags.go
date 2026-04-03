@@ -1109,13 +1109,35 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		}
 	}
 
+	return a.startPreparedDAGRunWithOptions(ctx, dag, opts, opts.params)
+}
+
+func (a *API) startRescheduledDAGRunWithOptions(
+	ctx context.Context,
+	dag *core.DAG,
+	opts startDAGRunOptions,
+	preservedParams string,
+) error {
+	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
+		return err
+	}
+
+	return a.startPreparedDAGRunWithOptions(ctx, dag, opts, preservedParams)
+}
+
+func (a *API) startPreparedDAGRunWithOptions(
+	ctx context.Context,
+	dag *core.DAG,
+	opts startDAGRunOptions,
+	dispatchParams string,
+) error {
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
 	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 		timeout := 5 * time.Second
 		if osrt.GOOS == "windows" {
 			timeout = 10 * time.Second
 		}
-		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, opts.params, opts.tags)
+		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, dispatchParams, opts.tags)
 	}
 
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
