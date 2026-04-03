@@ -35,6 +35,12 @@ type TimelineItem = {
 function DashboardTimeChart({ data: input, selectedDate }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineInstance = useRef<Timeline | null>(null);
+  const timelineItemsRef = useRef(new DataSet<TimelineItem>([]));
+  const initialViewRef = useRef<{ start: Date; end: Date } | null>(null);
+  const appliedSelectedDateRef = useRef<{
+    startTimestamp: number | null;
+    endTimestamp: number | null;
+  } | null>(null);
   const config = useConfig();
   const [selectedDAGRun, setSelectedDAGRun] = useState<{
     name: string;
@@ -253,7 +259,7 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
 
     timelineInstance.current = new Timeline(
       timelineRef.current,
-      new DataSet([]),
+      timelineItemsRef.current,
       {
         start: validViewStartDate,
         end: validViewEndDate,
@@ -327,9 +333,8 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
     if (!timelineInstance.current) return;
 
     const validTimezone = getValidTimezone(config.tz);
-    const items: TimelineItem[] = [];
+    const nextItems = new Map<string, TimelineItem>();
     const now = dayjs();
-    const seenIds = new Set<string>();
 
     input.forEach((dagRun) => {
       const status = dagRun.status;
@@ -342,15 +347,14 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
         const endDate = end.tz(validTimezone).toDate();
 
         const id = dagRun.name + `_${dagRun.dagRunId}`;
-        if (seenIds.has(id)) return; // Skip duplicates
-        seenIds.add(id);
+        if (nextItems.has(id)) return; // Skip duplicates
 
         if (
           !isNaN(startDate.getTime()) &&
           !isNaN(endDate.getTime()) &&
           startDate <= endDate
         ) {
-          items.push({
+          nextItems.set(id, {
             id,
             content: dagRun.name,
             start: startDate,
@@ -362,13 +366,56 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       }
     });
 
-    const dataset = new DataSet(items);
-    timelineInstance.current.setItems(dataset);
+    const dataset = timelineItemsRef.current;
+    const existingItems = new Map(
+      dataset.get().map((item) => [item.id, item] as const)
+    );
+    const updates: TimelineItem[] = [];
+    const removals: string[] = [];
+
+    nextItems.forEach((nextItem, id) => {
+      const currentItem = existingItems.get(id);
+      if (
+        !currentItem ||
+        currentItem.content !== nextItem.content ||
+        currentItem.group !== nextItem.group ||
+        currentItem.className !== nextItem.className ||
+        currentItem.start.getTime() !== nextItem.start.getTime() ||
+        currentItem.end.getTime() !== nextItem.end.getTime()
+      ) {
+        updates.push(nextItem);
+      }
+      existingItems.delete(id);
+    });
+
+    existingItems.forEach((_item, id) => {
+      removals.push(id);
+    });
+
+    if (removals.length > 0) {
+      dataset.remove(removals);
+    }
+    if (updates.length > 0) {
+      dataset.update(updates);
+    }
   }, [input, config.tz, getValidTimezone]);
 
-  // Update window when selectedDate changes
+  // Update the window only when the selected date values change.
   useEffect(() => {
     if (!timelineInstance.current) return;
+
+    const nextSelectedDate = {
+      startTimestamp: selectedDate?.startTimestamp ?? null,
+      endTimestamp: selectedDate?.endTimestamp ?? null,
+    };
+    const previousSelectedDate = appliedSelectedDateRef.current;
+    if (
+      previousSelectedDate &&
+      previousSelectedDate.startTimestamp === nextSelectedDate.startTimestamp &&
+      previousSelectedDate.endTimestamp === nextSelectedDate.endTimestamp
+    ) {
+      return;
+    }
 
     const now = dayjs();
     const viewStartDate = selectedDate
@@ -392,13 +439,12 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
       start: validViewStartDate,
       end: validViewEndDate,
     };
-  }, [selectedDate]);
+    appliedSelectedDateRef.current = nextSelectedDate;
+  }, [selectedDate?.endTimestamp, selectedDate?.startTimestamp]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
   };
-
-  const initialViewRef = useRef<{ start: Date; end: Date } | null>(null);
 
   const handleZoomIn = () => {
     if (timelineInstance.current) {
@@ -634,8 +680,14 @@ function DashboardTimeChart({ data: input, selectedDate }: Props) {
           border-radius: 4px !important;
           border-width: 0 !important;
           cursor: pointer !important;
-          transition: transform 0.1s ease, filter 0.1s ease !important;
+          transition: none !important;
+          animation: none !important;
           box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .vis-item,
+        .vis-item * {
+          transition: none !important;
+          animation: none !important;
         }
         .vis-item:hover {
           filter: brightness(1.2);
