@@ -284,7 +284,7 @@ func (s *Store) loadMemoryWithCache(path string) (string, error) {
 		return s.readMemoryFile(path)
 	})
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) || os.IsNotExist(err) {
 			s.fileCache.Invalidate(path)
 			return "", nil
 		}

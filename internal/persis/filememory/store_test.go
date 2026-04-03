@@ -503,6 +503,16 @@ func TestCacheInvalidation(t *testing.T) {
 		_, found = cache.Load(path)
 		assert.False(t, found)
 	})
+
+	t.Run("missing automata memory returns empty with cache", func(t *testing.T) {
+		t.Parallel()
+		cache := fileutil.NewCache[string]("memory_test", 10, time.Hour)
+		store := newTestStoreWithOptions(t, WithFileCache(cache))
+
+		content, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		require.NoError(t, err)
+		assert.Empty(t, content)
+	})
 }
 
 // newTestStore creates a Store backed by a temporary directory.
