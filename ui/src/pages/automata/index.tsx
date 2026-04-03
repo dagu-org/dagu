@@ -28,6 +28,7 @@ import { useClient, useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/ui/LoadingIndicator';
 import StatusChip from '@/ui/StatusChip';
+import { updateAutomataDescriptionInSpec } from './spec';
 
 type AutomataDetail = components['schemas']['AutomataDetailResponse'];
 type AutomataSummary = components['schemas']['AutomataSummary'];
@@ -464,6 +465,8 @@ function AutomataPage(): React.ReactElement {
   const [instructionDraft, setInstructionDraft] = React.useState('');
   const [operatorMessageDraft, setOperatorMessageDraft] = React.useState('');
   const [newTaskDescription, setNewTaskDescription] = React.useState('');
+  const [descriptionDraft, setDescriptionDraft] = React.useState('');
+  const [isEditingDescription, setIsEditingDescription] = React.useState(false);
   const [freeTextResponse, setFreeTextResponse] = React.useState('');
   const [selectedOptions, setSelectedOptions] = React.useState<string[]>([]);
   const [error, setError] = React.useState('');
@@ -588,6 +591,15 @@ function AutomataPage(): React.ReactElement {
   const scheduleConfigured = /(^|\n)schedule\s*:/.test(
     specQuery.data?.spec || ''
   );
+  const descriptionChanged =
+    descriptionDraft.trim() !== (detail?.definition?.description || '').trim();
+  const descriptionSaveDisabled =
+    !name ||
+    !detail ||
+    !descriptionChanged ||
+    !!managementBusy ||
+    isSavingSpec ||
+    isEditingSpec;
   const listItems = (listQuery.data?.automata || []) as AutomataSummary[];
 
   React.useEffect(() => {
@@ -598,6 +610,12 @@ function AutomataPage(): React.ReactElement {
     setOperatorMessageDraft('');
     setNewTaskDescription('');
   }, [name]);
+
+  React.useEffect(() => {
+    if (!isEditingDescription) {
+      setDescriptionDraft(detail?.definition?.description || '');
+    }
+  }, [detail?.definition?.description, isEditingDescription]);
 
   React.useEffect(() => {
     setSelectedDAGRun(null);
@@ -1046,6 +1064,48 @@ function AutomataPage(): React.ReactElement {
     } finally {
       setIsSavingSpec(false);
     }
+  };
+
+  const onSaveDescription = async () => {
+    if (!name || !detail || descriptionSaveDisabled) return;
+    const currentSpec = specQuery.data?.spec;
+    if (!currentSpec) {
+      setError('Automata spec is not loaded yet.');
+      return;
+    }
+
+    setError('');
+    setManagementBusy('description');
+    try {
+      const nextSpec = updateAutomataDescriptionInSpec(
+        currentSpec,
+        descriptionDraft
+      );
+      const { error: apiError } = await client.PUT('/automata/{name}/spec', {
+        params: { path: { name } },
+        body: { spec: nextSpec },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to save description');
+      }
+      await Promise.all([
+        detailQuery.mutate(),
+        listQuery.mutate(),
+        specQuery.mutate(),
+      ]);
+      setIsEditingDescription(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to save description'
+      );
+    } finally {
+      setManagementBusy(null);
+    }
+  };
+
+  const onCancelDescription = () => {
+    setDescriptionDraft(detail?.definition?.description || '');
+    setIsEditingDescription(false);
   };
 
   return (
@@ -1541,6 +1601,51 @@ function AutomataPage(): React.ReactElement {
                   <div className="min-w-0 rounded-lg border p-4">
                     <h2 className="mb-2 text-sm font-semibold">Mission</h2>
                     <div className="space-y-2 text-sm">
+                      <div className="grid gap-2">
+                        <Label htmlFor="automata-detail-description">
+                          Description
+                        </Label>
+                        <Input
+                          id="automata-detail-description"
+                          value={descriptionDraft}
+                          onChange={(e) => {
+                            setDescriptionDraft(e.target.value);
+                            setIsEditingDescription(true);
+                          }}
+                          placeholder="Optional description"
+                          disabled={!!managementBusy || isSavingSpec || isEditingSpec}
+                        />
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-muted-foreground">
+                            {isEditingSpec
+                              ? 'Save or cancel raw spec edits before updating the description here.'
+                              : 'This updates the top-level description field in the Automata spec.'}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {descriptionChanged ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={onCancelDescription}
+                                disabled={!!managementBusy || isSavingSpec}
+                              >
+                                Cancel
+                              </Button>
+                            ) : null}
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={onSaveDescription}
+                              disabled={descriptionSaveDisabled}
+                            >
+                              {managementBusy === 'description'
+                                ? 'Saving...'
+                                : 'Save Description'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                       <p>
                         <span className="font-medium">Kind:</span>{' '}
                         {detail.definition.kind}
