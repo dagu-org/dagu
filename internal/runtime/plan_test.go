@@ -182,6 +182,83 @@ func TestRetryPlanWithRejectedNode(t *testing.T) {
 	require.Empty(t, rejectedNode.State().RejectionReason)
 }
 
+func TestRetryPlan_RebindsStepsFromRestoredDAG(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dag := &core.DAG{Steps: []core.Step{
+		{Name: "approve"},
+		{
+			Name:    "container-step",
+			Depends: []string{"approve"},
+			Env:     []string{"STEP_ENV=from-step"},
+			Container: &core.Container{
+				Image: "alpine:3",
+				Env:   []string{"CONTAINER_ENV=from-container"},
+			},
+		},
+	}}
+	nodes := []*runtime.Node{
+		makeNode("approve", core.NodeSucceeded),
+		runtime.NodeWithData(runtime.NodeData{
+			Step: core.Step{
+				Name:    "container-step",
+				Depends: []string{"approve"},
+				Container: &core.Container{
+					Image: "alpine:3",
+				},
+			},
+			State: runtime.NodeState{Status: core.NodeNotStarted},
+		}),
+	}
+
+	p, err := runtime.CreateRetryPlan(ctx, dag, nodes...)
+	require.NoError(t, err)
+	require.NotNil(t, p)
+
+	rebound := nodes[1].Step()
+	require.Equal(t, core.NodeNotStarted, nodes[1].State().Status)
+	require.Equal(t, []string{"STEP_ENV=from-step"}, rebound.Env)
+	require.NotNil(t, rebound.Container)
+	require.Equal(t, []string{"CONTAINER_ENV=from-container"}, rebound.Container.Env)
+}
+
+func TestStepRetryPlan_RebindsStepsFromRestoredDAG(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{Steps: []core.Step{
+		{
+			Name: "container-step",
+			Env:  []string{"STEP_ENV=from-step"},
+			Container: &core.Container{
+				Image: "alpine:3",
+				Env:   []string{"CONTAINER_ENV=from-container"},
+			},
+		},
+	}}
+	nodes := []*runtime.Node{
+		runtime.NodeWithData(runtime.NodeData{
+			Step: core.Step{
+				Name: "container-step",
+				Container: &core.Container{
+					Image: "alpine:3",
+				},
+			},
+			State: runtime.NodeState{Status: core.NodeSucceeded},
+		}),
+	}
+
+	p, err := runtime.CreateStepRetryPlan(dag, nodes, "container-step")
+	require.NoError(t, err)
+	require.NotNil(t, p)
+
+	rebound := nodes[0].Step()
+	require.Equal(t, core.NodeNotStarted, nodes[0].State().Status)
+	require.Equal(t, []string{"STEP_ENV=from-step"}, rebound.Env)
+	require.NotNil(t, rebound.Container)
+	require.Equal(t, []string{"CONTAINER_ENV=from-container"}, rebound.Container.Env)
+}
+
 func TestStepRetryPlan(t *testing.T) {
 	dag := &core.DAG{Steps: []core.Step{
 		{Name: "1"}, {Name: "2", Depends: []string{"1"}}, {Name: "3", Depends: []string{"2"}},

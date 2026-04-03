@@ -241,3 +241,49 @@ steps:
 	assert.Contains(t, result.Env, "HOST_VALUE=from-transport-host")
 	assert.Contains(t, result.Env, "BACKTICK_VALUE=from-transport-backtick")
 }
+
+func TestRestoreDAGFromStatus_RestoresRegistryAuthsFromYAML(t *testing.T) {
+	dag := &core.DAG{
+		Name: "test-dag",
+		YamlData: []byte(`
+registry_auths:
+  registry.example.com:
+    username: ${REGISTRY_USER}
+    password: ${REGISTRY_PASSWORD}
+steps:
+  - name: test
+    command: echo hello
+`),
+	}
+	status := &exec.DAGRunStatus{}
+
+	result, err := restoreDAGFromStatus(context.Background(), dag, status)
+	require.NoError(t, err)
+	require.Contains(t, result.RegistryAuths, "registry.example.com")
+	require.Equal(t, "${REGISTRY_USER}", result.RegistryAuths["registry.example.com"].Username)
+	require.Equal(t, "${REGISTRY_PASSWORD}", result.RegistryAuths["registry.example.com"].Password)
+}
+
+func TestRestoreDAGFromStatus_RestoresRegistryAuthsFromBaseConfig(t *testing.T) {
+	dag := &core.DAG{
+		Name: "test-dag",
+		YamlData: []byte(`
+steps:
+  - name: test
+    command: echo hello
+`),
+		BaseConfigData: []byte(`
+registry_auths:
+  registry.example.com:
+    username: ${REGISTRY_USER}
+    password: ${REGISTRY_PASSWORD}
+`),
+	}
+	status := &exec.DAGRunStatus{}
+
+	result, err := restoreDAGFromStatus(context.Background(), dag, status)
+	require.NoError(t, err)
+	require.Contains(t, result.RegistryAuths, "registry.example.com")
+	require.Equal(t, "${REGISTRY_USER}", result.RegistryAuths["registry.example.com"].Username)
+	require.Equal(t, "${REGISTRY_PASSWORD}", result.RegistryAuths["registry.example.com"].Password)
+}
