@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	osrt "runtime"
 	"sort"
 	"strconv"
@@ -1145,13 +1147,26 @@ func (a *API) startPreparedDAGRunWithOptions(
 	if opts.triggerType != core.TriggerTypeUnknown {
 		triggerTypeStr = opts.triggerType.String()
 	}
+	target := opts.target
+	fromRunID := opts.fromRunID
+	if fromRunID != "" && dispatchParams != "" && len(dag.YamlData) > 0 {
+		if dag.Location == "" || fileMissing(dag.Location) {
+			tempPath, err := writeInlineRescheduleSpec(dag.Name, opts.dagRunID, dag.YamlData)
+			if err != nil {
+				return fmt.Errorf("error preparing inline dag snapshot: %w", err)
+			}
+			dag.Location = tempPath
+			target = tempPath
+			fromRunID = ""
+		}
+	}
 	spec := a.subCmdBuilder.Start(dag, runtime.StartOptions{
-		Params:       opts.params,
+		Params:       dispatchParams,
 		DAGRunID:     opts.dagRunID,
 		Quiet:        true,
 		NameOverride: opts.nameOverride,
-		FromRunID:    opts.fromRunID,
-		Target:       opts.target,
+		FromRunID:    fromRunID,
+		Target:       target,
 		TriggerType:  triggerTypeStr,
 		Tags:         opts.tags,
 	})
@@ -1174,6 +1189,28 @@ func (a *API) startPreparedDAGRunWithOptions(
 	}
 
 	return nil
+}
+
+func writeInlineRescheduleSpec(name, dagRunID string, data []byte) (string, error) {
+	tmpDir := filepath.Join(os.TempDir(), name, dagRunID)
+	if err := os.MkdirAll(tmpDir, 0o750); err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(tmpDir, fmt.Sprintf("%s.yaml", name))
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func fileMissing(path string) bool {
+	if path == "" {
+		return true
+	}
+	_, err := os.Stat(path)
+	return errors.Is(err, os.ErrNotExist)
 }
 
 func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRunRequestObject) (api.EnqueueDAGDAGRunResponseObject, error) {

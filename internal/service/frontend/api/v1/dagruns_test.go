@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -18,8 +17,6 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/runtime/transform"
-	"github.com/dagu-org/dagu/internal/service/coordinator"
-	"github.com/dagu-org/dagu/internal/service/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -795,21 +792,21 @@ func TestRescheduleDAGRunResolvesLatest(t *testing.T) {
 func TestRescheduleDAGRunFromInlineStartUsesPersistedSnapshot(t *testing.T) {
 	server := test.SetupServer(t)
 
-	runID, dagLocation := createInlineDAGRunForReschedule(t, server, false)
+	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_start", false)
 	require.NoFileExists(t, dagLocation)
 
 	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_start", runID)
-	assertInlineRescheduledRunParams(t, server, "inline_reschedule_start", rescheduledRunID)
+	test.AssertInlineRescheduledRunParams(t, server, "inline_reschedule_start", rescheduledRunID)
 }
 
 func TestRescheduleDAGRunFromInlineEnqueueUsesPersistedSnapshot(t *testing.T) {
 	server := test.SetupServer(t)
 
-	runID, dagLocation := createInlineDAGRunForReschedule(t, server, true)
+	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_enqueue", true)
 	require.NoFileExists(t, dagLocation)
 
 	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_enqueue", runID)
-	assertInlineRescheduledRunParams(t, server, "inline_reschedule_enqueue", rescheduledRunID)
+	test.AssertInlineRescheduledRunParams(t, server, "inline_reschedule_enqueue", rescheduledRunID)
 }
 
 func TestRetryDAGRunQueuesRetryForQueuedDAGs(t *testing.T) {
@@ -1162,71 +1159,6 @@ func indentCommandBlock(command string, spaces int) string {
 	return prefix + strings.Join(lines, "\n"+prefix)
 }
 
-func createInlineDAGRunForReschedule(t *testing.T, server test.Server, enqueue bool) (string, string) {
-	t.Helper()
-
-	inlineSpec := `params:
-  - name: KEY
-    default: fallback
-  - name: COUNT
-    default: 1
-steps:
-  - name: print
-    command: echo "${KEY}|${COUNT}"`
-	name := "inline_reschedule_start"
-	if enqueue {
-		name = "inline_reschedule_enqueue"
-	}
-	params := `KEY="hello world" COUNT=3`
-
-	var dagRunID string
-	if enqueue {
-		resp := server.Client().Post("/api/v1/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
-			Spec:   inlineSpec,
-			Name:   &name,
-			Params: &params,
-		}).ExpectStatus(http.StatusOK).Send(t)
-
-		var body api.EnqueueDAGRunFromSpec200JSONResponse
-		resp.Unmarshal(t, &body)
-		dagRunID = body.DagRunId
-	} else {
-		resp := server.Client().Post("/api/v1/dag-runs", api.ExecuteDAGRunFromSpecJSONRequestBody{
-			Spec:   inlineSpec,
-			Name:   &name,
-			Params: &params,
-		}).ExpectStatus(http.StatusOK).Send(t)
-
-		var body api.ExecuteDAGRunFromSpec200JSONResponse
-		resp.Unmarshal(t, &body)
-		dagRunID = body.DagRunId
-	}
-	require.NotEmpty(t, dagRunID)
-
-	if enqueue {
-		processQueuedInlineRun(t, server, name)
-		require.Eventually(t, func() bool {
-			statusAttempt := waitForAttemptSnapshot(t, server, name, dagRunID)
-			status, err := statusAttempt.ReadStatus(server.Context)
-			return err == nil && status.Status == core.Succeeded
-		}, 10*time.Second, 200*time.Millisecond)
-	}
-
-	attempt, dag := waitForAttemptSnapshotWithDAG(t, server, name, dagRunID)
-	require.Contains(t, string(dag.YamlData), `echo "${KEY}|${COUNT}"`)
-
-	status, err := attempt.ReadStatus(server.Context)
-	require.NoError(t, err)
-	require.Equal(t, []string{"KEY=hello world", "COUNT=3"}, status.ParamsList)
-
-	location := dag.Location
-	if location == "" {
-		location = expectedInlineTempPath(name, dagRunID)
-	}
-
-	return dagRunID, location
-}
-
 func rescheduleInlineDAGRun(t *testing.T, server test.Server, dagName, dagRunID string) string {
 	t.Helper()
 
@@ -1239,76 +1171,6 @@ func rescheduleInlineDAGRun(t *testing.T, server test.Server, dagName, dagRunID 
 	resp.Unmarshal(t, &body)
 	require.NotEmpty(t, body.DagRunId)
 	return body.DagRunId
-}
-
-func assertInlineRescheduledRunParams(t *testing.T, server test.Server, dagName, dagRunID string) {
-	t.Helper()
-
-	attempt := waitForAttemptSnapshot(t, server, dagName, dagRunID)
-	require.Eventually(t, func() bool {
-		status, err := attempt.ReadStatus(server.Context)
-		require.NoError(t, err)
-		return status.Status == core.Succeeded
-	}, 10*time.Second, 200*time.Millisecond)
-
-	status, err := attempt.ReadStatus(server.Context)
-	require.NoError(t, err)
-	require.Equal(t, []string{"KEY=hello world", "COUNT=3"}, status.ParamsList)
-}
-
-func waitForAttemptSnapshot(t *testing.T, server test.Server, dagName, dagRunID string) exec.DAGRunAttempt {
-	t.Helper()
-
-	var attempt exec.DAGRunAttempt
-	require.Eventually(t, func() bool {
-		var err error
-		attempt, err = server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, dagRunID))
-		return err == nil
-	}, 10*time.Second, 100*time.Millisecond)
-
-	return attempt
-}
-
-func waitForAttemptSnapshotWithDAG(t *testing.T, server test.Server, dagName, dagRunID string) (exec.DAGRunAttempt, *core.DAG) {
-	t.Helper()
-
-	attempt := waitForAttemptSnapshot(t, server, dagName, dagRunID)
-
-	var dag *core.DAG
-	require.Eventually(t, func() bool {
-		var err error
-		dag, err = attempt.ReadDAG(server.Context)
-		return err == nil && dag != nil && len(dag.YamlData) > 0
-	}, 10*time.Second, 100*time.Millisecond)
-
-	return attempt, dag
-}
-
-func expectedInlineTempPath(name, dagRunID string) string {
-	return filepath.Join(os.TempDir(), name, dagRunID, fmt.Sprintf("%s.yaml", name))
-}
-
-func processQueuedInlineRun(t *testing.T, server test.Server, queueName string) {
-	t.Helper()
-
-	queueProcessor := scheduler.NewQueueProcessor(
-		server.QueueStore,
-		server.DAGRunStore,
-		server.ProcStore,
-		scheduler.NewDAGExecutor(
-			coordinator.New(server.ServiceRegistry, coordinator.DefaultConfig()),
-			server.SubCmdBuilder,
-			server.Config.DefaultExecMode,
-			server.Config.Paths.BaseConfig,
-		),
-		config.Queues{
-			Enabled: true,
-			Config: []config.QueueConfig{
-				{Name: queueName, MaxActiveRuns: 1},
-			},
-		},
-	)
-	queueProcessor.ProcessQueueItems(server.Context, queueName)
 }
 
 func TestExecuteDAGSyncSingleton(t *testing.T) {
