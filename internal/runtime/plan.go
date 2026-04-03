@@ -78,6 +78,10 @@ func CreateRetryPlan(ctx context.Context, dag *core.DAG, nodes ...*Node) (*Plan,
 
 	steps := stepsByName(dag)
 
+	if err := rebindRetryNodesToSteps(nodes, steps); err != nil {
+		return nil, err
+	}
+
 	// Initialize nodes
 	for _, node := range nodes {
 		node.Init()
@@ -133,6 +137,10 @@ func CreateStepRetryPlan(dag *core.DAG, nodes []*Node, stepName string) (*Plan, 
 
 	steps := stepsByName(dag)
 
+	if err := rebindRetryNodesToSteps(nodes, steps); err != nil {
+		return nil, err
+	}
+
 	for _, node := range nodes {
 		node.Init()
 		p.addNode(node)
@@ -184,6 +192,24 @@ func (p *Plan) buildEdges() error {
 
 	if p.isCyclic() {
 		return ErrCyclicPlan
+	}
+	return nil
+}
+
+// rebindRetryNodesToSteps makes the restored DAG definition authoritative for
+// retry execution. Persisted retry nodes carry mutable runtime state, but their
+// embedded Step snapshots can be lossy because some nested config is excluded
+// from JSON serialization for security reasons.
+func rebindRetryNodesToSteps(nodes []*Node, steps map[string]core.Step) error {
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		step, ok := steps[node.Name()]
+		if !ok {
+			return fmt.Errorf("%w: %s", ErrMissingNode, node.Name())
+		}
+		node.SetStep(step)
 	}
 	return nil
 }
