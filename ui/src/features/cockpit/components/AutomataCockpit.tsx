@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import Title from '@/ui/Title';
+import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
 import { AutomataDetailsModal } from './AutomataDetailsModal';
 
 type AutomataSummary = components['schemas']['AutomataSummary'];
@@ -184,6 +185,13 @@ function sortAutomata(
     }
     return a.name.localeCompare(b.name);
   });
+}
+
+function automataDisplayName(item: {
+  name: string;
+  nickname?: string | null;
+}): string {
+  return item.nickname?.trim() || item.name;
 }
 
 export function AutomataCockpit({
@@ -408,12 +416,25 @@ export function AutomataCockpit({
                           className="block w-full rounded-md border p-3 text-left transition hover:bg-muted/40"
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="truncate font-medium">
-                                {item.name}
-                              </div>
-                              <div className="mt-1 text-xs text-muted-foreground break-words">
-                                {item.instruction || item.goal}
+                            <div className="flex min-w-0 items-start gap-3">
+                              <AutomataAvatar
+                                name={item.name}
+                                nickname={item.nickname}
+                                iconUrl={item.iconUrl}
+                                className="h-12 w-12 rounded-2xl"
+                              />
+                              <div className="min-w-0">
+                                <div className="truncate font-medium">
+                                  {automataDisplayName(item)}
+                                </div>
+                                {item.nickname ? (
+                                  <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                                    {item.name}
+                                  </div>
+                                ) : null}
+                                <div className="mt-1 break-words text-xs text-muted-foreground">
+                                  {item.instruction || item.goal}
+                                </div>
                               </div>
                             </div>
                             <span

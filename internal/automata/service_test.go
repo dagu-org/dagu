@@ -210,6 +210,52 @@ allowed_dags:
 	require.ErrorContains(t, err, "invalid tags")
 }
 
+func TestServicePutSpecExposesNicknameAndIconURL(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `nickname: Build Captain
+icon_url: https://cdn.example.com/automata/build-captain.png
+goal: Complete the assigned software work
+allowed_dags:
+  names:
+    - build-app
+`
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Equal(t, "Build Captain", detail.Definition.Nickname)
+	require.Equal(t, "https://cdn.example.com/automata/build-captain.png", detail.Definition.IconURL)
+
+	items, err := svc.List(ctx)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "Build Captain", items[0].Nickname)
+	require.Equal(t, "https://cdn.example.com/automata/build-captain.png", items[0].IconURL)
+}
+
+func TestServicePutSpecRejectsInvalidIconURL(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+icon_url: javascript:alert(1)
+allowed_dags:
+  names:
+    - build-app
+`
+
+	err := svc.PutSpec(ctx, "software_dev", spec)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "icon_url must use http or https")
+}
+
 func TestServicePutSpecRejectsUnknownFields(t *testing.T) {
 	t.Parallel()
 

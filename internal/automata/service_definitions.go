@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -46,6 +47,8 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 		return errors.New("definition is required")
 	}
 	def.normalizeGoal()
+	def.Nickname = strings.TrimSpace(def.Nickname)
+	def.IconURL = strings.TrimSpace(def.IconURL)
 	if err := validateAutomataKind(def.Kind); err != nil {
 		return err
 	}
@@ -57,6 +60,12 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	}
 	if strings.TrimSpace(def.Goal) == "" {
 		return errors.New("goal is required")
+	}
+	if err := validateNickname(def.Nickname); err != nil {
+		return err
+	}
+	if err := validateIconURL(def.IconURL); err != nil {
+		return err
 	}
 	if !hasAllowedDAGs(def.AllowedDAGs) {
 		return errors.New("allowed_dags.names or allowed_dags.tags is required")
@@ -292,6 +301,8 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 		result = append(result, Summary{
 			Name:                def.Name,
 			Kind:                def.Kind,
+			Nickname:            def.Nickname,
+			IconURL:             def.IconURL,
 			Description:         def.Description,
 			Purpose:             def.Purpose,
 			Goal:                def.Goal,
@@ -452,6 +463,42 @@ func normalizeTags(tags *[]string) error {
 		return fmt.Errorf("invalid tags: %w", err)
 	}
 	*tags = parsed.Strings()
+	return nil
+}
+
+func validateNickname(value string) error {
+	if value == "" {
+		return nil
+	}
+	if strings.ContainsAny(value, "\r\n") {
+		return errors.New("nickname must be a single line")
+	}
+	if len(value) > 80 {
+		return errors.New("nickname must be 80 characters or fewer")
+	}
+	return nil
+}
+
+func validateIconURL(value string) error {
+	if value == "" {
+		return nil
+	}
+	if len(value) > 2048 {
+		return errors.New("icon_url must be 2048 characters or fewer")
+	}
+	if strings.HasPrefix(value, "/") && !strings.HasPrefix(value, "//") {
+		return nil
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed == nil {
+		return errors.New("icon_url must be an absolute http(s) URL or root-relative path")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New("icon_url must use http or https")
+	}
+	if parsed.Host == "" {
+		return errors.New("icon_url must include a host")
+	}
 	return nil
 }
 

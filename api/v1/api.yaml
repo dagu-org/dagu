@@ -11800,6 +11800,10 @@ components:
           type: string
         kind:
           $ref: "#/components/schemas/AutomataKind"
+        nickname:
+          type: string
+        iconUrl:
+          type: string
         description:
           type: string
         goal:
@@ -12016,6 +12020,10 @@ components:
           type: string
         kind:
           $ref: "#/components/schemas/AutomataKind"
+        nickname:
+          type: string
+        iconUrl:
+          type: string
         description:
           type: string
         goal:

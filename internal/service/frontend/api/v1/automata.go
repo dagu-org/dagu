@@ -472,10 +472,12 @@ func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 		DisplayStatus: ptrOf(api.AutomataDisplayStatus(item.DisplayStatus)),
 		DoneTaskCount: ptrOf(item.DoneTaskCount),
 		Goal:          item.Goal,
+		IconUrl:       ptrOf(item.IconURL),
 		Instruction:   ptrOf(item.Instruction),
 		Kind:          api.AutomataKind(item.Kind),
 		LastUpdatedAt: ptrOf(item.LastUpdatedAt),
 		Name:          item.Name,
+		Nickname:      ptrOf(item.Nickname),
 		NeedsInput: func() *bool {
 			v := item.NeedsInput
 			return &v
@@ -541,8 +543,10 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 		Description: ptrOf(def.Description),
 		Disabled:    ptrOf(def.Disabled),
 		Goal:        def.Goal,
+		IconUrl:     ptrOf(def.IconURL),
 		Kind:        api.AutomataKind(def.Kind),
 		Name:        def.Name,
+		Nickname:    ptrOf(def.Nickname),
 		AllowedDAGs: toAPIAutomataAllowedDAGs(def.AllowedDAGs),
 		Tags: func() *[]string {
 			if len(def.Tags) == 0 {

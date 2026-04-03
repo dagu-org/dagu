@@ -4973,6 +4973,8 @@ export interface components {
         AutomataDefinition: {
             name: string;
             kind: components["schemas"]["AutomataKind"];
+            nickname?: string;
+            iconUrl?: string;
             description?: string;
             goal: string;
             tags?: string[];
@@ -5071,6 +5073,8 @@ export interface components {
         AutomataSummary: {
             name: string;
             kind: components["schemas"]["AutomataKind"];
+            nickname?: string;
+            iconUrl?: string;
             description?: string;
             goal: string;
             tags?: string[];

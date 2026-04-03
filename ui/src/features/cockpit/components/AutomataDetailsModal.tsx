@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { useClient, useQuery } from '@/hooks/api';
+import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
 import { AutomataMemorySection } from '@/features/automata/components/AutomataMemorySection';
 import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
@@ -42,6 +43,13 @@ function lifecycleClass(state?: string): string {
 
 function isServiceKind(kind?: AutomataKindValue | string): boolean {
   return kind === AutomataKind.service;
+}
+
+function automataDisplayName(item: {
+  name?: string;
+  nickname?: string | null;
+}): string {
+  return item.nickname?.trim() || item.name || '';
 }
 
 function dagRunStatusToStatus(status?: string): Status | undefined {
@@ -416,11 +424,29 @@ export function AutomataDetailsModal({
       >
         <div className="flex h-full min-h-0 flex-col p-4 md:p-6">
           <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs text-muted-foreground">
-                Automata detail
+            <div className="flex min-w-0 items-start gap-4">
+              <AutomataAvatar
+                name={stableName}
+                nickname={data?.definition.nickname}
+                iconUrl={data?.definition.iconUrl}
+                className="h-16 w-16 rounded-2xl"
+              />
+              <div className="min-w-0">
+                <div className="text-xs text-muted-foreground">
+                  Automata detail
+                </div>
+                <h2 className="truncate text-2xl font-semibold">
+                  {automataDisplayName({
+                    name: stableName,
+                    nickname: data?.definition.nickname,
+                  })}
+                </h2>
+                {data?.definition.nickname ? (
+                  <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                    {stableName}
+                  </div>
+                ) : null}
               </div>
-              <h2 className="truncate text-2xl font-semibold">{stableName}</h2>
             </div>
             <div className="flex items-center gap-2">
               {canPause || canResume ? (

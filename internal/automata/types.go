@@ -114,6 +114,8 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 type Definition struct {
 	Name        string       `json:"name"`
 	Kind        AutomataKind `json:"kind" yaml:"kind,omitempty"`
+	Nickname    string       `json:"nickname,omitempty" yaml:"nickname,omitempty"`
+	IconURL     string       `json:"iconUrl,omitempty" yaml:"icon_url,omitempty"`
 	Description string       `json:"description,omitempty" yaml:"description,omitempty"`
 	Purpose     string       `json:"purpose,omitempty" yaml:"purpose,omitempty"`
 	Goal        string       `json:"goal" yaml:"goal"`
@@ -214,6 +216,8 @@ type RunSummary struct {
 type Summary struct {
 	Name                string         `json:"name"`
 	Kind                AutomataKind   `json:"kind"`
+	Nickname            string         `json:"nickname,omitempty"`
+	IconURL             string         `json:"iconUrl,omitempty"`
 	Description         string         `json:"description,omitempty"`
 	Purpose             string         `json:"purpose"`
 	Goal                string         `json:"goal"`
@@ -303,6 +307,9 @@ func nextCycleID() string {
 func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	type rawDefinition struct {
 		Kind             AutomataKind `yaml:"kind,omitempty"`
+		Nickname         string       `yaml:"nickname,omitempty"`
+		IconURL          string       `yaml:"iconUrl,omitempty"`
+		IconURLSnake     string       `yaml:"icon_url,omitempty"`
 		Description      string       `yaml:"description,omitempty"`
 		Purpose          string       `yaml:"purpose"`
 		Goal             string       `yaml:"goal"`
@@ -319,6 +326,11 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
+	d.Nickname = strings.TrimSpace(raw.Nickname)
+	d.IconURL = strings.TrimSpace(raw.IconURLSnake)
+	if d.IconURL == "" {
+		d.IconURL = strings.TrimSpace(raw.IconURL)
+	}
 	d.Description = raw.Description
 	d.Kind = normalizeAutomataKind(raw.Kind)
 	d.Purpose = strings.TrimSpace(raw.Purpose)

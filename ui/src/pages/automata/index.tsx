@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
 import { AutomataMemorySection } from '@/features/automata/components/AutomataMemorySection';
 import { DAGRunDetailsModal } from '@/features/dag-runs/components/dag-run-details';
 import { DAGDetailsModal } from '@/features/dags/components/dag-details';
@@ -36,6 +37,8 @@ type AutomataDisplayState = components['schemas']['AutomataDisplayStatus'];
 
 const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
 const DEFAULT_AUTOMATA_KIND: AutomataKindValue = AutomataKind.workflow;
+const MAX_AUTOMATA_NICKNAME_LENGTH = 80;
+const MAX_AUTOMATA_ICON_URL_LENGTH = 2048;
 
 type DAGOption = {
   fileName: string;
@@ -267,21 +270,35 @@ function quoteYAML(value: string): string {
 
 function buildAutomataSpec(input: {
   kind: AutomataKindValue;
+  nickname: string;
+  iconUrl: string;
   description: string;
   goal: string;
   tags: string[];
   allowedDAGNames: string[];
 }): string {
+  const nickname = input.nickname.trim();
+  const iconUrl = input.iconUrl.trim();
   const description = input.description.trim();
-  const lines = [`goal: ${quoteYAML(input.goal)}`];
+  const lines: string[] = [];
 
   if (input.kind !== DEFAULT_AUTOMATA_KIND) {
-    lines.unshift(`kind: ${input.kind}`);
+    lines.push(`kind: ${input.kind}`);
+  }
+
+  if (nickname) {
+    lines.push(`nickname: ${quoteYAML(nickname)}`);
+  }
+
+  if (iconUrl) {
+    lines.push(`icon_url: ${quoteYAML(iconUrl)}`);
   }
 
   if (description) {
-    lines.unshift(`description: ${quoteYAML(description)}`);
+    lines.push(`description: ${quoteYAML(description)}`);
   }
+
+  lines.push(`goal: ${quoteYAML(input.goal)}`);
 
   if (input.tags.length) {
     lines.push('tags:');
@@ -308,10 +325,14 @@ function buildAutomataSpec(input: {
 
 function validateAutomataCreateForm(input: {
   name: string;
+  nickname: string;
+  iconUrl: string;
   goal: string;
   allowedDAGNames: string[];
 }): string | null {
   const name = input.name.trim();
+  const nickname = input.nickname.trim();
+  const iconUrl = input.iconUrl.trim();
   if (!name) {
     return 'Automata name is required.';
   }
@@ -321,10 +342,45 @@ function validateAutomataCreateForm(input: {
   if (!input.goal.trim()) {
     return 'Goal is required.';
   }
+  if (nickname.includes('\n') || nickname.includes('\r')) {
+    return 'Nickname must be a single line.';
+  }
+  if (nickname.length > MAX_AUTOMATA_NICKNAME_LENGTH) {
+    return `Nickname must be ${MAX_AUTOMATA_NICKNAME_LENGTH} characters or fewer.`;
+  }
+  if (!isValidAutomataIconUrl(iconUrl)) {
+    return 'Icon URL must be an absolute http(s) URL or a root-relative path.';
+  }
+  if (iconUrl.length > MAX_AUTOMATA_ICON_URL_LENGTH) {
+    return `Icon URL must be ${MAX_AUTOMATA_ICON_URL_LENGTH} characters or fewer.`;
+  }
   if (input.allowedDAGNames.length === 0) {
     return 'Select at least one allowed DAG.';
   }
   return null;
+}
+
+function isValidAutomataIconUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return true;
+  }
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    return true;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function automataDisplayName(item: {
+  name: string;
+  nickname?: string | null;
+}): string {
+  return item.nickname?.trim() || item.name;
 }
 
 function displayStatusClass(state?: AutomataDisplayState | string): string {
@@ -391,6 +447,8 @@ function AutomataPage(): React.ReactElement {
   const [createName, setCreateName] = React.useState('');
   const [createKind, setCreateKind] =
     React.useState<AutomataKindValue>(DEFAULT_AUTOMATA_KIND);
+  const [createNickname, setCreateNickname] = React.useState('');
+  const [createIconUrl, setCreateIconUrl] = React.useState('');
   const [createDescription, setCreateDescription] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
   const [createTags, setCreateTags] = React.useState('');
@@ -565,6 +623,8 @@ function AutomataPage(): React.ReactElement {
   const resetCreateForm = () => {
     setCreateName('');
     setCreateKind(DEFAULT_AUTOMATA_KIND);
+    setCreateNickname('');
+    setCreateIconUrl('');
     setCreateDescription('');
     setCreateGoal('');
     setCreateTags('');
@@ -589,6 +649,8 @@ function AutomataPage(): React.ReactElement {
   const onCreate = async () => {
     const validationError = validateAutomataCreateForm({
       name: createName,
+      nickname: createNickname,
+      iconUrl: createIconUrl,
       goal: createGoal,
       allowedDAGNames: createAllowedDAGNames,
     });
@@ -606,6 +668,8 @@ function AutomataPage(): React.ReactElement {
         params: { path: { name: automataName } },
         body: {
           spec: buildAutomataSpec({
+            nickname: createNickname,
+            iconUrl: createIconUrl,
             description: createDescription,
             goal: createGoal,
             kind: createKind,
@@ -1025,10 +1089,25 @@ function AutomataPage(): React.ReactElement {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {item.instruction || item.goal}
+                      <div className="flex min-w-0 items-start gap-3">
+                        <AutomataAvatar
+                          name={item.name}
+                          nickname={item.nickname}
+                          iconUrl={item.iconUrl}
+                          className="h-10 w-10"
+                        />
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">
+                            {automataDisplayName(item)}
+                          </div>
+                          {item.nickname ? (
+                            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                              {item.name}
+                            </div>
+                          ) : null}
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {item.instruction || item.goal}
+                          </div>
                         </div>
                       </div>
                       <span
@@ -1151,6 +1230,51 @@ function AutomataPage(): React.ReactElement {
                   </div>
 
                   <div className="grid gap-2">
+                    <Label htmlFor="automata-nickname">Nickname</Label>
+                    <Input
+                      id="automata-nickname"
+                      value={createNickname}
+                      onChange={(e) => setCreateNickname(e.target.value)}
+                      placeholder="Build Captain"
+                      disabled={isCreating}
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Optional short label shown in cockpit cards and detail
+                      headers.
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[auto,1fr] md:items-start">
+                    <AutomataAvatar
+                      name={createName.trim() || 'automata'}
+                      nickname={createNickname}
+                      iconUrl={createIconUrl}
+                      className="h-16 w-16 rounded-2xl"
+                    />
+                    <div className="grid gap-2">
+                      <Label htmlFor="automata-icon-url">Icon Image URL</Label>
+                      <Input
+                        id="automata-icon-url"
+                        value={createIconUrl}
+                        onChange={(e) => setCreateIconUrl(e.target.value)}
+                        placeholder="https://cdn.example.com/automata/build-captain.png"
+                        disabled={isCreating}
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        Optional. Use an absolute
+                        <span className="mx-1 font-mono text-foreground">
+                          http(s)
+                        </span>
+                        URL or a root-relative path like
+                        <span className="mx-1 font-mono text-foreground">
+                          /assets/automata/build-captain.png
+                        </span>
+                        . A placeholder icon is shown when no image is set.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
                     <Label htmlFor="automata-description">Description</Label>
                     <Input
                       id="automata-description"
@@ -1258,15 +1382,28 @@ function AutomataPage(): React.ReactElement {
             ) : detail ? (
               <div className="space-y-6 overflow-x-hidden p-4 md:h-full md:overflow-auto md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl font-semibold">
-                      {detail.definition.name}
-                    </h1>
-                    {detail.definition.description ? (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {detail.definition.description}
-                      </p>
-                    ) : null}
+                  <div className="flex min-w-0 items-start gap-4">
+                    <AutomataAvatar
+                      name={detail.definition.name}
+                      nickname={detail.definition.nickname}
+                      iconUrl={detail.definition.iconUrl}
+                      className="h-16 w-16 rounded-2xl"
+                    />
+                    <div className="min-w-0">
+                      <h1 className="truncate text-2xl font-semibold">
+                        {automataDisplayName(detail.definition)}
+                      </h1>
+                      {detail.definition.nickname ? (
+                        <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                          {detail.definition.name}
+                        </div>
+                      ) : null}
+                      {detail.definition.description ? (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {detail.definition.description}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
