@@ -534,6 +534,17 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 		))
 	}
 
+	// Collect schedule warnings (misleading step values like */33).
+	for _, sched := range result.Schedule {
+		result.BuildWarnings = append(result.BuildWarnings, sched.Warnings...)
+	}
+	for _, sched := range result.StopSchedule {
+		result.BuildWarnings = append(result.BuildWarnings, sched.Warnings...)
+	}
+	for _, sched := range result.RestartSchedule {
+		result.BuildWarnings = append(result.BuildWarnings, sched.Warnings...)
+	}
+
 	// Build handlers and steps directly (they need access to partially built result)
 	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
 		if handlerOn, err := buildHandlers(ctx, d, result); err != nil {
