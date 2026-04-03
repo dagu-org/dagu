@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, History } from 'lucide-react';
+import { History } from 'lucide-react';
+import { AutomataSwarmIcon } from '@/components/icons/AutomataSwarmIcon';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
 import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 import { DateKanbanList } from '@/features/cockpit/components/DateKanbanList';
@@ -86,7 +87,7 @@ export default function CockpitPage(): React.ReactElement {
               aria-label="Automata cockpit"
               className="h-8 px-3"
             >
-              <Bot size={16} className="mr-1.5" />
+              <span className="mr-1.5"><AutomataSwarmIcon size={16} /></span>
               Automata
             </ToggleButton>
           </ToggleGroup>

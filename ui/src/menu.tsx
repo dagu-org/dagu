@@ -16,6 +16,7 @@ import {
 } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useHasFeature } from '@/hooks/useLicense';
+import { AutomataSwarmIcon } from '@/components/icons/AutomataSwarmIcon';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
 import {
@@ -524,7 +525,7 @@ export const mainListItems = React.forwardRef<
               <NavItem
                 to="/automata"
                 text="Automata"
-                icon={<Bot size={18} />}
+                icon={<AutomataSwarmIcon size={18} />}
                 isOpen={isOpen}
                 onClick={onNavItemClick}
                 customColor={customColor}
