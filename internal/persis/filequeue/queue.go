@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
@@ -106,6 +107,39 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun exec.DAGRunRef
 	_ = os.Remove(q.baseDir)
 
 	return items, nil
+}
+
+// DeleteByItemIDs removes the exact queue item files identified by their queue item IDs.
+func (q *DualQueue) DeleteByItemIDs(ctx context.Context, itemIDs []string) (int, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(q.name))
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	deleted := 0
+	for _, itemID := range itemIDs {
+		if itemID == "" {
+			continue
+		}
+		fileName := filepath.Base(itemID + ".json")
+		if fileName == ".json" {
+			continue
+		}
+		if err := os.Remove(filepath.Join(q.baseDir, fileName)); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			logger.Error(ctx, "Failed to remove queue item",
+				tag.File(fileName),
+				tag.Error(err),
+			)
+			return deleted, fmt.Errorf("failed to remove queue item %s: %w", itemID, err)
+		}
+		deleted++
+	}
+
+	_ = os.Remove(q.baseDir)
+
+	return deleted, nil
 }
 
 // List returns all items in the queue

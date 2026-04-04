@@ -258,6 +258,11 @@ func (m *mockQueueStore) DequeueByDAGRunID(ctx context.Context, name string, dag
 	return args.Get(0).([]exec.QueuedItemData), args.Error(1)
 }
 
+func (m *mockQueueStore) DeleteByItemIDs(ctx context.Context, name string, itemIDs []string) (int, error) {
+	args := m.Called(ctx, name, itemIDs)
+	return args.Int(0), args.Error(1)
+}
+
 func (m *mockQueueStore) Len(ctx context.Context, name string) (int, error) {
 	args := m.Called(ctx, name)
 	return args.Int(0), args.Error(1)

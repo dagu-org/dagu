@@ -2262,35 +2262,20 @@ func (a *API) DequeueDAGRun(ctx context.Context, request api.DequeueDAGRunReques
 	}
 
 	dagRun := exec.NewDAGRunRef(request.Name, request.DagRunId)
-	attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+	queueName, err := a.queueNameForDAGRun(ctx, dagRun)
 	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
-		}
+		return nil, mapAbortQueuedDAGRunAPIError(request.Name, request.DagRunId, err)
 	}
 
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error reading DAG: %w", err)
+	if err := a.procStore.Lock(ctx, queueName); err != nil {
+		return nil, fmt.Errorf("failed to lock process group %s: %w", queueName, err)
 	}
+	defer a.procStore.Unlock(ctx, queueName)
 
-	latestStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRun.ID)
-	if err != nil {
-		return nil, fmt.Errorf("error getting latest status: %w", err)
+	if err := exec.AbortQueuedDAGRun(ctx, a.dagRunStore, dagRun); err != nil {
+		return nil, mapAbortQueuedDAGRunAPIError(request.Name, request.DagRunId, err)
 	}
-
-	if latestStatus.Status != core.Queued {
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("DAGRun status is not queued: %s", latestStatus.Status),
-		}
-	}
-
-	spec := a.subCmdBuilder.Dequeue(dag, dagRun)
-	if err := runtime.Run(ctx, spec); err != nil {
+	if _, err := a.queueStore.DequeueByDAGRunID(ctx, queueName, dagRun); err != nil && !errors.Is(err, exec.ErrQueueItemNotFound) {
 		return nil, fmt.Errorf("error dequeueing dag-run: %w", err)
 	}
 

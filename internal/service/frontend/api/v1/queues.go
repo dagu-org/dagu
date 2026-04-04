@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/audit"
 )
 
 // ListQueues implements api.StrictServerInterface.
@@ -252,6 +254,94 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 		Items:      items,
 		Pagination: toPagination(paginatedResult),
 	}, nil
+}
+
+// DeleteQueueItems implements api.StrictServerInterface.
+// It clears queued items for the specified queue on the server side.
+func (a *API) DeleteQueueItems(ctx context.Context, req api.DeleteQueueItemsRequestObject) (api.DeleteQueueItemsResponseObject, error) {
+	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
+		return nil, err
+	}
+	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+
+	queueName := req.Name
+	if err := a.procStore.Lock(ctx, queueName); err != nil {
+		return nil, fmt.Errorf("failed to lock process group %s: %w", queueName, err)
+	}
+	defer a.procStore.Unlock(ctx, queueName)
+
+	items, err := a.queueStore.List(ctx, queueName)
+	if err != nil {
+		return nil, &Error{
+			Code:       api.ErrorCodeInternalError,
+			Message:    "Failed to list queued items",
+			HTTPStatus: 500,
+		}
+	}
+
+	itemIDsToDelete := make([]string, 0, len(items))
+	clearedCount := 0
+	skippedCount := 0
+
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+
+		dagRunRef, err := item.Data()
+		if err != nil {
+			logger.Warn(ctx, "Clearing queue skipped status update for unreadable queue item",
+				tag.Queue(queueName),
+				tag.File(item.ID()),
+				tag.Error(err),
+			)
+			itemIDsToDelete = append(itemIDsToDelete, item.ID())
+			skippedCount++
+			continue
+		}
+
+		if err := exec.AbortQueuedDAGRun(ctx, a.dagRunStore, *dagRunRef); err != nil {
+			if isQueueAbortSkippable(err) {
+				logger.Warn(ctx, "Queue clear skipped status update for stale queue item",
+					tag.Queue(queueName),
+					tag.DAG(dagRunRef.Name),
+					tag.RunID(dagRunRef.ID),
+					tag.Error(err),
+				)
+				itemIDsToDelete = append(itemIDsToDelete, item.ID())
+				skippedCount++
+				continue
+			}
+
+			if _, deleteErr := a.queueStore.DeleteByItemIDs(ctx, queueName, itemIDsToDelete); deleteErr != nil {
+				return nil, errors.Join(err, fmt.Errorf("failed to remove cleared queue items: %w", deleteErr))
+			}
+			return nil, fmt.Errorf("failed to abort queued dag-run %s: %w", dagRunRef.ID, err)
+		}
+
+		itemIDsToDelete = append(itemIDsToDelete, item.ID())
+		clearedCount++
+	}
+
+	deletedCount := 0
+	if len(itemIDsToDelete) > 0 {
+		deletedCount, err = a.queueStore.DeleteByItemIDs(ctx, queueName, itemIDsToDelete)
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete queue items: %w", err)
+		}
+	}
+
+	a.logAudit(ctx, audit.CategoryDAG, "queue_clear", map[string]any{
+		"queue_name":     queueName,
+		"snapshot_count": len(items),
+		"cleared_count":  clearedCount,
+		"skipped_count":  skippedCount,
+		"deleted_count":  deletedCount,
+	})
+
+	return api.DeleteQueueItems204Response{}, nil
 }
 
 // Helper struct to build queue information

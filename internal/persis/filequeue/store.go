@@ -293,6 +293,35 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun exec.
 	return items, nil
 }
 
+// DeleteByItemIDs removes the exact queue items identified by their queue item IDs.
+func (s *Store) DeleteByItemIDs(ctx context.Context, name string, itemIDs []string) (int, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(name))
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.queues[name]; !ok {
+		s.queues[name] = s.createDualQueue(name)
+	}
+
+	if err := s.queues[name].Lock(ctx); err != nil {
+		logger.Error(ctx, "Failed to lock queue", tag.Error(err))
+		return 0, fmt.Errorf("failed to lock queue %s: %w", name, err)
+	}
+	defer func() {
+		if err := s.queues[name].Unlock(); err != nil {
+			logger.Error(ctx, "Failed to unlock queue",
+				tag.Queue(name),
+				tag.Error(err))
+		}
+	}()
+
+	deleted, err := s.queues[name].DeleteByItemIDs(ctx, itemIDs)
+	if err != nil {
+		return deleted, err
+	}
+	return deleted, nil
+}
+
 // Enqueue implements models.QueueStore.
 func (s *Store) Enqueue(ctx context.Context, name string, p exec.QueuePriority, dagRun exec.DAGRunRef) error {
 	ctx = logger.WithValues(ctx,

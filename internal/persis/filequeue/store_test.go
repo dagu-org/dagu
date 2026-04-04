@@ -90,6 +90,35 @@ func TestStore_DequeueByDAGRunID(t *testing.T) {
 	require.Contains(t, jobs[0].ID(), "test-dag-2", "expected job ID to contain 'test-dag-2'")
 }
 
+func TestStore_DeleteByItemIDs(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+	store := filequeue.New(th.Config.Paths.QueueDir)
+
+	require.NoError(t, store.Enqueue(th.Context, "test-name", exec.QueuePriorityLow, exec.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-dag",
+	}))
+	require.NoError(t, store.Enqueue(th.Context, "test-name", exec.QueuePriorityLow, exec.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-dag-2",
+	}))
+
+	items, err := store.List(th.Context, "test-name")
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+
+	deleted, err := store.DeleteByItemIDs(th.Context, "test-name", []string{items[0].ID(), "missing-item"})
+	require.NoError(t, err)
+	require.Equal(t, 1, deleted)
+
+	remaining, err := store.List(th.Context, "test-name")
+	require.NoError(t, err)
+	require.Len(t, remaining, 1)
+	require.Equal(t, items[1].ID(), remaining[0].ID())
+}
+
 func TestStore_List(t *testing.T) {
 	t.Parallel()
 

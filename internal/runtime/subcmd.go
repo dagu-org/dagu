@@ -276,6 +276,13 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 	}
 }
 
+// QueueDispatchRetry creates a retry command spec for a scheduler-consumed queued run.
+func (b *SubCmdBuilder) QueueDispatchRetry(dag *core.DAG, dagRunID string, stepName string) CmdSpec {
+	spec := b.Retry(dag, dagRunID, stepName)
+	spec.Env = append(spec.Env, exec1.EnvKeyQueueDispatchRetry+"=1")
+	return spec
+}
+
 // TaskStart creates a start command spec for coordinator tasks.
 // envHints optionally provides resolved DAG/base-config env entries for
 // rebuild-time env values in the child process.
@@ -378,7 +385,7 @@ func (b *SubCmdBuilder) TaskRetry(task *coordinatorv1.Task, envHints []string, d
 	return CmdSpec{
 		Executable: b.executable,
 		Args:       args,
-		Env:        env,
+		Env:        append(env, exec1.EnvKeyQueueDispatchRetry+"=1"),
 		BuildEnv:   append([]string{}, envHints...),
 	}
 }

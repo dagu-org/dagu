@@ -665,6 +665,13 @@ func TestRetry(t *testing.T) {
 		assert.Contains(t, spec.Args, "test-dag")
 	})
 
+	t.Run("RetryDoesNotMarkQueueDispatch", func(t *testing.T) {
+		t.Parallel()
+		spec := builder.Retry(dag, "retry-run-id", "")
+
+		assert.NotContains(t, spec.Env, exec.EnvKeyQueueDispatchRetry+"=1")
+	})
+
 	t.Run("RetryWithoutConfig", func(t *testing.T) {
 		t.Parallel()
 		cfgNoFile := &config.Config{
@@ -945,6 +952,19 @@ func TestTaskRetry(t *testing.T) {
 		spec := builder.TaskRetry(task, nil, "")
 
 		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
+	})
+
+	t.Run("TaskRetryMarksQueueDispatch", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:       "retry-run-id",
+			AttemptId:      "attempt-2",
+			Target:         "/path/to/task.yaml",
+			RootDagRunName: "root-dag",
+		}
+		spec := builder.TaskRetry(task, nil, "")
+
+		assert.Contains(t, spec.Env, exec.EnvKeyQueueDispatchRetry+"=1")
 	})
 
 	t.Run("TaskRetryWithoutConfig", func(t *testing.T) {

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmn/logger"
 	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/spf13/cobra"
 )
@@ -48,7 +47,7 @@ func runDequeue(ctx *Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse dag-run reference %s: %w", dagRunRef, err)
 	}
-	return dequeueDAGRun(ctx, queueName, dagRun, false)
+	return dequeueQueuedDAGRun(ctx, queueName, dagRun)
 }
 
 // dequeueFirst dequeues the first DAG run from the named queue and processes that run as aborted.
@@ -61,91 +60,39 @@ func dequeueFirst(ctx *Context, queueName string) error {
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
 	}
-	item, err := ctx.QueueStore.DequeueByName(ctx.Context, queueName)
+	result, err := ctx.QueueStore.ListPaginated(ctx.Context, queueName, exec.NewPaginator(1, 1))
 	if err != nil {
-		return fmt.Errorf("failed to dequeue from queue %s: %w", queueName, err)
+		return fmt.Errorf("failed to list queue %s: %w", queueName, err)
 	}
-	if item == nil {
+	if len(result.Items) == 0 {
 		return fmt.Errorf("no dag-run found in queue %s", queueName)
 	}
 
-	data, err := item.Data()
+	data, err := result.Items[0].Data()
 	if err != nil {
 		return fmt.Errorf("failed to get dag-run data: %w", err)
 	}
-	return dequeueDAGRun(ctx, queueName, *data, true)
+	return dequeueQueuedDAGRun(ctx, queueName, *data)
 }
 
-// dequeueDAGRun dequeues a dag-run from the queue.
-func dequeueDAGRun(ctx *Context, queueName string, dagRun exec.DAGRunRef, alreadyDequeued bool) error {
+// dequeueQueuedDAGRun aborts a queued dag-run and removes its queue entries.
+func dequeueQueuedDAGRun(ctx *Context, queueName string, dagRun exec.DAGRunRef) error {
 	// Check if queues are enabled
 	if !ctx.Config.Queues.Enabled {
 		return fmt.Errorf("queues are disabled in configuration")
 	}
-	attempt, err := ctx.DAGRunStore.FindAttempt(ctx, dagRun)
-	if err != nil {
-		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRun.ID, err)
+
+	if err := ctx.ProcStore.Lock(ctx, queueName); err != nil {
+		return fmt.Errorf("failed to lock process group %s: %w", queueName, err)
+	}
+	defer ctx.ProcStore.Unlock(ctx, queueName)
+
+	if err := exec.AbortQueuedDAGRun(ctx.Context, ctx.DAGRunStore, dagRun); err != nil {
+		return mapAbortQueuedDAGRunError(dagRun, err)
 	}
 
-	dagStatus, err := attempt.ReadStatus(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to read status: %w", err)
-	}
-
-	if dagStatus.Status != core.Queued {
-		// If the status is not queued, return an error
-		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, dagStatus.Status)
-	}
-
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to read dag: %w", err)
-	}
-
-	// Make sure the dag-run is not running at least locally
-	latestStatus, err := ctx.DAGRunMgr.GetCurrentStatus(ctx, dag, dagRun.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get latest status: %w", err)
-	}
-	if latestStatus.Status != core.Queued {
-		return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, latestStatus.Status)
-	}
-
-	// Dequeue the dag-run from the queue if we have not done so already
-	if !alreadyDequeued {
-		if _, err = ctx.QueueStore.DequeueByDAGRunID(ctx.Context, queueName, dagRun); err != nil {
-			return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
-		}
-	}
-
-	// Mark the execution as aborted now that it is dequeued
-	dagStatus.Status = core.Aborted
-
-	if err := attempt.Open(ctx.Context); err != nil {
-		return fmt.Errorf("failed to open run: %w", err)
-	}
-	if err := attempt.Write(ctx.Context, *dagStatus); err != nil {
-		_ = attempt.Close(ctx.Context)
-		return fmt.Errorf("failed to save status: %w", err)
-	}
-
-	// Close the attempt before hiding
-	if err := attempt.Close(ctx.Context); err != nil {
-		return fmt.Errorf("failed to close attempt: %w", err)
-	}
-
-	// Hide the aborted attempt to preserve the previous state
-	if err := attempt.Hide(ctx.Context); err != nil {
-		return fmt.Errorf("failed to hide aborted attempt: %w", err)
-	}
-
-	// Read the latest attempt and if it's NotStarted, we can remove the DAGRun from the store
-	// as it only has the queued status and no other attempts.
-	_, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun)
-	if errors.Is(err, exec.ErrNoStatusData) {
-		if err := ctx.DAGRunStore.RemoveDAGRun(ctx, dagRun); err != nil {
-			return fmt.Errorf("failed to remove dag-run %s from store: %w", dagRun.ID, err)
-		}
+	if _, err := ctx.QueueStore.DequeueByDAGRunID(ctx.Context, queueName, dagRun); err != nil && !errors.Is(err, exec.ErrQueueItemNotFound) {
+		return fmt.Errorf("failed to dequeue dag-run %s: %w", dagRun.ID, err)
 	}
 
 	logger.Info(ctx.Context, "Dequeued dag-run",
@@ -155,4 +102,20 @@ func dequeueDAGRun(ctx *Context, queueName string, dagRun exec.DAGRunRef, alread
 	)
 
 	return nil
+}
+
+func mapAbortQueuedDAGRunError(dagRun exec.DAGRunRef, err error) error {
+	if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
+		return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRun.ID, err)
+	}
+
+	var notQueuedErr *exec.DAGRunNotQueuedError
+	if errors.As(err, &notQueuedErr) {
+		if notQueuedErr.HasStatus {
+			return fmt.Errorf("dag-run %s is not in queued status but %s", dagRun.ID, notQueuedErr.Status)
+		}
+		return fmt.Errorf("dag-run %s is not in queued status", dagRun.ID)
+	}
+
+	return err
 }

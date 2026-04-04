@@ -1315,7 +1315,11 @@ export interface paths {
         get: operations["listQueueItems"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Clear queued items for a specific queue
+         * @description Clears queued DAG-runs for the specified queue on the server side. Running DAG-runs are not affected.
+         */
+        delete: operations["deleteQueueItems"];
         options?: never;
         head?: never;
         patch?: never;
@@ -8666,6 +8670,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteQueueItems: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description Queue name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue cleared successfully */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Generic error response */
             default: {

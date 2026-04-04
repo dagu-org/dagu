@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import type { components } from '../../../api/v1/schema';
 import { PathsQueuesNameItemsGetParametersQueryType } from '../../../api/v1/schema';
 import { Button } from '../../../components/ui/button';
+import { useErrorModal } from '../../../components/ui/error-modal';
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +34,7 @@ function QueueCard({
 }: QueueCardProps) {
   const config = useConfig();
   const client = useClient();
+  const { showError } = useErrorModal();
   const appBarContext = React.useContext(AppBarContext);
   const [isExpanded, setIsExpanded] = React.useState(true);
   const [isClearing, setIsClearing] = React.useState(false);
@@ -87,37 +89,25 @@ function QueueCard({
   const handleClearQueue = async () => {
     setIsClearing(true);
     try {
-      // Clear all queued items by dequeuing them one by one
-      // Note: This will only clear items on the current page, but triggers a refresh
-      await Promise.all(
-        queuedItems.map(async (dagRun) => {
-          try {
-            await client.GET('/dag-runs/{name}/{dagRunId}/dequeue', {
-              params: {
-                path: {
-                  name: dagRun.name,
-                  dagRunId: dagRun.dagRunId,
-                },
-                query: {
-                  remoteNode: remoteNode,
-                },
-              },
-            });
-          } catch (error) {
-            console.error(
-              `Failed to dequeue ${dagRun.name}:${dagRun.dagRunId}:`,
-              error
-            );
-          }
-        })
-      );
-      // Refresh the queued items
-      mutateQueuedData();
+      const { error } = await client.DELETE('/queues/{name}/items', {
+        params: {
+          path: { name: queue.name },
+          query: {
+            remoteNode: remoteNode,
+          },
+        },
+      });
+      if (error) {
+        showError(error.message || 'Failed to clear queue');
+        return;
+      }
+
+      await mutateQueuedData();
       if (onQueueCleared) {
-        onQueueCleared();
+        await onQueueCleared();
       }
     } catch (error) {
-      console.error('Failed to clear queue:', error);
+      showError(error instanceof Error ? error.message : 'Failed to clear queue');
     } finally {
       setIsClearing(false);
       setShowClearConfirm(false);
