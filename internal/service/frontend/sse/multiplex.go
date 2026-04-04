@@ -93,6 +93,7 @@ type Multiplexer struct {
 	sessions            map[string]*streamSession
 	topics              map[string]*multiplexTopic
 	fetchers            map[TopicType]FetchFunc
+	refreshModes        map[TopicType]TopicRefreshMode
 	authorizers         map[TopicType]TopicAuthorizer
 	maxClients          int
 	maxTopicsPerConn    int
@@ -132,6 +133,7 @@ func NewMultiplexer(cfg StreamConfig, metrics *Metrics) *Multiplexer {
 		sessions:            make(map[string]*streamSession),
 		topics:              make(map[string]*multiplexTopic),
 		fetchers:            make(map[TopicType]FetchFunc),
+		refreshModes:        make(map[TopicType]TopicRefreshMode),
 		authorizers:         make(map[TopicType]TopicAuthorizer),
 		maxClients:          cfg.MaxClients,
 		maxTopicsPerConn:    cfg.MaxTopicsPerConnection,
@@ -151,6 +153,17 @@ func (m *Multiplexer) RegisterFetcher(topicType TopicType, fetcher FetchFunc) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.fetchers[topicType] = fetcher
+}
+
+// SetRefreshMode configures how a topic stays fresh after its initial snapshot.
+func (m *Multiplexer) SetRefreshMode(topicType TopicType, mode TopicRefreshMode) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if mode == "" {
+		delete(m.refreshModes, topicType)
+		return
+	}
+	m.refreshModes[topicType] = mode
 }
 
 // RegisterAuthorizer registers an optional topic-specific authorizer.
@@ -537,9 +550,16 @@ func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiple
 		return nil, false, fmt.Errorf("no fetcher registered for topic type: %s", parsed.Type)
 	}
 
-	topic := newMultiplexTopic(m, parsed, fetcher)
+	topic := newMultiplexTopic(m, parsed, fetcher, m.refreshModeFor(parsed.Type))
 	m.topics[parsed.Key] = topic
 	return topic, true, nil
+}
+
+func (m *Multiplexer) refreshModeFor(topicType TopicType) TopicRefreshMode {
+	if mode, ok := m.refreshModes[topicType]; ok && mode != "" {
+		return mode
+	}
+	return TopicRefreshModePolling
 }
 
 func (m *Multiplexer) retireTopicIfUnused(topic *multiplexTopic) {
@@ -965,6 +985,7 @@ type multiplexTopic struct {
 	topicType         TopicType
 	identifier        string
 	fetcher           FetchFunc
+	refreshMode       TopicRefreshMode
 	clientsMu         sync.RWMutex
 	sessions          map[*streamSession]struct{}
 	retiring          bool
@@ -978,7 +999,7 @@ type multiplexTopic struct {
 	currentInterval   time.Duration
 }
 
-func newMultiplexTopic(mux *Multiplexer, parsed ParsedTopic, fetcher FetchFunc) *multiplexTopic {
+func newMultiplexTopic(mux *Multiplexer, parsed ParsedTopic, fetcher FetchFunc, refreshMode TopicRefreshMode) *multiplexTopic {
 	policy := backoff.NewExponentialBackoffPolicy(time.Second)
 	policy.MaxInterval = 30 * time.Second
 
@@ -988,6 +1009,7 @@ func newMultiplexTopic(mux *Multiplexer, parsed ParsedTopic, fetcher FetchFunc) 
 		topicType:       parsed.Type,
 		identifier:      parsed.Identifier,
 		fetcher:         fetcher,
+		refreshMode:     refreshMode,
 		sessions:        make(map[*streamSession]struct{}),
 		stopCh:          make(chan struct{}),
 		notifyCh:        make(chan struct{}, 1),
@@ -1049,9 +1071,16 @@ func (t *multiplexTopic) changedSince(lastEventID uint64) bool {
 
 func (t *multiplexTopic) start() {
 	t.wg.Go(func() {
-
-		timer := time.NewTimer(0)
+		timer := time.NewTimer(time.Hour)
+		if !timer.Stop() {
+			<-timer.C
+		}
 		defer timer.Stop()
+
+		var timerCh <-chan time.Time
+		if t.refreshMode == TopicRefreshModePolling {
+			t.resetTimer(timer, &timerCh, 0)
+		}
 
 		for {
 			select {
@@ -1059,18 +1088,27 @@ func (t *multiplexTopic) start() {
 				return
 			case <-t.stopCh:
 				return
-			case <-timer.C:
+			case <-timerCh:
+				timerCh = nil
 				t.poll()
-				timer.Reset(t.currentInterval)
+				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
+					t.resetTimer(timer, &timerCh, delay)
+					continue
+				}
+				if t.refreshMode == TopicRefreshModePolling {
+					t.resetTimer(timer, &timerCh, t.currentInterval)
+				}
 			case <-t.notifyCh:
 				t.poll()
-				if !timer.Stop() {
-					select {
-					case <-timer.C:
-					default:
-					}
+				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
+					t.resetTimer(timer, &timerCh, delay)
+					continue
 				}
-				timer.Reset(t.currentInterval)
+				if t.refreshMode == TopicRefreshModePolling {
+					t.resetTimer(timer, &timerCh, t.currentInterval)
+					continue
+				}
+				t.stopTimer(timer, &timerCh)
 			}
 		}
 	})
@@ -1090,6 +1128,33 @@ func (t *multiplexTopic) requestPoll() {
 	case t.notifyCh <- struct{}{}:
 	default:
 	}
+}
+
+func (t *multiplexTopic) stopTimer(timer *time.Timer, timerCh *<-chan time.Time) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	*timerCh = nil
+}
+
+func (t *multiplexTopic) resetTimer(timer *time.Timer, timerCh *<-chan time.Time, delay time.Duration) {
+	t.stopTimer(timer, timerCh)
+	timer.Reset(delay)
+	*timerCh = timer.C
+}
+
+func (t *multiplexTopic) nextRetryDelay() (time.Duration, bool) {
+	if t.backoffUntil.IsZero() {
+		return 0, false
+	}
+	delay := time.Until(t.backoffUntil)
+	if delay < 0 {
+		delay = 0
+	}
+	return delay, true
 }
 
 func (t *multiplexTopic) poll() {

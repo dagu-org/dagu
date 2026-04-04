@@ -38,6 +38,16 @@ const (
 	smoothingFactor     = 0.3              // EMA alpha: weight for new value (0.3 = 30% new, 70% old)
 )
 
+// TopicRefreshMode controls how a topic stays fresh after its initial snapshot.
+type TopicRefreshMode string
+
+const (
+	// TopicRefreshModePolling continuously refetches while subscribers are present.
+	TopicRefreshModePolling TopicRefreshMode = "polling"
+	// TopicRefreshModeOnDemand refetches only on explicit wakeups, with retry-backoff on errors.
+	TopicRefreshModeOnDemand TopicRefreshMode = "on_demand"
+)
+
 // TopicType identifies the type of data being watched.
 type TopicType string
 

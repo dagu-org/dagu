@@ -1180,6 +1180,15 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 	registrar.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
 	registrar.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
 	registrar.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
+
+	// DAG-run and queue live views have an explicit eventstore-backed invalidation
+	// path, so they should not keep background polling once the SSE topic is live.
+	registrar.SetRefreshMode(sse.TopicTypeDAGRun, sse.TopicRefreshModeOnDemand)
+	registrar.SetRefreshMode(sse.TopicTypeSubDAGRun, sse.TopicRefreshModeOnDemand)
+	registrar.SetRefreshMode(sse.TopicTypeDAGHistory, sse.TopicRefreshModeOnDemand)
+	registrar.SetRefreshMode(sse.TopicTypeDAGRuns, sse.TopicRefreshModeOnDemand)
+	registrar.SetRefreshMode(sse.TopicTypeQueueItems, sse.TopicRefreshModeOnDemand)
+	registrar.SetRefreshMode(sse.TopicTypeQueues, sse.TopicRefreshModeOnDemand)
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {

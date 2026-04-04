@@ -3,10 +3,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isAbortLikeError } from '@/lib/requestTimeout';
+import { useDAGRunSSE } from '@/hooks/useDAGRunSSE';
+import { useSubDAGRunSSE } from '@/hooks/useSubDAGRunSSE';
 import {
   type DAGRunDetails,
   type DAGRunDetailsRequestTarget,
   fetchDAGRunDetails,
+  matchesRequestedDAGRunDetails,
 } from './dagRunDetailsRequest';
 
 function toError(
@@ -30,11 +33,38 @@ type UseBoundedDAGRunDetailsResult = {
   refresh: () => Promise<void>;
 };
 
+function shouldUsePollingFallback(sseState: {
+  isConnected: boolean;
+  isConnecting: boolean;
+  shouldUseFallback: boolean;
+}): boolean {
+  return (
+    sseState.shouldUseFallback ||
+    (!sseState.isConnected && !sseState.isConnecting)
+  );
+}
+
 export function useBoundedDAGRunDetails({
   target,
   enabled = true,
   pollIntervalMs = 0,
 }: UseBoundedDAGRunDetailsOptions): UseBoundedDAGRunDetailsResult {
+  const isSubDAGRunTarget = Boolean(
+    target?.subDAGRunId && target?.parentName && target?.parentDAGRunId
+  );
+  const dagRunSSE = useDAGRunSSE(
+    target?.name ?? '',
+    target?.dagRunId ?? '',
+    enabled && target != null && !isSubDAGRunTarget
+  );
+  const subDAGRunSSE = useSubDAGRunSSE(
+    target?.parentName ?? '',
+    target?.parentDAGRunId ?? '',
+    target?.subDAGRunId ?? '',
+    enabled && target != null && isSubDAGRunTarget
+  );
+  const sseState = isSubDAGRunTarget ? subDAGRunSSE : dagRunSSE;
+
   const [data, setData] = useState<DAGRunDetails | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +74,7 @@ export function useBoundedDAGRunDetails({
   const targetRef = useRef<DAGRunDetailsRequestTarget | null>(target);
   const enabledRef = useRef(enabled);
   const pollIntervalRef = useRef(pollIntervalMs);
+  const usePollingFallbackRef = useRef(shouldUsePollingFallback(sseState));
   const inFlightRef = useRef<Promise<void> | null>(null);
   const pendingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +92,7 @@ export function useBoundedDAGRunDetails({
   targetRef.current = target;
   enabledRef.current = enabled;
   pollIntervalRef.current = pollIntervalMs;
+  usePollingFallbackRef.current = shouldUsePollingFallback(sseState);
 
   const clearPollTimer = useCallback(() => {
     if (timerRef.current) {
@@ -79,7 +111,11 @@ export function useBoundedDAGRunDetails({
   const schedulePoll = useCallback(
     (runFetch: () => Promise<void>) => {
       clearPollTimer();
-      if (!enabledRef.current || pollIntervalRef.current <= 0) {
+      if (
+        !enabledRef.current ||
+        pollIntervalRef.current <= 0 ||
+        !usePollingFallbackRef.current
+      ) {
         return;
       }
       timerRef.current = setTimeout(() => {
@@ -189,12 +225,53 @@ export function useBoundedDAGRunDetails({
       abortActiveRequest();
       pendingRef.current = false;
     };
+  }, [abortActiveRequest, clearPollTimer, enabled, requestKey, runFetch]);
+
+  useEffect(() => {
+    const liveDetails = sseState.data?.dagRunDetails;
+    const requestedDagRunID = target?.subDAGRunId ?? target?.dagRunId ?? '';
+    if (
+      !enabled ||
+      liveDetails == null ||
+      !matchesRequestedDAGRunDetails(liveDetails, requestedDagRunID)
+    ) {
+      return;
+    }
+
+    clearPollTimer();
+    abortActiveRequest();
+    pendingRef.current = false;
+    dataRef.current = liveDetails;
+    setData(liveDetails);
+    setError(null);
+    setIsLoading(false);
+    setIsValidating(false);
+  }, [abortActiveRequest, clearPollTimer, enabled, requestKey, sseState.data]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      target == null ||
+      pollIntervalMs <= 0 ||
+      !usePollingFallbackRef.current
+    ) {
+      clearPollTimer();
+      return;
+    }
+    if (timerRef.current != null || inFlightRef.current != null) {
+      return;
+    }
+    schedulePoll(runFetch);
   }, [
-    abortActiveRequest,
     clearPollTimer,
     enabled,
+    pollIntervalMs,
     requestKey,
     runFetch,
+    schedulePoll,
+    sseState.isConnected,
+    sseState.isConnecting,
+    sseState.shouldUseFallback,
   ]);
 
   useEffect(() => {
