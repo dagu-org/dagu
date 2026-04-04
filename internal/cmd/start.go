@@ -61,7 +61,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, attemptIDFlag, triggerTypeFlag, scheduleTimeFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, attemptIDFlag, triggerTypeFlag, scheduleTimeFlag, sourceFileFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -85,6 +85,12 @@ var triggerTypeFlag = commandLineFlag{
 var scheduleTimeFlag = commandLineFlag{
 	name:  "schedule-time",
 	usage: "RFC 3339 timestamp of when this run was scheduled (set by scheduler, not for manual use)",
+}
+
+var sourceFileFlag = commandLineFlag{
+	name:   "source-file",
+	usage:  "Original DAG source file path for provenance-aware worker execution",
+	hidden: true,
 }
 
 func runStart(ctx *Context, args []string) error {
@@ -340,6 +346,9 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load DAG from %s: %w", dagPath, err)
 	}
+	if sourceFile, err := ctx.StringParam("source-file"); err == nil && sourceFile != "" {
+		dag.SourceFile = sourceFile
+	}
 
 	return dag, params, nil
 }
@@ -557,6 +566,9 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, sc
 	}
 	if len(d.Tags) > 0 {
 		taskOpts = append(taskOpts, executor.WithTags(strings.Join(d.Tags.Strings(), ",")))
+	}
+	if d.SourceFile != "" {
+		taskOpts = append(taskOpts, executor.WithSourceFile(d.SourceFile))
 	}
 	if scheduleTime != "" {
 		taskOpts = append(taskOpts, executor.WithScheduleTime(scheduleTime))

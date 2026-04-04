@@ -70,6 +70,13 @@ func WithTaskParams(params string) TaskOption {
 	}
 }
 
+// WithSourceFile sets the original DAG source file path for provenance-aware flows.
+func WithSourceFile(sourceFile string) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		task.SourceFile = sourceFile
+	}
+}
+
 // WithWorkerSelector sets the worker selector labels for the task.
 func WithWorkerSelector(selector map[string]string) TaskOption {
 	return func(task *coordinatorv1.Task) {

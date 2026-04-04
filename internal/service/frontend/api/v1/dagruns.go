@@ -482,6 +482,7 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 			Message:    err.Error(),
 		}
 	}
+	dag.SourceFile = ""
 
 	return dag, cleanup, nil
 }
@@ -541,6 +542,7 @@ func rebuildDAGRunSnapshotFromYAML(ctx context.Context, dag *core.DAG) (*core.DA
 	if err != nil {
 		return nil, err
 	}
+	fresh.SourceFile = dag.SourceFile
 
 	dag.Env = fresh.Env
 	dag.Params = fresh.Params
@@ -1992,6 +1994,9 @@ func (a *API) retryDAGRun(ctx context.Context, dagName, dagRunID, retryDagRunID,
 			executor.WithPreviousStatus(prevStatus),
 			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)),
 		}
+		if dag.SourceFile != "" {
+			opts = append(opts, executor.WithSourceFile(dag.SourceFile))
+		}
 		if stepName != "" {
 			opts = append(opts, executor.WithStep(stepName))
 		}
@@ -2366,7 +2371,7 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 	if dag == nil {
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to read DAG snapshot: DAG data is nil")
 	}
-	storedLocation := dag.Location
+	storedSourceFile := dag.SourceFile
 
 	snapshotDAG, preservedSnapshotParams, err := restoreDAGRunSnapshot(ctx, dag, status)
 	if err != nil {
@@ -2407,7 +2412,7 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 	}()
 
 	if opts.useCurrentDAGFile {
-		dag, err = a.loadCurrentRescheduleDAG(ctx, storedLocation, nameOverride)
+		dag, err = a.loadCurrentRescheduleDAG(ctx, storedSourceFile, nameOverride)
 		if err != nil {
 			return rescheduleDAGRunResult{}, err
 		}
@@ -2423,6 +2428,7 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		if err != nil {
 			return rescheduleDAGRunResult{}, fmt.Errorf("failed to prepare reschedule snapshot: %w", err)
 		}
+		dag.SourceFile = snapshotDAG.SourceFile
 	}
 
 	if err := a.ensureDAGRunIDUnique(ctx, dag, newDagRunID); err != nil {
@@ -3102,8 +3108,8 @@ func clampInt(value, minVal, maxVal int) int {
 	return max(minVal, min(value, maxVal))
 }
 
-func (a *API) loadCurrentRescheduleDAG(ctx context.Context, location, nameOverride string) (*core.DAG, error) {
-	if location == "" || !fileExists(location) {
+func (a *API) loadCurrentRescheduleDAG(ctx context.Context, sourceFile, nameOverride string) (*core.DAG, error) {
+	if sourceFile == "" || !fileExists(sourceFile) {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
@@ -3119,7 +3125,7 @@ func (a *API) loadCurrentRescheduleDAG(ctx context.Context, location, nameOverri
 		loadOpts = append(loadOpts, spec.WithName(nameOverride))
 	}
 
-	dag, err := spec.Load(ctx, location, loadOpts...)
+	dag, err := spec.Load(ctx, sourceFile, loadOpts...)
 	if err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusBadRequest,
@@ -3139,7 +3145,7 @@ func (a *API) dagRunSpecFromFile(ctx context.Context, attempt exec.DAGRunAttempt
 	if err != nil || dag == nil {
 		return false
 	}
-	return dag.Location != "" && fileExists(dag.Location)
+	return dag.SourceFile != "" && fileExists(dag.SourceFile)
 }
 
 func fileExists(path string) bool {

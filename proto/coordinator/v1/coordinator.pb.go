@@ -404,7 +404,9 @@ type Task struct {
 	OwnerCoordinatorHost string `protobuf:"bytes,22,opt,name=owner_coordinator_host,json=ownerCoordinatorHost,proto3" json:"owner_coordinator_host,omitempty"`
 	OwnerCoordinatorPort int32  `protobuf:"varint,23,opt,name=owner_coordinator_port,json=ownerCoordinatorPort,proto3" json:"owner_coordinator_port,omitempty"`
 	// Durable token identifying the shared task claim.
-	ClaimToken    string `protobuf:"bytes,24,opt,name=claim_token,json=claimToken,proto3" json:"claim_token,omitempty"`
+	ClaimToken string `protobuf:"bytes,24,opt,name=claim_token,json=claimToken,proto3" json:"claim_token,omitempty"`
+	// Original DAG file path for provenance-aware reschedule-from-file behavior.
+	SourceFile    string `protobuf:"bytes,25,opt,name=source_file,json=sourceFile,proto3" json:"source_file,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -603,6 +605,13 @@ func (x *Task) GetOwnerCoordinatorPort() int32 {
 func (x *Task) GetClaimToken() string {
 	if x != nil {
 		return x.ClaimToken
+	}
+	return ""
+}
+
+func (x *Task) GetSourceFile() string {
+	if x != nil {
+		return x.SourceFile
 	}
 	return ""
 }
@@ -1949,7 +1958,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\x94\b\n" +
+	"\x10DispatchResponse\"\xb5\b\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -1983,7 +1992,9 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x16owner_coordinator_host\x18\x16 \x01(\tR\x14ownerCoordinatorHost\x124\n" +
 	"\x16owner_coordinator_port\x18\x17 \x01(\x05R\x14ownerCoordinatorPort\x12\x1f\n" +
 	"\vclaim_token\x18\x18 \x01(\tR\n" +
-	"claimToken\x1aA\n" +
+	"claimToken\x12\x1f\n" +
+	"\vsource_file\x18\x19 \x01(\tR\n" +
+	"sourceFile\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +

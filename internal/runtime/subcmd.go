@@ -318,6 +318,9 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, envHints []string, d
 	if task.ScheduleTime != "" {
 		args = append(args, fmt.Sprintf("--schedule-time=%s", task.ScheduleTime))
 	}
+	if task.SourceFile != "" {
+		args = append(args, fmt.Sprintf("--source-file=%s", task.SourceFile))
+	}
 
 	if b.configFile != "" {
 		args = append(args, "--config", b.configFile)

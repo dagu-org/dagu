@@ -113,6 +113,7 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	if err != nil {
 		return nil, err
 	}
+	fresh.SourceFile = dag.SourceFile
 
 	// Copy only fields excluded from JSON serialization (json:"-").
 	// All other fields (Queue, WorkerSelector, HandlerOn, Steps, Tags, etc.)

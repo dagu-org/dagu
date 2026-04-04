@@ -76,6 +76,10 @@ type DAG struct {
 	// Location is the absolute path to the DAG file.
 	// It is used to generate unix socket name and can be blank
 	Location string `json:"location,omitempty"`
+	// SourceFile is the original DAG file path this run was loaded from.
+	// Unlike Location, it is provenance-only and is preserved even when queued
+	// execution clears or rewrites runtime locations.
+	SourceFile string `json:"sourceFile,omitempty"`
 	// Group is the group name of the DAG. This is optional.
 	Group string `json:"group,omitempty"`
 	// Name is the name of the DAG. The default is the filename without the extension.

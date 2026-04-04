@@ -150,6 +150,9 @@ func (e *DAGExecutor) ExecuteDAG(
 			executor.WithPreviousStatus(previousStatus),
 			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, e.baseConfigPath)),
 		}
+		if dag.SourceFile != "" {
+			taskOpts = append(taskOpts, executor.WithSourceFile(dag.SourceFile))
+		}
 		if scheduleTime != "" {
 			taskOpts = append(taskOpts, executor.WithScheduleTime(scheduleTime))
 		}

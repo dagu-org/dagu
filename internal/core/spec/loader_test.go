@@ -686,8 +686,23 @@ func TestLoadYAML(t *testing.T) {
 			assert.Equal(t, tt.wantName, ret.Steps[0].Name)
 			require.Len(t, ret.Steps[0].Commands, 1)
 			assert.Equal(t, tt.wantCommand, ret.Steps[0].Commands[0].Command)
+			assert.Empty(t, ret.SourceFile)
 		})
 	}
+}
+
+func TestLoadPreservesSourceFileForFileBasedDAG(t *testing.T) {
+	t.Parallel()
+
+	dagFile := createTempYAMLFile(t, `steps:
+  - name: a
+    command: echo hi
+`)
+
+	dag, err := spec.Load(context.Background(), dagFile)
+	require.NoError(t, err)
+	assert.Equal(t, dagFile, dag.Location)
+	assert.Equal(t, dagFile, dag.SourceFile)
 }
 
 func TestLoadYAMLWithOpts_PreservesLegacyContract(t *testing.T) {

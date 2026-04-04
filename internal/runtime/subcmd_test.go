@@ -817,6 +817,19 @@ func TestTaskStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--schedule-time=2026-03-13T10:00:00Z")
 	})
 
+	t.Run("TaskStartWithSourceFile", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:   "task-run-id",
+			AttemptId:  "attempt-1",
+			Target:     "/path/to/task.yaml",
+			SourceFile: "/dags/original.yaml",
+		}
+		spec := builder.TaskStart(task, nil, "")
+
+		assert.Contains(t, spec.Args, "--source-file=/dags/original.yaml")
+	})
+
 	t.Run("TaskStartWithExternalStepRetry", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
