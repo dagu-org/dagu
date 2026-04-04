@@ -26,13 +26,16 @@ func (a *API) ListAutomata(ctx context.Context, _ api.ListAutomataRequestObject)
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
+	controllerStatus := a.currentAutomataControllerStatus(ctx)
 	items, err := a.automataService.List(ctx)
 	if err != nil {
 		return nil, toAutomataAPIError(err)
 	}
 	resp := make([]api.AutomataSummary, 0, len(items))
 	for _, item := range items {
-		resp = append(resp, toAPIAutomataSummary(item))
+		summary := toAPIAutomataSummary(item)
+		summary.AutomataController = &controllerStatus
+		resp = append(resp, summary)
 	}
 	return api.ListAutomata200JSONResponse{Automata: resp}, nil
 }
@@ -41,11 +44,14 @@ func (a *API) GetAutomata(ctx context.Context, request api.GetAutomataRequestObj
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
+	controllerStatus := a.currentAutomataControllerStatus(ctx)
 	item, err := a.automataService.Detail(ctx, string(request.Name))
 	if err != nil {
 		return nil, toAutomataAPIError(err)
 	}
-	return api.GetAutomata200JSONResponse(toAPIAutomataDetail(item)), nil
+	resp := toAPIAutomataDetail(item)
+	resp.AutomataController = &controllerStatus
+	return api.GetAutomata200JSONResponse(resp), nil
 }
 
 func (a *API) GetAutomataSpec(ctx context.Context, request api.GetAutomataSpecRequestObject) (api.GetAutomataSpecResponseObject, error) {
@@ -204,6 +210,9 @@ func (a *API) ResetAutomata(ctx context.Context, request api.ResetAutomataReques
 	if err := a.requireExecute(ctx); err != nil {
 		return nil, err
 	}
+	if err := a.requireReadyAutomataController(ctx); err != nil {
+		return nil, err
+	}
 	name := string(request.Name)
 	if err := a.automataService.ResetState(ctx, name); err != nil {
 		return nil, toAutomataAPIError(err)
@@ -217,6 +226,9 @@ func (a *API) StartAutomata(ctx context.Context, request api.StartAutomataReques
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.requireReadyAutomataController(ctx); err != nil {
 		return nil, err
 	}
 	name := string(request.Name)
@@ -243,6 +255,9 @@ func (a *API) PauseAutomata(ctx context.Context, request api.PauseAutomataReques
 	if err := a.requireExecute(ctx); err != nil {
 		return nil, err
 	}
+	if err := a.requireReadyAutomataController(ctx); err != nil {
+		return nil, err
+	}
 	name := string(request.Name)
 	if err := a.automataService.Pause(ctx, name, a.currentUsername(ctx)); err != nil {
 		return nil, toAutomataAPIError(err)
@@ -256,6 +271,9 @@ func (a *API) ResumeAutomata(ctx context.Context, request api.ResumeAutomataRequ
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.requireReadyAutomataController(ctx); err != nil {
 		return nil, err
 	}
 	name := string(request.Name)
@@ -365,6 +383,9 @@ func (a *API) MessageAutomata(ctx context.Context, request api.MessageAutomataRe
 	if err := a.requireExecute(ctx); err != nil {
 		return nil, err
 	}
+	if err := a.requireReadyAutomataController(ctx); err != nil {
+		return nil, err
+	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
@@ -385,6 +406,9 @@ func (a *API) RespondAutomata(ctx context.Context, request api.RespondAutomataRe
 		return nil, err
 	}
 	if err := a.requireExecute(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.requireReadyAutomataController(ctx); err != nil {
 		return nil, err
 	}
 	if request.Body == nil {
@@ -417,6 +441,22 @@ func (a *API) requireAutomataService() error {
 	return nil
 }
 
+func (a *API) requireReadyAutomataController(ctx context.Context) error {
+	status := a.currentAutomataControllerStatus(ctx)
+	if status.State == api.AutomataControllerStatusStateReady {
+		return nil
+	}
+	message := "No active scheduler with a ready Automata controller is available."
+	if status.Message != nil && *status.Message != "" {
+		message = *status.Message
+	}
+	return &Error{
+		Code:       api.ErrorCodeInternalError,
+		Message:    message,
+		HTTPStatus: http.StatusConflict,
+	}
+}
+
 func (a *API) requireAutomataMemoryStore() error {
 	if a.agentMemoryStore == nil {
 		return &Error{
@@ -426,6 +466,76 @@ func (a *API) requireAutomataMemoryStore() error {
 		}
 	}
 	return nil
+}
+
+func (a *API) currentAutomataControllerStatus(ctx context.Context) api.AutomataControllerStatus {
+	status := normalizeAutomataController(nil)
+	if a.serviceRegistry == nil {
+		status.State = exec.AutomataControllerStateUnavailable
+		status.Message = "Service registry is not configured"
+		return toAPIAutomataControllerStatus(status)
+	}
+
+	members, err := a.serviceRegistry.GetServiceMembers(ctx, exec.ServiceNameScheduler)
+	if err != nil {
+		status.State = exec.AutomataControllerStateUnavailable
+		status.Message = "Failed to retrieve scheduler status"
+		return toAPIAutomataControllerStatus(status)
+	}
+
+	var fallback exec.AutomataControllerInfo
+	hasFallback := false
+	for _, member := range members {
+		if member.Status != exec.ServiceStatusActive {
+			continue
+		}
+		normalized := normalizeAutomataController(member.AutomataController)
+		if normalized.State == exec.AutomataControllerStateReady {
+			return toAPIAutomataControllerStatus(normalized)
+		}
+		if !hasFallback {
+			fallback = normalized
+			hasFallback = true
+		}
+	}
+	if hasFallback {
+		return toAPIAutomataControllerStatus(fallback)
+	}
+
+	status.State = exec.AutomataControllerStateUnavailable
+	status.Message = "No active scheduler with a ready Automata controller is available."
+	return toAPIAutomataControllerStatus(status)
+}
+
+func normalizeAutomataController(info *exec.AutomataControllerInfo) exec.AutomataControllerInfo {
+	if info == nil || info.State == "" {
+		return exec.AutomataControllerInfo{
+			State:   exec.AutomataControllerStateUnknown,
+			Message: "Scheduler controller readiness is unknown",
+		}
+	}
+	normalized := *info
+	if normalized.Message == "" {
+		switch normalized.State {
+		case exec.AutomataControllerStateDisabled:
+			normalized.Message = "Automata is disabled in agent settings"
+		case exec.AutomataControllerStateUnavailable:
+			normalized.Message = "Automata controller is unavailable"
+		case exec.AutomataControllerStateUnknown:
+			normalized.Message = "Scheduler controller readiness is unknown"
+		}
+	}
+	return normalized
+}
+
+func toAPIAutomataControllerStatus(info exec.AutomataControllerInfo) api.AutomataControllerStatus {
+	status := api.AutomataControllerStatus{
+		State: api.AutomataControllerStatusState(info.State),
+	}
+	if info.Message != "" {
+		status.Message = ptrOf(info.Message)
+	}
+	return status
 }
 
 func (a *API) currentUsername(ctx context.Context) string {

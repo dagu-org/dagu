@@ -8,6 +8,10 @@ interface ServiceInstance {
   status: 'active' | 'inactive' | 'unknown';
   startedAt: string;
   port?: number;
+  automataController?: {
+    state: 'ready' | 'disabled' | 'unavailable' | 'unknown';
+    message?: string;
+  };
 }
 
 interface ServiceCardProps {
@@ -87,13 +91,33 @@ function ServiceCard({
               {instance.host}{instance.port ? `:${instance.port}` : ''}
             </span>
 
-            {/* Uptime */}
-            {instance.status === 'active' && (
-              <span className="flex items-center gap-1 text-muted-foreground ml-auto">
-                <Clock className="h-3 w-3" />
-                {getUptime(instance.startedAt)}
-              </span>
-            )}
+            <div className="ml-auto flex items-center gap-3">
+              {instance.automataController ? (
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                    instance.automataController.state === 'ready'
+                      ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'
+                      : instance.automataController.state === 'disabled'
+                        ? 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-200'
+                        : instance.automataController.state === 'unavailable'
+                          ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'
+                          : 'bg-muted text-muted-foreground'
+                  )}
+                  title={instance.automataController.message}
+                >
+                  automata {instance.automataController.state}
+                </span>
+              ) : null}
+
+              {/* Uptime */}
+              {instance.status === 'active' && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  {getUptime(instance.startedAt)}
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>

@@ -3409,13 +3409,22 @@ export interface components {
             instanceId: string;
             /** @description Hostname where scheduler is running */
             host: string;
+            /** @description Scheduler health port (0 when not exposed) */
+            port: number;
             /**
              * @description Scheduler status (active = holds lock and scheduling)
              * @enum {string}
              */
             status: SchedulerInstanceStatus;
+            automataController?: components["schemas"]["AutomataControllerStatus"];
             /** @description RFC3339 timestamp when scheduler started */
             startedAt: string;
+        };
+        /** @description Scheduler-owned Automata controller readiness */
+        AutomataControllerStatus: {
+            /** @enum {string} */
+            state: AutomataControllerStatusState;
+            message?: string;
         };
         /** @description Response containing status of all coordinator instances */
         CoordinatorStatusResponse: {
@@ -5102,6 +5111,7 @@ export interface components {
             nextTaskDescription?: string;
             /** Format: date-time */
             lastUpdatedAt?: string;
+            automataController?: components["schemas"]["AutomataControllerStatus"];
         };
         /** @description List of Automata */
         AutomataListResponse: {
@@ -5115,6 +5125,7 @@ export interface components {
             currentRun?: components["schemas"]["AutomataRunSummary"];
             recentRuns?: components["schemas"]["AutomataRunSummary"][];
             messages?: components["schemas"]["AgentMessage"][];
+            automataController?: components["schemas"]["AutomataControllerStatus"];
         };
         /** @description Raw Automata YAML spec */
         AutomataSpecResponse: {
@@ -12774,6 +12785,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Automata controller is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unexpected error */
             default: {
                 headers: {
@@ -13014,6 +13034,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Automata controller is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unexpected error */
             default: {
                 headers: {
@@ -13064,6 +13093,15 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Automata controller is not ready */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13128,6 +13166,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Automata controller is not ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Unexpected error */
             default: {
                 headers: {
@@ -13182,6 +13229,15 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Automata controller is not ready */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13559,6 +13615,15 @@ export interface operations {
             };
             /** @description Automata not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Automata controller is not ready */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15104,6 +15169,12 @@ export enum NodeStatusLabel {
 export enum SchedulerInstanceStatus {
     active = "active",
     inactive = "inactive",
+    unknown = "unknown"
+}
+export enum AutomataControllerStatusState {
+    ready = "ready",
+    disabled = "disabled",
+    unavailable = "unavailable",
     unknown = "unknown"
 }
 export enum CoordinatorInstanceStatus {

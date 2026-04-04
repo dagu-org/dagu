@@ -16,12 +16,13 @@ import (
 
 // instanceInfo represents the information stored for each service instance
 type instanceInfo struct {
-	ID        string             `json:"id"`
-	Host      string             `json:"host"`
-	Port      int                `json:"port"`
-	PID       int                `json:"pid"`
-	Status    exec.ServiceStatus `json:"status"`
-	StartedAt time.Time          `json:"startedAt"`
+	ID                 string                       `json:"id"`
+	Host               string                       `json:"host"`
+	Port               int                          `json:"port"`
+	PID                int                          `json:"pid"`
+	Status             exec.ServiceStatus           `json:"status"`
+	StartedAt          time.Time                    `json:"startedAt"`
+	AutomataController *exec.AutomataControllerInfo `json:"automataController,omitempty"`
 }
 
 // instanceFilePath returns the file path for an instance

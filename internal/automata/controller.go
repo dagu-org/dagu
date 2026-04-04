@@ -44,10 +44,20 @@ var serviceAutomataAllowedTools = []string{
 	"request_human_input",
 }
 
-func (s *Service) Run(ctx context.Context) {
-	if s.agentAPI == nil || s.subCmdBuilder == nil {
-		s.logger.Info("automata controller disabled", "reason", "runtime not configured")
-		return
+func (s *Service) ValidateController() error {
+	switch {
+	case s.agentAPI == nil:
+		return errors.New("agent API is not configured")
+	case s.subCmdBuilder == nil:
+		return errors.New("sub command builder is not configured")
+	default:
+		return nil
+	}
+}
+
+func (s *Service) Run(ctx context.Context) error {
+	if err := s.ValidateController(); err != nil {
+		return err
 	}
 	ticker := time.NewTicker(s.reconcileEvery)
 	defer ticker.Stop()
@@ -59,7 +69,7 @@ func (s *Service) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-ticker.C:
 			if err := s.ReconcileOnce(ctx); err != nil {
 				s.logger.Warn("automata reconcile failed", "error", err)
@@ -127,8 +137,9 @@ func (s *Service) reconcileDefinition(ctx context.Context, def *Definition) erro
 	}
 
 	if flushed, err := s.flushQueuedSessionTurn(ctx, def.Name, state); err != nil {
-		return err
+		return s.recordControllerError(ctx, def, state, "flush_queued_turn_failed", err)
 	} else if flushed {
+		state.LastError = ""
 		return s.saveState(ctx, def.Name, state)
 	}
 
@@ -235,13 +246,13 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 
 	runtimeOpts, err := s.runtimeOptions(ctx, def, state)
 	if err != nil {
-		return err
+		return s.recordControllerError(ctx, def, state, "runtime_options_failed", err)
 	}
 	user := s.systemUser(def.Name)
 	if state.SessionID == "" {
 		sessionID, err := s.agentAPI.CreateEmptySessionWithRuntime(ctx, user, "", def.Agent.SafeMode, runtimeOpts)
 		if err != nil {
-			return err
+			return s.recordControllerError(ctx, def, state, "session_create_failed", err)
 		}
 		state.SessionID = sessionID
 	}
@@ -255,15 +266,7 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 		if errors.Is(err, agent.ErrSessionNotFound) {
 			sessionID, createErr := s.agentAPI.CreateEmptySessionWithRuntime(ctx, user, "", def.Agent.SafeMode, runtimeOpts)
 			if createErr != nil {
-				prevError := state.LastError
-				state.LastError = createErr.Error()
-				if err := s.saveState(ctx, def.Name, state); err != nil {
-					return err
-				}
-				if state.LastError != prevError {
-					s.eventEmitter().error(ctx, def, state, "session_recreate_failed", s.clock())
-				}
-				return nil
+				return s.recordControllerError(ctx, def, state, "session_recreate_failed", createErr)
 			}
 			state.SessionID = sessionID
 			result, err = s.agentAPI.EnqueueChatMessageWithRuntime(ctx, state.SessionID, user, agent.ChatRequest{
@@ -274,39 +277,39 @@ func (s *Service) startTurn(ctx context.Context, def *Definition, state *State, 
 		}
 	}
 	if err != nil {
-		prevError := state.LastError
-		state.LastError = err.Error()
-		if err := s.saveState(ctx, def.Name, state); err != nil {
-			return err
-		}
-		if state.LastError != prevError {
-			s.eventEmitter().error(ctx, def, state, "enqueue_turn_failed", s.clock())
-		}
-		return nil
+		return s.recordControllerError(ctx, def, state, "enqueue_turn_failed", err)
 	}
 	if result.SessionID != "" {
 		state.SessionID = result.SessionID
 	}
 	if result.Queued {
 		if _, flushErr := s.flushQueuedSessionTurn(ctx, def.Name, state); flushErr != nil {
-			prevError := state.LastError
-			state.LastError = flushErr.Error()
-			if err := s.saveState(ctx, def.Name, state); err != nil {
-				return err
-			}
-			if state.LastError != prevError {
-				s.eventEmitter().error(ctx, def, state, "flush_queued_turn_failed", s.clock())
-			}
-			return nil
+			return s.recordControllerError(ctx, def, state, "flush_queued_turn_failed", flushErr)
 		}
 	}
 
+	state.LastError = ""
 	state.State = StateRunning
 	state.PendingTurnMessages = nil
 	state.StartRequestedAt = time.Time{}
 	state.LastTriggeredAt = s.clock()
 	state.WaitingReason = WaitingReasonNone
 	return s.saveState(ctx, def.Name, state)
+}
+
+func (s *Service) recordControllerError(ctx context.Context, def *Definition, state *State, reason string, err error) error {
+	if err == nil {
+		return nil
+	}
+	prevError := state.LastError
+	state.LastError = err.Error()
+	if saveErr := s.saveState(ctx, def.Name, state); saveErr != nil {
+		return saveErr
+	}
+	if state.LastError != prevError {
+		s.eventEmitter().error(ctx, def, state, reason, s.clock())
+	}
+	return nil
 }
 
 func (s *Service) flushQueuedSessionTurn(ctx context.Context, name string, state *State) (bool, error) {

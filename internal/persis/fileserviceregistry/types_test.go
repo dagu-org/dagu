@@ -22,6 +22,10 @@ func TestWriteReadInstanceFile(t *testing.T) {
 		Port:   8080,
 		Status: exec.ServiceStatusActive,
 		PID:    1234,
+		AutomataController: &exec.AutomataControllerInfo{
+			State:   exec.AutomataControllerStateReady,
+			Message: "controller is ready",
+		},
 	}
 
 	// Write instance file
@@ -40,6 +44,9 @@ func TestWriteReadInstanceFile(t *testing.T) {
 	assert.Equal(t, original.ID, read.ID)
 	assert.Equal(t, original.Host, read.Host)
 	assert.Equal(t, original.PID, read.PID)
+	require.NotNil(t, read.AutomataController)
+	assert.Equal(t, original.AutomataController.State, read.AutomataController.State)
+	assert.Equal(t, original.AutomataController.Message, read.AutomataController.Message)
 }
 
 func TestWriteInstanceFile_CreatesDirectory(t *testing.T) {

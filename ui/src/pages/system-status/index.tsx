@@ -195,7 +195,9 @@ function SystemStatus() {
             schedulerData?.schedulers?.map((s: SchedulerInstance) => ({
               instanceId: s.instanceId,
               host: s.host,
+              port: s.port,
               status: s.status,
+              automataController: s.automataController,
               startedAt: s.startedAt,
             })) || []
           }

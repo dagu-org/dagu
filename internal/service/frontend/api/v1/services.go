@@ -60,8 +60,13 @@ func (a *API) GetSchedulerStatus(ctx context.Context, _ api.GetSchedulerStatusRe
 		}
 
 		schedulers = append(schedulers, api.SchedulerInstance{
+			AutomataController: func() *api.AutomataControllerStatus {
+				controller := toAPIAutomataControllerStatus(normalizeAutomataController(member.AutomataController))
+				return &controller
+			}(),
 			InstanceId: member.ID,
 			Host:       member.Host,
+			Port:       member.Port,
 			Status:     status,
 			StartedAt:  member.StartedAt.Format(time.RFC3339),
 		})

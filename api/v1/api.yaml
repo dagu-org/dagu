@@ -5905,6 +5905,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: "Automata controller is not ready"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Unexpected error"
           content:
@@ -6069,6 +6075,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: "Automata controller is not ready"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Unexpected error"
           content:
@@ -6106,6 +6118,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "409":
+          description: "Automata controller is not ready"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           description: "Unexpected error"
           content:
@@ -6139,6 +6157,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "403":
           description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Automata controller is not ready"
           content:
             application/json:
               schema:
@@ -6182,6 +6206,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "403":
           description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Automata controller is not ready"
           content:
             application/json:
               schema:
@@ -6456,6 +6486,12 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: "Automata not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "Automata controller is not ready"
           content:
             application/json:
               schema:
@@ -8681,18 +8717,36 @@ components:
         host:
           type: string
           description: "Hostname where scheduler is running"
+        port:
+          type: integer
+          description: "Scheduler health port (0 when not exposed)"
         status:
           type: string
           enum: ["active", "inactive", "unknown"]
           description: "Scheduler status (active = holds lock and scheduling)"
+        automataController:
+          $ref: "#/components/schemas/AutomataControllerStatus"
         startedAt:
           type: string
           description: "RFC3339 timestamp when scheduler started"
       required:
         - instanceId
         - host
+        - port
         - status
         - startedAt
+
+    AutomataControllerStatus:
+      type: object
+      description: "Scheduler-owned Automata controller readiness"
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum: ["ready", "disabled", "unavailable", "unknown"]
+        message:
+          type: string
 
     CoordinatorStatusResponse:
       type: object
@@ -12093,6 +12147,8 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
+        automataController:
+          $ref: "#/components/schemas/AutomataControllerStatus"
 
     AutomataListResponse:
       type: object
@@ -12131,6 +12187,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AgentMessage"
+        automataController:
+          $ref: "#/components/schemas/AutomataControllerStatus"
 
     AutomataSpecResponse:
       type: object

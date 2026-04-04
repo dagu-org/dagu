@@ -137,11 +137,12 @@ func (f *finder) processInstanceFile(ctx context.Context, path string) *exec.Hos
 	}
 
 	return &exec.HostInfo{
-		ID:        instance.ID,
-		Host:      instance.Host,
-		Port:      instance.Port,
-		Status:    instance.Status,
-		StartedAt: instance.StartedAt,
+		ID:                 instance.ID,
+		Host:               instance.Host,
+		Port:               instance.Port,
+		Status:             instance.Status,
+		StartedAt:          instance.StartedAt,
+		AutomataController: instance.AutomataController,
 	}
 }
 

@@ -675,13 +675,38 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 		}
 	}
 	sched.SetDAGRunLeaseStore(c.DAGRunLeaseStore)
-	if automataService, err := c.newSchedulerAutomataService(dr, schedulerRunStore, schedulerRunMgr, coordinatorCli); err != nil {
-		logger.Warn(c.Context, "Failed to initialize automata service for scheduler", tag.Error(err))
-	} else {
+	automataEnabled, err := c.automataEnabled()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine automata enablement: %w", err)
+	}
+	if automataEnabled {
+		automataService, err := c.newSchedulerAutomataService(dr, schedulerRunStore, schedulerRunMgr, coordinatorCli)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize automata service for scheduler: %w", err)
+		}
+		if err := automataService.ValidateController(); err != nil {
+			return nil, fmt.Errorf("invalid automata controller configuration: %w", err)
+		}
 		sched.SetAutomataService(automataService)
+		sched.SetAutomataController(&exec.AutomataControllerInfo{
+			State: exec.AutomataControllerStateReady,
+		})
+	} else {
+		sched.SetAutomataController(&exec.AutomataControllerInfo{
+			State:   exec.AutomataControllerStateDisabled,
+			Message: "Automata is disabled in agent settings",
+		})
 	}
 	sched.SetDispatchTaskStore(c.DispatchTaskStore)
 	return sched, nil
+}
+
+func (c *Context) automataEnabled() (bool, error) {
+	store, err := fileagentconfig.New(c.Config.Paths.DataDir)
+	if err != nil {
+		return false, err
+	}
+	return store.IsEnabled(c.Context), nil
 }
 
 func (c *Context) newSchedulerAutomataService(

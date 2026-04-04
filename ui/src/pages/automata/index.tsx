@@ -35,6 +35,8 @@ type AutomataSummary = components['schemas']['AutomataSummary'];
 type AutomataTask = components['schemas']['AutomataTask'];
 type AutomataKindValue = components['schemas']['AutomataKind'];
 type AutomataDisplayState = components['schemas']['AutomataDisplayStatus'];
+type AutomataControllerStatus =
+  components['schemas']['AutomataControllerStatus'];
 
 const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
 const DEFAULT_AUTOMATA_KIND: AutomataKindValue = AutomataKind.workflow;
@@ -267,6 +269,27 @@ function DAGNameMultiSelect({
 
 function quoteYAML(value: string): string {
   return JSON.stringify(value.trim());
+}
+
+function automataControllerMessage(
+  status?: AutomataControllerStatus
+): string | undefined {
+  if (!status) {
+    return 'Scheduler controller readiness is unknown.';
+  }
+  if (status.message) {
+    return status.message;
+  }
+  switch (status.state) {
+    case 'ready':
+      return 'Automata controller is ready.';
+    case 'disabled':
+      return 'Automata is disabled in agent settings.';
+    case 'unavailable':
+      return 'No active scheduler with a ready Automata controller is available.';
+    default:
+      return 'Scheduler controller readiness is unknown.';
+  }
 }
 
 function buildAutomataSpec(input: {
@@ -561,13 +584,20 @@ function AutomataPage(): React.ReactElement {
   const automataKind = detail?.definition?.kind ?? DEFAULT_AUTOMATA_KIND;
   const serviceKind = isServiceKind(automataKind);
   const serviceActivated = serviceKind && !!detail?.state?.activatedAt;
+  const automataController = detail?.automataController;
+  const runtimeControllerReady = automataController?.state === 'ready';
+  const runtimeControllerMessage = automataControllerMessage(automataController);
   const displayStatus =
     detail?.state?.displayStatus ?? detail?.state?.state ?? '';
   const canStartTask = serviceKind
-    ? lifecycleState === 'idle' && !serviceActivated
-    : lifecycleState === 'idle' || lifecycleState === 'finished';
+    ? runtimeControllerReady &&
+      lifecycleState === 'idle' &&
+      !serviceActivated
+    : runtimeControllerReady &&
+      (lifecycleState === 'idle' || lifecycleState === 'finished');
   const canSendOperatorMessage =
     !!detail &&
+    runtimeControllerReady &&
     !detail.state.pendingPrompt &&
     (serviceKind
       ? serviceActivated && lifecycleState !== 'paused'
@@ -575,9 +605,10 @@ function AutomataPage(): React.ReactElement {
         lifecycleState === 'waiting' ||
         lifecycleState === 'paused');
   const canPause = serviceKind
-    ? serviceActivated && lifecycleState !== 'paused'
-    : lifecycleState === 'running' || lifecycleState === 'waiting';
-  const canResume = lifecycleState === 'paused';
+    ? runtimeControllerReady && serviceActivated && lifecycleState !== 'paused'
+    : runtimeControllerReady &&
+      (lifecycleState === 'running' || lifecycleState === 'waiting');
+  const canResume = runtimeControllerReady && lifecycleState === 'paused';
   const taskSummary = React.useMemo(
     () => taskCounts(detail?.state?.tasks),
     [detail?.state?.tasks]
@@ -1570,6 +1601,12 @@ function AutomataPage(): React.ReactElement {
                 {error ? (
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     {error}
+                  </div>
+                ) : null}
+
+                {!runtimeControllerReady ? (
+                  <div className="rounded-lg border border-amber-300/40 bg-amber-100/70 px-3 py-2 text-sm text-amber-950 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+                    {runtimeControllerMessage}
                   </div>
                 ) : null}
 
