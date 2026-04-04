@@ -1189,6 +1189,7 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 	registrar.SetRefreshMode(sse.TopicTypeDAGRuns, sse.TopicRefreshModeOnDemand)
 	registrar.SetRefreshMode(sse.TopicTypeQueueItems, sse.TopicRefreshModeOnDemand)
 	registrar.SetRefreshMode(sse.TopicTypeQueues, sse.TopicRefreshModeOnDemand)
+	registrar.SetPublishOnWake(sse.TopicTypeDAGRuns, true)
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {

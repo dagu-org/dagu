@@ -94,6 +94,7 @@ type Multiplexer struct {
 	topics              map[string]*multiplexTopic
 	fetchers            map[TopicType]FetchFunc
 	refreshModes        map[TopicType]TopicRefreshMode
+	publishOnWake       map[TopicType]bool
 	authorizers         map[TopicType]TopicAuthorizer
 	maxClients          int
 	maxTopicsPerConn    int
@@ -134,6 +135,7 @@ func NewMultiplexer(cfg StreamConfig, metrics *Metrics) *Multiplexer {
 		topics:              make(map[string]*multiplexTopic),
 		fetchers:            make(map[TopicType]FetchFunc),
 		refreshModes:        make(map[TopicType]TopicRefreshMode),
+		publishOnWake:       make(map[TopicType]bool),
 		authorizers:         make(map[TopicType]TopicAuthorizer),
 		maxClients:          cfg.MaxClients,
 		maxTopicsPerConn:    cfg.MaxTopicsPerConnection,
@@ -164,6 +166,19 @@ func (m *Multiplexer) SetRefreshMode(topicType TopicType, mode TopicRefreshMode)
 		return
 	}
 	m.refreshModes[topicType] = mode
+}
+
+// SetPublishOnWake forces an event to be emitted for explicit wakeups even when
+// the fetched payload hash is unchanged. This is useful for invalidation-only
+// consumers whose canonical data may span multiple pages beyond the topic payload.
+func (m *Multiplexer) SetPublishOnWake(topicType TopicType, enabled bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !enabled {
+		delete(m.publishOnWake, topicType)
+		return
+	}
+	m.publishOnWake[topicType] = true
 }
 
 // RegisterAuthorizer registers an optional topic-specific authorizer.
@@ -550,7 +565,13 @@ func (m *Multiplexer) getOrCreateTopicForMutation(parsed ParsedTopic) (*multiple
 		return nil, false, fmt.Errorf("no fetcher registered for topic type: %s", parsed.Type)
 	}
 
-	topic := newMultiplexTopic(m, parsed, fetcher, m.refreshModeFor(parsed.Type))
+	topic := newMultiplexTopic(
+		m,
+		parsed,
+		fetcher,
+		m.refreshModeFor(parsed.Type),
+		m.shouldPublishOnWake(parsed.Type),
+	)
 	m.topics[parsed.Key] = topic
 	return topic, true, nil
 }
@@ -560,6 +581,10 @@ func (m *Multiplexer) refreshModeFor(topicType TopicType) TopicRefreshMode {
 		return mode
 	}
 	return TopicRefreshModePolling
+}
+
+func (m *Multiplexer) shouldPublishOnWake(topicType TopicType) bool {
+	return m.publishOnWake[topicType]
 }
 
 func (m *Multiplexer) retireTopicIfUnused(topic *multiplexTopic) {
@@ -986,6 +1011,7 @@ type multiplexTopic struct {
 	identifier        string
 	fetcher           FetchFunc
 	refreshMode       TopicRefreshMode
+	publishOnWake     bool
 	clientsMu         sync.RWMutex
 	sessions          map[*streamSession]struct{}
 	retiring          bool
@@ -999,7 +1025,13 @@ type multiplexTopic struct {
 	currentInterval   time.Duration
 }
 
-func newMultiplexTopic(mux *Multiplexer, parsed ParsedTopic, fetcher FetchFunc, refreshMode TopicRefreshMode) *multiplexTopic {
+func newMultiplexTopic(
+	mux *Multiplexer,
+	parsed ParsedTopic,
+	fetcher FetchFunc,
+	refreshMode TopicRefreshMode,
+	publishOnWake bool,
+) *multiplexTopic {
 	policy := backoff.NewExponentialBackoffPolicy(time.Second)
 	policy.MaxInterval = 30 * time.Second
 
@@ -1010,6 +1042,7 @@ func newMultiplexTopic(mux *Multiplexer, parsed ParsedTopic, fetcher FetchFunc, 
 		identifier:      parsed.Identifier,
 		fetcher:         fetcher,
 		refreshMode:     refreshMode,
+		publishOnWake:   publishOnWake,
 		sessions:        make(map[*streamSession]struct{}),
 		stopCh:          make(chan struct{}),
 		notifyCh:        make(chan struct{}, 1),
@@ -1090,7 +1123,7 @@ func (t *multiplexTopic) start() {
 				return
 			case <-timerCh:
 				timerCh = nil
-				t.poll()
+				t.poll(false)
 				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
 					t.resetTimer(timer, &timerCh, delay)
 					continue
@@ -1099,7 +1132,7 @@ func (t *multiplexTopic) start() {
 					t.resetTimer(timer, &timerCh, t.currentInterval)
 				}
 			case <-t.notifyCh:
-				t.poll()
+				t.poll(t.publishOnWake)
 				if delay, shouldRetry := t.nextRetryDelay(); shouldRetry {
 					t.resetTimer(timer, &timerCh, delay)
 					continue
@@ -1157,7 +1190,7 @@ func (t *multiplexTopic) nextRetryDelay() (time.Duration, bool) {
 	return delay, true
 }
 
-func (t *multiplexTopic) poll() {
+func (t *multiplexTopic) poll(forcePublish bool) {
 	if time.Now().Before(t.backoffUntil) {
 		return
 	}
@@ -1186,7 +1219,7 @@ func (t *multiplexTopic) poll() {
 
 	hash := computeHash(payload)
 	t.clientsMu.Lock()
-	if hash == t.lastHash {
+	if hash == t.lastHash && !forcePublish {
 		t.clientsMu.Unlock()
 		return
 	}

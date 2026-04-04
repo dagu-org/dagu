@@ -294,7 +294,7 @@ func TestMultiplexTopicSendSnapshotDropsRemovedTopics(t *testing.T) {
 
 	topic := newMultiplexTopic(mux, parsed, func(_ context.Context, identifier string) (any, error) {
 		return map[string]string{"id": identifier}, nil
-	}, TopicRefreshModePolling)
+	}, TopicRefreshModePolling, false)
 	session, err := newStreamSession(httptest.NewRecorder(), mux)
 	require.NoError(t, err)
 	require.True(t, session.addTopic(topic))
@@ -465,6 +465,39 @@ func TestMultiplexerOnDemandTopicOnlyRefetchesOnWake(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return fetches.Load() == 2
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestMultiplexerPublishOnWakeEmitsMessageEvenWhenPayloadHashIsUnchanged(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDAGRuns, func(_ context.Context, identifier string) (any, error) {
+		return map[string]any{
+			"id":      identifier,
+			"dagRuns": []string{"same"},
+		}, nil
+	})
+	mux.SetRefreshMode(TopicTypeDAGRuns, TopicRefreshModeOnDemand)
+	mux.SetPublishOnWake(TopicTypeDAGRuns, true)
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(context.Background(), recorder, []string{"dagruns:fromDate=1&toDate=2"}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+	defer mux.removeSession(result.session)
+
+	topic := mux.topics["dagruns:fromDate=1&toDate=2"]
+	require.NotNil(t, topic)
+
+	require.NoError(t, topic.sendSnapshot(context.Background(), result.session, 1))
+	first := result.session.popNext()
+	require.NotNil(t, first)
+
+	mux.WakeTopic(TopicTypeDAGRuns, "fromDate=1&toDate=2")
+
+	require.Eventually(t, func() bool {
+		return result.session.popNext() != nil
 	}, time.Second, 10*time.Millisecond)
 }
 
