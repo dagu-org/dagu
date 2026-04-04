@@ -44,6 +44,7 @@ type TopicType string
 // Topic type constants. Each has a registered fetcher function.
 // Identifier formats:
 //   - TopicTypeDAGRun: "dagName/dagRunId"
+//   - TopicTypeSubDAGRun: "dagName/dagRunId/subDAGRunId"
 //   - TopicTypeDAG: "fileName"
 //   - TopicTypeDAGHistory: "fileName"
 //   - TopicTypeDAGRunLogs: "dagName/dagRunId"
@@ -56,6 +57,7 @@ type TopicType string
 //   - TopicTypeDocTree: URL query string (e.g., "page=1&perPage=200")
 const (
 	TopicTypeDAGRun     TopicType = "dagrun"
+	TopicTypeSubDAGRun  TopicType = "subdagrun"
 	TopicTypeDAG        TopicType = "dag"
 	TopicTypeDAGHistory TopicType = "daghistory"
 	TopicTypeDAGRunLogs TopicType = "dagrunlogs"

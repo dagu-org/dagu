@@ -16,12 +16,12 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGSpec,
-} from '../../../../hooks/useAppLive';
 import { useContentEditor } from '../../../../hooks/useContentEditor';
+import { useDAGSSE } from '../../../../hooks/useDAGSSE';
+import {
+  sseFallbackOptions,
+  useSSECacheSync,
+} from '../../../../hooks/useSSECacheSync';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
@@ -83,7 +83,7 @@ function DAGSpec({ fileName, localDags }: Props) {
     [setCookie, setFlowchart]
   );
 
-  const liveState = useLiveConnection(!!fileName);
+  const dagSSE = useDAGSSE(fileName, !!fileName);
 
   // Fetch spec — SWR is the single source of truth, refreshed by live invalidations
   const {
@@ -102,9 +102,17 @@ function DAGSpec({ fileName, localDags }: Props) {
         },
       },
     },
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(dagSSE)
   );
-  useLiveDAGSpec(fileName, mutateSpec, !!fileName);
+  useSSECacheSync(dagSSE, mutateSpec, (next) =>
+    next.spec === undefined
+      ? undefined
+      : {
+          dag: next.dag,
+          errors: next.errors ?? [],
+          spec: next.spec,
+        }
+  );
 
   // Server spec — SWR cache stays current via live invalidations or polling fallback
   const serverSpec = data?.spec ?? null;

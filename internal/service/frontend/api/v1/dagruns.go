@@ -2882,6 +2882,39 @@ func (a *API) GetDAGRunDetailsData(ctx context.Context, identifier string) (any,
 	return a.getDAGRunDetailsData(ctx, dagName, dagRunId)
 }
 
+// GetSubDAGRunDetailsData returns sub DAG run details for SSE.
+// Identifier format: "dagName/dagRunId/subDAGRunId"
+func (a *API) GetSubDAGRunDetailsData(ctx context.Context, identifier string) (any, error) {
+	parts := strings.SplitN(identifier, "/", 3)
+	if len(parts) != 3 {
+		return nil, fmt.Errorf(
+			"invalid identifier format: %s (expected 'dagName/dagRunId/subDAGRunId')",
+			identifier,
+		)
+	}
+
+	root := exec.NewDAGRunRef(parts[0], parts[1])
+	dagStatus, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint:    "/dag-runs/{name}/{dagRunId}/sub/{subDAGRunId}",
+		dagName:     parts[0],
+		dagRunID:    parts[1],
+		subDAGRunID: parts[2],
+	}, func(readCtx context.Context) (*exec.DAGRunStatus, error) {
+		return a.dagRunMgr.FindSubDAGRunStatus(readCtx, root, parts[2])
+	})
+	if err != nil {
+		return nil, fmt.Errorf(
+			"sub dag-run ID %s not found for DAG %s",
+			parts[2],
+			parts[0],
+		)
+	}
+
+	return api.GetSubDAGRunDetails200JSONResponse{
+		DagRunDetails: ToDAGRunDetails(*dagStatus),
+	}, nil
+}
+
 // GetDAGRunLogsData returns DAG run logs for SSE.
 // Identifier format: "dagName/dagRunId" or "dagName/dagRunId?tail=N"
 func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, error) {

@@ -8,11 +8,11 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGSSE } from '../../../../hooks/useDAGSSE';
 import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAG,
-} from '../../../../hooks/useAppLive';
+  sseFallbackOptions,
+  useSSECacheSync,
+} from '../../../../hooks/useSSECacheSync';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
@@ -47,12 +47,18 @@ type Props = {
 
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
 
-function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactElement | null {
+function DAGDetailsPanel({
+  fileName,
+  onClose,
+  onNavigate,
+}: Props): React.ReactElement | null {
   const navigate = useNavigate();
   const appBarContext = useContext(AppBarContext);
   const { setContext } = usePageContext();
 
-  const [currentDAGRun, setCurrentDAGRun] = useState<DAGRunDetails | undefined>();
+  const [currentDAGRun, setCurrentDAGRun] = useState<
+    DAGRunDetails | undefined
+  >();
   const [activeTab, setActiveTab] = useState('status');
   const [notFound, setNotFound] = useState(false);
 
@@ -69,10 +75,10 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     };
   }, [fileName, setContext]);
 
-  const liveState = useLiveConnection(!!fileName);
+  const dagSSE = useDAGSSE(fileName, !!fileName);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   // Fetch DAG details — SWR is the single source of truth, refreshed by live invalidations
-  const sseOpts = liveFallbackOptions(liveState);
+  const sseOpts = sseFallbackOptions(dagSSE);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
     {
@@ -83,7 +89,7 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
     },
     { ...sseOpts, refreshInterval: notFound ? 0 : sseOpts.refreshInterval }
   );
-  useLiveDAG(fileName, mutate, !!fileName);
+  useSSECacheSync(dagSSE, mutate);
 
   // Track data loading state and handle 404 errors
   useEffect(() => {
@@ -141,7 +147,10 @@ function DAGDetailsPanel({ fileName, onClose, onNavigate }: Props): React.ReactE
         return;
       }
 
-      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && onNavigate) {
+      if (
+        (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+        onNavigate
+      ) {
         event.preventDefault();
         onNavigate(event.key === 'ArrowDown' ? 'down' : 'up');
       }

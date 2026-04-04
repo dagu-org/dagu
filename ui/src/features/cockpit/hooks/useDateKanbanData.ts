@@ -1,5 +1,4 @@
 import { useContext, useMemo } from 'react';
-import { useLiveConnection } from '@/hooks/useAppLive';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
@@ -89,7 +88,6 @@ export function useDateKanbanData(
     [fromDate, remoteNode, tag, toDate]
   );
 
-  useLiveConnection(isToday);
   const { data, error, refresh } = useExactDAGRuns({
     query: dagRunsQuery,
     liveEnabled: isLive,

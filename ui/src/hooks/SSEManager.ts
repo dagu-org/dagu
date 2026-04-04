@@ -117,6 +117,16 @@ export function endpointToTopic(endpoint: string): string {
     return buildTopic('dagrun', `${segments[2]}/${segments[3]}`);
   }
   if (
+    segments.length === 6 &&
+    segments[1] === 'dag-runs' &&
+    segments[4] === 'sub-dag-runs'
+  ) {
+    return buildTopic(
+      'subdagrun',
+      `${segments[2]}/${segments[3]}/${segments[5]}`
+    );
+  }
+  if (
     segments.length === 5 &&
     segments[1] === 'dag-runs' &&
     segments[4] === 'logs'

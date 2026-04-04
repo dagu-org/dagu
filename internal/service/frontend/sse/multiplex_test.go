@@ -34,6 +34,15 @@ func TestParseTopicRejectsMalformedQuery(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParseTopicAcceptsSubDAGRunIdentifier(t *testing.T) {
+	parsed, err := ParseTopic("subdagrun:billing/run-1/sub-1")
+	require.NoError(t, err)
+
+	assert.Equal(t, TopicTypeSubDAGRun, parsed.Type)
+	assert.Equal(t, "billing/run-1/sub-1", parsed.Identifier)
+	assert.Equal(t, "subdagrun:billing/run-1/sub-1", parsed.Key)
+}
+
 func TestParseTopicRejectsDAGTraversalIdentifiers(t *testing.T) {
 	tests := []string{
 		"dag:../../tmp/secret.yaml",

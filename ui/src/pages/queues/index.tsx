@@ -9,11 +9,11 @@ import { DAGRunDetailsModal } from '../../features/dag-runs/components/dag-run-d
 import QueueList from '../../features/queues/components/QueueList';
 import QueueMetrics from '../../features/queues/components/QueueMetrics';
 import { useQuery } from '../../hooks/api';
+import { useQueuesListSSE } from '../../hooks/useQueuesListSSE';
 import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveQueues,
-} from '../../hooks/useAppLive';
+  sseFallbackOptions,
+  useSSECacheSync,
+} from '../../hooks/useSSECacheSync';
 import Title from '../../ui/Title';
 
 function Queues() {
@@ -100,7 +100,7 @@ function Queues() {
     appBarContext.setTitle('Queue Dashboard');
   }, [appBarContext]);
 
-  const liveState = useLiveConnection();
+  const queuesSSE = useQueuesListSSE();
 
   const { data, error, isLoading, mutate } = useQuery(
     '/queues',
@@ -111,9 +111,9 @@ function Queues() {
         },
       },
     },
-    liveFallbackOptions(liveState, 3000)
+    sseFallbackOptions(queuesSSE, 3000)
   );
-  useLiveQueues(mutate);
+  useSSECacheSync(queuesSSE, mutate);
 
   async function handleRefresh(): Promise<void> {
     await mutate();
@@ -141,10 +141,19 @@ function Queues() {
     const queues = data?.queues || [];
     const globalQueuesList = queues.filter((q) => q.type === 'global');
 
-    const totalRunning = queues.reduce((sum, q) => sum + (q.runningCount || 0), 0);
-    const totalQueued = queues.reduce((sum, q) => sum + (q.queuedCount || 0), 0);
+    const totalRunning = queues.reduce(
+      (sum, q) => sum + (q.runningCount || 0),
+      0
+    );
+    const totalQueued = queues.reduce(
+      (sum, q) => sum + (q.queuedCount || 0),
+      0
+    );
 
-    const globalRunning = globalQueuesList.reduce((sum, q) => sum + (q.runningCount || 0), 0);
+    const globalRunning = globalQueuesList.reduce(
+      (sum, q) => sum + (q.runningCount || 0),
+      0
+    );
     const globalCapacity = globalQueuesList
       .filter((q) => q.maxConcurrency)
       .reduce((sum, q) => sum + (q.maxConcurrency || 0), 0);
@@ -152,11 +161,16 @@ function Queues() {
     return {
       globalQueues: globalQueuesList.length,
       dagBasedQueues: queues.filter((q) => q.type === 'dag-based').length,
-      activeQueues: queues.filter((q) => (q.runningCount || 0) > 0 || (q.queuedCount || 0) > 0).length,
+      activeQueues: queues.filter(
+        (q) => (q.runningCount || 0) > 0 || (q.queuedCount || 0) > 0
+      ).length,
       totalRunning,
       totalQueued,
       totalActive: totalRunning + totalQueued,
-      utilization: globalCapacity > 0 ? Math.round((globalRunning / globalCapacity) * 100) : 0,
+      utilization:
+        globalCapacity > 0
+          ? Math.round((globalRunning / globalCapacity) * 100)
+          : 0,
     };
   }, [data?.queues]);
 

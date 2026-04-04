@@ -6,25 +6,28 @@ const getMock = vi.fn();
 const client = {
   GET: getMock,
 };
+const { useDAGRunsListSSEMock } = vi.hoisted(() => ({
+  useDAGRunsListSSEMock: vi.fn(() => ({
+    data: null,
+    error: null,
+    isConnected: false,
+    isConnecting: false,
+    shouldUseFallback: true,
+  })),
+}));
 
 vi.mock('@/hooks/api', () => ({
   useClient: () => client,
   useQuery: vi.fn(),
 }));
 
-vi.mock('@/hooks/useAppLive', () => ({
-  liveFallbackOptions: vi.fn(),
-  useLiveConnection: vi.fn(() => ({
-    isConnected: false,
-    isConnecting: false,
-    shouldUseFallback: true,
-    error: null,
-  })),
-  useLiveDAGRuns: vi.fn(),
-  useLiveInvalidation: vi.fn(),
+vi.mock('@/hooks/useDAGRunsListSSE', () => ({
+  useDAGRunsListSSE: useDAGRunsListSSEMock,
 }));
 
-function createQuery(overrides: Partial<DAGRunListQuery> = {}): DAGRunListQuery {
+function createQuery(
+  overrides: Partial<DAGRunListQuery> = {}
+): DAGRunListQuery {
   return {
     remoteNode: 'local',
     fromDate: 100,
@@ -45,6 +48,7 @@ function createDeferred<T>() {
 describe('useExactDAGRuns', () => {
   beforeEach(() => {
     getMock.mockReset();
+    useDAGRunsListSSEMock.mockClear();
   });
 
   afterEach(() => {
@@ -217,7 +221,9 @@ describe('useExactDAGRuns', () => {
       .mockImplementationOnce(() => firstPage.promise)
       .mockImplementationOnce(() => secondPage.promise);
 
-    const { result } = renderHook(() => useExactDAGRuns({ query: createQuery() }));
+    const { result } = renderHook(() =>
+      useExactDAGRuns({ query: createQuery() })
+    );
 
     await waitFor(() => {
       expect(getMock).toHaveBeenCalledTimes(1);
@@ -242,7 +248,9 @@ describe('useExactDAGRuns', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.data).toEqual([{ name: 'first', dagRunId: 'run-1' }]);
+      expect(result.current.data).toEqual([
+        { name: 'first', dagRunId: 'run-1' },
+      ]);
     });
 
     expect(result.current.isLoading).toBe(false);

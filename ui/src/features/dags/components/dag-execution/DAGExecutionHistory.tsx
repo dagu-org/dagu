@@ -6,14 +6,19 @@
 import { useErrorModal } from '@/components/ui/error-modal';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { components, NodeStatus, Status, Stream } from '../../../../api/v1/schema';
+import {
+  components,
+  NodeStatus,
+  Status,
+  Stream,
+} from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
+import { useDAGHistorySSE } from '../../../../hooks/useDAGHistorySSE';
 import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGRuns,
-} from '../../../../hooks/useAppLive';
+  sseFallbackOptions,
+  useSSECacheSync,
+} from '../../../../hooks/useSSECacheSync';
 import { toMermaidNodeId } from '../../../../lib/utils';
 import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
@@ -43,7 +48,7 @@ function DAGExecutionHistory({
 }: Omit<Props, 'isInModal' | 'activeTab'>) {
   const appBarContext = React.useContext(AppBarContext);
 
-  const liveState = useLiveConnection(!!fileName);
+  const historySSE = useDAGHistorySSE(fileName, !!fileName);
   // Fetch execution history data — SWR is the single source of truth, refreshed by live invalidations
   const { data, mutate } = useQuery(
     '/dags/{fileName}/dag-runs',
@@ -57,9 +62,9 @@ function DAGExecutionHistory({
         },
       },
     },
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(historySSE)
   );
-  useLiveDAGRuns(mutate, !!fileName);
+  useSSECacheSync(historySSE, mutate);
 
   // Show loading indicator while fetching data
   if (!data) {
@@ -292,9 +297,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
       }
 
       // Find the clicked step
-      const n = dagRun.nodes?.find(
-        (n) => toMermaidNodeId(n.step.name) == id
-      );
+      const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
       if (!n) return;
 
       // If it's a sub dagRun, navigate to its details
@@ -336,9 +339,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
       }
 
       // Find the right-clicked step
-      const n = dagRun.nodes?.find(
-        (n) => toMermaidNodeId(n.step.name) == id
-      );
+      const n = dagRun.nodes?.find((n) => toMermaidNodeId(n.step.name) == id);
 
       if (n) {
         setSelectedStep(n.step);
@@ -396,8 +397,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                     isOpen: true,
                     logType: 'step',
                     stepName: actualStepName,
-                    dagRunId:
-                      dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                    dagRunId: dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
                     stream: isStderr ? Stream.stderr : Stream.stdout,
                   });
                 }}

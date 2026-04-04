@@ -52,7 +52,9 @@ function snapshotState(state: SSEConnectionState): SSEConnectionState {
   };
 }
 
-function lastState(states: SSEConnectionState[]): SSEConnectionState | undefined {
+function lastState(
+  states: SSEConnectionState[]
+): SSEConnectionState | undefined {
   return states[states.length - 1];
 }
 
@@ -67,6 +69,10 @@ describe('endpointToTopic', () => {
         'dagruns:page=2&status=running',
       ],
       ['/events/dag-runs/mydag/run-1', 'dagrun:mydag/run-1'],
+      [
+        '/events/dag-runs/mydag/run-1/sub-dag-runs/sub-1',
+        'subdagrun:mydag/run-1/sub-1',
+      ],
       [
         '/events/dag-runs/mydag/run-1/logs?tail=500',
         'dagrunlogs:mydag/run-1?tail=500',
