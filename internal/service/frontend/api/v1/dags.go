@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	osrt "runtime"
 	"sort"
 	"strconv"
@@ -1109,13 +1111,35 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 		}
 	}
 
+	return a.startPreparedDAGRunWithOptions(ctx, dag, opts, opts.params)
+}
+
+func (a *API) startRescheduledDAGRunWithOptions(
+	ctx context.Context,
+	dag *core.DAG,
+	opts startDAGRunOptions,
+	preservedParams string,
+) error {
+	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
+		return err
+	}
+
+	return a.startPreparedDAGRunWithOptions(ctx, dag, opts, preservedParams)
+}
+
+func (a *API) startPreparedDAGRunWithOptions(
+	ctx context.Context,
+	dag *core.DAG,
+	opts startDAGRunOptions,
+	dispatchParams string,
+) error {
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
 	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 		timeout := 5 * time.Second
 		if osrt.GOOS == "windows" {
 			timeout = 10 * time.Second
 		}
-		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, opts.params, opts.tags)
+		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, dispatchParams, opts.tags)
 	}
 
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
@@ -1123,13 +1147,26 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 	if opts.triggerType != core.TriggerTypeUnknown {
 		triggerTypeStr = opts.triggerType.String()
 	}
+	target := opts.target
+	fromRunID := opts.fromRunID
+	if fromRunID != "" && dispatchParams != "" && len(dag.YamlData) > 0 {
+		if dag.Location == "" || fileMissing(dag.Location) {
+			tempPath, err := writeInlineRescheduleSpec(dag.Name, opts.dagRunID, dag.YamlData)
+			if err != nil {
+				return fmt.Errorf("error preparing inline dag snapshot: %w", err)
+			}
+			dag.Location = tempPath
+			target = tempPath
+			fromRunID = ""
+		}
+	}
 	spec := a.subCmdBuilder.Start(dag, runtime.StartOptions{
-		Params:       opts.params,
+		Params:       dispatchParams,
 		DAGRunID:     opts.dagRunID,
 		Quiet:        true,
 		NameOverride: opts.nameOverride,
-		FromRunID:    opts.fromRunID,
-		Target:       opts.target,
+		FromRunID:    fromRunID,
+		Target:       target,
 		TriggerType:  triggerTypeStr,
 		Tags:         opts.tags,
 	})
@@ -1152,6 +1189,28 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 	}
 
 	return nil
+}
+
+func writeInlineRescheduleSpec(name, dagRunID string, data []byte) (string, error) {
+	tmpDir := filepath.Join(os.TempDir(), name, dagRunID)
+	if err := os.MkdirAll(tmpDir, 0o750); err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(tmpDir, fmt.Sprintf("%s.yaml", name))
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func fileMissing(path string) bool {
+	if path == "" {
+		return true
+	}
+	_, err := os.Stat(path)
+	return errors.Is(err, os.ErrNotExist)
 }
 
 func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRunRequestObject) (api.EnqueueDAGDAGRunResponseObject, error) {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/dagu-org/dagu/api/v1"
 	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/cmn/buildenv"
 	"github.com/dagu-org/dagu/internal/cmn/collections"
 	"github.com/dagu-org/dagu/internal/cmn/config"
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
@@ -483,6 +484,74 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 	}
 
 	return dag, cleanup, nil
+}
+
+func restoreDAGRunSnapshot(ctx context.Context, dag *core.DAG, status *exec.DAGRunStatus) (*core.DAG, string, error) {
+	quotedParams := spec.QuoteRuntimeParams(status.ParamsList, dag.ParamDefs)
+	dag.Params = quotedParams
+	dag.LoadDotEnv(ctx)
+
+	restored, err := rebuildDAGRunSnapshotFromYAML(ctx, dag)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return restored, strings.Join(quotedParams, " "), nil
+}
+
+func rebuildDAGRunSnapshotFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
+	if len(dag.YamlData) == 0 {
+		return dag, nil
+	}
+
+	buildEnvMap := buildenv.ToMap(dag.Env)
+	for key, value := range dag.PresolvedBuildEnv {
+		if buildEnvMap == nil {
+			buildEnvMap = make(map[string]string)
+		}
+		buildEnvMap[key] = value
+	}
+
+	presolvedBuildEnv, err := buildenv.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load presolved build env: %w", err)
+	}
+	for key, value := range presolvedBuildEnv {
+		if buildEnvMap == nil {
+			buildEnvMap = make(map[string]string)
+		}
+		buildEnvMap[key] = value
+	}
+
+	loadOpts := []spec.LoadOption{
+		spec.WithParams(dag.Params),
+		spec.SkipSchemaValidation(),
+	}
+	if len(buildEnvMap) > 0 {
+		loadOpts = append(loadOpts, spec.WithBuildEnv(buildEnvMap))
+	}
+	if len(dag.BaseConfigData) > 0 {
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent(dag.BaseConfigData))
+	}
+	if dag.Name != "" {
+		loadOpts = append(loadOpts, spec.WithName(dag.Name))
+	}
+
+	fresh, err := spec.LoadYAML(ctx, dag.YamlData, loadOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	dag.Env = fresh.Env
+	dag.Params = fresh.Params
+	dag.ParamsJSON = fresh.ParamsJSON
+	dag.SMTP = fresh.SMTP
+	dag.SSH = fresh.SSH
+	dag.RegistryAuths = fresh.RegistryAuths
+
+	core.InitializeDefaults(dag)
+
+	return dag, nil
 }
 
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
@@ -2276,7 +2345,10 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to read DAG snapshot: DAG data is nil")
 	}
 
-	dag.Params = status.ParamsList
+	dag, preservedParams, err := restoreDAGRunSnapshot(ctx, dag, status)
+	if err != nil {
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to restore DAG snapshot: %w", err)
+	}
 
 	nameOverride := strings.TrimSpace(opts.nameOverride)
 	if nameOverride != "" {
@@ -2311,12 +2383,12 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		slog.String("from-dag-run-id", sourceDagRunID),
 		tag.RunID(newDagRunID))
 
-	if err := a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
+	if err := a.startRescheduledDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		dagRunID:     newDagRunID,
 		nameOverride: nameOverride,
 		fromRunID:    sourceDagRunID,
 		target:       dagName,
-	}); err != nil {
+	}, preservedParams); err != nil {
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to start dag-run: %w", err)
 	}
 
