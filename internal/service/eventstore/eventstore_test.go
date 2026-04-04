@@ -24,8 +24,8 @@ func TestPersistedDAGRunEventTypeForStatus(t *testing.T) {
 		ok     bool
 	}{
 		{name: "NotStarted", status: core.NotStarted, ok: false},
-		{name: "Queued", status: core.Queued, ok: false},
-		{name: "Running", status: core.Running, ok: false},
+		{name: "Queued", status: core.Queued, want: TypeDAGRunQueued, ok: true},
+		{name: "Running", status: core.Running, want: TypeDAGRunRunning, ok: true},
 		{name: "Rejected", status: core.Rejected, want: TypeDAGRunRejected, ok: true},
 		{name: "Waiting", status: core.Waiting, want: TypeDAGRunWaiting, ok: true},
 		{name: "Succeeded", status: core.Succeeded, want: TypeDAGRunSucceeded, ok: true},
@@ -79,13 +79,16 @@ func TestStableIDUsesCollisionSafeFraming(t *testing.T) {
 	)
 }
 
-func TestNewDAGRunEventEmbedsNotificationSnapshot(t *testing.T) {
+func TestNewDAGRunEventEmbedsDAGRunSnapshot(t *testing.T) {
 	t.Parallel()
 
 	status := &exec.DAGRunStatus{
+		Root:       exec.NewDAGRunRef("root-briefing", "root-run"),
+		Parent:     exec.NewDAGRunRef("root-briefing", "parent-run"),
 		Name:       "briefing",
 		DAGRunID:   "run-1",
 		AttemptID:  "attempt-1",
+		ProcGroup:  "priority-high",
 		Status:     core.Failed,
 		Error:      "boom",
 		Log:        "/tmp/run.log",
@@ -105,17 +108,31 @@ func TestNewDAGRunEventEmbedsNotificationSnapshot(t *testing.T) {
 		},
 	}
 
-	event := NewDAGRunEvent(Source{Service: SourceServiceServer, Instance: "test"}, TypeDAGRunFailed, status, map[string]any{"reason": "boom"})
+	event := NewDAGRunEvent(Source{Service: SourceServiceServer, Instance: "test"}, TypeDAGRunFailed, status, map[string]any{
+		"reason":           "boom",
+		DAGFileNameDataKey: "briefing.yaml",
+	})
 	require.NotNil(t, event)
 	require.NotNil(t, event.Data)
 	assert.Equal(t, "boom", event.Data["reason"])
 
-	restored, err := NotificationStatusFromEvent(event)
+	snapshot, err := DAGRunSnapshotFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, "briefing.yaml", snapshot.DAGFile)
+	assert.Equal(t, status.Root.Name, snapshot.Root.Name)
+	assert.Equal(t, status.Parent.ID, snapshot.Parent.DAGRunID)
+	assert.Equal(t, status.ProcGroup, snapshot.ProcGroup)
+
+	restored, err := DAGRunStatusFromEvent(event)
 	require.NoError(t, err)
 	require.NotNil(t, restored)
+	assert.Equal(t, status.Root, restored.Root)
+	assert.Equal(t, status.Parent, restored.Parent)
 	assert.Equal(t, status.Name, restored.Name)
 	assert.Equal(t, status.DAGRunID, restored.DAGRunID)
 	assert.Equal(t, status.AttemptID, restored.AttemptID)
+	assert.Equal(t, status.ProcGroup, restored.ProcGroup)
 	assert.Equal(t, status.Status, restored.Status)
 	assert.Equal(t, status.Error, restored.Error)
 	assert.Equal(t, status.Log, restored.Log)

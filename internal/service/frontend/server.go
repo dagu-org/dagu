@@ -111,6 +111,7 @@ type Server struct {
 	authService        *authservice.Service
 	auditService       *audit.Service
 	auditStore         *fileaudit.Store
+	eventService       *eventstore.Service
 	syncService        gitsync.Service
 	listener           net.Listener
 	appStream          *sse.AppStreamService
@@ -410,6 +411,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		authService:        authSvc,
 		auditService:       auditSvc,
 		auditStore:         auditStore,
+		eventService:       eventSvc,
 		syncService:        syncSvc,
 		metricsRegistry:    mr,
 		dagStore:           dr,
@@ -1144,6 +1146,7 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		SlowClientTimeout:      srv.config.Server.SSE.SlowClientTimeout,
 	}, sseMetrics)
 	srv.registerDedicatedSSEFetchers(srv.sseMultiplexer)
+	sse.StartDAGRunEventInvalidation(srv.sseMultiplexer.Context(), srv.eventService, srv.sseMultiplexer, slog.Default(), time.Second)
 
 	multiplexHandler := sse.NewMultiplexHandler(srv.sseMultiplexer, srv.remoteNodeResolver)
 	appHandler := sse.NewAppHandler(srv.appStream, srv.remoteNodeResolver)

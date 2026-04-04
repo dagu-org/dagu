@@ -18,10 +18,11 @@ import (
 	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
+var _ eventstore.DAGRunReader = (*Store)(nil)
 var _ eventstore.NotificationReader = (*Store)(nil)
 
-func (s *Store) NotificationHeadCursor(_ context.Context) (eventstore.NotificationCursor, error) {
-	cursor := eventstore.NotificationCursor{
+func (s *Store) DAGRunHeadCursor(_ context.Context) (eventstore.DAGRunCursor, error) {
+	cursor := eventstore.DAGRunCursor{
 		CommittedOffsets: make(map[string]int64),
 	}
 
@@ -48,9 +49,14 @@ func (s *Store) NotificationHeadCursor(_ context.Context) (eventstore.Notificati
 	return cursor.Normalize(), nil
 }
 
-func (s *Store) ReadNotificationEvents(_ context.Context, cursor eventstore.NotificationCursor) ([]*eventstore.Event, eventstore.NotificationCursor, error) {
+func (s *Store) NotificationHeadCursor(ctx context.Context) (eventstore.NotificationCursor, error) {
+	cursor, err := s.DAGRunHeadCursor(ctx)
+	return eventstore.NotificationCursor(cursor), err
+}
+
+func (s *Store) ReadDAGRunEvents(_ context.Context, cursor eventstore.DAGRunCursor) ([]*eventstore.Event, eventstore.DAGRunCursor, error) {
 	cursor = cursor.Normalize()
-	nextCursor := eventstore.NotificationCursor{
+	nextCursor := eventstore.DAGRunCursor{
 		LastInboxFile:    cursor.LastInboxFile,
 		CommittedOffsets: make(map[string]int64),
 	}
@@ -69,7 +75,7 @@ func (s *Store) ReadNotificationEvents(_ context.Context, cursor eventstore.Noti
 		}
 		nextCursor.CommittedOffsets[name] = size
 		for _, event := range events {
-			selectNewestNotificationEvent(eventsByID, event)
+			selectNewestDAGRunEvent(eventsByID, event)
 		}
 	}
 
@@ -82,15 +88,15 @@ func (s *Store) ReadNotificationEvents(_ context.Context, cursor eventstore.Noti
 			continue
 		}
 		nextCursor.LastInboxFile = name
-		event, err := s.readInboxNotificationEvent(name)
+		event, err := s.readInboxDAGRunEvent(name)
 		if err != nil {
-			slog.Warn("fileeventstore: skipping unreadable inbox notification file",
+			slog.Warn("fileeventstore: skipping unreadable inbox dag-run event file",
 				slog.String("file", filepath.Join(s.inboxDir, name)),
 				slog.String("cursor_last_inbox_file", cursor.LastInboxFile),
 				slog.String("error", err.Error()))
 			continue
 		}
-		selectNewestNotificationEvent(eventsByID, event)
+		selectNewestDAGRunEvent(eventsByID, event)
 	}
 
 	events := make([]*eventstore.Event, 0, len(eventsByID))
@@ -104,6 +110,21 @@ func (s *Store) ReadNotificationEvents(_ context.Context, cursor eventstore.Noti
 		return events[i].ID < events[j].ID
 	})
 	return events, nextCursor.Normalize(), nil
+}
+
+func (s *Store) ReadNotificationEvents(ctx context.Context, cursor eventstore.NotificationCursor) ([]*eventstore.Event, eventstore.NotificationCursor, error) {
+	events, nextCursor, err := s.ReadDAGRunEvents(ctx, eventstore.DAGRunCursor(cursor))
+	if err != nil {
+		return nil, eventstore.NotificationCursor{}, err
+	}
+	filtered := make([]*eventstore.Event, 0, len(events))
+	for _, event := range events {
+		if event == nil || !eventstore.IsNotificationEventType(event.Kind, event.Type) {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	return filtered, eventstore.NotificationCursor(nextCursor), nil
 }
 
 func (s *Store) listCommittedLogNames() ([]string, error) {
@@ -184,14 +205,14 @@ func (s *Store) readCommittedEventsFromOffset(name string, offset int64) ([]*eve
 	}
 
 	reader := io.LimitReader(file, size-offset)
-	events, err := readNotificationEventsFromReader(path, reader)
+	events, err := readDAGRunEventsFromReader(path, reader)
 	if err != nil {
 		return nil, 0, err
 	}
 	return events, size, nil
 }
 
-func (s *Store) readInboxNotificationEvent(name string) (*eventstore.Event, error) {
+func (s *Store) readInboxDAGRunEvent(name string) (*eventstore.Event, error) {
 	path := filepath.Join(s.inboxDir, name)
 	data, err := os.ReadFile(path) //nolint:gosec // controlled path
 	if err != nil {
@@ -209,13 +230,13 @@ func (s *Store) readInboxNotificationEvent(name string) (*eventstore.Event, erro
 	if err := event.Validate(); err != nil {
 		return nil, fmt.Errorf("fileeventstore: validate inbox file %s: %w", path, err)
 	}
-	if !eventstore.IsNotificationEventType(event.Kind, event.Type) {
+	if !eventstore.IsDAGRunEventType(event.Kind, event.Type) {
 		return nil, nil
 	}
 	return event, nil
 }
 
-func readNotificationEventsFromReader(path string, reader io.Reader) ([]*eventstore.Event, error) {
+func readDAGRunEventsFromReader(path string, reader io.Reader) ([]*eventstore.Event, error) {
 	scanner := bufio.NewScanner(reader)
 	fileutil.ConfigureScanner(scanner)
 
@@ -225,7 +246,7 @@ func readNotificationEventsFromReader(path string, reader io.Reader) ([]*eventst
 		lineNum++
 		event := new(eventstore.Event)
 		if err := json.Unmarshal(scanner.Bytes(), event); err != nil {
-			slog.Warn("fileeventstore: skipping malformed notification event line",
+			slog.Warn("fileeventstore: skipping malformed dag-run event line",
 				slog.String("file", path),
 				slog.Int("line", lineNum),
 				slog.String("error", err.Error()))
@@ -233,13 +254,13 @@ func readNotificationEventsFromReader(path string, reader io.Reader) ([]*eventst
 		}
 		event.Normalize()
 		if err := event.Validate(); err != nil {
-			slog.Warn("fileeventstore: skipping invalid notification event line",
+			slog.Warn("fileeventstore: skipping invalid dag-run event line",
 				slog.String("file", path),
 				slog.Int("line", lineNum),
 				slog.String("error", err.Error()))
 			continue
 		}
-		if !eventstore.IsNotificationEventType(event.Kind, event.Type) {
+		if !eventstore.IsDAGRunEventType(event.Kind, event.Type) {
 			continue
 		}
 		events = append(events, event)
@@ -250,7 +271,7 @@ func readNotificationEventsFromReader(path string, reader io.Reader) ([]*eventst
 	return events, nil
 }
 
-func selectNewestNotificationEvent(eventsByID map[string]*eventstore.Event, event *eventstore.Event) {
+func selectNewestDAGRunEvent(eventsByID map[string]*eventstore.Event, event *eventstore.Event) {
 	if event == nil {
 		return
 	}

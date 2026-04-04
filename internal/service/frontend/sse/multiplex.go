@@ -160,6 +160,42 @@ func (m *Multiplexer) RegisterAuthorizer(topicType TopicType, authorizer TopicAu
 	m.authorizers[topicType] = authorizer
 }
 
+// WakeTopic requests an immediate refetch for an active exact topic.
+func (m *Multiplexer) WakeTopic(topicType TopicType, identifier string) {
+	parsed, err := ParseTopic(string(topicType) + ":" + identifier)
+	if err != nil {
+		return
+	}
+	m.wakeTopicKey(parsed.Key)
+}
+
+// WakeTopicType requests an immediate refetch for all active topics of the given type.
+func (m *Multiplexer) WakeTopicType(topicType TopicType) {
+	m.mu.RLock()
+	topics := make([]*multiplexTopic, 0, len(m.topics))
+	for _, topic := range m.topics {
+		if topic == nil || topic.topicType != topicType {
+			continue
+		}
+		topics = append(topics, topic)
+	}
+	m.mu.RUnlock()
+
+	for _, topic := range topics {
+		topic.requestPoll()
+	}
+}
+
+func (m *Multiplexer) wakeTopicKey(key string) {
+	m.mu.RLock()
+	topic := m.topics[key]
+	m.mu.RUnlock()
+	if topic == nil {
+		return
+	}
+	topic.requestPoll()
+}
+
 // Shutdown stops all multiplexed sessions and topic watchers.
 func (m *Multiplexer) Shutdown() {
 	m.cancel()
@@ -176,6 +212,10 @@ func (m *Multiplexer) Shutdown() {
 
 	m.sessions = make(map[string]*streamSession)
 	m.topics = make(map[string]*multiplexTopic)
+}
+
+func (m *Multiplexer) Context() context.Context {
+	return m.ctx
 }
 
 // createSession creates a multiplexed SSE session and applies the initial topic set.
@@ -931,6 +971,7 @@ type multiplexTopic struct {
 	lastHash          string
 	lastChangeEventID uint64
 	stopCh            chan struct{}
+	notifyCh          chan struct{}
 	wg                sync.WaitGroup
 	errorBackoff      backoff.Retrier
 	backoffUntil      time.Time
@@ -949,6 +990,7 @@ func newMultiplexTopic(mux *Multiplexer, parsed ParsedTopic, fetcher FetchFunc) 
 		fetcher:         fetcher,
 		sessions:        make(map[*streamSession]struct{}),
 		stopCh:          make(chan struct{}),
+		notifyCh:        make(chan struct{}, 1),
 		errorBackoff:    backoff.NewRetrier(policy),
 		currentInterval: mux.watcherBaseInterval,
 	}
@@ -1020,6 +1062,15 @@ func (t *multiplexTopic) start() {
 			case <-timer.C:
 				t.poll()
 				timer.Reset(t.currentInterval)
+			case <-t.notifyCh:
+				t.poll()
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				timer.Reset(t.currentInterval)
 			}
 		}
 	})
@@ -1032,6 +1083,13 @@ func (t *multiplexTopic) stop() {
 		close(t.stopCh)
 	}
 	t.wg.Wait()
+}
+
+func (t *multiplexTopic) requestPoll() {
+	select {
+	case t.notifyCh <- struct{}{}:
+	default:
+	}
 }
 
 func (t *multiplexTopic) poll() {

@@ -324,6 +324,12 @@ func TestLoad_Env(t *testing.T) {
 		},
 		Bots: BotsConfig{
 			SafeMode: true,
+			Telegram: TelegramBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+			},
+			Slack: SlackBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+			},
 		},
 		DefaultExecMode: ExecutionModeLocal,
 		Warnings:        nil,
@@ -748,6 +754,12 @@ scheduler:
 		},
 		Bots: BotsConfig{
 			SafeMode: true,
+			Telegram: TelegramBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+			},
+			Slack: SlackBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+			},
 		},
 		DefaultExecMode: ExecutionModeLocal,
 		Warnings:        nil,

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -399,6 +400,36 @@ func TestMultiplexHandlerHandleStreamAllowsUnsupportedInitialTopics(t *testing.T
 	require.Len(t, control.Errors, 1)
 	assert.Equal(t, "agent:session-1", control.Errors[0].Topic)
 	assert.Equal(t, "unsupported_topic", control.Errors[0].Code)
+}
+
+func TestMultiplexerWakeTopicTriggersImmediateRefetch(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	var fetches atomic.Int64
+	mux.RegisterFetcher(TopicTypeDAG, func(_ context.Context, identifier string) (any, error) {
+		return map[string]any{
+			"id":    identifier,
+			"count": fetches.Add(1),
+		}, nil
+	})
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+	defer mux.removeSession(result.session)
+
+	require.Eventually(t, func() bool {
+		return fetches.Load() > 0
+	}, time.Second, 10*time.Millisecond)
+
+	before := fetches.Load()
+	mux.WakeTopic(TopicTypeDAG, "test.yaml")
+
+	require.Eventually(t, func() bool {
+		return fetches.Load() > before
+	}, time.Second, 10*time.Millisecond)
 }
 
 func parseControlEvent(t *testing.T, body string) StreamControlEvent {

@@ -90,6 +90,8 @@ const SEARCH_STATE_KEY = 'eventLogs';
 
 const EVENT_TYPE_OPTIONS = [
   { value: 'all', label: 'All outcomes' },
+  { value: 'dag.run.queued', label: 'Queued' },
+  { value: 'dag.run.running', label: 'Running' },
   { value: 'dag.run.succeeded', label: 'Succeeded' },
   { value: 'dag.run.failed', label: 'Failed' },
   { value: 'dag.run.aborted', label: 'Aborted' },
@@ -99,6 +101,10 @@ const EVENT_TYPE_OPTIONS = [
 
 function getOutcomeLabel(type: string, status?: string): string {
   switch (type) {
+    case 'dag.run.queued':
+      return 'Queued';
+    case 'dag.run.running':
+      return 'Running';
     case 'dag.run.succeeded':
       return 'Succeeded';
     case 'dag.run.failed':
@@ -121,6 +127,10 @@ function getOutcomeVariant(
   type: string
 ): React.ComponentProps<typeof Badge>['variant'] {
   switch (type) {
+    case 'dag.run.queued':
+      return 'warning';
+    case 'dag.run.running':
+      return 'default';
     case 'dag.run.succeeded':
       return 'success';
     case 'dag.run.failed':

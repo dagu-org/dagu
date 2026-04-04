@@ -127,6 +127,7 @@ func runServer(ctx *Context, _ []string) error {
 				telegram.Config{
 					Token:                 ctx.Config.Bots.Telegram.Token,
 					AllowedChatIDs:        ctx.Config.Bots.Telegram.AllowedChatIDs,
+					InterestedEventTypes:  ctx.Config.Bots.Telegram.InterestedEventTypes,
 					SafeMode:              ctx.Config.Bots.SafeMode,
 					EventService:          ctx.EventService,
 					NotificationStateFile: filepath.Join(ctx.Config.Paths.DataDir, "bots", "telegram", "notifications.json"),
@@ -151,6 +152,7 @@ func runServer(ctx *Context, _ []string) error {
 					BotToken:              ctx.Config.Bots.Slack.BotToken,
 					AppToken:              ctx.Config.Bots.Slack.AppToken,
 					AllowedChannelIDs:     ctx.Config.Bots.Slack.AllowedChannelIDs,
+					InterestedEventTypes:  ctx.Config.Bots.Slack.InterestedEventTypes,
 					RespondToAll:          ctx.Config.Bots.Slack.RespondToAll,
 					SafeMode:              ctx.Config.Bots.SafeMode,
 					EventService:          ctx.EventService,

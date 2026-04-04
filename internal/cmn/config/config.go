@@ -43,6 +43,14 @@ const (
 	BotProviderSlack    BotProvider = "slack"
 )
 
+var DefaultBotInterestedEventTypes = []string{
+	"dag.run.waiting",
+	"dag.run.succeeded",
+	"dag.run.failed",
+	"dag.run.aborted",
+	"dag.run.rejected",
+}
+
 // BotsConfig holds the configuration for bot integrations.
 type BotsConfig struct {
 	Provider BotProvider
@@ -53,16 +61,18 @@ type BotsConfig struct {
 
 // TelegramBotConfig holds the Telegram-specific bot configuration.
 type TelegramBotConfig struct {
-	Token          string
-	AllowedChatIDs []int64
+	Token                string
+	AllowedChatIDs       []int64
+	InterestedEventTypes []string
 }
 
 // SlackBotConfig holds the Slack-specific bot configuration.
 type SlackBotConfig struct {
-	BotToken          string
-	AppToken          string
-	AllowedChannelIDs []string
-	RespondToAll      bool // respond to all channel messages, not just @mentions
+	BotToken             string
+	AppToken             string
+	AllowedChannelIDs    []string
+	InterestedEventTypes []string
+	RespondToAll         bool // respond to all channel messages, not just @mentions
 }
 
 // GitSyncConfig holds the configuration for Git sync functionality.
@@ -519,6 +529,9 @@ func (c *Config) Validate() error {
 	if err := c.validateEventStore(); err != nil {
 		return err
 	}
+	if err := c.validateBots(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -566,6 +579,34 @@ func (c *Config) validateScheduler() error {
 func (c *Config) validateEventStore() error {
 	if c.EventStore.RetentionDays < 0 {
 		return fmt.Errorf("event_store.retention_days must be >= 0")
+	}
+	return nil
+}
+
+func (c *Config) validateBots() error {
+	if err := validateInterestedEventTypes("bots.telegram.interested_event_types", c.Bots.Telegram.InterestedEventTypes); err != nil {
+		return err
+	}
+	if err := validateInterestedEventTypes("bots.slack.interested_event_types", c.Bots.Slack.InterestedEventTypes); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateInterestedEventTypes(path string, eventTypes []string) error {
+	allowed := map[string]struct{}{
+		"dag.run.queued":    {},
+		"dag.run.running":   {},
+		"dag.run.waiting":   {},
+		"dag.run.succeeded": {},
+		"dag.run.failed":    {},
+		"dag.run.aborted":   {},
+		"dag.run.rejected":  {},
+	}
+	for _, eventType := range eventTypes {
+		if _, ok := allowed[eventType]; !ok {
+			return fmt.Errorf("%s contains unsupported event type %q", path, eventType)
+		}
 	}
 	return nil
 }
