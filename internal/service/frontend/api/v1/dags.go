@@ -663,13 +663,26 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	}
 
 	if dagRunId == "latest" {
+		attempt, err := a.dagRunStore.LatestAttempt(ctx, dag.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error getting latest attempt: %w", err)
+		}
 		latestStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest status: %w", err)
 		}
 		return &api.GetDAGDAGRunDetails200JSONResponse{
-			DagRun: ToDAGRunDetails(latestStatus),
+			DagRun: a.toDAGRunDetailsWithSpecSource(ctx, attempt, latestStatus),
 		}, nil
+	}
+
+	attempt, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, dagRunId))
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG run %s not found", dagRunId),
+		}
 	}
 
 	dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
@@ -685,7 +698,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	}
 
 	return &api.GetDAGDAGRunDetails200JSONResponse{
-		DagRun: ToDAGRunDetails(*dagStatus),
+		DagRun: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
 	}, nil
 }
 

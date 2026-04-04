@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -815,6 +816,7 @@ func TestRescheduleDAGRunFromInlineStartUsesPersistedSnapshot(t *testing.T) {
 
 	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_start", false)
 	require.NoFileExists(t, dagLocation)
+	assertRescheduleSpecSourceFlag(t, server, "inline_reschedule_start", runID, false)
 
 	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_start", runID)
 	test.ProcessQueuedInlineRun(t, server, "inline_reschedule_start")
@@ -831,10 +833,82 @@ func TestRescheduleDAGRunFromInlineEnqueueUsesPersistedSnapshot(t *testing.T) {
 
 	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_enqueue", true)
 	require.NoFileExists(t, dagLocation)
+	assertRescheduleSpecSourceFlag(t, server, "inline_reschedule_enqueue", runID, false)
 
 	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_enqueue", runID)
 	test.ProcessQueuedInlineRun(t, server, "inline_reschedule_enqueue")
 	test.AssertInlineRescheduledRunParams(t, server, "inline_reschedule_enqueue", rescheduledRunID)
+}
+
+func TestRescheduleDAGRunCanUseCurrentDAGFile(t *testing.T) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "reschedule_use_current_file", MaxActiveRuns: 1},
+		}
+	}))
+
+	dagName := "reschedule_use_current_file"
+	initialSpec := `queue: reschedule_use_current_file
+steps:
+  - name: main
+    command: echo stored snapshot`
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: dagName,
+		Spec: &initialSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dags/%s/start", dagName),
+		api.ExecuteDAGJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	assertRescheduleSpecSourceFlag(t, server, dagName, startBody.DagRunId, true)
+
+	currentSpec := `queue: reschedule_use_current_file
+steps:
+  - name: main
+    command: echo current file`
+	dagPath := filepath.Join(server.Config.Paths.DAGsDir, dagName+".yaml")
+	require.NoError(t, os.WriteFile(dagPath, []byte(currentSpec), 0o600))
+	useCurrentDagFile := true
+
+	resp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/reschedule", dagName, startBody.DagRunId),
+		api.RescheduleDAGRunJSONRequestBody{UseCurrentDagFile: &useCurrentDagFile},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.RescheduleDAGRun200JSONResponse
+	resp.Unmarshal(t, &body)
+	require.NotEmpty(t, body.DagRunId)
+	require.True(t, body.Queued)
+
+	test.ProcessQueuedInlineRun(t, server, dagName)
+
+	attempt, dag := test.WaitForAttemptSnapshotWithDAG(t, server, dagName, body.DagRunId)
+	require.Contains(t, string(dag.YamlData), "echo current file")
+
+	require.Eventually(t, func() bool {
+		status, err := attempt.ReadStatus(server.Context)
+		return err == nil && status.Status == core.Succeeded
+	}, 10*time.Second, 200*time.Millisecond)
 }
 
 func TestRescheduleDAGRunRequiresQueuesEnabled(t *testing.T) {
@@ -1242,6 +1316,19 @@ func rescheduleInlineDAGRun(t *testing.T, server test.Server, dagName, dagRunID 
 	require.NotEmpty(t, body.DagRunId)
 	require.True(t, body.Queued)
 	return body.DagRunId
+}
+
+func assertRescheduleSpecSourceFlag(t *testing.T, server test.Server, dagName, dagRunID string, want bool) {
+	t.Helper()
+
+	resp := server.Client().Get(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, dagRunID),
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.GetDAGRunDetails200JSONResponse
+	resp.Unmarshal(t, &body)
+	got := body.DagRunDetails.SpecFromFile != nil && *body.DagRunDetails.SpecFromFile
+	require.Equal(t, want, got)
 }
 
 func TestExecuteDAGSyncSingleton(t *testing.T) {
