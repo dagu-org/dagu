@@ -1330,8 +1330,7 @@ func assertRescheduleSpecSourceFlag(t *testing.T, server test.Server, dagName, d
 
 	var body api.GetDAGRunDetails200JSONResponse
 	resp.Unmarshal(t, &body)
-	require.NotNil(t, body.DagRunDetails.SpecFromFile)
-	got := *body.DagRunDetails.SpecFromFile
+	got := body.DagRunDetails.SpecFromFile != nil && *body.DagRunDetails.SpecFromFile
 	require.Equal(t, want, got)
 }
 

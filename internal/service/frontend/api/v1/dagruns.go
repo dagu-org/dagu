@@ -1538,6 +1538,9 @@ func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string
 		if err != nil {
 			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
 		}
+		if status == nil {
+			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		}
 		return api.GetDAGRunDetails200JSONResponse{
 			DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *status),
 		}, nil

@@ -103,38 +103,41 @@ function DAGRunActions({
     let cancelled = false;
     setRescheduleSourceLoading(true);
 
-    client
-      .GET('/dag-runs/{name}/{dagRunId}', {
-        params: {
-          path: {
-            name,
-            dagRunId: dagRun.dagRunId,
+    void (async () => {
+      try {
+        const { data } = await client.GET('/dag-runs/{name}/{dagRunId}', {
+          params: {
+            path: {
+              name,
+              dagRunId: dagRun.dagRunId,
+            },
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
           },
-          query: {
-            remoteNode: appBarContext.selectedRemoteNode || 'local',
-          },
-        },
-      })
-      .then(({ data }) => {
+        });
         if (cancelled) {
           return;
         }
         const available = Boolean(data?.dagRunDetails?.specFromFile);
         setSpecFromFile(available);
         setUseCurrentDagFile(available);
-      })
-      .catch(() => {
+      } catch (error) {
         if (cancelled) {
           return;
         }
+        console.error(
+          'Failed to fetch DAG run details for reschedule source',
+          error
+        );
         setSpecFromFile(false);
         setUseCurrentDagFile(false);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setRescheduleSourceLoading(false);
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;

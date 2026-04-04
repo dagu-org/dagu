@@ -665,6 +665,13 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 	if dagRunId == "latest" {
 		attempt, err := a.dagRunStore.LatestAttempt(ctx, dag.Name)
 		if err != nil {
+			if errors.Is(err, exec.ErrDAGRunIDNotFound) {
+				return nil, &Error{
+					HTTPStatus: http.StatusNotFound,
+					Code:       api.ErrorCodeNotFound,
+					Message:    fmt.Sprintf("no dag-runs found for DAG %s", dag.Name),
+				}
+			}
 			return nil, fmt.Errorf("error getting latest attempt: %w", err)
 		}
 		latestStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
@@ -678,11 +685,14 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 
 	attempt, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, dagRunId))
 	if err != nil {
-		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
-			Message:    fmt.Sprintf("DAG run %s not found", dagRunId),
+		if errors.Is(err, exec.ErrDAGRunIDNotFound) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    fmt.Sprintf("DAG run %s not found", dagRunId),
+			}
 		}
+		return nil, fmt.Errorf("error getting DAG run attempt: %w", err)
 	}
 
 	dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, dagRunId)
