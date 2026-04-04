@@ -110,6 +110,9 @@ func (e *taskHandler) buildCommandSpec(ctx context.Context, task *coordinatorv1.
 		if err != nil {
 			return runtime.CmdSpec{}, err
 		}
+		if isQueueDispatchTask(task) {
+			return e.subCmdBuilder.QueueDispatchTaskRetry(task, hints.env, dagName), nil
+		}
 		return e.subCmdBuilder.TaskRetry(task, hints.env, dagName), nil
 
 	case coordinatorv1.Operation_OPERATION_UNSPECIFIED:
@@ -187,4 +190,17 @@ func retryParams(task *coordinatorv1.Task, dag *core.DAG) (any, error) {
 	}
 
 	return spec.QuoteRuntimeParams(status.ParamsList, dag.ParamDefs), nil
+}
+
+func isQueueDispatchTask(task *coordinatorv1.Task) bool {
+	if task == nil || task.Operation != coordinatorv1.Operation_OPERATION_RETRY || task.PreviousStatus == nil {
+		return false
+	}
+
+	status, err := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	if err != nil {
+		return false
+	}
+
+	return status != nil && status.Status == core.Queued
 }

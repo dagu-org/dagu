@@ -6,6 +6,7 @@ package cmd_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/core"
@@ -108,6 +109,64 @@ func TestDequeueCommand_DefaultsToFirstItem(t *testing.T) {
 	})
 
 	// Verify queue is empty
+	length, err := th.QueueStore.Len(th.Context, dag.ProcGroup())
+	require.NoError(t, err)
+	assert.Equal(t, 0, length)
+}
+
+func TestDequeueCommand_TargetedDequeuesUseActualQueue(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dag := th.DAG(t, `queue: actual-queue
+steps:
+  - name: "1"
+    command: "true"
+`)
+
+	th.RunCommand(t, cmd.Enqueue(), test.CmdTest{
+		Name: "Enqueue",
+		Args: []string{"enqueue", "--run-id", "actual-queue-run", dag.Location},
+	})
+
+	th.RunCommand(t, cmd.Dequeue(), test.CmdTest{
+		Name:        "DequeueResolvedQueue",
+		Args:        []string{"dequeue", "wrong-queue", "--dag-run", dag.Name + ":actual-queue-run"},
+		ExpectedOut: []string{"Dequeued dag-run"},
+	})
+
+	length, err := th.QueueStore.Len(th.Context, dag.ProcGroup())
+	require.NoError(t, err)
+	assert.Equal(t, 0, length)
+}
+
+func TestDequeueCommand_DefaultsToFirstItemSkipsStaleHead(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dag := th.DAG(t, `queue: shared-queue
+steps:
+  - name: "1"
+    command: "true"
+`)
+
+	require.NoError(t, th.QueueStore.Enqueue(
+		th.Context,
+		dag.ProcGroup(),
+		exec.QueuePriorityLow,
+		exec.NewDAGRunRef(dag.Name, "stale-run"),
+	))
+	time.Sleep(10 * time.Millisecond)
+
+	th.RunCommand(t, cmd.Enqueue(), test.CmdTest{
+		Name: "Enqueue",
+		Args: []string{"enqueue", "--run-id", "valid-run", dag.Location},
+	})
+
+	th.RunCommand(t, cmd.Dequeue(), test.CmdTest{
+		Name:        "DequeueFirstSkipsStaleHead",
+		Args:        []string{"dequeue", dag.ProcGroup()},
+		ExpectedOut: []string{"Dequeued dag-run"},
+	})
+
 	length, err := th.QueueStore.Len(th.Context, dag.ProcGroup())
 	require.NoError(t, err)
 	assert.Equal(t, 0, length)

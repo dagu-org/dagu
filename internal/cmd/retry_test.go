@@ -169,6 +169,23 @@ steps:
 		require.Equal(t, core.TriggerTypeRetry, latestStatus.TriggerType)
 	})
 
+	t.Run("QueueDispatchRetryTreatsMissingRunAsStaleDispatch", func(t *testing.T) {
+		th := test.SetupCommand(t)
+		t.Setenv(exec.EnvKeyQueueDispatchRetry, "1")
+
+		dagFile := th.DAG(t, `name: queue-dispatch-stale-retry
+steps:
+  - name: "1"
+    command: echo stale dispatch
+`)
+
+		err := th.RunCommandWithError(t, cmd.Retry(), test.CmdTest{
+			Args: []string{"retry", "--run-id=missing-run", dagFile.Location},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "dag-run is not queued")
+	})
+
 	t.Run("QueuedCatchupRetryRestoresEnvSecretsFromPersistedFullDAG", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		t.Setenv("QUEUED_CATCHUP_SECRET_SOURCE", "from-host")

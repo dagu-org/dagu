@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Layers } from 'lucide-react';
 import React from 'react';
 import type { components } from '../../../api/v1/schema';
@@ -7,7 +10,7 @@ interface QueueListProps {
   queues: components['schemas']['Queue'][];
   isLoading?: boolean;
   onDAGRunClick: (dagRun: components['schemas']['DAGRunSummary']) => void;
-  onQueueCleared?: () => void;
+  onQueueCleared?: () => void | Promise<void>;
 }
 
 function QueueList({

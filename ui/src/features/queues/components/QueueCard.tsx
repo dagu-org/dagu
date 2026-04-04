@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import React from 'react';
 import useSWR from 'swr';
@@ -23,7 +26,7 @@ interface QueueCardProps {
   queue: components['schemas']['Queue'];
   isSelected?: boolean;
   onDAGRunClick: (dagRun: components['schemas']['DAGRunSummary']) => void;
-  onQueueCleared?: () => void;
+  onQueueCleared?: () => void | Promise<void>;
 }
 
 function QueueCard({

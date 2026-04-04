@@ -92,26 +92,44 @@ func runRetry(ctx *Context, args []string) error {
 	}
 
 	ref := exec.NewDAGRunRef(name, dagRunID)
+	queueDispatchRetry := queueDispatchRetryRequested()
 	var attempt exec.DAGRunAttempt
 	if rootRun.Zero() {
 		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, ref)
+		if queueDispatchRetry {
+			err = normalizeQueueDispatchRetryLookupError(err)
+		}
 		if err != nil {
+			if queueDispatchRetry {
+				return err
+			}
 			return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
 		}
 	} else {
 		attempt, err = ctx.DAGRunStore.FindSubAttempt(ctx, rootRun, dagRunID)
+		if queueDispatchRetry {
+			err = normalizeQueueDispatchRetryLookupError(err)
+		}
 		if err != nil {
+			if queueDispatchRetry {
+				return err
+			}
 			return fmt.Errorf("failed to find the sub DAG record for dag-run ID %s under root %s: %w", dagRunID, rootRun, err)
 		}
 	}
 
 	status, err := attempt.ReadStatus(ctx)
+	if queueDispatchRetry {
+		err = normalizeQueueDispatchRetryLookupError(err)
+	}
 	if err != nil {
+		if queueDispatchRetry {
+			return err
+		}
 		return fmt.Errorf("failed to read status: %w", err)
 	}
-	queueDispatchRetry := queueDispatchRetryRequested()
-	if queueDispatchRetry && status.Status != core.Queued {
-		return &exec.DAGRunNotQueuedError{Status: status.Status, HasStatus: true}
+	if queueDispatchRetry && (status == nil || status.Status != core.Queued) {
+		return newQueueDispatchNotQueuedError(status)
 	}
 
 	dag, err := attempt.ReadDAG(ctx)
@@ -225,11 +243,13 @@ func ensureQueueDispatchRetryTarget(
 	}
 
 	attempt, err := findRetryAttempt(ctx, dagRunStore, ref, rootRun)
+	err = normalizeQueueDispatchRetryLookupError(err)
 	if err != nil {
 		return err
 	}
 
 	status, err := attempt.ReadStatus(ctx)
+	err = normalizeQueueDispatchRetryLookupError(err)
 	if err != nil {
 		return err
 	}
@@ -238,6 +258,16 @@ func ensureQueueDispatchRetryTarget(
 	}
 
 	return nil
+}
+
+func normalizeQueueDispatchRetryLookupError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
+		return newQueueDispatchNotQueuedError(nil)
+	}
+	return err
 }
 
 func findRetryAttempt(
