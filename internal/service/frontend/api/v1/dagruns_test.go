@@ -789,6 +789,26 @@ func TestRescheduleDAGRunResolvesLatest(t *testing.T) {
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
+func TestRescheduleDAGRunFromInlineStartUsesPersistedSnapshot(t *testing.T) {
+	server := test.SetupServer(t)
+
+	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_start", false)
+	require.NoFileExists(t, dagLocation)
+
+	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_start", runID)
+	test.AssertInlineRescheduledRunParams(t, server, "inline_reschedule_start", rescheduledRunID)
+}
+
+func TestRescheduleDAGRunFromInlineEnqueueUsesPersistedSnapshot(t *testing.T) {
+	server := test.SetupServer(t)
+
+	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_enqueue", true)
+	require.NoFileExists(t, dagLocation)
+
+	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_enqueue", runID)
+	test.AssertInlineRescheduledRunParams(t, server, "inline_reschedule_enqueue", rescheduledRunID)
+}
+
 func TestRetryDAGRunQueuesRetryForQueuedDAGs(t *testing.T) {
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
 		cfg.Queues.Enabled = true
@@ -1137,6 +1157,20 @@ func indentCommandBlock(command string, spaces int) string {
 	prefix := strings.Repeat(" ", spaces)
 	lines := strings.Split(trimmed, "\n")
 	return prefix + strings.Join(lines, "\n"+prefix)
+}
+
+func rescheduleInlineDAGRun(t *testing.T, server test.Server, dagName, dagRunID string) string {
+	t.Helper()
+
+	resp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/reschedule", dagName, dagRunID),
+		api.RescheduleDAGRunJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.RescheduleDAGRun200JSONResponse
+	resp.Unmarshal(t, &body)
+	require.NotEmpty(t, body.DagRunId)
+	return body.DagRunId
 }
 
 func TestExecuteDAGSyncSingleton(t *testing.T) {

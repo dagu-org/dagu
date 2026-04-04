@@ -1,0 +1,57 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package intg_test
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"testing"
+
+	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagu-org/dagu/internal/test"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAPIRescheduleInlineStartUsesStoredSnapshot(t *testing.T) {
+	server := test.SetupServer(t)
+
+	runID, location := test.CreateInlineDAGRunForReschedule(t, server, "intg_inline_reschedule_start", false)
+	requireMissingFile(t, location)
+
+	newRunID := rescheduleServerInlineRun(t, server, "intg_inline_reschedule_start", runID)
+	test.AssertInlineRescheduledRunParams(t, server, "intg_inline_reschedule_start", newRunID)
+}
+
+func TestAPIRescheduleInlineEnqueueUsesStoredSnapshot(t *testing.T) {
+	server := test.SetupServer(t)
+
+	runID, location := test.CreateInlineDAGRunForReschedule(t, server, "intg_inline_reschedule_enqueue", true)
+	requireMissingFile(t, location)
+
+	newRunID := rescheduleServerInlineRun(t, server, "intg_inline_reschedule_enqueue", runID)
+	test.AssertInlineRescheduledRunParams(t, server, "intg_inline_reschedule_enqueue", newRunID)
+}
+
+func rescheduleServerInlineRun(t *testing.T, server test.Server, dagName, runID string) string {
+	t.Helper()
+
+	resp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/reschedule", dagName, runID),
+		api.RescheduleDAGRunJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.RescheduleDAGRun200JSONResponse
+	resp.Unmarshal(t, &body)
+	require.NotEmpty(t, body.DagRunId)
+	return body.DagRunId
+}
+
+func requireMissingFile(t *testing.T, path string) {
+	t.Helper()
+
+	_, err := os.Stat(path)
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err))
+}

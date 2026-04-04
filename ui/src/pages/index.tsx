@@ -214,6 +214,14 @@ function Dashboard(): React.ReactElement | null {
     setSelectedDAGRun(value);
   };
 
+  const selectedTimelineDate = React.useMemo(
+    () => ({
+      startTimestamp: dateRange.startDate,
+      endTimestamp: dateRange.endDate,
+    }),
+    [dateRange.endDate, dateRange.startDate]
+  );
+
   React.useEffect(() => {
     if (appBarContext) {
       appBarContext.setTitle('Dashboard');
@@ -365,13 +373,7 @@ function Dashboard(): React.ReactElement | null {
 
         {/* Timeline Visualization - Hero */}
         <div className="flex-1 min-h-[250px] rounded-xl border border-border bg-surface overflow-hidden">
-          <DashboardTimeChart
-            data={dagRunsList}
-            selectedDate={{
-              startTimestamp: dateRange.startDate,
-              endTimestamp: dateRange.endDate,
-            }}
-          />
+          <DashboardTimeChart data={dagRunsList} selectedDate={selectedTimelineDate} />
         </div>
       </div>
 
