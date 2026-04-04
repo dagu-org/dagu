@@ -1114,19 +1114,6 @@ func (a *API) startDAGRunWithOptions(ctx context.Context, dag *core.DAG, opts st
 	return a.startPreparedDAGRunWithOptions(ctx, dag, opts, opts.params)
 }
 
-func (a *API) startRescheduledDAGRunWithOptions(
-	ctx context.Context,
-	dag *core.DAG,
-	opts startDAGRunOptions,
-	preservedParams string,
-) error {
-	if err := buildErrorsToAPIError(dag.BuildErrors); err != nil {
-		return err
-	}
-
-	return a.startPreparedDAGRunWithOptions(ctx, dag, opts, preservedParams)
-}
-
 func (a *API) startPreparedDAGRunWithOptions(
 	ctx context.Context,
 	dag *core.DAG,

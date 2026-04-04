@@ -2324,6 +2324,14 @@ type rescheduleDAGRunResult struct {
 }
 
 func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, opts rescheduleDAGRunOptions) (rescheduleDAGRunResult, error) {
+	if !a.config.Queues.Enabled {
+		return rescheduleDAGRunResult{}, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "reschedule requires queues to be enabled",
+		}
+	}
+
 	attempt, sourceDagRunID, err := a.resolveAttemptForDAGRun(ctx, dagName, dagRunID)
 	if err != nil {
 		return rescheduleDAGRunResult{}, err
@@ -2383,13 +2391,18 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		slog.String("from-dag-run-id", sourceDagRunID),
 		tag.RunID(newDagRunID))
 
-	if err := a.startRescheduledDAGRunWithOptions(ctx, dag, startDAGRunOptions{
-		dagRunID:     newDagRunID,
-		nameOverride: nameOverride,
-		fromRunID:    sourceDagRunID,
-		target:       dagName,
-	}, preservedParams); err != nil {
-		return rescheduleDAGRunResult{}, fmt.Errorf("failed to start dag-run: %w", err)
+	if len(dag.YamlData) == 0 {
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: DAG snapshot YAML is missing")
+	}
+
+	tempPath, err := writeInlineRescheduleSpec(dag.Name, newDagRunID, dag.YamlData)
+	if err != nil {
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to prepare reschedule snapshot: %w", err)
+	}
+	dag.Location = tempPath
+
+	if err := a.enqueueDAGRun(ctx, dag, preservedParams, newDagRunID, "", core.TriggerTypeManual, ""); err != nil {
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 
 	queued := false

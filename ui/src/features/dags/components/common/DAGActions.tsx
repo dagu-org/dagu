@@ -588,7 +588,6 @@ function DAGActions({
                     body: {
                       dagRunId: newRunId || undefined, // Auto-generate if empty
                       ...(dagNameOverride ? { dagName: dagNameOverride } : {}),
-                      singleton: false,
                     },
                   }
                 );
