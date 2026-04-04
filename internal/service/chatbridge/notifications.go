@@ -227,6 +227,7 @@ func (b *NotificationBatcher) Enqueue(destination string, event NotificationEven
 			}
 		}
 	}
+	b.removeReadyRunLocked(destination, runKey)
 
 	bucketKey := notificationBucketKey(destination, class)
 	bucket, ok := b.buckets[bucketKey]
@@ -250,6 +251,33 @@ func (b *NotificationBatcher) Enqueue(destination string, event NotificationEven
 	bucket.events[runKey] = snapshot
 	b.runIndex[destRunKey] = bucketKey
 	return true
+}
+
+func (b *NotificationBatcher) removeReadyRunLocked(destination, runKey string) {
+	if len(b.ready) == 0 {
+		return
+	}
+
+	filteredReady := b.ready[:0]
+	for _, pending := range b.ready {
+		if pending.Destination != destination {
+			filteredReady = append(filteredReady, pending)
+			continue
+		}
+
+		filteredEvents := pending.Batch.Events[:0]
+		for _, event := range pending.Batch.Events {
+			if NotificationRunKey(event.Status) == runKey {
+				continue
+			}
+			filteredEvents = append(filteredEvents, event)
+		}
+		pending.Batch.Events = filteredEvents
+		if len(pending.Batch.Events) > 0 {
+			filteredReady = append(filteredReady, pending)
+		}
+	}
+	b.ready = filteredReady
 }
 
 // ReadyC is signaled when one or more batches are ready for delivery.
@@ -374,6 +402,8 @@ func NotificationClassForEvent(eventType eventstore.EventType, status core.Statu
 		return NotificationClassSuccessDigest, true
 	case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning:
 		return NotificationClassInformational, true
+	case eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
+		return NotificationClassUnknown, false
 	default:
 		switch status { //nolint:exhaustive // legacy direct notifications may only pass status
 		case core.Failed, core.Waiting:

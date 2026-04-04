@@ -1183,10 +1183,7 @@ func (t *multiplexTopic) nextRetryDelay() (time.Duration, bool) {
 	if t.backoffUntil.IsZero() {
 		return 0, false
 	}
-	delay := time.Until(t.backoffUntil)
-	if delay < 0 {
-		delay = 0
-	}
+	delay := max(time.Until(t.backoffUntil), 0)
 	return delay, true
 }
 
