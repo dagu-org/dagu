@@ -119,6 +119,10 @@ function useAutoLoadMore(
   }, [enabled, onLoadMore, sentinelRef]);
 }
 
+function supportsIntersectionObserver(): boolean {
+  return typeof IntersectionObserver !== 'undefined';
+}
+
 function DAGRuns() {
   const location = useLocation();
   const appBarContext = React.useContext(AppBarContext);
@@ -475,9 +479,10 @@ function DAGRuns() {
       autoLoadPendingRef.current = false;
     }
   }, [isLoadingMore]);
+  const canAutoLoadMore = supportsIntersectionObserver();
   useAutoLoadMore(
     loadMoreSentinelRef,
-    hasMore && !isLoadingMore && !loadMoreError,
+    canAutoLoadMore && hasMore && !isLoadingMore && !loadMoreError,
     () => {
       if (autoLoadPendingRef.current) {
         return;
@@ -953,10 +958,19 @@ function DAGRuns() {
           {hasMore ? (
             <>
               <div ref={loadMoreSentinelRef} className="h-4 w-full" />
-              {isLoadingMore && (
+              {isLoadingMore ? (
                 <div className="text-sm text-muted-foreground">
                   Loading more DAG runs...
                 </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleLoadMore()}
+                >
+                  {loadMoreError ? 'Retry loading more' : 'Load more'}
+                </Button>
               )}
             </>
           ) : dagRuns.length > 0 ? (

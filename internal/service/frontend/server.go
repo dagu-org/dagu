@@ -1146,7 +1146,9 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		SlowClientTimeout:      srv.config.Server.SSE.SlowClientTimeout,
 	}, sseMetrics)
 	srv.registerDedicatedSSEFetchers(srv.sseMultiplexer)
-	sse.StartDAGRunEventInvalidation(srv.sseMultiplexer.Context(), srv.eventService, srv.sseMultiplexer, slog.Default(), time.Second)
+	if srv.eventService != nil {
+		sse.StartDAGRunEventInvalidation(srv.sseMultiplexer.Context(), srv.eventService, srv.sseMultiplexer, slog.Default(), time.Second)
+	}
 
 	multiplexHandler := sse.NewMultiplexHandler(srv.sseMultiplexer, srv.remoteNodeResolver)
 	appHandler := sse.NewAppHandler(srv.appStream, srv.remoteNodeResolver)
@@ -1183,13 +1185,15 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 
 	// DAG-run and queue live views have an explicit eventstore-backed invalidation
 	// path, so they should not keep background polling once the SSE topic is live.
-	registrar.SetRefreshMode(sse.TopicTypeDAGRun, sse.TopicRefreshModeOnDemand)
-	registrar.SetRefreshMode(sse.TopicTypeSubDAGRun, sse.TopicRefreshModeOnDemand)
-	registrar.SetRefreshMode(sse.TopicTypeDAGHistory, sse.TopicRefreshModeOnDemand)
-	registrar.SetRefreshMode(sse.TopicTypeDAGRuns, sse.TopicRefreshModeOnDemand)
-	registrar.SetRefreshMode(sse.TopicTypeQueueItems, sse.TopicRefreshModeOnDemand)
-	registrar.SetRefreshMode(sse.TopicTypeQueues, sse.TopicRefreshModeOnDemand)
-	registrar.SetPublishOnWake(sse.TopicTypeDAGRuns, true)
+	if srv.eventService != nil {
+		registrar.SetRefreshMode(sse.TopicTypeDAGRun, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeSubDAGRun, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeDAGHistory, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeDAGRuns, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeQueueItems, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeQueues, sse.TopicRefreshModeOnDemand)
+		registrar.SetPublishOnWake(sse.TopicTypeDAGRuns, true)
+	}
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {

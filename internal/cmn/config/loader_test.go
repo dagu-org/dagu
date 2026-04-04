@@ -1190,6 +1190,36 @@ func TestBindEnv_AsPath(t *testing.T) {
 	}
 }
 
+func TestLoad_BotInterestedEventTypesEnvOverridesConfig(t *testing.T) {
+	t.Run("telegram env overrides config", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+bots:
+  telegram:
+    interested_event_types:
+      - dag.run.failed
+      - dag.run.succeeded
+`, map[string]string{
+			"DAGU_BOTS_TELEGRAM_INTERESTED_EVENT_TYPES": "dag.run.running,dag.run.queued",
+		})
+
+		assert.Equal(t, []string{"dag.run.running", "dag.run.queued"}, cfg.Bots.Telegram.InterestedEventTypes)
+	})
+
+	t.Run("slack env can clear configured list", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+bots:
+  slack:
+    interested_event_types:
+      - dag.run.failed
+      - dag.run.succeeded
+`, map[string]string{
+			"DAGU_BOTS_SLACK_INTERESTED_EVENT_TYPES": "",
+		})
+
+		assert.Empty(t, cfg.Bots.Slack.InterestedEventTypes)
+	})
+}
+
 func TestLoad_Monitoring(t *testing.T) {
 	t.Run("FromYAML", func(t *testing.T) {
 		cfg := loadFromYAML(t, `

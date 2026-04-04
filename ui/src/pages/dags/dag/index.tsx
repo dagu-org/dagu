@@ -134,7 +134,8 @@ function DAGDetails() {
   const dagRunSSE = useDAGRunSSE(
     dagRunName,
     dagRunId || '',
-    dagRunQueryEnabled
+    dagRunQueryEnabled,
+    remoteNode
   );
   const { data: dagRunResponse, mutate: mutateDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
@@ -157,7 +158,8 @@ function DAGDetails() {
     dagRunName,
     dagRunId || '',
     subDAGRunId || '',
-    subDAGRunQueryEnabled
+    subDAGRunQueryEnabled,
+    remoteNode
   );
   const { data: subDAGRunResponse, mutate: mutateSubDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',

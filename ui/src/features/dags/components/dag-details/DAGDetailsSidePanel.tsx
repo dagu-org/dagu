@@ -185,7 +185,8 @@ function DAGDetailsSidePanel({
   const trackedRunSSE = useDAGRunSSE(
     dagName,
     trackedDagRunId || '',
-    trackedRunEnabled
+    trackedRunEnabled,
+    remoteNode
   );
   const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',

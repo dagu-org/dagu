@@ -1,5 +1,10 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useDAGRunSSE } from '@/hooks/useDAGRunSSE';
+import { useSubDAGRunSSE } from '@/hooks/useSubDAGRunSSE';
 import { useBoundedDAGRunDetails } from '../useBoundedDAGRunDetails';
 
 const { fetchDAGRunDetailsMock, dagRunSSEState, subDAGRunSSEState } =
@@ -69,6 +74,8 @@ describe('useBoundedDAGRunDetails', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     fetchDAGRunDetailsMock.mockReset();
+    vi.mocked(useDAGRunSSE).mockClear();
+    vi.mocked(useSubDAGRunSSE).mockClear();
     dagRunSSEState.current = {
       data: null,
       error: null,
@@ -109,6 +116,12 @@ describe('useBoundedDAGRunDetails', () => {
     });
 
     expect(fetchDAGRunDetailsMock).toHaveBeenCalledTimes(1);
+    expect(useDAGRunSSE).toHaveBeenCalledWith(
+      'billing',
+      'run-1',
+      true,
+      'local'
+    );
   });
 
   it('hydrates from SSE payloads and aborts the in-flight fallback request', async () => {
@@ -158,5 +171,26 @@ describe('useBoundedDAGRunDetails', () => {
     });
 
     expect(capturedSignal?.aborted).toBe(true);
+  });
+
+  it('passes the selected remote node to sub DAG-run SSE subscriptions', () => {
+    renderHook(() =>
+      useBoundedDAGRunDetails({
+        target: createTarget({
+          remoteNode: 'remote-a',
+          parentName: 'billing',
+          parentDAGRunId: 'parent-run',
+          subDAGRunId: 'sub-run',
+        }),
+      })
+    );
+
+    expect(useSubDAGRunSSE).toHaveBeenCalledWith(
+      'billing',
+      'parent-run',
+      'sub-run',
+      true,
+      'remote-a'
+    );
   });
 });

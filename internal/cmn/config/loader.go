@@ -1176,8 +1176,8 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	if token := l.v.GetString("bots.telegram.token"); token != "" {
 		cfg.Bots.Telegram.Token = token
 	}
-	if l.v.IsSet("bots.telegram.interested_event_types") {
-		cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypes(l.v.GetString("bots.telegram.interested_event_types"))
+	if raw, ok := lookupInterestedEventTypesEnv("BOTS_TELEGRAM_INTERESTED_EVENT_TYPES"); ok {
+		cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypes(raw)
 	}
 
 	if def.Bots == nil {
@@ -1199,7 +1199,8 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		if len(def.Bots.Telegram.AllowedChatIDs) > 0 {
 			cfg.Bots.Telegram.AllowedChatIDs = def.Bots.Telegram.AllowedChatIDs
 		}
-		if def.Bots.Telegram.InterestedEventTypes != nil {
+		if def.Bots.Telegram.InterestedEventTypes != nil &&
+			!hasInterestedEventTypesEnv("BOTS_TELEGRAM_INTERESTED_EVENT_TYPES") {
 			cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypesSlice(def.Bots.Telegram.InterestedEventTypes)
 		}
 	}
@@ -1214,8 +1215,8 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	if appToken := l.v.GetString("bots.slack.app_token"); appToken != "" {
 		cfg.Bots.Slack.AppToken = appToken
 	}
-	if l.v.IsSet("bots.slack.interested_event_types") {
-		cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypes(l.v.GetString("bots.slack.interested_event_types"))
+	if raw, ok := lookupInterestedEventTypesEnv("BOTS_SLACK_INTERESTED_EVENT_TYPES"); ok {
+		cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypes(raw)
 	}
 
 	if def.Bots.Slack != nil {
@@ -1228,7 +1229,8 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		if len(def.Bots.Slack.AllowedChannelIDs) > 0 {
 			cfg.Bots.Slack.AllowedChannelIDs = def.Bots.Slack.AllowedChannelIDs
 		}
-		if def.Bots.Slack.InterestedEventTypes != nil {
+		if def.Bots.Slack.InterestedEventTypes != nil &&
+			!hasInterestedEventTypesEnv("BOTS_SLACK_INTERESTED_EVENT_TYPES") {
 			cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypesSlice(def.Bots.Slack.InterestedEventTypes)
 		}
 		if def.Bots.Slack.RespondToAll != nil {
@@ -1255,6 +1257,15 @@ func parseInterestedEventTypesSlice(values []string) []string {
 		result = append(result, value)
 	}
 	return result
+}
+
+func lookupInterestedEventTypesEnv(suffix string) (string, bool) {
+	return os.LookupEnv(strings.ToUpper(AppSlug) + "_" + suffix)
+}
+
+func hasInterestedEventTypesEnv(suffix string) bool {
+	_, ok := lookupInterestedEventTypesEnv(suffix)
+	return ok
 }
 
 func (l *ConfigLoader) loadLicenseConfig(cfg *Config, def Definition) {

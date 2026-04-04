@@ -29,7 +29,6 @@ function createQuery(
   overrides: Partial<DAGRunListQuery> = {}
 ): DAGRunListQuery {
   return {
-    remoteNode: 'local',
     fromDate: 100,
     ...overrides,
   };

@@ -2903,10 +2903,14 @@ func (a *API) GetSubDAGRunDetailsData(ctx context.Context, identifier string) (a
 		return a.dagRunMgr.FindSubDAGRunStatus(readCtx, root, parts[2])
 	})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return nil, err
+		}
 		return nil, fmt.Errorf(
-			"sub dag-run ID %s not found for DAG %s",
+			"sub dag-run ID %s not found for DAG %s: %w",
 			parts[2],
 			parts[0],
+			err,
 		)
 	}
 

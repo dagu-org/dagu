@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { getAuthHeaders, getAuthToken } from '@/lib/authHeaders';
 
 const MAX_RETRY_DELAY_MS = 16000;

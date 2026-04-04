@@ -402,7 +402,9 @@ func NotificationClassForEvent(eventType eventstore.EventType, status core.Statu
 		return NotificationClassSuccessDigest, true
 	case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning:
 		return NotificationClassInformational, true
-	case eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
+	case eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected:
+		return NotificationClassUrgent, true
+	case eventstore.TypeLLMUsageRecorded:
 		return NotificationClassUnknown, false
 	default:
 		switch status { //nolint:exhaustive // legacy direct notifications may only pass status

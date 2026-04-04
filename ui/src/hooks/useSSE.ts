@@ -39,10 +39,15 @@ const INITIAL_STATE: SSEState<unknown> = {
   shouldUseFallback: false,
 };
 
-export function useSSE<T>(endpoint: string, enabled: boolean = true): SSEState<T> {
+export function useSSE<T>(
+  endpoint: string,
+  enabled: boolean = true,
+  remoteNodeOverride?: string
+): SSEState<T> {
   const appBarContext = useContext(AppBarContext);
   const config = useConfig();
-  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const remoteNode =
+    remoteNodeOverride || appBarContext.selectedRemoteNode || 'local';
 
   const [state, setState] = useState<SSEState<T>>(INITIAL_STATE as SSEState<T>);
 

@@ -248,7 +248,7 @@ func DAGRunSnapshotFromEvent(event *Event) (*DAGRunStatusSnapshot, error) {
 	if !IsDAGRunEventType(event.Kind, event.Type) {
 		return nil, fmt.Errorf("eventstore: event %q is not a dag-run event", event.Type)
 	}
-	return dagRunStatusSnapshotFromData(event.Data)
+	return dagRunSnapshotFromData(event.Data)
 }
 
 func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
@@ -258,7 +258,22 @@ func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
 	if !IsNotificationEventType(event.Kind, event.Type) {
 		return nil, fmt.Errorf("eventstore: event %q is not a notification event", event.Type)
 	}
-	return DAGRunStatusFromEvent(event)
+	snapshot, err := dagRunSnapshotFromData(event.Data)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.DAGRunStatus(), nil
+}
+
+func dagRunSnapshotFromData(data map[string]any) (*DAGRunStatusSnapshot, error) {
+	snapshot, err := dagRunStatusSnapshotFromData(data)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot.DAGFile == "" {
+		snapshot.DAGFile = dagRunFileNameFromData(data)
+	}
+	return snapshot, nil
 }
 
 func dagRunStatusSnapshotFromData(data map[string]any) (*DAGRunStatusSnapshot, error) {

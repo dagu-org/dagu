@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/cmn/fileutil"
 	"github.com/dagu-org/dagu/internal/service/eventstore"
@@ -87,16 +88,20 @@ func (s *Store) ReadDAGRunEvents(_ context.Context, cursor eventstore.DAGRunCurs
 		if cursor.LastInboxFile != "" && name <= cursor.LastInboxFile {
 			continue
 		}
-		nextCursor.LastInboxFile = name
 		event, err := s.readInboxDAGRunEvent(name)
 		if err != nil {
-			slog.Warn("fileeventstore: skipping unreadable inbox dag-run event file",
-				slog.String("file", filepath.Join(s.inboxDir, name)),
+			path := filepath.Join(s.inboxDir, name)
+			slog.Warn("fileeventstore: quarantining unreadable inbox dag-run event file",
+				slog.String("file", path),
 				slog.String("cursor_last_inbox_file", cursor.LastInboxFile),
 				slog.String("error", err.Error()))
+			if quarantineErr := s.quarantineInboxFile(path, name, err); quarantineErr != nil {
+				return nil, nextCursor, quarantineErr
+			}
 			continue
 		}
 		selectNewestDAGRunEvent(eventsByID, event)
+		nextCursor.LastInboxFile = name
 	}
 
 	events := make([]*eventstore.Event, 0, len(eventsByID))
@@ -234,6 +239,20 @@ func (s *Store) readInboxDAGRunEvent(name string) (*eventstore.Event, error) {
 		return nil, nil
 	}
 	return event, nil
+}
+
+func (s *Store) quarantineInboxFile(path, name string, parseErr error) error {
+	dest := filepath.Join(s.quarantineDir, name)
+	if _, err := os.Stat(dest); err == nil {
+		dest = filepath.Join(s.quarantineDir, fmt.Sprintf("%d-%s", time.Now().UTC().UnixNano(), name))
+	}
+	if err := os.Rename(path, dest); err != nil {
+		return fmt.Errorf("fileeventstore: quarantine inbox file %s: %w", path, err)
+	}
+	slog.Warn("fileeventstore: quarantined malformed inbox file",
+		slog.String("file", dest),
+		slog.String("error", parseErr.Error()))
+	return nil
 }
 
 func readDAGRunEventsFromReader(path string, reader io.Reader) ([]*eventstore.Event, error) {

@@ -55,13 +55,15 @@ export function useBoundedDAGRunDetails({
   const dagRunSSE = useDAGRunSSE(
     target?.name ?? '',
     target?.dagRunId ?? '',
-    enabled && target != null && !isSubDAGRunTarget
+    enabled && target != null && !isSubDAGRunTarget,
+    target?.remoteNode
   );
   const subDAGRunSSE = useSubDAGRunSSE(
     target?.parentName ?? '',
     target?.parentDAGRunId ?? '',
     target?.subDAGRunId ?? '',
-    enabled && target != null && isSubDAGRunTarget
+    enabled && target != null && isSubDAGRunTarget,
+    target?.remoteNode
   );
   const sseState = isSubDAGRunTarget ? subDAGRunSSE : dagRunSSE;
 

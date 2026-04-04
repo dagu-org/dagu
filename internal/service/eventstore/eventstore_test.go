@@ -147,6 +147,40 @@ func TestNewDAGRunEventEmbedsDAGRunSnapshot(t *testing.T) {
 	assert.Equal(t, "handler boom", restored.OnFailure.Error)
 }
 
+func TestDAGRunSnapshotFromEventBackfillsLegacyDAGFile(t *testing.T) {
+	t.Parallel()
+
+	event := &Event{
+		ID:            "evt-legacy",
+		SchemaVersion: SchemaVersion,
+		OccurredAt:    time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC),
+		RecordedAt:    time.Date(2026, 4, 1, 9, 0, 1, 0, time.UTC),
+		Kind:          KindDAGRun,
+		Type:          TypeDAGRunSucceeded,
+		SourceService: SourceServiceServer,
+		Data: map[string]any{
+			notificationStatusSnapshotDataKey: map[string]any{
+				"name":       "legacy",
+				"dag_run_id": "run-1",
+				"attempt_id": "attempt-1",
+				"status":     core.Succeeded,
+			},
+			DAGFileNameDataKey: "legacy.yaml",
+		},
+	}
+
+	snapshot, err := DAGRunSnapshotFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, "legacy.yaml", snapshot.DAGFile)
+
+	status, err := NotificationStatusFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.Equal(t, "legacy", status.Name)
+	assert.Equal(t, "run-1", status.DAGRunID)
+}
+
 func TestNewDAGRunEventDeepClonesData(t *testing.T) {
 	t.Parallel()
 
