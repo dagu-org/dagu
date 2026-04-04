@@ -318,13 +318,12 @@ describe('DAGRunBatchActions', () => {
       screen.getByRole('button', { name: 'Reschedule selected' })
     );
 
-    const checkbox = await screen.findByLabelText('Use original DAG file');
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText(
+      'Stored YAML snapshots will be used because one or more selected DAG runs do not have the original DAG file available.'
+    );
+    const checkbox = within(dialog).getByLabelText('Use original DAG file');
     expect(checkbox).not.toBeChecked();
     expect(checkbox).toBeDisabled();
-    expect(
-      screen.getByText(
-        'Stored YAML snapshots will be used because one or more selected DAG runs do not have the original DAG file available.'
-      )
-    ).toBeInTheDocument();
   });
 });
