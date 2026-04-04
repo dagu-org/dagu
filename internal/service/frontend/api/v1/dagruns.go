@@ -2395,11 +2395,13 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: DAG snapshot YAML is missing")
 	}
 
-	tempPath, err := writeInlineRescheduleSpec(dag.Name, newDagRunID, dag.YamlData)
+	inlineName := dag.Name
+	inlineDAG, cleanup, err := a.loadInlineDAG(ctx, string(dag.YamlData), &inlineName, newDagRunID)
 	if err != nil {
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to prepare reschedule snapshot: %w", err)
 	}
-	dag.Location = tempPath
+	defer cleanup()
+	dag = inlineDAG
 
 	if err := a.enqueueDAGRun(ctx, dag, preservedParams, newDagRunID, "", core.TriggerTypeManual, ""); err != nil {
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: %w", err)
