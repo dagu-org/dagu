@@ -282,16 +282,22 @@ function DAGRunTable({
               <div className="flex items-start gap-2 min-w-0">
                 {onToggleBulkSelect && (
                   <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
+                    <button
+                      type="button"
                       aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
-                      checked={isBulkSelected(dagRun)}
-                      onCheckedChange={() =>
+                      onClick={() =>
                         onToggleBulkSelect({
                           name: dagRun.name,
                           dagRunId: dagRun.dagRunId,
                         })
                       }
-                    />
+                      className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Checkbox
+                        checked={isBulkSelected(dagRun)}
+                        className="h-5 w-5 pointer-events-none"
+                      />
+                    </button>
                   </div>
                 )}
                 <div className="font-normal text-sm">{dagRun.name}</div>
@@ -440,16 +446,22 @@ function DAGRunTable({
               {onToggleBulkSelect && (
                 <TableCell className="py-1 px-2">
                   <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
+                    <button
+                      type="button"
                       aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
-                      checked={isBulkSelected(dagRun)}
-                      onCheckedChange={() =>
+                      onClick={() =>
                         onToggleBulkSelect({
                           name: dagRun.name,
                           dagRunId: dagRun.dagRunId,
                         })
                       }
-                    />
+                      className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <Checkbox
+                        checked={isBulkSelected(dagRun)}
+                        className="h-5 w-5 pointer-events-none"
+                      />
+                    </button>
                   </div>
                 </TableCell>
               )}

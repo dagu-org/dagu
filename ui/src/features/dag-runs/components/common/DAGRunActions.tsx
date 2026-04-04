@@ -467,20 +467,43 @@ function DAGRunActions({
                     className="h-8 text-sm"
                   />
                 </div>
-                <div className="flex items-center space-x-2">
+                <div
+                  role="button"
+                  tabIndex={rescheduleSourceLoading || !specFromFile ? -1 : 0}
+                  aria-disabled={rescheduleSourceLoading || !specFromFile}
+                  onClick={() => {
+                    if (rescheduleSourceLoading || !specFromFile) {
+                      return;
+                    }
+                    setUseCurrentDagFile((value) => !value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      rescheduleSourceLoading ||
+                      !specFromFile ||
+                      (event.key !== 'Enter' && event.key !== ' ')
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    setUseCurrentDagFile((value) => !value);
+                  }}
+                  className="flex w-full items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-70 aria-disabled:hover:bg-transparent"
+                >
                   <Checkbox
                     id="use-current-dag-file"
+                    aria-label="Use original DAG file"
                     checked={useCurrentDagFile}
                     disabled={rescheduleSourceLoading || !specFromFile}
                     onCheckedChange={(checked) =>
                       setUseCurrentDagFile(checked as boolean)
                     }
-                    className="border-border"
+                    className="mt-0.5 h-5 w-5 border-border pointer-events-none"
                   />
                   <div className="space-y-0.5">
                     <Label
                       htmlFor="use-current-dag-file"
-                      className="cursor-pointer text-sm"
+                      className="cursor-pointer text-sm font-medium"
                     >
                       Use original DAG file
                     </Label>
