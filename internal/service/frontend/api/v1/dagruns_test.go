@@ -1330,7 +1330,8 @@ func assertRescheduleSpecSourceFlag(t *testing.T, server test.Server, dagName, d
 
 	var body api.GetDAGRunDetails200JSONResponse
 	resp.Unmarshal(t, &body)
-	got := body.DagRunDetails.SpecFromFile != nil && *body.DagRunDetails.SpecFromFile
+	require.NotNil(t, body.DagRunDetails.SpecFromFile)
+	got := *body.DagRunDetails.SpecFromFile
 	require.Equal(t, want, got)
 }
 
@@ -1505,4 +1506,85 @@ steps:
 	}
 	require.True(t, caseInsensitiveNames["tag_filter_prod"], "case-insensitive: prod DAG should be in CRITICAL filter results")
 	require.True(t, caseInsensitiveNames["tag_filter_dev"], "case-insensitive: dev DAG should be in CRITICAL filter results")
+}
+
+func TestListDAGRunsFilterByPartialName(t *testing.T) {
+	server := test.SetupServer(t)
+
+	spec := `steps:
+  - name: main
+    command: "echo search"`
+
+	for _, dagName := range []string{
+		"test-params-flag",
+		"other-dag",
+		"alpha-test-case",
+	} {
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		resp := server.Client().Post(
+			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
+			api.ExecuteDAGJSONRequestBody{},
+		).ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.NotEmpty(t, body.DagRunId)
+	}
+
+	resp := server.Client().Get("/api/v1/dag-runs?name=test").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.ListDAGRuns200JSONResponse
+	resp.Unmarshal(t, &body)
+
+	names := make(map[string]bool)
+	for _, run := range body.DagRuns {
+		names[run.Name] = true
+	}
+
+	require.True(t, names["test-params-flag"])
+	require.True(t, names["alpha-test-case"])
+	require.False(t, names["other-dag"])
+}
+
+func TestListDAGRunsByNameRemainsExact(t *testing.T) {
+	server := test.SetupServer(t)
+
+	spec := `steps:
+  - name: main
+    command: "echo search"`
+
+	for _, dagName := range []string{
+		"test-params-flag",
+		"alpha-test-case",
+	} {
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		resp := server.Client().Post(
+			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
+			api.ExecuteDAGJSONRequestBody{},
+		).ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.NotEmpty(t, body.DagRunId)
+	}
+
+	resp := server.Client().Get("/api/v1/dag-runs/test-params-flag").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.ListDAGRunsByName200JSONResponse
+	resp.Unmarshal(t, &body)
+
+	require.NotEmpty(t, body.DagRuns)
+	for _, run := range body.DagRuns {
+		require.Equal(t, "test-params-flag", run.Name)
+	}
 }
