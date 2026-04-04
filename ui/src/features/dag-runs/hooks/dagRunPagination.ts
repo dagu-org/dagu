@@ -13,7 +13,7 @@ export type DAGRunSummary = components['schemas']['DAGRunSummary'];
 export type DAGRunsPageResponse = components['schemas']['DAGRunsPageResponse'];
 export type DAGRunListQuery = paths['/dag-runs']['get']['parameters']['query'];
 
-const MAX_DAG_RUN_PAGE_LIMIT = 500;
+const EXACT_DAG_RUN_PAGE_LIMIT = 100;
 
 function normalizeDAGRunListQuery(
   query: DAGRunListQuery | undefined
@@ -70,12 +70,20 @@ async function fetchDAGRunsPage(
   return (response.data ?? { dagRuns: [] }) as DAGRunsPageResponse;
 }
 
+type FetchAllDAGRunsOptions = {
+  signal: AbortSignal;
+  onPage?: (
+    dagRuns: DAGRunSummary[],
+    page: DAGRunsPageResponse
+  ) => void;
+};
+
 export async function fetchAllDAGRuns(
   client: ReturnType<typeof useClient>,
   query: DAGRunListQuery,
-  signal: AbortSignal
+  { signal, onPage }: FetchAllDAGRunsOptions
 ): Promise<DAGRunSummary[]> {
-  const allRuns: DAGRunSummary[] = [];
+  let allRuns: DAGRunSummary[] = [];
   let cursor: string | undefined;
 
   for (;;) {
@@ -87,13 +95,14 @@ export async function fetchAllDAGRuns(
       client,
       {
         ...query,
-        limit: MAX_DAG_RUN_PAGE_LIMIT,
+        limit: EXACT_DAG_RUN_PAGE_LIMIT,
         cursor,
       },
       signal
     );
 
-    allRuns.push(...(page.dagRuns ?? []));
+    allRuns = mergeUniqueDAGRuns(allRuns, page.dagRuns ?? []);
+    onPage?.(allRuns, page);
     if (!page.nextCursor) {
       return allRuns;
     }
@@ -167,7 +176,9 @@ export function useExactDAGRuns({
     controllerRef.current = controller;
     setError(null);
 
-    if (dataRef.current.length === 0) {
+    const hadExistingData = dataRef.current.length > 0;
+
+    if (!hadExistingData) {
       setIsLoading(true);
     } else {
       setIsValidating(true);
@@ -177,7 +188,26 @@ export function useExactDAGRuns({
       const next = await fetchAllDAGRuns(
         client,
         queryRef.current,
-        controller.signal
+        {
+          signal: controller.signal,
+          onPage: (pageRuns, page) => {
+            if (
+              controller.signal.aborted ||
+              requestID !== requestIDRef.current
+            ) {
+              return;
+            }
+
+            dataRef.current = pageRuns;
+            setData(pageRuns);
+            setError(null);
+
+            if (!hadExistingData) {
+              setIsLoading(false);
+              setIsValidating(Boolean(page.nextCursor));
+            }
+          },
+        }
       );
       if (controller.signal.aborted || requestID !== requestIDRef.current) {
         return;

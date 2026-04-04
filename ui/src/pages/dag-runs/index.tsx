@@ -95,6 +95,30 @@ const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters): boolean =>
   a.specificPeriod === b.specificPeriod &&
   a.specificValue === b.specificValue;
 
+function useAutoLoadMore(
+  sentinelRef: React.RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  onLoadMore: () => void
+) {
+  React.useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !enabled || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [enabled, onLoadMore, sentinelRef]);
+}
+
 function DAGRuns() {
   const location = useLocation();
   const appBarContext = React.useContext(AppBarContext);
@@ -214,6 +238,8 @@ function DAGRuns() {
     name: string;
     dagRunId: string;
   } | null>(null);
+  const loadMoreSentinelRef = React.useRef<HTMLDivElement>(null);
+  const autoLoadPendingRef = React.useRef(false);
 
   // View mode comes from user preferences (local storage)
   const viewMode = preferences.dagRunsViewMode;
@@ -444,6 +470,22 @@ function DAGRuns() {
   } = usePaginatedDAGRuns({
     query: dagRunQuery,
   });
+  React.useEffect(() => {
+    if (!isLoadingMore) {
+      autoLoadPendingRef.current = false;
+    }
+  }, [isLoadingMore]);
+  useAutoLoadMore(
+    loadMoreSentinelRef,
+    hasMore && !isLoadingMore && !loadMoreError,
+    () => {
+      if (autoLoadPendingRef.current) {
+        return;
+      }
+      autoLoadPendingRef.current = true;
+      void handleLoadMore();
+    }
+  );
   const {
     clearSelection,
     replaceSelection,
@@ -909,13 +951,14 @@ function DAGRuns() {
             <div className="text-sm text-error">{loadMoreError}</div>
           )}
           {hasMore ? (
-            <Button
-              variant="outline"
-              onClick={() => void handleLoadMore()}
-              disabled={isLoadingMore}
-            >
-              {isLoadingMore ? 'Loading...' : 'Load more'}
-            </Button>
+            <>
+              <div ref={loadMoreSentinelRef} className="h-4 w-full" />
+              {isLoadingMore && (
+                <div className="text-sm text-muted-foreground">
+                  Loading more DAG runs...
+                </div>
+              )}
+            </>
           ) : dagRuns.length > 0 ? (
             <div className="text-sm text-muted-foreground">
               All loaded DAG runs are displayed.
