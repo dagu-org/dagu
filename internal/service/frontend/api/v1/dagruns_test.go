@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -684,7 +685,12 @@ func TestRejectDAGRunStepNotWaiting(t *testing.T) {
 }
 
 func TestRescheduleDAGRun(t *testing.T) {
-	server := test.SetupServer(t)
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "reschedule_dag", MaxActiveRuns: 1},
+		}
+	}))
 
 	dagSpec := `steps:
   - name: main
@@ -722,6 +728,9 @@ func TestRescheduleDAGRun(t *testing.T) {
 	var rescheduleBody api.RescheduleDAGRun200JSONResponse
 	rescheduleResp.Unmarshal(t, &rescheduleBody)
 	require.NotEmpty(t, rescheduleBody.DagRunId)
+	require.True(t, rescheduleBody.Queued)
+
+	test.ProcessQueuedInlineRun(t, server, "reschedule_dag")
 
 	require.Eventually(t, func() bool {
 		url := fmt.Sprintf("/api/v1/dags/reschedule_dag/dag-runs/%s", rescheduleBody.DagRunId)
@@ -737,7 +746,12 @@ func TestRescheduleDAGRun(t *testing.T) {
 }
 
 func TestRescheduleDAGRunResolvesLatest(t *testing.T) {
-	server := test.SetupServer(t)
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "reschedule_latest_dag", MaxActiveRuns: 1},
+		}
+	}))
 
 	dagSpec := `steps:
   - name: main
@@ -775,6 +789,9 @@ func TestRescheduleDAGRunResolvesLatest(t *testing.T) {
 	var rescheduleBody api.RescheduleDAGRun200JSONResponse
 	rescheduleResp.Unmarshal(t, &rescheduleBody)
 	require.NotEmpty(t, rescheduleBody.DagRunId)
+	require.True(t, rescheduleBody.Queued)
+
+	test.ProcessQueuedInlineRun(t, server, "reschedule_latest_dag")
 
 	require.Eventually(t, func() bool {
 		url := fmt.Sprintf("/api/v1/dags/reschedule_latest_dag/dag-runs/%s", rescheduleBody.DagRunId)
@@ -790,23 +807,153 @@ func TestRescheduleDAGRunResolvesLatest(t *testing.T) {
 }
 
 func TestRescheduleDAGRunFromInlineStartUsesPersistedSnapshot(t *testing.T) {
-	server := test.SetupServer(t)
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "inline_reschedule_start", MaxActiveRuns: 1},
+		}
+	}))
 
 	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_start", false)
 	require.NoFileExists(t, dagLocation)
+	assertRescheduleSpecSourceFlag(t, server, "inline_reschedule_start", runID, false)
 
 	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_start", runID)
+	test.ProcessQueuedInlineRun(t, server, "inline_reschedule_start")
 	test.AssertInlineRescheduledRunParams(t, server, "inline_reschedule_start", rescheduledRunID)
 }
 
 func TestRescheduleDAGRunFromInlineEnqueueUsesPersistedSnapshot(t *testing.T) {
-	server := test.SetupServer(t)
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "inline_reschedule_enqueue", MaxActiveRuns: 1},
+		}
+	}))
 
 	runID, dagLocation := test.CreateInlineDAGRunForReschedule(t, server, "inline_reschedule_enqueue", true)
 	require.NoFileExists(t, dagLocation)
+	assertRescheduleSpecSourceFlag(t, server, "inline_reschedule_enqueue", runID, false)
 
 	rescheduledRunID := rescheduleInlineDAGRun(t, server, "inline_reschedule_enqueue", runID)
+	test.ProcessQueuedInlineRun(t, server, "inline_reschedule_enqueue")
 	test.AssertInlineRescheduledRunParams(t, server, "inline_reschedule_enqueue", rescheduledRunID)
+}
+
+func TestRescheduleDAGRunCanUseCurrentDAGFile(t *testing.T) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "reschedule_use_current_file", MaxActiveRuns: 1},
+		}
+	}))
+
+	dagName := "reschedule_use_current_file"
+	initialSpec := `queue: reschedule_use_current_file
+steps:
+  - name: main
+    command: echo stored snapshot`
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: dagName,
+		Spec: &initialSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dags/%s/start", dagName),
+		api.ExecuteDAGJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	currentSpec := `queue: reschedule_use_current_file
+steps:
+  - name: main
+    command: echo current file`
+	dagPath := filepath.Join(server.Config.Paths.DAGsDir, dagName+".yaml")
+	assertRescheduleSpecSourceFlag(t, server, dagName, startBody.DagRunId, true)
+	originalAttempt, originalDAG := test.WaitForAttemptSnapshotWithDAG(t, server, dagName, startBody.DagRunId)
+	require.NotNil(t, originalAttempt)
+	require.Equal(t, dagPath, originalDAG.SourceFile)
+	require.NoError(t, os.WriteFile(dagPath, []byte(currentSpec), 0o600))
+	useCurrentDagFile := true
+
+	resp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/reschedule", dagName, startBody.DagRunId),
+		api.RescheduleDAGRunJSONRequestBody{UseCurrentDagFile: &useCurrentDagFile},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.RescheduleDAGRun200JSONResponse
+	resp.Unmarshal(t, &body)
+	require.NotEmpty(t, body.DagRunId)
+	require.True(t, body.Queued)
+
+	test.ProcessQueuedInlineRun(t, server, dagName)
+
+	attempt, dag := test.WaitForAttemptSnapshotWithDAG(t, server, dagName, body.DagRunId)
+	require.Contains(t, string(dag.YamlData), "echo current file")
+	require.Equal(t, dagPath, dag.SourceFile)
+
+	require.Eventually(t, func() bool {
+		status, err := attempt.ReadStatus(server.Context)
+		return err == nil && status.Status == core.Succeeded
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
+func TestRescheduleDAGRunRequiresQueuesEnabled(t *testing.T) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = false
+		cfg.Queues.Config = nil
+	}))
+
+	dagSpec := `steps:
+  - name: main
+    command: "echo reschedule disabled"`
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: "reschedule_requires_queue_dag",
+		Spec: &dagSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	startResp := server.Client().Post(
+		"/api/v1/dags/reschedule_requires_queue_dag/start",
+		api.ExecuteDAGJSONRequestBody{},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var startBody api.ExecuteDAG200JSONResponse
+	startResp.Unmarshal(t, &startBody)
+	require.NotEmpty(t, startBody.DagRunId)
+
+	require.Eventually(t, func() bool {
+		url := fmt.Sprintf("/api/v1/dags/reschedule_requires_queue_dag/dag-runs/%s", startBody.DagRunId)
+		statusResp := server.Client().Get(url).Send(t)
+		if statusResp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
+		statusResp.Unmarshal(t, &dagRunStatus)
+		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
+	}, 10*time.Second, 200*time.Millisecond)
+
+	server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/reschedule", "reschedule_requires_queue_dag", startBody.DagRunId),
+		api.RescheduleDAGRunJSONRequestBody{},
+	).ExpectStatus(http.StatusBadRequest).Send(t)
 }
 
 func TestRetryDAGRunQueuesRetryForQueuedDAGs(t *testing.T) {
@@ -1170,7 +1317,21 @@ func rescheduleInlineDAGRun(t *testing.T, server test.Server, dagName, dagRunID 
 	var body api.RescheduleDAGRun200JSONResponse
 	resp.Unmarshal(t, &body)
 	require.NotEmpty(t, body.DagRunId)
+	require.True(t, body.Queued)
 	return body.DagRunId
+}
+
+func assertRescheduleSpecSourceFlag(t *testing.T, server test.Server, dagName, dagRunID string, want bool) {
+	t.Helper()
+
+	resp := server.Client().Get(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, dagRunID),
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.GetDAGRunDetails200JSONResponse
+	resp.Unmarshal(t, &body)
+	got := body.DagRunDetails.SpecFromFile != nil && *body.DagRunDetails.SpecFromFile
+	require.Equal(t, want, got)
 }
 
 func TestExecuteDAGSyncSingleton(t *testing.T) {
@@ -1344,4 +1505,85 @@ steps:
 	}
 	require.True(t, caseInsensitiveNames["tag_filter_prod"], "case-insensitive: prod DAG should be in CRITICAL filter results")
 	require.True(t, caseInsensitiveNames["tag_filter_dev"], "case-insensitive: dev DAG should be in CRITICAL filter results")
+}
+
+func TestListDAGRunsFilterByPartialName(t *testing.T) {
+	server := test.SetupServer(t)
+
+	spec := `steps:
+  - name: main
+    command: "echo search"`
+
+	for _, dagName := range []string{
+		"test-params-flag",
+		"other-dag",
+		"alpha-test-case",
+	} {
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		resp := server.Client().Post(
+			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
+			api.ExecuteDAGJSONRequestBody{},
+		).ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.NotEmpty(t, body.DagRunId)
+	}
+
+	resp := server.Client().Get("/api/v1/dag-runs?name=test").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.ListDAGRuns200JSONResponse
+	resp.Unmarshal(t, &body)
+
+	names := make(map[string]bool)
+	for _, run := range body.DagRuns {
+		names[run.Name] = true
+	}
+
+	require.True(t, names["test-params-flag"])
+	require.True(t, names["alpha-test-case"])
+	require.False(t, names["other-dag"])
+}
+
+func TestListDAGRunsByNameRemainsExact(t *testing.T) {
+	server := test.SetupServer(t)
+
+	spec := `steps:
+  - name: main
+    command: "echo search"`
+
+	for _, dagName := range []string{
+		"test-params-flag",
+		"alpha-test-case",
+	} {
+		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+			Name: dagName,
+			Spec: &spec,
+		}).ExpectStatus(http.StatusCreated).Send(t)
+
+		resp := server.Client().Post(
+			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
+			api.ExecuteDAGJSONRequestBody{},
+		).ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.ExecuteDAG200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.NotEmpty(t, body.DagRunId)
+	}
+
+	resp := server.Client().Get("/api/v1/dag-runs/test-params-flag").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var body api.ListDAGRunsByName200JSONResponse
+	resp.Unmarshal(t, &body)
+
+	require.NotEmpty(t, body.DagRuns)
+	for _, run := range body.DagRuns {
+		require.Equal(t, "test-params-flag", run.Name)
+	}
 }

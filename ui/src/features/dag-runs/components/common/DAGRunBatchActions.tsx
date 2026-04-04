@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useClient } from '@/hooks/api';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import React from 'react';
 import { DAGRunSelectionItem } from '../../hooks/useBulkDAGRunSelection';
@@ -46,6 +50,8 @@ function DAGRunBatchActions({
   onSelectAllLoaded,
   selectedRuns,
 }: DAGRunBatchActionsProps) {
+  const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
   const {
     activeBatch,
     closeDialog,
@@ -64,11 +70,69 @@ function DAGRunBatchActions({
   const totalCount = snapshot.length;
   const isLocked = phase === 'running' || progress.isRefreshing;
   const isProcessing = phase === 'running' || phase === 'complete';
+  const [specFromFile, setSpecFromFile] = React.useState(false);
+  const [useCurrentDagFile, setUseCurrentDagFile] = React.useState(false);
+  const [rescheduleSourceLoading, setRescheduleSourceLoading] =
+    React.useState(false);
 
   const summaryText =
     selectedCount === 0
       ? `${loadedCount} loaded`
       : `${selectedCount} selected of ${loadedCount} loaded`;
+
+  React.useEffect(() => {
+    if (phase !== 'confirm' || activeBatch?.action !== 'reschedule') {
+      setSpecFromFile(false);
+      setUseCurrentDagFile(false);
+      setRescheduleSourceLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRescheduleSourceLoading(true);
+
+    Promise.all(
+      activeBatch.snapshot.map(async (dagRun) => {
+        const { data } = await client.GET('/dag-runs/{name}/{dagRunId}', {
+          params: {
+            path: {
+              name: dagRun.name,
+              dagRunId: dagRun.dagRunId,
+            },
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+          },
+        });
+
+        return Boolean(data?.dagRunDetails?.specFromFile);
+      })
+    )
+      .then((results) => {
+        if (cancelled) {
+          return;
+        }
+        const available = results.length > 0 && results.every(Boolean);
+        setSpecFromFile(available);
+        setUseCurrentDagFile(available);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setSpecFromFile(false);
+        setUseCurrentDagFile(false);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRescheduleSourceLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBatch, appBarContext.selectedRemoteNode, client, phase]);
 
   const renderResultDetails = (
     action: BatchActionType,
@@ -200,6 +264,57 @@ function DAGRunBatchActions({
                   </div>
                 ))}
               </div>
+              {activeBatch.action === 'reschedule' && (
+                <div
+                  role="button"
+                  tabIndex={rescheduleSourceLoading || !specFromFile ? -1 : 0}
+                  aria-disabled={rescheduleSourceLoading || !specFromFile}
+                  onClick={() => {
+                    if (rescheduleSourceLoading || !specFromFile) {
+                      return;
+                    }
+                    setUseCurrentDagFile((value) => !value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      rescheduleSourceLoading ||
+                      !specFromFile ||
+                      (event.key !== 'Enter' && event.key !== ' ')
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    setUseCurrentDagFile((value) => !value);
+                  }}
+                  className="flex w-full items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-70 aria-disabled:hover:bg-transparent"
+                >
+                  <Checkbox
+                    id="use-current-dag-file-batch"
+                    aria-label="Use original DAG file"
+                    checked={useCurrentDagFile}
+                    disabled={rescheduleSourceLoading || !specFromFile}
+                    onCheckedChange={(checked) =>
+                      setUseCurrentDagFile(checked as boolean)
+                    }
+                    className="mt-0.5 h-5 w-5 border-border pointer-events-none"
+                  />
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="use-current-dag-file-batch"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      Use original DAG file
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {rescheduleSourceLoading
+                        ? 'Checking whether the selected DAG runs still have their original DAG files.'
+                        : specFromFile
+                          ? 'Use the current spec from the original DAG file for every selected DAG run.'
+                          : 'Stored YAML snapshots will be used because one or more selected DAG runs do not have the original DAG file available.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -303,7 +418,15 @@ function DAGRunBatchActions({
                 <Button variant="outline" onClick={closeDialog}>
                   Cancel
                 </Button>
-                <Button onClick={submitBatchAction}>
+                <Button
+                  onClick={() =>
+                    submitBatchAction(
+                      activeBatch.action === 'reschedule'
+                        ? { useCurrentDagFile }
+                        : undefined
+                    )
+                  }
+                >
                   {activeBatch.action === 'retry'
                     ? `Retry ${activeBatch.snapshot.length} Run${activeBatch.snapshot.length === 1 ? '' : 's'}`
                     : `Reschedule ${activeBatch.snapshot.length} Run${activeBatch.snapshot.length === 1 ? '' : 's'}`}

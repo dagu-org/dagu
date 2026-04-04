@@ -413,4 +413,13 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		assert.True(t, task.ExternalStepRetry)
 	})
+
+	t.Run("WithSourceFile", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+		executor.WithSourceFile("/dags/test-dag.yaml")(task)
+
+		assert.Equal(t, "/dags/test-dag.yaml", task.SourceFile)
+	})
 }

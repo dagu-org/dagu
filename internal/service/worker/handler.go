@@ -141,6 +141,7 @@ func (e *taskHandler) subprocessHints(ctx context.Context, task *coordinatorv1.T
 	if err != nil {
 		return nil, fmt.Errorf("failed to load DAG for subprocess hints: %w", err)
 	}
+	dag.SourceFile = task.SourceFile
 
 	params, err := retryParams(task, dag)
 	if err != nil {

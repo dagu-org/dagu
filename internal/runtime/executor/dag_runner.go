@@ -322,6 +322,9 @@ func (e *SubDAGExecutor) coordinatorTaskOptions(ctx context.Context, extra ...Ta
 		WithWorkerSelector(e.DAG.WorkerSelector),
 		WithBaseConfig(baseConfig),
 	}
+	if e.DAG.SourceFile != "" {
+		options = append(options, WithSourceFile(e.DAG.SourceFile))
+	}
 	if e.externalStepRetry {
 		options = append(options, WithExternalStepRetry(true))
 	}

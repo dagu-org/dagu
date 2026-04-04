@@ -15,6 +15,7 @@ import { useClient } from '@/hooks/api';
 import DAGRunBatchActions from '../DAGRunBatchActions';
 
 const postMock = vi.fn();
+const getMock = vi.fn();
 
 vi.mock('@/hooks/api', () => ({
   useClient: vi.fn(),
@@ -41,7 +42,9 @@ const createDeferred = <T,>() => {
 describe('DAGRunBatchActions', () => {
   beforeEach(() => {
     postMock.mockReset();
+    getMock.mockReset();
     useClientMock.mockReturnValue({
+      GET: getMock,
       POST: postMock,
     } as never);
   });
@@ -63,6 +66,21 @@ describe('DAGRunBatchActions', () => {
     postMock
       .mockImplementationOnce(() => firstRequest.promise)
       .mockImplementationOnce(() => secondRequest.promise);
+    getMock
+      .mockResolvedValueOnce({
+        data: {
+          dagRunDetails: {
+            specFromFile: true,
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          dagRunDetails: {
+            specFromFile: true,
+          },
+        },
+      });
 
     const onActionComplete = vi
       .fn()
@@ -88,6 +106,9 @@ describe('DAGRunBatchActions', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Reschedule selected' })
     );
+    expect(
+      await screen.findByLabelText('Use original DAG file')
+    ).toBeChecked();
     fireEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Reschedule 2 Runs',
@@ -110,6 +131,7 @@ describe('DAGRunBatchActions', () => {
         },
         body: {
           dagRunId: undefined,
+          useCurrentDagFile: true,
         },
       }
     );
@@ -142,6 +164,7 @@ describe('DAGRunBatchActions', () => {
         },
         body: {
           dagRunId: undefined,
+          useCurrentDagFile: true,
         },
       }
     );
@@ -221,6 +244,13 @@ describe('DAGRunBatchActions', () => {
     postMock.mockResolvedValueOnce({
       data: {},
     });
+    getMock.mockResolvedValueOnce({
+      data: {
+        dagRunDetails: {
+          specFromFile: false,
+        },
+      },
+    });
 
     render(
       <AppBarContext.Provider value={appBarContextValue}>
@@ -247,6 +277,53 @@ describe('DAGRunBatchActions', () => {
     expect(
       await screen.findByText(
         'Reschedule request did not return a new DAG run ID.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows the reschedule file checkbox as disabled when any selected run has no source file', async () => {
+    getMock
+      .mockResolvedValueOnce({
+        data: {
+          dagRunDetails: {
+            specFromFile: true,
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          dagRunDetails: {
+            specFromFile: false,
+          },
+        },
+      });
+
+    render(
+      <AppBarContext.Provider value={appBarContextValue}>
+        <DAGRunBatchActions
+          selectedRuns={[
+            { name: 'alpha', dagRunId: 'run-1' },
+            { name: 'beta', dagRunId: 'run-2' },
+          ]}
+          loadedCount={2}
+          onSelectAllLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
+          onReplaceSelection={vi.fn()}
+          onActionComplete={vi.fn().mockResolvedValue(undefined)}
+        />
+      </AppBarContext.Provider>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reschedule selected' })
+    );
+
+    const checkbox = await screen.findByLabelText('Use original DAG file');
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox).toBeDisabled();
+    expect(
+      screen.getByText(
+        'Stored YAML snapshots will be used because one or more selected DAG runs do not have the original DAG file available.'
       )
     ).toBeInTheDocument();
   });

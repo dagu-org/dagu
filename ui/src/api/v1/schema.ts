@@ -3290,6 +3290,8 @@ export interface components {
             onAbort?: components["schemas"]["Node"];
             /** @description List of preconditions that must be met before the DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
+            /** @description Whether this DAG-run still has a usable source file on disk, so reschedule can load the current spec from that file instead of the stored historical YAML snapshot. */
+            specFromFile?: boolean;
         };
         /** @description Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings. */
         DAGRunOutputs: {
@@ -7192,6 +7194,8 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override for the new run. */
                     dagName?: string;
+                    /** @description When true, reschedule from the current contents of the original DAG file instead of the stored historical YAML snapshot. */
+                    useCurrentDagFile?: boolean;
                 };
             };
         };

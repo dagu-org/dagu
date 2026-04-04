@@ -358,6 +358,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 			dag := &core.DAG{
 				Name:        defaultName(filePath),
 				Location:    filePath,
+				SourceFile:  filePath,
 				BuildErrors: []error{err},
 			}
 			return dag, nil
@@ -561,8 +562,9 @@ func processDAGDocument(
 		return nil, err
 	}
 
-	// Set the location for the core.DAG
+	// Preserve runtime location separately from source provenance.
 	dest.Location = filePath
+	dest.SourceFile = filePath
 
 	if docIndex == 0 {
 		// If this is the first document, set the entire core.DAG
