@@ -6,7 +6,7 @@ import { components } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 
-const defaultQueuePageSize = 100;
+const defaultQueuePageSize = 20;
 
 type QueueDAGRun = components['schemas']['DAGRunSummary'];
 
