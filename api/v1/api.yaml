@@ -3178,30 +3178,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-    delete:
-      summary: "Clear queued items for a specific queue"
-      description: "Clears queued DAG-runs for the specified queue on the server side. Running DAG-runs are not affected."
-      operationId: "deleteQueueItems"
-      tags:
-        - "queues"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - name: name
-          in: path
-          description: "Queue name"
-          required: true
-          schema:
-            type: string
-      responses:
-        "204":
-          description: "Queue cleared successfully"
-        default:
-          description: "Generic error response"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
   /services/resources/history:
     get:
       summary: "Get resource usage history"

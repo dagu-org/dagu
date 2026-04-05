@@ -235,13 +235,13 @@ function Queues() {
       <QueueMetrics metrics={metrics} isLoading={isLoading} />
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <QueueList
-          queues={filteredQueues}
-          isLoading={isLoading && !data}
-          onDAGRunClick={handleDAGRunClick}
-          onQueueCleared={handleRefresh}
-        />
-      </div>
+          <QueueList
+            queues={filteredQueues}
+            isLoading={isLoading && !data}
+            onDAGRunClick={handleDAGRunClick}
+            onQueueChanged={handleRefresh}
+          />
+        </div>
 
       {modalDAGRun && (
         <DAGRunDetailsModal

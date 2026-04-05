@@ -52,14 +52,3 @@ func mapAbortQueuedDAGRunAPIError(dagName, dagRunID string, err error) error {
 
 	return err
 }
-
-func isQueueAbortSkippable(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) || errors.Is(err, exec.ErrCorruptedStatusFile) {
-		return true
-	}
-	var notQueuedErr *exec.DAGRunNotQueuedError
-	return errors.As(err, &notQueuedErr)
-}

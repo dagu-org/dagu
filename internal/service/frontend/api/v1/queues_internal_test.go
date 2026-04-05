@@ -5,8 +5,6 @@ package api
 
 import (
 	"context"
-	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -18,7 +16,6 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filedistributed"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
-	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -93,94 +90,6 @@ func TestListQueueItemsRunningFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing
 	assert.Equal(t, "fresh-run", listResp.Items[0].DagRunId)
 }
 
-func TestDeleteQueueItemsClearsQueuedRuns(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	tmpDir := t.TempDir()
-	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
-	queueStore := filequeue.New(filepath.Join(tmpDir, "queues"))
-	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
-
-	dag := &core.DAG{
-		Name:  "clear-queue-dag",
-		Queue: "clear-q",
-		Steps: []core.Step{{Name: "step", Command: "echo hi"}},
-	}
-	runRef := createQueuedQueueRun(t, ctx, dagRunStore, queueStore, dag, "queued-run", core.Queued)
-
-	a := &API{
-		dagRunStore: dagRunStore,
-		queueStore:  queueStore,
-		procStore:   procStore,
-		config: &config.Config{
-			Server: config.Server{
-				Permissions: map[config.Permission]bool{
-					config.PermissionRunDAGs: true,
-				},
-			},
-		},
-	}
-
-	resp, err := a.DeleteQueueItems(ctx, openapiv1.DeleteQueueItemsRequestObject{Name: dag.ProcGroup()})
-	require.NoError(t, err)
-	_, ok := resp.(openapiv1.DeleteQueueItems204Response)
-	require.True(t, ok)
-
-	count, err := queueStore.Len(ctx, dag.ProcGroup())
-	require.NoError(t, err)
-	assert.Zero(t, count)
-
-	_, err = dagRunStore.FindAttempt(ctx, runRef)
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData))
-}
-
-func TestDeleteQueueItemsDropsStaleQueueItemWithoutChangingRunningStatus(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	tmpDir := t.TempDir()
-	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
-	queueStore := filequeue.New(filepath.Join(tmpDir, "queues"))
-	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
-
-	dag := &core.DAG{
-		Name:  "running-queue-dag",
-		Queue: "running-q",
-		Steps: []core.Step{{Name: "step", Command: "echo hi"}},
-	}
-	runRef := createQueuedQueueRun(t, ctx, dagRunStore, queueStore, dag, "running-run", core.Running)
-
-	a := &API{
-		dagRunStore: dagRunStore,
-		queueStore:  queueStore,
-		procStore:   procStore,
-		config: &config.Config{
-			Server: config.Server{
-				Permissions: map[config.Permission]bool{
-					config.PermissionRunDAGs: true,
-				},
-			},
-		},
-	}
-
-	resp, err := a.DeleteQueueItems(ctx, openapiv1.DeleteQueueItemsRequestObject{Name: dag.ProcGroup()})
-	require.NoError(t, err)
-	_, ok := resp.(openapiv1.DeleteQueueItems204Response)
-	require.True(t, ok)
-
-	count, err := queueStore.Len(ctx, dag.ProcGroup())
-	require.NoError(t, err)
-	assert.Zero(t, count)
-
-	attempt, err := dagRunStore.FindAttempt(ctx, runRef)
-	require.NoError(t, err)
-	status, err := attempt.ReadStatus(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, core.Running, status.Status)
-}
-
 func createDistributedQueueRun(
 	t *testing.T,
 	ctx context.Context,
@@ -226,41 +135,4 @@ func createDistributedQueueRun(
 		WorkerID:        "worker-1",
 		LastHeartbeatAt: lastHeartbeatAt.UTC().UnixMilli(),
 	}))
-}
-
-func createQueuedQueueRun(
-	t *testing.T,
-	ctx context.Context,
-	dagRunStore exec.DAGRunStore,
-	queueStore exec.QueueStore,
-	dag *core.DAG,
-	dagRunID string,
-	status core.Status,
-) exec.DAGRunRef {
-	t.Helper()
-
-	runRef := exec.NewDAGRunRef(dag.Name, dagRunID)
-	attempt, err := dagRunStore.CreateAttempt(ctx, dag, time.Now().UTC(), dagRunID, exec.NewDAGRunAttemptOptions{})
-	require.NoError(t, err)
-	require.NoError(t, attempt.Open(ctx))
-	defer func() {
-		require.NoError(t, attempt.Close(ctx))
-	}()
-
-	runStatus := exec.InitialStatus(dag)
-	runStatus.Status = status
-	runStatus.DAGRunID = dagRunID
-	runStatus.AttemptID = attempt.ID()
-	runStatus.CreatedAt = time.Now().UnixMilli()
-	logPath := filepath.Join(t.TempDir(), dagRunID+".log")
-	require.NoError(t, os.WriteFile(logPath, []byte(""), 0o600))
-	runStatus.Log = logPath
-	if status != core.Queued {
-		runStatus.StartedAt = time.Now().UTC().Format(time.RFC3339)
-	}
-
-	require.NoError(t, attempt.Write(ctx, runStatus))
-	require.NoError(t, queueStore.Enqueue(ctx, dag.ProcGroup(), exec.QueuePriorityLow, runRef))
-
-	return runRef
 }

@@ -290,6 +290,43 @@ func TestDispatchAndWaitForStartup_TransientRetryThenSuccess(t *testing.T) {
 	procStore.AssertExpectations(t)
 }
 
+func TestDispatchAndWaitForStartup_StaleQueueDispatchIsDiscarded(t *testing.T) {
+	dagRunStore := &mockDAGRunStore{}
+	procStore := &mockProcStore{}
+
+	disp := &mockDispatcher{
+		errFunc: func(_ int32) error {
+			return backoff.PermanentError(&exec.StaleQueueDispatchError{
+				Reason: "queued attempt was superseded",
+			})
+		},
+	}
+
+	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "")
+	dag := &core.DAG{Name: "test-dag"}
+	status := &exec.DAGRunStatus{Status: core.Queued, TriggerType: core.TriggerTypeScheduler}
+	runRef := exec.NewDAGRunRef("test-dag", "run-1")
+
+	p := &QueueProcessor{
+		dagRunStore: dagRunStore,
+		procStore:   procStore,
+		dagExecutor: dagExec,
+		quit:        make(chan struct{}),
+		wakeUpCh:    make(chan struct{}, 1),
+		backoffConfig: BackoffConfig{
+			InitialInterval:    10 * time.Millisecond,
+			MaxInterval:        50 * time.Millisecond,
+			MaxRetries:         5,
+			StartupGracePeriod: 10 * time.Millisecond,
+		},
+	}
+
+	started := p.dispatchAndWaitForStartup(context.Background(), "test-queue", runRef, dag, "run-1", status)
+	require.True(t, started)
+	require.Equal(t, int32(1), disp.callCount.Load())
+	procStore.AssertNotCalled(t, "IsRunAlive", mock.Anything, mock.Anything, mock.Anything)
+}
+
 func TestDispatchAndWaitForStartup_PermanentErrorStopsRetry(t *testing.T) {
 	dagRunStore := &mockDAGRunStore{}
 	procStore := &mockProcStore{}
