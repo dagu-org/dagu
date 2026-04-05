@@ -108,4 +108,23 @@ describe('cockpit count labels', () => {
       'Running2+'
     );
   });
+
+  it('bounds the mobile column area so the active tab can scroll internally', () => {
+    const columns: KanbanColumns = {
+      queued: createColumn(),
+      running: createColumn({ hasMore: true }),
+      review: createColumn({ runs: [] }),
+      done: createColumn({ runs: [] }),
+      failed: createColumn({ runs: [] }),
+    };
+
+    const { container } = render(
+      <MobileKanbanBoard columns={columns} onCardClick={() => {}} />
+    );
+
+    const boardRoot = container.firstElementChild;
+    expect(boardRoot).toHaveClass('max-h-[70vh]');
+    expect(boardRoot).toHaveClass('overflow-hidden');
+    expect(boardRoot?.lastElementChild).toHaveClass('overflow-hidden');
+  });
 });

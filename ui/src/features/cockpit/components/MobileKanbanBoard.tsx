@@ -44,7 +44,7 @@ export function MobileKanbanBoard({
   }, []);
 
   return (
-    <div className="flex flex-col min-h-0">
+    <div className="flex min-h-0 max-h-[70vh] flex-col overflow-hidden">
       <Tabs className="overflow-x-auto border-b-0 mb-1">
         {COLUMN_KEYS.map((key) => {
           const count = columns[key].runs.length;
@@ -66,12 +66,14 @@ export function MobileKanbanBoard({
           );
         })}
       </Tabs>
-      <KanbanColumn
-        title={COLUMN_LABELS[activeTab]}
-        column={columns[activeTab]}
-        onCardClick={onCardClick}
-        hideHeader
-      />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <KanbanColumn
+          title={COLUMN_LABELS[activeTab]}
+          column={columns[activeTab]}
+          onCardClick={onCardClick}
+          hideHeader
+        />
+      </div>
     </div>
   );
 }
