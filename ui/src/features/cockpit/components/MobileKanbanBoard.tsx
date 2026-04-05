@@ -48,6 +48,7 @@ export function MobileKanbanBoard({
       <Tabs className="overflow-x-auto border-b-0 mb-1">
         {COLUMN_KEYS.map((key) => {
           const count = columns[key].runs.length;
+          const countLabel = `${count}${columns[key].hasMore ? '+' : ''}`;
           return (
             <Tab
               key={key}
@@ -56,8 +57,10 @@ export function MobileKanbanBoard({
               className="h-8 px-2 text-xs"
             >
               {COLUMN_LABELS[key]}
-              {count > 0 && (
-                <span className="ml-1 text-muted-foreground/60">{count}</span>
+              {(count > 0 || columns[key].hasMore) && (
+                <span className="ml-1 text-muted-foreground/60">
+                  {countLabel}
+                </span>
               )}
             </Tab>
           );

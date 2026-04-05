@@ -21,6 +21,7 @@ export function KanbanColumn({
 }: Props): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const visibleCountLabel = `${column.runs.length}${column.hasMore ? '+' : ''}`;
 
   useEffect(() => {
     const root = scrollRef.current;
@@ -56,7 +57,7 @@ export function KanbanColumn({
             {title}
           </span>
           <span className="text-[11px] text-muted-foreground/60">
-            {column.runs.length}
+            {visibleCountLabel}
           </span>
         </div>
       )}
