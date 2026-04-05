@@ -71,6 +71,7 @@ function Dashboard(): React.ReactElement | null {
   } | null>(null);
   const autoLoadSentinelRef = React.useRef<HTMLDivElement>(null);
   const [autoLoadRequested, setAutoLoadRequested] = React.useState(false);
+  const lastWindowScrollYRef = React.useRef(0);
 
   type DashboardFilters = {
     selectedDAGRun: string;
@@ -243,18 +244,35 @@ function Dashboard(): React.ReactElement | null {
   }, [appBarContext]);
 
   React.useEffect(() => {
+    lastWindowScrollYRef.current = window.scrollY;
+
     const requestAutoLoad = () => {
+      const currentScrollY = window.scrollY;
+      const isScrollingDown = currentScrollY > lastWindowScrollYRef.current;
+      lastWindowScrollYRef.current = currentScrollY;
+
+      if (!isScrollingDown) {
+        return;
+      }
+
+      const documentHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      const viewportBottom = currentScrollY + window.innerHeight;
+      const distanceToBottom = documentHeight - viewportBottom;
+
+      if (distanceToBottom > 200) {
+        return;
+      }
+
       setAutoLoadRequested(true);
     };
 
     window.addEventListener('scroll', requestAutoLoad, { passive: true });
-    window.addEventListener('wheel', requestAutoLoad, { passive: true });
-    window.addEventListener('touchmove', requestAutoLoad, { passive: true });
 
     return () => {
       window.removeEventListener('scroll', requestAutoLoad);
-      window.removeEventListener('wheel', requestAutoLoad);
-      window.removeEventListener('touchmove', requestAutoLoad);
     };
   }, []);
 
