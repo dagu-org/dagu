@@ -18,6 +18,7 @@ import { useSearchState } from '../contexts/SearchStateContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import { usePaginatedDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
+import { optionalPositiveInt } from '../hooks/queryUtils';
 import PathsCard from '../features/system-status/components/PathsCard';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
@@ -174,17 +175,23 @@ function Dashboard(): React.ReactElement | null {
   };
 
   const selectedDAGName = selectedDAGRun !== 'all' ? selectedDAGRun : undefined;
+  const dashboardPageLimit = React.useMemo(
+    () => optionalPositiveInt(config.maxDashboardPageLimit),
+    [config.maxDashboardPageLimit]
+  );
   const dagRunsQuery = React.useMemo(
     () => ({
       remoteNode: appBarContext.selectedRemoteNode || 'local',
       fromDate: dateRange.startDate,
       toDate: dateRange.endDate,
       name: selectedDAGName,
-      limit: config.maxDashboardPageLimit,
+      ...(dashboardPageLimit !== undefined
+        ? { limit: dashboardPageLimit }
+        : {}),
     }),
     [
       appBarContext.selectedRemoteNode,
-      config.maxDashboardPageLimit,
+      dashboardPageLimit,
       dateRange.endDate,
       dateRange.startDate,
       selectedDAGName,

@@ -17,7 +17,7 @@
           version: "{{ version }}",
           tz: "{{ tz }}",
           tzOffsetInSec: +"{{ tzOffsetInSec }}",
-          maxDashboardPageLimit: "{{ maxDashboardPageLimit }}",
+          maxDashboardPageLimit: +"{{ maxDashboardPageLimit }}",
           remoteNodes: "{{ remoteNodes }}",
           initialWorkspaces: (() => { try { return JSON.parse('{{ js initialWorkspacesJSON }}'); } catch { return []; } })(),
           authMode: "{{ authMode }}",
