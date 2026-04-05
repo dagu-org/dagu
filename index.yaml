@@ -1,0 +1,22 @@
+apiVersion: v1
+entries:
+  dagu:
+  - apiVersion: v2
+    created: "2026-04-05T18:57:34.716036+09:00"
+    description: A DAG-based workflow engine
+    digest: df09dcadec44dd21ff1b6282a26e35885ed393d9edd1164ba606179d63bd98e7
+    name: dagu
+    type: application
+    urls:
+    - https://dagucloud.github.io/dagu/dagu-1.0.4.tgz
+    version: 1.0.4
+  - apiVersion: v2
+    created: "2026-04-05T18:57:34.715725+09:00"
+    description: A DAG-based workflow engine
+    digest: fdef8d50724495148c29ab18efb385c3cb54f2aa4a4b4f998fc8f5d48161727a
+    name: dagu
+    type: application
+    urls:
+    - https://dagucloud.github.io/dagu/dagu-1.0.2.tgz
+    version: 1.0.2
+generated: "2026-04-05T18:57:34.7149+09:00"
