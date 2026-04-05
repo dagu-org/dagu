@@ -27,26 +27,47 @@ const (
 	DefaultNotificationLockStaleThreshold    = 45 * time.Second
 )
 
+var defaultInterestedNotificationEventTypes = []eventstore.EventType{
+	eventstore.TypeDAGRunWaiting,
+	eventstore.TypeDAGRunSucceeded,
+	eventstore.TypeDAGRunFailed,
+	eventstore.TypeDAGRunAborted,
+	eventstore.TypeDAGRunRejected,
+}
+
 // NotificationMonitorConfig controls source polling, batching, and shutdown behavior.
 type NotificationMonitorConfig struct {
-	PollInterval      time.Duration
-	SeenEvictInterval time.Duration
-	SeenTTL           time.Duration
-	FlushTimeout      time.Duration
-	UrgentWindow      time.Duration
-	SuccessWindow     time.Duration
+	PollInterval         time.Duration
+	SeenEvictInterval    time.Duration
+	SeenTTL              time.Duration
+	FlushTimeout         time.Duration
+	UrgentWindow         time.Duration
+	SuccessWindow        time.Duration
+	InterestedEventTypes []eventstore.EventType
 }
 
 // DefaultNotificationMonitorConfig returns the default monitor settings.
 func DefaultNotificationMonitorConfig() NotificationMonitorConfig {
 	return NotificationMonitorConfig{
-		PollInterval:      DefaultNotificationMonitorPollInterval,
-		SeenEvictInterval: DefaultNotificationSeenEvictInterval,
-		SeenTTL:           DefaultNotificationSeenTTL,
-		FlushTimeout:      DefaultNotificationFlushTimeout,
-		UrgentWindow:      DefaultUrgentNotificationWindow,
-		SuccessWindow:     DefaultSuccessNotificationWindow,
+		PollInterval:         DefaultNotificationMonitorPollInterval,
+		SeenEvictInterval:    DefaultNotificationSeenEvictInterval,
+		SeenTTL:              DefaultNotificationSeenTTL,
+		FlushTimeout:         DefaultNotificationFlushTimeout,
+		UrgentWindow:         DefaultUrgentNotificationWindow,
+		SuccessWindow:        DefaultSuccessNotificationWindow,
+		InterestedEventTypes: append([]eventstore.EventType(nil), defaultInterestedNotificationEventTypes...),
 	}
+}
+
+func interestedEventTypeSet(eventTypes []eventstore.EventType) map[eventstore.EventType]struct{} {
+	set := make(map[eventstore.EventType]struct{}, len(eventTypes))
+	for _, eventType := range eventTypes {
+		if eventType == "" {
+			continue
+		}
+		set[eventType] = struct{}{}
+	}
+	return set
 }
 
 // NotificationTransport supplies destination discovery and transport-specific delivery.
@@ -64,6 +85,7 @@ type NotificationMonitor struct {
 	transport    NotificationTransport
 	logger       *slog.Logger
 	cfg          NotificationMonitorConfig
+	interested   map[eventstore.EventType]struct{}
 
 	batcherMu sync.RWMutex
 	batcher   *NotificationBatcher
@@ -117,6 +139,7 @@ func NewNotificationMonitor(
 		transport:    transport,
 		logger:       logger,
 		cfg:          cfg,
+		interested:   interestedEventTypeSet(cfg.InterestedEventTypes),
 		batcher:      NewNotificationBatcher(cfg.UrgentWindow, cfg.SuccessWindow),
 		state:        newNotificationMonitorState(),
 	}
@@ -166,6 +189,10 @@ func (m *NotificationMonitor) NotifyCompletion(status *exec.DAGRunStatus) bool {
 	if status == nil {
 		return false
 	}
+	eventType, ok := eventstore.PersistedDAGRunEventTypeForStatus(status.Status)
+	if !ok || !m.isInterestedEventType(eventType) {
+		return false
+	}
 	if !m.canMutateNotificationState("Notification lock is not held; cannot queue notification") {
 		return false
 	}
@@ -178,6 +205,7 @@ func (m *NotificationMonitor) NotifyCompletion(status *exec.DAGRunStatus) bool {
 
 	event := NotificationEvent{
 		Key:        NotificationSeenKey(status),
+		Type:       eventType,
 		Status:     cloneNotificationStatus(status),
 		ObservedAt: time.Now().UTC(),
 	}
@@ -342,21 +370,21 @@ func (m *NotificationMonitor) pollSource(ctx context.Context) {
 	cursor := m.state.SourceCursor
 	m.stateMu.Unlock()
 
-	events, nextCursor, err := m.eventService.ReadNotificationEvents(ctx, cursor)
+	events, nextCursor, err := m.eventService.ReadDAGRunEvents(ctx, cursor)
 	if err != nil {
-		m.logger.Debug("Failed to read notification events", slog.String("error", err.Error()))
+		m.logger.Debug("Failed to read DAG-run events", slog.String("error", err.Error()))
 		return
 	}
 
 	destinations := m.transport.NotificationDestinations()
 	pending := make([]NotificationEvent, 0, len(events))
 	for _, event := range events {
-		if event == nil {
+		if event == nil || !m.isInterestedEventType(event.Type) {
 			continue
 		}
-		status, err := eventstore.NotificationStatusFromEvent(event)
+		status, err := eventstore.DAGRunStatusFromEvent(event)
 		if err != nil {
-			m.logger.Warn("Failed to decode notification event payload",
+			m.logger.Warn("Failed to decode DAG-run event payload",
 				slog.String("event_id", event.ID),
 				slog.String("error", err.Error()),
 			)
@@ -368,6 +396,7 @@ func (m *NotificationMonitor) pollSource(ctx context.Context) {
 		}
 		pending = append(pending, NotificationEvent{
 			Key:        NotificationSeenKey(status),
+			Type:       event.Type,
 			Status:     status,
 			ObservedAt: observedAt.UTC(),
 		})
@@ -678,7 +707,7 @@ func (m *NotificationMonitor) ensureBootstrapped(ctx context.Context) bool {
 		return true
 	}
 
-	cursor, err := m.eventService.NotificationHeadCursor(ctx)
+	cursor, err := m.eventService.DAGRunHeadCursor(ctx)
 	if err != nil {
 		m.recordBootstrapFailure("Failed to bootstrap notification cursor: " + err.Error())
 		return false
@@ -918,6 +947,14 @@ func (m *NotificationMonitor) enqueueBatch(destination string, event Notificatio
 	return m.currentBatcher().Enqueue(destination, event)
 }
 
+func (m *NotificationMonitor) isInterestedEventType(eventType eventstore.EventType) bool {
+	if eventType == "" {
+		return false
+	}
+	_, ok := m.interested[eventType]
+	return ok
+}
+
 func (m *NotificationMonitor) resetBatcher() {
 	replacement := NewNotificationBatcher(m.cfg.UrgentWindow, m.cfg.SuccessWindow)
 
@@ -979,6 +1016,9 @@ func normalizeNotificationMonitorConfig(cfg *NotificationMonitorConfig) {
 	if cfg.SuccessWindow <= 0 {
 		cfg.SuccessWindow = defaults.SuccessWindow
 	}
+	if cfg.InterestedEventTypes == nil {
+		cfg.InterestedEventTypes = append([]eventstore.EventType(nil), defaults.InterestedEventTypes...)
+	}
 }
 
 func cloneNotificationMonitorState(state notificationMonitorState) notificationMonitorState {
@@ -1001,6 +1041,7 @@ func cloneNotificationMonitorState(state notificationMonitorState) notificationM
 		for key, event := range destState.Pending {
 			pending[key] = NotificationEvent{
 				Key:        event.Key,
+				Type:       event.Type,
 				Status:     cloneNotificationStatus(event.Status),
 				ObservedAt: event.ObservedAt,
 			}

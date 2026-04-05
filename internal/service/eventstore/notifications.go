@@ -14,47 +14,60 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
-const notificationStatusSnapshotDataKey = "notification_status"
+const (
+	dagRunStatusSnapshotDataKey       = "dag_run_status"
+	notificationStatusSnapshotDataKey = "notification_status"
+	DAGFileNameDataKey                = "dag_file"
+)
 
-type NotificationCursor struct {
+type DAGRunCursor struct {
 	LastInboxFile    string           `json:"last_inbox_file,omitempty"`
 	CommittedOffsets map[string]int64 `json:"committed_offsets,omitempty"`
 }
 
-func (c NotificationCursor) Normalize() NotificationCursor {
+func (c DAGRunCursor) Normalize() DAGRunCursor {
 	if c.CommittedOffsets == nil {
 		c.CommittedOffsets = make(map[string]int64)
 	}
 	return c
 }
 
-func (c NotificationCursor) Equal(other NotificationCursor) bool {
+func (c DAGRunCursor) Equal(other DAGRunCursor) bool {
 	return c.LastInboxFile == other.LastInboxFile && maps.Equal(c.CommittedOffsets, other.CommittedOffsets)
 }
+
+type DAGRunReader interface {
+	DAGRunHeadCursor(ctx context.Context) (DAGRunCursor, error)
+	ReadDAGRunEvents(ctx context.Context, cursor DAGRunCursor) ([]*Event, DAGRunCursor, error)
+}
+
+type NotificationCursor = DAGRunCursor
 
 type NotificationReader interface {
 	NotificationHeadCursor(ctx context.Context) (NotificationCursor, error)
 	ReadNotificationEvents(ctx context.Context, cursor NotificationCursor) ([]*Event, NotificationCursor, error)
 }
 
-type NotificationNodeSnapshot struct {
+type DAGRunNodeSnapshot struct {
 	StepName string          `json:"step_name,omitempty"`
 	Status   core.NodeStatus `json:"status,omitempty"`
 	Error    string          `json:"error,omitempty"`
 }
 
-func newNotificationNodeSnapshot(node *exec.Node) *NotificationNodeSnapshot {
+type NotificationNodeSnapshot = DAGRunNodeSnapshot
+
+func newDAGRunNodeSnapshot(node *exec.Node) *DAGRunNodeSnapshot {
 	if node == nil {
 		return nil
 	}
-	return &NotificationNodeSnapshot{
+	return &DAGRunNodeSnapshot{
 		StepName: node.Step.Name,
 		Status:   node.Status,
 		Error:    node.Error,
 	}
 }
 
-func (s *NotificationNodeSnapshot) Node() *exec.Node {
+func (s *DAGRunNodeSnapshot) Node() *exec.Node {
 	if s == nil {
 		return nil
 	}
@@ -65,61 +78,90 @@ func (s *NotificationNodeSnapshot) Node() *exec.Node {
 	}
 }
 
-type NotificationStatusSnapshot struct {
-	Name       string                     `json:"name"`
-	DAGRunID   string                     `json:"dag_run_id"`
-	AttemptID  string                     `json:"attempt_id"`
-	Status     core.Status                `json:"status"`
-	Error      string                     `json:"error,omitempty"`
-	Log        string                     `json:"log,omitempty"`
-	QueuedAt   string                     `json:"queued_at,omitempty"`
-	StartedAt  string                     `json:"started_at,omitempty"`
-	FinishedAt string                     `json:"finished_at,omitempty"`
-	Nodes      []NotificationNodeSnapshot `json:"nodes,omitempty"`
-	OnFailure  *NotificationNodeSnapshot  `json:"on_failure,omitempty"`
-	OnExit     *NotificationNodeSnapshot  `json:"on_exit,omitempty"`
-	OnWait     *NotificationNodeSnapshot  `json:"on_wait,omitempty"`
+type DAGRunRefSnapshot struct {
+	Name     string `json:"name,omitempty"`
+	DAGRunID string `json:"dag_run_id,omitempty"`
 }
 
-func (s *NotificationStatusSnapshot) Validate() error {
+func newDAGRunRefSnapshot(ref exec.DAGRunRef) DAGRunRefSnapshot {
+	return DAGRunRefSnapshot{
+		Name:     ref.Name,
+		DAGRunID: ref.ID,
+	}
+}
+
+func (s DAGRunRefSnapshot) DAGRunRef() exec.DAGRunRef {
+	if s.Name == "" || s.DAGRunID == "" {
+		return exec.DAGRunRef{}
+	}
+	return exec.NewDAGRunRef(s.Name, s.DAGRunID)
+}
+
+type DAGRunStatusSnapshot struct {
+	Root       DAGRunRefSnapshot    `json:"root"`
+	Parent     DAGRunRefSnapshot    `json:"parent"`
+	Name       string               `json:"name"`
+	DAGFile    string               `json:"dag_file,omitempty"`
+	DAGRunID   string               `json:"dag_run_id"`
+	AttemptID  string               `json:"attempt_id"`
+	ProcGroup  string               `json:"proc_group,omitempty"`
+	Status     core.Status          `json:"status"`
+	Error      string               `json:"error,omitempty"`
+	Log        string               `json:"log,omitempty"`
+	QueuedAt   string               `json:"queued_at,omitempty"`
+	StartedAt  string               `json:"started_at,omitempty"`
+	FinishedAt string               `json:"finished_at,omitempty"`
+	Nodes      []DAGRunNodeSnapshot `json:"nodes,omitempty"`
+	OnFailure  *DAGRunNodeSnapshot  `json:"on_failure,omitempty"`
+	OnExit     *DAGRunNodeSnapshot  `json:"on_exit,omitempty"`
+	OnWait     *DAGRunNodeSnapshot  `json:"on_wait,omitempty"`
+}
+
+type NotificationStatusSnapshot = DAGRunStatusSnapshot
+
+func (s *DAGRunStatusSnapshot) Validate() error {
 	if s == nil {
-		return errors.New("eventstore: notification snapshot is nil")
+		return errors.New("eventstore: dag-run snapshot is nil")
 	}
 	if s.DAGRunID == "" {
-		return errors.New("eventstore: invalid notification snapshot: missing dag_run_id")
+		return errors.New("eventstore: invalid dag-run snapshot: missing dag_run_id")
 	}
 	if s.AttemptID == "" {
-		return errors.New("eventstore: invalid notification snapshot: missing attempt_id")
+		return errors.New("eventstore: invalid dag-run snapshot: missing attempt_id")
 	}
 	if s.Name == "" {
-		return errors.New("eventstore: invalid notification snapshot: missing name")
+		return errors.New("eventstore: invalid dag-run snapshot: missing name")
 	}
-	switch s.Status { //nolint:exhaustive // notification snapshots only allow persisted terminal/waiting states
-	case core.Waiting, core.Succeeded, core.PartiallySucceeded, core.Failed, core.Aborted, core.Rejected:
+	switch s.Status { //nolint:exhaustive // persisted DAG-run events only allow lifecycle states
+	case core.Queued, core.Running, core.Waiting, core.Succeeded, core.PartiallySucceeded, core.Failed, core.Aborted, core.Rejected:
 	default:
-		return errors.New("eventstore: invalid notification snapshot: missing or unsupported status")
+		return errors.New("eventstore: invalid dag-run snapshot: missing or unsupported status")
 	}
 	return nil
 }
 
-func newNotificationStatusSnapshot(status *exec.DAGRunStatus) *NotificationStatusSnapshot {
+func newDAGRunStatusSnapshot(status *exec.DAGRunStatus, dagFile string) *DAGRunStatusSnapshot {
 	if status == nil {
 		return nil
 	}
 
-	nodes := make([]NotificationNodeSnapshot, 0, len(status.Nodes))
+	nodes := make([]DAGRunNodeSnapshot, 0, len(status.Nodes))
 	for _, node := range status.Nodes {
-		snapshot := newNotificationNodeSnapshot(node)
+		snapshot := newDAGRunNodeSnapshot(node)
 		if snapshot == nil {
 			continue
 		}
 		nodes = append(nodes, *snapshot)
 	}
 
-	return &NotificationStatusSnapshot{
+	return &DAGRunStatusSnapshot{
+		Root:       newDAGRunRefSnapshot(status.Root),
+		Parent:     newDAGRunRefSnapshot(status.Parent),
 		Name:       status.Name,
+		DAGFile:    dagFile,
 		DAGRunID:   status.DAGRunID,
 		AttemptID:  status.AttemptID,
+		ProcGroup:  status.ProcGroup,
 		Status:     status.Status,
 		Error:      status.Error,
 		Log:        status.Log,
@@ -127,13 +169,13 @@ func newNotificationStatusSnapshot(status *exec.DAGRunStatus) *NotificationStatu
 		StartedAt:  status.StartedAt,
 		FinishedAt: status.FinishedAt,
 		Nodes:      nodes,
-		OnFailure:  newNotificationNodeSnapshot(status.OnFailure),
-		OnExit:     newNotificationNodeSnapshot(status.OnExit),
-		OnWait:     newNotificationNodeSnapshot(status.OnWait),
+		OnFailure:  newDAGRunNodeSnapshot(status.OnFailure),
+		OnExit:     newDAGRunNodeSnapshot(status.OnExit),
+		OnWait:     newDAGRunNodeSnapshot(status.OnWait),
 	}
 }
 
-func (s *NotificationStatusSnapshot) DAGRunStatus() *exec.DAGRunStatus {
+func (s *DAGRunStatusSnapshot) DAGRunStatus() *exec.DAGRunStatus {
 	if s == nil {
 		return nil
 	}
@@ -144,10 +186,13 @@ func (s *NotificationStatusSnapshot) DAGRunStatus() *exec.DAGRunStatus {
 	}
 
 	return &exec.DAGRunStatus{
+		Root:       s.Root.DAGRunRef(),
+		Parent:     s.Parent.DAGRunRef(),
 		Name:       s.Name,
 		DAGRunID:   s.DAGRunID,
 		AttemptID:  s.AttemptID,
 		Status:     s.Status,
+		ProcGroup:  s.ProcGroup,
 		Error:      s.Error,
 		Log:        s.Log,
 		QueuedAt:   s.QueuedAt,
@@ -160,18 +205,50 @@ func (s *NotificationStatusSnapshot) DAGRunStatus() *exec.DAGRunStatus {
 	}
 }
 
-func IsNotificationEventType(kind EventKind, eventType EventType) bool {
+func IsDAGRunEventType(kind EventKind, eventType EventType) bool {
 	if kind != KindDAGRun {
 		return false
 	}
 	switch eventType {
-	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
+	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 		return true
 	case TypeLLMUsageRecorded:
 		return false
 	default:
 		return false
 	}
+}
+
+func IsNotificationEventType(kind EventKind, eventType EventType) bool {
+	if !IsDAGRunEventType(kind, eventType) {
+		return false
+	}
+	switch eventType {
+	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
+		return true
+	case TypeDAGRunQueued, TypeDAGRunRunning, TypeLLMUsageRecorded:
+		return false
+	default:
+		return false
+	}
+}
+
+func DAGRunStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
+	snapshot, err := DAGRunSnapshotFromEvent(event)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.DAGRunStatus(), nil
+}
+
+func DAGRunSnapshotFromEvent(event *Event) (*DAGRunStatusSnapshot, error) {
+	if event == nil {
+		return nil, errors.New("eventstore: event is nil")
+	}
+	if !IsDAGRunEventType(event.Kind, event.Type) {
+		return nil, fmt.Errorf("eventstore: event %q is not a dag-run event", event.Type)
+	}
+	return dagRunSnapshotFromData(event.Data)
 }
 
 func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
@@ -181,57 +258,126 @@ func NotificationStatusFromEvent(event *Event) (*exec.DAGRunStatus, error) {
 	if !IsNotificationEventType(event.Kind, event.Type) {
 		return nil, fmt.Errorf("eventstore: event %q is not a notification event", event.Type)
 	}
-	if len(event.Data) == 0 {
-		return nil, errors.New("eventstore: notification snapshot is missing")
-	}
-
-	raw, ok := event.Data[notificationStatusSnapshotDataKey]
-	if !ok {
-		return nil, errors.New("eventstore: notification snapshot is missing")
-	}
-
-	payload, err := json.Marshal(raw)
+	snapshot, err := dagRunSnapshotFromData(event.Data)
 	if err != nil {
-		return nil, fmt.Errorf("eventstore: marshal notification snapshot: %w", err)
-	}
-
-	var snapshot NotificationStatusSnapshot
-	if err := json.Unmarshal(payload, &snapshot); err != nil {
-		return nil, fmt.Errorf("eventstore: unmarshal notification snapshot: %w", err)
-	}
-	if err := snapshot.Validate(); err != nil {
 		return nil, err
 	}
 	return snapshot.DAGRunStatus(), nil
 }
 
-func (s *Service) NotificationHeadCursor(ctx context.Context) (NotificationCursor, error) {
-	if s == nil || s.store == nil {
-		return NotificationCursor{}, errors.New("eventstore: store is not configured")
-	}
-	reader, ok := s.store.(NotificationReader)
-	if !ok {
-		return NotificationCursor{}, errors.New("eventstore: notification reader is not configured")
-	}
-	cursor, err := reader.NotificationHeadCursor(ctx)
+func dagRunSnapshotFromData(data map[string]any) (*DAGRunStatusSnapshot, error) {
+	snapshot, err := dagRunStatusSnapshotFromData(data)
 	if err != nil {
-		return NotificationCursor{}, err
+		return nil, err
 	}
-	return cursor.Normalize(), nil
+	if snapshot.DAGFile == "" {
+		snapshot.DAGFile = dagRunFileNameFromData(data)
+	}
+	return snapshot, nil
+}
+
+func dagRunStatusSnapshotFromData(data map[string]any) (*DAGRunStatusSnapshot, error) {
+	if len(data) == 0 {
+		return nil, errors.New("eventstore: dag-run snapshot is missing")
+	}
+
+	raw, ok := data[dagRunStatusSnapshotDataKey]
+	if !ok {
+		raw, ok = data[notificationStatusSnapshotDataKey]
+	}
+	if !ok {
+		return nil, errors.New("eventstore: dag-run snapshot is missing")
+	}
+
+	payload, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("eventstore: marshal dag-run snapshot: %w", err)
+	}
+
+	var snapshot DAGRunStatusSnapshot
+	if err := json.Unmarshal(payload, &snapshot); err != nil {
+		return nil, fmt.Errorf("eventstore: unmarshal dag-run snapshot: %w", err)
+	}
+	if err := snapshot.Validate(); err != nil {
+		return nil, err
+	}
+	return &snapshot, nil
+}
+
+func dagRunFileNameFromData(data map[string]any) string {
+	if len(data) == 0 {
+		return ""
+	}
+	raw, ok := data[DAGFileNameDataKey]
+	if !ok {
+		return ""
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return ""
+	}
+	return value
+}
+
+func (s *Service) DAGRunHeadCursor(ctx context.Context) (DAGRunCursor, error) {
+	if s == nil || s.store == nil {
+		return DAGRunCursor{}, errors.New("eventstore: store is not configured")
+	}
+	if reader, ok := s.store.(DAGRunReader); ok {
+		cursor, err := reader.DAGRunHeadCursor(ctx)
+		if err != nil {
+			return DAGRunCursor{}, err
+		}
+		return cursor.Normalize(), nil
+	}
+	if reader, ok := s.store.(NotificationReader); ok {
+		cursor, err := reader.NotificationHeadCursor(ctx)
+		if err != nil {
+			return DAGRunCursor{}, err
+		}
+		return DAGRunCursor(cursor).Normalize(), nil
+	}
+	return DAGRunCursor{}, errors.New("eventstore: dag-run reader is not configured")
+}
+
+func (s *Service) ReadDAGRunEvents(ctx context.Context, cursor DAGRunCursor) ([]*Event, DAGRunCursor, error) {
+	if s == nil || s.store == nil {
+		return nil, DAGRunCursor{}, errors.New("eventstore: store is not configured")
+	}
+	cursor = cursor.Normalize()
+	if reader, ok := s.store.(DAGRunReader); ok {
+		events, nextCursor, err := reader.ReadDAGRunEvents(ctx, cursor)
+		if err != nil {
+			return nil, DAGRunCursor{}, err
+		}
+		return events, nextCursor.Normalize(), nil
+	}
+	if reader, ok := s.store.(NotificationReader); ok {
+		events, nextCursor, err := reader.ReadNotificationEvents(ctx, NotificationCursor(cursor))
+		if err != nil {
+			return nil, DAGRunCursor{}, err
+		}
+		return events, DAGRunCursor(nextCursor).Normalize(), nil
+	}
+	return nil, DAGRunCursor{}, errors.New("eventstore: dag-run reader is not configured")
+}
+
+func (s *Service) NotificationHeadCursor(ctx context.Context) (NotificationCursor, error) {
+	cursor, err := s.DAGRunHeadCursor(ctx)
+	return NotificationCursor(cursor), err
 }
 
 func (s *Service) ReadNotificationEvents(ctx context.Context, cursor NotificationCursor) ([]*Event, NotificationCursor, error) {
-	if s == nil || s.store == nil {
-		return nil, NotificationCursor{}, errors.New("eventstore: store is not configured")
-	}
-	reader, ok := s.store.(NotificationReader)
-	if !ok {
-		return nil, NotificationCursor{}, errors.New("eventstore: notification reader is not configured")
-	}
-	cursor = cursor.Normalize()
-	events, nextCursor, err := reader.ReadNotificationEvents(ctx, cursor)
+	events, nextCursor, err := s.ReadDAGRunEvents(ctx, DAGRunCursor(cursor))
 	if err != nil {
 		return nil, NotificationCursor{}, err
 	}
-	return events, nextCursor.Normalize(), nil
+	filtered := make([]*Event, 0, len(events))
+	for _, event := range events {
+		if event == nil || !IsNotificationEventType(event.Kind, event.Type) {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	return filtered, NotificationCursor(nextCursor), nil
 }

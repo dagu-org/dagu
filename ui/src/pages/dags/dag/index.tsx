@@ -11,13 +11,14 @@ import {
 import { DAGContext } from '../../../features/dags/contexts/DAGContext';
 import { RootDAGRunContext } from '../../../features/dags/contexts/RootDAGRunContext';
 import { useQuery } from '../../../hooks/api';
+import { useDAGRunSSE } from '../../../hooks/useDAGRunSSE';
+import { useDAGSSE } from '../../../hooks/useDAGSSE';
 import { whenEnabled } from '../../../hooks/queryUtils';
 import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAG,
-  useLiveDAGRuns,
-} from '../../../hooks/useAppLive';
+  sseFallbackOptions,
+  useSSECacheSync,
+} from '../../../hooks/useSSECacheSync';
+import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
 import dayjs from '../../../lib/dayjs';
 
 type Params = {
@@ -39,7 +40,10 @@ function DAGDetails() {
   const stepName = searchParams.get('step');
   const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
-  const remoteNode = searchParams.get('remoteNode') || appBarContext.selectedRemoteNode || 'local';
+  const remoteNode =
+    searchParams.get('remoteNode') ||
+    appBarContext.selectedRemoteNode ||
+    'local';
   const fileName = params.fileName || '';
 
   // Set page context for agent chat
@@ -56,7 +60,7 @@ function DAGDetails() {
     };
   }, [fileName, dagRunId, setContext]);
 
-  const liveState = useLiveConnection(!!fileName);
+  const dagSSE = useDAGSSE(fileName, !!fileName);
 
   // Determine active tab
   const tab = params.tab || 'status';
@@ -93,7 +97,10 @@ function DAGDetails() {
   const handleTabChange = useCallback(
     (newTab: string) => {
       if (!fileName) return;
-      const path = newTab === 'status' ? `/dags/${fileName}` : `/dags/${fileName}/${newTab}`;
+      const path =
+        newTab === 'status'
+          ? `/dags/${fileName}`
+          : `/dags/${fileName}/${newTab}`;
       navigate(buildUrl(path));
     },
     [fileName, navigate, buildUrl]
@@ -115,15 +122,21 @@ function DAGDetails() {
         path: { fileName },
       },
     },
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(dagSSE)
   );
-  useLiveDAG(fileName, mutateDag, !!fileName);
+  useSSECacheSync(dagSSE, mutateDag);
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
   const dagRunQueryEnabled = Boolean(dagRunName && dagRunId && !subDAGRunId);
 
   // Fetch specific DAG-run data if dagRunId is provided
+  const dagRunSSE = useDAGRunSSE(
+    dagRunName,
+    dagRunId || '',
+    dagRunQueryEnabled,
+    remoteNode
+  );
   const { data: dagRunResponse, mutate: mutateDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     whenEnabled(dagRunQueryEnabled, {
@@ -135,12 +148,19 @@ function DAGDetails() {
         query: { remoteNode },
       },
     }),
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(dagRunSSE)
   );
-  useLiveDAGRuns(mutateDagRun, dagRunQueryEnabled);
+  useSSECacheSync(dagRunSSE, mutateDagRun);
 
   // Fetch sub DAG-run data if needed
   const subDAGRunQueryEnabled = Boolean(subDAGRunId && dagRunId && dagRunName);
+  const subDAGRunSSE = useSubDAGRunSSE(
+    dagRunName,
+    dagRunId || '',
+    subDAGRunId || '',
+    subDAGRunQueryEnabled,
+    remoteNode
+  );
   const { data: subDAGRunResponse, mutate: mutateSubDagRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}',
     whenEnabled(subDAGRunQueryEnabled, {
@@ -153,9 +173,9 @@ function DAGDetails() {
         query: { remoteNode },
       },
     }),
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(subDAGRunSSE)
   );
-  useLiveDAGRuns(mutateSubDagRun, subDAGRunQueryEnabled);
+  useSSECacheSync(subDAGRunSSE, mutateSubDagRun);
 
   // Determine the current DAG-run to display based on URL parameters
   function getCurrentDAGRun(): DAGRunDetails | undefined {
@@ -170,7 +190,9 @@ function DAGDetails() {
   const currentDAGRun = getCurrentDAGRun();
 
   // Root DAG-run context state for header display
-  const [rootDAGRunData, setRootDAGRunData] = useState<DAGRunDetails | undefined>(undefined);
+  const [rootDAGRunData, setRootDAGRunData] = useState<
+    DAGRunDetails | undefined
+  >(undefined);
 
   // Update root DAG-run data when current DAG-run or latest DAG-run changes
   useEffect(() => {

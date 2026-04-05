@@ -16,11 +16,11 @@ import { DAGErrors } from '../../features/dags/components/dag-editor';
 import { DAGTable } from '../../features/dags/components/dag-list';
 import DAGListHeader from '../../features/dags/components/dag-list/DAGListHeader';
 import { useQuery } from '../../hooks/api';
+import { useDAGsListSSE } from '../../hooks/useDAGsListSSE';
 import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGsList,
-} from '../../hooks/useAppLive';
+  sseFallbackOptions,
+  useSSECacheSync,
+} from '../../hooks/useSSECacheSync';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -204,10 +204,17 @@ function DAGsContent() {
       sort: sortField,
       order: sortOrder,
     }),
-    [page, preferences.pageLimit, apiSearchText, apiSearchTags, sortField, sortOrder]
+    [
+      page,
+      preferences.pageLimit,
+      apiSearchText,
+      apiSearchTags,
+      sortField,
+      sortOrder,
+    ]
   );
 
-  const liveState = useLiveConnection();
+  const dagsListSSE = useDAGsListSSE(queryParams);
   const { data, mutate, isLoading } = useQuery(
     '/dags',
     {
@@ -221,13 +228,13 @@ function DAGsContent() {
       },
     },
     {
-      ...liveFallbackOptions(liveState),
+      ...sseFallbackOptions(dagsListSSE),
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
     }
   );
-  useLiveDAGsList(mutate);
+  useSSECacheSync(dagsListSSE, mutate);
 
   const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);
@@ -318,9 +325,7 @@ function DAGsContent() {
           <DAGErrors
             dags={data.dags || []}
             errors={data.errors || []}
-            hasError={
-              (errorCount > 0 || data.errors?.length > 0) && !isLoading
-            }
+            hasError={(errorCount > 0 || data.errors?.length > 0) && !isLoading}
           />
           <DAGTable
             dags={dagFiles}

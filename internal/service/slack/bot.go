@@ -41,6 +41,7 @@ type Config struct {
 	BotToken              string
 	AppToken              string
 	AllowedChannelIDs     []string
+	InterestedEventTypes  []string
 	SafeMode              bool
 	RespondToAll          bool // respond to all channel messages, not just @mentions
 	EventService          *eventstore.Service

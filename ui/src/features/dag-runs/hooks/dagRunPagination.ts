@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { components, paths } from '@/api/v1/schema';
+import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
 import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAGRuns,
-  useLiveInvalidation,
-} from '@/hooks/useAppLive';
+  useDAGRunsListSSE,
+  type DAGRunsListSSEResponse,
+} from '@/hooks/useDAGRunsListSSE';
+import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { isAbortLikeError } from '@/lib/requestTimeout';
 
 export type DAGRunSummary = components['schemas']['DAGRunSummary'];
 export type DAGRunsPageResponse = components['schemas']['DAGRunsPageResponse'];
 export type DAGRunListQuery = paths['/dag-runs']['get']['parameters']['query'];
 
-const MAX_DAG_RUN_PAGE_LIMIT = 500;
+const EXACT_DAG_RUN_PAGE_LIMIT = 100;
 
 function normalizeDAGRunListQuery(
   query: DAGRunListQuery | undefined
@@ -70,12 +70,18 @@ async function fetchDAGRunsPage(
   return (response.data ?? { dagRuns: [] }) as DAGRunsPageResponse;
 }
 
+type FetchAllDAGRunsOptions = {
+  remoteNode: string;
+  signal: AbortSignal;
+  onPage?: (dagRuns: DAGRunSummary[], page: DAGRunsPageResponse) => void;
+};
+
 export async function fetchAllDAGRuns(
   client: ReturnType<typeof useClient>,
   query: DAGRunListQuery,
-  signal: AbortSignal
+  { remoteNode, signal, onPage }: FetchAllDAGRunsOptions
 ): Promise<DAGRunSummary[]> {
-  const allRuns: DAGRunSummary[] = [];
+  let allRuns: DAGRunSummary[] = [];
   let cursor: string | undefined;
 
   for (;;) {
@@ -87,13 +93,15 @@ export async function fetchAllDAGRuns(
       client,
       {
         ...query,
-        limit: MAX_DAG_RUN_PAGE_LIMIT,
+        remoteNode,
+        limit: EXACT_DAG_RUN_PAGE_LIMIT,
         cursor,
       },
       signal
     );
 
-    allRuns.push(...(page.dagRuns ?? []));
+    allRuns = mergeUniqueDAGRuns(allRuns, page.dagRuns ?? []);
+    onPage?.(allRuns, page);
     if (!page.nextCursor) {
       return allRuns;
     }
@@ -138,8 +146,22 @@ export function useExactDAGRuns({
   liveEnabled = true,
   fallbackIntervalMs = 5000,
 }: UseExactDAGRunsOptions): UseExactDAGRunsResult {
+  const appBarContext = useContext(AppBarContext);
   const client = useClient();
-  const liveState = useLiveConnection(enabled && liveEnabled);
+  const remoteNode =
+    query?.remoteNode || appBarContext.selectedRemoteNode || 'local';
+  const resolvedQuery = useMemo(
+    () => ({
+      ...query,
+      remoteNode,
+    }),
+    [query, remoteNode]
+  );
+  const sseState = useDAGRunsListSSE(
+    query,
+    enabled && liveEnabled,
+    remoteNode
+  );
   const [data, setData] = useState<DAGRunSummary[]>([]);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -148,11 +170,16 @@ export function useExactDAGRuns({
   const dataRef = useRef<DAGRunSummary[]>([]);
   const controllerRef = useRef<AbortController | null>(null);
   const requestIDRef = useRef(0);
-  const queryRef = useRef(query);
-  const queryKey = useMemo(() => getDAGRunListQueryKey(query), [query]);
+  const queryRef = useRef(resolvedQuery);
+  const lastSSEPayloadRef = useRef<DAGRunsListSSEResponse | null>(null);
+  const skipNextSSERefreshRef = useRef(true);
+  const queryKey = useMemo(
+    () => getDAGRunListQueryKey(resolvedQuery),
+    [resolvedQuery]
+  );
 
   dataRef.current = data;
-  queryRef.current = query;
+  queryRef.current = resolvedQuery;
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!enabled) {
@@ -167,18 +194,33 @@ export function useExactDAGRuns({
     controllerRef.current = controller;
     setError(null);
 
-    if (dataRef.current.length === 0) {
+    const hadExistingData = dataRef.current.length > 0;
+
+    if (!hadExistingData) {
       setIsLoading(true);
     } else {
       setIsValidating(true);
     }
 
     try {
-      const next = await fetchAllDAGRuns(
-        client,
-        queryRef.current,
-        controller.signal
-      );
+      const next = await fetchAllDAGRuns(client, queryRef.current, {
+        remoteNode,
+        signal: controller.signal,
+        onPage: (pageRuns, page) => {
+          if (controller.signal.aborted || requestID !== requestIDRef.current) {
+            return;
+          }
+
+          dataRef.current = pageRuns;
+          setData(pageRuns);
+          setError(null);
+
+          if (!hadExistingData) {
+            setIsLoading(false);
+            setIsValidating(Boolean(page.nextCursor));
+          }
+        },
+      });
       if (controller.signal.aborted || requestID !== requestIDRef.current) {
         return;
       }
@@ -206,7 +248,7 @@ export function useExactDAGRuns({
         setIsValidating(false);
       }
     }
-  }, [client, enabled]);
+  }, [client, enabled, remoteNode]);
 
   useEffect(() => {
     if (!enabled) {
@@ -230,10 +272,37 @@ export function useExactDAGRuns({
   }, [enabled, queryKey, refresh]);
 
   useEffect(() => {
+    lastSSEPayloadRef.current = null;
+    skipNextSSERefreshRef.current = true;
+  }, [enabled, liveEnabled, queryKey]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      !liveEnabled ||
+      !sseState.isConnected ||
+      sseState.data == null ||
+      sseState.data === lastSSEPayloadRef.current
+    ) {
+      return;
+    }
+
+    lastSSEPayloadRef.current = sseState.data;
+    if (skipNextSSERefreshRef.current) {
+      skipNextSSERefreshRef.current = false;
+      return;
+    }
+
+    void refresh();
+  }, [enabled, liveEnabled, refresh, sseState.data, sseState.isConnected]);
+
+  useEffect(() => {
     if (
       !enabled ||
       fallbackIntervalMs <= 0 ||
-      (liveEnabled && liveState.isConnected && !liveState.shouldUseFallback)
+      (liveEnabled &&
+        !sseState.shouldUseFallback &&
+        (sseState.isConnected || sseState.isConnecting))
     ) {
       return;
     }
@@ -249,24 +318,11 @@ export function useExactDAGRuns({
     enabled,
     fallbackIntervalMs,
     liveEnabled,
-    liveState.isConnected,
-    liveState.shouldUseFallback,
+    sseState.isConnected,
+    sseState.isConnecting,
+    sseState.shouldUseFallback,
     refresh,
   ]);
-
-  const liveMutate = useCallback(async () => {
-    await refresh();
-    return {
-      dagRuns: dataRef.current,
-    } as DAGRunsPageResponse;
-  }, [refresh]);
-
-  useLiveInvalidation({
-    enabled: enabled && liveEnabled,
-    mutate: liveMutate,
-    matcher: (event) =>
-      event.type === 'reset' || event.type === 'dagrun.changed',
-  });
 
   return {
     data,
@@ -281,8 +337,18 @@ export function usePaginatedDAGRuns({
   query,
   enabled = true,
 }: UsePaginatedDAGRunsOptions): UsePaginatedDAGRunsResult {
+  const appBarContext = useContext(AppBarContext);
   const client = useClient();
-  const liveState = useLiveConnection(enabled);
+  const remoteNode =
+    query?.remoteNode || appBarContext.selectedRemoteNode || 'local';
+  const resolvedQuery = useMemo(
+    () => ({
+      ...query,
+      remoteNode,
+    }),
+    [query, remoteNode]
+  );
+  const sseState = useDAGRunsListSSE(query, enabled, remoteNode);
   const [olderRuns, setOlderRuns] = useState<DAGRunSummary[]>([]);
   const [continuationCursorOverride, setContinuationCursorOverride] = useState<
     string | null | undefined
@@ -290,7 +356,10 @@ export function usePaginatedDAGRuns({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
-  const stableQueryKey = useMemo(() => getDAGRunListQueryKey(query), [query]);
+  const stableQueryKey = useMemo(
+    () => getDAGRunListQueryKey(resolvedQuery),
+    [resolvedQuery]
+  );
   const {
     data: headPage,
     mutate,
@@ -300,13 +369,13 @@ export function usePaginatedDAGRuns({
     enabled
       ? {
           params: {
-            query,
+            query: resolvedQuery,
           },
         }
       : null,
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(sseState)
   );
-  useLiveDAGRuns(mutate, enabled);
+  useSSECacheSync(sseState, mutate);
 
   useEffect(() => {
     setOlderRuns([]);
@@ -344,6 +413,7 @@ export function usePaginatedDAGRuns({
       params: {
         query: {
           ...query,
+          remoteNode,
           cursor: nextCursor,
         },
       },
@@ -367,7 +437,7 @@ export function usePaginatedDAGRuns({
       mergeUniqueDAGRuns(previous, pageData.dagRuns ?? [])
     );
     setContinuationCursorOverride(pageData.nextCursor ?? null);
-  }, [client, isLoadingMore, nextCursor, query]);
+  }, [client, isLoadingMore, nextCursor, query, remoteNode]);
 
   return {
     dagRuns,

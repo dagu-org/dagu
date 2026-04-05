@@ -452,16 +452,18 @@ type BotsDef struct {
 
 // TelegramBotDef configures the Telegram bot.
 type TelegramBotDef struct {
-	Token          string  `mapstructure:"token"`
-	AllowedChatIDs []int64 `mapstructure:"allowed_chat_ids"`
+	Token                string   `mapstructure:"token"`
+	AllowedChatIDs       []int64  `mapstructure:"allowed_chat_ids"`
+	InterestedEventTypes []string `mapstructure:"interested_event_types"`
 }
 
 // SlackBotDef configures the Slack bot.
 type SlackBotDef struct {
-	BotToken          string   `mapstructure:"bot_token"`
-	AppToken          string   `mapstructure:"app_token"`
-	AllowedChannelIDs []string `mapstructure:"allowed_channel_ids"`
-	RespondToAll      *bool    `mapstructure:"respond_to_all"` // Default: true
+	BotToken             string   `mapstructure:"bot_token"`
+	AppToken             string   `mapstructure:"app_token"`
+	AllowedChannelIDs    []string `mapstructure:"allowed_channel_ids"`
+	InterestedEventTypes []string `mapstructure:"interested_event_types"`
+	RespondToAll         *bool    `mapstructure:"respond_to_all"` // Default: true
 }
 
 // -----------------------------------------------------------------------------

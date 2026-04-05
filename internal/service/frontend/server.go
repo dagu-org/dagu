@@ -111,6 +111,7 @@ type Server struct {
 	authService        *authservice.Service
 	auditService       *audit.Service
 	auditStore         *fileaudit.Store
+	eventService       *eventstore.Service
 	syncService        gitsync.Service
 	listener           net.Listener
 	appStream          *sse.AppStreamService
@@ -410,6 +411,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		authService:        authSvc,
 		auditService:       auditSvc,
 		auditStore:         auditStore,
+		eventService:       eventSvc,
 		syncService:        syncSvc,
 		metricsRegistry:    mr,
 		dagStore:           dr,
@@ -1128,15 +1130,8 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV1Base
 }
 
 func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath string) {
-	appStream, err := sse.NewAppStreamService(sse.AppStreamConfig{
-		Paths:             srv.config.Paths,
-		HeartbeatInterval: srv.config.Server.SSE.HeartbeatInterval,
-	})
-	if err != nil {
-		logger.Warn(ctx, "Failed to initialize app SSE stream", tag.Error(err))
-	} else {
-		srv.appStream = appStream
-	}
+	srv.appStream = nil
+	logger.Info(ctx, "App SSE stream disabled; multiplexed SSE is the supported live-update transport")
 
 	var sseMetrics *sse.Metrics
 	if srv.metricsRegistry != nil {
@@ -1151,6 +1146,9 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 		SlowClientTimeout:      srv.config.Server.SSE.SlowClientTimeout,
 	}, sseMetrics)
 	srv.registerDedicatedSSEFetchers(srv.sseMultiplexer)
+	if srv.eventService != nil {
+		sse.StartDAGRunEventInvalidation(srv.sseMultiplexer.Context(), srv.eventService, srv.sseMultiplexer, slog.Default(), time.Second)
+	}
 
 	multiplexHandler := sse.NewMultiplexHandler(srv.sseMultiplexer, srv.remoteNodeResolver)
 	appHandler := sse.NewAppHandler(srv.appStream, srv.remoteNodeResolver)
@@ -1172,8 +1170,30 @@ func (srv *Server) setupSSERoute(ctx context.Context, r *chi.Mux, apiV1BasePath 
 }
 
 func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
+	registrar.RegisterFetcher(sse.TopicTypeDAGRun, srv.apiV1.GetDAGRunDetailsData)
+	registrar.RegisterFetcher(sse.TopicTypeSubDAGRun, srv.apiV1.GetSubDAGRunDetailsData)
+	registrar.RegisterFetcher(sse.TopicTypeDAG, srv.apiV1.GetDAGDetailsData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGHistory, srv.apiV1.GetDAGHistoryData)
 	registrar.RegisterFetcher(sse.TopicTypeDAGRunLogs, srv.apiV1.GetDAGRunLogsData)
 	registrar.RegisterFetcher(sse.TopicTypeStepLog, srv.apiV1.GetStepLogData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGRuns, srv.apiV1.GetDAGRunsListData)
+	registrar.RegisterFetcher(sse.TopicTypeQueueItems, srv.apiV1.GetQueueItemsData)
+	registrar.RegisterFetcher(sse.TopicTypeQueues, srv.apiV1.GetQueuesListData)
+	registrar.RegisterFetcher(sse.TopicTypeDAGsList, srv.apiV1.GetDAGsListData)
+	registrar.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
+	registrar.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
+
+	// DAG-run and queue live views have an explicit eventstore-backed invalidation
+	// path, so they should not keep background polling once the SSE topic is live.
+	if srv.eventService != nil {
+		registrar.SetRefreshMode(sse.TopicTypeDAGRun, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeSubDAGRun, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeDAGHistory, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeDAGRuns, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeQueueItems, sse.TopicRefreshModeOnDemand)
+		registrar.SetRefreshMode(sse.TopicTypeQueues, sse.TopicRefreshModeOnDemand)
+		registrar.SetPublishOnWake(sse.TopicTypeDAGRuns, true)
+	}
 }
 
 func (srv *Server) setupAgentRoutes(ctx context.Context, r *chi.Mux, apiV1BasePath string) {

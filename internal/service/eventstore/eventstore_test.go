@@ -24,8 +24,8 @@ func TestPersistedDAGRunEventTypeForStatus(t *testing.T) {
 		ok     bool
 	}{
 		{name: "NotStarted", status: core.NotStarted, ok: false},
-		{name: "Queued", status: core.Queued, ok: false},
-		{name: "Running", status: core.Running, ok: false},
+		{name: "Queued", status: core.Queued, want: TypeDAGRunQueued, ok: true},
+		{name: "Running", status: core.Running, want: TypeDAGRunRunning, ok: true},
 		{name: "Rejected", status: core.Rejected, want: TypeDAGRunRejected, ok: true},
 		{name: "Waiting", status: core.Waiting, want: TypeDAGRunWaiting, ok: true},
 		{name: "Succeeded", status: core.Succeeded, want: TypeDAGRunSucceeded, ok: true},
@@ -79,13 +79,16 @@ func TestStableIDUsesCollisionSafeFraming(t *testing.T) {
 	)
 }
 
-func TestNewDAGRunEventEmbedsNotificationSnapshot(t *testing.T) {
+func TestNewDAGRunEventEmbedsDAGRunSnapshot(t *testing.T) {
 	t.Parallel()
 
 	status := &exec.DAGRunStatus{
+		Root:       exec.NewDAGRunRef("root-briefing", "root-run"),
+		Parent:     exec.NewDAGRunRef("root-briefing", "parent-run"),
 		Name:       "briefing",
 		DAGRunID:   "run-1",
 		AttemptID:  "attempt-1",
+		ProcGroup:  "priority-high",
 		Status:     core.Failed,
 		Error:      "boom",
 		Log:        "/tmp/run.log",
@@ -105,17 +108,31 @@ func TestNewDAGRunEventEmbedsNotificationSnapshot(t *testing.T) {
 		},
 	}
 
-	event := NewDAGRunEvent(Source{Service: SourceServiceServer, Instance: "test"}, TypeDAGRunFailed, status, map[string]any{"reason": "boom"})
+	event := NewDAGRunEvent(Source{Service: SourceServiceServer, Instance: "test"}, TypeDAGRunFailed, status, map[string]any{
+		"reason":           "boom",
+		DAGFileNameDataKey: "briefing.yaml",
+	})
 	require.NotNil(t, event)
 	require.NotNil(t, event.Data)
 	assert.Equal(t, "boom", event.Data["reason"])
 
-	restored, err := NotificationStatusFromEvent(event)
+	snapshot, err := DAGRunSnapshotFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, "briefing.yaml", snapshot.DAGFile)
+	assert.Equal(t, status.Root.Name, snapshot.Root.Name)
+	assert.Equal(t, status.Parent.ID, snapshot.Parent.DAGRunID)
+	assert.Equal(t, status.ProcGroup, snapshot.ProcGroup)
+
+	restored, err := DAGRunStatusFromEvent(event)
 	require.NoError(t, err)
 	require.NotNil(t, restored)
+	assert.Equal(t, status.Root, restored.Root)
+	assert.Equal(t, status.Parent, restored.Parent)
 	assert.Equal(t, status.Name, restored.Name)
 	assert.Equal(t, status.DAGRunID, restored.DAGRunID)
 	assert.Equal(t, status.AttemptID, restored.AttemptID)
+	assert.Equal(t, status.ProcGroup, restored.ProcGroup)
 	assert.Equal(t, status.Status, restored.Status)
 	assert.Equal(t, status.Error, restored.Error)
 	assert.Equal(t, status.Log, restored.Log)
@@ -128,6 +145,40 @@ func TestNewDAGRunEventEmbedsNotificationSnapshot(t *testing.T) {
 	require.NotNil(t, restored.OnFailure)
 	assert.Equal(t, "notify", restored.OnFailure.Step.Name)
 	assert.Equal(t, "handler boom", restored.OnFailure.Error)
+}
+
+func TestDAGRunSnapshotFromEventBackfillsLegacyDAGFile(t *testing.T) {
+	t.Parallel()
+
+	event := &Event{
+		ID:            "evt-legacy",
+		SchemaVersion: SchemaVersion,
+		OccurredAt:    time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC),
+		RecordedAt:    time.Date(2026, 4, 1, 9, 0, 1, 0, time.UTC),
+		Kind:          KindDAGRun,
+		Type:          TypeDAGRunSucceeded,
+		SourceService: SourceServiceServer,
+		Data: map[string]any{
+			notificationStatusSnapshotDataKey: map[string]any{
+				"name":       "legacy",
+				"dag_run_id": "run-1",
+				"attempt_id": "attempt-1",
+				"status":     core.Succeeded,
+			},
+			DAGFileNameDataKey: "legacy.yaml",
+		},
+	}
+
+	snapshot, err := DAGRunSnapshotFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	assert.Equal(t, "legacy.yaml", snapshot.DAGFile)
+
+	status, err := NotificationStatusFromEvent(event)
+	require.NoError(t, err)
+	require.NotNil(t, status)
+	assert.Equal(t, "legacy", status.Name)
+	assert.Equal(t, "run-1", status.DAGRunID)
 }
 
 func TestNewDAGRunEventDeepClonesData(t *testing.T) {

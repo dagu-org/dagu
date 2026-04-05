@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
 const (
@@ -25,19 +26,12 @@ const (
 	maxNotificationDetailRunes       = 160
 )
 
-// NotificationStatuses are the DAG statuses that can generate bot notifications.
-var NotificationStatuses = []core.Status{
-	core.Succeeded,
-	core.Failed,
-	core.PartiallySucceeded,
-	core.Waiting,
-}
-
 // NotificationClass controls batching policy.
 type NotificationClass int
 
 const (
 	NotificationClassUnknown NotificationClass = iota
+	NotificationClassInformational
 	NotificationClassSuccessDigest
 	NotificationClassUrgent
 )
@@ -45,6 +39,7 @@ const (
 // NotificationEvent is a status snapshot buffered for delivery.
 type NotificationEvent struct {
 	Key        string
+	Type       eventstore.EventType
 	Status     *exec.DAGRunStatus
 	ObservedAt time.Time
 }
@@ -181,7 +176,16 @@ func (b *NotificationBatcher) Enqueue(destination string, event NotificationEven
 		return false
 	}
 
-	class, ok := NotificationClassForStatus(event.Status.Status)
+	eventType := event.Type
+	if eventType == "" {
+		var ok bool
+		eventType, ok = eventstore.PersistedDAGRunEventTypeForStatus(event.Status.Status)
+		if !ok {
+			return false
+		}
+	}
+
+	class, ok := NotificationClassForEvent(eventType, event.Status.Status)
 	if !ok {
 		return false
 	}
@@ -192,6 +196,7 @@ func (b *NotificationBatcher) Enqueue(destination string, event NotificationEven
 	}
 	snapshot := NotificationEvent{
 		Key:        event.Key,
+		Type:       eventType,
 		Status:     cloneNotificationStatus(event.Status),
 		ObservedAt: observedAt,
 	}
@@ -222,6 +227,7 @@ func (b *NotificationBatcher) Enqueue(destination string, event NotificationEven
 			}
 		}
 	}
+	b.removeReadyRunLocked(destination, runKey)
 
 	bucketKey := notificationBucketKey(destination, class)
 	bucket, ok := b.buckets[bucketKey]
@@ -245,6 +251,33 @@ func (b *NotificationBatcher) Enqueue(destination string, event NotificationEven
 	bucket.events[runKey] = snapshot
 	b.runIndex[destRunKey] = bucketKey
 	return true
+}
+
+func (b *NotificationBatcher) removeReadyRunLocked(destination, runKey string) {
+	if len(b.ready) == 0 {
+		return
+	}
+
+	filteredReady := b.ready[:0]
+	for _, pending := range b.ready {
+		if pending.Destination != destination {
+			filteredReady = append(filteredReady, pending)
+			continue
+		}
+
+		filteredEvents := pending.Batch.Events[:0]
+		for _, event := range pending.Batch.Events {
+			if NotificationRunKey(event.Status) == runKey {
+				continue
+			}
+			filteredEvents = append(filteredEvents, event)
+		}
+		pending.Batch.Events = filteredEvents
+		if len(pending.Batch.Events) > 0 {
+			filteredReady = append(filteredReady, pending)
+		}
+	}
+	b.ready = filteredReady
 }
 
 // ReadyC is signaled when one or more batches are ready for delivery.
@@ -360,15 +393,28 @@ func (b *NotificationBatcher) windowForClass(class NotificationClass) time.Durat
 	return b.successWindow
 }
 
-// NotificationClassForStatus maps a DAG status to its notification class.
-func NotificationClassForStatus(status core.Status) (NotificationClass, bool) {
-	switch status { //nolint:exhaustive // notification policy is intentionally fixed
-	case core.Failed, core.Waiting:
+// NotificationClassForEvent maps a DAG-run lifecycle event to its notification class.
+func NotificationClassForEvent(eventType eventstore.EventType, status core.Status) (NotificationClass, bool) {
+	switch eventType {
+	case eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunWaiting:
 		return NotificationClassUrgent, true
-	case core.Succeeded, core.PartiallySucceeded:
+	case eventstore.TypeDAGRunSucceeded:
 		return NotificationClassSuccessDigest, true
-	default:
+	case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning:
+		return NotificationClassInformational, true
+	case eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected:
+		return NotificationClassUrgent, true
+	case eventstore.TypeLLMUsageRecorded:
 		return NotificationClassUnknown, false
+	default:
+		switch status { //nolint:exhaustive // legacy direct notifications may only pass status
+		case core.Failed, core.Waiting:
+			return NotificationClassUrgent, true
+		case core.Succeeded, core.PartiallySucceeded:
+			return NotificationClassSuccessDigest, true
+		default:
+			return NotificationClassUnknown, false
+		}
 	}
 }
 
@@ -488,6 +534,9 @@ func FormatNotificationBatch(batch NotificationBatch) string {
 	case NotificationClassUrgent:
 		fmt.Fprintf(&b, "Urgent DAG updates (%d %s in last %s)\n", len(batch.Events), pluralize("run", len(batch.Events)), window)
 		writeNotificationGroups(&b, groups, true)
+	case NotificationClassInformational:
+		fmt.Fprintf(&b, "DAG activity updates (%d %s in last %s)\n", len(batch.Events), pluralize("run", len(batch.Events)), window)
+		writeNotificationGroups(&b, groups, false)
 	case NotificationClassSuccessDigest:
 		fmt.Fprintf(&b, "DAG completion digest (%d %s in last %s)\n", len(batch.Events), pluralize("run", len(batch.Events)), window)
 		writeNotificationGroups(&b, groups, false)
@@ -589,6 +638,10 @@ func formatSingleNotification(status *exec.DAGRunStatus) string {
 	emoji := notificationEmoji(status.Status)
 
 	switch status.Status { //nolint:exhaustive // fixed notification policy
+	case core.Queued:
+		fmt.Fprintf(&b, "%s DAG `%s` was queued.", emoji, status.Name)
+	case core.Running:
+		fmt.Fprintf(&b, "%s DAG `%s` started running.", emoji, status.Name)
 	case core.Waiting:
 		fmt.Fprintf(&b, "%s DAG `%s` is waiting for approval.", emoji, status.Name)
 		if detail := waitingNotificationDetail(status); detail != "" {

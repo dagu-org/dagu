@@ -41,6 +41,7 @@ type telegramAPI interface {
 type Config struct {
 	Token                 string
 	AllowedChatIDs        []int64
+	InterestedEventTypes  []string
 	SafeMode              bool
 	EventService          *eventstore.Service
 	NotificationStateFile string

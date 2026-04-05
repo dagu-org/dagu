@@ -15,6 +15,8 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
 
 func TestNotificationSeenKeyIncludesStatus(t *testing.T) {
@@ -80,6 +82,52 @@ func TestNotificationBatcher_DuplicateStatusDoesNotDuplicateBatch(t *testing.T) 
 	assert.Equal(t, NotificationClassUrgent, ready.Batch.Class)
 	require.Len(t, ready.Batch.Events, 1)
 	assert.Equal(t, core.Failed, ready.Batch.Events[0].Status.Status)
+}
+
+func TestNotificationBatcher_RunningEventsUseInformationalClass(t *testing.T) {
+	t.Parallel()
+
+	batcher := NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond)
+	defer batcher.Stop()
+
+	event := testNotificationEvent(&exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "a1",
+		Status:    core.Running,
+	})
+	event.Type = eventstore.TypeDAGRunRunning
+
+	require.True(t, batcher.Enqueue("dest-1", event))
+
+	ready := waitForReadyBatch(t, batcher)
+	assert.Equal(t, NotificationClassInformational, ready.Batch.Class)
+	require.Len(t, ready.Batch.Events, 1)
+	assert.Equal(t, eventstore.TypeDAGRunRunning, ready.Batch.Events[0].Type)
+	assert.Contains(t, FormatNotificationBatch(ready.Batch), "DAG activity updates")
+}
+
+func TestNotificationBatcher_AbortedEventsUseUrgentClass(t *testing.T) {
+	t.Parallel()
+
+	batcher := NewNotificationBatcher(10*time.Millisecond, 20*time.Millisecond)
+	defer batcher.Stop()
+
+	event := testNotificationEvent(&exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "a1",
+		Status:    core.Aborted,
+	})
+	event.Type = eventstore.TypeDAGRunAborted
+
+	require.True(t, batcher.Enqueue("dest-1", event))
+
+	ready := waitForReadyBatch(t, batcher)
+	assert.Equal(t, NotificationClassUrgent, ready.Batch.Class)
+	require.Len(t, ready.Batch.Events, 1)
+	assert.Equal(t, eventstore.TypeDAGRunAborted, ready.Batch.Events[0].Type)
+	assert.Contains(t, FormatNotificationBatch(ready.Batch), "aborted")
 }
 
 func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlushes(t *testing.T) {

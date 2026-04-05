@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,6 +33,15 @@ func TestParseTopicCanonicalizesQuery(t *testing.T) {
 func TestParseTopicRejectsMalformedQuery(t *testing.T) {
 	_, err := ParseTopic("dagruns:%ZZ")
 	require.Error(t, err)
+}
+
+func TestParseTopicAcceptsSubDAGRunIdentifier(t *testing.T) {
+	parsed, err := ParseTopic("subdagrun:billing/run-1/sub-1")
+	require.NoError(t, err)
+
+	assert.Equal(t, TopicTypeSubDAGRun, parsed.Type)
+	assert.Equal(t, "billing/run-1/sub-1", parsed.Identifier)
+	assert.Equal(t, "subdagrun:billing/run-1/sub-1", parsed.Key)
 }
 
 func TestParseTopicRejectsDAGTraversalIdentifiers(t *testing.T) {
@@ -284,7 +294,7 @@ func TestMultiplexTopicSendSnapshotDropsRemovedTopics(t *testing.T) {
 
 	topic := newMultiplexTopic(mux, parsed, func(_ context.Context, identifier string) (any, error) {
 		return map[string]string{"id": identifier}, nil
-	})
+	}, TopicRefreshModePolling, false)
 	session, err := newStreamSession(httptest.NewRecorder(), mux)
 	require.NoError(t, err)
 	require.True(t, session.addTopic(topic))
@@ -390,6 +400,105 @@ func TestMultiplexHandlerHandleStreamAllowsUnsupportedInitialTopics(t *testing.T
 	require.Len(t, control.Errors, 1)
 	assert.Equal(t, "agent:session-1", control.Errors[0].Topic)
 	assert.Equal(t, "unsupported_topic", control.Errors[0].Code)
+}
+
+func TestMultiplexerWakeTopicTriggersImmediateRefetch(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	var fetches atomic.Int64
+	mux.RegisterFetcher(TopicTypeDAG, func(_ context.Context, identifier string) (any, error) {
+		return map[string]any{
+			"id":    identifier,
+			"count": fetches.Add(1),
+		}, nil
+	})
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(context.Background(), recorder, []string{"dag:test.yaml"}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+	defer mux.removeSession(result.session)
+
+	require.Eventually(t, func() bool {
+		return fetches.Load() > 0
+	}, time.Second, 10*time.Millisecond)
+
+	before := fetches.Load()
+	mux.WakeTopic(TopicTypeDAG, "test.yaml")
+
+	require.Eventually(t, func() bool {
+		return fetches.Load() > before
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestMultiplexerOnDemandTopicOnlyRefetchesOnWake(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	mux.watcherBaseInterval = 20 * time.Millisecond
+	mux.watcherMaxInterval = 20 * time.Millisecond
+	t.Cleanup(mux.Shutdown)
+
+	var fetches atomic.Int64
+	mux.RegisterFetcher(TopicTypeDAGRun, func(_ context.Context, identifier string) (any, error) {
+		return map[string]any{
+			"id":    identifier,
+			"count": fetches.Add(1),
+		}, nil
+	})
+	mux.SetRefreshMode(TopicTypeDAGRun, TopicRefreshModeOnDemand)
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(context.Background(), recorder, []string{"dagrun:test/run-1"}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+	defer mux.removeSession(result.session)
+
+	topic := mux.topics["dagrun:test/run-1"]
+	require.NotNil(t, topic)
+	require.NoError(t, topic.sendSnapshot(context.Background(), result.session, 1))
+	assert.EqualValues(t, 1, fetches.Load())
+
+	time.Sleep(100 * time.Millisecond)
+	assert.EqualValues(t, 1, fetches.Load())
+
+	mux.WakeTopic(TopicTypeDAGRun, "test/run-1")
+
+	require.Eventually(t, func() bool {
+		return fetches.Load() == 2
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestMultiplexerPublishOnWakeEmitsMessageEvenWhenPayloadHashIsUnchanged(t *testing.T) {
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDAGRuns, func(_ context.Context, identifier string) (any, error) {
+		return map[string]any{
+			"id":      identifier,
+			"dagRuns": []string{"same"},
+		}, nil
+	})
+	mux.SetRefreshMode(TopicTypeDAGRuns, TopicRefreshModeOnDemand)
+	mux.SetPublishOnWake(TopicTypeDAGRuns, true)
+
+	recorder := httptest.NewRecorder()
+	result, err := mux.createSession(context.Background(), recorder, []string{"dagruns:fromDate=1&toDate=2"}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result.session)
+	defer mux.removeSession(result.session)
+
+	topic := mux.topics["dagruns:fromDate=1&toDate=2"]
+	require.NotNil(t, topic)
+
+	require.NoError(t, topic.sendSnapshot(context.Background(), result.session, 1))
+	first := result.session.popNext()
+	require.NotNil(t, first)
+
+	mux.WakeTopic(TopicTypeDAGRuns, "fromDate=1&toDate=2")
+
+	require.Eventually(t, func() bool {
+		return result.session.popNext() != nil
+	}, time.Second, 10*time.Millisecond)
 }
 
 func parseControlEvent(t *testing.T, body string) StreamControlEvent {

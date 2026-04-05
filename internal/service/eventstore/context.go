@@ -46,13 +46,29 @@ func SourceFromContext(ctx context.Context) (Source, bool) {
 }
 
 func EmitPersistedStatusFromContext(ctx context.Context, status *exec.DAGRunStatus) error {
+	_, _, err := EmitPersistedStatusTransitionFromContext(ctx, "", status, nil)
+	return err
+}
+
+func EmitPersistedStatusTransitionFromContext(
+	ctx context.Context,
+	previous EventType,
+	status *exec.DAGRunStatus,
+	data map[string]any,
+) (EventType, bool, error) {
 	service, source, ok := FromContext(ctx)
 	if !ok || service == nil || status == nil {
-		return nil
+		return previous, false, nil
 	}
 	eventType, ok := PersistedDAGRunEventTypeForStatus(status.Status)
 	if !ok {
-		return nil
+		return previous, false, nil
 	}
-	return service.Emit(context.WithoutCancel(ctx), NewDAGRunEvent(source, eventType, status, nil))
+	if eventType == previous {
+		return previous, false, nil
+	}
+	if err := service.Emit(context.WithoutCancel(ctx), NewDAGRunEvent(source, eventType, status, data)); err != nil {
+		return previous, false, err
+	}
+	return eventType, true, nil
 }
