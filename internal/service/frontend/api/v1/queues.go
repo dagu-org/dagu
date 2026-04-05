@@ -287,7 +287,7 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 	return queueMap, nil
 }
 
-func (a *API) toQueueResource(ctx context.Context, q *queueInfo) (api.Queue, error) {
+func (a *API) toQueueResource(_ context.Context, q *queueInfo) (api.Queue, error) {
 	if q == nil {
 		return api.Queue{}, nil
 	}
