@@ -229,7 +229,7 @@ func TestLoad_Env(t *testing.T) {
 		},
 		EventStore: EventStoreConfig{
 			Enabled:       true,
-			RetentionDays: 3,
+			RetentionDays: 1,
 		},
 		Paths: PathsConfig{
 			DAGsDir:            filepath.Join(testPaths, "dags"),
@@ -673,7 +673,7 @@ scheduler:
 		},
 		EventStore: EventStoreConfig{
 			Enabled:       true,
-			RetentionDays: 3,
+			RetentionDays: 1,
 		},
 		Paths: PathsConfig{
 			DAGsDir:            "/var/dagu/dags",
