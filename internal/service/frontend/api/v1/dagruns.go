@@ -3157,7 +3157,7 @@ func parseStatusListQueryValues(ctx context.Context, rawValues []string) api.Sta
 
 	result := make(api.StatusList, 0, len(rawValues))
 	for _, rawValue := range rawValues {
-		for _, part := range strings.Split(rawValue, ",") {
+		for part := range strings.SplitSeq(rawValue, ",") {
 			value := strings.TrimSpace(part)
 			if value == "" {
 				continue
