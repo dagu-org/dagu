@@ -52,7 +52,7 @@ func TestStoreReadNotificationEventsTracksCommittedOffsetsAndInbox(t *testing.T)
 	assert.GreaterOrEqual(t, len(nextCursor.CommittedOffsets), len(cursor.CommittedOffsets))
 }
 
-func TestStoreReadNotificationEventsSkipsMalformedInboxFiles(t *testing.T) {
+func TestStoreReadNotificationEventsQuarantinesMalformedInboxFiles(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
@@ -72,6 +72,10 @@ func TestStoreReadNotificationEventsSkipsMalformedInboxFiles(t *testing.T) {
 	require.Len(t, events, 1)
 	assert.Equal(t, "evt-good", events[0].ID)
 	assert.NotEmpty(t, nextCursor.LastInboxFile)
+	_, statErr := os.Stat(filepath.Join(store.inboxDir, "00000000000000000001-bad.json"))
+	assert.ErrorIs(t, statErr, os.ErrNotExist)
+	_, statErr = os.Stat(filepath.Join(store.quarantineDir, "00000000000000000001-bad.json"))
+	require.NoError(t, statErr)
 
 	events, nextCursor, err = store.ReadNotificationEvents(context.Background(), nextCursor)
 	require.NoError(t, err)

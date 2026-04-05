@@ -1164,6 +1164,8 @@ func setDefaultIfNotPositive(target *int, defaultValue int) {
 func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	// Default safe mode to true
 	cfg.Bots.SafeMode = true
+	cfg.Bots.Telegram.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
+	cfg.Bots.Slack.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
 
 	// Check env var override for provider
 	if provider := l.v.GetString("bots.provider"); provider != "" {
@@ -1173,6 +1175,9 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	// Check env var override for token
 	if token := l.v.GetString("bots.telegram.token"); token != "" {
 		cfg.Bots.Telegram.Token = token
+	}
+	if raw, ok := lookupInterestedEventTypesEnv("BOTS_TELEGRAM_INTERESTED_EVENT_TYPES"); ok {
+		cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypes(raw)
 	}
 
 	if def.Bots == nil {
@@ -1194,6 +1199,10 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		if len(def.Bots.Telegram.AllowedChatIDs) > 0 {
 			cfg.Bots.Telegram.AllowedChatIDs = def.Bots.Telegram.AllowedChatIDs
 		}
+		if def.Bots.Telegram.InterestedEventTypes != nil &&
+			!hasInterestedEventTypesEnv("BOTS_TELEGRAM_INTERESTED_EVENT_TYPES") {
+			cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypesSlice(def.Bots.Telegram.InterestedEventTypes)
+		}
 	}
 
 	// Default Slack respond_to_all to true
@@ -1206,6 +1215,9 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	if appToken := l.v.GetString("bots.slack.app_token"); appToken != "" {
 		cfg.Bots.Slack.AppToken = appToken
 	}
+	if raw, ok := lookupInterestedEventTypesEnv("BOTS_SLACK_INTERESTED_EVENT_TYPES"); ok {
+		cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypes(raw)
+	}
 
 	if def.Bots.Slack != nil {
 		if cfg.Bots.Slack.BotToken == "" {
@@ -1217,10 +1229,43 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		if len(def.Bots.Slack.AllowedChannelIDs) > 0 {
 			cfg.Bots.Slack.AllowedChannelIDs = def.Bots.Slack.AllowedChannelIDs
 		}
+		if def.Bots.Slack.InterestedEventTypes != nil &&
+			!hasInterestedEventTypesEnv("BOTS_SLACK_INTERESTED_EVENT_TYPES") {
+			cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypesSlice(def.Bots.Slack.InterestedEventTypes)
+		}
 		if def.Bots.Slack.RespondToAll != nil {
 			cfg.Bots.Slack.RespondToAll = *def.Bots.Slack.RespondToAll
 		}
 	}
+}
+
+func parseInterestedEventTypes(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return []string{}
+	}
+	parts := strings.Split(raw, ",")
+	return parseInterestedEventTypesSlice(parts)
+}
+
+func parseInterestedEventTypesSlice(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		result = append(result, value)
+	}
+	return result
+}
+
+func lookupInterestedEventTypesEnv(suffix string) (string, bool) {
+	return os.LookupEnv(strings.ToUpper(AppSlug) + "_" + suffix)
+}
+
+func hasInterestedEventTypesEnv(suffix string) bool {
+	_, ok := lookupInterestedEventTypesEnv(suffix)
+	return ok
 }
 
 func (l *ConfigLoader) loadLicenseConfig(cfg *Config, def Definition) {
@@ -1700,9 +1745,11 @@ var envBindings = []envBinding{
 	{key: "bots.safe_mode", env: "BOTS_SAFE_MODE"},
 	{key: "bots.telegram.token", env: "BOTS_TELEGRAM_TOKEN"},
 	{key: "bots.telegram.allowed_chat_ids", env: "BOTS_TELEGRAM_ALLOWED_CHAT_IDS"},
+	{key: "bots.telegram.interested_event_types", env: "BOTS_TELEGRAM_INTERESTED_EVENT_TYPES"},
 	{key: "bots.slack.bot_token", env: "BOTS_SLACK_BOT_TOKEN"},
 	{key: "bots.slack.app_token", env: "BOTS_SLACK_APP_TOKEN"},
 	{key: "bots.slack.allowed_channel_ids", env: "BOTS_SLACK_ALLOWED_CHANNEL_IDS"},
+	{key: "bots.slack.interested_event_types", env: "BOTS_SLACK_INTERESTED_EVENT_TYPES"},
 	{key: "bots.slack.respond_to_all", env: "BOTS_SLACK_RESPOND_TO_ALL"},
 
 	// License

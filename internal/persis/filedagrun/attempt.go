@@ -53,13 +53,14 @@ var _ exec.DAGRunAttempt = (*Attempt)(nil)
 // Attempt manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
 type Attempt struct {
-	id        string                              // Attempt ID, extracted from the file path
-	file      string                              // Path to the status file
-	writer    *Writer                             // Writer for appending status updates
-	mu        sync.RWMutex                        // Mutex for thread safety
-	cache     *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for read operations
-	isClosing atomic.Bool                         // Flag to prevent writes during Close/Compact
-	dag       *core.DAG                           // DAG associated with the status file
+	id                   string                              // Attempt ID, extracted from the file path
+	file                 string                              // Path to the status file
+	writer               *Writer                             // Writer for appending status updates
+	mu                   sync.RWMutex                        // Mutex for thread safety
+	cache                *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for read operations
+	isClosing            atomic.Bool                         // Flag to prevent writes during Close/Compact
+	dag                  *core.DAG                           // DAG associated with the status file
+	lastEmittedEventType eventstore.EventType
 }
 
 // AttemptOption defines a functional option for configuring an Attempt.
@@ -185,6 +186,7 @@ func (att *Attempt) Open(ctx context.Context) error {
 	}
 
 	att.writer = writer
+	att.lastEmittedEventType = att.lastPersistedEventTypeLocked(ctx)
 	return nil
 }
 
@@ -212,8 +214,16 @@ func (att *Attempt) Write(ctx context.Context, status exec.DAGRunStatus) error {
 		att.cache.Invalidate(att.file)
 	}
 
-	if err := eventstore.EmitPersistedStatusFromContext(ctx, &status); err != nil {
+	nextEventType, _, err := eventstore.EmitPersistedStatusTransitionFromContext(
+		ctx,
+		att.lastEmittedEventType,
+		&status,
+		att.eventData(),
+	)
+	if err != nil {
 		logger.Warn(ctx, "Failed to emit DAG-run event", tag.Error(err))
+	} else {
+		att.lastEmittedEventType = nextEventType
 	}
 
 	return nil
@@ -382,6 +392,34 @@ func (att *Attempt) ReadStatus(ctx context.Context) (*exec.DAGRunStatus, error) 
 // Must be called with a lock (read or write) already held.
 func (att *Attempt) parseLocked(ctx context.Context) (*exec.DAGRunStatus, error) {
 	return parseStatusFileWithContext(ctx, att.file)
+}
+
+func (att *Attempt) lastPersistedEventTypeLocked(ctx context.Context) eventstore.EventType {
+	status, err := att.parseLocked(ctx)
+	if err != nil {
+		return ""
+	}
+	eventType, ok := eventstore.PersistedDAGRunEventTypeForStatus(status.Status)
+	if !ok {
+		return ""
+	}
+	return eventType
+}
+
+func (att *Attempt) eventData() map[string]any {
+	if att.dag == nil {
+		return nil
+	}
+	fileName := att.dag.FileName()
+	if fileName == "" && att.dag.SourceFile != "" {
+		fileName = fileutil.TrimYAMLFileExtension(filepath.Base(att.dag.SourceFile))
+	}
+	if fileName == "" {
+		return nil
+	}
+	return map[string]any{
+		eventstore.DAGFileNameDataKey: fileName,
+	}
 }
 
 // ParseStatusFile reads the status file and returns the last valid status.

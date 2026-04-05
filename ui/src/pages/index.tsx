@@ -19,7 +19,6 @@ import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-deta
 import { useExactDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import PathsCard from '../features/system-status/components/PathsCard';
-import { useLiveConnection } from '../hooks/useAppLive';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -188,7 +187,6 @@ function Dashboard(): React.ReactElement | null {
     ]
   );
 
-  useLiveConnection();
   const {
     data: dagRunsList,
     error,
@@ -373,7 +371,10 @@ function Dashboard(): React.ReactElement | null {
 
         {/* Timeline Visualization - Hero */}
         <div className="flex-1 min-h-[250px] rounded-xl border border-border bg-surface overflow-hidden">
-          <DashboardTimeChart data={dagRunsList} selectedDate={selectedTimelineDate} />
+          <DashboardTimeChart
+            data={dagRunsList}
+            selectedDate={selectedTimelineDate}
+          />
         </div>
       </div>
 

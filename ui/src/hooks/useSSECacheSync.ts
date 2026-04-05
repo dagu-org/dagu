@@ -11,7 +11,9 @@ export function sseFallbackOptions(
   sseResult: SSEState<unknown>,
   fallbackInterval: number = 2000
 ) {
-  const sseActive = sseResult.isConnected && !sseResult.shouldUseFallback;
+  const hasTopicData = sseResult.data != null;
+  const sseActive =
+    sseResult.isConnected && !sseResult.shouldUseFallback && hasTopicData;
   // While SSE is still connecting (handshake in progress), suppress SWR polling
   // to avoid redundant fetches. The initial revalidateOnMount fetch provides
   // data during this window. Once SSE connects, it pushes updates via
@@ -21,7 +23,7 @@ export function sseFallbackOptions(
     revalidateOnMount: true,
     revalidateIfStale: !sseActive && !sseSettling,
     revalidateOnFocus: !sseActive,
-    refreshInterval: (sseActive || sseSettling) ? 0 : fallbackInterval,
+    refreshInterval: sseActive || sseSettling ? 0 : fallbackInterval,
   };
 }
 

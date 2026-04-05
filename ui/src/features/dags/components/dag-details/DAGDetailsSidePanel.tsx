@@ -6,13 +6,10 @@ import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
 import { useQuery } from '@/hooks/api';
+import { useDAGRunSSE } from '@/hooks/useDAGRunSSE';
+import { useDAGSSE } from '@/hooks/useDAGSSE';
 import { whenEnabled } from '@/hooks/queryUtils';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDAG,
-  useLiveDAGRuns,
-} from '@/hooks/useAppLive';
+import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
@@ -132,7 +129,8 @@ function DAGDetailsSidePanel({
   if (fileName) {
     stableFileNameRef.current = fileName;
   }
-  const stableFileName = isOpen || shouldRender ? stableFileNameRef.current : '';
+  const stableFileName =
+    isOpen || shouldRender ? stableFileNameRef.current : '';
 
   React.useEffect(() => {
     if (isOpen) {
@@ -169,7 +167,7 @@ function DAGDetailsSidePanel({
   }, []);
 
   const dagDetailsEnabled = isOpen && !!stableFileName;
-  const liveState = useLiveConnection(dagDetailsEnabled);
+  const dagDetailsSSE = useDAGSSE(stableFileName, dagDetailsEnabled);
   const { data, error, mutate } = useQuery(
     '/dags/{fileName}',
     whenEnabled(dagDetailsEnabled, {
@@ -178,12 +176,18 @@ function DAGDetailsSidePanel({
         path: { fileName: stableFileName },
       },
     }),
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(dagDetailsSSE)
   );
-  useLiveDAG(stableFileName, mutate, dagDetailsEnabled);
+  useSSECacheSync(dagDetailsSSE, mutate);
 
   const dagName = data?.dag?.name || '';
   const trackedRunEnabled = isOpen && !!dagName && !!trackedDagRunId;
+  const trackedRunSSE = useDAGRunSSE(
+    dagName,
+    trackedDagRunId || '',
+    trackedRunEnabled,
+    remoteNode
+  );
   const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
     '/dag-runs/{name}/{dagRunId}',
     whenEnabled(trackedRunEnabled, {
@@ -192,9 +196,9 @@ function DAGDetailsSidePanel({
         query: { remoteNode },
       },
     }),
-    liveFallbackOptions(liveState)
+    sseFallbackOptions(trackedRunSSE)
   );
-  useLiveDAGRuns(mutateTrackedRun, trackedRunEnabled);
+  useSSECacheSync(trackedRunSSE, mutateTrackedRun);
 
   React.useEffect(() => {
     if (trackedRunData?.dagRunDetails) {
@@ -353,7 +357,11 @@ function DAGDetailsSidePanel({
                       {loadState.message}
                     </p>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => void mutate()}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void mutate()}
+                      >
                         Retry
                       </Button>
                       <Button variant="ghost" size="sm" onClick={onClose}>

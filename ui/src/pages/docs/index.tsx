@@ -21,12 +21,9 @@ import { useUserPreferences } from '@/contexts/UserPreference';
 import { CockpitToolbar } from '@/features/cockpit/components/CockpitToolbar';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
 import { useClient, useQuery } from '@/hooks/api';
-import {
-  liveFallbackOptions,
-  useLiveConnection,
-  useLiveDocTree,
-} from '@/hooks/useAppLive';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
+import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
@@ -105,7 +102,7 @@ function DocsContent() {
   const sort = docSortField as PathsDocsGetParametersQuerySort;
   const order = docSortOrder as PathsDocsGetParametersQueryOrder;
 
-  const liveState = useLiveConnection();
+  const docTreeSSE = useDocTreeSSE({ sort, order, remoteNode });
 
   const {
     data: treeData,
@@ -120,14 +117,14 @@ function DocsContent() {
       },
     },
     {
-      ...liveFallbackOptions(liveState),
+      ...sseFallbackOptions(docTreeSSE),
       revalidateIfStale: false,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       keepPreviousData: true,
     }
   );
-  useLiveDocTree(mutate);
+  useSSECacheSync(docTreeSSE, mutate);
 
   // Set page title
   useEffect(() => {

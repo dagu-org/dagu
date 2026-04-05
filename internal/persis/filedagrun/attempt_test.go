@@ -15,6 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/cmn/stringutil"
 	"github.com/dagu-org/dagu/internal/core"
 	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagu-org/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -867,4 +868,111 @@ func TestAttempt_WorkDir(t *testing.T) {
 	att, err := NewAttempt(statusFile, nil)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(dagRunDir, "work"), att.WorkDir())
+}
+
+func TestAttempt_WriteEmitsLifecycleTransitionsOnce(t *testing.T) {
+	t.Parallel()
+
+	dir := createTempDir(t)
+	file := filepath.Join(dir, "status.dat")
+	store := &captureEventStore{}
+	service := eventstore.New(store)
+	ctx := eventstore.WithContext(context.Background(), service, eventstore.Source{Service: eventstore.SourceServiceServer})
+
+	dag := &core.DAG{Name: "TestDAG", Location: filepath.Join(dir, "test-dag.yaml")}
+	att, err := NewAttempt(file, nil, WithDAG(dag))
+	require.NoError(t, err)
+	require.NoError(t, att.Open(ctx))
+
+	queued := createTestStatus(core.Queued)
+	queued.AttemptID = "attempt-1"
+	queued.QueuedAt = time.Now().UTC().Format(time.RFC3339)
+	require.NoError(t, att.Write(ctx, queued))
+	require.NoError(t, att.Write(ctx, queued))
+
+	running := queued
+	running.Status = core.Running
+	running.StartedAt = time.Now().UTC().Format(time.RFC3339)
+	require.NoError(t, att.Write(ctx, running))
+	require.NoError(t, att.Write(ctx, running))
+
+	succeeded := running
+	succeeded.Status = core.Succeeded
+	succeeded.FinishedAt = time.Now().UTC().Format(time.RFC3339)
+	require.NoError(t, att.Write(ctx, succeeded))
+	require.NoError(t, att.Write(ctx, succeeded))
+
+	require.Len(t, store.events, 3)
+	assert.Equal(t, []eventstore.EventType{
+		eventstore.TypeDAGRunQueued,
+		eventstore.TypeDAGRunRunning,
+		eventstore.TypeDAGRunSucceeded,
+	}, captureEventTypes(store.events))
+
+	snapshot, err := eventstore.DAGRunSnapshotFromEvent(store.events[0])
+	require.NoError(t, err)
+	assert.Equal(t, "test-dag", snapshot.DAGFile)
+	assert.Equal(t, core.Queued, snapshot.Status)
+}
+
+func TestAttempt_OpenRestoresLastEmittedLifecycleState(t *testing.T) {
+	t.Parallel()
+
+	dir := createTempDir(t)
+	file := filepath.Join(dir, "status.dat")
+	store := &captureEventStore{}
+	service := eventstore.New(store)
+	ctx := eventstore.WithContext(context.Background(), service, eventstore.Source{Service: eventstore.SourceServiceServer})
+
+	dag := &core.DAG{Name: "TestDAG", Location: filepath.Join(dir, "test-dag.yaml")}
+	att, err := NewAttempt(file, nil, WithDAG(dag))
+	require.NoError(t, err)
+	require.NoError(t, att.Open(ctx))
+
+	queued := createTestStatus(core.Queued)
+	queued.AttemptID = "attempt-1"
+	queued.QueuedAt = time.Now().UTC().Format(time.RFC3339)
+	require.NoError(t, att.Write(ctx, queued))
+	require.NoError(t, att.Close(ctx))
+	require.Len(t, store.events, 1)
+
+	reopened, err := NewAttempt(file, nil, WithDAG(dag))
+	require.NoError(t, err)
+	require.NoError(t, reopened.Open(ctx))
+	require.NoError(t, reopened.Write(ctx, queued))
+
+	running := queued
+	running.Status = core.Running
+	running.StartedAt = time.Now().UTC().Format(time.RFC3339)
+	require.NoError(t, reopened.Write(ctx, running))
+
+	require.Len(t, store.events, 2)
+	assert.Equal(t, []eventstore.EventType{
+		eventstore.TypeDAGRunQueued,
+		eventstore.TypeDAGRunRunning,
+	}, captureEventTypes(store.events))
+}
+
+type captureEventStore struct {
+	events []*eventstore.Event
+}
+
+func (c *captureEventStore) Emit(_ context.Context, event *eventstore.Event) error {
+	c.events = append(c.events, event)
+	return nil
+}
+
+func (*captureEventStore) Query(context.Context, eventstore.QueryFilter) (*eventstore.QueryResult, error) {
+	return nil, nil
+}
+
+func captureEventTypes(events []*eventstore.Event) []eventstore.EventType {
+	types := make([]eventstore.EventType, 0, len(events))
+	for _, event := range events {
+		if event == nil {
+			continue
+		}
+		types = append(types, event.Type)
+	}
+	return types
 }
