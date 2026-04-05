@@ -14,7 +14,7 @@
   </p>
 </div>
 
-## What is Dagu Workflow Engine?
+## Local-First Workflow Engine
 
 **Dagu is a self-contained, lightweight workflow engine for small teams.** Define workflows in simple YAML, execute them anywhere with a single binary, compose complex pipelines from reusable sub-workflows, and distribute tasks across workers. All without requiring databases, message brokers, or code changes to your existing scripts.
 
@@ -22,10 +22,11 @@ Built for developers who want powerful workflow orchestration without the operat
 
 - Zero-Ops: Single binary, file-based storage, under 128MB memory footprint
 - Full-Power: Docker steps, SSH execution, DAG composition, distributed mode, Git-based version management for DAGs & docs, [19+ executors](https://docs.dagu.sh/step-types/shell)
-- AI-Native: Built-in LLM agent creates, edits, and debugs workflows from natural language in the Web UI or as `type: agent` steps
-- Workflow Operator: Persistent AI operator for Slack and Telegram. Monitor runs, debug failures, recover incidents, and continue follow-up in the same conversation
-- Legacy Script Friendly: Orchestrate existing shell commands, Python scripts, Docker containers, or HTTP calls without modification.
+- AI Agent integration: Built-in AI agent for workflow management and workflow steps operate on your infrastructure with no external dependencies
+- Legacy Script Friendly: Orchestrate existing shell commands, Python scripts, Docker containers, or HTTP calls without modification
+- Chat App integration: Persistent AI operator for Slack and Telegram. Monitor runs, debug failures, recover incidents, and continue follow-up in the same conversation
 - Air-gapped Ready: Runs in isolated environments without external dependencies or network access
+- Various LLM provider support: OpenAI codex subscriptions, Anthropic, Google Gemini, OpenRouter, and more
 
 <div align="center">
   <img src="./assets/images/dagu-demo.gif" alt="Demo" width="720">
@@ -53,6 +54,8 @@ Built for developers who want powerful workflow orchestration without the operat
 ```
 
 One binary. No Postgres. No Redis. No Python. Just `dagu start-all`.
+
+> Dagu allows you to keep workflow orchestration separate from your core business logic. Define workflows declaratively, stay zero-invasive to application code, and get a more capable alternative to cron without taking on Airflow-level complexity.
 
 ## Quick Start
 
