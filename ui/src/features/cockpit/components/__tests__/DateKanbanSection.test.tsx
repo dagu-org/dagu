@@ -23,11 +23,62 @@ afterEach(() => {
 });
 
 const defaultReturn = {
-  columns: { queued: [], running: [], review: [], done: [], failed: [] },
+  columns: {
+    queued: {
+      runs: [],
+      hasMore: false,
+      isInitialLoading: false,
+      isLoadingMore: false,
+      error: null,
+      loadMoreError: null,
+      loadMore: vi.fn(async () => {}),
+      retry: vi.fn(async () => {}),
+    },
+    running: {
+      runs: [],
+      hasMore: false,
+      isInitialLoading: false,
+      isLoadingMore: false,
+      error: null,
+      loadMoreError: null,
+      loadMore: vi.fn(async () => {}),
+      retry: vi.fn(async () => {}),
+    },
+    review: {
+      runs: [],
+      hasMore: false,
+      isInitialLoading: false,
+      isLoadingMore: false,
+      error: null,
+      loadMoreError: null,
+      loadMore: vi.fn(async () => {}),
+      retry: vi.fn(async () => {}),
+    },
+    done: {
+      runs: [],
+      hasMore: false,
+      isInitialLoading: false,
+      isLoadingMore: false,
+      error: null,
+      loadMoreError: null,
+      loadMore: vi.fn(async () => {}),
+      retry: vi.fn(async () => {}),
+    },
+    failed: {
+      runs: [],
+      hasMore: false,
+      isInitialLoading: false,
+      isLoadingMore: false,
+      error: null,
+      loadMoreError: null,
+      loadMore: vi.fn(async () => {}),
+      retry: vi.fn(async () => {}),
+    },
+  },
   error: null,
   isLoading: false,
   isEmpty: true,
-  retry: vi.fn(),
+  retry: vi.fn(async () => {}),
 };
 
 describe('DateKanbanSection live-update flags', () => {

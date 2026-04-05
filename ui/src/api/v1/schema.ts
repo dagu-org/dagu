@@ -4732,8 +4732,8 @@ export interface components {
         DAGRunIdSearch: components["schemas"]["DAGRunId"];
         /** @description name of the DAG-run */
         DAGRunName: string;
-        /** @description status of the DAG-run */
-        Status: components["schemas"]["Status"];
+        /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
+        StatusList: components["schemas"]["Status"][];
         /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
         DateTimeFrom: components["schemas"]["UnixTimestamp"];
         /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
@@ -6824,8 +6824,8 @@ export interface operations {
     listDAGRuns: {
         parameters: {
             query?: {
-                /** @description status of the DAG-run */
-                status?: components["parameters"]["Status"];
+                /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
+                status?: components["parameters"]["StatusList"];
                 /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
                 fromDate?: components["parameters"]["DateTimeFrom"];
                 /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
@@ -7023,8 +7023,8 @@ export interface operations {
     listDAGRunsByName: {
         parameters: {
             query?: {
-                /** @description status of the DAG-run */
-                status?: components["parameters"]["Status"];
+                /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
+                status?: components["parameters"]["StatusList"];
                 /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
                 fromDate?: components["parameters"]["DateTimeFrom"];
                 /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */

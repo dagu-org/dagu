@@ -11,13 +11,12 @@ export function sseFallbackOptions(
   sseResult: SSEState<unknown>,
   fallbackInterval: number = 2000
 ) {
-  const hasTopicData = sseResult.data != null;
-  const sseActive =
-    sseResult.isConnected && !sseResult.shouldUseFallback && hasTopicData;
+  const sseActive = sseResult.isConnected && !sseResult.shouldUseFallback;
   // While SSE is still connecting (handshake in progress), suppress SWR polling
   // to avoid redundant fetches. The initial revalidateOnMount fetch provides
-  // data during this window. Once SSE connects, it pushes updates via
-  // useSSECacheSync. If SSE fails after retries, polling resumes.
+  // data during this window. Once SSE connects, live invalidations come from
+  // the stream even if no events have arrived yet. If SSE fails after retries,
+  // polling resumes.
   const sseSettling = sseResult.isConnecting && !sseResult.shouldUseFallback;
   return {
     revalidateOnMount: true,
