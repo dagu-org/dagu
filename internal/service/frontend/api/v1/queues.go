@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -17,120 +18,32 @@ import (
 	"github.com/dagu-org/dagu/internal/core/exec"
 )
 
+const (
+	queuePreviewLimit     = 3
+	defaultQueueListLimit = 100
+	maxQueueListLimit     = 500
+	queueCursorScanBatch  = 64
+)
+
 // ListQueues implements api.StrictServerInterface.
 func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (api.ListQueuesResponseObject, error) {
-	// Map to track queues and their DAG runs
-	queueMap := make(map[string]*queueInfo)
-
-	// Track statistics
-	var totalRunning, totalQueued, totalCapacity int
-
-	// 1. First, add all configured queues from config.yaml
-	// This ensures configured queues appear even when empty
-	if a.config.Queues.Enabled && a.config.Queues.Config != nil {
-		for _, queueCfg := range a.config.Queues.Config {
-			queue := &queueInfo{
-				name:           queueCfg.Name,
-				queueType:      "global",
-				maxConcurrency: queueCfg.MaxActiveRuns,
-				running:        []api.DAGRunSummary{},
-				queuedCount:    0,
-			}
-			queueMap[queueCfg.Name] = queue
-		}
-	}
-
-	// 2. Get all running DAG runs from ProcStore (real-time with heartbeats)
-	runningByGroup, err := a.procStore.ListAllAlive(ctx)
+	queueMap, err := a.collectQueues(ctx, "")
 	if err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Failed to list running processes",
-			HTTPStatus: 500,
-		}
+		return nil, err
 	}
 
-	// Process running DAG runs (local)
-	localRunningIDs := make(map[string]struct{})
-	for groupName, dagRuns := range runningByGroup {
-		var queue *queueInfo
-
-		// Convert each running DAG run to DAGRunSummary
-		for _, dagRun := range dagRuns {
-			// Get the DAG run attempt
-			attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
-			if err != nil {
-				continue // Skip if we can't find the attempt
-			}
-
-			// Get or create queue (only once for the group)
-			if queue == nil {
-				queue = getOrCreateQueue(queueMap, groupName, a.config)
-			}
-
-			// Get the status and add to queue
-			runStatus, err := attempt.ReadStatus(ctx)
-			if err != nil {
-				continue // Skip if we can't read status
-			}
-
-			runSummary := toDAGRunSummary(*runStatus)
-			queue.running = append(queue.running, runSummary)
-			localRunningIDs[dagRun.ID] = struct{}{}
-			totalRunning++
-		}
-	}
-
-	// 2b. Get distributed running DAG runs from the active lease store.
-	for queueName, summaries := range a.activeDistributedRunningSummaries(ctx, "", localRunningIDs) {
-		queue := getOrCreateQueue(queueMap, queueName, a.config)
-		queue.running = append(queue.running, summaries...)
-		totalRunning += len(summaries)
-	}
-
-	// 3. Get queued COUNTS only (NOT full items) using QueueList + Len
-	queueNames, err := a.queueStore.QueueList(ctx)
-	if err != nil {
-		return nil, &Error{
-			Code:       api.ErrorCodeInternalError,
-			Message:    "Failed to list queue names",
-			HTTPStatus: 500,
-		}
-	}
-
-	for _, queueName := range queueNames {
-		count, err := a.queueStore.Len(ctx, queueName)
-		if err != nil {
-			logger.Warn(ctx, "Failed to get queue length",
-				tag.Queue(queueName),
-				tag.Error(err))
-			continue
-		}
-
-		queue := getOrCreateQueue(queueMap, queueName, a.config)
-		// Subtract running items to show only truly-waiting count,
-		// consistent with ListQueueItems which filters out running items.
-		queue.queuedCount = max(count-len(queue.running), 0)
-	}
-
-	// Convert map to slice and calculate total capacity
 	queues := make([]api.Queue, 0, len(queueMap))
+	var totalRunning, totalQueued, totalCapacity int
 	for _, q := range queueMap {
-		queue := api.Queue{
-			Name:         q.name,
-			Type:         api.QueueType(q.queueType),
-			Running:      q.running,
-			RunningCount: len(q.running),
-			QueuedCount:  q.queuedCount,
+		queue, err := a.toQueueResource(ctx, q)
+		if err != nil {
+			return nil, err
 		}
-
-		// Include maxConcurrency for both global and DAG-based queues
+		totalRunning += len(q.running)
+		totalQueued += q.queuedCount
 		if q.maxConcurrency > 0 {
-			queue.MaxConcurrency = &q.maxConcurrency
 			totalCapacity += q.maxConcurrency
 		}
-
-		totalQueued += q.queuedCount
 		queues = append(queues, queue)
 	}
 
@@ -155,6 +68,30 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	return api.ListQueues200JSONResponse(response), nil
 }
 
+// GetQueue implements api.StrictServerInterface.
+func (a *API) GetQueue(ctx context.Context, req api.GetQueueRequestObject) (api.GetQueueResponseObject, error) {
+	queueMap, err := a.collectQueues(ctx, req.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	queueInfo, ok := queueMap[req.Name]
+	if !ok {
+		return nil, &Error{
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("Queue %q not found", req.Name),
+			HTTPStatus: 404,
+		}
+	}
+
+	queue, err := a.toQueueResource(ctx, queueInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.GetQueue200JSONResponse(queue), nil
+}
+
 // fetchDAGRunSummary fetches the status and converts it to a summary for a given DAG-run reference.
 func (a *API) fetchDAGRunSummary(ctx context.Context, dagRun exec.DAGRunRef) (api.DAGRunSummary, error) {
 	attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
@@ -169,62 +106,19 @@ func (a *API) fetchDAGRunSummary(ctx context.Context, dagRun exec.DAGRunRef) (ap
 }
 
 // ListQueueItems implements api.StrictServerInterface.
-// Returns paginated items for a specific queue.
 func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestObject) (api.ListQueueItemsResponseObject, error) {
-	queueName := req.Name
-	itemType := api.ListQueueItemsParamsTypeQueued
-	if req.Params.Type != nil {
-		itemType = *req.Params.Type
-	}
+	limit := normalizeQueueListLimit(req.Params.Limit)
+	cursor := valueOf(req.Params.Cursor)
 
-	pg := exec.NewPaginator(valueOf(req.Params.Page), valueOf(req.Params.PerPage))
-	var items []api.DAGRunSummary
-	var total int
-
-	if itemType == api.ListQueueItemsParamsTypeRunning {
-		// Get running items from proc store (local runs)
-		runningByGroup, err := a.procStore.ListAllAlive(ctx)
-		if err != nil {
-			return nil, &Error{
-				Code:       api.ErrorCodeInternalError,
-				Message:    "Failed to list running processes",
-				HTTPStatus: 500,
-			}
-		}
-
-		// Collect all running summaries (local + distributed)
-		var allRunning []api.DAGRunSummary
-		localRunIDs := make(map[string]struct{})
-		for _, dagRun := range runningByGroup[queueName] {
-			summary, err := a.fetchDAGRunSummary(ctx, dagRun)
-			if err != nil {
-				continue
-			}
-			allRunning = append(allRunning, summary)
-			localRunIDs[dagRun.ID] = struct{}{}
-		}
-
-		for _, summaries := range a.activeDistributedRunningSummaries(ctx, queueName, localRunIDs) {
-			allRunning = append(allRunning, summaries...)
-		}
-
-		total = len(allRunning)
-
-		// Apply pagination
-		startIndex := min(pg.Offset(), total)
-		endIndex := min(pg.Offset()+pg.Limit(), total)
-		items = allRunning[startIndex:endIndex]
-
-		paginatedResult := exec.NewPaginatedResult(items, total, pg)
-		return api.ListQueueItems200JSONResponse{
-			Items:      items,
-			Pagination: toPagination(paginatedResult),
-		}, nil
-	}
-
-	// Get queued items with pagination using ListPaginated
-	paginatedResult, err := a.queueStore.ListPaginated(ctx, queueName, pg)
+	items, nextCursor, err := a.listVisibleQueuedItems(ctx, req.Name, limit, cursor)
 	if err != nil {
+		if errors.Is(err, exec.ErrInvalidCursor) {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "Invalid queue cursor",
+				HTTPStatus: 400,
+			}
+		}
 		return nil, &Error{
 			Code:       api.ErrorCodeInternalError,
 			Message:    "Failed to list queued items",
@@ -232,26 +126,13 @@ func (a *API) ListQueueItems(ctx context.Context, req api.ListQueueItemsRequestO
 		}
 	}
 
-	for _, queuedItem := range paginatedResult.Items {
-		dagRunRef, err := queuedItem.Data()
-		if err != nil {
-			continue
-		}
-		summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
-		if err != nil {
-			continue
-		}
-		// Filter out running items from the "queued" list to avoid duplication
-		if summary.Status == api.StatusRunning {
-			continue
-		}
-		items = append(items, summary)
+	response := api.ListQueueItems200JSONResponse{
+		Items: items,
 	}
-
-	return api.ListQueueItems200JSONResponse{
-		Items:      items,
-		Pagination: toPagination(paginatedResult),
-	}, nil
+	if nextCursor != "" {
+		response.NextCursor = &nextCursor
+	}
+	return response, nil
 }
 
 // Helper struct to build queue information
@@ -261,6 +142,7 @@ type queueInfo struct {
 	maxConcurrency int
 	running        []api.DAGRunSummary
 	queuedCount    int
+	queuedPreview  []api.DAGRunSummary
 }
 
 // getOrCreateQueue returns an existing queue from the map or creates a new one.
@@ -276,10 +158,16 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *con
 		queuedCount: 0,
 	}
 
-	// Check if this is a global queue from config
-	if globalCfg := cfg.FindQueueConfig(queueName); globalCfg != nil {
-		queue.queueType = "global"
-		queue.maxConcurrency = globalCfg.MaxActiveRuns
+	// Check if this is a global queue from config.
+	if cfg != nil {
+		if globalCfg := cfg.FindQueueConfig(queueName); globalCfg != nil {
+			queue.queueType = "global"
+			queue.maxConcurrency = globalCfg.MaxActiveRuns
+		} else {
+			// For DAG-based (local) queues, maxConcurrency is always 1 (FIFO processing).
+			// DAG's maxActiveRuns is deprecated and ignored for local queues.
+			queue.maxConcurrency = 1
+		}
 	} else {
 		// For DAG-based (local) queues, maxConcurrency is always 1 (FIFO processing).
 		// DAG's maxActiveRuns is deprecated and ignored for local queues.
@@ -290,12 +178,199 @@ func getOrCreateQueue(queueMap map[string]*queueInfo, queueName string, cfg *con
 	return queue
 }
 
-// SSE Data Methods for Queues
+func normalizeQueueListLimit(raw *int) int {
+	if raw == nil || *raw <= 0 {
+		return defaultQueueListLimit
+	}
+	if *raw > maxQueueListLimit {
+		return maxQueueListLimit
+	}
+	return *raw
+}
 
-// QueueItemsResponse represents the response for queue items SSE.
-type QueueItemsResponse struct {
-	Running []api.DAGRunSummary `json:"running"`
-	Queued  []api.DAGRunSummary `json:"queued"`
+func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*queueInfo, error) {
+	queueMap := make(map[string]*queueInfo)
+
+	if a.config != nil && a.config.Queues.Enabled && a.config.Queues.Config != nil {
+		for _, queueCfg := range a.config.Queues.Config {
+			if onlyQueue != "" && queueCfg.Name != onlyQueue {
+				continue
+			}
+			queueMap[queueCfg.Name] = &queueInfo{
+				name:           queueCfg.Name,
+				queueType:      "global",
+				maxConcurrency: queueCfg.MaxActiveRuns,
+				running:        []api.DAGRunSummary{},
+				queuedCount:    0,
+			}
+		}
+	}
+
+	runningByGroup := map[string][]exec.DAGRunRef{}
+	if a.procStore != nil {
+		var err error
+		runningByGroup, err = a.procStore.ListAllAlive(ctx)
+		if err != nil {
+			return nil, &Error{
+				Code:       api.ErrorCodeInternalError,
+				Message:    "Failed to list running processes",
+				HTTPStatus: 500,
+			}
+		}
+	}
+
+	localRunningIDs := make(map[string]struct{})
+	for groupName, dagRuns := range runningByGroup {
+		if onlyQueue != "" && groupName != onlyQueue {
+			continue
+		}
+		var queue *queueInfo
+		for _, dagRun := range dagRuns {
+			attempt, err := a.dagRunStore.FindAttempt(ctx, dagRun)
+			if err != nil {
+				continue
+			}
+			if queue == nil {
+				queue = getOrCreateQueue(queueMap, groupName, a.config)
+			}
+			runStatus, err := attempt.ReadStatus(ctx)
+			if err != nil {
+				continue
+			}
+			queue.running = append(queue.running, toDAGRunSummary(*runStatus))
+			localRunningIDs[dagRun.ID] = struct{}{}
+		}
+	}
+
+	for queueName, summaries := range a.activeDistributedRunningSummaries(ctx, onlyQueue, localRunningIDs) {
+		queue := getOrCreateQueue(queueMap, queueName, a.config)
+		queue.running = append(queue.running, summaries...)
+	}
+
+	if a.queueStore == nil {
+		return queueMap, nil
+	}
+
+	if onlyQueue != "" {
+		count, err := a.queueStore.Len(ctx, onlyQueue)
+		if err != nil {
+			return nil, &Error{
+				Code:       api.ErrorCodeInternalError,
+				Message:    "Failed to get queue length",
+				HTTPStatus: 500,
+			}
+		}
+		if count > 0 {
+			queue := getOrCreateQueue(queueMap, onlyQueue, a.config)
+			queue.queuedCount = max(count-len(queue.running), 0)
+		}
+	} else {
+		queueNames, err := a.queueStore.QueueList(ctx)
+		if err != nil {
+			return nil, &Error{
+				Code:       api.ErrorCodeInternalError,
+				Message:    "Failed to list queue names",
+				HTTPStatus: 500,
+			}
+		}
+		for _, queueName := range queueNames {
+			count, err := a.queueStore.Len(ctx, queueName)
+			if err != nil {
+				logger.Warn(ctx, "Failed to get queue length",
+					tag.Queue(queueName),
+					tag.Error(err))
+				continue
+			}
+			queue := getOrCreateQueue(queueMap, queueName, a.config)
+			queue.queuedCount = max(count-len(queue.running), 0)
+		}
+	}
+
+	return queueMap, nil
+}
+
+func (a *API) toQueueResource(ctx context.Context, q *queueInfo) (api.Queue, error) {
+	if q == nil {
+		return api.Queue{}, nil
+	}
+
+	if q.queuedCount > 0 && a.queueStore != nil {
+		preview, _, err := a.listVisibleQueuedItems(ctx, q.name, queuePreviewLimit, "")
+		if err != nil {
+			return api.Queue{}, err
+		}
+		q.queuedPreview = preview
+	} else {
+		q.queuedPreview = []api.DAGRunSummary{}
+	}
+
+	queue := api.Queue{
+		Name:          q.name,
+		Type:          api.QueueType(q.queueType),
+		Running:       q.running,
+		RunningCount:  len(q.running),
+		QueuedCount:   q.queuedCount,
+		QueuedPreview: q.queuedPreview,
+	}
+	if q.maxConcurrency > 0 {
+		queue.MaxConcurrency = &q.maxConcurrency
+	}
+	return queue, nil
+}
+
+func (a *API) listVisibleQueuedItems(ctx context.Context, queueName string, limit int, cursor string) ([]api.DAGRunSummary, string, error) {
+	if limit <= 0 || a.queueStore == nil {
+		return []api.DAGRunSummary{}, "", nil
+	}
+
+	items := make([]api.DAGRunSummary, 0, limit)
+	currentCursor := cursor
+	for len(items) < limit {
+		batchSize := min(max(limit-len(items), 1), queueCursorScanBatch)
+		page, err := a.queueStore.ListCursor(ctx, queueName, currentCursor, batchSize)
+		if err != nil {
+			return nil, "", err
+		}
+		if len(page.Items) == 0 {
+			return items, "", nil
+		}
+
+		for _, queuedItem := range page.Items {
+			dagRunRef, err := queuedItem.Data()
+			if err != nil {
+				logger.Warn(ctx, "Failed to parse queued item data",
+					tag.Queue(queueName),
+					tag.Error(err),
+					slog.String("queueItemID", queuedItem.ID()),
+				)
+				continue
+			}
+
+			summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
+			if err != nil {
+				logger.Warn(ctx, "Failed to fetch queued DAG run summary",
+					tag.Queue(queueName),
+					tag.Error(err),
+					slog.String("dagRunId", dagRunRef.ID),
+				)
+				continue
+			}
+			if summary.Status == api.StatusRunning {
+				continue
+			}
+			items = append(items, summary)
+			if len(items) == limit {
+				break
+			}
+		}
+
+		currentCursor = page.NextCursor
+		if !page.HasMore {
+			return items, "", nil
+		}
+	}
+
+	return items, currentCursor, nil
 }
 
 // GetQueuesListData returns queue list for SSE.
@@ -306,75 +381,6 @@ func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
 		return nil, fmt.Errorf("error listing queues: %w", err)
 	}
 	return response, nil
-}
-
-// GetQueueItemsData returns queue items for SSE.
-// Identifier format: "queueName"
-func (a *API) GetQueueItemsData(ctx context.Context, queueName string) (any, error) {
-	// Initialize slices with make() to avoid null JSON payloads
-	running := make([]api.DAGRunSummary, 0)
-	queued := make([]api.DAGRunSummary, 0)
-
-	// Get running items from proc store (local runs)
-	runningByGroup, err := a.procStore.ListAllAlive(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list running processes: %w", err)
-	}
-
-	localRunIDs := make(map[string]struct{})
-	for _, dagRun := range runningByGroup[queueName] {
-		summary, err := a.fetchDAGRunSummary(ctx, dagRun)
-		if err != nil {
-			logger.Warn(ctx, "Failed to fetch running DAG run summary",
-				tag.Error(err),
-				slog.String("queue", queueName),
-				slog.String("dagRunId", dagRun.ID),
-			)
-			continue
-		}
-		running = append(running, summary)
-		localRunIDs[dagRun.ID] = struct{}{}
-	}
-
-	for _, summaries := range a.activeDistributedRunningSummaries(ctx, queueName, localRunIDs) {
-		running = append(running, summaries...)
-	}
-
-	// Get queued items
-	queuedItems, err := a.queueStore.List(ctx, queueName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list queued items: %w", err)
-	}
-
-	for _, queuedItem := range queuedItems {
-		dagRunRef, err := queuedItem.Data()
-		if err != nil {
-			logger.Warn(ctx, "Failed to parse queued item data",
-				tag.Error(err),
-				slog.String("queue", queueName),
-			)
-			continue
-		}
-		summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
-		if err != nil {
-			logger.Warn(ctx, "Failed to fetch queued DAG run summary",
-				tag.Error(err),
-				slog.String("queue", queueName),
-				slog.String("dagRunId", dagRunRef.ID),
-			)
-			continue
-		}
-		// Skip running items to avoid duplication
-		if summary.Status == api.StatusRunning {
-			continue
-		}
-		queued = append(queued, summary)
-	}
-
-	return QueueItemsResponse{
-		Running: running,
-		Queued:  queued,
-	}, nil
 }
 
 func (a *API) effectiveLeaseStaleThreshold() time.Duration {

@@ -34,7 +34,7 @@ func TestQueueFile(t *testing.T) {
 	require.Equal(t, 0, queueLen, "expected queue length to be 0")
 
 	// Add a job to the queue
-	err = qf.Push(th.Context, exec.DAGRunRef{
+	_, err = qf.Push(th.Context, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
@@ -79,7 +79,7 @@ func TestQueueFile_FindByDAGRunID(t *testing.T) {
 	}
 
 	// Add a job to the queue
-	err := qf.Push(th.Context, exec.DAGRunRef{
+	_, err := qf.Push(th.Context, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})
@@ -113,7 +113,7 @@ func TestQueueFile_Pop(t *testing.T) {
 	}
 
 	// Add a job to the queue
-	err := qf.Push(th.Context, exec.DAGRunRef{
+	_, err := qf.Push(th.Context, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "test-dag",
 	})

@@ -31,8 +31,8 @@ type QueueStore interface {
 	Len(ctx context.Context, name string) (int, error)
 	// List returns all items in the queue with the given name
 	List(ctx context.Context, name string) ([]QueuedItemData, error)
-	// ListPaginated returns paginated items for a specific queue
-	ListPaginated(ctx context.Context, name string, pg Paginator) (PaginatedResult[QueuedItemData], error)
+	// ListCursor returns one forward-only page of queued items for a specific queue.
+	ListCursor(ctx context.Context, name, cursor string, limit int) (CursorResult[QueuedItemData], error)
 	// All returns all items in the queue
 	All(ctx context.Context) ([]QueuedItemData, error)
 	// ListByDAGName returns all items that has a specific DAG name
@@ -125,9 +125,9 @@ func (m *MockQueueStore) List(ctx context.Context, name string) ([]QueuedItemDat
 	return args.Get(0).([]QueuedItemData), args.Error(1)
 }
 
-func (m *MockQueueStore) ListPaginated(ctx context.Context, name string, pg Paginator) (PaginatedResult[QueuedItemData], error) {
-	args := m.Called(ctx, name, pg)
-	return args.Get(0).(PaginatedResult[QueuedItemData]), args.Error(1)
+func (m *MockQueueStore) ListCursor(ctx context.Context, name, cursor string, limit int) (CursorResult[QueuedItemData], error) {
+	args := m.Called(ctx, name, cursor, limit)
+	return args.Get(0).(CursorResult[QueuedItemData]), args.Error(1)
 }
 
 func (m *MockQueueStore) All(ctx context.Context) ([]QueuedItemData, error) {

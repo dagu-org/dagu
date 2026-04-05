@@ -10,15 +10,9 @@ interface QueueListProps {
   queues: components['schemas']['Queue'][];
   isLoading?: boolean;
   onDAGRunClick: (dagRun: components['schemas']['DAGRunSummary']) => void;
-  onQueueChanged?: () => void | Promise<void>;
 }
 
-function QueueList({
-  queues,
-  isLoading,
-  onDAGRunClick,
-  onQueueChanged,
-}: QueueListProps) {
+function QueueList({ queues, isLoading, onDAGRunClick }: QueueListProps) {
   const [selectedIndex, setSelectedIndex] = React.useState<number>(-1);
 
   // Enhanced keyboard navigation for queues
@@ -86,7 +80,6 @@ function QueueList({
           queue={queue}
           isSelected={index === selectedIndex}
           onDAGRunClick={onDAGRunClick}
-          onQueueChanged={onQueueChanged}
         />
       ))}
     </div>

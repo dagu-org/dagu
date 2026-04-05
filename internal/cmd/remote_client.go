@@ -221,12 +221,13 @@ func (c *remoteClient) dequeueDAGRun(ctx context.Context, name, dagRunID string)
 	return c.do(ctx, http.MethodGet, dagRunPath(name, dagRunID)+"/dequeue", nil, nil, nil)
 }
 
-func (c *remoteClient) listQueueItems(ctx context.Context, queueName string, state api.ListQueueItemsParamsType, page, perPage int) (*api.QueueItemsResponse, error) {
-	var out api.QueueItemsResponse
+func (c *remoteClient) listQueueItems(ctx context.Context, queueName string, limit int, cursor string) (*api.QueuedDAGRunsPageResponse, error) {
+	var out api.QueuedDAGRunsPageResponse
 	params := map[string]string{
-		"type":    string(state),
-		"page":    fmt.Sprintf("%d", page),
-		"perPage": fmt.Sprintf("%d", perPage),
+		"limit": fmt.Sprintf("%d", limit),
+	}
+	if cursor != "" {
+		params["cursor"] = cursor
 	}
 	if err := c.do(ctx, http.MethodGet, "/queues/"+url.PathEscape(queueName)+"/items", nil, &out, params); err != nil {
 		return nil, err

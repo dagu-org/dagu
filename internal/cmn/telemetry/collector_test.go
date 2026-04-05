@@ -273,9 +273,9 @@ func (m *mockQueueStore) List(ctx context.Context, name string) ([]exec.QueuedIt
 	return args.Get(0).([]exec.QueuedItemData), args.Error(1)
 }
 
-func (m *mockQueueStore) ListPaginated(ctx context.Context, name string, pg exec.Paginator) (exec.PaginatedResult[exec.QueuedItemData], error) {
-	args := m.Called(ctx, name, pg)
-	return args.Get(0).(exec.PaginatedResult[exec.QueuedItemData]), args.Error(1)
+func (m *mockQueueStore) ListCursor(ctx context.Context, name, cursor string, limit int) (exec.CursorResult[exec.QueuedItemData], error) {
+	args := m.Called(ctx, name, cursor, limit)
+	return args.Get(0).(exec.CursorResult[exec.QueuedItemData]), args.Error(1)
 }
 
 func (m *mockQueueStore) All(ctx context.Context) ([]exec.QueuedItemData, error) {

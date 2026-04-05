@@ -3114,7 +3114,7 @@ paths:
   /queues:
     get:
       summary: "List all execution queues with summary statistics"
-      description: "Returns queue list with running/queued counts. Use /queues/{name}/items for paginated item details."
+      description: "Returns queue list with running/queued counts and a tiny queued preview. Use /queues/{name} for queue details and /queues/{name}/items for queued backlog browsing."
       operationId: "listQueues"
       tags:
         - "queues"
@@ -3134,40 +3134,67 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /queues/{name}/items:
+  /queues/{name}:
     get:
-      summary: "Get paginated items for a specific queue"
-      description: "Returns paginated list of running or queued DAG-runs for the specified queue"
-      operationId: "listQueueItems"
+      summary: "Get summary information for a specific queue"
+      description: "Returns queue metadata, running items, queued counts, and a tiny queued preview for the specified queue."
+      operationId: "getQueue"
       tags:
         - "queues"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PerPage"
         - name: name
           in: path
           description: "Queue name"
           required: true
           schema:
             type: string
-        - name: type
-          in: query
-          description: "Item type to fetch"
-          required: false
-          schema:
-            type: string
-            enum: ["running", "queued"]
-            default: "queued"
       responses:
         "200":
           description: "A successful response"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/QueueItemsResponse"
+                $ref: "#/components/schemas/Queue"
         "404":
           description: "Queue not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /queues/{name}/items:
+    get:
+      summary: "Get queued items for a specific queue"
+      description: "Returns one forward-only page of queued DAG-runs for the specified queue."
+      operationId: "listQueueItems"
+      tags:
+        - "queues"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/QueueListLimit"
+        - $ref: "#/components/parameters/QueueListCursor"
+        - name: name
+          in: path
+          description: "Queue name"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedDAGRunsPageResponse"
+        "400":
+          description: "Invalid cursor"
           content:
             application/json:
               schema:
@@ -6882,6 +6909,25 @@ components:
       schema:
         type: string
 
+    QueueListLimit:
+      name: limit
+      in: query
+      description: "Maximum number of queued DAG-runs to return (default 100)"
+      required: false
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 500
+
+    QueueListCursor:
+      name: cursor
+      in: query
+      description: "Opaque cursor for loading the next page of queued DAG-runs"
+      required: false
+      schema:
+        type: string
+
     EventLogPaginationMode:
       name: paginationMode
       in: query
@@ -8899,27 +8945,33 @@ components:
           description: "List of currently running DAG-runs (bounded by maxConcurrency)"
           items:
             $ref: "#/components/schemas/DAGRunSummary"
+        queuedPreview:
+          type: array
+          description: "Tiny preview of the next queued DAG-runs for this queue"
+          items:
+            $ref: "#/components/schemas/DAGRunSummary"
       required:
         - name
         - type
         - runningCount
         - queuedCount
         - running
+        - queuedPreview
 
-    QueueItemsResponse:
+    QueuedDAGRunsPageResponse:
       type: object
-      description: "Paginated queue items response"
+      description: "Forward-only paginated queued DAG-run response"
       properties:
         items:
           type: array
-          description: "List of DAG-run summaries"
+          description: "List of queued DAG-run summaries"
           items:
             $ref: "#/components/schemas/DAGRunSummary"
-        pagination:
-          $ref: "#/components/schemas/Pagination"
+        nextCursor:
+          type: string
+          description: "Opaque cursor for loading the next page of queued DAG-runs"
       required:
         - items
-        - pagination
 
     QueuesSummary:
       type: object

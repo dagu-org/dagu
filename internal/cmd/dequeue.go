@@ -61,7 +61,7 @@ func dequeueFirst(ctx *Context, queueName string) error {
 		return fmt.Errorf("queues are disabled in configuration")
 	}
 	for {
-		result, err := ctx.QueueStore.ListPaginated(ctx.Context, queueName, exec.NewPaginator(1, 1))
+		result, err := ctx.QueueStore.ListCursor(ctx.Context, queueName, "", 1)
 		if err != nil {
 			return fmt.Errorf("failed to list queue %s: %w", queueName, err)
 		}

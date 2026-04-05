@@ -20,6 +20,7 @@ import (
 func New(baseDir string) exec.QueueStore {
 	return &Store{
 		baseDir: baseDir,
+		indices: make(map[string]*queueReadIndexCache),
 		queues:  make(map[string]*DualQueue),
 	}
 }
@@ -32,6 +33,7 @@ var _ exec.QueueStore = (*Store)(nil)
 // as a prototype for a more complex queue implementation.
 type Store struct {
 	baseDir string
+	indices map[string]*queueReadIndexCache
 	// queues is a map of queues, where the key is the queue name (DAG name)
 	queues map[string]*DualQueue
 	mu     sync.Mutex
@@ -59,7 +61,7 @@ func (s *Store) QueueList(ctx context.Context) ([]string, error) {
 	for _, entry := range entries {
 		if entry.IsDir() {
 			name := entry.Name()
-			// Ensure the directory is not empty
+			// Ensure the directory still contains queue item files.
 			queueDir := filepath.Join(s.baseDir, name)
 			subEntries, err := os.ReadDir(queueDir)
 			if err != nil {
@@ -68,7 +70,7 @@ func (s *Store) QueueList(ctx context.Context) ([]string, error) {
 					tag.Error(err))
 				continue
 			}
-			if len(subEntries) == 0 {
+			if !hasQueueItemEntries(subEntries) {
 				continue
 			}
 			names = append(names, name)
@@ -141,6 +143,19 @@ func (s *Store) DequeueByName(ctx context.Context, name string) (exec.QueuedItem
 		logger.Error(ctx, "Failed to dequeue dag-run", tag.Error(err))
 		return nil, fmt.Errorf("failed to dequeue dag-run %s: %w", name, err)
 	}
+	if item != nil {
+		idx, idxErr := s.loadOrRebuildQueueIndexLocked(ctx, name)
+		if idxErr != nil {
+			logger.Warn(ctx, "Failed to refresh queue index after dequeue", tag.Error(idxErr))
+			s.invalidateQueueIndexLocked(ctx, name)
+			return item, nil
+		}
+		idx.removeItemID(item.ID())
+		if saveErr := s.saveQueueIndexLocked(ctx, name, idx); saveErr != nil {
+			logger.Warn(ctx, "Failed to persist queue index after dequeue", tag.Error(saveErr))
+			s.invalidateQueueIndexLocked(ctx, name)
+		}
+	}
 
 	return item, nil
 }
@@ -153,9 +168,11 @@ func (s *Store) Len(ctx context.Context, name string) (int, error) {
 	if _, ok := s.queues[name]; !ok {
 		s.queues[name] = s.createDualQueue(name)
 	}
-
-	q := s.queues[name]
-	return q.Len(ctx)
+	idx, err := s.loadOrRebuildQueueIndexLocked(ctx, name)
+	if err != nil {
+		return 0, err
+	}
+	return idx.total(), nil
 }
 
 // List implements models.QueueStore.
@@ -167,69 +184,65 @@ func (s *Store) List(ctx context.Context, name string) ([]exec.QueuedItemData, e
 	if _, ok := s.queues[name]; !ok {
 		s.queues[name] = s.createDualQueue(name)
 	}
-
-	q := s.queues[name]
-	items, err := q.List(ctx)
+	idx, err := s.loadOrRebuildQueueIndexLocked(ctx, name)
 	if err != nil {
-		logger.Error(ctx, "Failed to list dag-runs", tag.Error(err))
+		logger.Error(ctx, "Failed to load queue index", tag.Error(err))
 		return nil, fmt.Errorf("failed to list dag-runs %s: %w", name, err)
 	}
-
+	queueDir := s.queueDir(name)
+	items := make([]exec.QueuedItemData, 0, idx.total())
+	for _, fileName := range idx.High {
+		items = append(items, NewQueuedFile(filepath.Join(queueDir, fileName)))
+	}
+	for _, fileName := range idx.Low {
+		items = append(items, NewQueuedFile(filepath.Join(queueDir, fileName)))
+	}
 	return items, nil
 }
 
-// ListPaginated returns paginated items for a specific queue.
-// This implementation paginates at the file-path level BEFORE creating any
-// QueuedFile objects, ensuring O(1) memory for the paginated items regardless
-// of total queue size.
-func (s *Store) ListPaginated(ctx context.Context, name string, pg exec.Paginator) (exec.PaginatedResult[exec.QueuedItemData], error) {
+// ListCursor returns one forward-only page of queued items for a specific queue.
+func (s *Store) ListCursor(ctx context.Context, name, cursor string, limit int) (exec.CursorResult[exec.QueuedItemData], error) {
 	ctx = logger.WithValues(ctx, tag.Queue(name))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	limit := pg.Limit()
-	offset := pg.Offset()
-
-	// Build queue directory path
-	queueDir := filepath.Join(s.baseDir, name)
-	if _, err := os.Stat(queueDir); os.IsNotExist(err) {
-		return exec.NewPaginatedResult([]exec.QueuedItemData{}, 0, pg), nil
+	if limit <= 0 {
+		limit = 1
 	}
 
-	// Collect file paths ONLY (no parsing, no object creation)
-	// High priority first, then low - maintains proper queue ordering
-	patterns := []string{
-		filepath.Join(queueDir, "item_high_*.json"),
-		filepath.Join(queueDir, "item_low_*.json"),
+	idx, err := s.loadOrRebuildQueueIndexLocked(ctx, name)
+	if err != nil {
+		logger.Error(ctx, "Failed to load queue index", tag.Error(err))
+		return exec.CursorResult[exec.QueuedItemData]{}, fmt.Errorf("failed to list queue files: %w", err)
 	}
 
-	var allFiles []string
-	for _, pattern := range patterns {
-		files, err := filepath.Glob(pattern)
-		if err != nil {
-			logger.Error(ctx, "Failed to glob queue files", tag.Error(err))
-			return exec.PaginatedResult[exec.QueuedItemData]{}, fmt.Errorf("failed to list queue files: %w", err)
-		}
-		// Lexicographic sort = chronological (timestamp encoded in filename)
-		sort.Strings(files)
-		allFiles = append(allFiles, files...)
+	decoded, err := decodeQueueReadCursor(name, cursor)
+	if err != nil {
+		return exec.CursorResult[exec.QueuedItemData]{}, err
+	}
+	start, err := idx.resolveStart(decoded)
+	if err != nil {
+		return exec.CursorResult[exec.QueuedItemData]{}, err
 	}
 
-	total := len(allFiles)
-
-	// Apply pagination to file paths (efficient string slicing)
-	startIndex := min(offset, total)
-	endIndex := min(offset+limit, total)
-	paginatedFiles := allFiles[startIndex:endIndex]
-
-	// Create QueuedFile objects only for the paginated portion.
-	// QueuedFile is lazy-loaded - JSON is not read until Data() is called.
-	items := make([]exec.QueuedItemData, 0, len(paginatedFiles))
-	for _, file := range paginatedFiles {
-		items = append(items, NewQueuedFile(file))
+	files := idx.slice(start, limit)
+	items := make([]exec.QueuedItemData, 0, len(files))
+	queueDir := s.queueDir(name)
+	for _, fileName := range files {
+		items = append(items, NewQueuedFile(filepath.Join(queueDir, fileName)))
 	}
 
-	return exec.NewPaginatedResult(items, total, pg), nil
+	hasMore := start+len(files) < idx.total()
+	nextCursor := ""
+	if hasMore && len(files) > 0 {
+		nextCursor = encodeQueueReadCursor(name, idx, start+len(files), files[len(files)-1])
+	}
+
+	return exec.CursorResult[exec.QueuedItemData]{
+		Items:      items,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	}, nil
 }
 
 func (s *Store) ListByDAGName(ctx context.Context, name, dagName string) ([]exec.QueuedItemData, error) {
@@ -289,6 +302,19 @@ func (s *Store) DequeueByDAGRunID(ctx context.Context, name string, dagRun exec.
 	if len(items) == 0 {
 		return nil, exec.ErrQueueItemNotFound
 	}
+	idx, err := s.loadOrRebuildQueueIndexLocked(ctx, name)
+	if err != nil {
+		logger.Warn(ctx, "Failed to refresh queue index after dequeue by dag-run ID", tag.Error(err))
+		s.invalidateQueueIndexLocked(ctx, name)
+		return items, nil
+	}
+	for _, queuedItem := range items {
+		idx.removeItemID(queuedItem.ID())
+	}
+	if err := s.saveQueueIndexLocked(ctx, name, idx); err != nil {
+		logger.Warn(ctx, "Failed to persist queue index after dequeue by dag-run ID", tag.Error(err))
+		s.invalidateQueueIndexLocked(ctx, name)
+	}
 
 	return items, nil
 }
@@ -319,6 +345,19 @@ func (s *Store) DeleteByItemIDs(ctx context.Context, name string, itemIDs []stri
 	if err != nil {
 		return deleted, err
 	}
+	idx, err := s.loadOrRebuildQueueIndexLocked(ctx, name)
+	if err != nil {
+		logger.Warn(ctx, "Failed to refresh queue index after delete", tag.Error(err))
+		s.invalidateQueueIndexLocked(ctx, name)
+		return deleted, nil
+	}
+	for _, itemID := range itemIDs {
+		idx.removeItemID(itemID)
+	}
+	if err := s.saveQueueIndexLocked(ctx, name, idx); err != nil {
+		logger.Warn(ctx, "Failed to persist queue index after delete", tag.Error(err))
+		s.invalidateQueueIndexLocked(ctx, name)
+	}
 	return deleted, nil
 }
 
@@ -336,13 +375,24 @@ func (s *Store) Enqueue(ctx context.Context, name string, p exec.QueuePriority, 
 		s.queues[name] = s.createDualQueue(name)
 	}
 
+	idx, err := s.loadOrRebuildQueueIndexLocked(ctx, name)
+	if err != nil {
+		return err
+	}
+
 	q := s.queues[name]
-	if err := q.Enqueue(ctx, p, dagRun); err != nil {
+	fileName, err := q.Enqueue(ctx, p, dagRun)
+	if err != nil {
 		logger.Error(ctx, "Failed to enqueue dag-run",
 			tag.Error(err),
 			tag.Priority(int(p)),
 		)
 		return fmt.Errorf("failed to enqueue dag-run %s: %w", name, err)
+	}
+	idx.append(p, fileName)
+	if err := s.saveQueueIndexLocked(ctx, name, idx); err != nil {
+		logger.Warn(ctx, "Failed to persist queue index after enqueue", tag.Error(err))
+		s.invalidateQueueIndexLocked(ctx, name)
 	}
 
 	logger.Info(ctx, "Enqueued dag-run", tag.Priority(int(p)))

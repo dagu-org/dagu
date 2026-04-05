@@ -69,9 +69,9 @@ type ItemData struct {
 	QueuedAt time.Time      `json:"queuedAt"`
 }
 
-// Push adds a job to the queue
+// Push adds a job to the queue and returns the created queue file name.
 // Since it's a prototype, it just create a json file with the job ID and dag-run reference
-func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) error {
+func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) (string, error) {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(filepath.Base(q.baseDir)),
 		tag.DAG(dagRun.Name),
@@ -94,7 +94,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) error {
 			tag.Dir(q.baseDir),
 			tag.Error(err),
 		)
-		return fmt.Errorf("failed to create directory %s: %w", q.baseDir, err)
+		return "", fmt.Errorf("failed to create directory %s: %w", q.baseDir, err)
 	}
 
 	// Create the queue file in temporary directory
@@ -104,7 +104,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) error {
 			tag.Dir(q.baseDir),
 			tag.Error(err),
 		)
-		return fmt.Errorf("failed to create temporary file in %s: %w", q.baseDir, err)
+		return "", fmt.Errorf("failed to create temporary file in %s: %w", q.baseDir, err)
 	}
 	defer func() {
 		_ = tmpFile.Close()
@@ -119,13 +119,13 @@ func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) error {
 
 	if err != nil {
 		logger.Error(ctx, "Failed to marshal queue item", tag.Error(err))
-		return fmt.Errorf("failed to marshal item data: %w", err)
+		return "", fmt.Errorf("failed to marshal item data: %w", err)
 	}
 
 	// Write the data to the file
 	if _, err := tmpFile.Write(data); err != nil {
 		logger.Error(ctx, "Failed to write queue item", tag.Error(err))
-		return fmt.Errorf("failed to write data to queue file %s: %w", fullPath, err)
+		return "", fmt.Errorf("failed to write data to queue file %s: %w", fullPath, err)
 	}
 
 	// Close the temporary file
@@ -134,7 +134,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) error {
 			tag.File(tmpFile.Name()),
 			tag.Error(err),
 		)
-		return fmt.Errorf("failed to close temporary file %s: %w", tmpFile.Name(), err)
+		return "", fmt.Errorf("failed to close temporary file %s: %w", tmpFile.Name(), err)
 	}
 
 	// Rename the temporary file to the final name (this is atomic)
@@ -143,11 +143,11 @@ func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) error {
 			tag.File(tmpFile.Name()),
 			tag.Error(err),
 		)
-		return fmt.Errorf("failed to rename temporary file %s to %s: %w", tmpFile.Name(), fullPath, err)
+		return "", fmt.Errorf("failed to rename temporary file %s to %s: %w", tmpFile.Name(), fullPath, err)
 	}
 
 	logger.Debug(ctx, "Queued item file written")
-	return nil
+	return fileName, nil
 }
 
 // PopByDAGRunID removes jobs from the queue by dag-run ID

@@ -174,8 +174,8 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-// Enqueue adds a dag-run to the queue with the specified priority
-func (q *DualQueue) Enqueue(ctx context.Context, priority exec.QueuePriority, dagRun exec.DAGRunRef) error {
+// Enqueue adds a dag-run to the queue with the specified priority and returns the created file name.
+func (q *DualQueue) Enqueue(ctx context.Context, priority exec.QueuePriority, dagRun exec.DAGRunRef) (string, error) {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(q.name),
 		tag.DAG(dagRun.Name),
@@ -185,17 +185,18 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority exec.QueuePriority, da
 	defer q.mu.Unlock()
 
 	if _, ok := q.files[priority]; !ok {
-		return fmt.Errorf("invalid queue priority: %d", priority)
+		return "", fmt.Errorf("invalid queue priority: %d", priority)
 	}
 	qf := q.files[priority]
-	if err := qf.Push(ctx, dagRun); err != nil {
+	fileName, err := qf.Push(ctx, dagRun)
+	if err != nil {
 		logger.Error(ctx, "Failed to enqueue dag-run to queue file", tag.Error(err))
-		return err
+		return "", err
 	}
 	logger.Debug(ctx, "Enqueued item",
 		tag.RunID(dagRun.ID),
 		tag.Priority(int(priority)))
-	return nil
+	return fileName, nil
 }
 
 // Dequeue retrieves a dag-run from the queue and removes it.
