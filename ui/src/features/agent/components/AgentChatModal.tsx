@@ -129,17 +129,25 @@ export function AgentChatModal(): ReactElement | null {
     );
   }, [cancelSession, setError]);
 
+  const handleClearSession = useCallback((): void => {
+    // If the user explicitly requests a fresh session before the initial
+    // session list finishes loading, suppress the one-time auto-select for
+    // this open cycle so the latest session does not get re-selected.
+    hasAutoSelectedRef.current = true;
+    clearSession();
+  }, [clearSession]);
+
   const handleSelectSession = useCallback(
     (value: string): void => {
       if (value === 'new') {
-        clearSession();
+        handleClearSession();
         return;
       }
       selectSession(value).catch((err) =>
         setError(err instanceof Error ? err.message : 'Failed to select session')
       );
     },
-    [selectSession, clearSession, setError]
+    [selectSession, handleClearSession, setError]
   );
 
   const handleOpenDelegate = useCallback((id: string) => {
@@ -177,7 +185,7 @@ export function AgentChatModal(): ReactElement | null {
         totalCost={sessionState?.total_cost}
         isSidebarOpen={sidebarOpen}
         onToggleSidebar={toggleSidebar}
-        onClearSession={clearSession}
+        onClearSession={handleClearSession}
         onClose={closeChat}
         dragHandlers={isMobile ? undefined : dragHandlers}
         isMobile={isMobile}
