@@ -58,15 +58,6 @@ func countTasksByState(tasks []Task, state TaskState) int {
 	return count
 }
 
-func nextOpenTaskDescription(tasks []Task) string {
-	for _, task := range tasks {
-		if task.State == TaskStateOpen {
-			return task.Description
-		}
-	}
-	return ""
-}
-
 func findTaskIndex(tasks []Task, taskID string) int {
 	for i := range tasks {
 		if tasks[i].ID == taskID {
@@ -77,7 +68,12 @@ func findTaskIndex(tasks []Task, taskID string) int {
 }
 
 func hasOpenTask(tasks []Task) bool {
-	return nextOpenTaskDescription(tasks) != ""
+	for _, task := range tasks {
+		if task.State == TaskStateOpen {
+			return true
+		}
+	}
+	return false
 }
 
 func buildTaskListSummary(tasks []Task) string {

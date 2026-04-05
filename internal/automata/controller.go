@@ -416,7 +416,7 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 		fmt.Fprintf(&sb, "Description: %s\n", def.Description)
 	}
 	fmt.Fprintf(&sb, "Lifecycle state: %s\n", state.State)
-	sb.WriteString("Checklist:\n")
+	sb.WriteString("Task list:\n")
 	sb.WriteString(buildTaskListSummary(state.Tasks))
 	sb.WriteString("\n")
 	sb.WriteString("Allowed DAGs:\n")
@@ -436,10 +436,11 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	}
 	sb.WriteString("Rules:\n")
 	sb.WriteString("- Use only the tools available in this session.\n")
-	sb.WriteString("- The checklist is operator-owned. You may only mark existing tasks done or not done.\n")
-	sb.WriteString("- Do not create, edit, reorder, or delete checklist tasks.\n")
-	sb.WriteString("- Use list_automata_tasks when you need a fresh view of the checklist.\n")
-	sb.WriteString("- Use set_automata_task_done only to check or uncheck an existing checklist task.\n")
+	sb.WriteString("- The task list is operator-owned. You may only mark existing tasks done or open again.\n")
+	sb.WriteString("- Open tasks are not strictly ordered. Choose whichever open task best fits the current context unless the operator gave explicit priority.\n")
+	sb.WriteString("- Do not create, edit, reorder, or delete task list items.\n")
+	sb.WriteString("- Use list_automata_tasks when you need a fresh view of the task list.\n")
+	sb.WriteString("- Use set_automata_task_done to mark an existing task done or reopen it if more work is needed.\n")
 	sb.WriteString("- Use run_allowed_dag for execution and wait for the scheduler to resume you.\n")
 	sb.WriteString("- Use request_human_input if blocked on approval or clarification.\n")
 	if isService(def) {
@@ -455,13 +456,13 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
 	if isService(def) {
 		return fmt.Sprintf(
-			"Activate service Automata %q. Current instruction: %q. Review the checklist and continue any actionable work. If work must be executed, run one allowlisted DAG. If blocked, request human input. If there is nothing actionable right now, return to standby without finishing the automata.",
+			"Activate service Automata %q. Current instruction: %q. Review the open tasks and current context. Continue any actionable work, choosing whichever open task is most appropriate. If work must be executed, run one allowlisted DAG. If blocked, request human input. If there is nothing actionable right now, return to standby without finishing the automata.",
 			def.Name,
 			state.Instruction,
 		)
 	}
 	return fmt.Sprintf(
-		"Continue Automata %q. Current instruction: %q. Work through the checklist toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
+		"Continue Automata %q. Current instruction: %q. Review the open tasks and choose the most appropriate work toward the goal. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
 		def.Name,
 		state.Instruction,
 	)
@@ -471,13 +472,13 @@ func (s *Service) buildResumeMessage(def *Definition, state *State, requestedBy 
 	if isService(def) {
 		if requestedBy == "" {
 			return fmt.Sprintf(
-				"Service Automata %q was resumed. Current instruction: %q. Continue any active work from the latest context. If there is nothing actionable right now, return to standby.",
+				"Service Automata %q was resumed. Current instruction: %q. Continue from the latest context and choose any appropriate open task if more work is needed. If there is nothing actionable right now, return to standby.",
 				def.Name,
 				state.Instruction,
 			)
 		}
 		return fmt.Sprintf(
-			"Service Automata %q was resumed by %s. Current instruction: %q. Continue any active work from the latest context. If there is nothing actionable right now, return to standby.",
+			"Service Automata %q was resumed by %s. Current instruction: %q. Continue from the latest context and choose any appropriate open task if more work is needed. If there is nothing actionable right now, return to standby.",
 			def.Name,
 			requestedBy,
 			state.Instruction,
@@ -485,13 +486,13 @@ func (s *Service) buildResumeMessage(def *Definition, state *State, requestedBy 
 	}
 	if requestedBy == "" {
 		return fmt.Sprintf(
-			"Automata %q was resumed. Current instruction: %q. Continue the active task from the latest context and checklist state.",
+			"Automata %q was resumed. Current instruction: %q. Continue from the latest context and choose any appropriate open task.",
 			def.Name,
 			state.Instruction,
 		)
 	}
 	return fmt.Sprintf(
-		"Automata %q was resumed by %s. Current instruction: %q. Continue the active task from the latest context and checklist state.",
+		"Automata %q was resumed by %s. Current instruction: %q. Continue from the latest context and choose any appropriate open task.",
 		def.Name,
 		requestedBy,
 		state.Instruction,
@@ -520,7 +521,7 @@ func (s *Service) buildHumanResponseMessage(prompt *Prompt, response *PromptResp
 
 func (s *Service) buildScheduledTickMessage(def *Definition, state *State, tickTime time.Time) string {
 	return fmt.Sprintf(
-		"Scheduled wake-up for service Automata %q at %s. Current instruction: %q. Review the checklist and current context. If there is actionable work, continue it or run one allowlisted DAG. If there is nothing actionable right now, return to standby without finishing the automata.",
+		"Scheduled wake-up for service Automata %q at %s. Current instruction: %q. Review the open tasks and current context. If there is actionable work, continue it or run one allowlisted DAG. Choose whichever open task is most appropriate. If there is nothing actionable right now, return to standby without finishing the automata.",
 		def.Name,
 		tickTime.Format(time.RFC3339),
 		state.Instruction,

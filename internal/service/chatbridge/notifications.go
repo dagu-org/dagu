@@ -332,9 +332,6 @@ Event Type: %s`, intro, snapshot.Name, snapshot.Kind, event.Type)
 	if snapshot.Status != "" {
 		fmt.Fprintf(&prompt, "\nLifecycle State: %s", snapshot.Status)
 	}
-	if snapshot.CurrentTaskDescription != "" {
-		fmt.Fprintf(&prompt, "\nCurrent Task: %s", snapshot.CurrentTaskDescription)
-	}
 	if snapshot.PromptQuestion != "" {
 		fmt.Fprintf(&prompt, "\nPrompt: %s", snapshot.PromptQuestion)
 	}

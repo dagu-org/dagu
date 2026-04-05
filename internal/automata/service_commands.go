@@ -476,14 +476,14 @@ func buildOperatorMessage(requestedBy, message string) string {
 }
 
 func buildTaskListUpdateMessage(requestedBy, action string, tasks []Task) string {
-	prefix := "Operator updated the checklist"
+	prefix := "Operator updated the task list"
 	if requestedBy != "" {
-		prefix = fmt.Sprintf("Operator %s updated the checklist", requestedBy)
+		prefix = fmt.Sprintf("Operator %s updated the task list", requestedBy)
 	}
 	if strings.TrimSpace(action) != "" {
 		prefix = fmt.Sprintf("%s (%s)", prefix, action)
 	}
-	return fmt.Sprintf("%s.\nCurrent checklist:\n%s", prefix, buildTaskListSummary(tasks))
+	return fmt.Sprintf("%s.\nCurrent task list:\n%s", prefix, buildTaskListSummary(tasks))
 }
 
 func buildOperatorWakeMessage() string {

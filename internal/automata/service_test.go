@@ -657,7 +657,7 @@ func TestServiceTaskUpdateWhileBlockedAppendsToSession(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, detail.Messages, 1)
 	require.Equal(t, agent.MessageTypeUser, detail.Messages[0].Type)
-	require.Contains(t, detail.Messages[0].Content, "updated the checklist")
+	require.Contains(t, detail.Messages[0].Content, "updated the task list")
 	require.Contains(t, detail.Messages[0].Content, "[x] Investigate the failing test")
 	require.Len(t, detail.State.PendingTurnMessages, 1)
 	require.Equal(t, "task_list_updated", detail.State.PendingTurnMessages[0].Kind)

@@ -1,178 +1,17 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, X } from 'lucide-react';
-import {
-  AutomataDisplayStatus,
-  AutomataKind,
-  components,
-  Status,
-} from '@/api/v1/schema';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { whenEnabled } from '@/hooks/queryUtils';
-import { useClient, useQuery } from '@/hooks/api';
-import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
-import { AutomataMemorySection } from '@/features/automata/components/AutomataMemorySection';
-import { useAvailableModels } from '@/features/agent/hooks/useAvailableModels';
-import { cn } from '@/lib/utils';
-import dayjs from '@/lib/dayjs';
-import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
-import { Textarea } from '@/components/ui/textarea';
-import LoadingIndicator from '@/ui/LoadingIndicator';
-import StatusChip from '@/ui/StatusChip';
-import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
-import { updateAutomataMetadataInSpec } from '@/pages/automata/spec';
 
-type AutomataDetail = components['schemas']['AutomataDetailResponse'];
-type AgentMessage = components['schemas']['AgentMessage'];
-type AutomataRunSummary = components['schemas']['AutomataRunSummary'];
-type AutomataTask = components['schemas']['AutomataTask'];
-type AutomataKindValue = components['schemas']['AutomataKind'];
+import { Button } from '@/components/ui/button';
+import { AutomataDetailSurface } from '@/features/automata/components/AutomataDetailSurface';
+import { useAutomataDetailController } from '@/features/automata/hooks/useAutomataDetail';
+import { cn } from '@/lib/utils';
+import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 
 const CLOSE_ANIMATION_MS = 150;
-
-function lifecycleClass(state?: string): string {
-  switch (state) {
-    case AutomataDisplayStatus.running:
-      return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200';
-    case AutomataDisplayStatus.paused:
-      return 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-100';
-    case AutomataDisplayStatus.finished:
-      return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
-}
-
-function isServiceKind(kind?: AutomataKindValue | string): boolean {
-  return kind === AutomataKind.service;
-}
-
-function automataDisplayName(item: {
-  name?: string;
-  nickname?: string | null;
-}): string {
-  return item.nickname?.trim() || item.name || '';
-}
-
-function dagRunStatusToStatus(status?: string): Status | undefined {
-  switch (status) {
-    case 'not_started':
-      return Status.NotStarted;
-    case 'running':
-      return Status.Running;
-    case 'failed':
-      return Status.Failed;
-    case 'aborted':
-      return Status.Aborted;
-    case 'succeeded':
-      return Status.Success;
-    case 'queued':
-      return Status.Queued;
-    case 'partially_succeeded':
-      return Status.PartialSuccess;
-    case 'waiting':
-      return Status.Waiting;
-    case 'rejected':
-      return Status.Rejected;
-    default:
-      return undefined;
-  }
-}
-
-function formatAbsoluteTime(value?: string): string {
-  if (!value || value === '-') {
-    return 'n/a';
-  }
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format('MMM D, YYYY HH:mm') : 'n/a';
-}
-
-function formatRelativeTime(value?: string): string {
-  if (!value || value === '-') {
-    return 'n/a';
-  }
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.fromNow() : 'n/a';
-}
-
-function taskCounts(tasks?: AutomataTask[]): { open: number; done: number } {
-  const items = tasks || [];
-  return {
-    open: items.filter((task) => task.state === 'open').length,
-    done: items.filter((task) => task.state === 'done').length,
-  };
-}
-
-function MessageBlock({
-  message,
-}: {
-  message: AgentMessage;
-}): React.ReactElement {
-  return (
-    <div className="min-w-0 rounded-md border p-3 text-sm">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        <span>{message.type}</span>
-        <span className="normal-case tracking-normal">
-          {formatAbsoluteTime(message.createdAt)}
-        </span>
-      </div>
-      {message.content ? (
-        <div className="whitespace-pre-wrap break-words">{message.content}</div>
-      ) : null}
-      {message.userPrompt?.question ? (
-        <div className="whitespace-pre-wrap break-words">
-          {message.userPrompt.question}
-        </div>
-      ) : null}
-      {message.toolResults?.length ? (
-        <div className="mt-2 space-y-2">
-          {message.toolResults.map((result, index) => (
-            <div
-              key={`${message.id}-tool-${index}`}
-              className="rounded bg-muted p-2 text-xs whitespace-pre-wrap break-words"
-            >
-              {result.content}
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function RunRow({
-  run,
-  onOpen,
-}: {
-  run: AutomataRunSummary;
-  onOpen: (run: AutomataRunSummary) => void;
-}): React.ReactElement {
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(run)}
-      className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left transition hover:bg-muted/40"
-    >
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium">{run.name}</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          {run.dagRunId} · {formatRelativeTime(run.startedAt || run.createdAt)}
-        </div>
-      </div>
-      <StatusChip status={dagRunStatusToStatus(run.status)} size="xs">
-        {run.status}
-      </StatusChip>
-    </button>
-  );
-}
 
 export function AutomataDetailsModal({
   name,
@@ -185,23 +24,10 @@ export function AutomataDetailsModal({
   onClose: () => void;
   onUpdated?: () => void | Promise<void>;
 }): React.ReactElement | null {
-  const client = useClient();
   const navigate = useNavigate();
   const [shouldRender, setShouldRender] = React.useState(isOpen);
   const [isVisible, setIsVisible] = React.useState(false);
-  const [selectedRun, setSelectedRun] =
-    React.useState<AutomataRunSummary | null>(null);
-  const [instructionDraft, setInstructionDraft] = React.useState('');
-  const instructionTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
-  const [operatorMessageDraft, setOperatorMessageDraft] = React.useState('');
-  const [modelDraft, setModelDraft] = React.useState('');
-  const [isEditingMetadata, setIsEditingMetadata] = React.useState(false);
-  const [selectedOptions, setSelectedOptions] = React.useState<string[]>([]);
-  const [freeTextResponse, setFreeTextResponse] = React.useState('');
-  const [actionError, setActionError] = React.useState('');
-  const [busyAction, setBusyAction] = React.useState<string | null>(null);
   const stableNameRef = React.useRef(name);
-  const { models: availableModels } = useAvailableModels();
 
   if (name) {
     stableNameRef.current = name;
@@ -219,7 +45,6 @@ export function AutomataDetailsModal({
     setIsVisible(false);
     const timer = setTimeout(() => {
       setShouldRender(false);
-      setSelectedRun(null);
     }, CLOSE_ANIMATION_MS);
     return () => clearTimeout(timer);
   }, [isOpen]);
@@ -243,243 +68,15 @@ export function AutomataDetailsModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, navigate, onClose, stableName]);
 
-  const { data, error, isLoading, mutate } = useQuery(
-    '/automata/{name}',
-    whenEnabled(isOpen && !!stableName, {
-      params: { path: { name: stableName } },
-    }),
-    {
-      refreshInterval: (detail?: AutomataDetail) =>
-        detail?.state?.state === 'running' ||
-        detail?.state?.state === 'waiting' ||
-        detail?.state?.state === 'paused'
-          ? 2000
-          : 15000,
-    }
-  );
-  const specQuery = useQuery(
-    '/automata/{name}/spec',
-    whenEnabled(isOpen && !!stableName, {
-      params: { path: { name: stableName } },
-    }),
-    { refreshInterval: 15000 }
-  );
-
-  React.useEffect(() => {
-    setInstructionDraft(data?.state?.instruction || '');
-  }, [data?.state?.instruction, stableName]);
-
-  React.useEffect(() => {
-    if (!isEditingMetadata) {
-      setModelDraft(data?.definition?.agent?.model || '');
-    }
-  }, [data?.definition?.agent?.model, isEditingMetadata]);
-
-  React.useEffect(() => {
-    const node = instructionTextareaRef.current;
-    if (!node) {
-      return;
-    }
-    node.style.height = '0px';
-    node.style.height = `${node.scrollHeight}px`;
-  }, [instructionDraft]);
-
-  React.useEffect(() => {
-    setSelectedOptions([]);
-    setFreeTextResponse('');
-  }, [data?.state?.pendingPrompt?.id, stableName]);
-
-  const lifecycleState = data?.state?.state ?? '';
-  const automataKind = data?.definition?.kind ?? AutomataKind.workflow;
-  const serviceKind = isServiceKind(automataKind);
-  const serviceActivated = serviceKind && !!data?.state?.activatedAt;
-  const displayStatus = data?.state?.displayStatus ?? data?.state?.state ?? '';
-  const checklistSummary = React.useMemo(
-    () => taskCounts(data?.state?.tasks),
-    [data?.state?.tasks]
-  );
-  const canStartTask = serviceKind
-    ? lifecycleState === 'idle' && !serviceActivated
-    : lifecycleState === 'idle' || lifecycleState === 'finished';
-  const canSendOperatorMessage =
-    !!data &&
-    !data.state.pendingPrompt &&
-    (serviceKind
-      ? serviceActivated && lifecycleState !== 'paused'
-      : lifecycleState === 'running' ||
-        lifecycleState === 'waiting' ||
-        lifecycleState === 'paused');
-  const canPause = serviceKind
-    ? serviceActivated && lifecycleState !== 'paused'
-    : lifecycleState === 'running' || lifecycleState === 'waiting';
-  const canResume = lifecycleState === 'paused';
-  const canStartWithoutOpenTasks = serviceKind;
-  const metadataChanged =
-    modelDraft.trim() !== (data?.definition?.agent?.model || '').trim();
-
-  const refreshAfterAction = React.useCallback(async () => {
-    await Promise.all([mutate(), specQuery.mutate()]);
-    if (onUpdated) {
-      await onUpdated();
-    }
-  }, [mutate, onUpdated, specQuery]);
-
-  const onSaveMetadata = React.useCallback(async () => {
-    if (!stableName || !data || !metadataChanged || busyAction) return;
-    const currentSpec = specQuery.data?.spec;
-    if (!currentSpec) {
-      setActionError('Automata spec is not loaded yet.');
-      return;
-    }
-    setActionError('');
-    setBusyAction('metadata');
-    try {
-      const nextSpec = updateAutomataMetadataInSpec(currentSpec, {
-        description: data.definition.description || '',
-        iconUrl: data.definition.iconUrl || '',
-        goal: data.definition.goal || '',
-        model: modelDraft,
-      });
-      const { error: apiError } = await client.PUT('/automata/{name}/spec', {
-        params: { path: { name: stableName } },
-        body: { spec: nextSpec },
-      });
-      if (apiError) {
-        throw new Error(apiError.message || 'Failed to save metadata');
-      }
-      setIsEditingMetadata(false);
-      await refreshAfterAction();
-    } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : 'Failed to save metadata'
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  }, [busyAction, client, data, metadataChanged, modelDraft, refreshAfterAction, specQuery.data?.spec, stableName]);
-
-  const onStart = React.useCallback(async () => {
-    if (!stableName || !instructionDraft.trim()) return;
-    setActionError('');
-    setBusyAction('start');
-    try {
-      const { error: apiError } = await client.POST('/automata/{name}/start', {
-        params: { path: { name: stableName } },
-        body: { instruction: instructionDraft || undefined },
-      });
-      if (apiError) {
-        throw new Error(apiError.message || 'Failed to start automata');
-      }
-      await refreshAfterAction();
-    } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : 'Failed to start automata'
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  }, [client, instructionDraft, refreshAfterAction, stableName]);
-
-  const onSendOperatorMessage = React.useCallback(async () => {
-    if (!stableName || !operatorMessageDraft.trim()) return;
-    setActionError('');
-    setBusyAction('message');
-    try {
-      const { error: apiError } = await client.POST(
-        '/automata/{name}/message',
-        {
-          params: { path: { name: stableName } },
-          body: { message: operatorMessageDraft },
-        }
-      );
-      if (apiError) {
-        throw new Error(apiError.message || 'Failed to send operator message');
-      }
-      setOperatorMessageDraft('');
-      await refreshAfterAction();
-    } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : 'Failed to send operator message'
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  }, [client, operatorMessageDraft, refreshAfterAction, stableName]);
-
-  const submitHumanResponse = React.useCallback(
-    async (optionIDs: string[], freeText: string) => {
-      if (!stableName || !data?.state?.pendingPrompt) return;
-      setActionError('');
-      setBusyAction('respond');
-      try {
-        const { error: apiError } = await client.POST(
-          '/automata/{name}/response',
-          {
-            params: { path: { name: stableName } },
-            body: {
-              promptId: data.state.pendingPrompt.id,
-              selectedOptionIds: optionIDs.length ? optionIDs : undefined,
-              freeTextResponse: freeText || undefined,
-            },
-          }
-        );
-        if (apiError) {
-          throw new Error(apiError.message || 'Failed to respond');
-        }
-        setSelectedOptions([]);
-        setFreeTextResponse('');
-        await refreshAfterAction();
-      } catch (err) {
-        setActionError(
-          err instanceof Error ? err.message : 'Failed to respond'
-        );
-      } finally {
-        setBusyAction(null);
-      }
-    },
-    [client, data?.state?.pendingPrompt, refreshAfterAction, stableName]
-  );
-
-  const onPauseResume = React.useCallback(async () => {
-    if (!stableName || !data) return;
-    const paused = data.state.state === 'paused';
-    setActionError('');
-    setBusyAction(paused ? 'resume' : 'pause');
-    try {
-      const response = paused
-        ? await client.POST('/automata/{name}/resume', {
-            params: { path: { name: stableName } },
-          })
-        : await client.POST('/automata/{name}/pause', {
-            params: { path: { name: stableName } },
-          });
-      if (response.error) {
-        throw new Error(
-          response.error.message ||
-            (paused ? 'Failed to resume automata' : 'Failed to pause automata')
-        );
-      }
-      await refreshAfterAction();
-    } catch (err) {
-      setActionError(
-        err instanceof Error
-          ? err.message
-          : data.state.state === 'paused'
-            ? 'Failed to resume automata'
-            : 'Failed to pause automata'
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  }, [client, data, refreshAfterAction, stableName]);
+  const controller = useAutomataDetailController({
+    name: stableName,
+    enabled: isOpen && !!stableName,
+    onUpdated,
+  });
 
   if (!shouldRender) {
     return null;
   }
-
-  const modalVisibilityClass = isVisible
-    ? 'translate-x-0 opacity-100'
-    : 'translate-x-full opacity-0';
 
   return (
     <>
@@ -491,586 +88,57 @@ export function AutomataDetailsModal({
       <div
         className={cn(
           'fixed top-0 bottom-0 right-0 z-50 h-screen w-full border-l bg-background transition-all duration-150 ease-out md:w-3/4 xl:w-[56rem]',
-          modalVisibilityClass
+          isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         )}
       >
-        <div className="flex h-full min-h-0 flex-col p-4 md:p-6">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-4">
-              <AutomataAvatar
-                name={stableName}
-                nickname={data?.definition.nickname}
-                iconUrl={data?.definition.iconUrl}
-                className="h-16 w-16 rounded-2xl"
-              />
-              <div className="min-w-0">
-                <div className="text-xs text-muted-foreground">
-                  Automata detail
-                </div>
-                <h2 className="truncate text-2xl font-semibold">
-                  {automataDisplayName({
-                    name: stableName,
-                    nickname: data?.definition.nickname,
-                  })}
-                </h2>
-                {data?.definition.nickname ? (
-                  <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                    {stableName}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {canPause || canResume ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onPauseResume}
-                  disabled={busyAction === 'pause' || busyAction === 'resume'}
-                >
-                  {canResume ? 'Resume' : 'Pause'}
-                </Button>
-              ) : null}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  navigate(`/automata/${encodeURIComponent(stableName)}`)
-                }
-                title="Open full page (F)"
-                className="relative group"
-              >
-                <Maximize2 className="h-4 w-4" />
-                <span className="absolute -bottom-1 -right-1 rounded-sm border bg-muted px-1 text-xs font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                  F
-                </span>
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onClose}
-                title="Close (Esc)"
-                className="relative group"
-              >
-                <X className="h-4 w-4" />
-                <span className="absolute -bottom-1 -right-1 rounded-sm border bg-muted px-1 text-xs font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                  Esc
-                </span>
-              </Button>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {isLoading && !data ? (
-              <div className="flex h-full items-center justify-center">
-                <LoadingIndicator />
-              </div>
-            ) : error && !data ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                {error instanceof Error
-                  ? error.message
-                  : 'Failed to load Automata details'}
-              </div>
-            ) : data ? (
-              <div className="space-y-6">
-                {actionError ? (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                    {actionError}
-                  </div>
-                ) : null}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={cn(
-                      'rounded-full px-3 py-1 text-xs font-medium',
-                      lifecycleClass(displayStatus)
-                    )}
+        <div className="flex h-full min-h-0 flex-col overflow-x-hidden p-4 md:p-6">
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+            <AutomataDetailSurface
+              key={stableName}
+              controller={controller}
+              headerCaption="Automata detail"
+              renderHeaderActions={(detailController) => (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void detailController.onResetState()}
+                    disabled={!!detailController.busyAction}
                   >
-                    {displayStatus}
-                  </span>
-                  {data.state.busy ? (
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
-                      busy
+                    Reset State
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() =>
+                      navigate(`/automata/${encodeURIComponent(stableName)}`)
+                    }
+                    title="Open full page (F)"
+                    className="relative group"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    <span className="pointer-events-none absolute -top-7 right-0 rounded-sm border bg-muted px-1 text-xs font-medium whitespace-nowrap text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                      F
                     </span>
-                  ) : null}
-                  {data.state.needsInput ? (
-                    <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-900 dark:bg-rose-900/40 dark:text-rose-200">
-                      needs input
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={onClose}
+                    title="Close (Esc)"
+                    className="relative group"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="pointer-events-none absolute -top-7 right-0 rounded-sm border bg-muted px-1 text-xs font-medium whitespace-nowrap text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                      Esc
                     </span>
-                  ) : null}
-                  <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-                    {automataKind}
-                  </span>
-                  <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-                    Tasks {checklistSummary.done}/
-                    {checklistSummary.done + checklistSummary.open}
-                  </span>
-                  {data.definition.disabled ? (
-                    <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-                      disabled
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="min-w-0 rounded-lg border p-4">
-                    <h3 className="mb-3 text-sm font-semibold">Metadata</h3>
-                    <div className="space-y-2 text-sm">
-                      <p>
-                        <span className="font-medium">Kind:</span>{' '}
-                        {data.definition.kind}
-                      </p>
-                      <p>
-                        <span className="font-medium">Goal:</span>{' '}
-                        {data.definition.goal || 'n/a'}
-                      </p>
-                      <div className="grid gap-2">
-                        <Label htmlFor="cockpit-automata-model">Model</Label>
-                        <Select
-                          value={modelDraft || '__inherit__'}
-                          onValueChange={(value) => {
-                            setModelDraft(value === '__inherit__' ? '' : value);
-                            setIsEditingMetadata(true);
-                          }}
-                          disabled={!!busyAction}
-                        >
-                          <SelectTrigger id="cockpit-automata-model">
-                            <SelectValue placeholder="Use global default model" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__inherit__">
-                              Use global default model
-                            </SelectItem>
-                            {data.definition.agent?.model &&
-                            !availableModels.some(
-                              (model) => model.id === data.definition.agent?.model
-                            ) ? (
-                              <SelectItem value={data.definition.agent.model}>
-                                {data.definition.agent.model} (missing)
-                              </SelectItem>
-                            ) : null}
-                            {availableModels.map((model) => (
-                              <SelectItem key={model.id} value={model.id}>
-                                {model.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-xs text-muted-foreground">
-                            Save here to persist `agent.model` into the Automata spec.
-                          </div>
-                          {metadataChanged ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={onSaveMetadata}
-                              disabled={!!busyAction}
-                            >
-                              {busyAction === 'metadata'
-                                ? 'Saving...'
-                                : 'Save Metadata'}
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                      {data.definition.description ? (
-                        <p className="text-muted-foreground">
-                          {data.definition.description}
-                        </p>
-                      ) : null}
-                      {data.definition.tags?.length ? (
-                        <div>
-                          <span className="font-medium">Tags:</span>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {data.definition.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 rounded-lg border p-4">
-                    <h3 className="mb-3 text-sm font-semibold">Task State</h3>
-                    <div className="space-y-2 text-sm">
-                      <p>
-                        <span className="font-medium">Last updated:</span>{' '}
-                        {formatAbsoluteTime(data.state.lastUpdatedAt)}
-                      </p>
-                      {data.state.waitingReason ? (
-                        <p>
-                          <span className="font-medium">Waiting reason:</span>{' '}
-                          {data.state.waitingReason}
-                        </p>
-                      ) : null}
-                      {data.state.lastSummary ? (
-                        <p className="whitespace-pre-wrap break-words">
-                          <span className="font-medium">Summary:</span>{' '}
-                          {data.state.lastSummary}
-                        </p>
-                      ) : null}
-                      {data.state.lastError ? (
-                        <p className="whitespace-pre-wrap break-words text-destructive">
-                          <span className="font-medium">Error:</span>{' '}
-                          {data.state.lastError}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="min-w-0 rounded-lg border p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold">Session Messages</h3>
-                    {data.state.sessionId ? (
-                      <span className="text-[11px] text-muted-foreground">
-                        Session: {data.state.sessionId}
-                      </span>
-                    ) : null}
-                  </div>
-                  {data.messages?.length || data.state.pendingTurnMessages?.length ? (
-                    <div className="max-h-[30rem] space-y-3 overflow-y-auto">
-                      {(data.state.pendingTurnMessages || []).map((message) => (
-                        <div
-                          key={`queued-${message.id}`}
-                          className="rounded-md border border-amber-300/40 bg-amber-50 p-3 text-sm dark:border-amber-700/40 dark:bg-amber-950/20"
-                        >
-                          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
-                            <span>{message.kind.replace(/_/g, ' ')} queued</span>
-                            <span className="normal-case tracking-normal">
-                              {new Date(message.createdAt).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="whitespace-pre-wrap break-words">
-                            {message.message}
-                          </div>
-                        </div>
-                      ))}
-                      {(data.messages || []).slice(-20).map((message) => (
-                        <MessageBlock key={message.id} message={message} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No session or queued messages yet.
-                    </div>
-                  )}
-                </div>
-
-                <AutomataMemorySection automataName={stableName} />
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="min-w-0 rounded-lg border p-4">
-                    <h3 className="mb-3 text-sm font-semibold">
-                      {serviceKind
-                        ? 'Activate Service'
-                        : data.state.state === 'finished'
-                        ? 'Start New Task'
-                        : 'Start Instruction'}
-                    </h3>
-                    <div className="space-y-3">
-                      <Textarea
-                        ref={instructionTextareaRef}
-                        value={instructionDraft}
-                        onChange={(e) => setInstructionDraft(e.target.value)}
-                        className="min-h-24 overflow-hidden resize-none"
-                        placeholder={
-                          serviceKind
-                            ? 'Define the standing instruction for this service before activating it.'
-                            : 'Tell this Automata what task to work on before starting it.'
-                        }
-                        disabled={!canStartTask || !!busyAction}
-                      />
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs text-muted-foreground">
-                          {canStartTask
-                            ? serviceKind
-                              ? checklistSummary.open > 0
-                                ? 'Activating this service makes it live immediately. Schedule ticks can wake it while open tasks exist.'
-                                : 'You can activate this service without open tasks. It will stay on standby until a task is opened or a message arrives.'
-                              : checklistSummary.open > 0
-                                ? 'Automata stays idle until an instruction is provided.'
-                                : 'Add or reopen at least one checklist task before starting.'
-                            : data.state.state === 'paused'
-                              ? serviceKind
-                                ? 'This service is paused. Resume it to put it back on standby.'
-                                : 'This Automata is paused. Resume it to continue the current task.'
-                              : serviceKind
-                                ? 'This service is already live. Use an operator message, tasks, or schedule ticks to steer it.'
-                                : 'This Automata already has an active task. Use an operator message to steer it.'}
-                        </div>
-                        <Button
-                          onClick={onStart}
-                          disabled={
-                            !instructionDraft.trim() ||
-                            !canStartTask ||
-                            (!canStartWithoutOpenTasks &&
-                              checklistSummary.open === 0) ||
-                            !!busyAction
-                          }
-                        >
-                          {busyAction === 'start'
-                            ? serviceKind
-                              ? 'Activating...'
-                              : 'Starting...'
-                            : serviceKind
-                              ? 'Activate'
-                              : data.state.state === 'finished'
-                                ? 'Start New Task'
-                                : 'Start'}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 rounded-lg border p-4">
-                    <h3 className="mb-3 text-sm font-semibold">
-                      Operator Message
-                    </h3>
-                    <div className="space-y-3">
-                      <Textarea
-                        value={operatorMessageDraft}
-                        onChange={(e) =>
-                          setOperatorMessageDraft(e.target.value)
-                        }
-                        placeholder={
-                          serviceKind
-                            ? 'Add context, request work, or clarify what this service should handle.'
-                            : 'Add context, change priority, or clarify the current task.'
-                        }
-                        disabled={!canSendOperatorMessage || !!busyAction}
-                      />
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs text-muted-foreground">
-                          {data.state.pendingPrompt
-                            ? 'Respond to the pending prompt before sending a general operator message.'
-                            : canSendOperatorMessage
-                              ? serviceKind
-                                ? data.state.currentRunRef
-                                  ? 'This records your message now and the service will pick it up after the current child DAG changes state.'
-                                  : data.state.busy
-                                    ? 'This queues a user message into the active service turn.'
-                                    : 'This wakes the service with a new operator message.'
-                                : data.state.state === 'paused'
-                                  ? 'This records your message now, but the Automata will stay paused until you resume it.'
-                                  : data.state.currentRunRef
-                                    ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
-                                    : 'This queues a user message into the active Automata task.'
-                              : serviceKind
-                                ? serviceActivated
-                                  ? 'This service is paused. Resume it before sending a message.'
-                                  : 'Activate this service before sending operator messages.'
-                                : 'Operator messages are only accepted while the Automata has an active task.'}
-                        </div>
-                        <Button
-                          variant="outline"
-                          onClick={onSendOperatorMessage}
-                          disabled={
-                            !operatorMessageDraft.trim() ||
-                            !canSendOperatorMessage ||
-                            !!busyAction
-                          }
-                        >
-                          {busyAction === 'message'
-                            ? 'Sending...'
-                            : 'Send Message'}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="min-w-0 rounded-lg border p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold">Checklist</h3>
-                    <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-                      {checklistSummary.done} done / {checklistSummary.open}{' '}
-                      open
-                    </span>
-                  </div>
-                  {data.state.tasks?.length ? (
-                    <div className="space-y-2">
-                      {data.state.tasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className="flex items-start gap-3 rounded-md border p-3 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={task.state === 'done'}
-                            readOnly
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div
-                              className={cn(
-                                'break-words',
-                                task.state === 'done' &&
-                                  'text-muted-foreground line-through'
-                              )}
-                            >
-                              {task.description}
-                            </div>
-                            <div className="mt-1 text-[11px] text-muted-foreground">
-                              {task.state}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No checklist tasks yet.
-                    </div>
-                  )}
-                </div>
-
-                {data.state.pendingPrompt ? (
-                  <div className="rounded-lg border border-amber-400/40 bg-amber-50/50 p-4 dark:bg-amber-950/20">
-                    <h3 className="mb-2 text-sm font-semibold">
-                      Waiting For Human Input
-                    </h3>
-                    <p className="mb-3 text-sm">
-                      {data.state.pendingPrompt.question}
-                    </p>
-                    <div className="space-y-2">
-                      {data.state.state === 'paused' ? (
-                        <div className="rounded-md border border-slate-300/60 bg-slate-100/70 px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
-                          Response will be queued, and the Automata will remain
-                          paused until you resume it.
-                        </div>
-                      ) : null}
-                      {(data.state.pendingPrompt.options || []).map(
-                        (option) => {
-                          const selected = selectedOptions.includes(option.id);
-                          return (
-                            <label
-                              key={option.id}
-                              className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={(e) => {
-                                  setSelectedOptions((prev) =>
-                                    e.target.checked
-                                      ? [...prev, option.id]
-                                      : prev.filter((id) => id !== option.id)
-                                  );
-                                }}
-                              />
-                              <span>
-                                <span className="font-medium">
-                                  {option.label}
-                                </span>
-                                {option.description ? (
-                                  <span className="block text-xs text-muted-foreground">
-                                    {option.description}
-                                  </span>
-                                ) : null}
-                              </span>
-                            </label>
-                          );
-                        }
-                      )}
-                      <Textarea
-                        value={freeTextResponse}
-                        onChange={(e) => setFreeTextResponse(e.target.value)}
-                        placeholder={
-                          data.state.pendingPrompt.freeTextPlaceholder ||
-                          'Add an optional note or free-text response'
-                        }
-                        disabled={!!busyAction}
-                      />
-                      <Button
-                        onClick={() =>
-                          void submitHumanResponse(
-                            selectedOptions,
-                            freeTextResponse
-                          )
-                        }
-                        disabled={!!busyAction}
-                      >
-                        {busyAction === 'respond'
-                          ? 'Submitting...'
-                          : 'Submit Response'}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="min-w-0 rounded-lg border p-4">
-                    <h3 className="mb-3 text-sm font-semibold">Allowed DAGs</h3>
-                    {data.allowedDags.length ? (
-                      <div className="flex flex-wrap gap-2">
-                        {data.allowedDags.map((dag) => (
-                          <span
-                            key={dag.name}
-                            className="rounded-full border px-3 py-1 text-xs"
-                          >
-                            {dag.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        No DAGs are allowlisted for this automata.
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 rounded-lg border p-4">
-                    <h3 className="mb-3 text-sm font-semibold">
-                      Current Child DAG
-                    </h3>
-                    {data.currentRun ? (
-                      <RunRow run={data.currentRun} onOpen={setSelectedRun} />
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        No active child DAG run.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="min-w-0 rounded-lg border p-4">
-                  <h3 className="mb-3 text-sm font-semibold">Recent Runs</h3>
-                  {data.recentRuns?.length ? (
-                    <div className="space-y-2">
-                      {data.recentRuns.slice(0, 8).map((run) => (
-                        <RunRow
-                          key={`${run.name}-${run.dagRunId}`}
-                          run={run}
-                          onOpen={setSelectedRun}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No recent child DAG runs yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
+                  </Button>
+                </>
+              )}
+            />
           </div>
         </div>
       </div>
-
-      {selectedRun ? (
-        <DAGRunDetailsModal
-          name={selectedRun.name}
-          dagRunId={selectedRun.dagRunId}
-          isOpen={!!selectedRun}
-          onClose={() => setSelectedRun(null)}
-        />
-      ) : null}
     </>
   );
 }

@@ -32,16 +32,15 @@ func (e automataEventEmitter) input(def *Definition, state *State) eventstore.Au
 		return eventstore.AutomataEventInput{}
 	}
 	return eventstore.AutomataEventInput{
-		Name:                   def.Name,
-		Kind:                   string(normalizeAutomataKind(def.Kind)),
-		CycleID:                state.CurrentCycleID,
-		SessionID:              state.SessionID,
-		Status:                 string(state.State),
-		Summary:                state.LastSummary,
-		Error:                  state.LastError,
-		CurrentTaskDescription: nextOpenTaskDescription(state.Tasks),
-		OpenTaskCount:          countTasksByState(state.Tasks, TaskStateOpen),
-		DoneTaskCount:          countTasksByState(state.Tasks, TaskStateDone),
+		Name:          def.Name,
+		Kind:          string(normalizeAutomataKind(def.Kind)),
+		CycleID:       state.CurrentCycleID,
+		SessionID:     state.SessionID,
+		Status:        string(state.State),
+		Summary:       state.LastSummary,
+		Error:         state.LastError,
+		OpenTaskCount: countTasksByState(state.Tasks, TaskStateOpen),
+		DoneTaskCount: countTasksByState(state.Tasks, TaskStateDone),
 	}
 }
 

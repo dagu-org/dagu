@@ -24,7 +24,7 @@ func init() {
 	RegisterTool(ToolRegistration{
 		Name:           listAutomataTasksToolName,
 		Label:          "List Automata Tasks",
-		Description:    "List the checklist tasks for this Automata",
+		Description:    "List the task list items for this Automata",
 		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
 			if cfg.AutomataRuntime == nil {
@@ -72,7 +72,7 @@ func init() {
 	RegisterTool(ToolRegistration{
 		Name:           setAutomataTaskDoneTool,
 		Label:          "Set Automata Task Done",
-		Description:    "Check or uncheck an existing Automata checklist task",
+		Description:    "Mark an existing Automata task list item done or open",
 		DefaultEnabled: true,
 		Factory: func(cfg ToolConfig) *AgentTool {
 			if cfg.AutomataRuntime == nil {
@@ -113,7 +113,7 @@ func newListAutomataTasksTool(runtime AutomataRuntime) *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        listAutomataTasksToolName,
-				Description: "Return the ordered checklist tasks for this Automata.",
+				Description: "Return the ordered task list items for this Automata.",
 				Parameters: map[string]any{
 					"type":       "object",
 					"properties": map[string]any{},
@@ -246,7 +246,7 @@ func newSetAutomataTaskDoneTool(runtime AutomataRuntime) *AgentTool {
 			Type: "function",
 			Function: llm.ToolFunction{
 				Name:        setAutomataTaskDoneTool,
-				Description: "Check or uncheck one existing checklist task for this Automata.",
+				Description: "Mark one existing task list item done or open for this Automata.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
