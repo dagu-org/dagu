@@ -3089,7 +3089,18 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 		cursor       *string
 	)
 
-	if parsed := parseStatusListQueryValues(ctx, params["status"]); len(parsed) > 0 {
+	if rawStatuses, hasStatus := params["status"]; hasStatus {
+		parsed, parseErr := parseStatusListQueryValues(ctx, rawStatuses)
+		if parseErr != nil {
+			return dagRunListOptions{}, parseErr
+		}
+		if len(parsed) == 0 {
+			return dagRunListOptions{}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "status parameter must include at least one valid status value",
+			}
+		}
 		statusValues = &parsed
 	}
 	if rawFromDate := params.Get("fromDate"); rawFromDate != "" {
@@ -3150,9 +3161,9 @@ func toCoreStatuses(statuses *api.StatusList) []core.Status {
 	return result
 }
 
-func parseStatusListQueryValues(ctx context.Context, rawValues []string) api.StatusList {
+func parseStatusListQueryValues(ctx context.Context, rawValues []string) (api.StatusList, error) {
 	if len(rawValues) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	result := make(api.StatusList, 0, len(rawValues))
@@ -3166,13 +3177,44 @@ func parseStatusListQueryValues(ctx context.Context, rawValues []string) api.Sta
 			statusInt, convErr := strconv.Atoi(value)
 			if convErr != nil {
 				logger.Warn(ctx, "Invalid status parameter", slog.String("status", value), tag.Error(convErr))
-				continue
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    fmt.Sprintf("invalid status parameter: %s", value),
+				}
 			}
-			result = append(result, api.Status(statusInt))
+
+			status := api.Status(statusInt)
+			if !isValidAPIStatus(status) {
+				logger.Warn(ctx, "Status parameter out of range", slog.String("status", value))
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    fmt.Sprintf("invalid status parameter: %s", value),
+				}
+			}
+			result = append(result, status)
 		}
 	}
 
-	return result
+	return result, nil
+}
+
+func isValidAPIStatus(status api.Status) bool {
+	switch status {
+	case api.StatusNotStarted,
+		api.StatusRunning,
+		api.StatusFailed,
+		api.StatusAborted,
+		api.StatusSuccess,
+		api.StatusQueued,
+		api.StatusPartialSuccess,
+		api.StatusWaiting,
+		api.StatusRejected:
+		return true
+	default:
+		return false
+	}
 }
 
 func clampInt(value, minVal, maxVal int) int {

@@ -26,10 +26,12 @@ describe('optionalPositiveInt', () => {
 
   it('omits blank strings', () => {
     expect(optionalPositiveInt('')).toBeUndefined();
+    expect(optionalPositiveInt('   ')).toBeUndefined();
   });
 
   it('omits invalid values', () => {
     expect(optionalPositiveInt('abc')).toBeUndefined();
+    expect(optionalPositiveInt('3.14')).toBeUndefined();
     expect(optionalPositiveInt(0)).toBeUndefined();
     expect(optionalPositiveInt(-1)).toBeUndefined();
   });

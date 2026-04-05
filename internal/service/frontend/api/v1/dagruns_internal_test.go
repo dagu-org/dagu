@@ -164,6 +164,22 @@ func TestDAGRunListOptionsFromQueryStringParsesMultipleStatuses(t *testing.T) {
 	require.Equal(t, 20, applied.Limit)
 }
 
+func TestDAGRunListOptionsFromQueryStringRejectsInvalidStatuses(t *testing.T) {
+	t.Parallel()
+
+	_, err := dagRunListOptionsFromQueryString(
+		context.Background(),
+		"status=1&status=running",
+	)
+	require.Error(t, err)
+
+	apiErr, ok := err.(*Error)
+	require.True(t, ok)
+	require.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	require.Equal(t, openapiv1.ErrorCodeBadRequest, apiErr.Code)
+	require.Contains(t, apiErr.Message, "invalid status parameter")
+}
+
 var _ exec.DAGRunStore = (*blockingDAGRunStore)(nil)
 
 type blockingDAGRunStore struct{}

@@ -11,12 +11,17 @@ import {
 import { Filter } from 'lucide-react';
 import React from 'react';
 import type { components } from '../api/v1/schema';
-import { Status } from '../api/v1/schema';
+import {
+  PathsDagsGetParametersQueryOrder,
+  PathsDagsGetParametersQuerySort,
+  Status,
+} from '../api/v1/schema';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
 import { usePaginatedDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
+import { useClient } from '../hooks/api';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import { optionalPositiveInt } from '../hooks/queryUtils';
 import PathsCard from '../features/system-status/components/PathsCard';
@@ -59,11 +64,66 @@ function getDayBounds(
   };
 }
 
+function compareDAGNames(left: string, right: string): number {
+  return left.localeCompare(right);
+}
+
+async function fetchAllDashboardDAGNames(
+  client: ReturnType<typeof useClient>,
+  remoteNode: string,
+  signal: AbortSignal
+): Promise<string[]> {
+  const names = new Set<string>();
+  let page = 1;
+
+  for (;;) {
+    const response = await client.GET('/dags', {
+      params: {
+        query: {
+          remoteNode,
+          page,
+          perPage: 100,
+          sort: PathsDagsGetParametersQuerySort.name,
+          order: PathsDagsGetParametersQueryOrder.asc,
+        },
+      },
+      signal,
+    });
+
+    if (response.error) {
+      const message =
+        response.error &&
+        typeof response.error === 'object' &&
+        'message' in response.error
+          ? String(response.error.message)
+          : 'Failed to load DAG definitions';
+      throw new Error(message);
+    }
+
+    const data = response.data;
+    for (const dag of data?.dags ?? []) {
+      if (dag.dag.name) {
+        names.add(dag.dag.name);
+      }
+    }
+
+    const totalPages = data?.pagination?.totalPages ?? page;
+    if (page >= totalPages) {
+      break;
+    }
+    page += 1;
+  }
+
+  return Array.from(names).sort(compareDAGNames);
+}
+
 function Dashboard(): React.ReactElement | null {
   const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
   const config = useConfig();
   const searchState = useSearchState();
-  const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const remoteKey = remoteNode;
 
   const [modalDAGRun, setModalDAGRun] = React.useState<{
     name: string;
@@ -71,6 +131,9 @@ function Dashboard(): React.ReactElement | null {
   } | null>(null);
   const autoLoadSentinelRef = React.useRef<HTMLDivElement>(null);
   const [autoLoadRequested, setAutoLoadRequested] = React.useState(false);
+  const [availableDAGNames, setAvailableDAGNames] = React.useState<string[]>(
+    []
+  );
   const lastWindowScrollYRef = React.useRef(0);
 
   type DashboardFilters = {
@@ -182,7 +245,7 @@ function Dashboard(): React.ReactElement | null {
   );
   const dagRunsQuery = React.useMemo(
     () => ({
-      remoteNode: appBarContext.selectedRemoteNode || 'local',
+      remoteNode,
       fromDate: dateRange.startDate,
       toDate: dateRange.endDate,
       name: selectedDAGName,
@@ -191,10 +254,10 @@ function Dashboard(): React.ReactElement | null {
         : {}),
     }),
     [
-      appBarContext.selectedRemoteNode,
       dashboardPageLimit,
       dateRange.endDate,
       dateRange.startDate,
+      remoteNode,
       selectedDAGName,
     ]
   );
@@ -219,11 +282,19 @@ function Dashboard(): React.ReactElement | null {
   };
 
   const uniqueDAGRunNames = React.useMemo(() => {
-    const names = new Set(
-      dagRunsList.map((dagRun) => dagRun.name).filter(Boolean)
-    );
-    return Array.from(names).sort();
-  }, [dagRunsList]);
+    const names = new Set(availableDAGNames);
+
+    for (const dagRun of dagRunsList) {
+      if (dagRun.name) {
+        names.add(dagRun.name);
+      }
+    }
+    if (selectedDAGRun !== 'all') {
+      names.add(selectedDAGRun);
+    }
+
+    return Array.from(names).sort(compareDAGNames);
+  }, [availableDAGNames, dagRunsList, selectedDAGRun]);
 
   const handleDAGRunChange = (value: string) => {
     setSelectedDAGRun(value);
@@ -242,6 +313,25 @@ function Dashboard(): React.ReactElement | null {
       appBarContext.setTitle('Dashboard');
     }
   }, [appBarContext]);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setAvailableDAGNames([]);
+
+    void fetchAllDashboardDAGNames(client, remoteNode, controller.signal)
+      .then((names) => {
+        if (!controller.signal.aborted) {
+          setAvailableDAGNames(names);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setAvailableDAGNames([]);
+        }
+      });
+
+    return () => controller.abort();
+  }, [client, remoteNode]);
 
   React.useEffect(() => {
     lastWindowScrollYRef.current = window.scrollY;

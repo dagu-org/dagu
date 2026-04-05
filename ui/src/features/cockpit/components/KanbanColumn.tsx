@@ -21,7 +21,17 @@ export function KanbanColumn({
 }: Props): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const visibleCountLabel = `${column.runs.length}${column.hasMore ? '+' : ''}`;
+  const {
+    error,
+    hasMore,
+    isInitialLoading,
+    isLoadingMore,
+    loadMore,
+    loadMoreError,
+    retry,
+    runs,
+  } = column;
+  const visibleCountLabel = `${runs.length}${hasMore ? '+' : ''}`;
 
   useEffect(() => {
     const root = scrollRef.current;
@@ -29,8 +39,8 @@ export function KanbanColumn({
     if (
       !root ||
       !el ||
-      !column.hasMore ||
-      column.isLoadingMore ||
+      !hasMore ||
+      isLoadingMore ||
       typeof IntersectionObserver === 'undefined'
     ) {
       return;
@@ -39,7 +49,7 @@ export function KanbanColumn({
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          void column.loadMore();
+          void loadMore();
         }
       },
       { root, threshold: 0.1 }
@@ -47,7 +57,7 @@ export function KanbanColumn({
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [column, column.hasMore, column.isLoadingMore, column.runs.length]);
+  }, [hasMore, isLoadingMore, loadMore, runs.length]);
 
   return (
     <div className="flex flex-col min-w-0 flex-1">
@@ -65,16 +75,16 @@ export function KanbanColumn({
         ref={scrollRef}
         className="flex flex-col gap-1.5 overflow-y-auto min-h-0 flex-1 px-0.5"
       >
-        {column.runs.length === 0 && column.isInitialLoading ? (
+        {runs.length === 0 && isInitialLoading ? (
           <div className="px-1 py-2 text-xs text-muted-foreground">
             Loading...
           </div>
-        ) : column.runs.length === 0 && column.error ? (
+        ) : runs.length === 0 && error ? (
           <div className="px-1 py-2 text-xs">
-            <div className="text-destructive">{column.error.message}</div>
+            <div className="text-destructive">{error.message}</div>
             <button
               type="button"
-              onClick={() => void column.retry()}
+              onClick={() => void retry()}
               className="mt-2 rounded border border-border px-2 py-1 text-muted-foreground hover:text-foreground"
             >
               Retry
@@ -84,7 +94,7 @@ export function KanbanColumn({
           <>
             <LayoutGroup>
               <AnimatePresence mode="popLayout">
-                {column.runs.map((run) => (
+                {runs.map((run) => (
                   <KanbanCard
                     key={run.dagRunId}
                     run={run}
@@ -93,22 +103,22 @@ export function KanbanColumn({
                 ))}
               </AnimatePresence>
             </LayoutGroup>
-            {column.hasMore && (
+            {hasMore && (
               <div className="flex flex-col items-center gap-2 py-2">
                 <button
                   type="button"
-                  onClick={() => void column.loadMore()}
-                  disabled={column.isLoadingMore}
+                  onClick={() => void loadMore()}
+                  disabled={isLoadingMore}
                   className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {column.isLoadingMore ? 'Loading...' : 'Load more'}
+                  {isLoadingMore ? 'Loading...' : 'Load more'}
                 </button>
                 <div ref={sentinelRef} className="h-1 w-full shrink-0" />
               </div>
             )}
-            {column.loadMoreError && (
+            {loadMoreError && (
               <div className="px-1 pb-2 text-[11px] text-destructive">
-                {column.loadMoreError}
+                {loadMoreError}
               </div>
             )}
           </>

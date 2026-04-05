@@ -512,12 +512,14 @@ export function usePaginatedDAGRuns({
         mergeUniqueDAGRuns(previous, pageData.dagRuns ?? [])
       );
       setContinuationCursorOverride(pageData.nextCursor ?? null);
-    } catch (error) {
-      if (controller.signal.aborted && isAbortLikeError(error)) {
+    } catch (caughtError) {
+      if (controller.signal.aborted && isAbortLikeError(caughtError)) {
         return;
       }
       setLoadMoreError(
-        error instanceof Error ? error.message : 'Failed to load more DAG runs'
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Failed to load more DAG runs'
       );
     } finally {
       if (loadMoreControllerRef.current === controller) {
