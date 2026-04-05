@@ -204,20 +204,22 @@ function QueueCard({
       >
         {selectable && (
           <td
-            className="w-10 py-1.5 px-2"
+            className="w-10 py-1.5 px-2 align-middle"
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}
           >
-            <Checkbox
-              aria-label={`Select ${dagRun.name} ${dagRun.dagRunId}`}
-              checked={selected}
-              onCheckedChange={() =>
-                toggleSelection({
-                  name: dagRun.name,
-                  dagRunId: dagRun.dagRunId,
-                })
-              }
-            />
+            <div className="flex h-8 w-8 items-center justify-center">
+              <Checkbox
+                aria-label={`Select ${dagRun.name} ${dagRun.dagRunId}`}
+                checked={selected}
+                onCheckedChange={() =>
+                  toggleSelection({
+                    name: dagRun.name,
+                    dagRunId: dagRun.dagRunId,
+                  })
+                }
+              />
+            </div>
           </td>
         )}
         <td className="py-1.5 px-2 text-xs font-medium">{dagRun.name}</td>
@@ -421,19 +423,21 @@ function QueueCard({
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="w-10 py-1 px-2">
-                            <Checkbox
-                              aria-label={`Select all loaded queue items for ${queue.name}`}
-                              checked={headerCheckboxState}
-                              disabled={loadedCount === 0 || isRunning}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  selectAllLoaded();
-                                  return;
-                                }
-                                clearSelection();
-                              }}
-                            />
+                          <th className="w-10 py-1 px-2 align-middle">
+                            <div className="flex h-8 w-8 items-center justify-center">
+                              <Checkbox
+                                aria-label={`Select all loaded queue items for ${queue.name}`}
+                                checked={headerCheckboxState}
+                                disabled={loadedCount === 0 || isRunning}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    selectAllLoaded();
+                                    return;
+                                  }
+                                  clearSelection();
+                                }}
+                              />
+                            </div>
                           </th>
                           <th className="text-left py-1 px-2 font-medium text-muted-foreground">
                             DAG
