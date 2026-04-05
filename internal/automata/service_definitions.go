@@ -59,9 +59,6 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	if err := validateName(def.Name); err != nil {
 		return err
 	}
-	if strings.TrimSpace(def.Goal) == "" {
-		return errors.New("goal is required")
-	}
 	if err := validateNickname(def.Nickname); err != nil {
 		return err
 	}

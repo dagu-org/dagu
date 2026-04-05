@@ -132,6 +132,25 @@ allowed_dags:
 	require.Equal(t, "Complete the assigned software work", detail.Definition.Goal)
 }
 
+func TestServicePutSpecAcceptsMissingGoal(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `description: Goal-free automata
+allowed_dags:
+  names:
+    - build-app
+`
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Empty(t, detail.Definition.Goal)
+	require.Equal(t, "Goal-free automata", detail.Definition.Description)
+}
+
 func TestServicePutSpecRejectsStagesField(t *testing.T) {
 	t.Parallel()
 

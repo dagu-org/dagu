@@ -33,7 +33,12 @@ export function updateAutomataMetadataInSpec(
     delete nextSpec.icon_url;
   }
 
-  nextSpec.goal = metadata.goal.trim();
+  const nextGoal = metadata.goal.trim();
+  if (nextGoal) {
+    nextSpec.goal = nextGoal;
+  } else {
+    delete nextSpec.goal;
+  }
 
   const nextModel = metadata.model.trim();
   const currentAgent =

@@ -227,7 +227,6 @@ export function useAutomataDetailController({
   const metadataChanged =
     descriptionChanged || iconUrlChanged || goalChanged || modelChanged;
   const metadataValidationError =
-    !goalDraft.trim() ||
     !isValidAutomataIconUrl(iconUrlDraft) ||
     iconUrlDraft.trim().length > 2048;
   const metadataSaveDisabled =

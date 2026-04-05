@@ -131,6 +131,24 @@ describe('updateAutomataMetadataInSpec', () => {
     });
   });
 
+  it('removes goal when blank', () => {
+    const next = updateAutomataMetadataInSpec(
+      'description: "Automata workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
+      {
+        description: 'Automata workflow',
+        iconUrl: '',
+        goal: '   ',
+        model: '',
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      description: 'Automata workflow',
+      allowed_dags: { names: ['build'] },
+    });
+    expect(parse(next)).not.toHaveProperty('goal');
+  });
+
   it('sets agent model while preserving other agent config', () => {
     const next = updateAutomataMetadataInSpec(
       [

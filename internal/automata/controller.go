@@ -406,7 +406,11 @@ func (s *Service) buildSystemPromptExtra(def *Definition, state *State, allowed 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "You are controlling Automata %q.\n", def.Name)
 	fmt.Fprintf(&sb, "Kind: %s\n", def.Kind)
-	fmt.Fprintf(&sb, "Goal: %s\n", def.Goal)
+	if goal := strings.TrimSpace(def.Goal); goal != "" {
+		fmt.Fprintf(&sb, "Goal: %s\n", goal)
+	} else {
+		sb.WriteString("Goal: none provided yet.\n")
+	}
 	if instruction := strings.TrimSpace(state.Instruction); instruction != "" {
 		fmt.Fprintf(&sb, "Current instruction: %s\n", instruction)
 	} else {
@@ -457,6 +461,13 @@ func (s *Service) buildKickoffMessage(def *Definition, state *State) string {
 	if isService(def) {
 		return fmt.Sprintf(
 			"Activate service Automata %q. Current instruction: %q. Review the open tasks and current context. Continue any actionable work, choosing whichever open task is most appropriate. If work must be executed, run one allowlisted DAG. If blocked, request human input. If there is nothing actionable right now, return to standby without finishing the automata.",
+			def.Name,
+			state.Instruction,
+		)
+	}
+	if strings.TrimSpace(def.Goal) == "" {
+		return fmt.Sprintf(
+			"Continue Automata %q. Current instruction: %q. Review the open tasks and current context, then choose the most appropriate work. If work must be executed, run one allowlisted DAG. If blocked, request human input. If complete, finish the automata.",
 			def.Name,
 			state.Instruction,
 		)

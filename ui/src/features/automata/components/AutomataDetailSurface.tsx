@@ -785,9 +785,10 @@ function ConfigTab({
                   controller.isEditingSpec
                 }
               />
-              {!controller.goalDraft.trim() ? (
-                <div className="text-xs text-destructive">Goal is required.</div>
-              ) : null}
+              <div className="text-xs text-muted-foreground">
+                Optional. Leave blank if this Automata should work from the
+                instruction, task list, and runtime context.
+              </div>
             </div>
 
             <div className="grid gap-2">
@@ -811,7 +812,7 @@ function ConfigTab({
                 like /assets/automata/build-captain.png.
               </div>
               {!controller.metadataValidationError &&
-              controller.iconUrlDraft.trim().length <= 2048 ? null : !controller.goalDraft.trim() ? null : (
+              controller.iconUrlDraft.trim().length <= 2048 ? null : (
                 <div className="text-xs text-destructive">
                   Icon URL must be an absolute http(s) URL or a root-relative
                   path, and 2048 characters or fewer.

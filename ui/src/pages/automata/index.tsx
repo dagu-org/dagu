@@ -295,7 +295,9 @@ function buildAutomataSpec(input: {
     lines.push(`description: ${quoteYAML(description)}`);
   }
 
-  lines.push(`goal: ${quoteYAML(input.goal)}`);
+  if (input.goal.trim()) {
+    lines.push(`goal: ${quoteYAML(input.goal)}`);
+  }
 
   if (input.tags.length) {
     lines.push('tags:');
@@ -335,9 +337,6 @@ function validateAutomataCreateForm(input: {
   }
   if (!AUTOMATA_NAME_PATTERN.test(name)) {
     return 'Automata name must start with a letter or number and use only letters, numbers, and underscores.';
-  }
-  if (!input.goal.trim()) {
-    return 'Goal is required.';
   }
   if (nickname.includes('\n') || nickname.includes('\r')) {
     return 'Nickname must be a single line.';
@@ -663,8 +662,11 @@ function AutomataPage(): React.ReactElement {
                   <div>
                     <h1 className="text-2xl font-semibold">Create Automata</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Define the Automata goal and the automata-wide allowed DAG
-                      list. Manage task list items after creation.
+                      Configure metadata and the automata-wide allowed DAG list.
+                      Manage task list items after creation.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Only fields marked required must be filled in now.
                     </p>
                   </div>
                   <Button
@@ -679,7 +681,7 @@ function AutomataPage(): React.ReactElement {
 
                 <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="automata-name">Name</Label>
+                    <Label htmlFor="automata-name">Name (Required)</Label>
                     <Input
                       id="automata-name"
                       value={createName}
@@ -723,7 +725,7 @@ function AutomataPage(): React.ReactElement {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="automata-nickname">Nickname</Label>
+                    <Label htmlFor="automata-nickname">Nickname (Optional)</Label>
                     <Input
                       id="automata-nickname"
                       value={createNickname}
@@ -745,7 +747,9 @@ function AutomataPage(): React.ReactElement {
                       className="h-16 w-16 rounded-2xl"
                     />
                     <div className="grid gap-2">
-                      <Label htmlFor="automata-icon-url">Icon Image URL</Label>
+                      <Label htmlFor="automata-icon-url">
+                        Icon Image URL (Optional)
+                      </Label>
                       <Input
                         id="automata-icon-url"
                         value={createIconUrl}
@@ -768,7 +772,9 @@ function AutomataPage(): React.ReactElement {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="automata-description">Description</Label>
+                    <Label htmlFor="automata-description">
+                      Description (Optional)
+                    </Label>
                     <Input
                       id="automata-description"
                       value={createDescription}
@@ -779,7 +785,7 @@ function AutomataPage(): React.ReactElement {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="automata-goal">Goal</Label>
+                    <Label htmlFor="automata-goal">Goal (Optional)</Label>
                     <Textarea
                       id="automata-goal"
                       value={createGoal}
@@ -787,10 +793,14 @@ function AutomataPage(): React.ReactElement {
                       placeholder="Complete the assigned task and leave it ready for review"
                       disabled={isCreating}
                     />
+                    <div className="text-xs text-muted-foreground">
+                      Optional. Leave blank if the Automata should work from the
+                      instruction, task list, and runtime context.
+                    </div>
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="automata-tags">Tags</Label>
+                    <Label htmlFor="automata-tags">Tags (Optional)</Label>
                     <Textarea
                       id="automata-tags"
                       value={createTags}
@@ -814,7 +824,7 @@ function AutomataPage(): React.ReactElement {
 
                   <div className="space-y-3">
                     <div>
-                      <Label>Allowed DAGs</Label>
+                      <Label>Allowed DAGs (Required)</Label>
                       <div className="mt-1 text-xs text-muted-foreground">
                         These DAGs are available for the automata across its
                         full runtime.
