@@ -32,7 +32,10 @@ interface Props {
   onCardClick: (run: DAGRunSummary) => void;
 }
 
-export function MobileKanbanBoard({ columns, onCardClick }: Props): React.ReactElement {
+export function MobileKanbanBoard({
+  columns,
+  onCardClick,
+}: Props): React.ReactElement {
   const [activeTab, setActiveTab] = useState<ColumnKey>(getInitialTab);
 
   const handleTabChange = useCallback((key: ColumnKey) => {
@@ -44,7 +47,7 @@ export function MobileKanbanBoard({ columns, onCardClick }: Props): React.ReactE
     <div className="flex flex-col min-h-0">
       <Tabs className="overflow-x-auto border-b-0 mb-1">
         {COLUMN_KEYS.map((key) => {
-          const count = columns[key].length;
+          const count = columns[key].runs.length;
           return (
             <Tab
               key={key}
@@ -62,7 +65,7 @@ export function MobileKanbanBoard({ columns, onCardClick }: Props): React.ReactE
       </Tabs>
       <KanbanColumn
         title={COLUMN_LABELS[activeTab]}
-        runs={columns[activeTab]}
+        column={columns[activeTab]}
         onCardClick={onCardClick}
         hideHeader
       />

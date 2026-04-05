@@ -16,7 +16,7 @@ import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
-import { useExactDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
+import { usePaginatedDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
 import PathsCard from '../features/system-status/components/PathsCard';
 import dayjs from '../lib/dayjs';
@@ -68,6 +68,8 @@ function Dashboard(): React.ReactElement | null {
     name: string;
     dagRunId: string;
   } | null>(null);
+  const autoLoadSentinelRef = React.useRef<HTMLDivElement>(null);
+  const [autoLoadRequested, setAutoLoadRequested] = React.useState(false);
 
   type DashboardFilters = {
     selectedDAGRun: string;
@@ -178,9 +180,11 @@ function Dashboard(): React.ReactElement | null {
       fromDate: dateRange.startDate,
       toDate: dateRange.endDate,
       name: selectedDAGName,
+      limit: config.maxDashboardPageLimit,
     }),
     [
       appBarContext.selectedRemoteNode,
+      config.maxDashboardPageLimit,
       dateRange.endDate,
       dateRange.startDate,
       selectedDAGName,
@@ -188,13 +192,18 @@ function Dashboard(): React.ReactElement | null {
   );
 
   const {
-    data: dagRunsList,
+    dagRuns: dagRunsList,
     error,
-    isLoading,
+    isInitialLoading: isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
     refresh,
-  } = useExactDAGRuns({
+  } = usePaginatedDAGRuns({
     query: dagRunsQuery,
+    liveEnabled: true,
     fallbackIntervalMs: 5000,
+    resetOnSSEInvalidate: true,
   });
 
   const handleRefreshAll = async () => {
@@ -225,6 +234,48 @@ function Dashboard(): React.ReactElement | null {
       appBarContext.setTitle('Dashboard');
     }
   }, [appBarContext]);
+
+  React.useEffect(() => {
+    const requestAutoLoad = () => {
+      setAutoLoadRequested(true);
+    };
+
+    window.addEventListener('scroll', requestAutoLoad, { passive: true });
+    window.addEventListener('wheel', requestAutoLoad, { passive: true });
+    window.addEventListener('touchmove', requestAutoLoad, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', requestAutoLoad);
+      window.removeEventListener('wheel', requestAutoLoad);
+      window.removeEventListener('touchmove', requestAutoLoad);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const el = autoLoadSentinelRef.current;
+    if (
+      !autoLoadRequested ||
+      !el ||
+      !hasMore ||
+      isLoadingMore ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setAutoLoadRequested(false);
+          void loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [autoLoadRequested, hasMore, isLoadingMore, loadMore]);
 
   if (error) {
     const errorMessage = error.message || 'Unknown error loading dashboard';
@@ -312,8 +363,9 @@ function Dashboard(): React.ReactElement | null {
           <div className="flex items-baseline gap-1">
             <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
               {totalDAGRuns}
+              {hasMore ? '+' : ''}
             </span>
-            <span className="text-xs">runs</span>
+            <span className="text-xs">recent runs</span>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
@@ -376,6 +428,18 @@ function Dashboard(): React.ReactElement | null {
             selectedDate={selectedTimelineDate}
           />
         </div>
+        {hasMore && (
+          <div className="flex flex-col items-center justify-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => void loadMore()}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? 'Loading...' : 'Load older runs'}
+            </Button>
+            <div ref={autoLoadSentinelRef} className="h-1 w-full shrink-0" />
+          </div>
+        )}
       </div>
 
       {/* DAG Run Details Modal */}

@@ -1,38 +1,117 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AnimatePresence, LayoutGroup } from 'framer-motion';
 import { components } from '@/api/v1/schema';
 import { KanbanCard } from './KanbanCard';
+import type { KanbanColumnData } from '../hooks/useDateKanbanData';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
 interface Props {
   title: string;
-  runs: DAGRunSummary[];
+  column: KanbanColumnData;
   onCardClick: (run: DAGRunSummary) => void;
   hideHeader?: boolean;
 }
 
-export function KanbanColumn({ title, runs, onCardClick, hideHeader }: Props): React.ReactElement {
+export function KanbanColumn({
+  title,
+  column,
+  onCardClick,
+  hideHeader,
+}: Props): React.ReactElement {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const el = sentinelRef.current;
+    if (
+      !root ||
+      !el ||
+      !column.hasMore ||
+      column.isLoadingMore ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          void column.loadMore();
+        }
+      },
+      { root, threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [column, column.hasMore, column.isLoadingMore, column.runs.length]);
+
   return (
     <div className="flex flex-col min-w-0 flex-1">
       {!hideHeader && (
         <div className="flex items-center gap-2 px-1 pb-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</span>
-          <span className="text-[11px] text-muted-foreground/60">{runs.length}</span>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {title}
+          </span>
+          <span className="text-[11px] text-muted-foreground/60">
+            {column.runs.length}
+          </span>
         </div>
       )}
-      <div className="flex flex-col gap-1.5 overflow-y-auto min-h-0 flex-1 px-0.5">
-        <LayoutGroup>
-          <AnimatePresence mode="popLayout">
-            {runs.map((run) => (
-              <KanbanCard
-                key={run.dagRunId}
-                run={run}
-                onClick={() => onCardClick(run)}
-              />
-            ))}
-          </AnimatePresence>
-        </LayoutGroup>
+      <div
+        ref={scrollRef}
+        className="flex flex-col gap-1.5 overflow-y-auto min-h-0 flex-1 px-0.5"
+      >
+        {column.runs.length === 0 && column.isInitialLoading ? (
+          <div className="px-1 py-2 text-xs text-muted-foreground">
+            Loading...
+          </div>
+        ) : column.runs.length === 0 && column.error ? (
+          <div className="px-1 py-2 text-xs">
+            <div className="text-destructive">{column.error.message}</div>
+            <button
+              type="button"
+              onClick={() => void column.retry()}
+              className="mt-2 rounded border border-border px-2 py-1 text-muted-foreground hover:text-foreground"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
+            <LayoutGroup>
+              <AnimatePresence mode="popLayout">
+                {column.runs.map((run) => (
+                  <KanbanCard
+                    key={run.dagRunId}
+                    run={run}
+                    onClick={() => onCardClick(run)}
+                  />
+                ))}
+              </AnimatePresence>
+            </LayoutGroup>
+            {column.hasMore && (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <button
+                  type="button"
+                  onClick={() => void column.loadMore()}
+                  disabled={column.isLoadingMore}
+                  className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {column.isLoadingMore ? 'Loading...' : 'Load more'}
+                </button>
+                <div ref={sentinelRef} className="h-1 w-full shrink-0" />
+              </div>
+            )}
+            {column.loadMoreError && (
+              <div className="px-1 pb-2 text-[11px] text-destructive">
+                {column.loadMoreError}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

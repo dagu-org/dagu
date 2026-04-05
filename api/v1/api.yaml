@@ -1739,7 +1739,7 @@ paths:
       tags:
         - "dag-runs"
       parameters:
-        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/StatusList"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/DAGRunIdSearch"
@@ -1932,7 +1932,7 @@ paths:
       tags:
         - "dag-runs"
       parameters:
-        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/StatusList"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/DAGRunName"
@@ -6929,13 +6929,16 @@ components:
       schema:
         type: string
 
-    Status:
+    StatusList:
       name: status
       in: query
-      description: status of the DAG-run
+      description: status of the DAG-run. Repeat the parameter to match multiple statuses.
       required: false
+      explode: true
       schema:
-        $ref: "#/components/schemas/Status"
+        type: array
+        items:
+          $ref: "#/components/schemas/Status"
 
     DateTimeFrom:
       name: fromDate

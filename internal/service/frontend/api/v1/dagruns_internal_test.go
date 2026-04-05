@@ -142,6 +142,28 @@ func TestApplyInlineEnqueueTags_InvalidYAML(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestDAGRunListOptionsFromQueryStringParsesMultipleStatuses(t *testing.T) {
+	t.Parallel()
+
+	opts, err := dagRunListOptionsFromQueryString(
+		context.Background(),
+		"status=5&status=1,6&limit=20",
+	)
+	require.NoError(t, err)
+
+	var applied exec.ListDAGRunStatusesOptions
+	for _, opt := range opts.query {
+		opt(&applied)
+	}
+
+	require.Equal(t, []core.Status{
+		core.Status(openapiv1.StatusQueued),
+		core.Status(openapiv1.StatusRunning),
+		core.Status(openapiv1.StatusPartialSuccess),
+	}, applied.Statuses)
+	require.Equal(t, 20, applied.Limit)
+}
+
 var _ exec.DAGRunStore = (*blockingDAGRunStore)(nil)
 
 type blockingDAGRunStore struct{}

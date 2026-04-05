@@ -1,4 +1,11 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { components, paths } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
@@ -15,11 +22,21 @@ export type DAGRunListQuery = paths['/dag-runs']['get']['parameters']['query'];
 
 const EXACT_DAG_RUN_PAGE_LIMIT = 100;
 
+function normalizeDAGRunListQueryValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return [...value]
+      .map((item) => normalizeDAGRunListQueryValue(item))
+      .sort((left, right) => String(left).localeCompare(String(right)));
+  }
+  return value;
+}
+
 function normalizeDAGRunListQuery(
   query: DAGRunListQuery | undefined
 ): Record<string, unknown> {
   const normalizedEntries = Object.entries(query ?? {})
     .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => [key, normalizeDAGRunListQueryValue(value)] as const)
     .sort(([left], [right]) => left.localeCompare(right));
   return Object.fromEntries(normalizedEntries);
 }
@@ -119,11 +136,15 @@ type UseExactDAGRunsOptions = {
 type UsePaginatedDAGRunsOptions = {
   query: DAGRunListQuery;
   enabled?: boolean;
+  liveEnabled?: boolean;
+  fallbackIntervalMs?: number;
+  resetOnSSEInvalidate?: boolean;
 };
 
 type UsePaginatedDAGRunsResult = {
   dagRuns: DAGRunSummary[];
   headPage: DAGRunsPageResponse | undefined;
+  error: Error | null;
   isInitialLoading: boolean;
   isLoadingMore: boolean;
   loadMoreError: string | null;
@@ -157,11 +178,7 @@ export function useExactDAGRuns({
     }),
     [query, remoteNode]
   );
-  const sseState = useDAGRunsListSSE(
-    query,
-    enabled && liveEnabled,
-    remoteNode
-  );
+  const sseState = useDAGRunsListSSE(query, enabled && liveEnabled, remoteNode);
   const [data, setData] = useState<DAGRunSummary[]>([]);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -336,6 +353,9 @@ export function useExactDAGRuns({
 export function usePaginatedDAGRuns({
   query,
   enabled = true,
+  liveEnabled = true,
+  fallbackIntervalMs = 2000,
+  resetOnSSEInvalidate = false,
 }: UsePaginatedDAGRunsOptions): UsePaginatedDAGRunsResult {
   const appBarContext = useContext(AppBarContext);
   const client = useClient();
@@ -348,13 +368,17 @@ export function usePaginatedDAGRuns({
     }),
     [query, remoteNode]
   );
-  const sseState = useDAGRunsListSSE(query, enabled, remoteNode);
+  const sseState = useDAGRunsListSSE(query, enabled && liveEnabled, remoteNode);
   const [olderRuns, setOlderRuns] = useState<DAGRunSummary[]>([]);
   const [continuationCursorOverride, setContinuationCursorOverride] = useState<
     string | null | undefined
   >(undefined);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const loadMoreControllerRef = useRef<AbortController | null>(null);
+  const paginationGenerationRef = useRef(0);
+  const lastSSEPayloadRef = useRef<DAGRunsListSSEResponse | null>(null);
+  const skipNextSSEResetRef = useRef(true);
 
   const stableQueryKey = useMemo(
     () => getDAGRunListQueryKey(resolvedQuery),
@@ -364,6 +388,7 @@ export function usePaginatedDAGRuns({
     data: headPage,
     mutate,
     isLoading,
+    error,
   } = useQuery(
     '/dag-runs',
     enabled
@@ -373,16 +398,56 @@ export function usePaginatedDAGRuns({
           },
         }
       : null,
-    sseFallbackOptions(sseState)
+    sseFallbackOptions(sseState, fallbackIntervalMs)
   );
   useSSECacheSync(sseState, mutate);
 
-  useEffect(() => {
+  const resetOlderPages = useCallback(() => {
+    paginationGenerationRef.current += 1;
+    loadMoreControllerRef.current?.abort();
+    loadMoreControllerRef.current = null;
     setOlderRuns([]);
     setContinuationCursorOverride(undefined);
     setLoadMoreError(null);
     setIsLoadingMore(false);
-  }, [stableQueryKey]);
+  }, []);
+
+  useEffect(() => {
+    resetOlderPages();
+  }, [resetOlderPages, stableQueryKey]);
+
+  useEffect(() => {
+    lastSSEPayloadRef.current = null;
+    skipNextSSEResetRef.current = true;
+  }, [enabled, liveEnabled, resetOnSSEInvalidate, stableQueryKey]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      !liveEnabled ||
+      !resetOnSSEInvalidate ||
+      !sseState.isConnected ||
+      sseState.data == null ||
+      sseState.data === lastSSEPayloadRef.current
+    ) {
+      return;
+    }
+
+    lastSSEPayloadRef.current = sseState.data;
+    if (skipNextSSEResetRef.current) {
+      skipNextSSEResetRef.current = false;
+      return;
+    }
+
+    resetOlderPages();
+  }, [
+    enabled,
+    liveEnabled,
+    resetOnSSEInvalidate,
+    resetOlderPages,
+    sseState.data,
+    sseState.isConnected,
+  ]);
 
   const dagRuns = useMemo(
     () => mergeUniqueDAGRuns(headPage?.dagRuns ?? [], olderRuns),
@@ -394,54 +459,85 @@ export function usePaginatedDAGRuns({
       : continuationCursorOverride;
 
   const refresh = useCallback(async (): Promise<void> => {
-    setOlderRuns([]);
-    setContinuationCursorOverride(undefined);
-    setLoadMoreError(null);
-    setIsLoadingMore(false);
+    resetOlderPages();
     await mutate();
-  }, [mutate]);
+  }, [mutate, resetOlderPages]);
 
   const loadMore = useCallback(async (): Promise<void> => {
     if (isLoadingMore || !nextCursor) {
       return;
     }
 
+    const generation = paginationGenerationRef.current;
+    loadMoreControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadMoreControllerRef.current = controller;
     setIsLoadingMore(true);
     setLoadMoreError(null);
 
-    const response = await client.GET('/dag-runs', {
-      params: {
-        query: {
-          ...query,
-          remoteNode,
-          cursor: nextCursor,
+    try {
+      const response = await client.GET('/dag-runs', {
+        params: {
+          query: {
+            ...query,
+            remoteNode,
+            cursor: nextCursor,
+          },
         },
-      },
-    });
+        signal: controller.signal,
+      });
 
-    setIsLoadingMore(false);
+      if (
+        controller.signal.aborted ||
+        generation !== paginationGenerationRef.current
+      ) {
+        return;
+      }
 
-    if (response.error) {
-      const message =
-        response.error &&
-        typeof response.error === 'object' &&
-        'message' in response.error
-          ? String(response.error.message)
-          : 'Failed to load more DAG runs';
-      setLoadMoreError(message);
-      return;
+      if (response.error) {
+        const message =
+          response.error &&
+          typeof response.error === 'object' &&
+          'message' in response.error
+            ? String(response.error.message)
+            : 'Failed to load more DAG runs';
+        setLoadMoreError(message);
+        return;
+      }
+
+      const pageData = (response.data ?? {
+        dagRuns: [],
+      }) as DAGRunsPageResponse;
+      setOlderRuns((previous) =>
+        mergeUniqueDAGRuns(previous, pageData.dagRuns ?? [])
+      );
+      setContinuationCursorOverride(pageData.nextCursor ?? null);
+    } catch (error) {
+      if (controller.signal.aborted && isAbortLikeError(error)) {
+        return;
+      }
+      setLoadMoreError(
+        error instanceof Error ? error.message : 'Failed to load more DAG runs'
+      );
+    } finally {
+      if (loadMoreControllerRef.current === controller) {
+        loadMoreControllerRef.current = null;
+      }
+      if (generation === paginationGenerationRef.current) {
+        setIsLoadingMore(false);
+      }
     }
-
-    const pageData = (response.data ?? { dagRuns: [] }) as DAGRunsPageResponse;
-    setOlderRuns((previous) =>
-      mergeUniqueDAGRuns(previous, pageData.dagRuns ?? [])
-    );
-    setContinuationCursorOverride(pageData.nextCursor ?? null);
   }, [client, isLoadingMore, nextCursor, query, remoteNode]);
 
   return {
     dagRuns,
     headPage,
+    error:
+      error instanceof Error
+        ? error
+        : error
+          ? new Error('Failed to load DAG runs')
+          : null,
     isInitialLoading: isLoading,
     isLoadingMore,
     loadMoreError,

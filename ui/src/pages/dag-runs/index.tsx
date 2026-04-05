@@ -448,7 +448,7 @@ function DAGRuns() {
       remoteNode: appBarContext.selectedRemoteNode || 'local',
       name: apiSearchText || undefined,
       dagRunId: apiDagRunId || undefined,
-      status: apiStatus !== 'all' ? parseInt(apiStatus) : undefined,
+      status: apiStatus !== 'all' ? [parseInt(apiStatus)] : undefined,
       tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
       fromDate: formatDateForApi(apiFromDate),
       toDate: formatDateForApi(apiToDate),
