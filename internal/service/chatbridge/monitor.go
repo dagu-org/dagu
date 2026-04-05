@@ -25,26 +25,47 @@ const (
 	DefaultNotificationLockStaleThreshold    = 45 * time.Second
 )
 
+var defaultInterestedNotificationEventTypes = []eventstore.EventType{
+	eventstore.TypeDAGRunWaiting,
+	eventstore.TypeDAGRunSucceeded,
+	eventstore.TypeDAGRunFailed,
+	eventstore.TypeDAGRunAborted,
+	eventstore.TypeDAGRunRejected,
+}
+
 // NotificationMonitorConfig controls source polling, batching, and shutdown behavior.
 type NotificationMonitorConfig struct {
-	PollInterval      time.Duration
-	SeenEvictInterval time.Duration
-	SeenTTL           time.Duration
-	FlushTimeout      time.Duration
-	UrgentWindow      time.Duration
-	SuccessWindow     time.Duration
+	PollInterval         time.Duration
+	SeenEvictInterval    time.Duration
+	SeenTTL              time.Duration
+	FlushTimeout         time.Duration
+	UrgentWindow         time.Duration
+	SuccessWindow        time.Duration
+	InterestedEventTypes []eventstore.EventType
 }
 
 // DefaultNotificationMonitorConfig returns the default monitor settings.
 func DefaultNotificationMonitorConfig() NotificationMonitorConfig {
 	return NotificationMonitorConfig{
-		PollInterval:      DefaultNotificationMonitorPollInterval,
-		SeenEvictInterval: DefaultNotificationSeenEvictInterval,
-		SeenTTL:           DefaultNotificationSeenTTL,
-		FlushTimeout:      DefaultNotificationFlushTimeout,
-		UrgentWindow:      DefaultUrgentNotificationWindow,
-		SuccessWindow:     DefaultSuccessNotificationWindow,
+		PollInterval:         DefaultNotificationMonitorPollInterval,
+		SeenEvictInterval:    DefaultNotificationSeenEvictInterval,
+		SeenTTL:              DefaultNotificationSeenTTL,
+		FlushTimeout:         DefaultNotificationFlushTimeout,
+		UrgentWindow:         DefaultUrgentNotificationWindow,
+		SuccessWindow:        DefaultSuccessNotificationWindow,
+		InterestedEventTypes: append([]eventstore.EventType(nil), defaultInterestedNotificationEventTypes...),
 	}
+}
+
+func interestedEventTypeSet(eventTypes []eventstore.EventType) map[eventstore.EventType]struct{} {
+	set := make(map[eventstore.EventType]struct{}, len(eventTypes))
+	for _, eventType := range eventTypes {
+		if eventType == "" {
+			continue
+		}
+		set[eventType] = struct{}{}
+	}
+	return set
 }
 
 // NotificationTransport supplies destination discovery and transport-specific delivery.
@@ -62,6 +83,7 @@ type NotificationMonitor struct {
 	transport    NotificationTransport
 	logger       *slog.Logger
 	cfg          NotificationMonitorConfig
+	interested   map[eventstore.EventType]struct{}
 
 	batcherMu sync.RWMutex
 	batcher   *NotificationBatcher
@@ -115,6 +137,7 @@ func NewNotificationMonitor(
 		transport:    transport,
 		logger:       logger,
 		cfg:          cfg,
+		interested:   interestedEventTypeSet(cfg.InterestedEventTypes),
 		batcher:      NewNotificationBatcher(cfg.UrgentWindow, cfg.SuccessWindow),
 		state:        newNotificationMonitorState(),
 	}
@@ -123,6 +146,10 @@ func NewNotificationMonitor(
 // NotifyCompletion queues a status update for every destination that has not yet acknowledged it.
 func (m *NotificationMonitor) NotifyCompletion(status *exec.DAGRunStatus) bool {
 	if status == nil {
+		return false
+	}
+	eventType, ok := eventstore.PersistedDAGRunEventTypeForStatus(status.Status)
+	if !ok || !m.isInterestedEventType(eventType) {
 		return false
 	}
 	if !m.canMutateNotificationState("Notification lock is not held; cannot queue notification") {
@@ -134,7 +161,6 @@ func (m *NotificationMonitor) NotifyCompletion(status *exec.DAGRunStatus) bool {
 		slog.String("status", status.Status.String()),
 		slog.String("dag_run_id", status.DAGRunID),
 	)
-	eventType, _ := eventstore.PersistedDAGRunEventTypeForStatus(status.Status)
 	snapshot := cloneNotificationStatus(status)
 
 	event := NotificationEvent{
@@ -218,4 +244,15 @@ func normalizeNotificationMonitorConfig(cfg *NotificationMonitorConfig) {
 	if cfg.SuccessWindow <= 0 {
 		cfg.SuccessWindow = defaults.SuccessWindow
 	}
+	if cfg.InterestedEventTypes == nil {
+		cfg.InterestedEventTypes = append([]eventstore.EventType(nil), defaults.InterestedEventTypes...)
+	}
+}
+
+func (m *NotificationMonitor) isInterestedEventType(eventType eventstore.EventType) bool {
+	if eventType == "" {
+		return false
+	}
+	_, ok := m.interested[eventType]
+	return ok
 }

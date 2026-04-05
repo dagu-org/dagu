@@ -32,7 +32,10 @@ interface Props {
   onCardClick: (run: DAGRunSummary) => void;
 }
 
-export function MobileKanbanBoard({ columns, onCardClick }: Props): React.ReactElement {
+export function MobileKanbanBoard({
+  columns,
+  onCardClick,
+}: Props): React.ReactElement {
   const [activeTab, setActiveTab] = useState<ColumnKey>(getInitialTab);
 
   const handleTabChange = useCallback((key: ColumnKey) => {
@@ -44,7 +47,8 @@ export function MobileKanbanBoard({ columns, onCardClick }: Props): React.ReactE
     <div className="flex flex-col min-h-0">
       <Tabs className="overflow-x-auto border-b-0 mb-1">
         {COLUMN_KEYS.map((key) => {
-          const count = columns[key].length;
+          const count = columns[key].runs.length;
+          const countLabel = `${count}${columns[key].hasMore ? '+' : ''}`;
           return (
             <Tab
               key={key}
@@ -53,8 +57,10 @@ export function MobileKanbanBoard({ columns, onCardClick }: Props): React.ReactE
               className="h-8 px-2 text-xs"
             >
               {COLUMN_LABELS[key]}
-              {count > 0 && (
-                <span className="ml-1 text-muted-foreground/60">{count}</span>
+              {(count > 0 || columns[key].hasMore) && (
+                <span className="ml-1 text-muted-foreground/60">
+                  {countLabel}
+                </span>
               )}
             </Tab>
           );
@@ -62,7 +68,7 @@ export function MobileKanbanBoard({ columns, onCardClick }: Props): React.ReactE
       </Tabs>
       <KanbanColumn
         title={COLUMN_LABELS[activeTab]}
-        runs={columns[activeTab]}
+        column={columns[activeTab]}
         onCardClick={onCardClick}
         hideHeader
       />

@@ -898,7 +898,7 @@
         },
         "retention_days": {
           "type": "integer",
-          "description": "Number of days to retain event logs. Default: 3.",
+          "description": "Number of days to retain event logs. Default: 1.",
           "minimum": 0
         }
       }
@@ -1228,6 +1228,22 @@
           "items": {
             "type": "integer"
           }
+        },
+        "interested_event_types": {
+          "type": "array",
+          "description": "DAG-run lifecycle event types that should generate Telegram notifications. Defaults to waiting, succeeded, failed, aborted, and rejected.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "dag.run.queued",
+              "dag.run.running",
+              "dag.run.waiting",
+              "dag.run.succeeded",
+              "dag.run.failed",
+              "dag.run.aborted",
+              "dag.run.rejected"
+            ]
+          }
         }
       }
     },
@@ -1249,6 +1265,22 @@
           "description": "Slack channel IDs the bot is allowed to operate in. Required and must be non-empty when provider is 'slack'.",
           "items": {
             "type": "string"
+          }
+        },
+        "interested_event_types": {
+          "type": "array",
+          "description": "DAG-run lifecycle event types that should generate Slack notifications. Defaults to waiting, succeeded, failed, aborted, and rejected.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "dag.run.queued",
+              "dag.run.running",
+              "dag.run.waiting",
+              "dag.run.succeeded",
+              "dag.run.failed",
+              "dag.run.aborted",
+              "dag.run.rejected"
+            ]
           }
         },
         "respond_to_all": {

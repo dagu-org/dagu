@@ -148,7 +148,7 @@ func (store *Store) listStatusesOrdered(
 func (store *Store) newStatusIterators(ctx context.Context, opts exec.ListDAGRunStatusesOptions) ([]*dagRunStatusIterator, error) {
 	var roots []DataRoot
 	if opts.ExactName == "" {
-		listed, err := store.listRoot(ctx, opts.Name)
+		listed, err := store.listRoot(ctx, "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to list root directories: %w", err)
 		}
@@ -267,6 +267,9 @@ func (it *dagRunStatusIterator) loadDay(ctx context.Context, dayPath string) ([]
 		if status == nil {
 			continue
 		}
+		if it.opts.Name != "" && !containsFold(status.Name, it.opts.Name) {
+			continue
+		}
 
 		items = append(items, dagRunListItem{
 			Key: dagRunListKey{
@@ -280,6 +283,10 @@ func (it *dagRunStatusIterator) loadDay(ctx context.Context, dayPath string) ([]
 
 	sortDayItems(items)
 	return items, nil
+}
+
+func containsFold(value, query string) bool {
+	return strings.Contains(strings.ToLower(value), strings.ToLower(query))
 }
 
 func effectiveTimeRange(from, to exec.TimeInUTC) (time.Time, time.Time) {

@@ -3625,6 +3625,8 @@ export interface components {
             onAbort?: components["schemas"]["Node"];
             /** @description List of preconditions that must be met before the DAG-run can start */
             preconditions?: components["schemas"]["Condition"][];
+            /** @description Whether this DAG-run still has a usable source file on disk, so reschedule can load the current spec from that file instead of the stored historical YAML snapshot. */
+            specFromFile?: boolean;
         };
         /** @description Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings. */
         DAGRunOutputs: {
@@ -5297,8 +5299,8 @@ export interface components {
         DAGRunIdSearch: components["schemas"]["DAGRunId"];
         /** @description name of the DAG-run */
         DAGRunName: string;
-        /** @description status of the DAG-run */
-        Status: components["schemas"]["Status"];
+        /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
+        StatusList: components["schemas"]["Status"][];
         /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
         DateTimeFrom: components["schemas"]["UnixTimestamp"];
         /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
@@ -7391,8 +7393,8 @@ export interface operations {
     listDAGRuns: {
         parameters: {
             query?: {
-                /** @description status of the DAG-run */
-                status?: components["parameters"]["Status"];
+                /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
+                status?: components["parameters"]["StatusList"];
                 /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
                 fromDate?: components["parameters"]["DateTimeFrom"];
                 /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
@@ -7590,8 +7592,8 @@ export interface operations {
     listDAGRunsByName: {
         parameters: {
             query?: {
-                /** @description status of the DAG-run */
-                status?: components["parameters"]["Status"];
+                /** @description status of the DAG-run. Repeat the parameter to match multiple statuses. */
+                status?: components["parameters"]["StatusList"];
                 /** @description start datetime for filtering DAG-runs in ISO 8601 format with timezone */
                 fromDate?: components["parameters"]["DateTimeFrom"];
                 /** @description end datetime for filtering DAG-runs in ISO 8601 format with timezone */
@@ -7761,6 +7763,8 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunId"] & unknown;
                     /** @description Optional DAG name override for the new run. */
                     dagName?: string;
+                    /** @description When true, reschedule from the current contents of the original DAG file instead of the stored historical YAML snapshot. */
+                    useCurrentDagFile?: boolean;
                 };
             };
         };

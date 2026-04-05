@@ -11,15 +11,20 @@ import {
 import { Filter } from 'lucide-react';
 import React from 'react';
 import type { components } from '../api/v1/schema';
-import { Status } from '../api/v1/schema';
+import {
+  PathsDagsGetParametersQueryOrder,
+  PathsDagsGetParametersQuerySort,
+  Status,
+} from '../api/v1/schema';
 import { AppBarContext } from '../contexts/AppBarContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSearchState } from '../contexts/SearchStateContext';
 import { DAGRunDetailsModal } from '../features/dag-runs/components/dag-run-details';
-import { useExactDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
+import { usePaginatedDAGRuns } from '../features/dag-runs/hooks/dagRunPagination';
+import { useClient } from '../hooks/api';
 import DashboardTimeChart from '../features/dashboard/components/DashboardTimechart';
+import { optionalPositiveInt } from '../hooks/queryUtils';
 import PathsCard from '../features/system-status/components/PathsCard';
-import { useLiveConnection } from '../hooks/useAppLive';
 import dayjs from '../lib/dayjs';
 import Title from '../ui/Title';
 
@@ -59,16 +64,77 @@ function getDayBounds(
   };
 }
 
+function compareDAGNames(left: string, right: string): number {
+  return left.localeCompare(right);
+}
+
+async function fetchAllDashboardDAGNames(
+  client: ReturnType<typeof useClient>,
+  remoteNode: string,
+  signal: AbortSignal
+): Promise<string[]> {
+  const names = new Set<string>();
+  let page = 1;
+
+  for (;;) {
+    const response = await client.GET('/dags', {
+      params: {
+        query: {
+          remoteNode,
+          page,
+          perPage: 100,
+          sort: PathsDagsGetParametersQuerySort.name,
+          order: PathsDagsGetParametersQueryOrder.asc,
+        },
+      },
+      signal,
+    });
+
+    if (response.error) {
+      const message =
+        response.error &&
+        typeof response.error === 'object' &&
+        'message' in response.error
+          ? String(response.error.message)
+          : 'Failed to load DAG definitions';
+      throw new Error(message);
+    }
+
+    const data = response.data;
+    for (const dag of data?.dags ?? []) {
+      if (dag.dag.name) {
+        names.add(dag.dag.name);
+      }
+    }
+
+    const totalPages = data?.pagination?.totalPages ?? page;
+    if (page >= totalPages) {
+      break;
+    }
+    page += 1;
+  }
+
+  return Array.from(names).sort(compareDAGNames);
+}
+
 function Dashboard(): React.ReactElement | null {
   const appBarContext = React.useContext(AppBarContext);
+  const client = useClient();
   const config = useConfig();
   const searchState = useSearchState();
-  const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const remoteKey = remoteNode;
 
   const [modalDAGRun, setModalDAGRun] = React.useState<{
     name: string;
     dagRunId: string;
   } | null>(null);
+  const autoLoadSentinelRef = React.useRef<HTMLDivElement>(null);
+  const [autoLoadRequested, setAutoLoadRequested] = React.useState(false);
+  const [availableDAGNames, setAvailableDAGNames] = React.useState<string[]>(
+    []
+  );
+  const lastWindowScrollYRef = React.useRef(0);
 
   type DashboardFilters = {
     selectedDAGRun: string;
@@ -173,30 +239,42 @@ function Dashboard(): React.ReactElement | null {
   };
 
   const selectedDAGName = selectedDAGRun !== 'all' ? selectedDAGRun : undefined;
+  const dashboardPageLimit = React.useMemo(
+    () => optionalPositiveInt(config.maxDashboardPageLimit),
+    [config.maxDashboardPageLimit]
+  );
   const dagRunsQuery = React.useMemo(
     () => ({
-      remoteNode: appBarContext.selectedRemoteNode || 'local',
+      remoteNode,
       fromDate: dateRange.startDate,
       toDate: dateRange.endDate,
       name: selectedDAGName,
+      ...(dashboardPageLimit !== undefined
+        ? { limit: dashboardPageLimit }
+        : {}),
     }),
     [
-      appBarContext.selectedRemoteNode,
+      dashboardPageLimit,
       dateRange.endDate,
       dateRange.startDate,
+      remoteNode,
       selectedDAGName,
     ]
   );
 
-  useLiveConnection();
   const {
-    data: dagRunsList,
+    dagRuns: dagRunsList,
     error,
-    isLoading,
+    isInitialLoading: isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
     refresh,
-  } = useExactDAGRuns({
+  } = usePaginatedDAGRuns({
     query: dagRunsQuery,
+    liveEnabled: true,
     fallbackIntervalMs: 5000,
+    resetOnSSEInvalidate: true,
   });
 
   const handleRefreshAll = async () => {
@@ -204,11 +282,19 @@ function Dashboard(): React.ReactElement | null {
   };
 
   const uniqueDAGRunNames = React.useMemo(() => {
-    const names = new Set(
-      dagRunsList.map((dagRun) => dagRun.name).filter(Boolean)
-    );
-    return Array.from(names).sort();
-  }, [dagRunsList]);
+    const names = new Set(availableDAGNames);
+
+    for (const dagRun of dagRunsList) {
+      if (dagRun.name) {
+        names.add(dagRun.name);
+      }
+    }
+    if (selectedDAGRun !== 'all') {
+      names.add(selectedDAGRun);
+    }
+
+    return Array.from(names).sort(compareDAGNames);
+  }, [availableDAGNames, dagRunsList, selectedDAGRun]);
 
   const handleDAGRunChange = (value: string) => {
     setSelectedDAGRun(value);
@@ -227,6 +313,84 @@ function Dashboard(): React.ReactElement | null {
       appBarContext.setTitle('Dashboard');
     }
   }, [appBarContext]);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setAvailableDAGNames([]);
+
+    void fetchAllDashboardDAGNames(client, remoteNode, controller.signal)
+      .then((names) => {
+        if (!controller.signal.aborted) {
+          setAvailableDAGNames(names);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setAvailableDAGNames([]);
+        }
+      });
+
+    return () => controller.abort();
+  }, [client, remoteNode]);
+
+  React.useEffect(() => {
+    lastWindowScrollYRef.current = window.scrollY;
+
+    const requestAutoLoad = () => {
+      const currentScrollY = window.scrollY;
+      const isScrollingDown = currentScrollY > lastWindowScrollYRef.current;
+      lastWindowScrollYRef.current = currentScrollY;
+
+      if (!isScrollingDown) {
+        return;
+      }
+
+      const documentHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      const viewportBottom = currentScrollY + window.innerHeight;
+      const distanceToBottom = documentHeight - viewportBottom;
+
+      if (distanceToBottom > 200) {
+        return;
+      }
+
+      setAutoLoadRequested(true);
+    };
+
+    window.addEventListener('scroll', requestAutoLoad, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', requestAutoLoad);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const el = autoLoadSentinelRef.current;
+    if (
+      !autoLoadRequested ||
+      !el ||
+      !hasMore ||
+      isLoadingMore ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setAutoLoadRequested(false);
+          void loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [autoLoadRequested, hasMore, isLoadingMore, loadMore]);
 
   if (error) {
     const errorMessage = error.message || 'Unknown error loading dashboard';
@@ -314,8 +478,9 @@ function Dashboard(): React.ReactElement | null {
           <div className="flex items-baseline gap-1">
             <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
               {totalDAGRuns}
+              {hasMore ? '+' : ''}
             </span>
-            <span className="text-xs">runs</span>
+            <span className="text-xs">recent runs</span>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
@@ -373,8 +538,23 @@ function Dashboard(): React.ReactElement | null {
 
         {/* Timeline Visualization - Hero */}
         <div className="flex-1 min-h-[250px] rounded-xl border border-border bg-surface overflow-hidden">
-          <DashboardTimeChart data={dagRunsList} selectedDate={selectedTimelineDate} />
+          <DashboardTimeChart
+            data={dagRunsList}
+            selectedDate={selectedTimelineDate}
+          />
         </div>
+        {hasMore && (
+          <div className="flex flex-col items-center justify-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => void loadMore()}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? 'Loading...' : 'Load older runs'}
+            </Button>
+            <div ref={autoLoadSentinelRef} className="h-1 w-full shrink-0" />
+          </div>
+        )}
       </div>
 
       {/* DAG Run Details Modal */}

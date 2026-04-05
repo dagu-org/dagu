@@ -38,6 +38,7 @@ type NotificationClass int
 
 const (
 	NotificationClassUnknown NotificationClass = iota
+	NotificationClassInformational
 	NotificationClassSuccessDigest
 	NotificationClassUrgent
 )
@@ -103,12 +104,23 @@ func NotificationClassForEvent(event NotificationEvent) (NotificationClass, bool
 		if dagRun == nil {
 			return NotificationClassUnknown, false
 		}
-		return NotificationClassForStatus(dagRun.Status)
+		switch event.Type {
+		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning:
+			return NotificationClassInformational, true
+		case eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected:
+			return NotificationClassUrgent, true
+		case eventstore.TypeDAGRunSucceeded:
+			return NotificationClassSuccessDigest, true
+		case eventstore.TypeLLMUsageRecorded:
+			return NotificationClassUnknown, false
+		default:
+			return NotificationClassForStatus(dagRun.Status)
+		}
 	case eventstore.KindAutomata:
 		switch event.Type {
 		case eventstore.TypeAutomataNeedsInput, eventstore.TypeAutomataError, eventstore.TypeAutomataFinished:
 			return NotificationClassUrgent, true
-		case eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
+		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return NotificationClassUnknown, false
 		default:
 			return NotificationClassUnknown, false
@@ -399,7 +411,7 @@ func notificationStatusLabel(event NotificationEvent) string {
 			return "error"
 		case eventstore.TypeAutomataFinished:
 			return "finished"
-		case eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
+		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return string(event.Type)
 		default:
 			return string(event.Type)
@@ -515,7 +527,7 @@ func notificationTextEmoji(event NotificationEvent) string {
 			return "\u23F3"
 		case eventstore.TypeAutomataError:
 			return "\u274C"
-		case eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
+		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return "\u2139\uFE0F"
 		default:
 			return "\u2139\uFE0F"

@@ -52,8 +52,23 @@ func newDAGRunMonitorWithWindows(
 	cfg := chatbridge.DefaultNotificationMonitorConfig()
 	cfg.UrgentWindow = urgentWindow
 	cfg.SuccessWindow = successWindow
+	cfg.InterestedEventTypes = telegramInterestedEventTypes(bot.cfg.InterestedEventTypes)
 	monitor.core = chatbridge.NewNotificationMonitor(eventService, stateFile, monitor, logger, cfg)
 	return monitor
+}
+
+func telegramInterestedEventTypes(values []string) []eventstore.EventType {
+	if values == nil {
+		return nil
+	}
+	result := make([]eventstore.EventType, 0, len(values))
+	for _, value := range values {
+		if value == "" {
+			continue
+		}
+		result = append(result, eventstore.EventType(value))
+	}
+	return result
 }
 
 // Run starts the monitor loop.

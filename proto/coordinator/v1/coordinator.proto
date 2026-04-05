@@ -102,6 +102,8 @@ message Task {
   int32 owner_coordinator_port = 23;
   // Durable token identifying the shared task claim.
   string claim_token = 24;
+  // Original DAG file path for provenance-aware reschedule-from-file behavior.
+  string source_file = 25;
 }
 
 enum Operation {

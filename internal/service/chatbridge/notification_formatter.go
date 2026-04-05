@@ -45,6 +45,13 @@ func FormatNotificationBatch(batch NotificationBatch) string {
 			fmt.Fprintf(&b, "Urgent updates (%d %s in last %s)\n", len(batch.Events), pluralize("event", len(batch.Events)), window)
 		}
 		writeNotificationGroups(&b, groups, true)
+	case NotificationClassInformational:
+		if allDAGRun {
+			fmt.Fprintf(&b, "DAG activity updates (%d %s in last %s)\n", len(batch.Events), pluralize("run", len(batch.Events)), window)
+		} else {
+			fmt.Fprintf(&b, "Activity updates (%d %s in last %s)\n", len(batch.Events), pluralize("event", len(batch.Events)), window)
+		}
+		writeNotificationGroups(&b, groups, false)
 	case NotificationClassSuccessDigest:
 		if allDAGRun {
 			fmt.Fprintf(&b, "DAG completion digest (%d %s in last %s)\n", len(batch.Events), pluralize("run", len(batch.Events)), window)

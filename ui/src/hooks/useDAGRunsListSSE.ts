@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components } from '../api/v1/schema';
 import { buildSSEEndpoint, SSEState, useSSE } from './useSSE';
 
@@ -8,7 +11,7 @@ interface DAGRunsListSSEResponse {
 }
 
 interface DAGRunsListParams {
-  status?: number;
+  status?: components['parameters']['StatusList'];
   fromDate?: number;
   toDate?: number;
   name?: string;
@@ -18,10 +21,11 @@ interface DAGRunsListParams {
 
 export function useDAGRunsListSSE(
   params: DAGRunsListParams = {},
-  enabled: boolean = true
+  enabled: boolean = true,
+  remoteNode?: string
 ): SSEState<DAGRunsListSSEResponse> {
   const endpoint = buildSSEEndpoint('/events/dag-runs', params);
-  return useSSE<DAGRunsListSSEResponse>(endpoint, enabled);
+  return useSSE<DAGRunsListSSEResponse>(endpoint, enabled, remoteNode);
 }
 
 export type { DAGRunsListParams, DAGRunsListSSEResponse };

@@ -79,6 +79,10 @@ function DAGRunActions({
   const [retryAsNew, setRetryAsNew] = React.useState(false);
   const [newRunId, setNewRunId] = React.useState('');
   const [dagNameOverride, setDagNameOverride] = React.useState('');
+  const [specFromFile, setSpecFromFile] = React.useState(false);
+  const [useCurrentDagFile, setUseCurrentDagFile] = React.useState(false);
+  const [rescheduleSourceLoading, setRescheduleSourceLoading] =
+    React.useState(false);
 
   const client = useClient();
 
@@ -90,6 +94,61 @@ function DAGRunActions({
       refresh();
     }
   };
+
+  React.useEffect(() => {
+    if (!isRetryModal || !dagRun?.dagRunId) {
+      return;
+    }
+
+    let cancelled = false;
+    setRescheduleSourceLoading(true);
+
+    void (async () => {
+      try {
+        const { data } = await client.GET('/dag-runs/{name}/{dagRunId}', {
+          params: {
+            path: {
+              name,
+              dagRunId: dagRun.dagRunId,
+            },
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+          },
+        });
+        if (cancelled) {
+          return;
+        }
+        const available = Boolean(data?.dagRunDetails?.specFromFile);
+        setSpecFromFile(available);
+        setUseCurrentDagFile(available);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        console.error(
+          'Failed to fetch DAG run details for reschedule source',
+          error
+        );
+        setSpecFromFile(false);
+        setUseCurrentDagFile(false);
+      } finally {
+        if (!cancelled) {
+          setRescheduleSourceLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    appBarContext.selectedRemoteNode,
+    client,
+    dagRun?.dagRunId,
+    isRetryModal,
+    name,
+  ]);
 
   const isWaiting = dagRun?.status === Status.Waiting;
   const hasNodes =
@@ -263,6 +322,8 @@ function DAGRunActions({
             setRetryAsNew(false);
             setNewRunId('');
             setDagNameOverride('');
+            setSpecFromFile(false);
+            setUseCurrentDagFile(false);
           }}
           onSubmit={async () => {
             setIsRetryModal(false);
@@ -284,6 +345,7 @@ function DAGRunActions({
                   body: {
                     dagRunId: newRunId || undefined, // Auto-generate if empty
                     ...(dagNameOverride ? { dagName: dagNameOverride } : {}), // Use original if empty
+                    useCurrentDagFile,
                   },
                 }
               );
@@ -296,6 +358,8 @@ function DAGRunActions({
                 setRetryAsNew(false);
                 setNewRunId('');
                 setDagNameOverride('');
+                setSpecFromFile(false);
+                setUseCurrentDagFile(false);
                 return;
               }
               // Show success message with new run ID
@@ -306,6 +370,8 @@ function DAGRunActions({
               setRetryAsNew(false);
               setNewRunId('');
               setDagNameOverride('');
+              setSpecFromFile(false);
+              setUseCurrentDagFile(false);
             } else {
               // Use retry endpoint for regular retry
               const { error } = await client.POST(
@@ -403,6 +469,53 @@ function DAGRunActions({
                     onChange={(e) => setDagNameOverride(e.target.value)}
                     className="h-8 text-sm"
                   />
+                </div>
+                <div
+                  role="button"
+                  tabIndex={rescheduleSourceLoading || !specFromFile ? -1 : 0}
+                  aria-disabled={rescheduleSourceLoading || !specFromFile}
+                  onClick={() => {
+                    if (rescheduleSourceLoading || !specFromFile) {
+                      return;
+                    }
+                    setUseCurrentDagFile((value) => !value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      rescheduleSourceLoading ||
+                      !specFromFile ||
+                      (event.key !== 'Enter' && event.key !== ' ')
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    setUseCurrentDagFile((value) => !value);
+                  }}
+                  className="flex w-full items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-70 aria-disabled:hover:bg-transparent"
+                >
+                  <Checkbox
+                    id="use-current-dag-file"
+                    aria-label="Use original DAG file"
+                    checked={useCurrentDagFile}
+                    disabled={rescheduleSourceLoading || !specFromFile}
+                    onCheckedChange={(checked) =>
+                      setUseCurrentDagFile(checked as boolean)
+                    }
+                    className="mt-0.5 h-5 w-5 border-border pointer-events-none"
+                  />
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="use-current-dag-file"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      Use original DAG file
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {specFromFile
+                        ? 'Use the current spec from the original DAG file instead of the stored YAML snapshot.'
+                        : 'Stored YAML snapshot will be used because the original DAG file is not available.'}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

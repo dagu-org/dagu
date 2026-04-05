@@ -256,3 +256,52 @@ func TestNotificationMonitor_ShutdownDrainFlushesPendingBatchWithoutLLM(t *testi
 	assert.Equal(t, call{destination: "dest-1", allowLLM: false}, calls[0])
 	assert.True(t, monitor.IsDelivered("dest-1", status))
 }
+
+func TestNotificationMonitor_PollSourceFiltersInterestedEventTypes(t *testing.T) {
+	t.Parallel()
+
+	store := &stubNotificationStore{}
+	service := eventstore.New(store)
+	transport := &fakeNotificationTransport{destinations: []string{"dest-1"}}
+
+	cfg := DefaultNotificationMonitorConfig()
+	cfg.UrgentWindow = 5 * time.Millisecond
+	cfg.SuccessWindow = 5 * time.Millisecond
+	cfg.InterestedEventTypes = []eventstore.EventType{eventstore.TypeDAGRunRunning}
+
+	monitor := NewNotificationMonitor(service, "", transport, slog.New(slog.NewTextHandler(io.Discard, nil)), cfg)
+	monitor.initializeSession(context.Background())
+
+	queued := &exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "attempt-1",
+		Status:    core.Queued,
+		QueuedAt:  time.Now().UTC().Format(time.RFC3339),
+	}
+	running := *queued
+	running.Status = core.Running
+	running.StartedAt = time.Now().UTC().Format(time.RFC3339)
+
+	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
+		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
+		eventstore.TypeDAGRunQueued,
+		queued,
+		nil,
+	)))
+	require.NoError(t, service.Emit(context.Background(), eventstore.NewDAGRunEvent(
+		eventstore.Source{Service: eventstore.SourceServiceServer, Instance: "test"},
+		eventstore.TypeDAGRunRunning,
+		&running,
+		nil,
+	)))
+
+	monitor.pollSource(context.Background())
+
+	ready := waitForReadyBatch(t, monitor.currentBatcher())
+	require.Len(t, ready.Batch.Events, 1)
+	assert.Equal(t, NotificationClassInformational, ready.Batch.Class)
+	assert.Equal(t, eventstore.TypeDAGRunRunning, ready.Batch.Events[0].Type)
+	require.NotNil(t, ready.Batch.Events[0].DAGRun)
+	assert.Equal(t, core.Running, ready.Batch.Events[0].DAGRun.Status)
+}

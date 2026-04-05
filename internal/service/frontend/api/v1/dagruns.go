@@ -482,6 +482,7 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 			Message:    err.Error(),
 		}
 	}
+	dag.SourceFile = ""
 
 	return dag, cleanup, nil
 }
@@ -541,6 +542,7 @@ func rebuildDAGRunSnapshotFromYAML(ctx context.Context, dag *core.DAG) (*core.DA
 	if err != nil {
 		return nil, err
 	}
+	fresh.SourceFile = dag.SourceFile
 
 	dag.Env = fresh.Env
 	dag.Params = fresh.Params
@@ -556,7 +558,7 @@ func rebuildDAGRunSnapshotFromYAML(ctx context.Context, dag *core.DAG) (*core.DA
 
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
 	opts := buildDAGRunListOptions(dagRunListFilterInput{
-		status:   request.Params.Status,
+		statuses: request.Params.Status,
 		fromDate: request.Params.FromDate,
 		toDate:   request.Params.ToDate,
 		name:     request.Params.Name,
@@ -596,7 +598,7 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 
 func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNameRequestObject) (api.ListDAGRunsByNameResponseObject, error) {
 	opts := buildDAGRunListOptions(dagRunListFilterInput{
-		status:    request.Params.Status,
+		statuses:  request.Params.Status,
 		fromDate:  request.Params.FromDate,
 		toDate:    request.Params.ToDate,
 		dagRunID:  request.Params.DagRunId,
@@ -635,7 +637,7 @@ type dagRunListOptions struct {
 }
 
 type dagRunListFilterInput struct {
-	status    *api.Status
+	statuses  *api.StatusList
 	fromDate  *int64
 	toDate    *int64
 	name      *string
@@ -655,10 +657,8 @@ func buildDAGRunListOptions(input dagRunListFilterInput) dagRunListOptions {
 	opts := dagRunListOptions{}
 	limit := defaultLimit
 
-	if input.status != nil {
-		opts.query = append(opts.query, exec.WithStatuses([]core.Status{
-			core.Status(*input.status),
-		}))
+	if statuses := toCoreStatuses(input.statuses); len(statuses) > 0 {
+		opts.query = append(opts.query, exec.WithStatuses(statuses))
 	}
 	if input.fromDate != nil {
 		opts.query = append(opts.query, exec.WithFrom(exec.NewUTC(time.Unix(*input.fromDate, 0))))
@@ -1536,19 +1536,32 @@ func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string
 		if err != nil {
 			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
 		}
+		if status == nil {
+			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		}
 		return api.GetDAGRunDetails200JSONResponse{
-			DagRunDetails: ToDAGRunDetails(*status),
+			DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *status),
 		}, nil
 	}
 
 	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+	}
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
 		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
 	return api.GetDAGRunDetails200JSONResponse{
-		DagRunDetails: ToDAGRunDetails(*dagStatus),
+		DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
 	}, nil
+}
+
+func (a *API) toDAGRunDetailsWithSpecSource(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) api.DAGRunDetails {
+	details := ToDAGRunDetails(status)
+	details.SpecFromFile = ptrOf(a.dagRunSpecFromFile(ctx, attempt))
+	return details
 }
 
 // GetDAGRunSpec returns the YAML spec used for a specific DAG-run.
@@ -1982,6 +1995,9 @@ func (a *API) retryDAGRun(ctx context.Context, dagName, dagRunID, retryDagRunID,
 			executor.WithPreviousStatus(prevStatus),
 			executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)),
 		}
+		if dag.SourceFile != "" {
+			opts = append(opts, executor.WithSourceFile(dag.SourceFile))
+		}
 		if stepName != "" {
 			opts = append(opts, executor.WithStep(stepName))
 		}
@@ -2300,6 +2316,9 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 		if body.DagRunId != nil {
 			opts.newDagRunID = *body.DagRunId
 		}
+		if body.UseCurrentDagFile != nil {
+			opts.useCurrentDAGFile = *body.UseCurrentDagFile
+		}
 	}
 
 	result, err := a.rescheduleDAGRun(ctx, request.Name, request.DagRunId, opts)
@@ -2314,8 +2333,9 @@ func (a *API) RescheduleDAGRun(ctx context.Context, request api.RescheduleDAGRun
 }
 
 type rescheduleDAGRunOptions struct {
-	nameOverride string
-	newDagRunID  string
+	nameOverride      string
+	newDagRunID       string
+	useCurrentDAGFile bool
 }
 
 type rescheduleDAGRunResult struct {
@@ -2324,6 +2344,14 @@ type rescheduleDAGRunResult struct {
 }
 
 func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, opts rescheduleDAGRunOptions) (rescheduleDAGRunResult, error) {
+	if !a.config.Queues.Enabled {
+		return rescheduleDAGRunResult{}, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "reschedule requires queues to be enabled",
+		}
+	}
+
 	attempt, sourceDagRunID, err := a.resolveAttemptForDAGRun(ctx, dagName, dagRunID)
 	if err != nil {
 		return rescheduleDAGRunResult{}, err
@@ -2344,8 +2372,9 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 	if dag == nil {
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to read DAG snapshot: DAG data is nil")
 	}
+	storedSourceFile := dag.SourceFile
 
-	dag, preservedParams, err := restoreDAGRunSnapshot(ctx, dag, status)
+	snapshotDAG, preservedSnapshotParams, err := restoreDAGRunSnapshot(ctx, dag, status)
 	if err != nil {
 		return rescheduleDAGRunResult{}, fmt.Errorf("failed to restore DAG snapshot: %w", err)
 	}
@@ -2359,7 +2388,10 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 				Message:    err.Error(),
 			}
 		}
-		dag.Name = nameOverride
+	}
+	currentFileParams := status.Params
+	if currentFileParams == "" {
+		currentFileParams = preservedSnapshotParams
 	}
 
 	newDagRunID := strings.TrimSpace(opts.newDagRunID)
@@ -2374,6 +2406,32 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		newDagRunID = id
 	}
 
+	var cleanup func()
+	cleanup = func() {}
+	defer func() {
+		cleanup()
+	}()
+
+	if opts.useCurrentDAGFile {
+		dag, err = a.loadCurrentRescheduleDAG(ctx, storedSourceFile, nameOverride)
+		if err != nil {
+			return rescheduleDAGRunResult{}, err
+		}
+	} else {
+		if len(snapshotDAG.YamlData) == 0 {
+			return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: DAG snapshot YAML is missing")
+		}
+		inlineName := snapshotDAG.Name
+		if nameOverride != "" {
+			inlineName = nameOverride
+		}
+		dag, cleanup, err = a.loadInlineDAG(ctx, string(snapshotDAG.YamlData), &inlineName, newDagRunID)
+		if err != nil {
+			return rescheduleDAGRunResult{}, fmt.Errorf("failed to prepare reschedule snapshot: %w", err)
+		}
+		dag.SourceFile = snapshotDAG.SourceFile
+	}
+
 	if err := a.ensureDAGRunIDUnique(ctx, dag, newDagRunID); err != nil {
 		return rescheduleDAGRunResult{}, err
 	}
@@ -2383,13 +2441,12 @@ func (a *API) rescheduleDAGRun(ctx context.Context, dagName, dagRunID string, op
 		slog.String("from-dag-run-id", sourceDagRunID),
 		tag.RunID(newDagRunID))
 
-	if err := a.startRescheduledDAGRunWithOptions(ctx, dag, startDAGRunOptions{
-		dagRunID:     newDagRunID,
-		nameOverride: nameOverride,
-		fromRunID:    sourceDagRunID,
-		target:       dagName,
-	}, preservedParams); err != nil {
-		return rescheduleDAGRunResult{}, fmt.Errorf("failed to start dag-run: %w", err)
+	paramsToUse := preservedSnapshotParams
+	if opts.useCurrentDAGFile {
+		paramsToUse = currentFileParams
+	}
+	if err := a.enqueueDAGRun(ctx, dag, paramsToUse, newDagRunID, "", core.TriggerTypeManual, ""); err != nil {
+		return rescheduleDAGRunResult{}, fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 
 	queued := false
@@ -2823,6 +2880,43 @@ func (a *API) GetDAGRunDetailsData(ctx context.Context, identifier string) (any,
 	return a.getDAGRunDetailsData(ctx, dagName, dagRunId)
 }
 
+// GetSubDAGRunDetailsData returns sub DAG run details for SSE.
+// Identifier format: "dagName/dagRunId/subDAGRunId"
+func (a *API) GetSubDAGRunDetailsData(ctx context.Context, identifier string) (any, error) {
+	parts := strings.SplitN(identifier, "/", 3)
+	if len(parts) != 3 {
+		return nil, fmt.Errorf(
+			"invalid identifier format: %s (expected 'dagName/dagRunId/subDAGRunId')",
+			identifier,
+		)
+	}
+
+	root := exec.NewDAGRunRef(parts[0], parts[1])
+	dagStatus, err := withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint:    "/dag-runs/{name}/{dagRunId}/sub/{subDAGRunId}",
+		dagName:     parts[0],
+		dagRunID:    parts[1],
+		subDAGRunID: parts[2],
+	}, func(readCtx context.Context) (*exec.DAGRunStatus, error) {
+		return a.dagRunMgr.FindSubDAGRunStatus(readCtx, root, parts[2])
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return nil, err
+		}
+		return nil, fmt.Errorf(
+			"sub dag-run ID %s not found for DAG %s: %w",
+			parts[2],
+			parts[0],
+			err,
+		)
+	}
+
+	return api.GetSubDAGRunDetails200JSONResponse{
+		DagRunDetails: ToDAGRunDetails(*dagStatus),
+	}, nil
+}
+
 // GetDAGRunLogsData returns DAG run logs for SSE.
 // Identifier format: "dagName/dagRunId" or "dagName/dagRunId?tail=N"
 func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, error) {
@@ -2985,22 +3079,29 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 	}
 
 	var (
-		statusValue *api.Status
-		fromDate    *int64
-		toDate      *int64
-		name        *string
-		dagRunID    *string
-		tags        *string
-		limit       *int
-		cursor      *string
+		statusValues *api.StatusList
+		fromDate     *int64
+		toDate       *int64
+		name         *string
+		dagRunID     *string
+		tags         *string
+		limit        *int
+		cursor       *string
 	)
 
-	if rawStatus := params.Get("status"); rawStatus != "" {
-		if statusInt, convErr := strconv.Atoi(rawStatus); convErr == nil {
-			statusValue = ptrOf(api.Status(statusInt))
-		} else {
-			logger.Warn(ctx, "Invalid status parameter", slog.String("status", rawStatus), tag.Error(convErr))
+	if rawStatuses, hasStatus := params["status"]; hasStatus {
+		parsed, parseErr := parseStatusListQueryValues(ctx, rawStatuses)
+		if parseErr != nil {
+			return dagRunListOptions{}, parseErr
 		}
+		if len(parsed) == 0 {
+			return dagRunListOptions{}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "status parameter must include at least one valid status value",
+			}
+		}
+		statusValues = &parsed
 	}
 	if rawFromDate := params.Get("fromDate"); rawFromDate != "" {
 		if ts, convErr := strconv.ParseInt(rawFromDate, 10, 64); convErr == nil {
@@ -3037,7 +3138,7 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 	}
 
 	return buildDAGRunListOptions(dagRunListFilterInput{
-		status:   statusValue,
+		statuses: statusValues,
 		fromDate: fromDate,
 		toDate:   toDate,
 		name:     name,
@@ -3048,8 +3149,116 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 	}), nil
 }
 
+func toCoreStatuses(statuses *api.StatusList) []core.Status {
+	if statuses == nil || len(*statuses) == 0 {
+		return nil
+	}
+
+	result := make([]core.Status, 0, len(*statuses))
+	for _, status := range *statuses {
+		result = append(result, core.Status(status))
+	}
+	return result
+}
+
+func parseStatusListQueryValues(ctx context.Context, rawValues []string) (api.StatusList, error) {
+	if len(rawValues) == 0 {
+		return nil, nil
+	}
+
+	result := make(api.StatusList, 0, len(rawValues))
+	for _, rawValue := range rawValues {
+		for part := range strings.SplitSeq(rawValue, ",") {
+			value := strings.TrimSpace(part)
+			if value == "" {
+				continue
+			}
+
+			statusInt, convErr := strconv.Atoi(value)
+			if convErr != nil {
+				logger.Warn(ctx, "Invalid status parameter", slog.String("status", value), tag.Error(convErr))
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    fmt.Sprintf("invalid status parameter: %s", value),
+				}
+			}
+
+			status := api.Status(statusInt)
+			if !isValidAPIStatus(status) {
+				logger.Warn(ctx, "Status parameter out of range", slog.String("status", value))
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    fmt.Sprintf("invalid status parameter: %s", value),
+				}
+			}
+			result = append(result, status)
+		}
+	}
+
+	return result, nil
+}
+
+func isValidAPIStatus(status api.Status) bool {
+	switch status {
+	case api.StatusNotStarted,
+		api.StatusRunning,
+		api.StatusFailed,
+		api.StatusAborted,
+		api.StatusSuccess,
+		api.StatusQueued,
+		api.StatusPartialSuccess,
+		api.StatusWaiting,
+		api.StatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
 func clampInt(value, minVal, maxVal int) int {
 	return max(minVal, min(value, maxVal))
+}
+
+func (a *API) loadCurrentRescheduleDAG(ctx context.Context, sourceFile, nameOverride string) (*core.DAG, error) {
+	if sourceFile == "" || !fileExists(sourceFile) {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "original DAG file is not available for this DAG run",
+		}
+	}
+
+	loadOpts := []spec.LoadOption{
+		spec.WithBaseConfig(a.config.Paths.BaseConfig),
+		spec.WithDAGsDir(a.config.Paths.DAGsDir),
+	}
+	if nameOverride != "" {
+		loadOpts = append(loadOpts, spec.WithName(nameOverride))
+	}
+
+	dag, err := spec.Load(ctx, sourceFile, loadOpts...)
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    err.Error(),
+		}
+	}
+
+	return dag, nil
+}
+
+func (a *API) dagRunSpecFromFile(ctx context.Context, attempt exec.DAGRunAttempt) bool {
+	if attempt == nil {
+		return false
+	}
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil || dag == nil {
+		return false
+	}
+	return dag.SourceFile != "" && fileExists(dag.SourceFile)
 }
 
 func fileExists(path string) bool {

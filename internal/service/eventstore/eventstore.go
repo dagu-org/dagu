@@ -36,6 +36,8 @@ const (
 type EventType string
 
 const (
+	TypeDAGRunQueued    EventType = "dag.run.queued"
+	TypeDAGRunRunning   EventType = "dag.run.running"
 	TypeDAGRunWaiting   EventType = "dag.run.waiting"
 	TypeDAGRunSucceeded EventType = "dag.run.succeeded"
 	TypeDAGRunFailed    EventType = "dag.run.failed"
@@ -237,11 +239,11 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 	}
 	source = normalizeSource(source)
 	data = cloneData(data)
-	if snapshot := newNotificationStatusSnapshot(status); snapshot != nil {
+	if snapshot := newDAGRunStatusSnapshot(status, dagRunFileNameFromData(data)); snapshot != nil {
 		if data == nil {
 			data = make(map[string]any, 1)
 		}
-		data[notificationStatusSnapshotDataKey] = snapshot
+		data[dagRunStatusSnapshotDataKey] = snapshot
 	}
 	event := &Event{
 		ID:             DAGRunEventID(eventType, status.Name, status.DAGRunID, status.AttemptID),
@@ -358,8 +360,12 @@ func NewLLMUsageEvent(
 
 func PersistedDAGRunEventTypeForStatus(status core.Status) (EventType, bool) {
 	switch status {
-	case core.NotStarted, core.Queued, core.Running:
+	case core.NotStarted:
 		return "", false
+	case core.Queued:
+		return TypeDAGRunQueued, true
+	case core.Running:
+		return TypeDAGRunRunning, true
 	case core.Waiting:
 		return TypeDAGRunWaiting, true
 	case core.Succeeded, core.PartiallySucceeded:
@@ -397,6 +403,17 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 		return time.Now().UTC()
 	}
 	switch eventType {
+	case TypeDAGRunQueued:
+		if t, err := stringutil.ParseTime(status.QueuedAt); err == nil && !t.IsZero() {
+			return t.UTC()
+		}
+	case TypeDAGRunRunning:
+		if t, err := stringutil.ParseTime(status.StartedAt); err == nil && !t.IsZero() {
+			return t.UTC()
+		}
+		if t, err := stringutil.ParseTime(status.QueuedAt); err == nil && !t.IsZero() {
+			return t.UTC()
+		}
 	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 		if t, err := stringutil.ParseTime(status.FinishedAt); err == nil && !t.IsZero() {
 			return t.UTC()

@@ -119,6 +119,7 @@ func buildExecDAG(ctx *Context, opts ExecOptions) (*core.DAG, string, error) {
 		dag.WorkerSelector = opts.WorkerLabels
 	}
 	dag.Location = ""
+	dag.SourceFile = ""
 
 	return dag, string(specYAML), nil
 }

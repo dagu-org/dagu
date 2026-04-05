@@ -14,6 +14,10 @@ type ActiveBatch = {
   snapshot: DAGRunSelectionItem[];
 };
 
+type BatchActionOptions = {
+  useCurrentDagFile?: boolean;
+};
+
 export type BatchActionResult = DAGRunSelectionItem & {
   ok: boolean;
   error?: string;
@@ -107,7 +111,8 @@ export function useDAGRunBatchSubmission({
   const submitBatchItem = React.useCallback(
     async (
       action: BatchActionType,
-      dagRun: DAGRunSelectionItem
+      dagRun: DAGRunSelectionItem,
+      options?: BatchActionOptions
     ): Promise<BatchActionResult> => {
       const fallback = `Failed to ${action} DAG run`;
 
@@ -159,6 +164,7 @@ export function useDAGRunBatchSubmission({
             },
             body: {
               dagRunId: undefined,
+              useCurrentDagFile: options?.useCurrentDagFile,
             },
           }
         );
@@ -196,94 +202,97 @@ export function useDAGRunBatchSubmission({
     [client, remoteNode]
   );
 
-  const submitBatchAction = React.useCallback(async () => {
-    if (!activeBatch) {
-      return;
-    }
-
-    const { action, snapshot } = activeBatch;
-    const results: BatchActionResult[] = [];
-    let successCount = 0;
-    let failureCount = 0;
-
-    setPhase('running');
-    setProgress({
-      currentItem: snapshot[0] ?? null,
-      failureCount: 0,
-      isRefreshing: false,
-      processedCount: 0,
-      refreshError: null,
-      results: [],
-      successCount: 0,
-    });
-
-    for (const [index, dagRun] of snapshot.entries()) {
-      setProgress({
-        currentItem: dagRun,
-        failureCount,
-        isRefreshing: false,
-        processedCount: index,
-        refreshError: null,
-        results: [...results],
-        successCount,
-      });
-
-      const result = await submitBatchItem(action, dagRun);
-      results.push(result);
-
-      if (result.ok) {
-        successCount++;
-      } else {
-        failureCount++;
+  const submitBatchAction = React.useCallback(
+    async (options?: BatchActionOptions) => {
+      if (!activeBatch) {
+        return;
       }
 
+      const { action, snapshot } = activeBatch;
+      const results: BatchActionResult[] = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      setPhase('running');
       setProgress({
-        currentItem: snapshot[index + 1] ?? null,
-        failureCount,
+        currentItem: snapshot[0] ?? null,
+        failureCount: 0,
         isRefreshing: false,
-        processedCount: index + 1,
+        processedCount: 0,
         refreshError: null,
-        results: [...results],
+        results: [],
+        successCount: 0,
+      });
+
+      for (const [index, dagRun] of snapshot.entries()) {
+        setProgress({
+          currentItem: dagRun,
+          failureCount,
+          isRefreshing: false,
+          processedCount: index,
+          refreshError: null,
+          results: [...results],
+          successCount,
+        });
+
+        const result = await submitBatchItem(action, dagRun, options);
+        results.push(result);
+
+        if (result.ok) {
+          successCount++;
+        } else {
+          failureCount++;
+        }
+
+        setProgress({
+          currentItem: snapshot[index + 1] ?? null,
+          failureCount,
+          isRefreshing: false,
+          processedCount: index + 1,
+          refreshError: null,
+          results: [...results],
+          successCount,
+        });
+      }
+
+      setPhase('complete');
+      setProgress({
+        currentItem: null,
+        failureCount,
+        isRefreshing: true,
+        processedCount: snapshot.length,
+        refreshError: null,
+        results,
         successCount,
       });
-    }
 
-    setPhase('complete');
-    setProgress({
-      currentItem: null,
-      failureCount,
-      isRefreshing: true,
-      processedCount: snapshot.length,
-      refreshError: null,
-      results,
-      successCount,
-    });
+      let refreshError: string | null = null;
+      try {
+        await onActionComplete?.();
+      } catch (error) {
+        refreshError = getErrorMessage(
+          error,
+          'Failed to refresh DAG runs after submitting the batch action.'
+        );
+      }
 
-    let refreshError: string | null = null;
-    try {
-      await onActionComplete?.();
-    } catch (error) {
-      refreshError = getErrorMessage(
-        error,
-        'Failed to refresh DAG runs after submitting the batch action.'
+      onReplaceSelection(
+        results
+          .filter((result) => !result.ok)
+          .map((result) => ({
+            name: result.name,
+            dagRunId: result.dagRunId,
+          }))
       );
-    }
 
-    onReplaceSelection(
-      results
-        .filter((result) => !result.ok)
-        .map((result) => ({
-          name: result.name,
-          dagRunId: result.dagRunId,
-        }))
-    );
-
-    setProgress((previous) => ({
-      ...previous,
-      isRefreshing: false,
-      refreshError,
-    }));
-  }, [activeBatch, onActionComplete, onReplaceSelection, submitBatchItem]);
+      setProgress((previous) => ({
+        ...previous,
+        isRefreshing: false,
+        refreshError,
+      }));
+    },
+    [activeBatch, onActionComplete, onReplaceSelection, submitBatchItem]
+  );
 
   return {
     activeBatch,

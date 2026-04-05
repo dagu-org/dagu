@@ -341,6 +341,7 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 		cleanupFunc()
 		return nil, nil, fmt.Errorf("failed to load DAG from %s: %w", tempFile, err)
 	}
+	dag.SourceFile = task.SourceFile
 
 	return dag, cleanupFunc, nil
 }

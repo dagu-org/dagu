@@ -1741,7 +1741,7 @@ paths:
       tags:
         - "dag-runs"
       parameters:
-        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/StatusList"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/DAGRunIdSearch"
@@ -1934,7 +1934,7 @@ paths:
       tags:
         - "dag-runs"
       parameters:
-        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/StatusList"
         - $ref: "#/components/parameters/DateTimeFrom"
         - $ref: "#/components/parameters/DateTimeTo"
         - $ref: "#/components/parameters/DAGRunName"
@@ -2060,6 +2060,9 @@ paths:
                 dagName:
                   type: string
                   description: "Optional DAG name override for the new run."
+                useCurrentDagFile:
+                  type: boolean
+                  description: "When true, reschedule from the current contents of the original DAG file instead of the stored historical YAML snapshot."
       responses:
         "200":
           description: "Successfully scheduled a new DAG-run"
@@ -7790,13 +7793,16 @@ components:
       schema:
         type: string
 
-    Status:
+    StatusList:
       name: status
       in: query
-      description: status of the DAG-run
+      description: status of the DAG-run. Repeat the parameter to match multiple statuses.
       required: false
+      explode: true
       schema:
-        $ref: "#/components/schemas/Status"
+        type: array
+        items:
+          $ref: "#/components/schemas/Status"
 
     DateTimeFrom:
       name: fromDate
@@ -9105,6 +9111,9 @@ components:
               description: "List of preconditions that must be met before the DAG-run can start"
               items:
                 $ref: "#/components/schemas/Condition"
+            specFromFile:
+              type: boolean
+              description: "Whether this DAG-run still has a usable source file on disk, so reschedule can load the current spec from that file instead of the stored historical YAML snapshot."
           required:
             - rootDAGRunName
             - rootDAGRunId

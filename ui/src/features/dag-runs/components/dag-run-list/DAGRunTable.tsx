@@ -281,7 +281,19 @@ function DAGRunTable({
             <div className="flex justify-between items-start gap-3 mb-2">
               <div className="flex items-start gap-2 min-w-0">
                 {onToggleBulkSelect && (
-                  <div onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-ring"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      onToggleBulkSelect({
+                        name: dagRun.name,
+                        dagRunId: dagRun.dagRunId,
+                      });
+                    }}
+                  >
                     <Checkbox
                       aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
                       checked={isBulkSelected(dagRun)}
@@ -291,6 +303,7 @@ function DAGRunTable({
                           dagRunId: dagRun.dagRunId,
                         })
                       }
+                      className="h-5 w-5 pointer-events-none"
                     />
                   </div>
                 )}
@@ -439,7 +452,19 @@ function DAGRunTable({
             >
               {onToggleBulkSelect && (
                 <TableCell className="py-1 px-2">
-                  <div onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-ring"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      onToggleBulkSelect({
+                        name: dagRun.name,
+                        dagRunId: dagRun.dagRunId,
+                      });
+                    }}
+                  >
                     <Checkbox
                       aria-label={`Select DAG run ${dagRun.name} ${dagRun.dagRunId}`}
                       checked={isBulkSelected(dagRun)}
@@ -449,6 +474,7 @@ function DAGRunTable({
                           dagRunId: dagRun.dagRunId,
                         })
                       }
+                      className="h-5 w-5 pointer-events-none"
                     />
                   </div>
                 </TableCell>

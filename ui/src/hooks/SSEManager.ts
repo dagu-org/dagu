@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { getAuthHeaders, getAuthToken } from '@/lib/authHeaders';
 
 const MAX_RETRY_DELAY_MS = 16000;
@@ -115,6 +118,16 @@ export function endpointToTopic(endpoint: string): string {
   }
   if (segments.length === 4 && segments[1] === 'dag-runs') {
     return buildTopic('dagrun', `${segments[2]}/${segments[3]}`);
+  }
+  if (
+    segments.length === 6 &&
+    segments[1] === 'dag-runs' &&
+    segments[4] === 'sub-dag-runs'
+  ) {
+    return buildTopic(
+      'subdagrun',
+      `${segments[2]}/${segments[3]}/${segments[5]}`
+    );
   }
   if (
     segments.length === 5 &&

@@ -6,27 +6,29 @@ const getMock = vi.fn();
 const client = {
   GET: getMock,
 };
+const { useDAGRunsListSSEMock } = vi.hoisted(() => ({
+  useDAGRunsListSSEMock: vi.fn(() => ({
+    data: null,
+    error: null,
+    isConnected: false,
+    isConnecting: false,
+    shouldUseFallback: true,
+  })),
+}));
 
 vi.mock('@/hooks/api', () => ({
   useClient: () => client,
   useQuery: vi.fn(),
 }));
 
-vi.mock('@/hooks/useAppLive', () => ({
-  liveFallbackOptions: vi.fn(),
-  useLiveConnection: vi.fn(() => ({
-    isConnected: false,
-    isConnecting: false,
-    shouldUseFallback: true,
-    error: null,
-  })),
-  useLiveDAGRuns: vi.fn(),
-  useLiveInvalidation: vi.fn(),
+vi.mock('@/hooks/useDAGRunsListSSE', () => ({
+  useDAGRunsListSSE: useDAGRunsListSSEMock,
 }));
 
-function createQuery(overrides: Partial<DAGRunListQuery> = {}): DAGRunListQuery {
+function createQuery(
+  overrides: Partial<DAGRunListQuery> = {}
+): DAGRunListQuery {
   return {
-    remoteNode: 'local',
     fromDate: 100,
     ...overrides,
   };
@@ -45,6 +47,7 @@ function createDeferred<T>() {
 describe('useExactDAGRuns', () => {
   beforeEach(() => {
     getMock.mockReset();
+    useDAGRunsListSSEMock.mockClear();
   });
 
   afterEach(() => {
@@ -136,8 +139,12 @@ describe('useExactDAGRuns', () => {
   });
 
   it('ignores stale responses after a query change and aborts the older request', async () => {
-    const firstRequest = createDeferred<{ data: { dagRuns: Array<{ name: string; dagRunId: string }> } }>();
-    const secondRequest = createDeferred<{ data: { dagRuns: Array<{ name: string; dagRunId: string }> } }>();
+    const firstRequest = createDeferred<{
+      data: { dagRuns: Array<{ name: string; dagRunId: string }> };
+    }>();
+    const secondRequest = createDeferred<{
+      data: { dagRuns: Array<{ name: string; dagRunId: string }> };
+    }>();
 
     getMock
       .mockImplementationOnce(
@@ -196,6 +203,87 @@ describe('useExactDAGRuns', () => {
     await waitFor(() => {
       expect(result.current.data).toEqual([{ name: 'fresh', dagRunId: 'new' }]);
     });
+  });
+
+  it('streams the first page before pagination completes and uses smaller page limits', async () => {
+    const firstPage = createDeferred<{
+      data: {
+        dagRuns: Array<{ name: string; dagRunId: string }>;
+        nextCursor: string;
+      };
+    }>();
+    const secondPage = createDeferred<{
+      data: { dagRuns: Array<{ name: string; dagRunId: string }> };
+    }>();
+
+    getMock
+      .mockImplementationOnce(() => firstPage.promise)
+      .mockImplementationOnce(() => secondPage.promise);
+
+    const { result } = renderHook(() =>
+      useExactDAGRuns({ query: createQuery() })
+    );
+
+    await waitFor(() => {
+      expect(getMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(getMock.mock.calls[0]?.[1]).toMatchObject({
+      params: {
+        query: expect.objectContaining({
+          remoteNode: 'local',
+          fromDate: 100,
+          limit: 100,
+        }),
+      },
+    });
+    expect(result.current.isLoading).toBe(true);
+
+    firstPage.resolve({
+      data: {
+        dagRuns: [{ name: 'first', dagRunId: 'run-1' }],
+        nextCursor: 'cursor-1',
+      },
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual([
+        { name: 'first', dagRunId: 'run-1' },
+      ]);
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isValidating).toBe(true);
+
+    await waitFor(() => {
+      expect(getMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(getMock.mock.calls[1]?.[1]).toMatchObject({
+      params: {
+        query: expect.objectContaining({
+          remoteNode: 'local',
+          fromDate: 100,
+          limit: 100,
+          cursor: 'cursor-1',
+        }),
+      },
+    });
+
+    secondPage.resolve({
+      data: {
+        dagRuns: [{ name: 'second', dagRunId: 'run-2' }],
+      },
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual([
+        { name: 'first', dagRunId: 'run-1' },
+        { name: 'second', dagRunId: 'run-2' },
+      ]);
+    });
+
+    expect(result.current.isValidating).toBe(false);
   });
 
   it('polls only on the configured fallback interval instead of every rerender', async () => {

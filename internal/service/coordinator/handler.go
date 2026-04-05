@@ -368,6 +368,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
+	dag.SourceFile = task.SourceFile
 
 	ref := exec.DAGRunRef{Name: dag.Name, ID: task.DagRunId}
 
@@ -482,6 +483,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
+	dag.SourceFile = task.SourceFile
 	attempt.SetDAG(dag)
 
 	task.AttemptId = attempt.ID()

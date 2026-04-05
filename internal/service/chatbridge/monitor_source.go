@@ -6,6 +6,7 @@ package chatbridge
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/service/eventstore"
 )
@@ -74,27 +75,37 @@ func (m *NotificationMonitor) pollSource(ctx context.Context) {
 	cursor := m.state.SourceCursor
 	m.stateMu.Unlock()
 
-	events, nextCursor, err := m.eventService.ReadNotificationEvents(ctx, cursor)
+	events, nextCursor, err := m.eventService.ReadDAGRunEvents(ctx, cursor)
 	if err != nil {
-		m.logger.Debug("Failed to read notification events", slog.String("error", err.Error()))
+		m.logger.Debug("Failed to read DAG-run events", slog.String("error", err.Error()))
 		return
 	}
 
 	destinations := m.transport.NotificationDestinations()
 	pending := make([]NotificationEvent, 0, len(events))
 	for _, event := range events {
-		if event == nil {
+		if event == nil || !m.isInterestedEventType(event.Type) {
 			continue
 		}
-		notification, err := NotificationEventFromStoredEvent(event)
+		status, err := eventstore.DAGRunStatusFromEvent(event)
 		if err != nil {
-			m.logger.Warn("Failed to decode notification event payload",
+			m.logger.Warn("Failed to decode DAG-run event payload",
 				slog.String("event_id", event.ID),
 				slog.String("error", err.Error()),
 			)
 			continue
 		}
-		pending = append(pending, notification)
+		observedAt := event.RecordedAt
+		if observedAt.IsZero() {
+			observedAt = time.Now().UTC()
+		}
+		pending = append(pending, NotificationEvent{
+			Key:        NotificationSeenKey(status),
+			Kind:       eventstore.KindDAGRun,
+			Type:       event.Type,
+			DAGRun:     status,
+			ObservedAt: observedAt.UTC(),
+		})
 	}
 
 	queued, committed := m.commitSourceProgress(ctx, destinations, nextCursor, pending)
@@ -201,7 +212,7 @@ func (m *NotificationMonitor) ensureBootstrapped(ctx context.Context) bool {
 		return true
 	}
 
-	cursor, err := m.eventService.NotificationHeadCursor(ctx)
+	cursor, err := m.eventService.DAGRunHeadCursor(ctx)
 	if err != nil {
 		m.recordBootstrapFailure("Failed to bootstrap notification cursor: " + err.Error())
 		return false
