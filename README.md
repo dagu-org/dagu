@@ -89,7 +89,7 @@ docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagucloud/dagu:lat
 **Kubernetes (Helm):**
 
 ```bash
-helm repo add dagu https://dagu-org.github.io/dagu
+helm repo add dagu https://dagucloud.github.io/dagu
 helm repo update
 helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-class>
 ```
