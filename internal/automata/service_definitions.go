@@ -50,6 +50,7 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	def.normalizeGoal()
 	def.Nickname = strings.TrimSpace(def.Nickname)
 	def.IconURL = strings.TrimSpace(def.IconURL)
+	def.StandingInstruction = strings.TrimSpace(def.StandingInstruction)
 	if err := validateAutomataKind(def.Kind); err != nil {
 		return err
 	}
@@ -294,6 +295,10 @@ func (s *Service) Duplicate(ctx context.Context, name string, req DuplicateReque
 	if err != nil {
 		return err
 	}
+	state, err := s.loadState(ctx, name)
+	if err != nil {
+		return err
+	}
 	if err := s.assertAutomataTargetAvailable(newName); err != nil {
 		return err
 	}
@@ -305,6 +310,19 @@ func (s *Service) Duplicate(ctx context.Context, name string, req DuplicateReque
 		_ = os.RemoveAll(filepath.Join(s.stateDir, newName))
 		_ = s.removeMemoryFile(ctx, newName)
 		return err
+	}
+	if state != nil {
+		if len(state.TaskTemplates) == 0 && len(state.Tasks) > 0 {
+			state.TaskTemplates = cloneTaskTemplatesFromTasks(state.Tasks)
+		}
+		newState := newInitialState()
+		newState.TaskTemplates = append([]TaskTemplate(nil), state.TaskTemplates...)
+		if err := s.saveState(ctx, newName, newState); err != nil {
+			_ = os.Remove(filepath.Clean(s.definitionPath(newName)))
+			_ = os.RemoveAll(filepath.Join(s.stateDir, newName))
+			_ = s.removeMemoryFile(ctx, newName)
+			return err
+		}
 	}
 	return nil
 }
@@ -369,12 +387,13 @@ func (s *Service) Detail(ctx context.Context, name string) (*Detail, error) {
 		}
 	}
 	return &Detail{
-		Definition:  def,
-		State:       state,
-		AllowedDAGs: allowed,
-		CurrentRun:  currentRun,
-		RecentRuns:  recentRuns,
-		Messages:    messages,
+		Definition:    def,
+		State:         state,
+		AllowedDAGs:   allowed,
+		TaskTemplates: append([]TaskTemplate(nil), state.TaskTemplates...),
+		CurrentRun:    currentRun,
+		RecentRuns:    recentRuns,
+		Messages:      messages,
 	}, nil
 }
 

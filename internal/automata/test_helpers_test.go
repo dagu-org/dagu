@@ -228,6 +228,7 @@ func serviceAutomataSpec(allowedDAG string) string {
 	return `kind: service
 description: Software development automata
 goal: Complete the assigned software work
+standing_instruction: Handle inbound work continuously.
 allowed_dags:
   names:
     - ` + allowedDAG + `
@@ -238,6 +239,7 @@ func serviceAutomataSpecWithSchedule(allowedDAG, schedule string) string {
 	return `kind: service
 description: Software development automata
 goal: Complete the assigned software work
+standing_instruction: Handle inbound work continuously.
 schedule: "` + schedule + `"
 allowed_dags:
   names:

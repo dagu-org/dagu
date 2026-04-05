@@ -9,6 +9,42 @@ import (
 	"time"
 )
 
+func normalizePersistedTaskTemplates(tasks *[]TaskTemplate) (bool, error) {
+	if tasks == nil {
+		return false, nil
+	}
+	if *tasks == nil {
+		*tasks = []TaskTemplate{}
+		return true, nil
+	}
+
+	changed := false
+	seen := make(map[string]struct{}, len(*tasks))
+	for i := range *tasks {
+		task := &(*tasks)[i]
+		task.Description = strings.TrimSpace(task.Description)
+		if task.Description == "" {
+			return false, fmt.Errorf("task template %d has an empty description", i+1)
+		}
+		if task.ID == "" {
+			return false, fmt.Errorf("task template %d is missing an id", i+1)
+		}
+		if _, ok := seen[task.ID]; ok {
+			return false, fmt.Errorf("duplicate task template id %q", task.ID)
+		}
+		seen[task.ID] = struct{}{}
+		if task.CreatedAt.IsZero() {
+			task.CreatedAt = task.UpdatedAt
+			changed = true
+		}
+		if task.UpdatedAt.IsZero() {
+			task.UpdatedAt = task.CreatedAt
+			changed = true
+		}
+	}
+	return changed, nil
+}
+
 func normalizePersistedTasks(tasks *[]Task) (bool, error) {
 	if tasks == nil {
 		return false, nil
@@ -46,6 +82,68 @@ func normalizePersistedTasks(tasks *[]Task) (bool, error) {
 		}
 	}
 	return changed, nil
+}
+
+func cloneTaskTemplatesFromTasks(tasks []Task) []TaskTemplate {
+	if len(tasks) == 0 {
+		return []TaskTemplate{}
+	}
+	out := make([]TaskTemplate, 0, len(tasks))
+	for _, task := range tasks {
+		out = append(out, TaskTemplate{
+			ID:          task.ID,
+			Description: task.Description,
+			CreatedAt:   firstNonZeroTime(task.CreatedAt, task.UpdatedAt),
+			CreatedBy:   task.CreatedBy,
+			UpdatedAt:   firstNonZeroTime(task.UpdatedAt, task.CreatedAt),
+			UpdatedBy:   task.UpdatedBy,
+		})
+	}
+	return out
+}
+
+func cloneTasksFromTemplates(tasks []TaskTemplate, now time.Time) []Task {
+	if len(tasks) == 0 {
+		return []Task{}
+	}
+	out := make([]Task, 0, len(tasks))
+	for _, task := range tasks {
+		out = append(out, Task{
+			ID:          task.ID,
+			Description: task.Description,
+			State:       TaskStateOpen,
+			CreatedAt:   now,
+			CreatedBy:   task.CreatedBy,
+			UpdatedAt:   now,
+			UpdatedBy:   task.UpdatedBy,
+		})
+	}
+	return out
+}
+
+func taskFromTemplate(task TaskTemplate) Task {
+	return Task{
+		ID:          task.ID,
+		Description: task.Description,
+		State:       TaskStateOpen,
+		CreatedAt:   task.CreatedAt,
+		CreatedBy:   task.CreatedBy,
+		UpdatedAt:   task.UpdatedAt,
+		UpdatedBy:   task.UpdatedBy,
+	}
+}
+
+func findTaskTemplateIndex(tasks []TaskTemplate, taskID string) int {
+	for i := range tasks {
+		if tasks[i].ID == taskID {
+			return i
+		}
+	}
+	return -1
+}
+
+func hasTaskTemplates(tasks []TaskTemplate) bool {
+	return len(tasks) > 0
 }
 
 func countTasksByState(tasks []Task, state TaskState) int {

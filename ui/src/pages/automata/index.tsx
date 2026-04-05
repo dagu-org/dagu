@@ -22,6 +22,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
 import { AutomataDetailSurface } from '@/features/automata/components/AutomataDetailSurface';
+import {
+  isValidAutomataIconUrl,
+  parseAutomataScheduleText,
+  validateAutomataScheduleExpressions,
+} from '@/features/automata/detail-utils';
 import { useAutomataDetailController } from '@/features/automata/hooks/useAutomataDetail';
 import { useClient, useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
@@ -271,12 +276,15 @@ function buildAutomataSpec(input: {
   iconUrl: string;
   description: string;
   goal: string;
+  standingInstruction: string;
+  schedule: string[];
   tags: string[];
   allowedDAGNames: string[];
 }): string {
   const nickname = input.nickname.trim();
   const iconUrl = input.iconUrl.trim();
   const description = input.description.trim();
+  const standingInstruction = input.standingInstruction.trim();
   const lines: string[] = [];
 
   if (input.kind !== DEFAULT_AUTOMATA_KIND) {
@@ -297,6 +305,19 @@ function buildAutomataSpec(input: {
 
   if (input.goal.trim()) {
     lines.push(`goal: ${quoteYAML(input.goal)}`);
+  }
+
+  if (input.kind === AutomataKind.service && standingInstruction) {
+    lines.push(`standing_instruction: ${quoteYAML(standingInstruction)}`);
+  }
+
+  if (input.kind === AutomataKind.service && input.schedule.length === 1) {
+    lines.push(`schedule: ${quoteYAML(input.schedule[0] || '')}`);
+  } else if (input.kind === AutomataKind.service && input.schedule.length > 1) {
+    lines.push('schedule:');
+    input.schedule.forEach((expression) => {
+      lines.push(`  - ${quoteYAML(expression)}`);
+    });
   }
 
   if (input.tags.length) {
@@ -323,10 +344,12 @@ function buildAutomataSpec(input: {
 }
 
 function validateAutomataCreateForm(input: {
+  kind: AutomataKindValue;
   name: string;
   nickname: string;
   iconUrl: string;
   goal: string;
+  schedule: string[];
   allowedDAGNames: string[];
 }): string | null {
   const name = input.name.trim();
@@ -350,26 +373,16 @@ function validateAutomataCreateForm(input: {
   if (iconUrl.length > MAX_AUTOMATA_ICON_URL_LENGTH) {
     return `Icon URL must be ${MAX_AUTOMATA_ICON_URL_LENGTH} characters or fewer.`;
   }
+  if (input.kind === AutomataKind.service) {
+    const scheduleError = validateAutomataScheduleExpressions(input.schedule);
+    if (scheduleError) {
+      return scheduleError;
+    }
+  }
   if (input.allowedDAGNames.length === 0) {
     return 'Select at least one allowed DAG.';
   }
   return null;
-}
-
-function isValidAutomataIconUrl(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return true;
-  }
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-    return true;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 function automataDisplayName(item: {
@@ -431,6 +444,9 @@ function AutomataPage(): React.ReactElement {
   const [createIconUrl, setCreateIconUrl] = React.useState('');
   const [createDescription, setCreateDescription] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
+  const [createStandingInstruction, setCreateStandingInstruction] =
+    React.useState('');
+  const [createSchedule, setCreateSchedule] = React.useState('');
   const [createTags, setCreateTags] = React.useState('');
   const [createAllowedDAGNames, setCreateAllowedDAGNames] = React.useState<
     string[]
@@ -479,6 +495,8 @@ function AutomataPage(): React.ReactElement {
     setCreateIconUrl('');
     setCreateDescription('');
     setCreateGoal('');
+    setCreateStandingInstruction('');
+    setCreateSchedule('');
     setCreateTags('');
     setCreateAllowedDAGNames([]);
     setCreateError('');
@@ -499,11 +517,14 @@ function AutomataPage(): React.ReactElement {
   };
 
   const onCreate = async () => {
+    const parsedSchedule = parseAutomataScheduleText(createSchedule);
     const validationError = validateAutomataCreateForm({
+      kind: createKind,
       name: createName,
       nickname: createNickname,
       iconUrl: createIconUrl,
       goal: createGoal,
+      schedule: parsedSchedule,
       allowedDAGNames: createAllowedDAGNames,
     });
     if (validationError) {
@@ -524,6 +545,8 @@ function AutomataPage(): React.ReactElement {
             iconUrl: createIconUrl,
             description: createDescription,
             goal: createGoal,
+            standingInstruction: createStandingInstruction,
+            schedule: parsedSchedule,
             kind: createKind,
             tags: parseTagInput(createTags),
             allowedDAGNames: createAllowedDAGNames,
@@ -798,6 +821,48 @@ function AutomataPage(): React.ReactElement {
                       instruction, task list, and runtime context.
                     </div>
                   </div>
+
+                  {createKind === AutomataKind.service ? (
+                    <>
+                      <div className="grid gap-2">
+                        <Label htmlFor="automata-standing-instruction">
+                          Standing Instruction (Optional)
+                        </Label>
+                        <Textarea
+                          id="automata-standing-instruction"
+                          value={createStandingInstruction}
+                          onChange={(e) =>
+                            setCreateStandingInstruction(e.target.value)
+                          }
+                          placeholder="Handle each service cycle and work through the task list."
+                          disabled={isCreating}
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Optional at creation time, but required before a
+                          service can activate or run on schedule.
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="automata-schedule">
+                          Schedule (Optional)
+                        </Label>
+                        <Textarea
+                          id="automata-schedule"
+                          value={createSchedule}
+                          onChange={(e) => setCreateSchedule(e.target.value)}
+                          placeholder={'0 * * * *\n30 9 * * 1-5'}
+                          disabled={isCreating}
+                          rows={3}
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Optional. Use one cron expression per line. Each due
+                          tick starts a fresh cycle by reopening the Config task
+                          template.
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
 
                   <div className="grid gap-2">
                     <Label htmlFor="automata-tags">Tags (Optional)</Label>

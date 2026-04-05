@@ -124,12 +124,25 @@ func (s *Service) ensureState(ctx context.Context, def *Definition) (*State, err
 	if err != nil {
 		return nil, err
 	}
+	templateChanged, err := normalizePersistedTaskTemplates(&state.TaskTemplates)
+	if err != nil {
+		return nil, err
+	}
+	changed = changed || templateChanged
 	if state.State == "" {
 		state.State = StateIdle
 		changed = true
 	}
+	if state.TaskTemplates == nil {
+		state.TaskTemplates = []TaskTemplate{}
+		changed = true
+	}
 	if state.Tasks == nil {
 		state.Tasks = []Task{}
+		changed = true
+	}
+	if len(state.TaskTemplates) == 0 && len(state.Tasks) > 0 {
+		state.TaskTemplates = cloneTaskTemplatesFromTasks(state.Tasks)
 		changed = true
 	}
 	if isService(def) {
@@ -239,6 +252,16 @@ func resetRuntimeState(state *State) {
 	if state == nil {
 		return
 	}
+	clearCurrentCycleState(state)
+	state.ActivatedAt = time.Time{}
+	state.ActivatedBy = ""
+	state.LastScheduleMinute = time.Time{}
+}
+
+func clearCurrentCycleState(state *State) {
+	if state == nil {
+		return
+	}
 	state.WaitingReason = WaitingReasonNone
 	state.PendingPrompt = nil
 	state.PendingResponse = nil
@@ -247,14 +270,12 @@ func resetRuntimeState(state *State) {
 	state.CurrentRunRef = nil
 	state.LastRunRef = nil
 	state.CurrentCycleID = ""
+	state.Tasks = []Task{}
 	state.StartRequestedAt = time.Time{}
 	state.PausedAt = time.Time{}
 	state.PausedBy = ""
 	state.PausedFromState = ""
-	state.ActivatedAt = time.Time{}
-	state.ActivatedBy = ""
 	state.FinishedAt = time.Time{}
-	state.LastScheduleMinute = time.Time{}
 	state.LastSummary = ""
 	state.LastError = ""
 }

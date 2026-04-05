@@ -581,7 +581,7 @@ func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 		Disabled:      ptrOf(item.Disabled),
 		DisplayStatus: ptrOf(api.AutomataDisplayStatus(item.DisplayStatus)),
 		DoneTaskCount: ptrOf(item.DoneTaskCount),
-		Goal:          item.Goal,
+		Goal:          ptrOf(item.Goal),
 		IconUrl:       ptrOf(item.IconURL),
 		Instruction:   ptrOf(item.Instruction),
 		Kind:          api.AutomataKind(item.Kind),
@@ -619,7 +619,8 @@ func toAPIAutomataMemory(item *automata.Memory) api.AutomataMemoryResponse {
 func toAPIAutomataDetail(item *automata.Detail) api.AutomataDetailResponse {
 	if item == nil {
 		return api.AutomataDetailResponse{
-			AllowedDags: []api.AutomataAllowedDAGInfo{},
+			AllowedDags:   []api.AutomataAllowedDAGInfo{},
+			TaskTemplates: &[]api.AutomataTaskTemplate{},
 		}
 	}
 	resp := api.AutomataDetailResponse{
@@ -628,6 +629,8 @@ func toAPIAutomataDetail(item *automata.Detail) api.AutomataDetailResponse {
 		Definition:  toAPIAutomataDefinition(item.Definition),
 		State:       toAPIAutomataState(item.Definition, item.State),
 	}
+	taskTemplates := toAPIAutomataTaskTemplates(item.TaskTemplates)
+	resp.TaskTemplates = &taskTemplates
 	if len(item.RecentRuns) > 0 {
 		runs := make([]api.AutomataRunSummary, 0, len(item.RecentRuns))
 		for _, run := range item.RecentRuns {
@@ -650,14 +653,15 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 		return api.AutomataDefinition{}
 	}
 	resp := api.AutomataDefinition{
-		Description: ptrOf(def.Description),
-		Disabled:    ptrOf(def.Disabled),
-		Goal:        def.Goal,
-		IconUrl:     ptrOf(def.IconURL),
-		Kind:        api.AutomataKind(def.Kind),
-		Name:        def.Name,
-		Nickname:    ptrOf(def.Nickname),
-		AllowedDAGs: toAPIAutomataAllowedDAGs(def.AllowedDAGs),
+		Description:         ptrOf(def.Description),
+		Disabled:            ptrOf(def.Disabled),
+		Goal:                ptrOf(def.Goal),
+		IconUrl:             ptrOf(def.IconURL),
+		Kind:                api.AutomataKind(def.Kind),
+		Name:                def.Name,
+		Nickname:            ptrOf(def.Nickname),
+		AllowedDAGs:         toAPIAutomataAllowedDAGs(def.AllowedDAGs),
+		StandingInstruction: ptrOf(def.StandingInstruction),
 		Tags: func() *[]string {
 			if len(def.Tags) == 0 {
 				return nil
@@ -665,6 +669,15 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 			tags := append([]string(nil), def.Tags...)
 			return &tags
 		}(),
+	}
+	if len(def.Schedule) > 0 {
+		schedule := make([]string, 0, len(def.Schedule))
+		for _, item := range def.Schedule {
+			if item.Expression != "" {
+				schedule = append(schedule, item.Expression)
+			}
+		}
+		resp.Schedule = &schedule
 	}
 	if agentConfig := toAPIAutomataAgentConfig(def.Agent); agentConfig != nil {
 		resp.Agent = agentConfig
@@ -851,6 +864,21 @@ func toAPIAutomataTasks(tasks []automata.Task) []api.AutomataTask {
 	for i := range tasks {
 		task := tasks[i]
 		resp = append(resp, toAPIAutomataTask(&task))
+	}
+	return resp
+}
+
+func toAPIAutomataTaskTemplates(tasks []automata.TaskTemplate) []api.AutomataTaskTemplate {
+	resp := make([]api.AutomataTaskTemplate, 0, len(tasks))
+	for _, task := range tasks {
+		resp = append(resp, api.AutomataTaskTemplate{
+			CreatedAt:   ptrOf(task.CreatedAt),
+			CreatedBy:   ptrOf(task.CreatedBy),
+			Description: task.Description,
+			Id:          task.ID,
+			UpdatedAt:   ptrOf(task.UpdatedAt),
+			UpdatedBy:   ptrOf(task.UpdatedBy),
+		})
 	}
 	return resp
 }

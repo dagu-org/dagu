@@ -112,18 +112,19 @@ func (s *ScheduleList) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type Definition struct {
-	Name        string       `json:"name"`
-	Kind        AutomataKind `json:"kind" yaml:"kind,omitempty"`
-	Nickname    string       `json:"nickname,omitempty" yaml:"nickname,omitempty"`
-	IconURL     string       `json:"iconUrl,omitempty" yaml:"icon_url,omitempty"`
-	Description string       `json:"description,omitempty" yaml:"description,omitempty"`
-	Purpose     string       `json:"purpose,omitempty" yaml:"purpose,omitempty"`
-	Goal        string       `json:"goal" yaml:"goal"`
-	Tags        []string     `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Schedule    ScheduleList `json:"schedule,omitempty" yaml:"schedule,omitempty"`
-	AllowedDAGs AllowedDAGs  `json:"allowedDAGs" yaml:"allowed_dags"`
-	Agent       AgentConfig  `json:"agent" yaml:"agent,omitempty"`
-	Disabled    bool         `json:"disabled,omitempty" yaml:"disabled,omitempty"`
+	Name                string       `json:"name"`
+	Kind                AutomataKind `json:"kind" yaml:"kind,omitempty"`
+	Nickname            string       `json:"nickname,omitempty" yaml:"nickname,omitempty"`
+	IconURL             string       `json:"iconUrl,omitempty" yaml:"icon_url,omitempty"`
+	Description         string       `json:"description,omitempty" yaml:"description,omitempty"`
+	Purpose             string       `json:"purpose,omitempty" yaml:"purpose,omitempty"`
+	Goal                string       `json:"goal" yaml:"goal"`
+	StandingInstruction string       `json:"standingInstruction,omitempty" yaml:"standing_instruction,omitempty"`
+	Tags                []string     `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Schedule            ScheduleList `json:"schedule,omitempty" yaml:"schedule,omitempty"`
+	AllowedDAGs         AllowedDAGs  `json:"allowedDAGs" yaml:"allowed_dags"`
+	Agent               AgentConfig  `json:"agent" yaml:"agent,omitempty"`
+	Disabled            bool         `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 }
 
 type Prompt struct {
@@ -168,6 +169,15 @@ type Task struct {
 	DoneBy      string    `json:"doneBy,omitempty"`
 }
 
+type TaskTemplate struct {
+	ID          string    `json:"id"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"createdAt"`
+	CreatedBy   string    `json:"createdBy,omitempty"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	UpdatedBy   string    `json:"updatedBy,omitempty"`
+}
+
 type State struct {
 	State                LifecycleState       `json:"state"`
 	Instruction          string               `json:"instruction,omitempty"`
@@ -175,6 +185,7 @@ type State struct {
 	InstructionUpdatedBy string               `json:"instructionUpdatedBy,omitempty"`
 	ActivatedAt          time.Time            `json:"activatedAt"`
 	ActivatedBy          string               `json:"activatedBy,omitempty"`
+	TaskTemplates        []TaskTemplate       `json:"taskTemplates,omitempty"`
 	Tasks                []Task               `json:"tasks,omitempty"`
 	SessionID            string               `json:"sessionId,omitempty"`
 	CurrentRunRef        *exec.DAGRunRef      `json:"currentRunRef,omitempty"`
@@ -236,12 +247,13 @@ type Summary struct {
 }
 
 type Detail struct {
-	Definition  *Definition      `json:"definition"`
-	State       *State           `json:"state"`
-	AllowedDAGs []AllowedDAGInfo `json:"allowedDags"`
-	CurrentRun  *RunSummary      `json:"currentRun,omitempty"`
-	RecentRuns  []RunSummary     `json:"recentRuns,omitempty"`
-	Messages    []agent.Message  `json:"messages,omitempty"`
+	Definition    *Definition      `json:"definition"`
+	State         *State           `json:"state"`
+	AllowedDAGs   []AllowedDAGInfo `json:"allowedDags"`
+	TaskTemplates []TaskTemplate   `json:"taskTemplates,omitempty"`
+	CurrentRun    *RunSummary      `json:"currentRun,omitempty"`
+	RecentRuns    []RunSummary     `json:"recentRuns,omitempty"`
+	Messages      []agent.Message  `json:"messages,omitempty"`
 }
 
 type Memory struct {
@@ -295,6 +307,7 @@ func newInitialState() *State {
 	now := time.Now()
 	return &State{
 		State:         StateIdle,
+		TaskTemplates: []TaskTemplate{},
 		Tasks:         []Task{},
 		LastUpdatedAt: now,
 	}
@@ -306,19 +319,21 @@ func nextCycleID() string {
 
 func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	type rawDefinition struct {
-		Kind             AutomataKind `yaml:"kind,omitempty"`
-		Nickname         string       `yaml:"nickname,omitempty"`
-		IconURL          string       `yaml:"iconUrl,omitempty"`
-		IconURLSnake     string       `yaml:"icon_url,omitempty"`
-		Description      string       `yaml:"description,omitempty"`
-		Purpose          string       `yaml:"purpose"`
-		Goal             string       `yaml:"goal"`
-		Tags             []string     `yaml:"tags"`
-		Schedule         ScheduleList `yaml:"schedule,omitempty"`
-		AllowedDAGs      AllowedDAGs  `yaml:"allowedDAGs"`
-		AllowedDAGsSnake AllowedDAGs  `yaml:"allowed_dags"`
-		Agent            AgentConfig  `yaml:"agent,omitempty"`
-		Disabled         bool         `yaml:"disabled,omitempty"`
+		Kind                     AutomataKind `yaml:"kind,omitempty"`
+		Nickname                 string       `yaml:"nickname,omitempty"`
+		IconURL                  string       `yaml:"iconUrl,omitempty"`
+		IconURLSnake             string       `yaml:"icon_url,omitempty"`
+		Description              string       `yaml:"description,omitempty"`
+		Purpose                  string       `yaml:"purpose"`
+		Goal                     string       `yaml:"goal"`
+		StandingInstruction      string       `yaml:"standingInstruction,omitempty"`
+		StandingInstructionSnake string       `yaml:"standing_instruction,omitempty"`
+		Tags                     []string     `yaml:"tags"`
+		Schedule                 ScheduleList `yaml:"schedule,omitempty"`
+		AllowedDAGs              AllowedDAGs  `yaml:"allowedDAGs"`
+		AllowedDAGsSnake         AllowedDAGs  `yaml:"allowed_dags"`
+		Agent                    AgentConfig  `yaml:"agent,omitempty"`
+		Disabled                 bool         `yaml:"disabled,omitempty"`
 	}
 
 	var raw rawDefinition
@@ -335,6 +350,10 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	d.Kind = normalizeAutomataKind(raw.Kind)
 	d.Purpose = strings.TrimSpace(raw.Purpose)
 	d.Goal = strings.TrimSpace(raw.Goal)
+	d.StandingInstruction = strings.TrimSpace(raw.StandingInstructionSnake)
+	if d.StandingInstruction == "" {
+		d.StandingInstruction = strings.TrimSpace(raw.StandingInstruction)
+	}
 	d.Tags = append([]string(nil), raw.Tags...)
 	d.normalizeGoal()
 	d.Schedule = raw.Schedule

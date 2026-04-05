@@ -6255,7 +6255,7 @@ paths:
   /automata/{name}/tasks:
     post:
       summary: "Create automata task"
-      description: "Creates a new checklist task for an Automata."
+      description: "Creates a new persistent task template for an Automata."
       operationId: "createAutomataTask"
       tags:
         - "automata"
@@ -6302,7 +6302,7 @@ paths:
   /automata/{name}/tasks/reorder:
     post:
       summary: "Reorder automata tasks"
-      description: "Reorders the checklist tasks for an Automata."
+      description: "Reorders the persistent task templates for an Automata."
       operationId: "reorderAutomataTasks"
       tags:
         - "automata"
@@ -6345,7 +6345,7 @@ paths:
   /automata/{name}/tasks/{taskId}:
     patch:
       summary: "Update automata task"
-      description: "Updates a checklist task for an Automata."
+      description: "Updates an Automata task template description and, when requested, the current cycle task state."
       operationId: "updateAutomataTask"
       tags:
         - "automata"
@@ -6395,7 +6395,7 @@ paths:
                 $ref: "#/components/schemas/Error"
     delete:
       summary: "Delete automata task"
-      description: "Deletes a checklist task from an Automata."
+      description: "Deletes a persistent task template from an Automata."
       operationId: "deleteAutomataTask"
       tags:
         - "automata"
@@ -11891,7 +11891,7 @@ components:
 
     AutomataTask:
       type: object
-      description: "Runtime checklist task for an Automata"
+      description: "Runtime current-cycle task for an Automata"
       required:
         - id
         - description
@@ -11919,6 +11919,28 @@ components:
         doneBy:
           type: string
 
+    AutomataTaskTemplate:
+      type: object
+      description: "Persistent task template for an Automata"
+      required:
+        - id
+        - description
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+
     AutomataAgentConfig:
       type: object
       description: "Agent runtime configuration for an Automata definition"
@@ -11939,7 +11961,6 @@ components:
       description: "Automata definition"
       required:
         - name
-        - goal
         - kind
       properties:
         name:
@@ -11954,6 +11975,12 @@ components:
           type: string
         goal:
           type: string
+        standingInstruction:
+          type: string
+        schedule:
+          type: array
+          items:
+            type: string
         tags:
           type: array
           items:
@@ -12158,7 +12185,6 @@ components:
       description: "Summary row for an Automata"
       required:
         - name
-        - goal
         - kind
         - state
       properties:
@@ -12231,6 +12257,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AutomataAllowedDAGInfo"
+        taskTemplates:
+          type: array
+          items:
+            $ref: "#/components/schemas/AutomataTaskTemplate"
         currentRun:
           $ref: "#/components/schemas/AutomataRunSummary"
         recentRuns:

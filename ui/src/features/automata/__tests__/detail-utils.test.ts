@@ -4,7 +4,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { AgentMessageType } from '@/api/v1/schema';
-import { buildAutomataThread } from '@/features/automata/detail-utils';
+import {
+  buildAutomataThread,
+  formatAutomataScheduleText,
+  parseAutomataScheduleText,
+  validateAutomataScheduleExpressions,
+} from '@/features/automata/detail-utils';
 
 describe('buildAutomataThread', () => {
   it('merges queued and persisted messages in chronological order', () => {
@@ -73,5 +78,20 @@ describe('buildAutomataThread', () => {
     );
 
     expect(thread.map((item) => item.id)).toEqual(['m-1', 'm-2']);
+  });
+});
+
+describe('automata schedule helpers', () => {
+  it('normalizes newline-separated schedules', () => {
+    const parsed = parseAutomataScheduleText('\n0 * * * *\n  \n30 9 * * 1-5\n');
+    expect(parsed).toEqual(['0 * * * *', '30 9 * * 1-5']);
+    expect(formatAutomataScheduleText(parsed)).toBe('0 * * * *\n30 9 * * 1-5');
+  });
+
+  it('validates cron expressions', () => {
+    expect(validateAutomataScheduleExpressions(['0 * * * *'])).toBeNull();
+    expect(validateAutomataScheduleExpressions(['not-a-cron'])).toContain(
+      'Invalid cron schedule'
+    );
   });
 });

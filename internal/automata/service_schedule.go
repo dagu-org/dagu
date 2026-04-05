@@ -34,13 +34,7 @@ func (s *Service) handleScheduledServiceTick(ctx context.Context, def *Definitio
 	if err != nil {
 		return err
 	}
-	if !isServiceActivated(state) || state.State == StatePaused {
-		return nil
-	}
-	if strings.TrimSpace(state.Instruction) == "" || !hasOpenTask(state.Tasks) {
-		return nil
-	}
-	if state.PendingPrompt != nil || state.CurrentRunRef != nil || len(state.PendingTurnMessages) > 0 {
+	if state.State == StatePaused {
 		return nil
 	}
 	if !state.LastScheduleMinute.IsZero() && state.LastScheduleMinute.Equal(tickTime) {
@@ -49,16 +43,42 @@ func (s *Service) handleScheduledServiceTick(ctx context.Context, def *Definitio
 	if !scheduleListDueAt(def.Schedule, tickTime) {
 		return nil
 	}
+	state.LastScheduleMinute = tickTime
+	if strings.TrimSpace(def.StandingInstruction) == "" {
+		return s.recordScheduleConfigError(ctx, def, state, tickTime, "service automata schedule requires a standing instruction")
+	}
+	if !hasTaskTemplates(state.TaskTemplates) {
+		return s.recordScheduleConfigError(ctx, def, state, tickTime, "service automata schedule requires at least one task template")
+	}
+	if state.PendingPrompt != nil || state.CurrentRunRef != nil || len(state.PendingTurnMessages) > 0 {
+		return s.saveState(ctx, def.Name, state)
+	}
 	activity := s.inspectSessionActivity(ctx, def.Name, state)
 	if activity.Working || activity.HasPendingPrompt || activity.HasQueuedInput {
-		return nil
+		return s.saveState(ctx, def.Name, state)
 	}
-
+	if err := s.startServiceCycle(ctx, def, state, strings.TrimSpace(def.StandingInstruction), "schedule"); err != nil {
+		return err
+	}
 	queueTurnMessage(state, "scheduled_tick", s.buildScheduledTickMessage(def, state, tickTime), s.clock())
-	state.State = StateRunning
-	state.WaitingReason = WaitingReasonNone
 	state.LastScheduleMinute = tickTime
 	return s.saveState(ctx, def.Name, state)
+}
+
+func (s *Service) recordScheduleConfigError(ctx context.Context, def *Definition, state *State, tickTime time.Time, message string) error {
+	if state == nil {
+		return nil
+	}
+	prevError := state.LastError
+	state.LastError = message
+	state.LastScheduleMinute = tickTime
+	if err := s.saveState(ctx, def.Name, state); err != nil {
+		return err
+	}
+	if prevError != message {
+		s.eventEmitter().error(ctx, def, state, "schedule_config_invalid", tickTime)
+	}
+	return nil
 }
 
 func scheduleListDueAt(items ScheduleList, tickTime time.Time) bool {

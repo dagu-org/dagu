@@ -5,15 +5,23 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { updateAutomataMetadataInSpec } from '../spec';
 
+const baseMetadata = {
+  description: '',
+  iconUrl: '',
+  goal: '',
+  model: '',
+  standingInstruction: '',
+  schedule: [] as string[],
+};
+
 describe('updateAutomataMetadataInSpec', () => {
   it('adds description when missing', () => {
     const next = updateAutomataMetadataInSpec(
       'goal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
       {
+        ...baseMetadata,
         description: 'Handles delivery work',
-        iconUrl: '',
         goal: 'Ship it',
-        model: '',
       }
     );
 
@@ -28,10 +36,9 @@ describe('updateAutomataMetadataInSpec', () => {
     const next = updateAutomataMetadataInSpec(
       'description: "Automata workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
       {
+        ...baseMetadata,
         description: 'Handles delivery work',
-        iconUrl: '',
         goal: 'Ship it',
-        model: '',
       }
     );
 
@@ -45,10 +52,9 @@ describe('updateAutomataMetadataInSpec', () => {
     const next = updateAutomataMetadataInSpec(
       'description: "Automata workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
       {
+        ...baseMetadata,
         description: '   ',
-        iconUrl: '',
         goal: 'Ship it',
-        model: '',
       }
     );
 
@@ -75,10 +81,11 @@ describe('updateAutomataMetadataInSpec', () => {
         '',
       ].join('\n'),
       {
+        ...baseMetadata,
         description: 'Handles delivery work',
         iconUrl: 'https://cdn.example.com/icon.png',
         goal: 'Ship it',
-        model: '',
+        schedule: ['* * * * *'],
       }
     );
 
@@ -98,10 +105,10 @@ describe('updateAutomataMetadataInSpec', () => {
     const next = updateAutomataMetadataInSpec(
       'description: "Automata workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
       {
+        ...baseMetadata,
         description: 'Automata workflow',
         iconUrl: ' ',
         goal: 'Ship it',
-        model: '',
       }
     );
 
@@ -116,10 +123,10 @@ describe('updateAutomataMetadataInSpec', () => {
     const next = updateAutomataMetadataInSpec(
       'description: "Automata workflow"\nicon_url: "https://cdn.example.com/old.png"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
       {
+        ...baseMetadata,
         description: 'Handles delivery work',
         iconUrl: 'https://cdn.example.com/new.png',
         goal: 'Handle triage and delivery',
-        model: '',
       }
     );
 
@@ -135,10 +142,9 @@ describe('updateAutomataMetadataInSpec', () => {
     const next = updateAutomataMetadataInSpec(
       'description: "Automata workflow"\ngoal: "Ship it"\nallowed_dags:\n  names:\n    - "build"\n',
       {
+        ...baseMetadata,
         description: 'Automata workflow',
-        iconUrl: '',
         goal: '   ',
-        model: '',
       }
     );
 
@@ -162,8 +168,7 @@ describe('updateAutomataMetadataInSpec', () => {
         '',
       ].join('\n'),
       {
-        description: '',
-        iconUrl: '',
+        ...baseMetadata,
         goal: 'Ship it',
         model: 'claude-sonnet-4-6',
       }
@@ -192,8 +197,7 @@ describe('updateAutomataMetadataInSpec', () => {
         '',
       ].join('\n'),
       {
-        description: '',
-        iconUrl: '',
+        ...baseMetadata,
         goal: 'Ship it',
         model: ' ',
       }
@@ -206,5 +210,85 @@ describe('updateAutomataMetadataInSpec', () => {
       },
     });
     expect((parse(next) as { agent?: { model?: string } }).agent?.model).toBeUndefined();
+  });
+
+  it('sets standing instruction for services', () => {
+    const next = updateAutomataMetadataInSpec(
+      'kind: "service"\nallowed_dags:\n  names:\n    - "build"\n',
+      {
+        ...baseMetadata,
+        standingInstruction:
+          'Handle each scheduled cycle and work through the task list.',
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      kind: 'service',
+      standing_instruction:
+        'Handle each scheduled cycle and work through the task list.',
+      allowed_dags: { names: ['build'] },
+    });
+  });
+
+  it('removes standing instruction when blank', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'kind: "service"',
+        'standing_instruction: "Handle each scheduled cycle."',
+        'allowed_dags:',
+        '  names:',
+        '    - "build"',
+        '',
+      ].join('\n'),
+      {
+        ...baseMetadata,
+        standingInstruction: '   ',
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      kind: 'service',
+      allowed_dags: { names: ['build'] },
+    });
+    expect(parse(next)).not.toHaveProperty('standing_instruction');
+  });
+
+  it('writes multi-line schedule expressions', () => {
+    const next = updateAutomataMetadataInSpec(
+      'kind: "service"\nallowed_dags:\n  names:\n    - "build"\n',
+      {
+        ...baseMetadata,
+        schedule: ['0 * * * *', '30 9 * * 1-5'],
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      kind: 'service',
+      schedule: ['0 * * * *', '30 9 * * 1-5'],
+    });
+  });
+
+  it('removes schedule when blank', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'kind: "service"',
+        'schedule:',
+        '  - "0 * * * *"',
+        '  - "30 9 * * 1-5"',
+        'allowed_dags:',
+        '  names:',
+        '    - "build"',
+        '',
+      ].join('\n'),
+      {
+        ...baseMetadata,
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      kind: 'service',
+      allowed_dags: { names: ['build'] },
+    });
+    expect(parse(next)).not.toHaveProperty('schedule');
   });
 });

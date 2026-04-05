@@ -2473,7 +2473,7 @@ export interface paths {
         put?: never;
         /**
          * Create automata task
-         * @description Creates a new checklist task for an Automata.
+         * @description Creates a new persistent task template for an Automata.
          */
         post: operations["createAutomataTask"];
         delete?: never;
@@ -2493,7 +2493,7 @@ export interface paths {
         put?: never;
         /**
          * Reorder automata tasks
-         * @description Reorders the checklist tasks for an Automata.
+         * @description Reorders the persistent task templates for an Automata.
          */
         post: operations["reorderAutomataTasks"];
         delete?: never;
@@ -2514,14 +2514,14 @@ export interface paths {
         post?: never;
         /**
          * Delete automata task
-         * @description Deletes a checklist task from an Automata.
+         * @description Deletes a persistent task template from an Automata.
          */
         delete: operations["deleteAutomataTask"];
         options?: never;
         head?: never;
         /**
          * Update automata task
-         * @description Updates a checklist task for an Automata.
+         * @description Updates an Automata task template description and, when requested, the current cycle task state.
          */
         patch: operations["updateAutomataTask"];
         trace?: never;
@@ -4991,7 +4991,7 @@ export interface components {
          * @enum {string}
          */
         AutomataTaskState: AutomataTaskState;
-        /** @description Runtime checklist task for an Automata */
+        /** @description Runtime current-cycle task for an Automata */
         AutomataTask: {
             id: string;
             description: string;
@@ -5005,6 +5005,17 @@ export interface components {
             /** Format: date-time */
             doneAt?: string;
             doneBy?: string;
+        };
+        /** @description Persistent task template for an Automata */
+        AutomataTaskTemplate: {
+            id: string;
+            description: string;
+            /** Format: date-time */
+            createdAt?: string;
+            createdBy?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            updatedBy?: string;
         };
         /** @description Agent runtime configuration for an Automata definition */
         AutomataAgentConfig: {
@@ -5020,7 +5031,9 @@ export interface components {
             nickname?: string;
             iconUrl?: string;
             description?: string;
-            goal: string;
+            goal?: string;
+            standingInstruction?: string;
+            schedule?: string[];
             tags?: string[];
             allowedDAGs?: components["schemas"]["AutomataAllowedDAGs"];
             agent?: components["schemas"]["AutomataAgentConfig"];
@@ -5120,7 +5133,7 @@ export interface components {
             nickname?: string;
             iconUrl?: string;
             description?: string;
-            goal: string;
+            goal?: string;
             tags?: string[];
             instruction?: string;
             state: components["schemas"]["AutomataLifecycleState"];
@@ -5145,6 +5158,7 @@ export interface components {
             definition: components["schemas"]["AutomataDefinition"];
             state: components["schemas"]["AutomataState"];
             allowedDags: components["schemas"]["AutomataAllowedDAGInfo"][];
+            taskTemplates?: components["schemas"]["AutomataTaskTemplate"][];
             currentRun?: components["schemas"]["AutomataRunSummary"];
             recentRuns?: components["schemas"]["AutomataRunSummary"][];
             messages?: components["schemas"]["AgentMessage"][];

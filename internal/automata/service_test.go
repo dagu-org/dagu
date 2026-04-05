@@ -362,13 +362,10 @@ func TestServiceTaskCRUDAndReorder(t *testing.T) {
 
 	updated, err := svc.UpdateTask(ctx, "software_dev", first.ID, UpdateTaskRequest{
 		Description: new("Investigate and reproduce the failing test"),
-		Done:        new(true),
 		RequestedBy: "tester",
 	})
 	require.NoError(t, err)
-	require.Equal(t, TaskStateDone, updated.State)
-	require.Equal(t, "tester", updated.DoneBy)
-	require.Equal(t, fixedTime, updated.DoneAt)
+	require.Equal(t, TaskStateOpen, updated.State)
 	require.Equal(t, fixedTime, updated.UpdatedAt)
 
 	require.NoError(t, svc.ReorderTasks(ctx, "software_dev", ReorderTasksRequest{
@@ -379,10 +376,10 @@ func TestServiceTaskCRUDAndReorder(t *testing.T) {
 
 	detail, err := svc.Detail(ctx, "software_dev")
 	require.NoError(t, err)
-	require.Len(t, detail.State.Tasks, 1)
-	require.Equal(t, first.ID, detail.State.Tasks[0].ID)
-	require.Equal(t, "Investigate and reproduce the failing test", detail.State.Tasks[0].Description)
-	require.Equal(t, TaskStateDone, detail.State.Tasks[0].State)
+	require.Empty(t, detail.State.Tasks)
+	require.Len(t, detail.TaskTemplates, 1)
+	require.Equal(t, first.ID, detail.TaskTemplates[0].ID)
+	require.Equal(t, "Investigate and reproduce the failing test", detail.TaskTemplates[0].Description)
 }
 
 func TestServiceTaskOperationsValidateInput(t *testing.T) {
@@ -419,7 +416,7 @@ func TestServiceRequestStartRequiresInstructionAndOpenTask(t *testing.T) {
 		RequestedBy: "tester",
 		Instruction: "Handle the current assigned task.",
 	})
-	require.ErrorContains(t, err, "at least one open task is required")
+	require.ErrorContains(t, err, "at least one task template is required")
 
 	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 
@@ -461,14 +458,27 @@ func TestServiceRequestStartRejectsWhenAllTasksDone(t *testing.T) {
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 	task := createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
-	_, err := svc.SetTaskDone(ctx, "software_dev", task.ID, true, "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, state.LastUpdatedAt)
+	state.CurrentCycleID = nextCycleID()
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+	_, err = svc.SetTaskDone(ctx, "software_dev", task.ID, true, "tester")
 	require.NoError(t, err)
 
 	err = svc.RequestStart(ctx, "software_dev", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle the current assigned task.",
 	})
-	require.ErrorContains(t, err, "at least one open task is required")
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Len(t, detail.State.Tasks, 1)
+	require.Equal(t, TaskStateOpen, detail.State.Tasks[0].State)
 }
 
 func TestServiceRequestStartActivatesServiceWithoutOpenTasks(t *testing.T) {
@@ -478,6 +488,7 @@ func TestServiceRequestStartActivatesServiceWithoutOpenTasks(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
 
 	err := svc.RequestStart(ctx, "queue_worker", StartRequest{
 		RequestedBy: "tester",
@@ -488,18 +499,20 @@ func TestServiceRequestStartActivatesServiceWithoutOpenTasks(t *testing.T) {
 	detail, err := svc.Detail(ctx, "queue_worker")
 	require.NoError(t, err)
 	require.Equal(t, AutomataKindService, detail.Definition.Kind)
-	require.Equal(t, StateIdle, detail.State.State)
+	require.Equal(t, StateRunning, detail.State.State)
 	require.Equal(t, "Handle inbound work continuously.", detail.State.Instruction)
 	require.Equal(t, fixedTime, detail.State.ActivatedAt)
 	require.Equal(t, "tester", detail.State.ActivatedBy)
-	require.Empty(t, detail.State.PendingTurnMessages)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Len(t, detail.State.Tasks, 1)
+	require.Equal(t, TaskStateOpen, detail.State.Tasks[0].State)
 
 	items, err := svc.List(ctx)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.Equal(t, AutomataKindService, items[0].Kind)
 	require.Equal(t, DisplayStatusRunning, items[0].DisplayStatus)
-	require.False(t, items[0].Busy)
+	require.True(t, items[0].Busy)
 	require.False(t, items[0].NeedsInput)
 }
 
@@ -510,6 +523,7 @@ func TestServiceRequestStartRejectsSecondServiceActivation(t *testing.T) {
 	svc, _ := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
 	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle inbound work continuously.",
@@ -545,6 +559,7 @@ func TestServiceSubmitOperatorMessageAllowsIdleActiveService(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
 	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle inbound work continuously.",
@@ -559,10 +574,10 @@ func TestServiceSubmitOperatorMessageAllowsIdleActiveService(t *testing.T) {
 	detail, err := svc.Detail(ctx, "queue_worker")
 	require.NoError(t, err)
 	require.Equal(t, StateRunning, detail.State.State)
-	require.Len(t, detail.State.PendingTurnMessages, 1)
-	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[0].Kind)
-	require.Equal(t, fixedTime, detail.State.PendingTurnMessages[0].CreatedAt)
-	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "Watch for failed builds first.")
+	require.Len(t, detail.State.PendingTurnMessages, 2)
+	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[1].Kind)
+	require.Equal(t, fixedTime, detail.State.PendingTurnMessages[1].CreatedAt)
+	require.Contains(t, detail.State.PendingTurnMessages[1].Message, "Watch for failed builds first.")
 }
 
 func TestServiceSubmitOperatorMessageQueuesMessage(t *testing.T) {
@@ -656,6 +671,7 @@ func TestServiceTaskUpdateWhileBlockedAppendsToSession(t *testing.T) {
 	state.InstructionUpdatedBy = "tester"
 	state.SessionID = "sess-1"
 	state.CurrentRunRef = &ref
+	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, fixedTime)
 
 	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
 		ID:        state.SessionID,
@@ -719,8 +735,9 @@ func TestServiceResetStatePreservesTasksAndInstruction(t *testing.T) {
 	require.Equal(t, "Handle the current assigned task.", detail.State.Instruction)
 	require.Empty(t, detail.State.SessionID)
 	require.Nil(t, detail.State.CurrentRunRef)
-	require.Len(t, detail.State.Tasks, 1)
-	require.Equal(t, task.ID, detail.State.Tasks[0].ID)
+	require.Empty(t, detail.State.Tasks)
+	require.Len(t, detail.TaskTemplates, 1)
+	require.Equal(t, task.ID, detail.TaskTemplates[0].ID)
 
 	_, err = svc.sessionStore.GetSession(ctx, "sess-reset")
 	require.ErrorIs(t, err, agent.ErrSessionNotFound)
@@ -877,12 +894,21 @@ func TestServicePauseAndResumeStandbyService(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
 	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle inbound work continuously.",
 	}))
+	def, err := svc.GetDefinition(ctx, "queue_worker")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateIdle
+	state.PendingTurnMessages = nil
+	state.Tasks = nil
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
 
-	err := svc.Pause(ctx, "queue_worker", "tester")
+	err = svc.Pause(ctx, "queue_worker", "tester")
 	require.NoError(t, err)
 
 	detail, err := svc.Detail(ctx, "queue_worker")
@@ -969,11 +995,19 @@ func TestServiceHandleScheduleTickQueuesTurnForActiveService(t *testing.T) {
 	svc, fixedTime := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpecWithSchedule("build-app", "* * * * *")))
+	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
 	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
 		RequestedBy: "tester",
 		Instruction: "Handle inbound work continuously.",
 	}))
-	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
+	def, err := svc.GetDefinition(ctx, "queue_worker")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateIdle
+	state.PendingTurnMessages = nil
+	state.Tasks = nil
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
 
 	require.NoError(t, svc.HandleScheduleTick(ctx, fixedTime))
 
@@ -998,31 +1032,26 @@ func TestServiceHandleScheduleTickIgnoresInactiveOrTasklessService(t *testing.T)
 
 	detail, err := svc.Detail(ctx, "queue_worker")
 	require.NoError(t, err)
-	require.Equal(t, StateIdle, detail.State.State)
-	require.True(t, detail.State.LastScheduleMinute.IsZero())
-	require.Empty(t, detail.State.PendingTurnMessages)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.Equal(t, fixedTime, detail.State.LastScheduleMinute)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
 
-	require.NoError(t, svc.RequestStart(ctx, "queue_worker", StartRequest{
-		RequestedBy: "tester",
-		Instruction: "Handle inbound work continuously.",
-	}))
-
-	def, err := svc.GetDefinition(ctx, "queue_worker")
-	require.NoError(t, err)
-	state, err := svc.ensureState(ctx, def)
-	require.NoError(t, err)
-	state.State = StateIdle
-	state.PendingTurnMessages = nil
-	state.Tasks = nil
-	require.NoError(t, svc.saveState(ctx, def.Name, state))
-
+	require.NoError(t, svc.PutSpec(ctx, "taskless_worker", `kind: service
+description: Software development automata
+goal: Complete the assigned software work
+standing_instruction: Handle inbound work continuously.
+schedule: "* * * * *"
+allowed_dags:
+  names:
+    - build-app
+`))
 	require.NoError(t, svc.HandleScheduleTick(ctx, fixedTime))
 
-	detail, err = svc.Detail(ctx, "queue_worker")
+	detail, err = svc.Detail(ctx, "taskless_worker")
 	require.NoError(t, err)
 	require.Equal(t, StateIdle, detail.State.State)
-	require.True(t, detail.State.LastScheduleMinute.IsZero())
-	require.Empty(t, detail.State.PendingTurnMessages)
+	require.Equal(t, fixedTime, detail.State.LastScheduleMinute)
+	require.Contains(t, detail.State.LastError, "requires at least one task template")
 }
 
 func TestServiceReconcileOnceReturnsInactiveRunningAutomataToIdle(t *testing.T) {
@@ -1157,6 +1186,9 @@ func TestControllerRuntimeSetTaskDonePersists(t *testing.T) {
 	require.NoError(t, err)
 	state, err := svc.ensureState(ctx, def)
 	require.NoError(t, err)
+	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, fixedTime)
+	state.CurrentCycleID = nextCycleID()
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
 
 	rt := &controllerRuntime{service: svc, def: def, state: state}
 	require.NoError(t, rt.SetTaskDone(ctx, task.ID, true))

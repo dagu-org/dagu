@@ -40,25 +40,12 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 	if instruction == "" {
 		return errors.New("instruction is required before starting automata")
 	}
-	if !hasOpenTask(state.Tasks) {
-		return errors.New("at least one open task is required before starting automata")
+	if !hasTaskTemplates(state.TaskTemplates) {
+		return errors.New("at least one task template is required before starting automata")
 	}
-	if state.SessionID != "" {
-		if err := s.cancelAutomataSession(ctx, name, state.SessionID); err != nil {
-			return err
-		}
-		if s.sessionStore != nil {
-			if err := s.sessionStore.DeleteSession(ctx, state.SessionID); err != nil && !errors.Is(err, agent.ErrSessionNotFound) {
-				return err
-			}
-		}
+	if err := s.startWorkflowCycle(ctx, def, state, instruction, req.RequestedBy); err != nil {
+		return err
 	}
-	resetRuntimeState(state)
-	state.State = StateRunning
-	state.Instruction = instruction
-	state.InstructionUpdatedAt = s.clock()
-	state.InstructionUpdatedBy = req.RequestedBy
-	state.StartRequestedAt = s.clock()
 	queueTurnMessage(state, "kickoff", s.buildKickoffMessage(def, state), s.clock())
 	return s.saveState(ctx, name, state)
 }
@@ -67,36 +54,19 @@ func (s *Service) requestServiceStart(ctx context.Context, def *Definition, stat
 	if isServiceActivated(state) {
 		return errors.New("service automata is already active")
 	}
-	instruction := strings.TrimSpace(req.Instruction)
+	instruction := strings.TrimSpace(def.StandingInstruction)
 	if instruction == "" {
-		instruction = strings.TrimSpace(state.Instruction)
+		return errors.New("standing instruction is required before activating service automata")
 	}
-	if instruction == "" {
-		return errors.New("instruction is required before starting automata")
+	if !hasTaskTemplates(state.TaskTemplates) {
+		return errors.New("at least one task template is required before activating service automata")
 	}
-	if state.SessionID != "" {
-		if err := s.cancelAutomataSession(ctx, def.Name, state.SessionID); err != nil {
-			return err
-		}
-		if s.sessionStore != nil {
-			if err := s.sessionStore.DeleteSession(ctx, state.SessionID); err != nil && !errors.Is(err, agent.ErrSessionNotFound) {
-				return err
-			}
-		}
+	if err := s.startServiceCycle(ctx, def, state, instruction, req.RequestedBy); err != nil {
+		return err
 	}
-	resetRuntimeState(state)
-	state.State = StateIdle
-	state.Instruction = instruction
-	state.InstructionUpdatedAt = s.clock()
-	state.InstructionUpdatedBy = req.RequestedBy
 	state.ActivatedAt = s.clock()
 	state.ActivatedBy = req.RequestedBy
-	state.WaitingReason = WaitingReasonNone
-	if hasOpenTask(state.Tasks) {
-		state.State = StateRunning
-		state.StartRequestedAt = s.clock()
-		queueTurnMessage(state, "kickoff", s.buildKickoffMessage(def, state), s.clock())
-	}
+	queueTurnMessage(state, "kickoff", s.buildKickoffMessage(def, state), s.clock())
 	return s.saveState(ctx, def.Name, state)
 }
 
@@ -210,21 +180,20 @@ func (s *Service) CreateTask(ctx context.Context, name string, req CreateTaskReq
 		return nil, errors.New("task description is required")
 	}
 	now := s.clock()
-	task := Task{
+	task := TaskTemplate{
 		ID:          uuid.NewString(),
 		Description: description,
-		State:       TaskStateOpen,
 		CreatedAt:   now,
 		CreatedBy:   req.RequestedBy,
 		UpdatedAt:   now,
 		UpdatedBy:   req.RequestedBy,
 	}
-	state.Tasks = append(state.Tasks, task)
-	s.queueTaskListUpdate(ctx, name, state, req.RequestedBy, "created")
+	state.TaskTemplates = append(state.TaskTemplates, task)
 	if err := s.saveState(ctx, name, state); err != nil {
 		return nil, err
 	}
-	return &task, nil
+	resp := taskFromTemplate(task)
+	return &resp, nil
 }
 
 func (s *Service) UpdateTask(ctx context.Context, name, taskID string, req UpdateTaskRequest) (*Task, error) {
@@ -236,31 +205,44 @@ func (s *Service) UpdateTask(ctx context.Context, name, taskID string, req Updat
 	if err != nil {
 		return nil, err
 	}
-	idx := findTaskIndex(state.Tasks, taskID)
-	if idx < 0 {
+	templateIdx := findTaskTemplateIndex(state.TaskTemplates, taskID)
+	if templateIdx < 0 {
 		return nil, fmt.Errorf("unknown task %q", taskID)
 	}
+	currentIdx := findTaskIndex(state.Tasks, taskID)
 	if req.Description == nil && req.Done == nil {
 		return nil, errors.New("no task changes requested")
 	}
 	now := s.clock()
-	task := &state.Tasks[idx]
 	changed := false
 	if req.Description != nil {
 		description := strings.TrimSpace(*req.Description)
 		if description == "" {
 			return nil, errors.New("task description is required")
 		}
-		if description != task.Description {
-			task.Description = description
+		template := &state.TaskTemplates[templateIdx]
+		if description != template.Description {
+			template.Description = description
+			template.UpdatedAt = now
+			template.UpdatedBy = req.RequestedBy
+			changed = true
+		}
+		if currentIdx >= 0 && state.Tasks[currentIdx].Description != description {
+			state.Tasks[currentIdx].Description = description
+			state.Tasks[currentIdx].UpdatedAt = now
+			state.Tasks[currentIdx].UpdatedBy = req.RequestedBy
 			changed = true
 		}
 	}
 	if req.Done != nil {
+		if currentIdx < 0 {
+			return nil, errors.New("task state can only be updated for the current cycle")
+		}
 		targetState := TaskStateOpen
 		if *req.Done {
 			targetState = TaskStateDone
 		}
+		task := &state.Tasks[currentIdx]
 		if task.State != targetState {
 			task.State = targetState
 			if targetState == TaskStateDone {
@@ -271,19 +253,25 @@ func (s *Service) UpdateTask(ctx context.Context, name, taskID string, req Updat
 				task.DoneBy = ""
 			}
 			changed = true
+			s.queueTaskListUpdate(ctx, name, state, req.RequestedBy, "updated")
 		}
 	}
 	if !changed {
-		copied := *task
+		if currentIdx >= 0 {
+			copied := state.Tasks[currentIdx]
+			return &copied, nil
+		}
+		copied := taskFromTemplate(state.TaskTemplates[templateIdx])
 		return &copied, nil
 	}
-	task.UpdatedAt = now
-	task.UpdatedBy = req.RequestedBy
-	s.queueTaskListUpdate(ctx, name, state, req.RequestedBy, "updated")
 	if err := s.saveState(ctx, name, state); err != nil {
 		return nil, err
 	}
-	copied := *task
+	if currentIdx >= 0 {
+		copied := state.Tasks[currentIdx]
+		return &copied, nil
+	}
+	copied := taskFromTemplate(state.TaskTemplates[templateIdx])
 	return &copied, nil
 }
 
@@ -303,12 +291,11 @@ func (s *Service) DeleteTask(ctx context.Context, name, taskID, requestedBy stri
 	if err != nil {
 		return err
 	}
-	idx := findTaskIndex(state.Tasks, taskID)
+	idx := findTaskTemplateIndex(state.TaskTemplates, taskID)
 	if idx < 0 {
 		return fmt.Errorf("unknown task %q", taskID)
 	}
-	state.Tasks = append(state.Tasks[:idx], state.Tasks[idx+1:]...)
-	s.queueTaskListUpdate(ctx, name, state, requestedBy, "deleted")
+	state.TaskTemplates = append(state.TaskTemplates[:idx], state.TaskTemplates[idx+1:]...)
 	return s.saveState(ctx, name, state)
 }
 
@@ -321,14 +308,14 @@ func (s *Service) ReorderTasks(ctx context.Context, name string, req ReorderTask
 	if err != nil {
 		return err
 	}
-	if len(req.TaskIDs) != len(state.Tasks) {
+	if len(req.TaskIDs) != len(state.TaskTemplates) {
 		return errors.New("taskIds must contain every task exactly once")
 	}
-	existing := make(map[string]Task, len(state.Tasks))
-	for _, task := range state.Tasks {
+	existing := make(map[string]TaskTemplate, len(state.TaskTemplates))
+	for _, task := range state.TaskTemplates {
 		existing[task.ID] = task
 	}
-	reordered := make([]Task, 0, len(req.TaskIDs))
+	reordered := make([]TaskTemplate, 0, len(req.TaskIDs))
 	seen := make(map[string]struct{}, len(req.TaskIDs))
 	for _, taskID := range req.TaskIDs {
 		taskID = strings.TrimSpace(taskID)
@@ -345,8 +332,7 @@ func (s *Service) ReorderTasks(ctx context.Context, name string, req ReorderTask
 		seen[taskID] = struct{}{}
 		reordered = append(reordered, task)
 	}
-	state.Tasks = reordered
-	s.queueTaskListUpdate(ctx, name, state, req.RequestedBy, "reordered")
+	state.TaskTemplates = reordered
 	return s.saveState(ctx, name, state)
 }
 
@@ -373,6 +359,18 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 		if state.State == StatePaused {
 			return errors.New("service automata is paused")
 		}
+		if state.State == StateIdle {
+			if !hasTaskTemplates(state.TaskTemplates) {
+				return errors.New("at least one task template is required before starting service automata cycle")
+			}
+			instruction := strings.TrimSpace(def.StandingInstruction)
+			if instruction == "" {
+				return errors.New("standing instruction is required before starting service automata cycle")
+			}
+			if err := s.startServiceCycle(ctx, def, state, instruction, "operator"); err != nil {
+				return err
+			}
+		}
 	} else if state.State != StateRunning && state.State != StateWaiting && state.State != StatePaused {
 		return errors.New("automata is not running an active task")
 	}
@@ -398,6 +396,50 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 		state.WaitingReason = WaitingReasonNone
 	}
 	return s.saveState(ctx, name, state)
+}
+
+func (s *Service) startWorkflowCycle(ctx context.Context, def *Definition, state *State, instruction, requestedBy string) error {
+	if err := s.cleanupRuntime(ctx, def.Name, true); err != nil {
+		return err
+	}
+	resetRuntimeState(state)
+	now := s.clock()
+	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, now)
+	state.CurrentCycleID = nextCycleID()
+	state.LastTriggeredAt = now
+	state.State = StateRunning
+	state.WaitingReason = WaitingReasonNone
+	state.Instruction = instruction
+	state.InstructionUpdatedAt = now
+	state.InstructionUpdatedBy = requestedBy
+	state.StartRequestedAt = now
+	return nil
+}
+
+func (s *Service) startServiceCycle(ctx context.Context, def *Definition, state *State, instruction, requestedBy string) error {
+	if err := s.cleanupRuntime(ctx, def.Name, true); err != nil {
+		return err
+	}
+	activatedAt := state.ActivatedAt
+	activatedBy := state.ActivatedBy
+	clearCurrentCycleState(state)
+	now := s.clock()
+	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, now)
+	state.CurrentCycleID = nextCycleID()
+	state.LastTriggeredAt = now
+	state.State = StateRunning
+	state.WaitingReason = WaitingReasonNone
+	state.Instruction = instruction
+	state.InstructionUpdatedAt = now
+	state.InstructionUpdatedBy = requestedBy
+	state.StartRequestedAt = now
+	state.ActivatedAt = firstNonZeroTime(activatedAt, now)
+	if activatedBy != "" {
+		state.ActivatedBy = activatedBy
+	} else {
+		state.ActivatedBy = requestedBy
+	}
+	return nil
 }
 
 func (s *Service) queueTaskListUpdate(ctx context.Context, name string, state *State, requestedBy, action string) {

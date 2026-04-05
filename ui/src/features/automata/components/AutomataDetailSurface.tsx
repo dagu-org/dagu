@@ -25,6 +25,7 @@ import {
   formatRelativeTime,
   type AutomataRunSummary,
   type AutomataTask,
+  type AutomataTaskTemplate,
 } from '@/features/automata/detail-utils';
 import { cn } from '@/lib/utils';
 import ConfirmModal from '@/ui/ConfirmModal';
@@ -247,25 +248,24 @@ function TalkThread({
 
 function TaskList({
   tasks,
-  summary,
   newTaskDescription,
   setNewTaskDescription,
   onCreateTask,
-  onToggleTask,
   onMoveTask,
   onEditTask,
   onDeleteTask,
   disabled,
 }: {
-  tasks?: AutomataTask[];
-  summary: { open: number; done: number };
+  tasks?: AutomataTaskTemplate[];
   newTaskDescription: string;
   setNewTaskDescription: (value: string) => void;
   onCreateTask: () => void | Promise<void>;
-  onToggleTask: (task: AutomataTask, done: boolean) => void | Promise<void>;
-  onMoveTask: (task: AutomataTask, direction: -1 | 1) => void | Promise<void>;
-  onEditTask: (task: AutomataTask) => void | Promise<void>;
-  onDeleteTask: (task: AutomataTask) => void | Promise<void>;
+  onMoveTask: (
+    task: AutomataTaskTemplate,
+    direction: -1 | 1
+  ) => void | Promise<void>;
+  onEditTask: (task: AutomataTaskTemplate) => void | Promise<void>;
+  onDeleteTask: (task: AutomataTaskTemplate) => void | Promise<void>;
   disabled: boolean;
 }): React.ReactElement {
   const items = tasks || [];
@@ -276,12 +276,11 @@ function TaskList({
         <div>
           <h2 className="text-sm font-semibold">Task List</h2>
           <div className="text-xs text-muted-foreground">
-            Operators manage task descriptions and ordering. The agent can only
-            mark tasks done or open.
+            Operators manage the persistent task template for each cycle.
           </div>
         </div>
         <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-          {summary.done} done / {summary.open} open
+          {items.length} template{items.length === 1 ? '' : 's'}
         </span>
       </div>
 
@@ -303,7 +302,6 @@ function TaskList({
       {items.length ? (
         <div className="space-y-2">
           {items.map((task, index) => {
-            const done = task.state === 'done';
             return (
               <div
                 key={task.id}
@@ -311,41 +309,12 @@ function TaskList({
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
-                          done
-                            ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'
-                            : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
-                        )}
-                      >
-                        {done ? 'done' : 'open'}
-                      </span>
-                      {task.doneBy ? (
-                        <span className="text-[11px] text-muted-foreground">
-                          by {task.doneBy}
-                        </span>
-                      ) : null}
+                    <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-900 dark:bg-slate-800 dark:text-slate-100 inline-flex">
+                      template
                     </div>
-                    <div
-                      className={cn(
-                        'break-words text-sm',
-                        done && 'text-muted-foreground line-through'
-                      )}
-                    >
-                      {task.description}
-                    </div>
+                    <div className="mt-2 break-words text-sm">{task.description}</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void onToggleTask(task, !done)}
-                      disabled={disabled}
-                    >
-                      {done ? 'Reopen' : 'Mark Done'}
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -386,8 +355,8 @@ function TaskList({
         </div>
       ) : (
         <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          No task list items yet. Add at least one open task before starting
-          this automata.
+          No task templates yet. Add at least one task before starting this
+          automata.
         </div>
       )}
     </div>
@@ -410,8 +379,7 @@ function TaskProgress({
         <div>
           <h2 className="text-sm font-semibold">Task Progress</h2>
           <div className="text-xs text-muted-foreground">
-            Edit task list items in the Config tab. Status only shows current
-            progress.
+            Status only shows the current cycle. Edit task templates in Config.
           </div>
         </div>
         <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
@@ -421,6 +389,12 @@ function TaskProgress({
 
       {items.length ? (
         <div className="space-y-2 text-sm">
+          {items.length ? (
+            <div className="text-xs text-muted-foreground">
+              Current cycle task state resets from the Config task template when
+              a new cycle starts.
+            </div>
+          ) : null}
           {openTasks.length ? (
             <>
               <div className="font-medium">Open tasks</div>
@@ -443,8 +417,8 @@ function TaskProgress({
         </div>
       ) : (
         <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-          No task list items yet. Add tasks in the Config tab before starting
-          this automata.
+          No current cycle is active. Start the automata or wait for the next
+          scheduled cycle.
         </div>
       )}
     </div>
@@ -461,8 +435,19 @@ function StatusTab({
   onOpenRun: (run: AutomataRunSummary) => void;
 }): React.ReactElement {
   const instructionTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const hasTaskTemplates = (controller.detail?.taskTemplates?.length || 0) > 0;
+  const hasStandingInstruction = !!controller.detail?.definition?.standingInstruction?.trim();
+  const canActivateService =
+    controller.canStartTask && hasTaskTemplates && hasStandingInstruction;
+  const canStartWorkflow =
+    controller.canStartTask &&
+    hasTaskTemplates &&
+    !!controller.instructionDraft.trim();
 
   React.useEffect(() => {
+    if (controller.serviceKind) {
+      return;
+    }
     const node = instructionTextareaRef.current;
     if (!node) {
       return;
@@ -508,9 +493,9 @@ function StatusTab({
             <p>
               {controller.scheduleConfigured
                 ? controller.serviceKind
-                  ? controller.serviceActivated
-                    ? 'Schedule ticks can wake this service while it is live and has open tasks.'
-                    : 'Schedule ticks stay inactive until this service is activated once.'
+                  ? hasStandingInstruction && hasTaskTemplates
+                    ? 'Due schedule ticks can start a fresh service cycle automatically. Each scheduled cycle reopens the task template from Config.'
+                    : 'Schedule is configured, but it cannot start clean cycles until Standing Instruction and at least one task template are set in Config.'
                   : 'Schedules are only active for service automata.'
                 : 'No schedule is configured for this automata.'}
             </p>
@@ -613,48 +598,68 @@ function StatusTab({
               ? 'Activate Service'
               : controller.lifecycleState === 'finished'
                 ? 'Start New Task'
-                : 'Start Instruction'}
+              : 'Start Instruction'}
           </h2>
           <div className="space-y-3">
-            <Textarea
-              ref={instructionTextareaRef}
-              value={controller.instructionDraft}
-              onChange={(event) =>
-                controller.setInstructionDraft(event.target.value)
-              }
-              className="min-h-24 overflow-hidden resize-none"
-              placeholder={
-                controller.serviceKind
-                  ? 'Define the standing instruction for this service before activating it.'
-                  : 'Tell this Automata what task to work on before starting it.'
-              }
-              disabled={!controller.canStartTask || !!controller.busyAction}
-            />
+            {controller.serviceKind ? (
+              <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Standing Instruction
+                </div>
+                {hasStandingInstruction ? (
+                  <div className="whitespace-pre-wrap break-words text-sm">
+                    {controller.detail?.definition?.standingInstruction}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    No standing instruction is configured yet. Add one in the
+                    Config tab before activating this service or relying on
+                    schedule ticks.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Textarea
+                ref={instructionTextareaRef}
+                value={controller.instructionDraft}
+                onChange={(event) =>
+                  controller.setInstructionDraft(event.target.value)
+                }
+                className="min-h-24 overflow-hidden resize-none"
+                placeholder="Tell this Automata what task to work on before starting it."
+                disabled={!controller.canStartTask || !!controller.busyAction}
+              />
+            )}
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs text-muted-foreground">
-                {controller.canStartTask
-                  ? controller.serviceKind
-                    ? controller.taskSummary.open > 0
-                      ? 'Activating this service makes it live immediately. Schedule ticks can wake it while open tasks exist.'
-                      : 'You can activate this service without open tasks. It will stay on standby until a task is opened or a message arrives.'
-                    : controller.taskSummary.open > 0
-                      ? 'Automata stays idle until an instruction is provided.'
-                      : 'Add or reopen at least one task list item before starting.'
-                  : controller.lifecycleState === 'paused'
-                    ? controller.serviceKind
-                      ? 'This service is paused. Resume it to put it back on standby.'
-                      : 'This Automata is paused. Resume it to continue the current task.'
-                    : controller.serviceKind
-                      ? 'This service is already live. Use an operator message, tasks, or schedule ticks to steer it.'
+                {controller.serviceKind
+                  ? !hasStandingInstruction
+                    ? 'Standing Instruction is required for service activation and scheduled cycles.'
+                    : !hasTaskTemplates
+                      ? 'Add at least one task template in Config before activating this service.'
+                      : controller.canStartTask
+                        ? controller.scheduleConfigured
+                          ? 'Activating starts a fresh cycle immediately. Future due schedule ticks can also start fresh cycles automatically from the saved task template.'
+                          : 'Activating starts a fresh cycle immediately. Without a schedule, future cycles start only from operator messages.'
+                        : controller.lifecycleState === 'paused'
+                          ? 'This service is paused. Resume it to put it back on standby.'
+                          : controller.serviceActivated
+                            ? 'This service is already live. Use operator messages or schedule ticks to start the next cycle.'
+                            : 'This service cannot be activated from the current lifecycle state.'
+                  : controller.canStartTask
+                    ? hasTaskTemplates
+                      ? 'Starting creates a fresh workflow cycle from the Config task template.'
+                      : 'Add at least one task template in Config before starting.'
+                    : controller.lifecycleState === 'paused'
+                      ? 'This Automata is paused. Resume it to continue the current task.'
                       : 'This Automata already has an active task. Use an operator message to steer it.'}
               </div>
               <Button
                 onClick={() => void controller.onStart()}
                 disabled={
-                  !controller.instructionDraft.trim() ||
-                  !controller.canStartTask ||
-                  (!controller.canStartWithoutOpenTasks &&
-                    controller.taskSummary.open === 0)
+                  controller.serviceKind
+                    ? !canActivateService
+                    : !canStartWorkflow
                 }
               >
                 {controller.serviceKind
@@ -758,6 +763,9 @@ function ConfigTab({
   controller: AutomataDetailController;
   onOpenDAG: (dagName: string) => void;
 }): React.ReactElement {
+  const metadataFieldDisabled =
+    !!controller.busyAction || controller.isSavingSpec || controller.isEditingSpec;
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-2">
@@ -779,17 +787,58 @@ function ConfigTab({
                   controller.setIsEditingMetadata(true);
                 }}
                 placeholder="Complete the assigned task and leave it ready for review"
-                disabled={
-                  !!controller.busyAction ||
-                  controller.isSavingSpec ||
-                  controller.isEditingSpec
-                }
+                disabled={metadataFieldDisabled}
               />
               <div className="text-xs text-muted-foreground">
                 Optional. Leave blank if this Automata should work from the
                 instruction, task list, and runtime context.
               </div>
             </div>
+
+            {controller.serviceKind ? (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="automata-detail-standing-instruction">
+                    Standing Instruction
+                  </Label>
+                  <Textarea
+                    id="automata-detail-standing-instruction"
+                    value={controller.standingInstructionDraft}
+                    onChange={(event) => {
+                      controller.setStandingInstructionDraft(event.target.value);
+                      controller.setIsEditingMetadata(true);
+                    }}
+                    placeholder="Handle each scheduled service cycle and use the task list as the default operating checklist."
+                    disabled={metadataFieldDisabled}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Required for service activation and scheduled cycles. This
+                    instruction is reused for every fresh service cycle.
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="automata-detail-schedule">
+                    Schedule
+                  </Label>
+                  <Textarea
+                    id="automata-detail-schedule"
+                    value={controller.scheduleDraft}
+                    onChange={(event) => {
+                      controller.setScheduleDraft(event.target.value);
+                      controller.setIsEditingMetadata(true);
+                    }}
+                    placeholder={'0 * * * *\n30 9 * * 1-5'}
+                    disabled={metadataFieldDisabled}
+                    rows={3}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Optional. Use one cron expression per line. Due ticks start
+                    a fresh cycle by reopening the Config task template.
+                  </div>
+                </div>
+              </>
+            ) : null}
 
             <div className="grid gap-2">
               <Label htmlFor="automata-detail-icon-url">Image URL</Label>
@@ -801,23 +850,12 @@ function ConfigTab({
                   controller.setIsEditingMetadata(true);
                 }}
                 placeholder="https://cdn.example.com/automata/build-captain.png"
-                disabled={
-                  !!controller.busyAction ||
-                  controller.isSavingSpec ||
-                  controller.isEditingSpec
-                }
+                disabled={metadataFieldDisabled}
               />
               <div className="text-xs text-muted-foreground">
                 Optional. Use an absolute http(s) URL or a root-relative path
                 like /assets/automata/build-captain.png.
               </div>
-              {!controller.metadataValidationError &&
-              controller.iconUrlDraft.trim().length <= 2048 ? null : (
-                <div className="text-xs text-destructive">
-                  Icon URL must be an absolute http(s) URL or a root-relative
-                  path, and 2048 characters or fewer.
-                </div>
-              )}
             </div>
 
             <div className="grid gap-2">
@@ -830,11 +868,7 @@ function ConfigTab({
                   );
                   controller.setIsEditingMetadata(true);
                 }}
-                disabled={
-                  !!controller.busyAction ||
-                  controller.isSavingSpec ||
-                  controller.isEditingSpec
-                }
+                disabled={metadataFieldDisabled}
               >
                 <SelectTrigger id="automata-detail-model">
                   <SelectValue placeholder="Use global default model" />
@@ -875,42 +909,8 @@ function ConfigTab({
                   controller.setIsEditingMetadata(true);
                 }}
                 placeholder="Optional description"
-                disabled={
-                  !!controller.busyAction ||
-                  controller.isSavingSpec ||
-                  controller.isEditingSpec
-                }
+                disabled={metadataFieldDisabled}
               />
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs text-muted-foreground">
-                  {controller.isEditingSpec
-                    ? 'Save or cancel raw spec edits before updating metadata here.'
-                    : 'This updates the top-level metadata fields in the Automata spec.'}
-                </div>
-                <div className="flex items-center gap-2">
-                  {controller.metadataChanged ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={controller.onCancelMetadata}
-                      disabled={!!controller.busyAction || controller.isSavingSpec}
-                    >
-                      Cancel
-                    </Button>
-                  ) : null}
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void controller.onSaveMetadata()}
-                    disabled={controller.metadataSaveDisabled}
-                  >
-                    {controller.busyAction === 'metadata'
-                      ? 'Saving...'
-                      : 'Save Metadata'}
-                  </Button>
-                </div>
-              </div>
             </div>
 
             {controller.detail?.definition.tags?.length ? (
@@ -928,6 +928,42 @@ function ConfigTab({
                 </div>
               </div>
             ) : null}
+
+            <div className="space-y-3 border-t pt-3">
+              <div className="text-xs text-muted-foreground">
+                {controller.isEditingSpec
+                  ? 'Save or cancel raw spec edits before updating metadata here.'
+                  : 'This updates the top-level metadata fields in the Automata spec.'}
+              </div>
+              {controller.metadataValidationError ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {controller.metadataValidationError}
+                </div>
+              ) : null}
+              <div className="flex items-center justify-end gap-2">
+                {controller.metadataChanged ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={controller.onCancelMetadata}
+                    disabled={!!controller.busyAction || controller.isSavingSpec}
+                  >
+                    Cancel
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void controller.onSaveMetadata()}
+                  disabled={controller.metadataSaveDisabled}
+                >
+                  {controller.busyAction === 'metadata'
+                    ? 'Saving...'
+                    : 'Save Metadata'}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -965,12 +1001,10 @@ function ConfigTab({
       </div>
 
       <TaskList
-        tasks={controller.detail?.state.tasks}
-        summary={controller.taskSummary}
+        tasks={controller.detail?.taskTemplates}
         newTaskDescription={controller.newTaskDescription}
         setNewTaskDescription={controller.setNewTaskDescription}
         onCreateTask={controller.onCreateTask}
-        onToggleTask={controller.onToggleTask}
         onMoveTask={controller.onMoveTask}
         onEditTask={controller.onEditTask}
         onDeleteTask={controller.onDeleteTask}

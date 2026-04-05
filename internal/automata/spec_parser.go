@@ -45,17 +45,21 @@ func parseDefinitionYAML(data []byte, def *Definition) error {
 
 func validateDefinitionNode(node *yaml.Node) error {
 	return validateMappingNode(node, "definition", map[string]yamlFieldRule{
-		"kind":        {},
-		"nickname":    {},
-		"iconUrl":     {canonical: "icon_url"},
-		"icon_url":    {canonical: "icon_url"},
-		"description": {},
-		"purpose":     {},
-		"goal":        {},
+		"kind":                 {},
+		"nickname":             {},
+		"iconUrl":              {canonical: "icon_url"},
+		"icon_url":             {canonical: "icon_url"},
+		"description":          {},
+		"purpose":              {},
+		"goal":                 {},
+		"standingInstruction":  {canonical: "standing_instruction"},
+		"standing_instruction": {canonical: "standing_instruction"},
 		"tags": {
 			validate: validateStringListNode,
 		},
-		"schedule": {},
+		"schedule": {
+			validate: validateScheduleNode,
+		},
 		"allowedDAGs": {
 			canonical: "allowed_dags",
 			validate:  validateAllowedDAGsNode,
@@ -69,6 +73,25 @@ func validateDefinitionNode(node *yaml.Node) error {
 		},
 		"disabled": {},
 	})
+}
+
+func validateScheduleNode(node *yaml.Node, path string) error {
+	if isNullNode(node) {
+		return nil
+	}
+	switch node.Kind {
+	case yaml.ScalarNode:
+		return nil
+	case yaml.SequenceNode:
+		for i, child := range node.Content {
+			if child.Kind != yaml.ScalarNode {
+				return fmt.Errorf("%s[%d] must be a string", path, i)
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("%s must be a string or list of strings", path)
+	}
 }
 
 func validateAllowedDAGsNode(node *yaml.Node, path string) error {

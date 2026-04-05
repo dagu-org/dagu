@@ -10,6 +10,8 @@ export function updateAutomataMetadataInSpec(
     iconUrl: string;
     goal: string;
     model: string;
+    standingInstruction: string;
+    schedule: string[];
   }
 ): string {
   const parsed = parse(spec);
@@ -38,6 +40,21 @@ export function updateAutomataMetadataInSpec(
     nextSpec.goal = nextGoal;
   } else {
     delete nextSpec.goal;
+  }
+
+  const nextStandingInstruction = metadata.standingInstruction.trim();
+  if (nextStandingInstruction) {
+    nextSpec.standing_instruction = nextStandingInstruction;
+  } else {
+    delete nextSpec.standing_instruction;
+  }
+
+  if (metadata.schedule.length === 1) {
+    nextSpec.schedule = metadata.schedule[0];
+  } else if (metadata.schedule.length > 1) {
+    nextSpec.schedule = [...metadata.schedule];
+  } else {
+    delete nextSpec.schedule;
   }
 
   const nextModel = metadata.model.trim();

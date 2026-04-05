@@ -8,6 +8,7 @@ import {
   Status,
   type components,
 } from '@/api/v1/schema';
+import { CronExpressionParser } from 'cron-parser';
 import dayjs from '@/lib/dayjs';
 
 export type AutomataDetail = components['schemas']['AutomataDetailResponse'];
@@ -16,6 +17,8 @@ export type AutomataPendingTurnMessage =
   components['schemas']['AutomataPendingTurnMessage'];
 export type AutomataRunSummary = components['schemas']['AutomataRunSummary'];
 export type AutomataTask = components['schemas']['AutomataTask'];
+export type AutomataTaskTemplate =
+  components['schemas']['AutomataTaskTemplate'];
 export type AutomataKindValue = components['schemas']['AutomataKind'];
 export type AutomataDisplayState =
   components['schemas']['AutomataDisplayStatus'];
@@ -70,6 +73,28 @@ export function taskCounts(tasks?: AutomataTask[]): {
     open: items.filter((task) => task.state === 'open').length,
     done: items.filter((task) => task.state === 'done').length,
   };
+}
+
+export function parseAutomataScheduleText(value: string): string[] {
+  return value
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function formatAutomataScheduleText(items?: string[]): string {
+  return (items || []).join('\n');
+}
+
+export function validateAutomataScheduleExpressions(items: string[]): string | null {
+  for (const item of items) {
+    try {
+      CronExpressionParser.parse(item);
+    } catch {
+      return `Invalid cron schedule: ${item}`;
+    }
+  }
+  return null;
 }
 
 export function dagRunStatusToStatus(status?: string): Status | undefined {
