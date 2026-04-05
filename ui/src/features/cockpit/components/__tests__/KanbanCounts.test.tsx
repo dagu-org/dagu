@@ -123,8 +123,9 @@ describe('cockpit count labels', () => {
     );
 
     const boardRoot = container.firstElementChild;
-    expect(boardRoot).toHaveClass('max-h-[70vh]');
-    expect(boardRoot).toHaveClass('overflow-hidden');
+    expect(boardRoot).not.toHaveClass('max-h-[70vh]');
+    expect(boardRoot?.firstElementChild).toHaveClass('overflow-y-hidden');
+    expect(boardRoot?.lastElementChild).toHaveClass('max-h-[70vh]');
     expect(boardRoot?.lastElementChild).toHaveClass('overflow-hidden');
   });
 });
