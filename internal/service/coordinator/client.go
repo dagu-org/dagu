@@ -181,6 +181,9 @@ func (cli *clientImpl) Dispatch(ctx context.Context, task *coordinatorv1.Task) e
 				// FailedPrecondition means permanent misconfiguration (e.g. selector mismatch).
 				// Stop retrying across coordinators and across the outer backoff loop.
 				if st, ok := status.FromError(err); ok && st.Code() == codes.FailedPrecondition {
+					if staleErr, ok := exec.ParseStaleQueueDispatchError(st.Message()); ok {
+						return backoff.PermanentError(fmt.Errorf("failed to dispatch task to coordinator %s: %w", member.ID, staleErr))
+					}
 					return backoff.PermanentError(wrapped)
 				}
 

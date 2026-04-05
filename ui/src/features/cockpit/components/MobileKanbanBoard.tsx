@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import React, { useState, useCallback } from 'react';
 import { components } from '@/api/v1/schema';
 import { Tabs, Tab } from '@/components/ui/tabs';
@@ -44,8 +47,8 @@ export function MobileKanbanBoard({
   }, []);
 
   return (
-    <div className="flex flex-col min-h-0">
-      <Tabs className="overflow-x-auto border-b-0 mb-1">
+    <div className="flex min-h-0 flex-col">
+      <Tabs className="mb-1 shrink-0 overflow-x-auto overflow-y-hidden border-b-0">
         {COLUMN_KEYS.map((key) => {
           const count = columns[key].runs.length;
           const countLabel = `${count}${columns[key].hasMore ? '+' : ''}`;
@@ -66,12 +69,14 @@ export function MobileKanbanBoard({
           );
         })}
       </Tabs>
-      <KanbanColumn
-        title={COLUMN_LABELS[activeTab]}
-        column={columns[activeTab]}
-        onCardClick={onCardClick}
-        hideHeader
-      />
+      <div className="flex max-h-[70vh] min-h-0 flex-1 overflow-hidden">
+        <KanbanColumn
+          title={COLUMN_LABELS[activeTab]}
+          column={columns[activeTab]}
+          onCardClick={onCardClick}
+          hideHeader
+        />
+      </div>
     </div>
   );
 }

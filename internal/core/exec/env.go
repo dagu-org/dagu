@@ -44,4 +44,8 @@ const (
 	// When set, retriable step failures transition to a queued retry state instead of
 	// sleeping inline inside the child DAG process.
 	EnvKeyExternalStepRetry = "DAGU_EXTERNAL_STEP_RETRY"
+
+	// EnvKeyQueueDispatchRetry marks an internal retry invocation that is consuming
+	// an already-queued run from the scheduler/worker queue dispatch path.
+	EnvKeyQueueDispatchRetry = "DAGU_QUEUE_DISPATCH_RETRY"
 )

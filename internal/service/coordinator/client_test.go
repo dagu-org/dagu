@@ -119,6 +119,45 @@ func TestClientDispatch(t *testing.T) {
 		assert.True(t, strings.Contains(err.Error(), "no coordinators available") ||
 			strings.Contains(err.Error(), "context deadline exceeded"))
 	})
+
+	t.Run("StaleQueueDispatchReturnsPermanentTypedError", func(t *testing.T) {
+		t.Parallel()
+
+		config := coordinator.DefaultConfig()
+		config.MaxRetries = 0
+		config.RequestTimeout = 100 * time.Millisecond
+
+		mockCoord := &mockCoordinatorService{
+			dispatchFunc: func(_ context.Context, _ *coordinatorv1.DispatchRequest) (*coordinatorv1.DispatchResponse, error) {
+				return nil, status.Error(codes.FailedPrecondition, (&exec.StaleQueueDispatchError{
+					Reason: "queued attempt was superseded",
+				}).Error())
+			},
+		}
+
+		server, addr := startMockServer(t, mockCoord)
+		defer server.Stop()
+
+		host, port := parseHostPort(addr)
+		monitor := &mockServiceMonitor{
+			members: []exec.HostInfo{
+				{ID: "coord-1", Host: host, Port: port, Status: exec.ServiceStatusActive},
+			},
+		}
+
+		client := coordinator.New(monitor, config)
+
+		err := client.Dispatch(context.Background(), &coordinatorv1.Task{
+			DagRunId: "run-123",
+			Target:   "test-dag",
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, backoff.ErrPermanent)
+
+		var staleErr *exec.StaleQueueDispatchError
+		require.ErrorAs(t, err, &staleErr)
+		require.Equal(t, "queued attempt was superseded", staleErr.Reason)
+	})
 }
 
 func TestClientPoll(t *testing.T) {

@@ -644,6 +644,72 @@ func TestHandler_Poll(t *testing.T) {
 	})
 }
 
+func TestHandler_DispatchRejectsStaleQueueDispatchRetry(t *testing.T) {
+	t.Parallel()
+
+	core.RegisterExecutorCapabilities("command", core.ExecutorCapabilities{Command: true})
+
+	baseDir := filepath.Join(t.TempDir(), "distributed")
+	dispatchStore := filedistributed.NewDispatchTaskStore(baseDir)
+	heartbeatStore := filedistributed.NewWorkerHeartbeatStore(baseDir)
+	require.NoError(t, heartbeatStore.Upsert(context.Background(), exec.WorkerHeartbeatRecord{
+		WorkerID:        "worker-1",
+		LastHeartbeatAt: time.Now().UTC().UnixMilli(),
+	}))
+
+	store := newMockDAGRunStore()
+	ref := exec.DAGRunRef{Name: "test-dag", ID: "run-123"}
+	store.addAttempt(ref, &exec.DAGRunStatus{
+		Name:      "test-dag",
+		DAGRunID:  "run-123",
+		AttemptID: "attempt-current",
+		Status:    core.Aborted,
+	})
+
+	previousStatus, err := convert.DAGRunStatusToProto(&exec.DAGRunStatus{
+		Name:      "test-dag",
+		DAGRunID:  "run-123",
+		AttemptID: "attempt-queued",
+		Status:    core.Queued,
+	})
+	require.NoError(t, err)
+
+	h := NewHandler(HandlerConfig{
+		DAGRunStore:          store,
+		DispatchTaskStore:    dispatchStore,
+		WorkerHeartbeatStore: heartbeatStore,
+	})
+
+	_, err = h.Dispatch(context.Background(), &coordinatorv1.DispatchRequest{
+		Task: &coordinatorv1.Task{
+			Operation:      coordinatorv1.Operation_OPERATION_RETRY,
+			DagRunId:       "run-123",
+			Target:         "test-dag",
+			Definition:     "name: test-dag\nsteps:\n  - name: step1\n    type: command\n    command: echo hello",
+			QueueName:      "test-queue",
+			PreviousStatus: previousStatus,
+		},
+	})
+	require.Error(t, err)
+
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.FailedPrecondition, st.Code())
+	require.Contains(t, st.Message(), "stale queue dispatch")
+
+	count, countErr := dispatchStore.CountOutstandingByQueue(context.Background(), "test-queue", time.Second)
+	require.NoError(t, countErr)
+	assert.Zero(t, count)
+
+	require.Len(t, store.attempts, 1)
+	attempt, findErr := store.FindAttempt(context.Background(), ref)
+	require.NoError(t, findErr)
+	runStatus, readErr := attempt.ReadStatus(context.Background())
+	require.NoError(t, readErr)
+	require.Equal(t, "attempt-current", runStatus.AttemptID)
+	require.Equal(t, core.Aborted, runStatus.Status)
+}
+
 type failingDispatchTaskStore struct {
 	enqueueErr error
 }

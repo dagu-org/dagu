@@ -621,7 +621,6 @@ func TestRestart(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/usr/bin/dagu",
@@ -663,6 +662,20 @@ func TestRetry(t *testing.T) {
 		assert.Contains(t, spec.Args, "--run-id=full-retry-id")
 		assert.Contains(t, spec.Args, "--step=step-2")
 		assert.Contains(t, spec.Args, "test-dag")
+	})
+
+	t.Run("RetryDoesNotMarkQueueDispatch", func(t *testing.T) {
+		t.Parallel()
+		spec := builder.Retry(dag, "retry-run-id", "")
+
+		assert.NotContains(t, spec.Env, exec.EnvKeyQueueDispatchRetry+"=1")
+	})
+
+	t.Run("RetryStripsInheritedQueueDispatchMarker", func(t *testing.T) {
+		t.Setenv(exec.EnvKeyQueueDispatchRetry, "1")
+		spec := builder.Retry(dag, "retry-run-id", "")
+
+		assert.NotContains(t, spec.Env, exec.EnvKeyQueueDispatchRetry+"=1")
 	})
 
 	t.Run("RetryWithoutConfig", func(t *testing.T) {
@@ -877,7 +890,6 @@ func TestTaskStart(t *testing.T) {
 }
 
 func TestTaskRetry(t *testing.T) {
-	t.Parallel()
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
 			Executable:     "/usr/bin/dagu",
@@ -945,6 +957,45 @@ func TestTaskRetry(t *testing.T) {
 		spec := builder.TaskRetry(task, nil, "")
 
 		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
+	})
+
+	t.Run("TaskRetryDoesNotMarkQueueDispatch", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:       "retry-run-id",
+			AttemptId:      "attempt-2",
+			Target:         "/path/to/task.yaml",
+			RootDagRunName: "root-dag",
+		}
+		spec := builder.TaskRetry(task, nil, "")
+
+		assert.NotContains(t, spec.Env, exec.EnvKeyQueueDispatchRetry+"=1")
+	})
+
+	t.Run("TaskRetryStripsInheritedQueueDispatchMarker", func(t *testing.T) {
+		t.Setenv(exec.EnvKeyQueueDispatchRetry, "1")
+		task := &coordinatorv1.Task{
+			DagRunId:       "retry-run-id",
+			AttemptId:      "attempt-2",
+			Target:         "/path/to/task.yaml",
+			RootDagRunName: "root-dag",
+		}
+		spec := builder.TaskRetry(task, nil, "")
+
+		assert.NotContains(t, spec.Env, exec.EnvKeyQueueDispatchRetry+"=1")
+	})
+
+	t.Run("QueueDispatchTaskRetryMarksQueueDispatch", func(t *testing.T) {
+		t.Parallel()
+		task := &coordinatorv1.Task{
+			DagRunId:       "retry-run-id",
+			AttemptId:      "attempt-2",
+			Target:         "/path/to/task.yaml",
+			RootDagRunName: "root-dag",
+		}
+		spec := builder.QueueDispatchTaskRetry(task, nil, "")
+
+		assert.Contains(t, spec.Env, exec.EnvKeyQueueDispatchRetry+"=1")
 	})
 
 	t.Run("TaskRetryWithoutConfig", func(t *testing.T) {

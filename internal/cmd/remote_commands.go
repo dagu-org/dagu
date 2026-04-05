@@ -413,7 +413,7 @@ func remoteRunDequeue(ctx *Context, args []string) error {
 		}
 		return ctx.Remote.dequeueDAGRun(ctx, ref.Name, ref.ID)
 	}
-	items, err := ctx.Remote.listQueueItems(ctx, queueName, api.ListQueueItemsParamsTypeQueued, 1, 1)
+	items, err := ctx.Remote.listQueueItems(ctx, queueName, 1, "")
 	if err != nil {
 		return err
 	}

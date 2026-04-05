@@ -28,14 +28,14 @@ func TestQueue(t *testing.T) {
 	require.Equal(t, 0, queueLen, "expected queue length to be 0")
 
 	// Add a low priority job to the queue
-	err = queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
+	_, err = queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "low-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
-	err = queue.Enqueue(th.Context, exec.QueuePriorityHigh, exec.DAGRunRef{
+	_, err = queue.Enqueue(th.Context, exec.QueuePriorityHigh, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "high-priority-dag-run",
 	})
@@ -75,14 +75,14 @@ func TestQueue_FindByDAGRunID(t *testing.T) {
 	queue := filequeue.NewDualQueue(queueDir, "test-name")
 
 	// Add a low priority job to the queue
-	err := queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
+	_, err := queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "low-priority-dag-run",
 	})
 	require.NoError(t, err, "expected no error when adding job to queue")
 
 	// Add a high priority job to the queue
-	err = queue.Enqueue(th.Context, exec.QueuePriorityHigh, exec.DAGRunRef{
+	_, err = queue.Enqueue(th.Context, exec.QueuePriorityHigh, exec.DAGRunRef{
 		Name: "test-name",
 		ID:   "high-priority-dag-run",
 	})
@@ -118,7 +118,7 @@ func TestQueue_OrderingHighFrequency(t *testing.T) {
 	// Enqueue items very quickly
 	numItems := 10
 	for i := range numItems {
-		err := queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
+		_, err := queue.Enqueue(th.Context, exec.QueuePriorityLow, exec.DAGRunRef{
 			Name: "test-ordering",
 			ID:   fmt.Sprintf("run-%d", i),
 		})

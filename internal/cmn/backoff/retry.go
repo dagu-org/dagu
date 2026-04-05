@@ -29,7 +29,7 @@ var (
 type retryFailureLogLevelKey struct{}
 
 func PermanentError(err error) error {
-	return fmt.Errorf("%w: %v", ErrPermanent, err)
+	return fmt.Errorf("%w: %w", ErrPermanent, err)
 }
 
 // WithRetryFailureLogLevel overrides the log level used for terminal retry

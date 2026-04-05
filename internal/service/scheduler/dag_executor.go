@@ -190,7 +190,7 @@ func (e *DAGExecutor) ExecuteDAG(
 		return runtime.Start(ctx, spec)
 
 	case coordinatorv1.Operation_OPERATION_RETRY:
-		spec := e.subCmdBuilder.Retry(dag, runID, "")
+		spec := e.subCmdBuilder.QueueDispatchRetry(dag, runID, "")
 		return runtime.Run(ctx, spec)
 
 	default:

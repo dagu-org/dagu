@@ -107,9 +107,21 @@ func (b *SubCmdBuilder) filteredEnv(extra ...string) []string {
 }
 
 func (b *SubCmdBuilder) parentEnv(extra ...string) []string {
-	env := os.Environ()
+	env := filteredParentEnv()
 	env = append(env, extra...)
 	return env
+}
+
+func filteredParentEnv() []string {
+	env := os.Environ()
+	filtered := env[:0]
+	for _, entry := range env {
+		if strings.HasPrefix(entry, exec1.EnvKeyQueueDispatchRetry+"=") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
 }
 
 func dagNameHint(target string) string {
@@ -274,6 +286,20 @@ func (b *SubCmdBuilder) Retry(dag *core.DAG, dagRunID string, stepName string) C
 		Env:        b.parentEnv(),
 		BuildEnv:   append([]string{}, dag.Env...),
 	}
+}
+
+// QueueDispatchRetry creates a retry command spec for a scheduler-consumed queued run.
+func (b *SubCmdBuilder) QueueDispatchRetry(dag *core.DAG, dagRunID string, stepName string) CmdSpec {
+	spec := b.Retry(dag, dagRunID, stepName)
+	spec.Env = append(spec.Env, exec1.EnvKeyQueueDispatchRetry+"=1")
+	return spec
+}
+
+// QueueDispatchTaskRetry creates a retry command spec for a worker-consumed queued run.
+func (b *SubCmdBuilder) QueueDispatchTaskRetry(task *coordinatorv1.Task, envHints []string, dagName string) CmdSpec {
+	spec := b.TaskRetry(task, envHints, dagName)
+	spec.Env = append(spec.Env, exec1.EnvKeyQueueDispatchRetry+"=1")
+	return spec
 }
 
 // TaskStart creates a start command spec for coordinator tasks.
