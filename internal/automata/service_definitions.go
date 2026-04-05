@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -136,6 +137,17 @@ func (s *Service) PutSpec(ctx context.Context, name, spec string) error {
 	if err := validateName(name); err != nil {
 		return err
 	}
+	var previous *Definition
+	if data, err := os.ReadFile(filepath.Clean(s.definitionPath(name))); err == nil {
+		var prior Definition
+		if err := parseDefinitionYAML(data, &prior); err != nil {
+			return err
+		}
+		prior.Name = name
+		previous = &prior
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	var def Definition
 	if err := parseDefinitionYAML([]byte(spec), &def); err != nil {
 		return err
@@ -147,7 +159,22 @@ func (s *Service) PutSpec(ctx context.Context, name, spec string) error {
 	if err := os.MkdirAll(s.definitionsDir, dirPerm); err != nil {
 		return fmt.Errorf("create definitions dir: %w", err)
 	}
-	return fileutil.WriteFileAtomic(s.definitionPath(name), []byte(spec), definitionFilePerm)
+	if err := fileutil.WriteFileAtomic(s.definitionPath(name), []byte(spec), definitionFilePerm); err != nil {
+		return err
+	}
+	if previous != nil && shouldResetRuntimeForSpecChange(previous, &def) {
+		if err := s.resetRuntimeForSpecChange(ctx, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func shouldResetRuntimeForSpecChange(previous, next *Definition) bool {
+	if previous == nil || next == nil {
+		return false
+	}
+	return !reflect.DeepEqual(previous.Agent, next.Agent)
 }
 
 func (s *Service) Delete(ctx context.Context, name string) error {

@@ -385,6 +385,42 @@ func TestListAgentSessions(t *testing.T) {
 	})
 }
 
+func TestCreateAgentSession_ReturnsActionableConfigError(t *testing.T) {
+	t.Parallel()
+
+	configStore := &mockAgentConfigStore{config: &agent.Config{
+		Enabled:        true,
+		DefaultModelID: "missing-model",
+	}}
+	agentAPI := agent.NewAPI(agent.APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   &mockAgentModelStore{models: map[string]*agent.ModelConfig{}, byName: map[string]string{}},
+		SessionStore: &mockSessionStore{},
+	})
+
+	a := apiV1.New(
+		nil, nil, nil, nil, runtime.Manager{},
+		&config.Config{}, nil, nil,
+		prometheus.NewRegistry(),
+		nil,
+		apiV1.WithAgentAPI(agentAPI),
+		apiV1.WithAgentConfigStore(configStore),
+	)
+
+	_, err := a.CreateAgentSession(sessionAdminCtx(), apigen.CreateAgentSessionRequestObject{
+		Body: &apigen.CreateAgentSessionJSONRequestBody{
+			Message: "hello",
+		},
+	})
+	require.Error(t, err)
+
+	var apiErr *apiV1.Error
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 503, apiErr.HTTPStatus)
+	assert.Contains(t, apiErr.Message, `failed to resolve model "missing-model"`)
+	assert.Contains(t, apiErr.Message, "model not found")
+}
+
 // deref safely dereferences a pointer, returning the zero value if nil.
 func deref[T any](p *T) T {
 	if p == nil {

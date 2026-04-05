@@ -648,18 +648,107 @@ func (s *Store) loadSessionByID(id string) (*SessionForStorage, error) {
 	s.mu.RUnlock()
 
 	if !exists {
-		return nil, agent.ErrSessionNotFound
+		discovered, err := s.discoverSessionOnDisk(id)
+		if err != nil {
+			return nil, err
+		}
+		if !discovered {
+			return nil, agent.ErrSessionNotFound
+		}
+		s.mu.RLock()
+		filePath, exists = s.byID[id]
+		s.mu.RUnlock()
+		if !exists {
+			return nil, agent.ErrSessionNotFound
+		}
 	}
 
 	stored, err := s.loadSessionFromFile(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			s.mu.Lock()
+			s.removeSessionIndexLocked(id)
+			s.mu.Unlock()
 			return nil, agent.ErrSessionNotFound
 		}
 		return nil, fmt.Errorf("filesession: failed to load session: %w", err)
 	}
 
 	return stored, nil
+}
+
+func (s *Store) discoverSessionOnDisk(id string) (bool, error) {
+	matches, err := filepath.Glob(filepath.Join(s.baseDir, "*", id+sessionFileExtension))
+	if err != nil {
+		return false, fmt.Errorf("filesession: failed to search session %s on disk: %w", id, err)
+	}
+	if len(matches) == 0 {
+		return false, nil
+	}
+
+	stored, err := s.loadSessionFromFile(matches[0])
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("filesession: failed to load discovered session %s: %w", id, err)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.indexSessionLocked(stored, matches[0])
+	return true, nil
+}
+
+func (s *Store) indexSessionLocked(sess *SessionForStorage, filePath string) {
+	if sess == nil {
+		return
+	}
+	s.removeSessionIndexLocked(sess.ID)
+	s.byID[sess.ID] = filePath
+	s.byUser[sess.UserID] = append(s.byUser[sess.UserID], sess.ID)
+	s.updatedAt[sess.ID] = sess.UpdatedAt
+	if sess.ParentSessionID != "" {
+		s.byParent[sess.ParentSessionID] = append(s.byParent[sess.ParentSessionID], sess.ID)
+	}
+	s.sortUserSessions(sess.UserID)
+}
+
+func (s *Store) removeSessionIndexLocked(id string) {
+	if id == "" {
+		return
+	}
+	delete(s.byID, id)
+	delete(s.updatedAt, id)
+	for userID, sessionIDs := range s.byUser {
+		filtered := slicesDelete(sessionIDs, id)
+		if len(filtered) == 0 {
+			delete(s.byUser, userID)
+			continue
+		}
+		s.byUser[userID] = filtered
+	}
+	for parentID, sessionIDs := range s.byParent {
+		filtered := slicesDelete(sessionIDs, id)
+		if len(filtered) == 0 {
+			delete(s.byParent, parentID)
+			continue
+		}
+		s.byParent[parentID] = filtered
+	}
+}
+
+func slicesDelete(values []string, target string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	filtered := values[:0]
+	for _, value := range values {
+		if value != target {
+			filtered = append(filtered, value)
+		}
+	}
+	return filtered
 }
 
 // ListSubSessions returns all sub-sessions for a parent session.

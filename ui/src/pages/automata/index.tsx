@@ -28,6 +28,7 @@ import { useClient, useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/ui/LoadingIndicator';
 import StatusChip from '@/ui/StatusChip';
+import { useAvailableModels } from '@/features/agent/hooks/useAvailableModels';
 import { updateAutomataMetadataInSpec } from './spec';
 
 type AutomataDetail = components['schemas']['AutomataDetailResponse'];
@@ -35,6 +36,8 @@ type AutomataSummary = components['schemas']['AutomataSummary'];
 type AutomataTask = components['schemas']['AutomataTask'];
 type AutomataKindValue = components['schemas']['AutomataKind'];
 type AutomataDisplayState = components['schemas']['AutomataDisplayStatus'];
+type AutomataPendingTurnMessage =
+  components['schemas']['AutomataPendingTurnMessage'];
 type AutomataControllerStatus =
   components['schemas']['AutomataControllerStatus'];
 
@@ -491,6 +494,7 @@ function AutomataPage(): React.ReactElement {
   const [iconUrlDraft, setIconUrlDraft] = React.useState('');
   const [descriptionDraft, setDescriptionDraft] = React.useState('');
   const [goalDraft, setGoalDraft] = React.useState('');
+  const [modelDraft, setModelDraft] = React.useState('');
   const [isEditingMetadata, setIsEditingMetadata] = React.useState(false);
   const [freeTextResponse, setFreeTextResponse] = React.useState('');
   const [selectedOptions, setSelectedOptions] = React.useState<string[]>([]);
@@ -506,6 +510,7 @@ function AutomataPage(): React.ReactElement {
     dagRunId: string;
   } | null>(null);
   const [selectedDAG, setSelectedDAG] = React.useState<string | null>(null);
+  const { models: availableModels } = useAvailableModels();
 
   React.useEffect(() => {
     appBar.setTitle('Automata');
@@ -580,6 +585,10 @@ function AutomataPage(): React.ReactElement {
     }
     return items;
   }, [detail]);
+  const queuedTurnMessages = React.useMemo<AutomataPendingTurnMessage[]>(
+    () => detail?.state?.pendingTurnMessages || [],
+    [detail?.state?.pendingTurnMessages]
+  );
   const lifecycleState = detail?.state?.state ?? '';
   const automataKind = detail?.definition?.kind ?? DEFAULT_AUTOMATA_KIND;
   const serviceKind = isServiceKind(automataKind);
@@ -630,7 +639,10 @@ function AutomataPage(): React.ReactElement {
   const iconUrlChanged =
     iconUrlDraft.trim() !== (detail?.definition?.iconUrl || '').trim();
   const goalChanged = goalDraft.trim() !== (detail?.definition?.goal || '').trim();
-  const metadataChanged = descriptionChanged || iconUrlChanged || goalChanged;
+  const modelChanged =
+    modelDraft.trim() !== (detail?.definition?.agent?.model || '').trim();
+  const metadataChanged =
+    descriptionChanged || iconUrlChanged || goalChanged || modelChanged;
   const metadataValidationError =
     !goalDraft.trim() ||
     !isValidAutomataIconUrl(iconUrlDraft) ||
@@ -668,11 +680,13 @@ function AutomataPage(): React.ReactElement {
       setDescriptionDraft(detail?.definition?.description || '');
       setIconUrlDraft(detail?.definition?.iconUrl || '');
       setGoalDraft(detail?.definition?.goal || '');
+      setModelDraft(detail?.definition?.agent?.model || '');
     }
   }, [
     detail?.definition?.description,
     detail?.definition?.iconUrl,
     detail?.definition?.goal,
+    detail?.definition?.agent?.model,
     isEditingMetadata,
   ]);
 
@@ -1142,6 +1156,7 @@ function AutomataPage(): React.ReactElement {
           description: descriptionDraft,
           iconUrl: iconUrlDraft,
           goal: goalDraft,
+          model: modelDraft,
         }
       );
       const { error: apiError } = await client.PUT('/automata/{name}/spec', {
@@ -1170,6 +1185,7 @@ function AutomataPage(): React.ReactElement {
     setDescriptionDraft(detail?.definition?.description || '');
     setIconUrlDraft(detail?.definition?.iconUrl || '');
     setGoalDraft(detail?.definition?.goal || '');
+    setModelDraft(detail?.definition?.agent?.model || '');
     setIsEditingMetadata(false);
   };
 
@@ -1619,8 +1635,24 @@ function AutomataPage(): React.ReactElement {
                       </span>
                     ) : null}
                   </div>
-                  {(detail.messages || []).length ? (
+                  {(detail.messages || []).length || queuedTurnMessages.length ? (
                     <div className="space-y-2">
+                      {queuedTurnMessages.map((message) => (
+                        <div
+                          key={`queued-${message.id}`}
+                          className="rounded-md border border-amber-300/40 bg-amber-50 p-2 text-sm dark:border-amber-700/40 dark:bg-amber-950/20"
+                        >
+                          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                            <span>{message.kind.replace(/_/g, ' ')} queued</span>
+                            <span className="normal-case tracking-normal">
+                              {new Date(message.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="whitespace-pre-wrap break-words">
+                            {message.message}
+                          </div>
+                        </div>
+                      ))}
                       {(detail.messages || []).slice(-5).map((message) => (
                         <div
                           key={message.id}
@@ -1661,7 +1693,7 @@ function AutomataPage(): React.ReactElement {
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground">
-                      No session messages yet.
+                      No session or queued messages yet.
                     </div>
                   )}
                 </div>
@@ -1725,6 +1757,43 @@ function AutomataPage(): React.ReactElement {
                             characters or fewer.
                           </div>
                         ) : null}
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="automata-detail-model">Model</Label>
+                        <Select
+                          value={modelDraft || '__inherit__'}
+                          onValueChange={(value) => {
+                            setModelDraft(value === '__inherit__' ? '' : value);
+                            setIsEditingMetadata(true);
+                          }}
+                          disabled={!!managementBusy || isSavingSpec || isEditingSpec}
+                        >
+                          <SelectTrigger id="automata-detail-model">
+                            <SelectValue placeholder="Use global default model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__inherit__">
+                              Use global default model
+                            </SelectItem>
+                            {detail.definition.agent?.model &&
+                            !availableModels.some(
+                              (model) => model.id === detail.definition.agent?.model
+                            ) ? (
+                              <SelectItem value={detail.definition.agent.model}>
+                                {detail.definition.agent.model} (missing)
+                              </SelectItem>
+                            ) : null}
+                            {availableModels.map((model) => (
+                              <SelectItem key={model.id} value={model.id}>
+                                {model.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="text-xs text-muted-foreground">
+                          Set an Automata-specific model here instead of inheriting
+                          the global default used by fresh sessions.
+                        </div>
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="automata-detail-description">

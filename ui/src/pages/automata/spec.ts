@@ -9,6 +9,7 @@ export function updateAutomataMetadataInSpec(
     description: string;
     iconUrl: string;
     goal: string;
+    model: string;
   }
 ): string {
   const parsed = parse(spec);
@@ -33,6 +34,22 @@ export function updateAutomataMetadataInSpec(
   }
 
   nextSpec.goal = metadata.goal.trim();
+
+  const nextModel = metadata.model.trim();
+  const currentAgent =
+    nextSpec.agent && typeof nextSpec.agent === 'object' && !Array.isArray(nextSpec.agent)
+      ? { ...(nextSpec.agent as Record<string, unknown>) }
+      : {};
+  if (nextModel) {
+    currentAgent.model = nextModel;
+  } else {
+    delete currentAgent.model;
+  }
+  if (Object.keys(currentAgent).length > 0) {
+    nextSpec.agent = currentAgent;
+  } else {
+    delete nextSpec.agent;
+  }
 
   return stringify(nextSpec);
 }

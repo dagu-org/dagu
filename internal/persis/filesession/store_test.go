@@ -578,6 +578,25 @@ func TestStore_GetMessages(t *testing.T) {
 	}
 }
 
+func TestStore_GetMessages_DiscoversSessionCreatedByAnotherStore(t *testing.T) {
+	baseDir := t.TempDir()
+	ctx := context.Background()
+
+	reader, err := New(baseDir)
+	require.NoError(t, err)
+
+	writer, err := New(baseDir)
+	require.NoError(t, err)
+
+	require.NoError(t, writer.CreateSession(ctx, createTestSession("sess1", "__automata__:Zenith")))
+	require.NoError(t, writer.AddMessage(ctx, "sess1", createTestMessage("msg1", "hello from scheduler", 1, agent.MessageTypeUser)))
+
+	msgs, err := reader.GetMessages(ctx, "sess1")
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "hello from scheduler", msgs[0].Content)
+}
+
 func TestStore_GetLatestSequenceID(t *testing.T) {
 	tests := []struct {
 		name      string

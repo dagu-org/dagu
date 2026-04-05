@@ -3,7 +3,10 @@
 
 package agent
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
 	// ErrMessageRequired is returned when a chat request has an empty message.
@@ -19,3 +22,26 @@ var (
 	// ErrPromptExpired is returned when the prompt has expired or was already answered.
 	ErrPromptExpired = errors.New("prompt expired or already answered")
 )
+
+type agentConfigError struct {
+	message string
+	cause   error
+}
+
+func (e *agentConfigError) Error() string {
+	return e.message
+}
+
+func (e *agentConfigError) Unwrap() error {
+	return ErrAgentNotConfigured
+}
+
+func wrapAgentConfigError(message string, cause error) error {
+	if cause == nil {
+		return &agentConfigError{message: message}
+	}
+	return &agentConfigError{
+		message: fmt.Sprintf("%s: %v", message, cause),
+		cause:   cause,
+	}
+}

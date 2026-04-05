@@ -4,9 +4,24 @@
 package cmd
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/auth"
+	"github.com/dagu-org/dagu/internal/cmn/config"
+	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
+	"github.com/dagu-org/dagu/internal/persis/fileagentconfig"
+	"github.com/dagu-org/dagu/internal/persis/fileagentmodel"
+	"github.com/dagu-org/dagu/internal/persis/fileagentoauth"
+	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
+	"github.com/dagu-org/dagu/internal/persis/fileagentsoul"
+	"github.com/dagu-org/dagu/internal/persis/filememory"
+	"github.com/dagu-org/dagu/internal/persis/filesession"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContext_StringParam(t *testing.T) {
@@ -91,4 +106,65 @@ func TestContext_StringParam(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestContext_newSchedulerAgentAPI_WiresOAuthManagerForCodexDefaultModel(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	ctxBase, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	cfg := &config.Config{
+		Paths: config.PathsConfig{
+			DAGsDir:        filepath.Join(root, "dags"),
+			DocsDir:        filepath.Join(root, "docs"),
+			LogDir:         filepath.Join(root, "logs"),
+			DataDir:        filepath.Join(root, "data"),
+			SessionsDir:    filepath.Join(root, "sessions"),
+			ConfigFileUsed: filepath.Join(root, "config.yaml"),
+			BaseConfig:     filepath.Join(root, "base.yaml"),
+		},
+		Server: config.Server{Session: config.SessionConfig{MaxPerUser: 10}},
+	}
+	cmdCtx := &Context{
+		Context: ctxBase,
+		Config:  cfg,
+	}
+
+	configStore, err := fileagentconfig.New(cfg.Paths.DataDir)
+	require.NoError(t, err)
+	agentCfg := agent.DefaultConfig()
+	agentCfg.DefaultModelID = "codex-default"
+	require.NoError(t, configStore.Save(ctxBase, agentCfg))
+
+	modelStore, err := fileagentmodel.New(filepath.Join(cfg.Paths.DataDir, "agent", "models"))
+	require.NoError(t, err)
+	require.NoError(t, modelStore.Create(ctxBase, &agent.ModelConfig{
+		ID:       "codex-default",
+		Name:     "Codex Default",
+		Provider: "openai-codex",
+		Model:    "gpt-5-3-codex",
+	}))
+
+	skillStore, err := fileagentskill.New(filepath.Join(cfg.Paths.DAGsDir, "skills"))
+	require.NoError(t, err)
+	soulStore, err := fileagentsoul.New(ctxBase, filepath.Join(cfg.Paths.DAGsDir, "souls"))
+	require.NoError(t, err)
+	sessionStore, err := filesession.New(cfg.Paths.SessionsDir, filesession.WithMaxPerUser(cfg.Server.Session.MaxPerUser))
+	require.NoError(t, err)
+	memoryStore, err := filememory.New(cfg.Paths.DAGsDir)
+	require.NoError(t, err)
+	oauthManager, err := fileagentoauth.NewManager(cfg.Paths.DataDir)
+	require.NoError(t, err)
+
+	api := cmdCtx.newSchedulerAgentAPI(nil, configStore, modelStore, skillStore, soulStore, sessionStore, memoryStore, oauthManager)
+
+	sessionID, err := api.CreateEmptySessionWithRuntime(ctxBase, agent.UserIdentity{
+		UserID:   "admin",
+		Username: "admin",
+		Role:     auth.RoleAdmin,
+	}, "", false, nil)
+	require.NoError(t, err)
+	assert.NotEmpty(t, sessionID)
 }

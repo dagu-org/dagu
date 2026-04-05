@@ -148,6 +148,7 @@ type sessionRuntimeConfig struct {
 // SessionRuntimeOptions applies runtime-scoped overrides when a session is
 // created or reactivated for a specific workflow controller.
 type SessionRuntimeOptions struct {
+	Model             string
 	AllowedTools      []string
 	SystemPromptExtra string
 	EnabledSkills     []string
@@ -542,14 +543,24 @@ func modelThinkingEffort(modelCfg *ModelConfig) llm.ThinkingEffort {
 	return effort
 }
 
-func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMode bool) (sessionRuntimeConfig, error) {
-	modelID := a.getDefaultModelID(ctx)
+func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMode bool, runtimeOpts *SessionRuntimeOptions) (sessionRuntimeConfig, error) {
+	modelID := ""
+	if runtimeOpts != nil {
+		modelID = strings.TrimSpace(runtimeOpts.Model)
+	}
 	if modelID == "" {
-		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+		modelID = a.getDefaultModelID(ctx)
+	}
+	if modelID == "" {
+		return sessionRuntimeConfig{}, wrapAgentConfigError("agent is not configured properly: no default model configured", nil)
 	}
 	_, modelCfg, err := a.resolveProvider(ctx, modelID)
 	if err != nil {
-		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+		label := "default model"
+		if runtimeOpts != nil && strings.TrimSpace(runtimeOpts.Model) != "" {
+			label = "model"
+		}
+		return sessionRuntimeConfig{}, wrapAgentConfigError(fmt.Sprintf("agent is not configured properly: failed to resolve %s %q", label, modelID), err)
 	}
 	enabledSkills := append([]string(nil), a.loadEnabledSkills(ctx)...)
 	return sessionRuntimeConfig{
@@ -571,11 +582,11 @@ func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMod
 func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, overrideDAGName string) (sessionRuntimeConfig, error) {
 	modelID := selectModel("", mgr.GetModel(), a.getDefaultModelID(ctx))
 	if modelID == "" {
-		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+		return sessionRuntimeConfig{}, wrapAgentConfigError("agent is not configured properly: no model configured for session", nil)
 	}
 	_, modelCfg, err := a.resolveProvider(ctx, modelID)
 	if err != nil {
-		return sessionRuntimeConfig{}, ErrAgentNotConfigured
+		return sessionRuntimeConfig{}, wrapAgentConfigError(fmt.Sprintf("agent is not configured properly: failed to resolve session model %q", modelID), err)
 	}
 	enabledSkills := append([]string(nil), mgr.enabledSkills...)
 	return sessionRuntimeConfig{
@@ -1188,7 +1199,7 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 	provider, modelCfg, err := a.resolveProvider(ctx, model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
-		return "", "", ErrAgentNotConfigured
+		return "", "", wrapAgentConfigError(fmt.Sprintf("agent is not configured properly: failed to resolve model %q", model), err)
 	}
 
 	now := time.Now()
@@ -1248,7 +1259,7 @@ func (a *API) CreateEmptySessionWithRuntime(
 	safeMode bool,
 	runtimeOpts *SessionRuntimeOptions,
 ) (string, error) {
-	cfg, err := a.defaultSessionRuntime(ctx, dagName, safeMode)
+	cfg, err := a.defaultSessionRuntime(ctx, dagName, safeMode, runtimeOpts)
 	if err != nil {
 		return "", err
 	}
@@ -1298,7 +1309,7 @@ func (a *API) GenerateAssistantMessage(ctx context.Context, sessionID string, us
 			return Message{}, err
 		}
 	} else {
-		runtimeCfg, err = a.defaultSessionRuntime(ctx, dagName, false)
+		runtimeCfg, err = a.defaultSessionRuntime(ctx, dagName, false, nil)
 		if err != nil {
 			return Message{}, err
 		}
@@ -1454,7 +1465,7 @@ func (a *API) prepareSessionRuntime(ctx context.Context, mgr *SessionManager, us
 	provider, modelCfg, err := a.resolveProvider(ctx, model)
 	if err != nil {
 		a.logger.Error("Failed to get LLM provider", "error", err)
-		return nil, "", "", ErrAgentNotConfigured
+		return nil, "", "", wrapAgentConfigError(fmt.Sprintf("agent is not configured properly: failed to resolve model %q", model), err)
 	}
 
 	mgr.SetSafeMode(req.SafeMode)

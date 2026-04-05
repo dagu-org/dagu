@@ -380,6 +380,7 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 		soul = loaded
 	}
 	return &agent.SessionRuntimeOptions{
+		Model:             def.Agent.Model,
 		AllowedTools:      allowedToolsForDefinition(def),
 		SystemPromptExtra: s.buildSystemPromptExtra(def, state, allowedDAGs),
 		EnabledSkills:     append([]string(nil), def.Agent.EnabledSkills...),

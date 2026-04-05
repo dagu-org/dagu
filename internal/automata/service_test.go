@@ -238,6 +238,46 @@ allowed_dags:
 	require.Equal(t, "https://cdn.example.com/automata/build-captain.png", items[0].IconURL)
 }
 
+func TestServicePutSpecResetsRuntimeWhenAgentConfigChanges(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecWithModel("build-app", "model-a")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateRunning
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-1"
+	state.LastError = "old error"
+	queueTurnMessage(state, "operator_message", "Operator update from tester:\nUse the new model.", fixedTime)
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpecWithModel("build-app", "model-b")))
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Empty(t, detail.State.SessionID)
+	require.Empty(t, detail.State.LastError)
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "Use the new model.")
+	_, err = svc.sessionStore.GetSession(ctx, "sess-1")
+	require.ErrorIs(t, err, agent.ErrSessionNotFound)
+}
+
 func TestServicePutSpecRejectsInvalidIconURL(t *testing.T) {
 	t.Parallel()
 
@@ -532,6 +572,48 @@ func TestServiceSubmitOperatorMessageQueuesMessage(t *testing.T) {
 	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[1].Kind)
 	require.Equal(t, fixedTime, detail.State.PendingTurnMessages[1].CreatedAt)
 	require.Contains(t, detail.State.PendingTurnMessages[1].Message, "Focus on the regression first.")
+}
+
+func TestServiceSubmitOperatorMessageAppendsToSessionWhenSessionExists(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	state.State = StateRunning
+	state.Instruction = "Handle the current assigned task."
+	state.InstructionUpdatedAt = fixedTime
+	state.InstructionUpdatedBy = "tester"
+	state.SessionID = "sess-1"
+	require.NoError(t, svc.sessionStore.CreateSession(ctx, &agent.Session{
+		ID:        state.SessionID,
+		UserID:    svc.systemUser(def.Name).UserID,
+		CreatedAt: fixedTime,
+		UpdatedAt: fixedTime,
+	}))
+	require.NoError(t, svc.saveState(ctx, def.Name, state))
+
+	err = svc.SubmitOperatorMessage(ctx, "software_dev", OperatorMessageRequest{
+		RequestedBy: "tester",
+		Message:     "Focus on the regression first.",
+	})
+	require.NoError(t, err)
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Len(t, detail.Messages, 1)
+	require.Equal(t, agent.MessageTypeUser, detail.Messages[0].Type)
+	require.Contains(t, detail.Messages[0].Content, "Focus on the regression first.")
+	require.Len(t, detail.State.PendingTurnMessages, 1)
+	require.Equal(t, "operator_message", detail.State.PendingTurnMessages[0].Kind)
+	require.Contains(t, detail.State.PendingTurnMessages[0].Message, "latest user message")
 }
 
 func TestServiceTaskUpdateWhileBlockedAppendsToSession(t *testing.T) {
@@ -981,6 +1063,66 @@ func TestServiceReconcileOnceReturnsInactiveRunningAutomataToIdle(t *testing.T) 
 	require.Equal(t, StateIdle, detail.State.State)
 	require.Equal(t, WaitingReasonNone, detail.State.WaitingReason)
 	require.Equal(t, "Handle the current assigned task.", detail.State.Instruction)
+}
+
+func TestServiceReconcileOnceRecordsActionableDefaultModelError(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime := newTestServiceWithSessionStore(t)
+	configStore := &testAgentConfigStore{
+		cfg: &agent.Config{
+			Enabled:        true,
+			DefaultModelID: "missing-model",
+		},
+	}
+	svc.agentAPI = agent.NewAPI(agent.APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   &testAgentModelStore{models: map[string]*agent.ModelConfig{}},
+		SessionStore: svc.sessionStore,
+	})
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle the current assigned task.",
+	}))
+
+	require.NoError(t, svc.ReconcileOnce(ctx))
+
+	detail, err := svc.Detail(ctx, "software_dev")
+	require.NoError(t, err)
+	require.Equal(t, StateRunning, detail.State.State)
+	require.Equal(t, fixedTime, detail.State.InstructionUpdatedAt)
+	require.Contains(t, detail.State.LastError, `failed to resolve default model "missing-model"`)
+	require.Contains(t, detail.State.LastError, "model not found")
+}
+
+func TestServiceRuntimeOptionsIncludeExplicitModel(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	spec := `goal: Complete the assigned software work
+allowed_dags:
+  names:
+    - build-app
+agent:
+  model: claude-sonnet-4-6
+  safeMode: true
+`
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	opts, err := svc.runtimeOptions(ctx, def, state)
+	require.NoError(t, err)
+	require.Equal(t, "claude-sonnet-4-6", opts.Model)
 }
 
 func TestControllerRuntimeSetTaskDonePersists(t *testing.T) {

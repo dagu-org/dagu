@@ -8,10 +8,19 @@ import {
   Status,
 } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { useClient, useQuery } from '@/hooks/api';
 import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
 import { AutomataMemorySection } from '@/features/automata/components/AutomataMemorySection';
+import { useAvailableModels } from '@/features/agent/hooks/useAvailableModels';
 import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
@@ -19,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import LoadingIndicator from '@/ui/LoadingIndicator';
 import StatusChip from '@/ui/StatusChip';
 import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
+import { updateAutomataMetadataInSpec } from '@/pages/automata/spec';
 
 type AutomataDetail = components['schemas']['AutomataDetailResponse'];
 type AgentMessage = components['schemas']['AgentMessage'];
@@ -184,11 +194,14 @@ export function AutomataDetailsModal({
   const [instructionDraft, setInstructionDraft] = React.useState('');
   const instructionTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [operatorMessageDraft, setOperatorMessageDraft] = React.useState('');
+  const [modelDraft, setModelDraft] = React.useState('');
+  const [isEditingMetadata, setIsEditingMetadata] = React.useState(false);
   const [selectedOptions, setSelectedOptions] = React.useState<string[]>([]);
   const [freeTextResponse, setFreeTextResponse] = React.useState('');
   const [actionError, setActionError] = React.useState('');
   const [busyAction, setBusyAction] = React.useState<string | null>(null);
   const stableNameRef = React.useRef(name);
+  const { models: availableModels } = useAvailableModels();
 
   if (name) {
     stableNameRef.current = name;
@@ -244,10 +257,23 @@ export function AutomataDetailsModal({
           : 15000,
     }
   );
+  const specQuery = useQuery(
+    '/automata/{name}/spec',
+    whenEnabled(isOpen && !!stableName, {
+      params: { path: { name: stableName } },
+    }),
+    { refreshInterval: 15000 }
+  );
 
   React.useEffect(() => {
     setInstructionDraft(data?.state?.instruction || '');
   }, [data?.state?.instruction, stableName]);
+
+  React.useEffect(() => {
+    if (!isEditingMetadata) {
+      setModelDraft(data?.definition?.agent?.model || '');
+    }
+  }, [data?.definition?.agent?.model, isEditingMetadata]);
 
   React.useEffect(() => {
     const node = instructionTextareaRef.current;
@@ -288,13 +314,49 @@ export function AutomataDetailsModal({
     : lifecycleState === 'running' || lifecycleState === 'waiting';
   const canResume = lifecycleState === 'paused';
   const canStartWithoutOpenTasks = serviceKind;
+  const metadataChanged =
+    modelDraft.trim() !== (data?.definition?.agent?.model || '').trim();
 
   const refreshAfterAction = React.useCallback(async () => {
-    await mutate();
+    await Promise.all([mutate(), specQuery.mutate()]);
     if (onUpdated) {
       await onUpdated();
     }
-  }, [mutate, onUpdated]);
+  }, [mutate, onUpdated, specQuery]);
+
+  const onSaveMetadata = React.useCallback(async () => {
+    if (!stableName || !data || !metadataChanged || busyAction) return;
+    const currentSpec = specQuery.data?.spec;
+    if (!currentSpec) {
+      setActionError('Automata spec is not loaded yet.');
+      return;
+    }
+    setActionError('');
+    setBusyAction('metadata');
+    try {
+      const nextSpec = updateAutomataMetadataInSpec(currentSpec, {
+        description: data.definition.description || '',
+        iconUrl: data.definition.iconUrl || '',
+        goal: data.definition.goal || '',
+        model: modelDraft,
+      });
+      const { error: apiError } = await client.PUT('/automata/{name}/spec', {
+        params: { path: { name: stableName } },
+        body: { spec: nextSpec },
+      });
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to save metadata');
+      }
+      setIsEditingMetadata(false);
+      await refreshAfterAction();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to save metadata'
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }, [busyAction, client, data, metadataChanged, modelDraft, refreshAfterAction, specQuery.data?.spec, stableName]);
 
   const onStart = React.useCallback(async () => {
     if (!stableName || !instructionDraft.trim()) return;
@@ -561,6 +623,56 @@ export function AutomataDetailsModal({
                         <span className="font-medium">Goal:</span>{' '}
                         {data.definition.goal || 'n/a'}
                       </p>
+                      <div className="grid gap-2">
+                        <Label htmlFor="cockpit-automata-model">Model</Label>
+                        <Select
+                          value={modelDraft || '__inherit__'}
+                          onValueChange={(value) => {
+                            setModelDraft(value === '__inherit__' ? '' : value);
+                            setIsEditingMetadata(true);
+                          }}
+                          disabled={!!busyAction}
+                        >
+                          <SelectTrigger id="cockpit-automata-model">
+                            <SelectValue placeholder="Use global default model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__inherit__">
+                              Use global default model
+                            </SelectItem>
+                            {data.definition.agent?.model &&
+                            !availableModels.some(
+                              (model) => model.id === data.definition.agent?.model
+                            ) ? (
+                              <SelectItem value={data.definition.agent.model}>
+                                {data.definition.agent.model} (missing)
+                              </SelectItem>
+                            ) : null}
+                            {availableModels.map((model) => (
+                              <SelectItem key={model.id} value={model.id}>
+                                {model.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-muted-foreground">
+                            Save here to persist `agent.model` into the Automata spec.
+                          </div>
+                          {metadataChanged ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={onSaveMetadata}
+                              disabled={!!busyAction}
+                            >
+                              {busyAction === 'metadata'
+                                ? 'Saving...'
+                                : 'Save Metadata'}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
                       {data.definition.description ? (
                         <p className="text-muted-foreground">
                           {data.definition.description}
@@ -622,15 +734,31 @@ export function AutomataDetailsModal({
                       </span>
                     ) : null}
                   </div>
-                  {data.messages?.length ? (
+                  {data.messages?.length || data.state.pendingTurnMessages?.length ? (
                     <div className="max-h-[30rem] space-y-3 overflow-y-auto">
-                      {data.messages.slice(-20).map((message) => (
+                      {(data.state.pendingTurnMessages || []).map((message) => (
+                        <div
+                          key={`queued-${message.id}`}
+                          className="rounded-md border border-amber-300/40 bg-amber-50 p-3 text-sm dark:border-amber-700/40 dark:bg-amber-950/20"
+                        >
+                          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                            <span>{message.kind.replace(/_/g, ' ')} queued</span>
+                            <span className="normal-case tracking-normal">
+                              {new Date(message.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="whitespace-pre-wrap break-words">
+                            {message.message}
+                          </div>
+                        </div>
+                      ))}
+                      {(data.messages || []).slice(-20).map((message) => (
                         <MessageBlock key={message.id} message={message} />
                       ))}
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground">
-                      No session messages yet.
+                      No session or queued messages yet.
                     </div>
                   )}
                 </div>

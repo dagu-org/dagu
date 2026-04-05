@@ -13,6 +13,7 @@ describe('updateAutomataMetadataInSpec', () => {
         description: 'Handles delivery work',
         iconUrl: '',
         goal: 'Ship it',
+        model: '',
       }
     );
 
@@ -30,6 +31,7 @@ describe('updateAutomataMetadataInSpec', () => {
         description: 'Handles delivery work',
         iconUrl: '',
         goal: 'Ship it',
+        model: '',
       }
     );
 
@@ -46,6 +48,7 @@ describe('updateAutomataMetadataInSpec', () => {
         description: '   ',
         iconUrl: '',
         goal: 'Ship it',
+        model: '',
       }
     );
 
@@ -75,6 +78,7 @@ describe('updateAutomataMetadataInSpec', () => {
         description: 'Handles delivery work',
         iconUrl: 'https://cdn.example.com/icon.png',
         goal: 'Ship it',
+        model: '',
       }
     );
 
@@ -97,6 +101,7 @@ describe('updateAutomataMetadataInSpec', () => {
         description: 'Automata workflow',
         iconUrl: ' ',
         goal: 'Ship it',
+        model: '',
       }
     );
 
@@ -114,6 +119,7 @@ describe('updateAutomataMetadataInSpec', () => {
         description: 'Handles delivery work',
         iconUrl: 'https://cdn.example.com/new.png',
         goal: 'Handle triage and delivery',
+        model: '',
       }
     );
 
@@ -123,5 +129,64 @@ describe('updateAutomataMetadataInSpec', () => {
       goal: 'Handle triage and delivery',
       allowed_dags: { names: ['build'] },
     });
+  });
+
+  it('sets agent model while preserving other agent config', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'goal: "Ship it"',
+        'allowed_dags:',
+        '  names:',
+        '    - "build"',
+        'agent:',
+        '  safeMode: true',
+        '  soul: "default"',
+        '',
+      ].join('\n'),
+      {
+        description: '',
+        iconUrl: '',
+        goal: 'Ship it',
+        model: 'claude-sonnet-4-6',
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      goal: 'Ship it',
+      agent: {
+        model: 'claude-sonnet-4-6',
+        safeMode: true,
+        soul: 'default',
+      },
+    });
+  });
+
+  it('removes agent model and preserves remaining agent config', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'goal: "Ship it"',
+        'allowed_dags:',
+        '  names:',
+        '    - "build"',
+        'agent:',
+        '  model: "gpt-5-3-codex"',
+        '  safeMode: true',
+        '',
+      ].join('\n'),
+      {
+        description: '',
+        iconUrl: '',
+        goal: 'Ship it',
+        model: ' ',
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      goal: 'Ship it',
+      agent: {
+        safeMode: true,
+      },
+    });
+    expect((parse(next) as { agent?: { model?: string } }).agent?.model).toBeUndefined();
   });
 });

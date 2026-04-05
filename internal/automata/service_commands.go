@@ -381,7 +381,7 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 	}
 	operatorMessage := buildOperatorMessage(req.RequestedBy, message)
 	turnMessage := operatorMessage
-	if state.CurrentRunRef != nil || (!isService(def) && state.State == StatePaused) {
+	if state.SessionID != "" {
 		if err := s.appendOperatorMessageToSession(ctx, name, state, operatorMessage); err != nil {
 			s.logger.Warn("failed to append queued operator message to automata session",
 				"automata", name,

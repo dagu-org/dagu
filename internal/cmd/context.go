@@ -739,31 +739,20 @@ func (c *Context) newSchedulerAutomataService(
 	if err != nil {
 		return nil, err
 	}
-	referencesDir := fileagentskill.SeedReferences(
-		filepath.Join(c.Config.Paths.DataDir, "agent", "references"),
+	oauthManager, err := fileagentoauth.NewManager(c.Config.Paths.DataDir)
+	if err != nil {
+		return nil, err
+	}
+	agentAPI := c.newSchedulerAgentAPI(
+		dagStore,
+		agentConfigStore,
+		modelStore,
+		skillStore,
+		soulStore,
+		sessionStore,
+		memoryStore,
+		oauthManager,
 	)
-	agentAPI := agent.NewAPI(agent.APIConfig{
-		ConfigStore:  agentConfigStore,
-		ModelStore:   modelStore,
-		SkillStore:   skillStore,
-		SoulStore:    soulStore,
-		WorkingDir:   c.Config.Paths.DAGsDir,
-		Logger:       slog.Default(),
-		SessionStore: sessionStore,
-		DAGStore:     dagStore,
-		MemoryStore:  memoryStore,
-		Environment: agent.EnvironmentInfo{
-			DAGsDir:        c.Config.Paths.DAGsDir,
-			DocsDir:        c.Config.Paths.DocsDir,
-			LogDir:         c.Config.Paths.LogDir,
-			DataDir:        c.Config.Paths.DataDir,
-			ConfigFile:     c.Config.Paths.ConfigFileUsed,
-			WorkingDir:     c.Config.Paths.DAGsDir,
-			BaseConfigFile: c.Config.Paths.BaseConfig,
-			ReferencesDir:  referencesDir,
-		},
-	})
-	agentAPI.StartCleanup(c.Context)
 	return automata.New(
 		c.Config,
 		dagStore,
@@ -782,6 +771,45 @@ func (c *Context) newSchedulerAutomataService(
 		}),
 		automata.WithLogger(slog.Default()),
 	), nil
+}
+
+func (c *Context) newSchedulerAgentAPI(
+	dagStore exec.DAGStore,
+	configStore agent.ConfigStore,
+	modelStore agent.ModelStore,
+	skillStore agent.SkillStore,
+	soulStore agent.SoulStore,
+	sessionStore agent.SessionStore,
+	memoryStore agent.MemoryStore,
+	oauthManager *agentoauth.Manager,
+) *agent.API {
+	referencesDir := fileagentskill.SeedReferences(
+		filepath.Join(c.Config.Paths.DataDir, "agent", "references"),
+	)
+	agentAPI := agent.NewAPI(agent.APIConfig{
+		ConfigStore:  configStore,
+		ModelStore:   modelStore,
+		SkillStore:   skillStore,
+		SoulStore:    soulStore,
+		WorkingDir:   c.Config.Paths.DAGsDir,
+		Logger:       slog.Default(),
+		SessionStore: sessionStore,
+		DAGStore:     dagStore,
+		MemoryStore:  memoryStore,
+		OAuthManager: oauthManager,
+		Environment: agent.EnvironmentInfo{
+			DAGsDir:        c.Config.Paths.DAGsDir,
+			DocsDir:        c.Config.Paths.DocsDir,
+			LogDir:         c.Config.Paths.LogDir,
+			DataDir:        c.Config.Paths.DataDir,
+			ConfigFile:     c.Config.Paths.ConfigFileUsed,
+			WorkingDir:     c.Config.Paths.DAGsDir,
+			BaseConfigFile: c.Config.Paths.BaseConfig,
+			ReferencesDir:  referencesDir,
+		},
+	})
+	agentAPI.StartCleanup(c.Context)
+	return agentAPI
 }
 
 // StringParam retrieves a string parameter from the command line flags.

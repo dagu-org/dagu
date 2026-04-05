@@ -88,6 +88,12 @@ func TestUpdateAgentConfig(t *testing.T) {
 		setup := newAgentTestSetup(t)
 		setup.configStore.config.Enabled = true
 		setup.configStore.config.DefaultModelID = "old-model"
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID:       "new-model",
+			Name:     "New Model",
+			Provider: "openai",
+			Model:    "gpt-4.1",
+		})
 
 		newDefault := "new-model"
 		resp, err := setup.api.UpdateAgentConfig(adminCtx(), apigen.UpdateAgentConfigRequestObject{
@@ -106,12 +112,38 @@ func TestUpdateAgentConfig(t *testing.T) {
 		assert.Equal(t, "new-model", *updateResp.DefaultModelId)
 	})
 
+	t.Run("rejects missing defaultModelId", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newAgentTestSetup(t)
+		setup.configStore.config.Enabled = true
+
+		missingDefault := "missing-model"
+		_, err := setup.api.UpdateAgentConfig(adminCtx(), apigen.UpdateAgentConfigRequestObject{
+			Body: &apigen.UpdateAgentConfigRequest{
+				DefaultModelId: &missingDefault,
+			},
+		})
+		require.Error(t, err)
+
+		var apiErr *apiV1.Error
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, "Model not found", apiErr.Message)
+		assert.Equal(t, "", setup.configStore.config.DefaultModelID)
+	})
+
 	t.Run("full update", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newAgentTestSetup(t)
 		setup.configStore.config.Enabled = true
 		setup.configStore.config.DefaultModelID = "old"
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID:       "new-default",
+			Name:     "New Default",
+			Provider: "openai",
+			Model:    "gpt-4.1",
+		})
 
 		newEnabled := false
 		newDefault := "new-default"
@@ -233,6 +265,12 @@ func TestUpdateAgentConfig_PersistsChanges(t *testing.T) {
 			Enabled:        true,
 			DefaultModelID: "model-1",
 		}
+		setup.modelStore.addModel(&agent.ModelConfig{
+			ID:       "model-2",
+			Name:     "Model 2",
+			Provider: "openai",
+			Model:    "gpt-4.1",
+		})
 
 		newEnabled := false
 		newDefault := "model-2"

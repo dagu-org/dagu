@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"net/http"
 
@@ -94,9 +95,33 @@ func (a *API) UpdateAgentConfig(ctx context.Context, request api.UpdateAgentConf
 		logger.Error(ctx, "Failed to load agent config", tag.Error(err))
 		return nil, ErrFailedToLoadAgentConfig
 	}
+	cfg = cloneAgentConfig(cfg)
 
 	if err := applyAgentConfigUpdates(cfg, request.Body); err != nil {
 		return nil, ErrInvalidToolPolicy
+	}
+
+	if request.Body.DefaultModelId != nil {
+		modelID := cfg.DefaultModelID
+		if modelID != "" {
+			if a.agentModelStore == nil {
+				return nil, errAgentModelStoreNotAvailable
+			}
+			model, err := a.agentModelStore.GetByID(ctx, modelID)
+			if err != nil {
+				if errors.Is(err, agent.ErrModelNotFound) {
+					return nil, errModelNotFound
+				}
+				return nil, &Error{
+					Code:       api.ErrorCodeInternalError,
+					Message:    "Failed to validate model",
+					HTTPStatus: http.StatusInternalServerError,
+				}
+			}
+			if err := a.validateModelProviderConfig(ctx, model, nil, nil); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// Validate that the selected soul exists (only when explicitly changed).
@@ -163,6 +188,28 @@ func toAgentConfigResponse(cfg *agent.Config) api.AgentConfigResponse {
 		}
 	}
 	return resp
+}
+
+func cloneAgentConfig(cfg *agent.Config) *agent.Config {
+	if cfg == nil {
+		return nil
+	}
+	cloned := *cfg
+	if cfg.ToolPolicy.Tools != nil {
+		cloned.ToolPolicy.Tools = make(map[string]bool, len(cfg.ToolPolicy.Tools))
+		maps.Copy(cloned.ToolPolicy.Tools, cfg.ToolPolicy.Tools)
+	}
+	if cfg.ToolPolicy.Bash.Rules != nil {
+		cloned.ToolPolicy.Bash.Rules = append([]agent.BashRule(nil), cfg.ToolPolicy.Bash.Rules...)
+	}
+	if cfg.EnabledSkills != nil {
+		cloned.EnabledSkills = append([]string(nil), cfg.EnabledSkills...)
+	}
+	if cfg.WebSearch != nil {
+		ws := *cfg.WebSearch
+		cloned.WebSearch = &ws
+	}
+	return &cloned
 }
 
 // applyAgentConfigUpdates applies non-nil fields from the update request to the agent configuration.

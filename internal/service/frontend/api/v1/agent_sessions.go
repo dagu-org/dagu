@@ -90,7 +90,11 @@ func mapAgentError(err error) error {
 	case errors.Is(err, agent.ErrMessageRequired):
 		return errAgentBadRequest
 	case errors.Is(err, agent.ErrAgentNotConfigured):
-		return errAgentNotConfigured
+		return &Error{
+			Code:       errAgentNotConfigured.Code,
+			Message:    err.Error(),
+			HTTPStatus: errAgentNotConfigured.HTTPStatus,
+		}
 	case errors.Is(err, agent.ErrSessionNotFound):
 		return errAgentSessionNotFound
 	case errors.Is(err, agent.ErrFailedToProcessMessage):

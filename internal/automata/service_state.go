@@ -80,6 +80,34 @@ func (s *Service) ResetState(ctx context.Context, name string) error {
 	return s.saveState(ctx, name, state)
 }
 
+func (s *Service) resetRuntimeForSpecChange(ctx context.Context, name string) error {
+	state, err := s.loadState(ctx, name)
+	if err != nil || state == nil {
+		return err
+	}
+	if err := s.cleanupRuntime(ctx, name, true); err != nil {
+		return err
+	}
+	state.SessionID = ""
+	state.CurrentRunRef = nil
+	state.LastRunRef = nil
+	state.CurrentCycleID = ""
+	state.PendingPrompt = nil
+	state.PendingResponse = nil
+	state.WaitingReason = WaitingReasonNone
+	state.LastSummary = ""
+	state.LastError = ""
+	if (state.State == StateRunning || state.State == StateWaiting) &&
+		len(state.PendingTurnMessages) == 0 {
+		queueTurnMessage(state, "config_updated",
+			"Automata configuration changed. Continue with the latest configuration and current instruction.",
+			s.clock(),
+		)
+		state.State = StateRunning
+	}
+	return s.saveState(ctx, name, state)
+}
+
 func (s *Service) ensureState(ctx context.Context, def *Definition) (*State, error) {
 	state, err := s.loadState(ctx, def.Name)
 	if err != nil {

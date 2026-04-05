@@ -193,6 +193,17 @@ allowed_dags:
 `
 }
 
+func automataSpecWithModel(allowedDAG, model string) string {
+	return `description: Software development automata
+goal: Complete the assigned software work
+allowed_dags:
+  names:
+    - ` + allowedDAG + `
+agent:
+  model: ` + model + `
+`
+}
+
 func automataSpecMultiDAGs() string {
 	return `description: Software development automata
 goal: Complete the assigned software work
