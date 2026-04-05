@@ -1330,7 +1330,7 @@ export interface paths {
         };
         /**
          * Get queued items for a specific queue
-         * @description Returns one forward-only page of queued DAG-runs for the specified queue.
+         * @description Returns one forward-only page of queued DAG-runs for the specified queue, ordered from the queue head toward the tail. The opaque cursor resumes after the last scanned queue entry.
          */
         get: operations["listQueueItems"];
         put?: never;

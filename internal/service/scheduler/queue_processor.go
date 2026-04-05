@@ -592,7 +592,7 @@ func (p *QueueProcessor) dispatchAndWaitForStartup(
 			if err != nil {
 				var staleErr *exec.StaleQueueDispatchError
 				if errors.As(err, &staleErr) {
-					return err
+					return backoff.PermanentError(err)
 				}
 				// Permanent dispatch error (e.g. selector mismatch): stop retrying.
 				if errors.Is(err, backoff.ErrPermanent) {

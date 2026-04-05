@@ -186,6 +186,39 @@ steps:
 		require.Contains(t, err.Error(), "dag-run is not queued")
 	})
 
+	t.Run("RetryAllowsRootFlagPointingAtSameRun", func(t *testing.T) {
+		th := test.SetupCommand(t)
+
+		dagFile := th.DAG(t, `name: retry-root-same-run
+steps:
+  - name: "1"
+    command: echo retry root
+`)
+
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args: []string{"start", "--run-id=root-same-run", dagFile.Location},
+		})
+
+		th.RunCommand(t, cmd.Retry(), test.CmdTest{
+			Args: []string{
+				"retry",
+				"--run-id=root-same-run",
+				"--root=" + dagFile.Name + ":root-same-run",
+				dagFile.Location,
+			},
+		})
+
+		latestAttempt, err := th.DAGRunStore.FindAttempt(
+			th.Context,
+			exec.NewDAGRunRef(dagFile.Name, "root-same-run"),
+		)
+		require.NoError(t, err)
+
+		latestStatus, err := latestAttempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.Equal(t, core.Succeeded, latestStatus.Status)
+	})
+
 	t.Run("QueuedCatchupRetryRestoresEnvSecretsFromPersistedFullDAG", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		t.Setenv("QUEUED_CATCHUP_SECRET_SOURCE", "from-host")

@@ -135,6 +135,31 @@ func TestListQueueItemsUsesCursorPaginationAndSkipsRunningEntries(t *testing.T) 
 	assert.Nil(t, secondPage.NextCursor)
 }
 
+func TestListQueuesReturnsDeterministicQueueOrder(t *testing.T) {
+	t.Parallel()
+
+	a := &API{
+		config: &config.Config{
+			Queues: config.Queues{
+				Enabled: true,
+				Config: []config.QueueConfig{
+					{Name: "z-queue", MaxActiveRuns: 1},
+					{Name: "a-queue", MaxActiveRuns: 1},
+				},
+			},
+		},
+	}
+
+	resp, err := a.ListQueues(context.Background(), openapiv1.ListQueuesRequestObject{})
+	require.NoError(t, err)
+
+	queueResp, ok := resp.(openapiv1.ListQueues200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, queueResp.Queues, 2)
+	assert.Equal(t, "a-queue", queueResp.Queues[0].Name)
+	assert.Equal(t, "z-queue", queueResp.Queues[1].Name)
+}
+
 func createDistributedQueueRun(
 	t *testing.T,
 	ctx context.Context,

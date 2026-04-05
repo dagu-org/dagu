@@ -107,9 +107,21 @@ func (b *SubCmdBuilder) filteredEnv(extra ...string) []string {
 }
 
 func (b *SubCmdBuilder) parentEnv(extra ...string) []string {
-	env := os.Environ()
+	env := filteredParentEnv()
 	env = append(env, extra...)
 	return env
+}
+
+func filteredParentEnv() []string {
+	env := os.Environ()
+	filtered := env[:0]
+	for _, entry := range env {
+		if strings.HasPrefix(entry, exec1.EnvKeyQueueDispatchRetry+"=") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
 }
 
 func dagNameHint(target string) string {

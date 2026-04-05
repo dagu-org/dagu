@@ -170,4 +170,35 @@ steps:
 	length, err := th.QueueStore.Len(th.Context, dag.ProcGroup())
 	require.NoError(t, err)
 	assert.Equal(t, 0, length)
+
+	_, err = th.DAGRunStore.FindAttempt(th.Context, exec.NewDAGRunRef(dag.Name, "valid-run"))
+	assert.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
+}
+
+func TestDequeueCommand_TargetedDequeueFallsBackToRequestedQueueForOrphanedItem(t *testing.T) {
+	th := test.SetupCommand(t)
+
+	dag := th.DAG(t, `queue: fallback-queue
+steps:
+  - name: "1"
+    command: "true"
+`)
+
+	runRef := exec.NewDAGRunRef(dag.Name, "orphaned-run")
+	require.NoError(t, th.QueueStore.Enqueue(
+		th.Context,
+		dag.ProcGroup(),
+		exec.QueuePriorityLow,
+		runRef,
+	))
+
+	th.RunCommand(t, cmd.Dequeue(), test.CmdTest{
+		Name:        "DequeueOrphanedRun",
+		Args:        []string{"dequeue", dag.ProcGroup(), "--dag-run", runRef.String()},
+		ExpectedOut: []string{"Removed orphaned queued dag-run"},
+	})
+
+	length, err := th.QueueStore.Len(th.Context, dag.ProcGroup())
+	require.NoError(t, err)
+	assert.Equal(t, 0, length)
 }

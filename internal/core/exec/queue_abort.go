@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
 	"github.com/dagu-org/dagu/internal/core"
 )
 
@@ -64,6 +66,12 @@ func AbortQueuedDAGRun(ctx context.Context, dagRunStore DAGRunStore, dagRun DAGR
 	}
 
 	if err := attempt.Hide(ctx); err != nil {
+		logger.Warn(ctx, "Queued DAG-run was aborted but hiding the attempt failed",
+			tag.DAG(dagRun.Name),
+			tag.RunID(dagRun.ID),
+			tag.AttemptID(attempt.ID()),
+			tag.Error(err),
+		)
 		return fmt.Errorf("hide aborted attempt: %w", err)
 	}
 

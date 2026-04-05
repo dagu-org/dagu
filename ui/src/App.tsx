@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Theme } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import React from 'react';

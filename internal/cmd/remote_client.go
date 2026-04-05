@@ -223,8 +223,9 @@ func (c *remoteClient) dequeueDAGRun(ctx context.Context, name, dagRunID string)
 
 func (c *remoteClient) listQueueItems(ctx context.Context, queueName string, limit int, cursor string) (*api.QueuedDAGRunsPageResponse, error) {
 	var out api.QueuedDAGRunsPageResponse
-	params := map[string]string{
-		"limit": fmt.Sprintf("%d", limit),
+	params := map[string]string{}
+	if limit > 0 {
+		params["limit"] = fmt.Sprintf("%d", limit)
 	}
 	if cursor != "" {
 		params["cursor"] = cursor

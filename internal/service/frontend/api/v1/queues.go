@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/dagu-org/dagu/api/v1"
@@ -32,8 +33,14 @@ func (a *API) ListQueues(ctx context.Context, _ api.ListQueuesRequestObject) (ap
 	}
 
 	queues := make([]api.Queue, 0, len(queueMap))
+	queueNames := make([]string, 0, len(queueMap))
+	for queueName := range queueMap {
+		queueNames = append(queueNames, queueName)
+	}
+	sort.Strings(queueNames)
 	var totalRunning, totalQueued, totalCapacity int
-	for _, q := range queueMap {
+	for _, queueName := range queueNames {
+		q := queueMap[queueName]
 		queue, err := a.toQueueResource(ctx, q)
 		if err != nil {
 			return nil, err

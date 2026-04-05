@@ -141,10 +141,14 @@ function QueueDetailsPage() {
     refreshToken,
   });
 
+  const handleLoadMore = React.useCallback(() => {
+    void loadMore();
+  }, [loadMore]);
+
   useAutoLoadMore(
     sentinelRef,
     hasMore && !isLoadingMore && !queuedItemsError,
-    () => void loadMore()
+    handleLoadMore
   );
 
   const {

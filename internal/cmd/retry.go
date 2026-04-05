@@ -93,29 +93,18 @@ func runRetry(ctx *Context, args []string) error {
 
 	ref := exec.NewDAGRunRef(name, dagRunID)
 	queueDispatchRetry := queueDispatchRetryRequested()
-	var attempt exec.DAGRunAttempt
-	if rootRun.Zero() {
-		attempt, err = ctx.DAGRunStore.FindAttempt(ctx, ref)
+	attempt, err := findRetryAttempt(ctx, ctx.DAGRunStore, ref, rootRun)
+	if queueDispatchRetry {
+		err = normalizeQueueDispatchRetryLookupError(err)
+	}
+	if err != nil {
 		if queueDispatchRetry {
-			err = normalizeQueueDispatchRetryLookupError(err)
+			return err
 		}
-		if err != nil {
-			if queueDispatchRetry {
-				return err
-			}
+		if rootRun.Zero() || rootRun.ID == ref.ID {
 			return fmt.Errorf("failed to find the record for dag-run ID %s: %w", dagRunID, err)
 		}
-	} else {
-		attempt, err = ctx.DAGRunStore.FindSubAttempt(ctx, rootRun, dagRunID)
-		if queueDispatchRetry {
-			err = normalizeQueueDispatchRetryLookupError(err)
-		}
-		if err != nil {
-			if queueDispatchRetry {
-				return err
-			}
-			return fmt.Errorf("failed to find the sub DAG record for dag-run ID %s under root %s: %w", dagRunID, rootRun, err)
-		}
+		return fmt.Errorf("failed to find the sub DAG record for dag-run ID %s under root %s: %w", dagRunID, rootRun, err)
 	}
 
 	status, err := attempt.ReadStatus(ctx)

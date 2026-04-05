@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,7 +56,15 @@ vi.mock('../ChatInput', () => ({
 }));
 
 vi.mock('../SessionSidebar', () => ({
-  SessionSidebar: () => null,
+  SessionSidebar: ({
+    onSelectSession,
+  }: {
+    onSelectSession: (sessionId: string) => void;
+  }) => (
+    <button type="button" onClick={() => onSelectSession('new')}>
+      Sidebar new session
+    </button>
+  ),
 }));
 
 vi.mock('../DelegatePanel', () => ({
@@ -162,6 +173,15 @@ describe('AgentChatModal', () => {
 
     rerender(<AgentChatModal />);
 
+    expect(selectSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the session when the sidebar requests a new session', () => {
+    render(<AgentChatModal />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sidebar new session' }));
+
+    expect(clearSessionMock).toHaveBeenCalledTimes(1);
     expect(selectSessionMock).not.toHaveBeenCalled();
   });
 });

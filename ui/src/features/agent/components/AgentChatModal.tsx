@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, X } from 'lucide-react';

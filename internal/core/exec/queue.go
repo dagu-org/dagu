@@ -127,6 +127,9 @@ func (m *MockQueueStore) List(ctx context.Context, name string) ([]QueuedItemDat
 
 func (m *MockQueueStore) ListCursor(ctx context.Context, name, cursor string, limit int) (CursorResult[QueuedItemData], error) {
 	args := m.Called(ctx, name, cursor, limit)
+	if args.Get(0) == nil {
+		return CursorResult[QueuedItemData]{}, args.Error(1)
+	}
 	return args.Get(0).(CursorResult[QueuedItemData]), args.Error(1)
 }
 

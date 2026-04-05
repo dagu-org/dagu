@@ -10,6 +10,7 @@ import { QueueSelectionItem } from './useQueueSelection';
 export type QueueBatchPhase = 'confirm' | 'running' | 'complete';
 
 type ActiveBatch = {
+  remoteNode: string;
   snapshot: QueueSelectionItem[];
 };
 
@@ -110,14 +111,18 @@ export function useQueueBatchDequeue({
       return;
     }
     setActiveBatch({
+      remoteNode,
       snapshot: [...selectedRuns],
     });
     setPhase('confirm');
     setProgress(createEmptyProgress());
-  }, [selectedRuns]);
+  }, [remoteNode, selectedRuns]);
 
   const submitBatchItem = React.useCallback(
-    async (dagRun: QueueSelectionItem): Promise<QueueBatchResult> => {
+    async (
+      dagRun: QueueSelectionItem,
+      batchRemoteNode: string
+    ): Promise<QueueBatchResult> => {
       const fallback = 'Failed to dequeue DAG run';
 
       try {
@@ -128,7 +133,7 @@ export function useQueueBatchDequeue({
               dagRunId: dagRun.dagRunId,
             },
             query: {
-              remoteNode,
+              remoteNode: batchRemoteNode,
             },
           },
         });
@@ -164,7 +169,7 @@ export function useQueueBatchDequeue({
         };
       }
     },
-    [client, remoteNode]
+    [client]
   );
 
   const submitBatchDequeue = React.useCallback(async () => {
@@ -172,7 +177,7 @@ export function useQueueBatchDequeue({
       return;
     }
 
-    const { snapshot } = activeBatch;
+    const { remoteNode: batchRemoteNode, snapshot } = activeBatch;
     const results: QueueBatchResult[] = [];
     let successCount = 0;
     let skippedCount = 0;
@@ -202,7 +207,7 @@ export function useQueueBatchDequeue({
         successCount,
       });
 
-      const result = await submitBatchItem(dagRun);
+      const result = await submitBatchItem(dagRun, batchRemoteNode);
       results.push(result);
 
       if (!result.ok) {

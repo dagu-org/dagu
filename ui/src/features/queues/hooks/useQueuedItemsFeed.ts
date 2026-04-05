@@ -19,22 +19,6 @@ interface UseQueuedItemsFeedProps {
 const getQueueFeedKey = (dagRun: QueueDAGRun): string =>
   `${dagRun.name}\u0000${dagRun.dagRunId}`;
 
-const getQueueFeedError = (error: unknown, fallback: string): string => {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (
-    error &&
-    typeof error === 'object' &&
-    'message' in error &&
-    typeof error.message === 'string' &&
-    error.message.length > 0
-  ) {
-    return error.message;
-  }
-  return fallback;
-};
-
 const mergeQueuedItems = (
   previous: QueueDAGRun[],
   next: QueueDAGRun[]
@@ -144,7 +128,17 @@ export function useQueuedItemsFeed({
         if (requestIDRef.current !== requestID) {
           return;
         }
-        setError(getQueueFeedError(error, 'Failed to load queued items.'));
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : error &&
+                typeof error === 'object' &&
+                'message' in error &&
+                typeof error.message === 'string' &&
+                error.message.length > 0
+              ? error.message
+              : 'Failed to load queued items.';
+        setError(message);
         setIsLoading(false);
         setIsLoadingMore(false);
       }
@@ -166,21 +160,9 @@ export function useQueuedItemsFeed({
     void loadPage(true);
   }, [enabled, loadPage, refreshToken]);
 
-  const loadMore = React.useCallback(async () => {
-    try {
-      await loadPage(false);
-    } catch (error) {
-      setError(getQueueFeedError(error, 'Failed to load more queued items.'));
-    }
-  }, [loadPage]);
+  const loadMore = React.useCallback(() => loadPage(false), [loadPage]);
 
-  const reload = React.useCallback(async () => {
-    try {
-      await loadPage(true);
-    } catch (error) {
-      setError(getQueueFeedError(error, 'Failed to reload queued items.'));
-    }
-  }, [loadPage]);
+  const reload = React.useCallback(() => loadPage(true), [loadPage]);
 
   return {
     error,

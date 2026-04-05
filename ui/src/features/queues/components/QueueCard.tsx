@@ -25,7 +25,7 @@ function QueueCard({ queue }: QueueCardProps) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-foreground">
+          <h3 className="whitespace-normal break-words text-base font-semibold text-foreground">
             {queue.name}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
