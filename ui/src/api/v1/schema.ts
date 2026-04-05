@@ -1290,7 +1290,7 @@ export interface paths {
         };
         /**
          * List all execution queues with summary statistics
-         * @description Returns queue list with running/queued counts and a tiny queued preview. Use /queues/{name} for queue details and /queues/{name}/items for queued backlog browsing.
+         * @description Returns queue list with running and queued counts. Use /queues/{name} for queue details and /queues/{name}/items for queued backlog browsing.
          */
         get: operations["listQueues"];
         put?: never;
@@ -1310,7 +1310,7 @@ export interface paths {
         };
         /**
          * Get summary information for a specific queue
-         * @description Returns queue metadata, running items, queued counts, and a tiny queued preview for the specified queue.
+         * @description Returns queue metadata, running items, and queued counts for the specified queue.
          */
         get: operations["getQueue"];
         put?: never;
@@ -3655,8 +3655,6 @@ export interface components {
             queuedCount: number;
             /** @description List of currently running DAG-runs (bounded by maxConcurrency) */
             running: components["schemas"]["DAGRunSummary"][];
-            /** @description Tiny preview of the next queued DAG-runs for this queue */
-            queuedPreview: components["schemas"]["DAGRunSummary"][];
         };
         /** @description Forward-only paginated queued DAG-run response */
         QueuedDAGRunsPageResponse: {

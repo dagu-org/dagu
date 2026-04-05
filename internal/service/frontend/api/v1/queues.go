@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	queuePreviewLimit     = 3
 	defaultQueueListLimit = 100
 	maxQueueListLimit     = 500
 	queueCursorScanBatch  = 64
@@ -142,7 +141,6 @@ type queueInfo struct {
 	maxConcurrency int
 	running        []api.DAGRunSummary
 	queuedCount    int
-	queuedPreview  []api.DAGRunSummary
 }
 
 // getOrCreateQueue returns an existing queue from the map or creates a new one.
@@ -294,23 +292,12 @@ func (a *API) toQueueResource(ctx context.Context, q *queueInfo) (api.Queue, err
 		return api.Queue{}, nil
 	}
 
-	if q.queuedCount > 0 && a.queueStore != nil {
-		preview, _, err := a.listVisibleQueuedItems(ctx, q.name, queuePreviewLimit, "")
-		if err != nil {
-			return api.Queue{}, err
-		}
-		q.queuedPreview = preview
-	} else {
-		q.queuedPreview = []api.DAGRunSummary{}
-	}
-
 	queue := api.Queue{
-		Name:          q.name,
-		Type:          api.QueueType(q.queueType),
-		Running:       q.running,
-		RunningCount:  len(q.running),
-		QueuedCount:   q.queuedCount,
-		QueuedPreview: q.queuedPreview,
+		Name:         q.name,
+		Type:         api.QueueType(q.queueType),
+		Running:      q.running,
+		RunningCount: len(q.running),
+		QueuedCount:  q.queuedCount,
 	}
 	if q.maxConcurrency > 0 {
 		queue.MaxConcurrency = &q.maxConcurrency

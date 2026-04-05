@@ -81,9 +81,6 @@ function queueRefreshToken(
     running: (queue.running ?? []).map(
       (dagRun) => `${dagRun.name}:${dagRun.dagRunId}:${dagRun.status}`
     ),
-    preview: (queue.queuedPreview ?? []).map(
-      (dagRun) => `${dagRun.name}:${dagRun.dagRunId}:${dagRun.status}`
-    ),
   });
 }
 
@@ -204,10 +201,9 @@ function QueueDetailsPage() {
   const totalBatchCount = activeBatch?.snapshot.length ?? 0;
   const isDialogLocked = phase === 'running' || progress.isRefreshing;
   const isProcessing = phase === 'running' || phase === 'complete';
-  const utilization =
-    queue?.type === 'global' && queue.maxConcurrency
-      ? Math.round(((queue.runningCount || 0) / queue.maxConcurrency) * 100)
-      : null;
+  const utilization = queue?.maxConcurrency
+    ? Math.round(((queue.runningCount || 0) / queue.maxConcurrency) * 100)
+    : null;
 
   const renderResultDetails = (result: QueueBatchResult): React.JSX.Element => {
     if (!result.ok) {
@@ -271,11 +267,6 @@ function QueueDetailsPage() {
               <span className="text-lg font-medium">
                 {queue?.name || queueName}
               </span>
-              {queue && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                  {queue.type}
-                </span>
-              )}
             </div>
           </div>
 

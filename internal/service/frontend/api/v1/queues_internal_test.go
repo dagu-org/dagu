@@ -49,7 +49,6 @@ func TestGetQueueFiltersDistributedRunsByLeaseFreshness(t *testing.T) {
 	queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
 	require.True(t, ok)
 	require.Len(t, queueResp.Running, 1)
-	require.Empty(t, queueResp.QueuedPreview)
 	assert.Equal(t, "fresh-run", queueResp.Running[0].DagRunId)
 	assert.Equal(t, openapiv1.StatusRunning, queueResp.Running[0].Status)
 }
@@ -81,40 +80,7 @@ func TestGetQueueFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing.T) {
 	queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
 	require.True(t, ok)
 	require.Len(t, queueResp.Running, 1)
-	require.Empty(t, queueResp.QueuedPreview)
 	assert.Equal(t, "fresh-run", queueResp.Running[0].DagRunId)
-}
-
-func TestGetQueueIncludesTinyQueuedPreview(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	tmpDir := t.TempDir()
-	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
-	queueStore := filequeue.New(filepath.Join(tmpDir, "queue"))
-	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
-
-	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "preview-q", "run-1", core.Queued)
-	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "preview-q", "run-2", core.Running)
-	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "preview-q", "run-3", core.Queued)
-	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "preview-q", "run-4", core.Queued)
-
-	a := &API{
-		dagRunStore: dagRunStore,
-		queueStore:  queueStore,
-		procStore:   procStore,
-		config:      &config.Config{},
-	}
-
-	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{Name: "preview-q"})
-	require.NoError(t, err)
-
-	queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
-	require.True(t, ok)
-	require.Len(t, queueResp.QueuedPreview, 3)
-	assert.Equal(t, "run-1", queueResp.QueuedPreview[0].DagRunId)
-	assert.Equal(t, "run-3", queueResp.QueuedPreview[1].DagRunId)
-	assert.Equal(t, "run-4", queueResp.QueuedPreview[2].DagRunId)
 }
 
 func TestListQueueItemsUsesCursorPaginationAndSkipsRunningEntries(t *testing.T) {
