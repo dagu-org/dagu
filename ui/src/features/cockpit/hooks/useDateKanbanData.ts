@@ -3,16 +3,33 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
 import { components, Status } from '@/api/v1/schema';
-import { useExactDAGRuns } from '@/features/dag-runs/hooks/dagRunPagination';
+import { usePaginatedDAGRuns } from '@/features/dag-runs/hooks/dagRunPagination';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
+const QUEUED_PAGE_LIMIT = 10;
+const RUNNING_PAGE_LIMIT = 20;
+const WAITING_PAGE_LIMIT = 20;
+const DONE_PAGE_LIMIT = 10;
+const FAILED_PAGE_LIMIT = 10;
+
+export interface KanbanColumnData {
+  runs: DAGRunSummary[];
+  hasMore: boolean;
+  isInitialLoading: boolean;
+  isLoadingMore: boolean;
+  error: Error | null;
+  loadMoreError: string | null;
+  loadMore: () => Promise<void>;
+  retry: () => Promise<void>;
+}
+
 export interface KanbanColumns {
-  queued: DAGRunSummary[];
-  running: DAGRunSummary[];
-  review: DAGRunSummary[];
-  done: DAGRunSummary[];
-  failed: DAGRunSummary[];
+  queued: KanbanColumnData;
+  running: KanbanColumnData;
+  review: KanbanColumnData;
+  done: KanbanColumnData;
+  failed: KanbanColumnData;
 }
 
 function dayBounds(
@@ -29,38 +46,44 @@ function dayBounds(
   };
 }
 
-function groupByStatus(runs: DAGRunSummary[]): KanbanColumns {
-  const columns: KanbanColumns = {
-    queued: [],
-    running: [],
-    review: [],
-    done: [],
-    failed: [],
+function useKanbanBucket(
+  query: {
+    remoteNode: string;
+    tags?: string;
+    fromDate: number;
+    toDate: number;
+    status: Status[];
+    limit: number;
+  },
+  liveEnabled: boolean,
+  fallbackIntervalMs: number
+): KanbanColumnData {
+  const {
+    dagRuns,
+    error,
+    isInitialLoading,
+    isLoadingMore,
+    loadMoreError,
+    hasMore,
+    refresh,
+    loadMore,
+  } = usePaginatedDAGRuns({
+    query,
+    liveEnabled,
+    fallbackIntervalMs,
+    resetOnSSEInvalidate: liveEnabled,
+  });
+
+  return {
+    runs: dagRuns,
+    hasMore,
+    isInitialLoading,
+    isLoadingMore,
+    error,
+    loadMoreError,
+    loadMore,
+    retry: refresh,
   };
-  for (const run of runs) {
-    switch (run.status) {
-      case Status.Queued:
-      case Status.NotStarted:
-        columns.queued.push(run);
-        break;
-      case Status.Running:
-        columns.running.push(run);
-        break;
-      case Status.Waiting:
-        columns.review.push(run);
-        break;
-      case Status.Success:
-      case Status.PartialSuccess:
-        columns.done.push(run);
-        break;
-      case Status.Failed:
-      case Status.Aborted:
-      case Status.Rejected:
-        columns.failed.push(run);
-        break;
-    }
-  }
-  return columns;
 }
 
 export function useDateKanbanData(
@@ -78,7 +101,7 @@ export function useDateKanbanData(
     () => dayBounds(date, tzOffsetInSec),
     [date, tzOffsetInSec]
   );
-  const dagRunsQuery = useMemo(
+  const baseQuery = useMemo(
     () => ({
       remoteNode,
       tags: tag,
@@ -87,37 +110,80 @@ export function useDateKanbanData(
     }),
     [fromDate, remoteNode, tag, toDate]
   );
+  const fallbackIntervalMs = isToday ? 2000 : 0;
 
-  const { data, error, refresh } = useExactDAGRuns({
-    query: dagRunsQuery,
-    liveEnabled: isLive,
-    fallbackIntervalMs: isToday ? 2000 : 0,
-  });
+  const queued = useKanbanBucket(
+    {
+      ...baseQuery,
+      status: [Status.Queued, Status.NotStarted],
+      limit: QUEUED_PAGE_LIMIT,
+    },
+    isLive,
+    fallbackIntervalMs
+  );
+  const running = useKanbanBucket(
+    {
+      ...baseQuery,
+      status: [Status.Running],
+      limit: RUNNING_PAGE_LIMIT,
+    },
+    isLive,
+    fallbackIntervalMs
+  );
+  const review = useKanbanBucket(
+    {
+      ...baseQuery,
+      status: [Status.Waiting],
+      limit: WAITING_PAGE_LIMIT,
+    },
+    isLive,
+    fallbackIntervalMs
+  );
+  const done = useKanbanBucket(
+    {
+      ...baseQuery,
+      status: [Status.Success, Status.PartialSuccess],
+      limit: DONE_PAGE_LIMIT,
+    },
+    isLive,
+    fallbackIntervalMs
+  );
+  const failed = useKanbanBucket(
+    {
+      ...baseQuery,
+      status: [Status.Failed, Status.Aborted, Status.Rejected],
+      limit: FAILED_PAGE_LIMIT,
+    },
+    isLive,
+    fallbackIntervalMs
+  );
 
-  const typedError = useMemo(() => {
-    if (!error) {
-      return null;
-    }
-    if (error instanceof Error) {
-      return error;
-    }
-    return new Error('Failed to load runs');
-  }, [error]);
+  const columns = useMemo(
+    () => ({
+      queued,
+      running,
+      review,
+      done,
+      failed,
+    }),
+    [done, failed, queued, review, running]
+  );
 
-  const columns = useMemo(() => groupByStatus(data), [data]);
-
-  const isEmpty =
-    columns.queued.length === 0 &&
-    columns.running.length === 0 &&
-    columns.review.length === 0 &&
-    columns.done.length === 0 &&
-    columns.failed.length === 0;
+  const allColumns = [queued, running, review, done, failed];
+  const hasAnyRuns = allColumns.some((column) => column.runs.length > 0);
+  const firstError =
+    allColumns.find((column) => column.error != null)?.error ?? null;
+  const isLoading =
+    !hasAnyRuns && allColumns.some((column) => column.isInitialLoading);
+  const isEmpty = !hasAnyRuns && !isLoading && firstError == null;
 
   return {
     columns,
-    error: typedError,
-    isLoading: data.length === 0 && !typedError,
+    error: !hasAnyRuns ? firstError : null,
+    isLoading,
     isEmpty,
-    retry: refresh,
+    retry: async () => {
+      await Promise.all(allColumns.map((column) => column.retry()));
+    },
   };
 }

@@ -15,16 +15,22 @@ export interface SSEState<T> {
  * Builds an SSE endpoint URL with query parameters from an object.
  * Filters out null/undefined values and converts values to strings.
  */
-export function buildSSEEndpoint(
-  basePath: string,
-  params: object
-): string {
+export function buildSSEEndpoint(basePath: string, params: object): string {
   const searchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(params)) {
-    if (value != null) {
-      searchParams.set(key, String(value));
+    if (value == null) {
+      continue;
     }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item != null) {
+          searchParams.append(key, String(item));
+        }
+      }
+      continue;
+    }
+    searchParams.set(key, String(value));
   }
 
   const queryString = searchParams.toString();
@@ -64,40 +70,42 @@ export function useSSE<T>(
 
   useEffect(() => {
     if (!enabled) {
-      setState((prev) => ({ ...prev, isConnected: false, shouldUseFallback: true }));
+      setState((prev) => ({
+        ...prev,
+        isConnected: false,
+        shouldUseFallback: true,
+      }));
       return;
     }
 
     let unsubscribe: (() => void) | undefined;
     try {
-      unsubscribe = sseManager.subscribe(
-        endpoint,
-        remoteNode,
-        config.apiURL,
-        {
-          onData: (data) =>
-            setState((prev) => ({
-              ...prev,
-              data: data as T,
-              isConnected: true,
-              isConnecting: false,
-              shouldUseFallback: false,
-              error: null,
-            })),
-          onStateChange: (connState) =>
-            setState((prev) => ({
-              ...prev,
-              ...connState,
-            })),
-        }
-      );
+      unsubscribe = sseManager.subscribe(endpoint, remoteNode, config.apiURL, {
+        onData: (data) =>
+          setState((prev) => ({
+            ...prev,
+            data: data as T,
+            isConnected: true,
+            isConnecting: false,
+            shouldUseFallback: false,
+            error: null,
+          })),
+        onStateChange: (connState) =>
+          setState((prev) => ({
+            ...prev,
+            ...connState,
+          })),
+      });
     } catch (error) {
       setState((prev) => ({
         ...prev,
         isConnected: false,
         isConnecting: false,
         shouldUseFallback: true,
-        error: error instanceof Error ? error : new Error('Failed to subscribe to SSE'),
+        error:
+          error instanceof Error
+            ? error
+            : new Error('Failed to subscribe to SSE'),
       }));
       return;
     }

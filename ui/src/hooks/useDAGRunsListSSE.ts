@@ -11,7 +11,7 @@ interface DAGRunsListSSEResponse {
 }
 
 interface DAGRunsListParams {
-  status?: number;
+  status?: components['parameters']['StatusList'];
   fromDate?: number;
   toDate?: number;
   name?: string;

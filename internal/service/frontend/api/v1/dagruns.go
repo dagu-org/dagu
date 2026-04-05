@@ -558,7 +558,7 @@ func rebuildDAGRunSnapshotFromYAML(ctx context.Context, dag *core.DAG) (*core.DA
 
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
 	opts := buildDAGRunListOptions(dagRunListFilterInput{
-		status:   request.Params.Status,
+		statuses: request.Params.Status,
 		fromDate: request.Params.FromDate,
 		toDate:   request.Params.ToDate,
 		name:     request.Params.Name,
@@ -598,7 +598,7 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 
 func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNameRequestObject) (api.ListDAGRunsByNameResponseObject, error) {
 	opts := buildDAGRunListOptions(dagRunListFilterInput{
-		status:    request.Params.Status,
+		statuses:  request.Params.Status,
 		fromDate:  request.Params.FromDate,
 		toDate:    request.Params.ToDate,
 		dagRunID:  request.Params.DagRunId,
@@ -637,7 +637,7 @@ type dagRunListOptions struct {
 }
 
 type dagRunListFilterInput struct {
-	status    *api.Status
+	statuses  *api.StatusList
 	fromDate  *int64
 	toDate    *int64
 	name      *string
@@ -657,10 +657,8 @@ func buildDAGRunListOptions(input dagRunListFilterInput) dagRunListOptions {
 	opts := dagRunListOptions{}
 	limit := defaultLimit
 
-	if input.status != nil {
-		opts.query = append(opts.query, exec.WithStatuses([]core.Status{
-			core.Status(*input.status),
-		}))
+	if statuses := toCoreStatuses(input.statuses); len(statuses) > 0 {
+		opts.query = append(opts.query, exec.WithStatuses(statuses))
 	}
 	if input.fromDate != nil {
 		opts.query = append(opts.query, exec.WithFrom(exec.NewUTC(time.Unix(*input.fromDate, 0))))
@@ -3066,22 +3064,29 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 	}
 
 	var (
-		statusValue *api.Status
-		fromDate    *int64
-		toDate      *int64
-		name        *string
-		dagRunID    *string
-		tags        *string
-		limit       *int
-		cursor      *string
+		statusValues *api.StatusList
+		fromDate     *int64
+		toDate       *int64
+		name         *string
+		dagRunID     *string
+		tags         *string
+		limit        *int
+		cursor       *string
 	)
 
-	if rawStatus := params.Get("status"); rawStatus != "" {
-		if statusInt, convErr := strconv.Atoi(rawStatus); convErr == nil {
-			statusValue = ptrOf(api.Status(statusInt))
-		} else {
-			logger.Warn(ctx, "Invalid status parameter", slog.String("status", rawStatus), tag.Error(convErr))
+	if rawStatuses, hasStatus := params["status"]; hasStatus {
+		parsed, parseErr := parseStatusListQueryValues(ctx, rawStatuses)
+		if parseErr != nil {
+			return dagRunListOptions{}, parseErr
 		}
+		if len(parsed) == 0 {
+			return dagRunListOptions{}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "status parameter must include at least one valid status value",
+			}
+		}
+		statusValues = &parsed
 	}
 	if rawFromDate := params.Get("fromDate"); rawFromDate != "" {
 		if ts, convErr := strconv.ParseInt(rawFromDate, 10, 64); convErr == nil {
@@ -3118,7 +3123,7 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 	}
 
 	return buildDAGRunListOptions(dagRunListFilterInput{
-		status:   statusValue,
+		statuses: statusValues,
 		fromDate: fromDate,
 		toDate:   toDate,
 		name:     name,
@@ -3127,6 +3132,74 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 		limit:    limit,
 		cursor:   cursor,
 	}), nil
+}
+
+func toCoreStatuses(statuses *api.StatusList) []core.Status {
+	if statuses == nil || len(*statuses) == 0 {
+		return nil
+	}
+
+	result := make([]core.Status, 0, len(*statuses))
+	for _, status := range *statuses {
+		result = append(result, core.Status(status))
+	}
+	return result
+}
+
+func parseStatusListQueryValues(ctx context.Context, rawValues []string) (api.StatusList, error) {
+	if len(rawValues) == 0 {
+		return nil, nil
+	}
+
+	result := make(api.StatusList, 0, len(rawValues))
+	for _, rawValue := range rawValues {
+		for part := range strings.SplitSeq(rawValue, ",") {
+			value := strings.TrimSpace(part)
+			if value == "" {
+				continue
+			}
+
+			statusInt, convErr := strconv.Atoi(value)
+			if convErr != nil {
+				logger.Warn(ctx, "Invalid status parameter", slog.String("status", value), tag.Error(convErr))
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    fmt.Sprintf("invalid status parameter: %s", value),
+				}
+			}
+
+			status := api.Status(statusInt)
+			if !isValidAPIStatus(status) {
+				logger.Warn(ctx, "Status parameter out of range", slog.String("status", value))
+				return nil, &Error{
+					HTTPStatus: http.StatusBadRequest,
+					Code:       api.ErrorCodeBadRequest,
+					Message:    fmt.Sprintf("invalid status parameter: %s", value),
+				}
+			}
+			result = append(result, status)
+		}
+	}
+
+	return result, nil
+}
+
+func isValidAPIStatus(status api.Status) bool {
+	switch status {
+	case api.StatusNotStarted,
+		api.StatusRunning,
+		api.StatusFailed,
+		api.StatusAborted,
+		api.StatusSuccess,
+		api.StatusQueued,
+		api.StatusPartialSuccess,
+		api.StatusWaiting,
+		api.StatusRejected:
+		return true
+	default:
+		return false
+	}
 }
 
 func clampInt(value, minVal, maxVal int) int {
