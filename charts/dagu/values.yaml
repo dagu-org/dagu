@@ -3,7 +3,7 @@
 
 # Image configuration
 image:
-  repository: ghcr.io/dagu-org/dagu
+  repository: ghcr.io/dagucloud/dagu
   tag: latest
   pullPolicy: IfNotPresent
 

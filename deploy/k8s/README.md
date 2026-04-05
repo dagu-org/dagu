@@ -43,7 +43,7 @@ k3d cluster create dagu-test --agents 2
 
 ### 1. Deploy to Kubernetes
 
-The manifests use the official `ghcr.io/dagu-org/dagu:latest` image by default, so you can deploy directly:
+The manifests use the official `ghcr.io/dagucloud/dagu:latest` image by default, so you can deploy directly:
 
 ```bash
 # Apply all manifests
@@ -71,7 +71,7 @@ kind load docker-image dagu:local --name dagu-test
 k3d image import dagu:local --cluster dagu-test
 
 # Update deployments to use local image
-sed -i '' 's|ghcr.io/dagu-org/dagu:latest|dagu:local|g' deploy/k8s/*-deployment.yaml
+sed -i '' 's|ghcr.io/dagucloud/dagu:latest|dagu:local|g' deploy/k8s/*-deployment.yaml
 sed -i '' 's|imagePullPolicy: Always|imagePullPolicy: IfNotPresent|g' deploy/k8s/*-deployment.yaml
 ```
 
@@ -214,8 +214,8 @@ To pin to a specific version instead of `latest`:
 
 ```bash
 # Update both deployments
-kubectl set image deployment/dagu-server -n dagu-dev dagu=ghcr.io/dagu-org/dagu:v1.14.0
-kubectl set image deployment/dagu-worker -n dagu-dev dagu=ghcr.io/dagu-org/dagu:v1.14.0
+kubectl set image deployment/dagu-server -n dagu-dev dagu=ghcr.io/dagucloud/dagu:v1.14.0
+kubectl set image deployment/dagu-worker -n dagu-dev dagu=ghcr.io/dagucloud/dagu:v1.14.0
 ```
 
 ## Troubleshooting

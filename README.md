@@ -83,7 +83,7 @@ Homebrew, npm, Docker, Helm, and manual downloads install Dagu without the guide
 **Docker:**
 
 ```bash
-docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all
+docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagucloud/dagu:latest dagu start-all
 ```
 
 **Kubernetes (Helm):**

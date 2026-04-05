@@ -21,7 +21,7 @@ spec:
       containers:
       - name: dagu
         # Use official latest image
-        image: ghcr.io/dagu-org/dagu:latest
+        image: ghcr.io/dagucloud/dagu:latest
         imagePullPolicy: IfNotPresent
         command:
           - dagu

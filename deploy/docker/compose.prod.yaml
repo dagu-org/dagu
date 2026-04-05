@@ -36,7 +36,7 @@ services:
 
   # Dagu control-plane: Coordinator (gRPC) for distributed workers
   dagu-coordinator:
-    image: ghcr.io/dagu-org/dagu:latest
+    image: ghcr.io/dagucloud/dagu:latest
     command: ["dagu", "coordinator"]
     environment:
       # Peer config: insecure by default; set TLS envs if needed
@@ -53,7 +53,7 @@ services:
 
   # Dagu scheduler service (reads DAGs and enqueues runs)
   dagu-scheduler:
-    image: ghcr.io/dagu-org/dagu:latest
+    image: ghcr.io/dagucloud/dagu:latest
     command: ["dagu", "scheduler"]
     environment:
       - DAGU_COORDINATOR_HOST=dagu-coordinator
@@ -74,7 +74,7 @@ services:
 
   # Dagu web UI / API server
   dagu-server:
-    image: ghcr.io/dagu-org/dagu:latest
+    image: ghcr.io/dagucloud/dagu:latest
     command: ["dagu", "server"]
     environment:
       - DAGU_COORDINATOR_HOST=dagu-coordinator
@@ -102,7 +102,7 @@ services:
 
   # Dagu worker (polls coordinator and executes tasks)
   dagu-worker:
-    image: ghcr.io/dagu-org/dagu:latest
+    image: ghcr.io/dagucloud/dagu:latest
     command: ["dagu", "worker"]
     environment:
       - DAGU_COORDINATOR_HOST=dagu-coordinator

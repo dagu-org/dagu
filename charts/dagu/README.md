@@ -56,7 +56,7 @@ Replace `<your-rwx-storage-class>` with a StorageClass in your cluster that supp
 
 `charts/dagu/Chart.yaml` defines the chart `version`, which is the version published to the Helm repository.
 
-The deployed container image comes from `values.yaml -> image.repository` and `values.yaml -> image.tag`. With the current defaults, the chart deploys `ghcr.io/dagu-org/dagu:latest`.
+The deployed container image comes from `values.yaml -> image.repository` and `values.yaml -> image.tag`. With the current defaults, the chart deploys `ghcr.io/dagucloud/dagu:latest`.
 
 For chart publication and repository maintenance, see [`RELEASING.md`](./RELEASING.md).
 
@@ -210,7 +210,7 @@ helm install dagu dagu/dagu \
 
 ```yaml
 image:
-  repository: ghcr.io/dagu-org/dagu
+  repository: ghcr.io/dagucloud/dagu
   tag: latest
 
 coordinator:
