@@ -4,7 +4,7 @@ This document covers publication of the Helm chart in `charts/dagu`.
 
 ## One-Time Repository Setup
 
-1. Create a `gh-pages` branch in `dagu-org/dagu`.
+1. Create a `gh-pages` branch in `dagucloud/dagu`.
 2. In GitHub repository settings, enable GitHub Pages from the `gh-pages` branch root.
 3. Ensure GitHub Actions can write repository contents with `GITHUB_TOKEN`.
 
@@ -39,7 +39,7 @@ The publish workflow in this repository assumes the `gh-pages` branch already ex
 4. Confirm the published repository works:
 
 ```bash
-helm repo add dagu https://dagu-org.github.io/dagu
+helm repo add dagu https://dagucloud.github.io/dagu
 helm repo update
 helm search repo dagu
 helm pull dagu/dagu --version <chart-version>

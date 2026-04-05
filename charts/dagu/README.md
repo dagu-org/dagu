@@ -20,13 +20,13 @@ Dagu uses a shared filesystem for state persistence. You must have a storage cla
 Official Helm repository URL:
 
 ```text
-https://dagu-org.github.io/dagu
+https://dagucloud.github.io/dagu
 ```
 
 Add the repository and install the chart:
 
 ```bash
-helm repo add dagu https://dagu-org.github.io/dagu
+helm repo add dagu https://dagucloud.github.io/dagu
 helm repo update
 helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-class>
 ```
@@ -56,7 +56,7 @@ Replace `<your-rwx-storage-class>` with a StorageClass in your cluster that supp
 
 `charts/dagu/Chart.yaml` defines the chart `version`, which is the version published to the Helm repository.
 
-The deployed container image comes from `values.yaml -> image.repository` and `values.yaml -> image.tag`. With the current defaults, the chart deploys `ghcr.io/dagu-org/dagu:latest`.
+The deployed container image comes from `values.yaml -> image.repository` and `values.yaml -> image.tag`. With the current defaults, the chart deploys `ghcr.io/dagucloud/dagu:latest`.
 
 For chart publication and repository maintenance, see [`RELEASING.md`](./RELEASING.md).
 
@@ -210,7 +210,7 @@ helm install dagu dagu/dagu \
 
 ```yaml
 image:
-  repository: ghcr.io/dagu-org/dagu
+  repository: ghcr.io/dagucloud/dagu
   tag: latest
 
 coordinator:

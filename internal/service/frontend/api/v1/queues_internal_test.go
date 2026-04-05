@@ -16,11 +16,12 @@ import (
 	"github.com/dagu-org/dagu/internal/persis/filedagrun"
 	"github.com/dagu-org/dagu/internal/persis/filedistributed"
 	"github.com/dagu-org/dagu/internal/persis/fileproc"
+	"github.com/dagu-org/dagu/internal/persis/filequeue"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestListQueueItemsRunningFiltersDistributedRunsByLeaseFreshness(t *testing.T) {
+func TestGetQueueFiltersDistributedRunsByLeaseFreshness(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -40,23 +41,19 @@ func TestListQueueItemsRunningFiltersDistributedRunsByLeaseFreshness(t *testing.
 		leaseStaleThreshold: 5 * time.Second,
 	}
 
-	itemType := openapiv1.ListQueueItemsParamsTypeRunning
-	resp, err := a.ListQueueItems(ctx, openapiv1.ListQueueItemsRequestObject{
+	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{
 		Name: "lease-q",
-		Params: openapiv1.ListQueueItemsParams{
-			Type: &itemType,
-		},
 	})
 	require.NoError(t, err)
 
-	listResp, ok := resp.(openapiv1.ListQueueItems200JSONResponse)
+	queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
 	require.True(t, ok)
-	require.Len(t, listResp.Items, 1)
-	assert.Equal(t, "fresh-run", listResp.Items[0].DagRunId)
-	assert.Equal(t, openapiv1.StatusRunning, listResp.Items[0].Status)
+	require.Len(t, queueResp.Running, 1)
+	assert.Equal(t, "fresh-run", queueResp.Running[0].DagRunId)
+	assert.Equal(t, openapiv1.StatusRunning, queueResp.Running[0].Status)
 }
 
-func TestListQueueItemsRunningFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing.T) {
+func TestGetQueueFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -75,19 +72,92 @@ func TestListQueueItemsRunningFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing
 		leaseStaleThreshold: 5 * time.Second,
 	}
 
-	itemType := openapiv1.ListQueueItemsParamsTypeRunning
-	resp, err := a.ListQueueItems(ctx, openapiv1.ListQueueItemsRequestObject{
+	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{
 		Name: "fallback-q",
+	})
+	require.NoError(t, err)
+
+	queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, queueResp.Running, 1)
+	assert.Equal(t, "fresh-run", queueResp.Running[0].DagRunId)
+}
+
+func TestListQueueItemsUsesCursorPaginationAndSkipsRunningEntries(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
+	queueStore := filequeue.New(filepath.Join(tmpDir, "queue"))
+	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
+
+	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "cursor-q", "run-1", core.Queued)
+	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "cursor-q", "run-2", core.Running)
+	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "cursor-q", "run-3", core.Queued)
+	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "cursor-q", "run-4", core.Queued)
+
+	a := &API{
+		dagRunStore: dagRunStore,
+		queueStore:  queueStore,
+		procStore:   procStore,
+		config:      &config.Config{},
+	}
+
+	firstResp, err := a.ListQueueItems(ctx, openapiv1.ListQueueItemsRequestObject{
+		Name: "cursor-q",
 		Params: openapiv1.ListQueueItemsParams{
-			Type: &itemType,
+			Limit: queueListLimitPtr(2),
 		},
 	})
 	require.NoError(t, err)
 
-	listResp, ok := resp.(openapiv1.ListQueueItems200JSONResponse)
+	firstPage, ok := firstResp.(openapiv1.ListQueueItems200JSONResponse)
 	require.True(t, ok)
-	require.Len(t, listResp.Items, 1)
-	assert.Equal(t, "fresh-run", listResp.Items[0].DagRunId)
+	require.Len(t, firstPage.Items, 2)
+	require.NotNil(t, firstPage.NextCursor)
+	assert.Equal(t, "run-1", firstPage.Items[0].DagRunId)
+	assert.Equal(t, "run-3", firstPage.Items[1].DagRunId)
+
+	secondResp, err := a.ListQueueItems(ctx, openapiv1.ListQueueItemsRequestObject{
+		Name: "cursor-q",
+		Params: openapiv1.ListQueueItemsParams{
+			Limit:  queueListLimitPtr(2),
+			Cursor: firstPage.NextCursor,
+		},
+	})
+	require.NoError(t, err)
+
+	secondPage, ok := secondResp.(openapiv1.ListQueueItems200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, secondPage.Items, 1)
+	assert.Equal(t, "run-4", secondPage.Items[0].DagRunId)
+	assert.Nil(t, secondPage.NextCursor)
+}
+
+func TestListQueuesReturnsDeterministicQueueOrder(t *testing.T) {
+	t.Parallel()
+
+	a := &API{
+		config: &config.Config{
+			Queues: config.Queues{
+				Enabled: true,
+				Config: []config.QueueConfig{
+					{Name: "z-queue", MaxActiveRuns: 1},
+					{Name: "a-queue", MaxActiveRuns: 1},
+				},
+			},
+		},
+	}
+
+	resp, err := a.ListQueues(context.Background(), openapiv1.ListQueuesRequestObject{})
+	require.NoError(t, err)
+
+	queueResp, ok := resp.(openapiv1.ListQueues200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, queueResp.Queues, 2)
+	assert.Equal(t, "a-queue", queueResp.Queues[0].Name)
+	assert.Equal(t, "z-queue", queueResp.Queues[1].Name)
 }
 
 func createDistributedQueueRun(
@@ -135,4 +205,49 @@ func createDistributedQueueRun(
 		WorkerID:        "worker-1",
 		LastHeartbeatAt: lastHeartbeatAt.UTC().UnixMilli(),
 	}))
+}
+
+func createQueuedQueueRun(
+	t *testing.T,
+	ctx context.Context,
+	store exec.DAGRunStore,
+	queueStore exec.QueueStore,
+	name string,
+	dagRunID string,
+	status core.Status,
+) {
+	t.Helper()
+
+	dag := &core.DAG{
+		Name: name,
+		Steps: []core.Step{
+			{Name: "step", Command: "echo hello"},
+		},
+	}
+
+	attempt, err := store.CreateAttempt(ctx, dag, time.Now().UTC(), dagRunID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+	require.NoError(t, attempt.Open(ctx))
+	defer func() {
+		require.NoError(t, attempt.Close(ctx))
+	}()
+
+	runStatus := exec.InitialStatus(dag)
+	runStatus.Status = status
+	runStatus.DAGRunID = dagRunID
+	runStatus.AttemptID = attempt.ID()
+	runStatus.ProcGroup = name
+	runStatus.QueuedAt = time.Now().UTC().Format(time.RFC3339)
+	runStatus.CreatedAt = time.Now().UnixMilli()
+	if status == core.Running {
+		runStatus.StartedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	require.NoError(t, attempt.Write(ctx, runStatus))
+	require.NoError(t, queueStore.Enqueue(ctx, name, exec.QueuePriorityLow, exec.NewDAGRunRef(name, dagRunID)))
+}
+
+func queueListLimitPtr(v int) *openapiv1.QueueListLimit {
+	limit := openapiv1.QueueListLimit(v)
+	return &limit
 }

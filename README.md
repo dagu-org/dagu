@@ -83,13 +83,13 @@ Homebrew, npm, Docker, Helm, and manual downloads install Dagu without the guide
 **Docker:**
 
 ```bash
-docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagu-org/dagu:latest dagu start-all
+docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagucloud/dagu:latest dagu start-all
 ```
 
 **Kubernetes (Helm):**
 
 ```bash
-helm repo add dagu https://dagu-org.github.io/dagu
+helm repo add dagu https://dagucloud.github.io/dagu
 helm repo update
 helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-class>
 ```

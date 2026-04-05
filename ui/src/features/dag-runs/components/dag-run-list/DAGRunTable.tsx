@@ -32,6 +32,22 @@ interface DAGRunTableProps {
   onToggleBulkSelect?: (dagRun: DAGRunSelectionItem) => void;
 }
 
+function isInteractiveEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, a, [role="button"], [role="combobox"], [role="textbox"], [contenteditable="true"]'
+    )
+  );
+}
+
 function DAGRunTable({
   dagRuns,
   selectedRunKeys,
@@ -92,6 +108,10 @@ function DAGRunTable({
     if (!onSelectDAGRun) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isInteractiveEventTarget(event.target)) {
+        return;
+      }
+
       // Find current index based on selectedDAGRun or selectedIndex
       const currentIdx = selectedDAGRun
         ? dagRuns.findIndex((item) => item.dagRunId === selectedDAGRun.dagRunId)

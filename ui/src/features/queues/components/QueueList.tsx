@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Layers } from 'lucide-react';
 import React from 'react';
 import type { components } from '../../../api/v1/schema';
@@ -6,58 +9,14 @@ import QueueCard from './QueueCard';
 interface QueueListProps {
   queues: components['schemas']['Queue'][];
   isLoading?: boolean;
-  onDAGRunClick: (dagRun: components['schemas']['DAGRunSummary']) => void;
-  onQueueCleared?: () => void;
 }
 
-function QueueList({
-  queues,
-  isLoading,
-  onDAGRunClick,
-  onQueueCleared,
-}: QueueListProps) {
-  const [selectedIndex, setSelectedIndex] = React.useState<number>(-1);
-
-  // Enhanced keyboard navigation for queues
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        setSelectedIndex((prev) => {
-          const newIndex = prev < queues.length - 1 ? prev + 1 : prev;
-          return newIndex;
-        });
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        setSelectedIndex((prev) => {
-          const newIndex = prev > 0 ? prev - 1 : prev === -1 ? 0 : prev;
-          return newIndex;
-        });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [queues.length]);
-
-  // Initialize selection when queues change
-  React.useEffect(() => {
-    if (queues.length > 0 && selectedIndex === -1) {
-      // Don't auto-select the first item by default to avoid weird border artifacts
-      // only select if there's actual interaction or specific need
-      // setSelectedIndex(0);
-    } else if (selectedIndex >= queues.length) {
-      setSelectedIndex(queues.length > 0 ? queues.length - 1 : -1);
-    }
-  }, [queues, selectedIndex]);
-
+function QueueList({ queues, isLoading }: QueueListProps) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <div className="text-center space-y-2">
-          <Layers className="h-8 w-8 text-muted-foreground mx-auto animate-pulse" />
+      <div className="flex h-32 items-center justify-center">
+        <div className="space-y-2 text-center">
+          <Layers className="mx-auto h-8 w-8 animate-pulse text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Loading queues...</p>
         </div>
       </div>
@@ -66,9 +25,9 @@ function QueueList({
 
   if (queues.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <div className="text-center space-y-2">
-          <Layers className="h-8 w-8 text-muted-foreground mx-auto" />
+      <div className="flex h-32 items-center justify-center">
+        <div className="space-y-2 text-center">
+          <Layers className="mx-auto h-8 w-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">No queues found</p>
         </div>
       </div>
@@ -76,15 +35,9 @@ function QueueList({
   }
 
   return (
-    <div className="space-y-2">
-      {queues.map((queue, index) => (
-        <QueueCard
-          key={queue.name}
-          queue={queue}
-          isSelected={index === selectedIndex}
-          onDAGRunClick={onDAGRunClick}
-          onQueueCleared={onQueueCleared}
-        />
+    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      {queues.map((queue) => (
+        <QueueCard key={queue.name} queue={queue} />
       ))}
     </div>
   );

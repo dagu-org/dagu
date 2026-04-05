@@ -6,6 +6,7 @@ import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { Status, StatusLabel, TriggerType } from '@/api/v1/schema';
+import { Input } from '@/components/ui/input';
 import { Config, ConfigContext } from '@/contexts/ConfigContext';
 import DAGRunTable from '../DAGRunTable';
 
@@ -135,6 +136,45 @@ describe('DAGRunTable', () => {
       name: 'bulk-dag',
       dagRunId: 'run-1',
     });
+    expect(onSelectDAGRun).not.toHaveBeenCalled();
+  });
+
+  it('ignores Enter shortcuts while a filter input is focused', () => {
+    const onSelectDAGRun = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <ConfigContext.Provider value={config}>
+          <div>
+            <Input aria-label="Filter by DAG name" />
+            <DAGRunTable
+              dagRuns={[
+                {
+                  dagRunId: 'run-1',
+                  name: 'alpha',
+                  status: Status.Failed,
+                  statusLabel: StatusLabel.failed,
+                  autoRetryCount: 0,
+                  autoRetryLimit: 0,
+                  triggerType: TriggerType.manual,
+                  queuedAt: '2026-03-13T10:00:30Z',
+                  startedAt: '2026-03-13T10:01:00Z',
+                  finishedAt: '2026-03-13T10:02:00Z',
+                },
+              ]}
+              onSelectDAGRun={onSelectDAGRun}
+            />
+          </div>
+        </ConfigContext.Provider>
+      </MemoryRouter>
+    );
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+
+    const input = screen.getByRole('textbox', { name: 'Filter by DAG name' });
+    input.focus();
+    fireEvent.keyDown(input, { key: 'Enter' });
+
     expect(onSelectDAGRun).not.toHaveBeenCalled();
   });
 });

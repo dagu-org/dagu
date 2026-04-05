@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/cmn/dirlock"
@@ -108,6 +109,39 @@ func (q *DualQueue) DequeueByDAGRunID(ctx context.Context, dagRun exec.DAGRunRef
 	return items, nil
 }
 
+// DeleteByItemIDs removes the exact queue item files identified by their queue item IDs.
+func (q *DualQueue) DeleteByItemIDs(ctx context.Context, itemIDs []string) (int, error) {
+	ctx = logger.WithValues(ctx, tag.Queue(q.name))
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	deleted := 0
+	for _, itemID := range itemIDs {
+		if itemID == "" {
+			continue
+		}
+		fileName := filepath.Base(itemID + ".json")
+		if fileName == ".json" {
+			continue
+		}
+		if err := os.Remove(filepath.Join(q.baseDir, fileName)); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			logger.Error(ctx, "Failed to remove queue item",
+				tag.File(fileName),
+				tag.Error(err),
+			)
+			return deleted, fmt.Errorf("failed to remove queue item %s: %w", itemID, err)
+		}
+		deleted++
+	}
+
+	_ = os.Remove(q.baseDir)
+
+	return deleted, nil
+}
+
 // List returns all items in the queue
 func (q *DualQueue) List(ctx context.Context) ([]exec.QueuedItemData, error) {
 	ctx = logger.WithValues(ctx, tag.Queue(q.name))
@@ -140,8 +174,8 @@ func (q *DualQueue) Len(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-// Enqueue adds a dag-run to the queue with the specified priority
-func (q *DualQueue) Enqueue(ctx context.Context, priority exec.QueuePriority, dagRun exec.DAGRunRef) error {
+// Enqueue adds a dag-run to the queue with the specified priority and returns the created file name.
+func (q *DualQueue) Enqueue(ctx context.Context, priority exec.QueuePriority, dagRun exec.DAGRunRef) (string, error) {
 	ctx = logger.WithValues(ctx,
 		tag.Queue(q.name),
 		tag.DAG(dagRun.Name),
@@ -151,17 +185,18 @@ func (q *DualQueue) Enqueue(ctx context.Context, priority exec.QueuePriority, da
 	defer q.mu.Unlock()
 
 	if _, ok := q.files[priority]; !ok {
-		return fmt.Errorf("invalid queue priority: %d", priority)
+		return "", fmt.Errorf("invalid queue priority: %d", priority)
 	}
 	qf := q.files[priority]
-	if err := qf.Push(ctx, dagRun); err != nil {
+	fileName, err := qf.Push(ctx, dagRun)
+	if err != nil {
 		logger.Error(ctx, "Failed to enqueue dag-run to queue file", tag.Error(err))
-		return err
+		return "", err
 	}
 	logger.Debug(ctx, "Enqueued item",
 		tag.RunID(dagRun.ID),
 		tag.Priority(int(priority)))
-	return nil
+	return fileName, nil
 }
 
 // Dequeue retrieves a dag-run from the queue and removes it.

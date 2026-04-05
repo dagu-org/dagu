@@ -388,6 +388,9 @@ func (p *QueueProcessor) ProcessQueueItems(ctx context.Context, queueName string
 				return
 			}
 			if _, err := p.queueStore.DequeueByDAGRunID(ctx, queueName, *data); err != nil {
+				if errors.Is(err, exec.ErrQueueItemNotFound) {
+					return
+				}
 				logger.Error(ctx, "Failed to dequeue item", tag.Error(err))
 			}
 		}(item)
@@ -571,6 +574,7 @@ func (p *QueueProcessor) dispatchAndWaitForStartup(
 	policy := backoff.NewExponentialBackoffPolicy(p.backoffConfig.InitialInterval)
 	policy.MaxInterval = p.backoffConfig.MaxInterval
 	policy.MaxRetries = p.backoffConfig.MaxRetries
+	retryCtx := backoff.WithRetryFailureLogLevel(ctx, slog.LevelInfo)
 
 	launchedAt := time.Now()
 	var started bool
@@ -586,10 +590,14 @@ func (p *QueueProcessor) dispatchAndWaitForStartup(
 			err := p.dagExecutor.ExecuteDAG(ctx, dag, coordinatorv1.Operation_OPERATION_RETRY,
 				runID, dagStatus, dagStatus.TriggerType, dagStatus.ScheduleTime)
 			if err != nil {
+				var staleErr *exec.StaleQueueDispatchError
+				if errors.As(err, &staleErr) {
+					return backoff.PermanentError(err)
+				}
 				// Permanent dispatch error (e.g. selector mismatch): stop retrying.
 				if errors.Is(err, backoff.ErrPermanent) {
 					logger.Error(ctx, "Permanent dispatch failure", tag.Error(err))
-					return backoff.PermanentError(err)
+					return err
 				}
 				// Transient dispatch error (e.g. no available workers): retry.
 				logger.Warn(ctx, "Transient dispatch failure, will retry", tag.Error(err))
@@ -606,7 +614,17 @@ func (p *QueueProcessor) dispatchAndWaitForStartup(
 		return err
 	}
 
-	if err := backoff.Retry(ctx, operation, policy, nil); err != nil {
+	if err := backoff.Retry(retryCtx, operation, policy, nil); err != nil {
+		var staleErr *exec.StaleQueueDispatchError
+		if errors.As(err, &staleErr) {
+			logger.Info(ctx, "Discarding stale distributed queue dispatch",
+				tag.DAG(runRef.Name),
+				tag.RunID(runRef.ID),
+				tag.Queue(queueName),
+				tag.Error(staleErr),
+			)
+			return true
+		}
 		logger.Error(ctx, "Failed to dispatch DAG after retries", tag.Error(err))
 	}
 

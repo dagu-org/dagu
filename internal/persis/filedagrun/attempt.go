@@ -87,7 +87,7 @@ func (att *Attempt) SetDAG(dag *core.DAG) {
 // NewAttempt creates a new Run for the specified file.
 func NewAttempt(file string, cache *fileutil.Cache[*exec.DAGRunStatus], opts ...AttemptOption) (*Attempt, error) {
 	dirName := filepath.Base(filepath.Dir(file))
-	matches := reAttemptDir.FindStringSubmatch(dirName)
+	matches := reAttemptDir.FindStringSubmatch(strings.TrimPrefix(dirName, "."))
 	if len(matches) != 3 {
 		return nil, fmt.Errorf("invalid file path for run data: %s", file)
 	}

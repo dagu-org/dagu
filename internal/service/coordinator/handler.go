@@ -318,7 +318,7 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 			var err error
 			prepared, err = h.prepareAttemptForDispatch(ctx, req.Task)
 			if err != nil {
-				return nil, status.Error(codes.Internal, "failed to prepare attempt: "+err.Error())
+				return nil, status.Error(prepareAttemptErrorCode(err), "failed to prepare attempt: "+err.Error())
 			}
 		} else {
 			h.ensureTaskAttemptMetadata(req.Task)
@@ -347,13 +347,32 @@ func (h *Handler) Dispatch(ctx context.Context, req *coordinatorv1.DispatchReque
 
 	prepared, err := h.prepareAttemptForDispatch(ctx, req.Task)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to prepare attempt: "+err.Error())
+		return nil, status.Error(prepareAttemptErrorCode(err), "failed to prepare attempt: "+err.Error())
 	}
 	if err := h.dispatchTaskStore.Enqueue(ctx, req.Task); err != nil {
 		h.markPreparedAttemptDispatchFailed(ctx, req.Task, prepared, err)
 		return nil, status.Error(codes.Internal, "failed to enqueue task: "+err.Error())
 	}
 	return &coordinatorv1.DispatchResponse{}, nil
+}
+
+func queueDispatchStatusForTask(task *coordinatorv1.Task) (*exec.DAGRunStatus, error) {
+	if task == nil || task.Operation != coordinatorv1.Operation_OPERATION_RETRY || task.PreviousStatus == nil {
+		return nil, nil
+	}
+
+	status, err := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode previous task status: %w", err)
+	}
+	if status == nil || status.Status != core.Queued {
+		return nil, nil
+	}
+	return status, nil
+}
+
+func staleQueueDispatchError(reason string) error {
+	return &exec.StaleQueueDispatchError{Reason: reason}
 }
 
 // createAttemptForTask creates a DAGRun attempt for a root-level task.
@@ -371,12 +390,45 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 	dag.SourceFile = task.SourceFile
 
 	ref := exec.DAGRunRef{Name: dag.Name, ID: task.DagRunId}
+	queueDispatchStatus, err := queueDispatchStatusForTask(task)
+	if err != nil {
+		return nil, err
+	}
 
 	// Check if dag-run already exists (e.g., queued via enqueue command)
 	existingAttempt, findErr := h.dagRunStore.FindAttempt(ctx, ref)
+	if queueDispatchStatus != nil {
+		if queueDispatchStatus.AttemptID == "" {
+			return nil, staleQueueDispatchError("queued attempt ID is missing")
+		}
+		if findErr != nil {
+			if errors.Is(findErr, exec.ErrDAGRunIDNotFound) || errors.Is(findErr, exec.ErrNoStatusData) || errors.Is(findErr, exec.ErrCorruptedStatusFile) {
+				return nil, staleQueueDispatchError("dag-run is no longer queued")
+			}
+			return nil, findErr
+		}
+
+		existingStatus, readErr := existingAttempt.ReadStatus(ctx)
+		if readErr != nil {
+			if errors.Is(readErr, exec.ErrNoStatusData) || errors.Is(readErr, exec.ErrCorruptedStatusFile) {
+				return nil, staleQueueDispatchError("dag-run is no longer queued")
+			}
+			return nil, readErr
+		}
+		if existingAttempt.ID() != queueDispatchStatus.AttemptID {
+			return nil, staleQueueDispatchError("queued attempt was superseded")
+		}
+		if existingStatus == nil || existingStatus.Status != core.Queued {
+			statusLabel := "unknown"
+			if existingStatus != nil {
+				statusLabel = existingStatus.Status.String()
+			}
+			return nil, staleQueueDispatchError("latest attempt is " + statusLabel)
+		}
+	}
 	if findErr == nil {
 		existingStatus, readErr := existingAttempt.ReadStatus(ctx)
-		if readErr == nil && existingStatus.Status == core.Queued {
+		if readErr == nil && existingStatus != nil && existingStatus.Status == core.Queued {
 			task.AttemptId = existingAttempt.ID()
 			task.AttemptKey = generateRootAttemptKey(task)
 
@@ -603,12 +655,23 @@ func (h *Handler) dispatchToWaitingPoller(task *coordinatorv1.Task) error {
 }
 
 func dispatchErrorCode(err error) codes.Code {
+	var staleErr *exec.StaleQueueDispatchError
 	switch {
 	case errors.Is(err, errNoMatchingWorkers):
+		return codes.FailedPrecondition
+	case errors.As(err, &staleErr):
 		return codes.FailedPrecondition
 	default:
 		return codes.Unavailable
 	}
+}
+
+func prepareAttemptErrorCode(err error) codes.Code {
+	var staleErr *exec.StaleQueueDispatchError
+	if errors.As(err, &staleErr) {
+		return codes.FailedPrecondition
+	}
+	return codes.Internal
 }
 
 func (h *Handler) markPreparedAttemptDispatchFailed(ctx context.Context, task *coordinatorv1.Task, prepared *preparedDispatchAttempt, dispatchErr error) {

@@ -90,6 +90,35 @@ func TestStore_DequeueByDAGRunID(t *testing.T) {
 	require.Contains(t, jobs[0].ID(), "test-dag-2", "expected job ID to contain 'test-dag-2'")
 }
 
+func TestStore_DeleteByItemIDs(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+	store := filequeue.New(th.Config.Paths.QueueDir)
+
+	require.NoError(t, store.Enqueue(th.Context, "test-name", exec.QueuePriorityLow, exec.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-dag",
+	}))
+	require.NoError(t, store.Enqueue(th.Context, "test-name", exec.QueuePriorityLow, exec.DAGRunRef{
+		Name: "test-name",
+		ID:   "test-dag-2",
+	}))
+
+	items, err := store.List(th.Context, "test-name")
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+
+	deleted, err := store.DeleteByItemIDs(th.Context, "test-name", []string{items[0].ID(), "missing-item"})
+	require.NoError(t, err)
+	require.Equal(t, 1, deleted)
+
+	remaining, err := store.List(th.Context, "test-name")
+	require.NoError(t, err)
+	require.Len(t, remaining, 1)
+	require.Equal(t, items[1].ID(), remaining[0].ID())
+}
+
 func TestStore_List(t *testing.T) {
 	t.Parallel()
 
@@ -116,6 +145,59 @@ func TestStore_List(t *testing.T) {
 	jobs, err := store.List(th.Context, "test-name")
 	require.NoError(t, err, "expected no error when listing jobs from store")
 	require.Len(t, jobs, 2, "expected to list two jobs")
+}
+
+func TestStore_ListCursor(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+	store := filequeue.New(th.Config.Paths.QueueDir)
+
+	require.NoError(t, store.Enqueue(th.Context, "cursor-q", exec.QueuePriorityHigh, exec.DAGRunRef{
+		Name: "cursor-q",
+		ID:   "run-high",
+	}))
+	require.NoError(t, store.Enqueue(th.Context, "cursor-q", exec.QueuePriorityLow, exec.DAGRunRef{
+		Name: "cursor-q",
+		ID:   "run-low-1",
+	}))
+	require.NoError(t, store.Enqueue(th.Context, "cursor-q", exec.QueuePriorityLow, exec.DAGRunRef{
+		Name: "cursor-q",
+		ID:   "run-low-2",
+	}))
+
+	firstPage, err := store.ListCursor(th.Context, "cursor-q", "", 2)
+	require.NoError(t, err)
+	require.Len(t, firstPage.Items, 2)
+	require.True(t, firstPage.HasMore)
+	require.NotEmpty(t, firstPage.NextCursor)
+
+	firstData, err := firstPage.Items[0].Data()
+	require.NoError(t, err)
+	secondData, err := firstPage.Items[1].Data()
+	require.NoError(t, err)
+	require.Equal(t, "run-high", firstData.ID)
+	require.Equal(t, "run-low-1", secondData.ID)
+
+	secondPage, err := store.ListCursor(th.Context, "cursor-q", firstPage.NextCursor, 2)
+	require.NoError(t, err)
+	require.Len(t, secondPage.Items, 1)
+	require.False(t, secondPage.HasMore)
+	require.Empty(t, secondPage.NextCursor)
+
+	lastData, err := secondPage.Items[0].Data()
+	require.NoError(t, err)
+	require.Equal(t, "run-low-2", lastData.ID)
+}
+
+func TestStore_ListCursorRejectsInvalidCursor(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+	store := filequeue.New(th.Config.Paths.QueueDir)
+
+	_, err := store.ListCursor(th.Context, "cursor-q", "not-a-valid-cursor", 10)
+	require.ErrorIs(t, err, exec.ErrInvalidCursor)
 }
 
 func TestStore_All(t *testing.T) {
