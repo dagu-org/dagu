@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 var _ exec.QueuedItemData = (*QueuedFile)(nil)

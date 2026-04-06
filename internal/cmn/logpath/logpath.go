@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 )
 
 // Config defines configuration for DAG run log file creation.

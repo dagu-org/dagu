@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/test"
 )
 
 func TestSchedulerCommand(t *testing.T) {

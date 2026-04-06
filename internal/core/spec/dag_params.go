@@ -8,7 +8,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/google/jsonschema-go/jsonschema"
 )
 

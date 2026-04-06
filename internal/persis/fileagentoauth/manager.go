@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/agentoauth"
-	"github.com/dagu-org/dagu/internal/cmn/crypto"
+	"github.com/dagucloud/dagu/internal/agentoauth"
+	"github.com/dagucloud/dagu/internal/cmn/crypto"
 )
 
 // NewManager creates an OAuth manager backed by the standard encrypted file store.

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/runtime/agent"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/runtime/agent"
 	"github.com/spf13/cobra"
 )
 

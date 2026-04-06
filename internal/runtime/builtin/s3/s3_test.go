@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

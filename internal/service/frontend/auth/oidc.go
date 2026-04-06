@@ -15,13 +15,13 @@ import (
 	"time"
 
 	oidc "github.com/coreos/go-oidc"
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	authservice "github.com/dagu-org/dagu/internal/service/auth"
-	"github.com/dagu-org/dagu/internal/service/oidcprovision"
+	"github.com/dagucloud/dagu/internal/cmn/backoff"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	authservice "github.com/dagucloud/dagu/internal/service/auth"
+	"github.com/dagucloud/dagu/internal/service/oidcprovision"
 	"golang.org/x/oauth2"
 )
 

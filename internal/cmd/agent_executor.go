@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/agent"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime/agent"
 	"golang.org/x/term"
 )
 

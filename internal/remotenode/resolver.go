@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 )
 
 // Source indicates where a remote node is defined.

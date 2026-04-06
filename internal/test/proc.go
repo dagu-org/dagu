@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/persis/fileproc"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/persis/fileproc"
 	"github.com/stretchr/testify/require"
 )
 

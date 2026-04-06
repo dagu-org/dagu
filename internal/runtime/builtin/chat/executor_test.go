@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	llmpkg "github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	llmpkg "github.com/dagucloud/dagu/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

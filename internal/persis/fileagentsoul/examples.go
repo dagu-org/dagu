@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
 )
 
 //go:embed examples/*.md

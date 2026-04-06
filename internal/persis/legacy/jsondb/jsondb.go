@@ -21,12 +21,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	"github.com/dagu-org/dagu/internal/persis/legacy"
-	"github.com/dagu-org/dagu/internal/persis/legacy/model"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/persis/legacy"
+	"github.com/dagucloud/dagu/internal/persis/legacy/model"
 )
 
 var (

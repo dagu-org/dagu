@@ -20,23 +20,23 @@ func TestGitClient_NormalizeRepoURL(t *testing.T) {
 	}{
 		{
 			name:     "https url",
-			repo:     "https://github.com/dagu-org/dagu.git",
-			expected: "https://github.com/dagu-org/dagu.git",
+			repo:     "https://github.com/dagucloud/dagu.git",
+			expected: "https://github.com/dagucloud/dagu.git",
 		},
 		{
 			name:     "http url",
-			repo:     "http://github.com/dagu-org/dagu.git",
-			expected: "http://github.com/dagu-org/dagu.git",
+			repo:     "http://github.com/dagucloud/dagu.git",
+			expected: "http://github.com/dagucloud/dagu.git",
 		},
 		{
 			name:     "ssh url",
-			repo:     "git@github.com:dagu-org/dagu.git",
-			expected: "git@github.com:dagu-org/dagu.git",
+			repo:     "git@github.com:dagucloud/dagu.git",
+			expected: "git@github.com:dagucloud/dagu.git",
 		},
 		{
 			name:     "short format",
-			repo:     "github.com/dagu-org/dagu",
-			expected: "https://github.com/dagu-org/dagu.git",
+			repo:     "github.com/dagucloud/dagu",
+			expected: "https://github.com/dagucloud/dagu.git",
 		},
 		{
 			name:     "empty",

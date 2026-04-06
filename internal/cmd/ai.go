@@ -16,8 +16,8 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
-	bundledskills "github.com/dagu-org/dagu/skills"
+	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
+	bundledskills "github.com/dagucloud/dagu/skills"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

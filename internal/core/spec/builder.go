@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 )
 

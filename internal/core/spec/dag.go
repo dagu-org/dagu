@@ -17,10 +17,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/spec/types"
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
 )
 

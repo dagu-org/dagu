@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/core"
 )
 
 const maxInt64AsUint = ^uint64(0) >> 1

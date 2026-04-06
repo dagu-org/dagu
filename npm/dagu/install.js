@@ -85,7 +85,7 @@ async function downloadBinaryFromNpm() {
   // Determine package name for this platform
   const platformSpecificPackageName = getPlatformPackage();
 
-  const url = `https://registry.npmjs.org/@dagu-org/${platformSpecificPackageName}/-/${platformSpecificPackageName}-${PACKAGE_VERSION}.tgz`;
+  const url = `https://registry.npmjs.org/@dagucloud/${platformSpecificPackageName}/-/${platformSpecificPackageName}-${PACKAGE_VERSION}.tgz`;
   console.log(`Downloading binary distribution package from ${url}...`);
   // Download the tarball of the right binary distribution package
   const tarballDownloadBuffer = await makeRequest(url);

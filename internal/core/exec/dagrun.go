@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core"
 )
 
 // Errors related to dag-run management

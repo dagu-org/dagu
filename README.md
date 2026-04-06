@@ -1,8 +1,8 @@
 <div align="center">
   <img src="./assets/images/hero-logo.webp" width="480" alt="Dagu Logo">
   <p>
-    <a href="https://docs.dagu.sh/overview/changelog"><img src="https://img.shields.io/github/release/dagu-org/dagu.svg?style=flat-square" alt="Latest Release"></a>
-    <a href="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagu-org/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
+    <a href="https://docs.dagu.sh/overview/changelog"><img src="https://img.shields.io/github/release/dagucloud/dagu.svg?style=flat-square" alt="Latest Release"></a>
+    <a href="https://github.com/dagucloud/dagu/actions/workflows/ci.yaml"><img src="https://img.shields.io/github/actions/workflow/status/dagucloud/dagu/ci.yaml?style=flat-square" alt="Build Status"></a>
     <a href="https://discord.gg/gpahPUjGRk"><img src="https://img.shields.io/discord/1095289480774172772?style=flat-square&logo=discord" alt="Discord"></a>
     <a href="https://bsky.app/profile/dagu-org.bsky.social"><img src="https://img.shields.io/badge/Bluesky-0285FF?style=flat-square&logo=bluesky&logoColor=white" alt="Bluesky"></a>
   </p>
@@ -64,7 +64,7 @@ One binary. No Postgres. No Redis. No Python. Just `dagu start-all`.
 **macOS/Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.sh | bash
 ```
 
 **Homebrew:**
@@ -76,7 +76,7 @@ brew install dagu
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1 | iex
+irm https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.ps1 | iex
 ```
 
 The script installers open a guided wizard. They can install Dagu, add it to your PATH, set it up as a background service, create the first admin account, and install the Dagu AI skill when a supported AI tool is detected.
@@ -118,7 +118,7 @@ dagu ai install --yes
 Fallback via the shared `skills` CLI:
 
 ```bash
-npx skills add https://github.com/dagu-org/dagu --skill dagu
+npx skills add https://github.com/dagucloud/dagu --skill dagu
 ```
 
 For explicit skills directories, see the [installation docs](https://docs.dagu.sh/getting-started/installation) and the [CLI reference](https://docs.dagu.sh/getting-started/cli#ai).
@@ -450,7 +450,7 @@ Full documentation at [docs.dagu.sh](https://docs.dagu.sh/).
 ## Community
 
 - Join the community on [Discord](https://discord.gg/gpahPUjGRk)
-- File bugs and feature requests on [GitHub Issues](https://github.com/dagu-org/dagu/issues)
+- File bugs and feature requests on [GitHub Issues](https://github.com/dagucloud/dagu/issues)
 - Follow us on [Bluesky](https://bsky.app/profile/dagu-org.bsky.social)
 
 ## Development
@@ -458,7 +458,7 @@ Full documentation at [docs.dagu.sh](https://docs.dagu.sh/).
 **Prerequisites:** [Go 1.26+](https://go.dev/doc/install), [Node.js](https://nodejs.org/en/download/), [pnpm](https://pnpm.io/installation)
 
 ```bash
-git clone https://github.com/dagu-org/dagu.git && cd dagu
+git clone https://github.com/dagucloud/dagu.git && cd dagu
 make build
 ```
 
@@ -500,8 +500,8 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development workflow, testing, and 
 
 We welcome contributions of all kinds. See our [Contribution Guide](./CONTRIBUTING.md) for details.
 
-<a href="https://github.com/dagu-org/dagu/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
+<a href="https://github.com/dagucloud/dagu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=dagucloud/dagu" />
 </a>
 
 ## License

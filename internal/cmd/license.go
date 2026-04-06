@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/license"
-	"github.com/dagu-org/dagu/internal/persis/filelicense"
+	"github.com/dagucloud/dagu/internal/license"
+	"github.com/dagucloud/dagu/internal/persis/filelicense"
 	"github.com/spf13/cobra"
 )
 

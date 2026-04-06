@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/jsonschema-go/jsonschema"
 	batchv1 "k8s.io/api/batch/v1"

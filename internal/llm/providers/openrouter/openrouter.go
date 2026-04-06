@@ -13,7 +13,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/llm"
 )
 
 const (
@@ -47,7 +47,7 @@ func New(cfg llm.Config) (llm.Provider, error) {
 	return &Provider{
 		config:     cfg,
 		httpClient: llm.NewHTTPClient(cfg),
-		SiteURL:    "https://github.com/dagu-org/dagu",
+		SiteURL:    "https://github.com/dagucloud/dagu",
 		SiteName:   "Dagu Workflow Engine",
 	}, nil
 }

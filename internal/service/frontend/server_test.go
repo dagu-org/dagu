@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 
-	authmodel "github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/persis/fileuser"
-	frontendauth "github.com/dagu-org/dagu/internal/service/frontend/auth"
+	authmodel "github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/persis/fileuser"
+	frontendauth "github.com/dagucloud/dagu/internal/service/frontend/auth"
 )
 
 // testContext returns a context that is cancelled when the test ends,

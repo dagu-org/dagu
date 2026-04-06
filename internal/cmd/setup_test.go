@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

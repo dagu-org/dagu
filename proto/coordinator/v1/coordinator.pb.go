@@ -2131,7 +2131,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"StreamLogs\x12\x18.coordinator.v1.LogChunk\x1a\".coordinator.v1.StreamLogsResponse(\x01\x12b\n" +
 	"\x0fGetDAGRunStatus\x12&.coordinator.v1.GetDAGRunStatusRequest\x1a'.coordinator.v1.GetDAGRunStatusResponse\x12\\\n" +
-	"\rRequestCancel\x12$.coordinator.v1.RequestCancelRequest\x1a%.coordinator.v1.RequestCancelResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
+	"\rRequestCancel\x12$.coordinator.v1.RequestCancelRequest\x1a%.coordinator.v1.RequestCancelResponseB=Z;github.com/dagucloud/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
 
 var (
 	file_proto_coordinator_v1_coordinator_proto_rawDescOnce sync.Once

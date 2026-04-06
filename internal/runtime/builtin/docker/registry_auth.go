@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/moby/moby/api/pkg/authconfig"
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"

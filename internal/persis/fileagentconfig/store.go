@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 )
 
 // Verify Store implements agent.ConfigStore at compile time.

@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/goccy/go-yaml"
 	"github.com/moby/moby/api/types/container"
 	"github.com/nektos/act/pkg/model"
@@ -281,7 +281,7 @@ func (e *githubAction) generateEventJSON() (string, error) {
 		"ref": "refs/heads/main",
 		"repository": map[string]any{
 			"name":      "dagu",
-			"full_name": "dagu-org/dagu",
+			"full_name": "dagucloud/dagu",
 			"private":   false,
 		},
 		"pusher": map[string]any{

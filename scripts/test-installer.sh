@@ -73,4 +73,11 @@ bash -c '
     [[ ! -e "${backup}" ]]
 ' bash "${INSTALLER}" "${bootstrap_file}"
 
+stdin_output="$(
+    bash -c 'cat "$1" | bash -s -- --dry-run' bash "${INSTALLER}"
+)"
+
+grep -Fq "Dagu Installer" <<<"${stdin_output}"
+grep -Fq "Dry run complete. No changes were made." <<<"${stdin_output}"
+
 printf '%s\n' "installer regression tests passed"

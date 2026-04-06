@@ -6,7 +6,7 @@ package agent
 import (
 	"context"
 
-	"github.com/dagu-org/dagu/internal/agentoauth"
+	"github.com/dagucloud/dagu/internal/agentoauth"
 )
 
 // Context keys for agent stores.

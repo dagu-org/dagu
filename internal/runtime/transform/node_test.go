@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/collections"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/runtime/transform"
+	"github.com/dagucloud/dagu/internal/cmn/collections"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/runtime/transform"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

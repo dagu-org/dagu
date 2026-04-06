@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 func TestNotificationSeenKeyIncludesStatus(t *testing.T) {

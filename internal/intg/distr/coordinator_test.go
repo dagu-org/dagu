@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/test"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/test"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

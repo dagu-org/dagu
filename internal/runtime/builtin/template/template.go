@@ -16,10 +16,10 @@ import (
 
 	sprig "github.com/go-task/slim-sprig/v3"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
 )
 

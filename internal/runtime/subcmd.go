@@ -13,12 +13,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/buildenv"
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/core"
-	exec1 "github.com/dagu-org/dagu/internal/core/exec"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/cmn/buildenv"
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core"
+	exec1 "github.com/dagucloud/dagu/internal/core/exec"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 )
 
 // CommandError wraps a command execution error with captured output.

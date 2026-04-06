@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/service/chatbridge"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/service/chatbridge"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 

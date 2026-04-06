@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/stretchr/testify/assert"
 )
 

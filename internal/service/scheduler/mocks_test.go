@@ -6,8 +6,8 @@ package scheduler_test
 import (
 	"context"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/service/scheduler"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/service/scheduler"
 )
 
 var _ scheduler.EntryReader = (*mockJobManager)(nil)

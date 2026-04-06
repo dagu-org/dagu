@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

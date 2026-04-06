@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/hashicorp/vault/api"
 )
 

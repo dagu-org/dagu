@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/clicontext"
+	api "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/clicontext"
 )
 
 const defaultRemoteTimeout = 30 * time.Second

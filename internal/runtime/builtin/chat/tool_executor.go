@@ -13,13 +13,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
-	exec1 "github.com/dagu-org/dagu/internal/core/exec"
-	llmpkg "github.com/dagu-org/dagu/internal/llm"
-	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/core"
+	exec1 "github.com/dagucloud/dagu/internal/core/exec"
+	llmpkg "github.com/dagucloud/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 )
 
 // ToolCallResult bundles a tool result with sub-DAG run info for tracking.

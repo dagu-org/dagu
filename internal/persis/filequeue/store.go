@@ -12,9 +12,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 func New(baseDir string) exec.QueueStore {

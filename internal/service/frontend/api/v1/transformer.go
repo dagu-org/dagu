@@ -4,9 +4,9 @@
 package api
 
 import (
-	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 const maxIntValue = int(^uint(0) >> 1)

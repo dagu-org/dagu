@@ -10,10 +10,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/cmn/mailer"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/cmn/mailer"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/go-viper/mapstructure/v2"
 )
 

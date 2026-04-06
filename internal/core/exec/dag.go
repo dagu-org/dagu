@@ -8,8 +8,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/spec"
 )
 
 // Errors for DAG file operations

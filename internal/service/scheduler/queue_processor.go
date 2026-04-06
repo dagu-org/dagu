@@ -13,14 +13,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/cmn/backoff"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 )
 
 const queueAgeWarningThreshold = 2 * time.Minute

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 )
 
 const heartbeatInterval = 24 * time.Hour

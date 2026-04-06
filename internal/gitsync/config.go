@@ -3,7 +3,7 @@
 
 package gitsync
 
-import "github.com/dagu-org/dagu/internal/cmn/config"
+import "github.com/dagucloud/dagu/internal/cmn/config"
 
 // Config holds the configuration for Git sync functionality.
 type Config struct {

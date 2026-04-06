@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/go-resty/resty/v2"
 	"github.com/go-viper/mapstructure/v2"
 )

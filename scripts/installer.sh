@@ -2,8 +2,8 @@
 # Copyright (C) 2026 Yota Hamada
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-RELEASES_URL="https://github.com/dagu-org/dagu/releases"
-GITHUB_API_URL="https://api.github.com/repos/dagu-org/dagu/releases/latest"
+RELEASES_URL="https://github.com/dagucloud/dagu/releases"
+GITHUB_API_URL="https://api.github.com/repos/dagucloud/dagu/releases/latest"
 FILE_BASENAME="dagu"
 WINSW_VERSION="v2.12.0"
 GUM_VERSION="0.17.0"
@@ -2118,7 +2118,7 @@ install_skill() {
             fi
         fi
         if is_promptable && command -v npx >/dev/null 2>&1 && prompt_yes_no "Use the shared skills installer instead?" "no"; then
-            npx skills add https://github.com/dagu-org/dagu --skill dagu
+            npx skills add https://github.com/dagucloud/dagu --skill dagu
         fi
     fi
 }
@@ -2209,6 +2209,6 @@ main() {
     open_browser_if_requested
 }
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then
     main "$@"
 fi

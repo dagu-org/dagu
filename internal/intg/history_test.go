@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

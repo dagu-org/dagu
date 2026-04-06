@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/service/audit"
-	"github.com/dagu-org/dagu/internal/workspace"
+	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/internal/workspace"
 )
 
 func workspaceStoreUnavailable() *Error {

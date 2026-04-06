@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/core"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 )
 
 var (

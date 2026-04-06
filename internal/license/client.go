@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 )
 
 const defaultCloudURL = "https://console.dagu.sh"

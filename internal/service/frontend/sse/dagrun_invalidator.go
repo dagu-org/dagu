@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 const defaultDAGRunInvalidationPollInterval = time.Second

@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/buildenv"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/cmn/buildenv"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/spec"
 )
 
 // parseTriggerTypeParam parses and validates the trigger-type flag from the command context.

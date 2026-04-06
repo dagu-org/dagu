@@ -7,8 +7,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/service/audit"
 )
 
 // ListAuditLogs returns audit log entries matching the filter criteria.

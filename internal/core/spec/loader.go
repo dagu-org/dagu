@@ -15,9 +15,9 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/spec/types"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/spec/types"
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/goccy/go-yaml"

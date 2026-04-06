@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
+	"github.com/dagucloud/dagu/internal/cmn/backoff"
 	"github.com/go-resty/resty/v2"
 )
 
 const (
-	githubAPIURL = "https://api.github.com/repos/dagu-org/dagu/releases"
+	githubAPIURL = "https://api.github.com/repos/dagucloud/dagu/releases"
 
 	defaultTimeout = 30 * time.Second
 )

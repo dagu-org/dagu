@@ -6,7 +6,7 @@ package fileproc
 import (
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 func testProcMetaFromRun(ref exec.DAGRunRef) exec.ProcMeta {

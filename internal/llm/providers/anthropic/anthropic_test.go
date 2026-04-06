@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

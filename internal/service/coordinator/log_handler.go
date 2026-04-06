@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

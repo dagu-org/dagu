@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/persis/fileagentskill"
+	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

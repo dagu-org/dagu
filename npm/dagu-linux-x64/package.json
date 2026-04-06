@@ -1,12 +1,12 @@
 {
-  "name": "@dagu-org/dagu-linux-x64",
+  "name": "@dagucloud/dagu-linux-x64",
   "version": "0.0.0-development",
   "description": "Dagu binary for Linux x64",
   "keywords": ["dagu", "workflow", "linux", "x64"],
-  "homepage": "https://github.com/dagu-org/dagu",
+  "homepage": "https://github.com/dagucloud/dagu",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dagu-org/dagu.git"
+    "url": "git+https://github.com/dagucloud/dagu.git"
   },
   "license": "GPL-3.0",
   "author": "Dagu Contributors",

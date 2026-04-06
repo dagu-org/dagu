@@ -1,4 +1,4 @@
-module github.com/dagu-org/dagu
+module github.com/dagucloud/dagu
 
 go 1.26
 

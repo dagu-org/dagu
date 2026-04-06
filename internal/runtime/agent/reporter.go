@@ -10,9 +10,9 @@ import (
 	"html"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 

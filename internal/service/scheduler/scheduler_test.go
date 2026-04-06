@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/service/scheduler"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/service/scheduler"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/require"
 )

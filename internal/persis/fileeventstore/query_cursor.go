@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 const queryCursorVersion = 1

@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime/agent"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/runtime/agent"
+	"github.com/dagucloud/dagu/internal/test"
 
 	"github.com/stretchr/testify/require"
 )

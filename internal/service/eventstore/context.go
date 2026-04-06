@@ -6,7 +6,7 @@ package eventstore
 import (
 	"context"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 type contextKey struct{}

@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agentoauth"
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/agentoauth"
+	"github.com/dagucloud/dagu/internal/llm"
 )
 
 const defaultMaxCacheSize = 64

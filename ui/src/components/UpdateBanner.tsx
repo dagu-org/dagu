@@ -22,7 +22,7 @@ export function UpdateBanner() {
       <span className="text-blue-800 dark:text-blue-200">
         Update available: v{config.version} &rarr; {config.latestVersion}
         <a
-          href="https://github.com/dagu-org/dagu/releases"
+          href="https://github.com/dagucloud/dagu/releases"
           target="_blank"
           rel="noopener noreferrer"
           className="ml-2 underline hover:no-underline"

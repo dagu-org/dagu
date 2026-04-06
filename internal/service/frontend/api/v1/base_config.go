@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/spec"
-	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/service/audit"
 )
 
 var (

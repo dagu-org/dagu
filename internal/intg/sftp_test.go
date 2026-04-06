@@ -12,8 +12,8 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/test"
 )
 
 // TestSFTPExecutorIntegration tests SFTP executor with a real SSH server in Docker

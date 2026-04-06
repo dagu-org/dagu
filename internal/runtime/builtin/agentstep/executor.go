@@ -16,15 +16,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/llm"
-	"github.com/dagu-org/dagu/internal/runtime"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 
 	// Import all LLM providers to register them.
-	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
+	_ "github.com/dagucloud/dagu/internal/llm/allproviders"
 )
 
 var _ executor.Executor = (*Executor)(nil)

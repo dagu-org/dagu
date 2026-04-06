@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/persis/fileupgradecheck"
-	"github.com/dagu-org/dagu/internal/upgrade"
+	"github.com/dagucloud/dagu/internal/persis/fileupgradecheck"
+	"github.com/dagucloud/dagu/internal/upgrade"
 	"github.com/spf13/cobra"
 )
 

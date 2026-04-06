@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	indexv1 "github.com/dagu-org/dagu/proto/index/v1"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	indexv1 "github.com/dagucloud/dagu/proto/index/v1"
 	"google.golang.org/protobuf/proto"
 )
 

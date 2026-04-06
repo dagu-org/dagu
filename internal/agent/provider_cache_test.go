@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/agentoauth"
-	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
+	"github.com/dagucloud/dagu/internal/agentoauth"
+	_ "github.com/dagucloud/dagu/internal/llm/allproviders"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

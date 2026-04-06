@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/remotenode"
-	"github.com/dagu-org/dagu/internal/service/scheduler/filenotify"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/remotenode"
+	"github.com/dagucloud/dagu/internal/service/scheduler/filenotify"
 	"github.com/fsnotify/fsnotify"
 )
 

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/spf13/viper"
 )
 

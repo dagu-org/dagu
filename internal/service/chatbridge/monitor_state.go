@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 const notificationMonitorStateVersion = 1

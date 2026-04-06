@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
-	"github.com/dagu-org/dagu/internal/cmn/collections"
-	"github.com/dagu-org/dagu/internal/cmn/signal"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/spec/types"
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/internal/cmn/collections"
+	"github.com/dagucloud/dagu/internal/cmn/signal"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/spec/types"
+	"github.com/dagucloud/dagu/internal/llm"
 	"github.com/google/jsonschema-go/jsonschema"
 )
 

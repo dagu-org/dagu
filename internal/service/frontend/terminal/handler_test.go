@@ -16,10 +16,10 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	api "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	terminalpkg "github.com/dagu-org/dagu/internal/service/frontend/terminal"
-	"github.com/dagu-org/dagu/internal/test"
+	api "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	terminalpkg "github.com/dagucloud/dagu/internal/service/frontend/terminal"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

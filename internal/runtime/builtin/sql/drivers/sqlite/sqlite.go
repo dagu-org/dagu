@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	sqlexec "github.com/dagu-org/dagu/internal/runtime/builtin/sql"
+	sqlexec "github.com/dagucloud/dagu/internal/runtime/builtin/sql"
 	"github.com/gofrs/flock"
 
 	_ "modernc.org/sqlite" // Pure Go SQLite driver

@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime/transform"
-	"github.com/dagu-org/dagu/internal/test"
+	api "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/runtime/transform"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

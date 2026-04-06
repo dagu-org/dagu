@@ -6,7 +6,7 @@ package intg_test
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/test"
 )
 
 func TestPreconditionWithDAGEnvVars(t *testing.T) {

@@ -1,8 +1,8 @@
 {
-  "name": "@dagu-org/dagu-win32-ia32",
+  "name": "@dagucloud/dagu-win32-ia32",
   "version": "0.0.0-development",
   "description": "Dagu binary for Windows 32-bit",
-  "repository": "github:dagu-org/dagu",
+  "repository": "github:dagucloud/dagu",
   "license": "GPL-3.0",
   "os": ["win32"],
   "cpu": ["ia32"],

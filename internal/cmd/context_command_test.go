@@ -6,7 +6,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/clicontext"
+	"github.com/dagucloud/dagu/internal/clicontext"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

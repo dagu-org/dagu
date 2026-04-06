@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +27,7 @@ steps:
     config:
       runner: node:25-bookworm
     params:
-      repository: dagu-org/dagu
+      repository: dagucloud/dagu
       sparse-checkout: README.md
 `)
 

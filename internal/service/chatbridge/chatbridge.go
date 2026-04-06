@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/agent"
 )
 
 // AgentService is the subset of the agent API required by chat bridge adapters.

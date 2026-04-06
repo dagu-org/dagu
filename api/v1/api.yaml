@@ -9,7 +9,7 @@ info:
   description: API for controlling and monitoring Dagu server.
   license:
     name: "GPL-3.0"
-    url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
+    url: "https://github.com/dagucloud/dagu/blob/main/LICENSE.md"
 
 servers:
   - url: "{schema}://{host}/api/v1"
