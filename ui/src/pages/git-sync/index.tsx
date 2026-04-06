@@ -162,6 +162,7 @@ export default function GitSyncPage() {
     open: boolean;
     itemId?: string;
   }>({ open: false });
+  const [publishForce, setPublishForce] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
   const [diffModal, setDiffModal] = useState<{ open: boolean; itemId?: string }>(
     { open: false }
@@ -185,6 +186,12 @@ export default function GitSyncPage() {
   useEffect(() => {
     setTitle('Git Sync');
   }, [setTitle]);
+
+  useEffect(() => {
+    if (publishModal.open) {
+      setPublishForce(false);
+    }
+  }, [publishModal.open, publishModal.itemId]);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -356,6 +363,7 @@ export default function GitSyncPage() {
         setPublishModal({ open: false });
         setDiffModal({ open: false });
         setCommitMessage('');
+        setPublishForce(false);
         setSelectedDags(new Set());
         userTouchedSelectionRef.current = false;
         mutateStatus();
@@ -542,6 +550,10 @@ export default function GitSyncPage() {
   );
 
   const publishableSelectedCount = publishableSelectedIds.length;
+  const publishItemStatus = publishModal.itemId
+    ? rowByID.get(publishModal.itemId)?.item.status
+    : undefined;
+  const canForcePublish = publishItemStatus === SyncStatus.conflict;
 
   const selectedCounts = useMemo(() => {
     let dag = 0;
@@ -977,7 +989,12 @@ export default function GitSyncPage() {
       {/* Publish Modal */}
       <Dialog
         open={publishModal.open}
-        onOpenChange={(open) => setPublishModal({ open })}
+        onOpenChange={(open) => {
+          setPublishModal({ open });
+          if (!open) {
+            setPublishForce(false);
+          }
+        }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1008,23 +1025,38 @@ export default function GitSyncPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !isPublishing) {
                     e.preventDefault();
-                    handlePublish(publishModal.itemId);
+                    handlePublish(publishModal.itemId, publishForce);
                   }
                 }}
               />
             </div>
+            {canForcePublish && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="publish-force"
+                  checked={publishForce}
+                  onCheckedChange={(checked) => setPublishForce(checked === true)}
+                />
+                <Label htmlFor="publish-force" className="text-xs">
+                  Force publish (override conflict)
+                </Label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPublishModal({ open: false })}
+              onClick={() => {
+                setPublishModal({ open: false });
+                setPublishForce(false);
+              }}
             >
               Cancel
             </Button>
             <Button
               size="sm"
-              onClick={() => handlePublish(publishModal.itemId)}
+              onClick={() => handlePublish(publishModal.itemId, publishForce)}
               disabled={isPublishing}
             >
               {isPublishing ? (
