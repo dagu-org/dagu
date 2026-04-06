@@ -42,7 +42,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BatchDeleteDialog } from './BatchDeleteDialog';
 import { CleanupDialog } from './CleanupDialog';
@@ -179,6 +179,7 @@ export default function GitSyncPage() {
   const [deleteMissingModal, setDeleteMissingModal] = useState(false);
   const [batchDeleteModal, setBatchDeleteModal] = useState(false);
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const userTouchedSelectionRef = useRef(false);
   const prevPublishableRef = useRef<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -258,6 +259,7 @@ export default function GitSyncPage() {
         : [],
     [status?.items]
   );
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const publishableKey = useMemo(() => {
     return syncRows
@@ -425,13 +427,18 @@ export default function GitSyncPage() {
 
   const filteredRows = useMemo(
     () =>
-      syncRows.filter(({ item, kind }) => {
-        const typeMatches = typeFilter === 'all' || kind === typeFilter;
+      syncRows.filter(({ itemId, item, kind }) => {
+        const typeMatches = kind === typeFilter;
         const statusMatches =
           statusFilter === 'all' || item.status === statusFilter;
-        return typeMatches && statusMatches;
+        const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
+        const searchMatches =
+          normalizedQuery === '' ||
+          itemId.toLowerCase().includes(normalizedQuery) ||
+          item.displayName.toLowerCase().includes(normalizedQuery);
+        return typeMatches && statusMatches && searchMatches;
       }),
-    [syncRows, typeFilter, statusFilter]
+    [syncRows, typeFilter, statusFilter, deferredSearchQuery]
   );
 
   const allVisibleItemIDs = useMemo(
@@ -573,12 +580,6 @@ export default function GitSyncPage() {
   }, [selectedDags, rowByID]);
 
   const emptyStateMessage = useMemo(() => {
-    if (typeFilter === 'all' && statusFilter === 'all') {
-      return 'No items found';
-    }
-    if (typeFilter === 'all') {
-      return `No ${statusFilter} items`;
-    }
     const typeLabelMap: Record<string, string> = {
       dag: 'DAG',
       memory: 'memory',
@@ -587,11 +588,17 @@ export default function GitSyncPage() {
       doc: 'doc',
     };
     const typeLabel = typeLabelMap[typeFilter] || typeFilter;
+    if (searchQuery.trim()) {
+      if (statusFilter === 'all') {
+        return `No ${typeLabel} items matching "${searchQuery.trim()}"`;
+      }
+      return `No ${typeLabel} items with ${statusFilter} status matching "${searchQuery.trim()}"`;
+    }
     if (statusFilter === 'all') {
       return `No ${typeLabel} items`;
     }
     return `No ${typeLabel} items with ${statusFilter} status`;
-  }, [statusFilter, typeFilter]);
+  }, [searchQuery, statusFilter, typeFilter]);
 
   const missingCount = status?.counts?.missing || 0;
 
@@ -738,6 +745,15 @@ export default function GitSyncPage() {
               {({ dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls', doc: 'Docs' } as Record<string, string>)[f]} ({typeCounts[f]})
             </button>
           ))}
+        </div>
+        <div className="w-full max-w-sm">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search items..."
+            className="h-8 text-xs"
+            aria-label="Search git sync items"
+          />
         </div>
         {selectedCounts.total > 0 && (
           <span className="text-xs text-muted-foreground">
