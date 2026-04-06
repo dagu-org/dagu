@@ -59,7 +59,7 @@ type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncItemDiffResponse = components['schemas']['SyncItemDiffResponse'];
 type SyncItem = components['schemas']['SyncItem'];
 type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict' | 'missing';
-type TypeFilter = 'all' | 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
+type TypeFilter = 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
 type UISyncKind = 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
 type SyncRow = { itemId: string; item: SyncItem; kind: UISyncKind };
 
@@ -70,7 +70,7 @@ const statusFilters: StatusFilter[] = [
   'conflict',
   'missing',
 ];
-const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill', 'soul', 'doc'];
+const typeFilters: TypeFilter[] = ['dag', 'memory', 'skill', 'soul', 'doc'];
 
 function parseStatusFilter(value: string | null): StatusFilter {
   if (
@@ -86,10 +86,10 @@ function parseStatusFilter(value: string | null): StatusFilter {
 }
 
 function parseTypeFilter(value: string | null): TypeFilter {
-  if (value === 'all' || value === 'dag' || value === 'memory' || value === 'skill' || value === 'soul' || value === 'doc') {
+  if (value === 'dag' || value === 'memory' || value === 'skill' || value === 'soul' || value === 'doc') {
     return value;
   }
-  return 'all';
+  return 'dag';
 }
 
 function normalizeSyncItemKind(kind: SyncItemKind): UISyncKind {
@@ -236,7 +236,7 @@ export default function GitSyncPage() {
         params.set('status', nextStatus);
       }
 
-      if (nextType === 'all') {
+      if (nextType === 'dag') {
         params.delete('type');
       } else {
         params.set('type', nextType);
@@ -471,7 +471,6 @@ export default function GitSyncPage() {
 
   const typeCounts = useMemo(() => {
     const counts: Record<TypeFilter, number> = {
-      all: syncRows.length,
       dag: 0,
       memory: 0,
       skill: 0,
@@ -494,7 +493,7 @@ export default function GitSyncPage() {
     };
 
     for (const { item, kind } of syncRows) {
-      if (typeFilter !== 'all' && kind !== typeFilter) {
+      if (kind !== typeFilter) {
         continue;
       }
       counts.all += 1;
@@ -736,7 +735,7 @@ export default function GitSyncPage() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {({ all: 'All', dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls', doc: 'Docs' } as Record<string, string>)[f]} ({typeCounts[f]})
+              {({ dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls', doc: 'Docs' } as Record<string, string>)[f]} ({typeCounts[f]})
             </button>
           ))}
         </div>
