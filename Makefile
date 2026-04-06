@@ -201,6 +201,7 @@ protoc: ${LOCAL_DIR}/${PB_RELEASE_NAME}
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protoc_gen_go_grpc}
 	@printf '%b\n' "${COLOR_GREEN}Generating Go code from proto files...${COLOR_RESET}"
 	@env PATH="${LOCAL_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" ${LOCAL_BIN_DIR}/protoc --go_out=. --go_opt=paths=source_relative \
+	    --go_opt=apilevelMproto/coordinator/v1/coordinator.proto=API_HYBRID \
 	    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
 	    proto/coordinator/v1/*.proto
 	@env PATH="${LOCAL_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" ${LOCAL_BIN_DIR}/protoc --go_out=. --go_opt=paths=source_relative \
