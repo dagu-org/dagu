@@ -309,6 +309,27 @@ func (s *serviceImpl) syncFilesToDAGsDir(_ context.Context, pullResult *PullResu
 
 		localHash := ComputeContentHash(localContent)
 
+		// If local and remote content already match, ensure state reflects synced.
+		if localHash == repoHash {
+			if dagState == nil || dagState.Status != StatusSynced || dagState.BaseCommit != pullResult.CurrentCommit || dagState.LastSyncedHash != repoHash {
+				now := time.Now()
+				newState := &DAGState{
+					Status:         StatusSynced,
+					Kind:           KindForDAGID(dagID),
+					BaseCommit:     pullResult.CurrentCommit,
+					LastSyncedHash: repoHash,
+					LastSyncedAt:   &now,
+					LocalHash:      repoHash,
+				}
+				if fi, err := os.Stat(dagFilePath); err == nil {
+					updateStatCache(newState, fi)
+				}
+				state.DAGs[dagID] = newState
+				synced = append(synced, dagID)
+			}
+			continue
+		}
+
 		// Check for locally modified files
 		if dagState != nil && dagState.Status == StatusModified {
 			// Local was modified, check if remote also changed
