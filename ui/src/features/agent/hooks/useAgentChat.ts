@@ -218,6 +218,7 @@ export function useAgentChat() {
 
   const selectGenRef = useRef(0);
   const [isSending, setIsSending] = useState(false);
+  const [optimisticWorking, setOptimisticWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answeredPrompts, setAnsweredPrompts] = useState<
     Record<string, string>
@@ -259,6 +260,7 @@ export function useAgentChat() {
 
     setMessages(nextMessages);
     if (snapshot.session_state) {
+      setOptimisticWorking(false);
       setSessionState(snapshot.session_state);
     }
 
@@ -293,6 +295,7 @@ export function useAgentChat() {
     // caused the pending bubble to vanish before the real message arrived.
 
     if (event.session_state) {
+      setOptimisticWorking(false);
       setSessionState(event.session_state);
     }
 
@@ -505,6 +508,7 @@ export function useAgentChat() {
 
       try {
         if (!sessionId) {
+          setOptimisticWorking(true);
           await startSession(message, model, dagContexts, soulId);
           return;
         }
@@ -523,9 +527,11 @@ export function useAgentChat() {
         );
         if (apiError)
           throw new Error(apiError.message || 'Failed to send message');
+        setOptimisticWorking(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to send message');
         setPendingUserMessage(null);
+        setOptimisticWorking(false);
         throw err;
       } finally {
         setIsSending(false);
@@ -575,11 +581,13 @@ export function useAgentChat() {
         );
         if (apiError)
           throw new Error(apiError.message || 'Failed to submit response');
+        setOptimisticWorking(true);
         setAnsweredPrompts((prev) => ({
           ...prev,
           [response.prompt_id]: displayValue,
         }));
       } catch (err) {
+        setOptimisticWorking(false);
         setError(
           err instanceof Error ? err.message : 'Failed to submit response'
         );
@@ -611,13 +619,14 @@ export function useAgentChat() {
     [fetchSessionDetail, setSessionId, applySessionSnapshot]
   );
 
-  const isWorking = isSending || sessionState?.working || false;
+  const isWorking = isSending || optimisticWorking || sessionState?.working || false;
 
   const clearError = useCallback(() => setError(null), []);
 
   const handleClearSession = useCallback(() => {
     selectGenRef.current++;
     clearSession();
+    setOptimisticWorking(false);
     setAnsweredPrompts({});
     resetDelegates();
   }, [clearSession, resetDelegates]);
