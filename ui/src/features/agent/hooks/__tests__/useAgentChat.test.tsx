@@ -555,4 +555,51 @@ describe('useAgentChat fallback polling', () => {
     expect(result.current.messages[1]?.content).toBe('post-reconnect delta');
     expect(result.current.sessionState?.working).toBe(false);
   });
+
+  it('shows working immediately after sending a message without forcing an extra session refresh', async () => {
+    getMock.mockImplementation(
+      async (
+        _path: string,
+        request?: { params?: { path?: { sessionId?: string } } }
+      ) => {
+        if (request?.params?.path?.sessionId === 'sess-1') {
+          return {
+            data: makeSessionDetailResponse({
+              messages: [makeApiMessage('msg-1', 'user echoed', 1)],
+              working: true,
+            }),
+          };
+        }
+        throw new Error('unexpected request');
+      }
+    );
+    postMock.mockResolvedValue({ data: { status: 'accepted' } });
+
+    const { result } = renderHook(() => useAgentChatWithOpen(), {
+      wrapper: TestProviders,
+    });
+
+    act(() => {
+      result.current.openChat();
+    });
+
+    await act(async () => {
+      await result.current.selectSession('sess-1');
+    });
+
+    getMock.mockClear();
+
+    await act(async () => {
+      await result.current.sendMessage('follow up');
+    });
+
+    expect(result.current.isWorking).toBe(true);
+    expect(postMock).toHaveBeenCalledWith(
+      '/agent/sessions/{sessionId}/chat',
+      expect.objectContaining({
+        params: { path: { sessionId: 'sess-1' }, query: { remoteNode: 'local' } },
+      })
+    );
+    expect(getMock).not.toHaveBeenCalled();
+  });
 });
