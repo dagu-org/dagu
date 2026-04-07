@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 type fakeNotificationTransport struct {

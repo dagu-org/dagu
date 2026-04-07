@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/persis/fileapikey"
-	"github.com/dagu-org/dagu/internal/persis/fileuser"
+	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/persis/fileapikey"
+	"github.com/dagucloud/dagu/internal/persis/fileuser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

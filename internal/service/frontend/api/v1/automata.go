@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/automata"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/automata"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/service/audit"
 )
 
 const (

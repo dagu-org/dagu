@@ -6,7 +6,7 @@ package spec
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core/spec/types"
+	"github.com/dagucloud/dagu/internal/core/spec/types"
 	"github.com/stretchr/testify/require"
 )
 

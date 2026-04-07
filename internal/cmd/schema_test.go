@@ -7,12 +7,12 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/dagu-org/dagu/internal/agent/schema" // Register schemas
+	_ "github.com/dagucloud/dagu/internal/agent/schema" // Register schemas
 )
 
 func runSchemaCmd(args ...string) (string, error) {

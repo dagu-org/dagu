@@ -1,12 +1,12 @@
 {
-  "name": "@dagu-org/dagu-darwin-arm64",
+  "name": "@dagucloud/dagu-darwin-arm64",
   "version": "0.0.0-development",
   "description": "Dagu binary for macOS ARM64 (Apple Silicon)",
   "keywords": ["dagu", "workflow", "darwin", "macos", "arm64", "apple-silicon"],
-  "homepage": "https://github.com/dagu-org/dagu",
+  "homepage": "https://github.com/dagucloud/dagu",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dagu-org/dagu.git"
+    "url": "git+https://github.com/dagucloud/dagu.git"
   },
   "license": "GPL-3.0",
   "author": "Dagu Contributors",

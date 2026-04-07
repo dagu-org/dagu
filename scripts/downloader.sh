@@ -4,7 +4,7 @@
 
 
 # Set up constants and URLs
-RELEASES_URL="https://github.com/dagu-org/dagu/releases"
+RELEASES_URL="https://github.com/dagucloud/dagu/releases"
 FILE_BASENAME="dagu"
 
 # Parse CLI arguments

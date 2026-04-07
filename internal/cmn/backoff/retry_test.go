@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/stretchr/testify/assert"
 )
 

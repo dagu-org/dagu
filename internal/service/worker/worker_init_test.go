@@ -6,7 +6,7 @@ package worker
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/stretchr/testify/require"
 )
 

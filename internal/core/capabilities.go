@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
 )
 
 // ExecutorCapabilities defines what an executor can do.

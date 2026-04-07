@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -233,6 +234,59 @@ func TestService_GetStatusBackfillsKinds(t *testing.T) {
 	assert.Equal(t, DAGKindDAG, status.DAGs["example"].Kind)
 	assert.Equal(t, DAGKindMemory, status.DAGs["memory/MEMORY"].Kind)
 	assert.Equal(t, DAGKindMemory, status.DAGs["memory/dags/a/MEMORY"].Kind)
+}
+
+func TestSyncFilesToDAGsDir_PromotesMatchingUntrackedItemToSynced(t *testing.T) {
+	t.Parallel()
+
+	svc, dagsDir := newTestService(t, testCfgReadOnly)
+
+	repoPath := filepath.Join(svc.dataDir, "gitsync", "repo")
+	require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "docs", "youtube_translate"), 0755))
+	repo, err := git.PlainInit(repoPath, false)
+	require.NoError(t, err)
+	svc.gitClient.repo = repo
+
+	itemID := "docs/youtube_translate/example"
+	repoFile := filepath.Join(repoPath, "docs", "youtube_translate", "example.md")
+	localFile := filepath.Join(dagsDir, "docs", "youtube_translate", "example.md")
+	content := []byte("# translated doc\n")
+
+	require.NoError(t, os.MkdirAll(filepath.Dir(localFile), 0755))
+	require.NoError(t, os.WriteFile(repoFile, content, 0600))
+	require.NoError(t, os.WriteFile(localFile, content, 0600))
+
+	commitHash, err := svc.gitClient.AddAndCommit(filepath.Join("docs", "youtube_translate", "example.md"), "add doc")
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, svc.stateManager.Save(&State{
+		Version: 1,
+		DAGs: map[string]*DAGState{
+			itemID: {
+				Status:     StatusUntracked,
+				Kind:       DAGKindDoc,
+				ModifiedAt: &now,
+				LocalHash:  ComputeContentHash(content),
+			},
+		},
+	}))
+
+	synced, conflicts, err := svc.syncFilesToDAGsDir(context.Background(), &PullResult{
+		PreviousCommit:  commitHash,
+		CurrentCommit:   commitHash,
+		AlreadyUpToDate: true,
+	}, commitHash)
+	require.NoError(t, err)
+	require.Equal(t, []string{itemID}, synced)
+	require.Empty(t, conflicts)
+
+	state, err := svc.stateManager.GetState()
+	require.NoError(t, err)
+	require.Contains(t, state.DAGs, itemID)
+	assert.Equal(t, StatusSynced, state.DAGs[itemID].Status)
+	assert.Equal(t, commitHash, state.DAGs[itemID].BaseCommit)
+	assert.Equal(t, ComputeContentHash(content), state.DAGs[itemID].LastSyncedHash)
 }
 
 func TestResolvePublishTargets(t *testing.T) {

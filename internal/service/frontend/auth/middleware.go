@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/service/frontend/api/pathutil"
+	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/service/frontend/api/pathutil"
 )
 
 // Options configures the authentication middleware.

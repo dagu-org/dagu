@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"net/http"
 
-	openapiv1 "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	openapiv1 "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 func (a *API) queueNameForDAGRun(ctx context.Context, dagRun exec.DAGRunRef) (string, error) {

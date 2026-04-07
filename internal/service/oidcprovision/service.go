@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	authservice "github.com/dagu-org/dagu/internal/service/auth"
+	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	authservice "github.com/dagucloud/dagu/internal/service/auth"
 	"github.com/google/uuid"
 )
 

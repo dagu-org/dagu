@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 )
 
 // EvalString evaluates the given string with the variables within the execution context.

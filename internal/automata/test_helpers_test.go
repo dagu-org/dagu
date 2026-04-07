@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/persis/filedag"
-	"github.com/dagu-org/dagu/internal/persis/filedagrun"
-	"github.com/dagu-org/dagu/internal/persis/filememory"
-	"github.com/dagu-org/dagu/internal/persis/filesession"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/persis/filedag"
+	"github.com/dagucloud/dagu/internal/persis/filedagrun"
+	"github.com/dagucloud/dagu/internal/persis/filememory"
+	"github.com/dagucloud/dagu/internal/persis/filesession"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/require"
 )
 

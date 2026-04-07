@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/require"
 )

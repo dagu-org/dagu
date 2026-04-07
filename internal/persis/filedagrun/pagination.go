@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/persis/filedagrun/dagrunindex"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/persis/filedagrun/dagrunindex"
 )
 
 type dagRunListKey struct {

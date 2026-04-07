@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/dagu-org/dagu/api/v1"
+	"github.com/dagucloud/dagu/api/v1"
 )
 
 // ActivateLicense handles license activation from the frontend.

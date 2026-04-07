@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	api "github.com/dagu-org/dagu/api/v1"
+	api "github.com/dagucloud/dagu/api/v1"
 	"github.com/stretchr/testify/require"
 )
 

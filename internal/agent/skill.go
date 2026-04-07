@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 // Sentinel errors for skill store operations.

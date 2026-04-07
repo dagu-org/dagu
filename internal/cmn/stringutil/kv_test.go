@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 )
 
 func TestKeyValue(t *testing.T) {

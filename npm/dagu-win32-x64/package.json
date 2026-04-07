@@ -1,12 +1,12 @@
 {
-  "name": "@dagu-org/dagu-win32-x64",
+  "name": "@dagucloud/dagu-win32-x64",
   "version": "0.0.0-development",
   "description": "Dagu binary for Windows x64",
   "keywords": ["dagu", "workflow", "windows", "win32", "x64"],
-  "homepage": "https://github.com/dagu-org/dagu",
+  "homepage": "https://github.com/dagucloud/dagu",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dagu-org/dagu.git"
+    "url": "git+https://github.com/dagucloud/dagu.git"
   },
   "license": "GPL-3.0",
   "author": "Dagu Contributors",

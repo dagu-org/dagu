@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/service/chatbridge"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/service/chatbridge"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 // DAGRunMonitor watches for DAG run completions and sends notifications via Slack.

@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/test"
 )
 
 func TestShellExecution(t *testing.T) {

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	openapiv1 "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	openapiv1 "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

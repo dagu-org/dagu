@@ -32,8 +32,8 @@ $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Script:InstallerSource = $MyInvocation.MyCommand.Definition
-$Script:ReleaseBase = "https://github.com/dagu-org/dagu/releases"
-$Script:ReleaseApi = "https://api.github.com/repos/dagu-org/dagu/releases/latest"
+$Script:ReleaseBase = "https://github.com/dagucloud/dagu/releases"
+$Script:ReleaseApi = "https://api.github.com/repos/dagucloud/dagu/releases/latest"
 $Script:WinSWVersion = "v2.12.0"
 $Script:WinSWBase = "https://github.com/winsw/winsw/releases/download/$($Script:WinSWVersion)"
 $Script:ServiceName = "Dagu"
@@ -1154,7 +1154,7 @@ function Install-AISkill {
         }
     }
     if ((Test-Interactive) -and (Get-Command npx -ErrorAction SilentlyContinue) -and (Confirm-Choice "Use the shared skills installer instead?" $false)) {
-        & npx skills add https://github.com/dagu-org/dagu --skill dagu
+        & npx skills add https://github.com/dagucloud/dagu --skill dagu
     }
 }
 

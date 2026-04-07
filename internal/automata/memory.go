@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 )
 
 func (s *Service) GetMemory(ctx context.Context, name string) (*Memory, error) {

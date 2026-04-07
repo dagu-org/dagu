@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/google/jsonschema-go/jsonschema"
 )
 

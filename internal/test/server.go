@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/cmn/telemetry"
-	"github.com/dagu-org/dagu/internal/service/coordinator"
-	"github.com/dagu-org/dagu/internal/service/frontend"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/telemetry"
+	"github.com/dagucloud/dagu/internal/service/coordinator"
+	"github.com/dagucloud/dagu/internal/service/frontend"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 )

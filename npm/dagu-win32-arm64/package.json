@@ -1,8 +1,8 @@
 {
-  "name": "@dagu-org/dagu-win32-arm64",
+  "name": "@dagucloud/dagu-win32-arm64",
   "version": "0.0.0-development",
   "description": "Dagu binary for Windows ARM64",
-  "repository": "github:dagu-org/dagu",
+  "repository": "github:dagucloud/dagu",
   "license": "GPL-3.0",
   "os": ["win32"],
   "cpu": ["arm64"],

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/dirlock"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/cmn/dirlock"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 type DAGRunLeaseStore struct {

@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime"
 )
 
 // NewNodesFromSteps builds legacy Node entries with default values for each DAG step.

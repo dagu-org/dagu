@@ -16,9 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agentoauth"
-	"github.com/dagu-org/dagu/internal/cmn/crypto"
-	"github.com/dagu-org/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/agentoauth"
+	"github.com/dagucloud/dagu/internal/cmn/crypto"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 )
 
 const (

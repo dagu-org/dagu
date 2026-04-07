@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
+	"github.com/dagucloud/dagu/internal/cmn/backoff"
 	"github.com/go-resty/resty/v2"
 )
 

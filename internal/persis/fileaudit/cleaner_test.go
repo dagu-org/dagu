@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/internal/service/audit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

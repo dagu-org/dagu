@@ -8,9 +8,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 )
 
 // MockExecutorType is a test executor type that simulates a successful agent step.

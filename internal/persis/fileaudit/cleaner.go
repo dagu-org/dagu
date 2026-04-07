@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/internal/service/audit"
 )
 
 // appendFn is a function that appends an audit entry to the store.

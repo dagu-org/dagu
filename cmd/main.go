@@ -6,11 +6,11 @@ package main
 import (
 	"os"
 
-	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/spf13/cobra"
 
-	_ "github.com/dagu-org/dagu/internal/runtime/builtin" // Register built-in executors
+	_ "github.com/dagucloud/dagu/internal/runtime/builtin" // Register built-in executors
 )
 
 var rootCmd = &cobra.Command{

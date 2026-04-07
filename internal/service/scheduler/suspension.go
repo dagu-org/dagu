@@ -6,8 +6,8 @@ package scheduler
 import (
 	"context"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 func isSchedulerManagedTriggerType(triggerType core.TriggerType) bool {

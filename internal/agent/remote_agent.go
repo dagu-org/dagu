@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/cmn/backoff"
+	"github.com/dagucloud/dagu/internal/llm"
 	"github.com/google/uuid"
 )
 

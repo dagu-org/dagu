@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 type automataEventEmitter struct {

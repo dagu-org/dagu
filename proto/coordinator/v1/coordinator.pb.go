@@ -7,13 +7,14 @@
 // 	protoc        v6.31.1
 // source: proto/coordinator/v1/coordinator.proto
 
+//go:build !protoopaque
+
 package coordinatorv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
-	sync "sync"
 	unsafe "unsafe"
 )
 
@@ -68,11 +69,6 @@ func (x Operation) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use Operation.Descriptor instead.
-func (Operation) EnumDescriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{0}
-}
-
 // Health status of a worker based on heartbeat recency.
 type WorkerHealthStatus int32
 
@@ -119,11 +115,6 @@ func (WorkerHealthStatus) Type() protoreflect.EnumType {
 
 func (x WorkerHealthStatus) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use WorkerHealthStatus.Descriptor instead.
-func (WorkerHealthStatus) EnumDescriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{1}
 }
 
 // Type of log stream.
@@ -174,14 +165,9 @@ func (x LogStreamType) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use LogStreamType.Descriptor instead.
-func (LogStreamType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{2}
-}
-
 // Request message for polling a task.
 type PollRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	PollerId      string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"`                                                       // Unique ID for this poll request
 	Labels        map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Worker labels for task matching
@@ -214,11 +200,6 @@ func (x *PollRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PollRequest.ProtoReflect.Descriptor instead.
-func (*PollRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{0}
-}
-
 func (x *PollRequest) GetWorkerId() string {
 	if x != nil {
 		return x.WorkerId
@@ -240,9 +221,39 @@ func (x *PollRequest) GetLabels() map[string]string {
 	return nil
 }
 
+func (x *PollRequest) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *PollRequest) SetPollerId(v string) {
+	x.PollerId = v
+}
+
+func (x *PollRequest) SetLabels(v map[string]string) {
+	x.Labels = v
+}
+
+type PollRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	WorkerId string
+	PollerId string
+	Labels   map[string]string
+}
+
+func (b0 PollRequest_builder) Build() *PollRequest {
+	m0 := &PollRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.WorkerId = b.WorkerId
+	x.PollerId = b.PollerId
+	x.Labels = b.Labels
+	return m0
+}
+
 // Response message for polling a task.
 type PollResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	Task          *Task                  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"` // The task to process.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -273,11 +284,6 @@ func (x *PollResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PollResponse.ProtoReflect.Descriptor instead.
-func (*PollResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{1}
-}
-
 func (x *PollResponse) GetTask() *Task {
 	if x != nil {
 		return x.Task
@@ -285,9 +291,38 @@ func (x *PollResponse) GetTask() *Task {
 	return nil
 }
 
+func (x *PollResponse) SetTask(v *Task) {
+	x.Task = v
+}
+
+func (x *PollResponse) HasTask() bool {
+	if x == nil {
+		return false
+	}
+	return x.Task != nil
+}
+
+func (x *PollResponse) ClearTask() {
+	x.Task = nil
+}
+
+type PollResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Task *Task
+}
+
+func (b0 PollResponse_builder) Build() *PollResponse {
+	m0 := &PollResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Task = b.Task
+	return m0
+}
+
 // Request message for dispatching a task.
 type DispatchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	Task          *Task                  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -318,11 +353,6 @@ func (x *DispatchRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DispatchRequest.ProtoReflect.Descriptor instead.
-func (*DispatchRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{2}
-}
-
 func (x *DispatchRequest) GetTask() *Task {
 	if x != nil {
 		return x.Task
@@ -330,9 +360,38 @@ func (x *DispatchRequest) GetTask() *Task {
 	return nil
 }
 
+func (x *DispatchRequest) SetTask(v *Task) {
+	x.Task = v
+}
+
+func (x *DispatchRequest) HasTask() bool {
+	if x == nil {
+		return false
+	}
+	return x.Task != nil
+}
+
+func (x *DispatchRequest) ClearTask() {
+	x.Task = nil
+}
+
+type DispatchRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Task *Task
+}
+
+func (b0 DispatchRequest_builder) Build() *DispatchRequest {
+	m0 := &DispatchRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Task = b.Task
+	return m0
+}
+
 // Response message for dispatching a task.
 type DispatchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -362,14 +421,21 @@ func (x *DispatchResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DispatchResponse.ProtoReflect.Descriptor instead.
-func (*DispatchResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{3}
+type DispatchResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+}
+
+func (b0 DispatchResponse_builder) Build() *DispatchResponse {
+	m0 := &DispatchResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	return m0
 }
 
 // Task to process.
 type Task struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
+	state            protoimpl.MessageState `protogen:"hybrid.v1"`
 	Operation        Operation              `protobuf:"varint,6,opt,name=operation,proto3,enum=coordinator.v1.Operation" json:"operation,omitempty"`
 	RootDagRunName   string                 `protobuf:"bytes,1,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
 	RootDagRunId     string                 `protobuf:"bytes,2,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
@@ -434,11 +500,6 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 		return ms
 	}
 	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Task.ProtoReflect.Descriptor instead.
-func (*Task) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Task) GetOperation() Operation {
@@ -616,9 +677,194 @@ func (x *Task) GetSourceFile() string {
 	return ""
 }
 
+func (x *Task) SetOperation(v Operation) {
+	x.Operation = v
+}
+
+func (x *Task) SetRootDagRunName(v string) {
+	x.RootDagRunName = v
+}
+
+func (x *Task) SetRootDagRunId(v string) {
+	x.RootDagRunId = v
+}
+
+func (x *Task) SetParentDagRunName(v string) {
+	x.ParentDagRunName = v
+}
+
+func (x *Task) SetParentDagRunId(v string) {
+	x.ParentDagRunId = v
+}
+
+func (x *Task) SetDagRunId(v string) {
+	x.DagRunId = v
+}
+
+func (x *Task) SetTarget(v string) {
+	x.Target = v
+}
+
+func (x *Task) SetParams(v string) {
+	x.Params = v
+}
+
+func (x *Task) SetStep(v string) {
+	x.Step = v
+}
+
+func (x *Task) SetWorkerSelector(v map[string]string) {
+	x.WorkerSelector = v
+}
+
+func (x *Task) SetDefinition(v string) {
+	x.Definition = v
+}
+
+func (x *Task) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *Task) SetPreviousStatus(v *DAGRunStatusProto) {
+	x.PreviousStatus = v
+}
+
+func (x *Task) SetAttemptId(v string) {
+	x.AttemptId = v
+}
+
+func (x *Task) SetAttemptKey(v string) {
+	x.AttemptKey = v
+}
+
+func (x *Task) SetTags(v string) {
+	x.Tags = v
+}
+
+func (x *Task) SetBaseConfig(v string) {
+	x.BaseConfig = v
+}
+
+func (x *Task) SetScheduleTime(v string) {
+	x.ScheduleTime = v
+}
+
+func (x *Task) SetExternalStepRetry(v bool) {
+	x.ExternalStepRetry = v
+}
+
+func (x *Task) SetQueueName(v string) {
+	x.QueueName = v
+}
+
+func (x *Task) SetOwnerCoordinatorId(v string) {
+	x.OwnerCoordinatorId = v
+}
+
+func (x *Task) SetOwnerCoordinatorHost(v string) {
+	x.OwnerCoordinatorHost = v
+}
+
+func (x *Task) SetOwnerCoordinatorPort(v int32) {
+	x.OwnerCoordinatorPort = v
+}
+
+func (x *Task) SetClaimToken(v string) {
+	x.ClaimToken = v
+}
+
+func (x *Task) SetSourceFile(v string) {
+	x.SourceFile = v
+}
+
+func (x *Task) HasPreviousStatus() bool {
+	if x == nil {
+		return false
+	}
+	return x.PreviousStatus != nil
+}
+
+func (x *Task) ClearPreviousStatus() {
+	x.PreviousStatus = nil
+}
+
+type Task_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Operation        Operation
+	RootDagRunName   string
+	RootDagRunId     string
+	ParentDagRunName string
+	ParentDagRunId   string
+	DagRunId         string
+	Target           string
+	Params           string
+	Step             string
+	WorkerSelector   map[string]string
+	Definition       string
+	WorkerId         string
+	// Previous status for OPERATION_RETRY in shared-nothing mode.
+	// When set, workers can retry without needing local DAGRunStore access.
+	PreviousStatus *DAGRunStatusProto
+	// Attempt ID created by coordinator. Workers use this to create attempts with the same ID.
+	AttemptId string
+	// Globally unique attempt identifier for cancellation tracking.
+	AttemptKey string
+	// Additional tags (comma-separated key=value or key-only) to apply to the DAG run.
+	Tags string
+	// Base config YAML content for workers (avoids relying on local base config files).
+	BaseConfig string
+	// RFC 3339 timestamp of when this task was originally scheduled.
+	ScheduleTime string
+	// Enables parent-managed step retries for this task.
+	ExternalStepRetry bool
+	// Queue/proc-group name used for distributed queue capacity accounting.
+	QueueName string
+	// Coordinator instance that owns this task after claim.
+	OwnerCoordinatorId   string
+	OwnerCoordinatorHost string
+	OwnerCoordinatorPort int32
+	// Durable token identifying the shared task claim.
+	ClaimToken string
+	// Original DAG file path for provenance-aware reschedule-from-file behavior.
+	SourceFile string
+}
+
+func (b0 Task_builder) Build() *Task {
+	m0 := &Task{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Operation = b.Operation
+	x.RootDagRunName = b.RootDagRunName
+	x.RootDagRunId = b.RootDagRunId
+	x.ParentDagRunName = b.ParentDagRunName
+	x.ParentDagRunId = b.ParentDagRunId
+	x.DagRunId = b.DagRunId
+	x.Target = b.Target
+	x.Params = b.Params
+	x.Step = b.Step
+	x.WorkerSelector = b.WorkerSelector
+	x.Definition = b.Definition
+	x.WorkerId = b.WorkerId
+	x.PreviousStatus = b.PreviousStatus
+	x.AttemptId = b.AttemptId
+	x.AttemptKey = b.AttemptKey
+	x.Tags = b.Tags
+	x.BaseConfig = b.BaseConfig
+	x.ScheduleTime = b.ScheduleTime
+	x.ExternalStepRetry = b.ExternalStepRetry
+	x.QueueName = b.QueueName
+	x.OwnerCoordinatorId = b.OwnerCoordinatorId
+	x.OwnerCoordinatorHost = b.OwnerCoordinatorHost
+	x.OwnerCoordinatorPort = b.OwnerCoordinatorPort
+	x.ClaimToken = b.ClaimToken
+	x.SourceFile = b.SourceFile
+	return m0
+}
+
 // Request message for getting workers.
 type GetWorkersRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -648,14 +894,21 @@ func (x *GetWorkersRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetWorkersRequest.ProtoReflect.Descriptor instead.
-func (*GetWorkersRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{5}
+type GetWorkersRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+}
+
+func (b0 GetWorkersRequest_builder) Build() *GetWorkersRequest {
+	m0 := &GetWorkersRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	return m0
 }
 
 // Response message for getting workers.
 type GetWorkersResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	Workers       []*WorkerInfo          `protobuf:"bytes,1,rep,name=workers,proto3" json:"workers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -686,11 +939,6 @@ func (x *GetWorkersResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetWorkersResponse.ProtoReflect.Descriptor instead.
-func (*GetWorkersResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{6}
-}
-
 func (x *GetWorkersResponse) GetWorkers() []*WorkerInfo {
 	if x != nil {
 		return x.Workers
@@ -698,9 +946,27 @@ func (x *GetWorkersResponse) GetWorkers() []*WorkerInfo {
 	return nil
 }
 
+func (x *GetWorkersResponse) SetWorkers(v []*WorkerInfo) {
+	x.Workers = v
+}
+
+type GetWorkersResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Workers []*WorkerInfo
+}
+
+func (b0 GetWorkersResponse_builder) Build() *GetWorkersResponse {
+	m0 := &GetWorkersResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Workers = b.Workers
+	return m0
+}
+
 // Information about a worker and its pollers.
 type WorkerInfo struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
+	state       protoimpl.MessageState `protogen:"hybrid.v1"`
 	WorkerId    string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	PollerId    string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"` // Deprecated: Only used for backward compatibility
 	Labels      map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -738,11 +1004,6 @@ func (x *WorkerInfo) ProtoReflect() protoreflect.Message {
 		return ms
 	}
 	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WorkerInfo.ProtoReflect.Descriptor instead.
-func (*WorkerInfo) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *WorkerInfo) GetWorkerId() string {
@@ -808,9 +1069,76 @@ func (x *WorkerInfo) GetHealthStatus() WorkerHealthStatus {
 	return WorkerHealthStatus_WORKER_HEALTH_STATUS_UNSPECIFIED
 }
 
+func (x *WorkerInfo) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *WorkerInfo) SetPollerId(v string) {
+	x.PollerId = v
+}
+
+func (x *WorkerInfo) SetLabels(v map[string]string) {
+	x.Labels = v
+}
+
+func (x *WorkerInfo) SetConnectedAt(v int64) {
+	x.ConnectedAt = v
+}
+
+func (x *WorkerInfo) SetTotalPollers(v int32) {
+	x.TotalPollers = v
+}
+
+func (x *WorkerInfo) SetBusyPollers(v int32) {
+	x.BusyPollers = v
+}
+
+func (x *WorkerInfo) SetRunningTasks(v []*RunningTask) {
+	x.RunningTasks = v
+}
+
+func (x *WorkerInfo) SetLastHeartbeatAt(v int64) {
+	x.LastHeartbeatAt = v
+}
+
+func (x *WorkerInfo) SetHealthStatus(v WorkerHealthStatus) {
+	x.HealthStatus = v
+}
+
+type WorkerInfo_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	WorkerId    string
+	PollerId    string
+	Labels      map[string]string
+	ConnectedAt int64
+	// Aggregated stats from heartbeat
+	TotalPollers    int32
+	BusyPollers     int32
+	RunningTasks    []*RunningTask
+	LastHeartbeatAt int64
+	HealthStatus    WorkerHealthStatus
+}
+
+func (b0 WorkerInfo_builder) Build() *WorkerInfo {
+	m0 := &WorkerInfo{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.WorkerId = b.WorkerId
+	x.PollerId = b.PollerId
+	x.Labels = b.Labels
+	x.ConnectedAt = b.ConnectedAt
+	x.TotalPollers = b.TotalPollers
+	x.BusyPollers = b.BusyPollers
+	x.RunningTasks = b.RunningTasks
+	x.LastHeartbeatAt = b.LastHeartbeatAt
+	x.HealthStatus = b.HealthStatus
+	return m0
+}
+
 // Request message for heartbeat.
 type HeartbeatRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	Labels        map[string]string      `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Stats         *WorkerStats           `protobuf:"bytes,3,opt,name=stats,proto3" json:"stats,omitempty"`
@@ -843,11 +1171,6 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
-func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{8}
-}
-
 func (x *HeartbeatRequest) GetWorkerId() string {
 	if x != nil {
 		return x.WorkerId
@@ -869,9 +1192,50 @@ func (x *HeartbeatRequest) GetStats() *WorkerStats {
 	return nil
 }
 
+func (x *HeartbeatRequest) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *HeartbeatRequest) SetLabels(v map[string]string) {
+	x.Labels = v
+}
+
+func (x *HeartbeatRequest) SetStats(v *WorkerStats) {
+	x.Stats = v
+}
+
+func (x *HeartbeatRequest) HasStats() bool {
+	if x == nil {
+		return false
+	}
+	return x.Stats != nil
+}
+
+func (x *HeartbeatRequest) ClearStats() {
+	x.Stats = nil
+}
+
+type HeartbeatRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	WorkerId string
+	Labels   map[string]string
+	Stats    *WorkerStats
+}
+
+func (b0 HeartbeatRequest_builder) Build() *HeartbeatRequest {
+	m0 := &HeartbeatRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.WorkerId = b.WorkerId
+	x.Labels = b.Labels
+	x.Stats = b.Stats
+	return m0
+}
+
 // Response message for heartbeat.
 type HeartbeatResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"hybrid.v1"`
 	// List of DAG runs that should be cancelled by the worker.
 	// Workers check this on each heartbeat and cancel matching running tasks.
 	CancelledRuns []*CancelledRun `protobuf:"bytes,1,rep,name=cancelled_runs,json=cancelledRuns,proto3" json:"cancelled_runs,omitempty"`
@@ -904,11 +1268,6 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
-func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{9}
-}
-
 func (x *HeartbeatResponse) GetCancelledRuns() []*CancelledRun {
 	if x != nil {
 		return x.CancelledRuns
@@ -916,8 +1275,28 @@ func (x *HeartbeatResponse) GetCancelledRuns() []*CancelledRun {
 	return nil
 }
 
+func (x *HeartbeatResponse) SetCancelledRuns(v []*CancelledRun) {
+	x.CancelledRuns = v
+}
+
+type HeartbeatResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// List of DAG runs that should be cancelled by the worker.
+	// Workers check this on each heartbeat and cancel matching running tasks.
+	CancelledRuns []*CancelledRun
+}
+
+func (b0 HeartbeatResponse_builder) Build() *HeartbeatResponse {
+	m0 := &HeartbeatResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.CancelledRuns = b.CancelledRuns
+	return m0
+}
+
 type AckTaskClaimRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	ClaimToken    string                 `protobuf:"bytes,2,opt,name=claim_token,json=claimToken,proto3" json:"claim_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -949,11 +1328,6 @@ func (x *AckTaskClaimRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AckTaskClaimRequest.ProtoReflect.Descriptor instead.
-func (*AckTaskClaimRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{10}
-}
-
 func (x *AckTaskClaimRequest) GetWorkerId() string {
 	if x != nil {
 		return x.WorkerId
@@ -968,8 +1342,32 @@ func (x *AckTaskClaimRequest) GetClaimToken() string {
 	return ""
 }
 
+func (x *AckTaskClaimRequest) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *AckTaskClaimRequest) SetClaimToken(v string) {
+	x.ClaimToken = v
+}
+
+type AckTaskClaimRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	WorkerId   string
+	ClaimToken string
+}
+
+func (b0 AckTaskClaimRequest_builder) Build() *AckTaskClaimRequest {
+	m0 := &AckTaskClaimRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.WorkerId = b.WorkerId
+	x.ClaimToken = b.ClaimToken
+	return m0
+}
+
 type AckTaskClaimResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
 	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1001,11 +1399,6 @@ func (x *AckTaskClaimResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AckTaskClaimResponse.ProtoReflect.Descriptor instead.
-func (*AckTaskClaimResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{11}
-}
-
 func (x *AckTaskClaimResponse) GetAccepted() bool {
 	if x != nil {
 		return x.Accepted
@@ -1020,8 +1413,32 @@ func (x *AckTaskClaimResponse) GetError() string {
 	return ""
 }
 
+func (x *AckTaskClaimResponse) SetAccepted(v bool) {
+	x.Accepted = v
+}
+
+func (x *AckTaskClaimResponse) SetError(v string) {
+	x.Error = v
+}
+
+type AckTaskClaimResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Accepted bool
+	Error    string
+}
+
+func (b0 AckTaskClaimResponse_builder) Build() *AckTaskClaimResponse {
+	m0 := &AckTaskClaimResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Accepted = b.Accepted
+	x.Error = b.Error
+	return m0
+}
+
 type RunHeartbeatRequest struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
+	state              protoimpl.MessageState `protogen:"hybrid.v1"`
 	WorkerId           string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	OwnerCoordinatorId string                 `protobuf:"bytes,2,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3" json:"owner_coordinator_id,omitempty"`
 	RunningTasks       []*RunningTask         `protobuf:"bytes,3,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`
@@ -1054,11 +1471,6 @@ func (x *RunHeartbeatRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RunHeartbeatRequest.ProtoReflect.Descriptor instead.
-func (*RunHeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{12}
-}
-
 func (x *RunHeartbeatRequest) GetWorkerId() string {
 	if x != nil {
 		return x.WorkerId
@@ -1080,8 +1492,38 @@ func (x *RunHeartbeatRequest) GetRunningTasks() []*RunningTask {
 	return nil
 }
 
+func (x *RunHeartbeatRequest) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *RunHeartbeatRequest) SetOwnerCoordinatorId(v string) {
+	x.OwnerCoordinatorId = v
+}
+
+func (x *RunHeartbeatRequest) SetRunningTasks(v []*RunningTask) {
+	x.RunningTasks = v
+}
+
+type RunHeartbeatRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	WorkerId           string
+	OwnerCoordinatorId string
+	RunningTasks       []*RunningTask
+}
+
+func (b0 RunHeartbeatRequest_builder) Build() *RunHeartbeatRequest {
+	m0 := &RunHeartbeatRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.WorkerId = b.WorkerId
+	x.OwnerCoordinatorId = b.OwnerCoordinatorId
+	x.RunningTasks = b.RunningTasks
+	return m0
+}
+
 type RunHeartbeatResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	CancelledRuns []*CancelledRun        `protobuf:"bytes,1,rep,name=cancelled_runs,json=cancelledRuns,proto3" json:"cancelled_runs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1112,11 +1554,6 @@ func (x *RunHeartbeatResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RunHeartbeatResponse.ProtoReflect.Descriptor instead.
-func (*RunHeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{13}
-}
-
 func (x *RunHeartbeatResponse) GetCancelledRuns() []*CancelledRun {
 	if x != nil {
 		return x.CancelledRuns
@@ -1124,9 +1561,27 @@ func (x *RunHeartbeatResponse) GetCancelledRuns() []*CancelledRun {
 	return nil
 }
 
+func (x *RunHeartbeatResponse) SetCancelledRuns(v []*CancelledRun) {
+	x.CancelledRuns = v
+}
+
+type RunHeartbeatResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	CancelledRuns []*CancelledRun
+}
+
+func (b0 RunHeartbeatResponse_builder) Build() *RunHeartbeatResponse {
+	m0 := &RunHeartbeatResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.CancelledRuns = b.CancelledRuns
+	return m0
+}
+
 // Information about a cancelled DAG run.
 type CancelledRun struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	AttemptKey    string                 `protobuf:"bytes,1,opt,name=attempt_key,json=attemptKey,proto3" json:"attempt_key,omitempty"` // Globally unique attempt identifier to cancel
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1157,11 +1612,6 @@ func (x *CancelledRun) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CancelledRun.ProtoReflect.Descriptor instead.
-func (*CancelledRun) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{14}
-}
-
 func (x *CancelledRun) GetAttemptKey() string {
 	if x != nil {
 		return x.AttemptKey
@@ -1169,9 +1619,27 @@ func (x *CancelledRun) GetAttemptKey() string {
 	return ""
 }
 
+func (x *CancelledRun) SetAttemptKey(v string) {
+	x.AttemptKey = v
+}
+
+type CancelledRun_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	AttemptKey string
+}
+
+func (b0 CancelledRun_builder) Build() *CancelledRun {
+	m0 := &CancelledRun{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.AttemptKey = b.AttemptKey
+	return m0
+}
+
 // Worker statistics reported via heartbeat.
 type WorkerStats struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	TotalPollers  int32                  `protobuf:"varint,1,opt,name=total_pollers,json=totalPollers,proto3" json:"total_pollers,omitempty"` // Total number of pollers
 	BusyPollers   int32                  `protobuf:"varint,2,opt,name=busy_pollers,json=busyPollers,proto3" json:"busy_pollers,omitempty"`    // Number currently processing tasks
 	RunningTasks  []*RunningTask         `protobuf:"bytes,3,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`  // Details of running tasks
@@ -1204,11 +1672,6 @@ func (x *WorkerStats) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WorkerStats.ProtoReflect.Descriptor instead.
-func (*WorkerStats) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{15}
-}
-
 func (x *WorkerStats) GetTotalPollers() int32 {
 	if x != nil {
 		return x.TotalPollers
@@ -1230,9 +1693,39 @@ func (x *WorkerStats) GetRunningTasks() []*RunningTask {
 	return nil
 }
 
+func (x *WorkerStats) SetTotalPollers(v int32) {
+	x.TotalPollers = v
+}
+
+func (x *WorkerStats) SetBusyPollers(v int32) {
+	x.BusyPollers = v
+}
+
+func (x *WorkerStats) SetRunningTasks(v []*RunningTask) {
+	x.RunningTasks = v
+}
+
+type WorkerStats_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	TotalPollers int32
+	BusyPollers  int32
+	RunningTasks []*RunningTask
+}
+
+func (b0 WorkerStats_builder) Build() *WorkerStats {
+	m0 := &WorkerStats{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.TotalPollers = b.TotalPollers
+	x.BusyPollers = b.BusyPollers
+	x.RunningTasks = b.RunningTasks
+	return m0
+}
+
 // Information about a running task.
 type RunningTask struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
+	state            protoimpl.MessageState `protogen:"hybrid.v1"`
 	DagRunId         string                 `protobuf:"bytes,1,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
 	DagName          string                 `protobuf:"bytes,2,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
 	StartedAt        int64                  `protobuf:"varint,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"` // Unix timestamp in seconds
@@ -1268,11 +1761,6 @@ func (x *RunningTask) ProtoReflect() protoreflect.Message {
 		return ms
 	}
 	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RunningTask.ProtoReflect.Descriptor instead.
-func (*RunningTask) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RunningTask) GetDagRunId() string {
@@ -1331,9 +1819,69 @@ func (x *RunningTask) GetAttemptKey() string {
 	return ""
 }
 
+func (x *RunningTask) SetDagRunId(v string) {
+	x.DagRunId = v
+}
+
+func (x *RunningTask) SetDagName(v string) {
+	x.DagName = v
+}
+
+func (x *RunningTask) SetStartedAt(v int64) {
+	x.StartedAt = v
+}
+
+func (x *RunningTask) SetRootDagRunName(v string) {
+	x.RootDagRunName = v
+}
+
+func (x *RunningTask) SetRootDagRunId(v string) {
+	x.RootDagRunId = v
+}
+
+func (x *RunningTask) SetParentDagRunName(v string) {
+	x.ParentDagRunName = v
+}
+
+func (x *RunningTask) SetParentDagRunId(v string) {
+	x.ParentDagRunId = v
+}
+
+func (x *RunningTask) SetAttemptKey(v string) {
+	x.AttemptKey = v
+}
+
+type RunningTask_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	DagRunId         string
+	DagName          string
+	StartedAt        int64
+	RootDagRunName   string
+	RootDagRunId     string
+	ParentDagRunName string
+	ParentDagRunId   string
+	AttemptKey       string
+}
+
+func (b0 RunningTask_builder) Build() *RunningTask {
+	m0 := &RunningTask{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.DagRunId = b.DagRunId
+	x.DagName = b.DagName
+	x.StartedAt = b.StartedAt
+	x.RootDagRunName = b.RootDagRunName
+	x.RootDagRunId = b.RootDagRunId
+	x.ParentDagRunName = b.ParentDagRunName
+	x.ParentDagRunId = b.ParentDagRunId
+	x.AttemptKey = b.AttemptKey
+	return m0
+}
+
 // Request message for reporting DAG run status.
 type ReportStatusRequest struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
+	state              protoimpl.MessageState `protogen:"hybrid.v1"`
 	WorkerId           string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	Status             *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	OwnerCoordinatorId string                 `protobuf:"bytes,3,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3" json:"owner_coordinator_id,omitempty"`
@@ -1366,11 +1914,6 @@ func (x *ReportStatusRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReportStatusRequest.ProtoReflect.Descriptor instead.
-func (*ReportStatusRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{17}
-}
-
 func (x *ReportStatusRequest) GetWorkerId() string {
 	if x != nil {
 		return x.WorkerId
@@ -1392,9 +1935,50 @@ func (x *ReportStatusRequest) GetOwnerCoordinatorId() string {
 	return ""
 }
 
+func (x *ReportStatusRequest) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *ReportStatusRequest) SetStatus(v *DAGRunStatusProto) {
+	x.Status = v
+}
+
+func (x *ReportStatusRequest) SetOwnerCoordinatorId(v string) {
+	x.OwnerCoordinatorId = v
+}
+
+func (x *ReportStatusRequest) HasStatus() bool {
+	if x == nil {
+		return false
+	}
+	return x.Status != nil
+}
+
+func (x *ReportStatusRequest) ClearStatus() {
+	x.Status = nil
+}
+
+type ReportStatusRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	WorkerId           string
+	Status             *DAGRunStatusProto
+	OwnerCoordinatorId string
+}
+
+func (b0 ReportStatusRequest_builder) Build() *ReportStatusRequest {
+	m0 := &ReportStatusRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.WorkerId = b.WorkerId
+	x.Status = b.Status
+	x.OwnerCoordinatorId = b.OwnerCoordinatorId
+	return m0
+}
+
 // Response message for reporting DAG run status.
 type ReportStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
 	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1426,11 +2010,6 @@ func (x *ReportStatusResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReportStatusResponse.ProtoReflect.Descriptor instead.
-func (*ReportStatusResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{18}
-}
-
 func (x *ReportStatusResponse) GetAccepted() bool {
 	if x != nil {
 		return x.Accepted
@@ -1445,9 +2024,33 @@ func (x *ReportStatusResponse) GetError() string {
 	return ""
 }
 
+func (x *ReportStatusResponse) SetAccepted(v bool) {
+	x.Accepted = v
+}
+
+func (x *ReportStatusResponse) SetError(v string) {
+	x.Error = v
+}
+
+type ReportStatusResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Accepted bool
+	Error    string
+}
+
+func (b0 ReportStatusResponse_builder) Build() *ReportStatusResponse {
+	m0 := &ReportStatusResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Accepted = b.Accepted
+	x.Error = b.Error
+	return m0
+}
+
 // Full DAG run status (JSON-serialized execution.DAGRunStatus).
 type DAGRunStatusProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	JsonData      string                 `protobuf:"bytes,1,opt,name=json_data,json=jsonData,proto3" json:"json_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1478,11 +2081,6 @@ func (x *DAGRunStatusProto) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DAGRunStatusProto.ProtoReflect.Descriptor instead.
-func (*DAGRunStatusProto) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{19}
-}
-
 func (x *DAGRunStatusProto) GetJsonData() string {
 	if x != nil {
 		return x.JsonData
@@ -1490,9 +2088,27 @@ func (x *DAGRunStatusProto) GetJsonData() string {
 	return ""
 }
 
+func (x *DAGRunStatusProto) SetJsonData(v string) {
+	x.JsonData = v
+}
+
+type DAGRunStatusProto_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	JsonData string
+}
+
+func (b0 DAGRunStatusProto_builder) Build() *DAGRunStatusProto {
+	m0 := &DAGRunStatusProto{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.JsonData = b.JsonData
+	return m0
+}
+
 // Log chunk sent from worker to coordinator.
 type LogChunk struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
+	state      protoimpl.MessageState `protogen:"hybrid.v1"`
 	WorkerId   string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	DagRunId   string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
 	DagName    string                 `protobuf:"bytes,3,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
@@ -1535,11 +2151,6 @@ func (x *LogChunk) ProtoReflect() protoreflect.Message {
 		return ms
 	}
 	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LogChunk.ProtoReflect.Descriptor instead.
-func (*LogChunk) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *LogChunk) GetWorkerId() string {
@@ -1626,9 +2237,99 @@ func (x *LogChunk) GetOwnerCoordinatorId() string {
 	return ""
 }
 
+func (x *LogChunk) SetWorkerId(v string) {
+	x.WorkerId = v
+}
+
+func (x *LogChunk) SetDagRunId(v string) {
+	x.DagRunId = v
+}
+
+func (x *LogChunk) SetDagName(v string) {
+	x.DagName = v
+}
+
+func (x *LogChunk) SetStepName(v string) {
+	x.StepName = v
+}
+
+func (x *LogChunk) SetStreamType(v LogStreamType) {
+	x.StreamType = v
+}
+
+func (x *LogChunk) SetData(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.Data = v
+}
+
+func (x *LogChunk) SetSequence(v uint64) {
+	x.Sequence = v
+}
+
+func (x *LogChunk) SetIsFinal(v bool) {
+	x.IsFinal = v
+}
+
+func (x *LogChunk) SetRootDagRunName(v string) {
+	x.RootDagRunName = v
+}
+
+func (x *LogChunk) SetRootDagRunId(v string) {
+	x.RootDagRunId = v
+}
+
+func (x *LogChunk) SetAttemptId(v string) {
+	x.AttemptId = v
+}
+
+func (x *LogChunk) SetOwnerCoordinatorId(v string) {
+	x.OwnerCoordinatorId = v
+}
+
+type LogChunk_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	WorkerId   string
+	DagRunId   string
+	DagName    string
+	StepName   string
+	StreamType LogStreamType
+	Data       []byte
+	Sequence   uint64
+	IsFinal    bool
+	// Root DAG info for sub-DAGs
+	RootDagRunName string
+	RootDagRunId   string
+	// Attempt ID for the DAG run
+	AttemptId string
+	// Owner coordinator used to validate owner-bound log writes.
+	OwnerCoordinatorId string
+}
+
+func (b0 LogChunk_builder) Build() *LogChunk {
+	m0 := &LogChunk{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.WorkerId = b.WorkerId
+	x.DagRunId = b.DagRunId
+	x.DagName = b.DagName
+	x.StepName = b.StepName
+	x.StreamType = b.StreamType
+	x.Data = b.Data
+	x.Sequence = b.Sequence
+	x.IsFinal = b.IsFinal
+	x.RootDagRunName = b.RootDagRunName
+	x.RootDagRunId = b.RootDagRunId
+	x.AttemptId = b.AttemptId
+	x.OwnerCoordinatorId = b.OwnerCoordinatorId
+	return m0
+}
+
 // Response message for log streaming.
 type StreamLogsResponse struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
+	state          protoimpl.MessageState `protogen:"hybrid.v1"`
 	ChunksReceived uint64                 `protobuf:"varint,1,opt,name=chunks_received,json=chunksReceived,proto3" json:"chunks_received,omitempty"`
 	BytesWritten   uint64                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
 	Error          string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
@@ -1661,11 +2362,6 @@ func (x *StreamLogsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StreamLogsResponse.ProtoReflect.Descriptor instead.
-func (*StreamLogsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{21}
-}
-
 func (x *StreamLogsResponse) GetChunksReceived() uint64 {
 	if x != nil {
 		return x.ChunksReceived
@@ -1687,9 +2383,39 @@ func (x *StreamLogsResponse) GetError() string {
 	return ""
 }
 
+func (x *StreamLogsResponse) SetChunksReceived(v uint64) {
+	x.ChunksReceived = v
+}
+
+func (x *StreamLogsResponse) SetBytesWritten(v uint64) {
+	x.BytesWritten = v
+}
+
+func (x *StreamLogsResponse) SetError(v string) {
+	x.Error = v
+}
+
+type StreamLogsResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	ChunksReceived uint64
+	BytesWritten   uint64
+	Error          string
+}
+
+func (b0 StreamLogsResponse_builder) Build() *StreamLogsResponse {
+	m0 := &StreamLogsResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.ChunksReceived = b.ChunksReceived
+	x.BytesWritten = b.BytesWritten
+	x.Error = b.Error
+	return m0
+}
+
 // Request message for getting DAG run status.
 type GetDAGRunStatusRequest struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
+	state    protoimpl.MessageState `protogen:"hybrid.v1"`
 	DagName  string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`      // Name of the DAG
 	DagRunId string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"` // ID of the DAG run
 	// Root DAG run info for sub-DAG queries (optional).
@@ -1725,11 +2451,6 @@ func (x *GetDAGRunStatusRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetDAGRunStatusRequest.ProtoReflect.Descriptor instead.
-func (*GetDAGRunStatusRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{22}
-}
-
 func (x *GetDAGRunStatusRequest) GetDagName() string {
 	if x != nil {
 		return x.DagName
@@ -1758,9 +2479,47 @@ func (x *GetDAGRunStatusRequest) GetRootDagRunId() string {
 	return ""
 }
 
+func (x *GetDAGRunStatusRequest) SetDagName(v string) {
+	x.DagName = v
+}
+
+func (x *GetDAGRunStatusRequest) SetDagRunId(v string) {
+	x.DagRunId = v
+}
+
+func (x *GetDAGRunStatusRequest) SetRootDagRunName(v string) {
+	x.RootDagRunName = v
+}
+
+func (x *GetDAGRunStatusRequest) SetRootDagRunId(v string) {
+	x.RootDagRunId = v
+}
+
+type GetDAGRunStatusRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	DagName  string
+	DagRunId string
+	// Root DAG run info for sub-DAG queries (optional).
+	// When set, the coordinator looks up the status as a sub-DAG.
+	RootDagRunName string
+	RootDagRunId   string
+}
+
+func (b0 GetDAGRunStatusRequest_builder) Build() *GetDAGRunStatusRequest {
+	m0 := &GetDAGRunStatusRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.DagName = b.DagName
+	x.DagRunId = b.DagRunId
+	x.RootDagRunName = b.RootDagRunName
+	x.RootDagRunId = b.RootDagRunId
+	return m0
+}
+
 // Response message for getting DAG run status.
 type GetDAGRunStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	Found         bool                   `protobuf:"varint,1,opt,name=found,proto3" json:"found,omitempty"`  // Whether the DAG run was found
 	Status        *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // The status (only set if found)
 	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`   // Error message if any
@@ -1793,11 +2552,6 @@ func (x *GetDAGRunStatusResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetDAGRunStatusResponse.ProtoReflect.Descriptor instead.
-func (*GetDAGRunStatusResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{23}
-}
-
 func (x *GetDAGRunStatusResponse) GetFound() bool {
 	if x != nil {
 		return x.Found
@@ -1819,9 +2573,50 @@ func (x *GetDAGRunStatusResponse) GetError() string {
 	return ""
 }
 
+func (x *GetDAGRunStatusResponse) SetFound(v bool) {
+	x.Found = v
+}
+
+func (x *GetDAGRunStatusResponse) SetStatus(v *DAGRunStatusProto) {
+	x.Status = v
+}
+
+func (x *GetDAGRunStatusResponse) SetError(v string) {
+	x.Error = v
+}
+
+func (x *GetDAGRunStatusResponse) HasStatus() bool {
+	if x == nil {
+		return false
+	}
+	return x.Status != nil
+}
+
+func (x *GetDAGRunStatusResponse) ClearStatus() {
+	x.Status = nil
+}
+
+type GetDAGRunStatusResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Found  bool
+	Status *DAGRunStatusProto
+	Error  string
+}
+
+func (b0 GetDAGRunStatusResponse_builder) Build() *GetDAGRunStatusResponse {
+	m0 := &GetDAGRunStatusResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Found = b.Found
+	x.Status = b.Status
+	x.Error = b.Error
+	return m0
+}
+
 // Request message for cancelling a DAG run.
 type RequestCancelRequest struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
+	state    protoimpl.MessageState `protogen:"hybrid.v1"`
 	DagName  string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
 	DagRunId string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
 	// Root DAG run info for sub-DAG cancellation
@@ -1856,11 +2651,6 @@ func (x *RequestCancelRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RequestCancelRequest.ProtoReflect.Descriptor instead.
-func (*RequestCancelRequest) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{24}
-}
-
 func (x *RequestCancelRequest) GetDagName() string {
 	if x != nil {
 		return x.DagName
@@ -1889,9 +2679,46 @@ func (x *RequestCancelRequest) GetRootDagRunId() string {
 	return ""
 }
 
+func (x *RequestCancelRequest) SetDagName(v string) {
+	x.DagName = v
+}
+
+func (x *RequestCancelRequest) SetDagRunId(v string) {
+	x.DagRunId = v
+}
+
+func (x *RequestCancelRequest) SetRootDagRunName(v string) {
+	x.RootDagRunName = v
+}
+
+func (x *RequestCancelRequest) SetRootDagRunId(v string) {
+	x.RootDagRunId = v
+}
+
+type RequestCancelRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	DagName  string
+	DagRunId string
+	// Root DAG run info for sub-DAG cancellation
+	RootDagRunName string
+	RootDagRunId   string
+}
+
+func (b0 RequestCancelRequest_builder) Build() *RequestCancelRequest {
+	m0 := &RequestCancelRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.DagName = b.DagName
+	x.DagRunId = b.DagRunId
+	x.RootDagRunName = b.RootDagRunName
+	x.RootDagRunId = b.RootDagRunId
+	return m0
+}
+
 // Response message for cancelling a DAG run.
 type RequestCancelResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState `protogen:"hybrid.v1"`
 	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
 	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1923,11 +2750,6 @@ func (x *RequestCancelResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RequestCancelResponse.ProtoReflect.Descriptor instead.
-func (*RequestCancelResponse) Descriptor() ([]byte, []int) {
-	return file_proto_coordinator_v1_coordinator_proto_rawDescGZIP(), []int{25}
-}
-
 func (x *RequestCancelResponse) GetAccepted() bool {
 	if x != nil {
 		return x.Accepted
@@ -1940,6 +2762,30 @@ func (x *RequestCancelResponse) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *RequestCancelResponse) SetAccepted(v bool) {
+	x.Accepted = v
+}
+
+func (x *RequestCancelResponse) SetError(v string) {
+	x.Error = v
+}
+
+type RequestCancelResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Accepted bool
+	Error    string
+}
+
+func (b0 RequestCancelResponse_builder) Build() *RequestCancelResponse {
+	m0 := &RequestCancelResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.Accepted = b.Accepted
+	x.Error = b.Error
+	return m0
 }
 
 var File_proto_coordinator_v1_coordinator_proto protoreflect.FileDescriptor
@@ -2131,19 +2977,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"StreamLogs\x12\x18.coordinator.v1.LogChunk\x1a\".coordinator.v1.StreamLogsResponse(\x01\x12b\n" +
 	"\x0fGetDAGRunStatus\x12&.coordinator.v1.GetDAGRunStatusRequest\x1a'.coordinator.v1.GetDAGRunStatusResponse\x12\\\n" +
-	"\rRequestCancel\x12$.coordinator.v1.RequestCancelRequest\x1a%.coordinator.v1.RequestCancelResponseB=Z;github.com/dagu-org/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
-
-var (
-	file_proto_coordinator_v1_coordinator_proto_rawDescOnce sync.Once
-	file_proto_coordinator_v1_coordinator_proto_rawDescData []byte
-)
-
-func file_proto_coordinator_v1_coordinator_proto_rawDescGZIP() []byte {
-	file_proto_coordinator_v1_coordinator_proto_rawDescOnce.Do(func() {
-		file_proto_coordinator_v1_coordinator_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_coordinator_v1_coordinator_proto_rawDesc), len(file_proto_coordinator_v1_coordinator_proto_rawDesc)))
-	})
-	return file_proto_coordinator_v1_coordinator_proto_rawDescData
-}
+	"\rRequestCancel\x12$.coordinator.v1.RequestCancelRequest\x1a%.coordinator.v1.RequestCancelResponseB>Z<github.com/dagucloud/dagu/proto/coordinator/v1;coordinatorv1b\x06proto3"
 
 var file_proto_coordinator_v1_coordinator_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_proto_coordinator_v1_coordinator_proto_msgTypes = make([]protoimpl.MessageInfo, 30)

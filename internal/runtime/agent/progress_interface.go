@@ -4,7 +4,7 @@
 package agent
 
 import (
-	"github.com/dagu-org/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 // ProgressReporter is the interface for progress display implementations

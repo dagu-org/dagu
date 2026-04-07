@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/runtime/executor"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/minio/minio-go/v7"
 )
 

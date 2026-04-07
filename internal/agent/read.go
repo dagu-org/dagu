@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/llm"
 )
 
 func init() {

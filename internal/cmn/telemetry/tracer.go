@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/core"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -27,7 +27,7 @@ import (
 
 const (
 	// TracerName is the name of the tracer
-	TracerName = "github.com/dagu-org/dagu"
+	TracerName = "github.com/dagucloud/dagu"
 )
 
 // Tracer wraps OpenTelemetry tracer with DAG-specific configuration

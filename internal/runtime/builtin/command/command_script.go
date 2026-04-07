@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/internal/core"
 )
 
 // setupScript creates a temporary executable script file containing the provided

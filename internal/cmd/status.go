@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/output"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

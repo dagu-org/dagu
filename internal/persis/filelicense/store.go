@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/license"
+	"github.com/dagucloud/dagu/internal/license"
 )
 
 const (

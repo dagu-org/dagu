@@ -13,7 +13,7 @@ TEST_TARGET?=./...
 SCRIPT_DIR=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # Remote repository for the project
-REMOTE_REPO_URL=https://github.com/dagu-org/dagu
+REMOTE_REPO_URL=https://github.com/dagucloud/dagu
 
 # Directories for miscellaneous files for the local environment
 LOCAL_DIR=$(SCRIPT_DIR)/.local
@@ -149,7 +149,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 
 # test runs all tests.
 .PHONY: test
-test: test-installer bin
+test: bin
 	@printf '%b\n' "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache
@@ -157,17 +157,11 @@ test: test-installer bin
 
 # test-coverage runs all tests with coverage.
 .PHONY: test-coverage
-test-coverage: test-installer
+test-coverage:
 	@printf '%b\n' "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverpkg=./... -coverprofile="coverage.out" -covermode=atomic ${TEST_TARGET}
 	@go tool cover -html=coverage.out -o coverage.html
-
-# test-installer runs the installer shell regression tests.
-.PHONY: test-installer
-test-installer:
-	@printf '%b\n' "${COLOR_GREEN}Running installer regression tests...${COLOR_RESET}"
-	@bash ./scripts/test-installer.sh
 
 # lint runs the linter.
 .PHONY: lint
@@ -207,6 +201,7 @@ protoc: ${LOCAL_DIR}/${PB_RELEASE_NAME}
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_protoc_gen_go_grpc}
 	@printf '%b\n' "${COLOR_GREEN}Generating Go code from proto files...${COLOR_RESET}"
 	@env PATH="${LOCAL_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" ${LOCAL_BIN_DIR}/protoc --go_out=. --go_opt=paths=source_relative \
+	    --go_opt=apilevelMproto/coordinator/v1/coordinator.proto=API_HYBRID \
 	    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
 	    proto/coordinator/v1/*.proto
 	@env PATH="${LOCAL_BIN_DIR}:/usr/local/bin:/usr/bin:/bin" ${LOCAL_BIN_DIR}/protoc --go_out=. --go_opt=paths=source_relative \
@@ -246,14 +241,14 @@ build-image-version:
 		exit 1; \
 	fi
 	@printf '%b\n' "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
-	@$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:$(VERSION) .
+	@$(DOCKER_CMD) -t ghcr.io/dagucloud/${APP_NAME}:$(VERSION) .
 
 # build-image-latest build the docker image with the latest tag and push to 
 # the registry.
 .PHONY: build-image-latest
 build-image-latest:
 	@printf '%b\n' "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
-	@$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:latest .
+	@$(DOCKER_CMD) -t ghcr.io/dagucloud/${APP_NAME}:latest .
 
 ${LOCAL_DIR}/merged:
 	@mkdir -p ${LOCAL_DIR}/merged

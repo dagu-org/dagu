@@ -1,12 +1,12 @@
 {
-  "name": "@dagu-org/dagu-linux-armv7",
+  "name": "@dagucloud/dagu-linux-armv7",
   "version": "0.0.0-development",
   "description": "Dagu binary for Linux ARMv7 (32-bit ARM)",
   "keywords": ["dagu", "workflow", "linux", "arm", "armv7", "raspberry-pi"],
-  "homepage": "https://github.com/dagu-org/dagu",
+  "homepage": "https://github.com/dagucloud/dagu",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dagu-org/dagu.git"
+    "url": "git+https://github.com/dagucloud/dagu.git"
   },
   "license": "GPL-3.0",
   "author": "Dagu Contributors",

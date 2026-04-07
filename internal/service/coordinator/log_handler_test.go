@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

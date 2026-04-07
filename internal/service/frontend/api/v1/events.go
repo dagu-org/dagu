@@ -9,8 +9,8 @@ import (
 	"maps"
 	"net/http"
 
-	"github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 )
 
 // ListEventLogs returns centralized event log entries matching the filter criteria.

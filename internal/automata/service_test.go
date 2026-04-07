@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	_ "github.com/dagu-org/dagu/internal/llm/allproviders"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	_ "github.com/dagucloud/dagu/internal/llm/allproviders"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/require"
 )
 

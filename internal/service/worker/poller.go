@@ -10,11 +10,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/backoff"
-	"github.com/dagu-org/dagu/internal/cmn/logger"
-	"github.com/dagu-org/dagu/internal/cmn/logger/tag"
-	"github.com/dagu-org/dagu/internal/service/coordinator"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/cmn/backoff"
+	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/service/coordinator"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 )
 

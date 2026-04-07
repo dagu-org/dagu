@@ -42,7 +42,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BatchDeleteDialog } from './BatchDeleteDialog';
 import { CleanupDialog } from './CleanupDialog';
@@ -59,7 +59,7 @@ type SyncConfigResponse = components['schemas']['SyncConfigResponse'];
 type SyncItemDiffResponse = components['schemas']['SyncItemDiffResponse'];
 type SyncItem = components['schemas']['SyncItem'];
 type StatusFilter = 'all' | 'modified' | 'untracked' | 'conflict' | 'missing';
-type TypeFilter = 'all' | 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
+type TypeFilter = 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
 type UISyncKind = 'dag' | 'memory' | 'skill' | 'soul' | 'doc';
 type SyncRow = { itemId: string; item: SyncItem; kind: UISyncKind };
 
@@ -70,7 +70,7 @@ const statusFilters: StatusFilter[] = [
   'conflict',
   'missing',
 ];
-const typeFilters: TypeFilter[] = ['all', 'dag', 'memory', 'skill', 'soul', 'doc'];
+const typeFilters: TypeFilter[] = ['dag', 'memory', 'skill', 'soul', 'doc'];
 
 function parseStatusFilter(value: string | null): StatusFilter {
   if (
@@ -86,10 +86,10 @@ function parseStatusFilter(value: string | null): StatusFilter {
 }
 
 function parseTypeFilter(value: string | null): TypeFilter {
-  if (value === 'all' || value === 'dag' || value === 'memory' || value === 'skill' || value === 'soul' || value === 'doc') {
+  if (value === 'dag' || value === 'memory' || value === 'skill' || value === 'soul' || value === 'doc') {
     return value;
   }
-  return 'all';
+  return 'dag';
 }
 
 function normalizeSyncItemKind(kind: SyncItemKind): UISyncKind {
@@ -162,6 +162,7 @@ export default function GitSyncPage() {
     open: boolean;
     itemId?: string;
   }>({ open: false });
+  const [publishForce, setPublishForce] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
   const [diffModal, setDiffModal] = useState<{ open: boolean; itemId?: string }>(
     { open: false }
@@ -178,6 +179,7 @@ export default function GitSyncPage() {
   const [deleteMissingModal, setDeleteMissingModal] = useState(false);
   const [batchDeleteModal, setBatchDeleteModal] = useState(false);
   const [selectedDags, setSelectedDags] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const userTouchedSelectionRef = useRef(false);
   const prevPublishableRef = useRef<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -185,6 +187,12 @@ export default function GitSyncPage() {
   useEffect(() => {
     setTitle('Git Sync');
   }, [setTitle]);
+
+  useEffect(() => {
+    if (publishModal.open) {
+      setPublishForce(false);
+    }
+  }, [publishModal.open, publishModal.itemId]);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
@@ -229,7 +237,7 @@ export default function GitSyncPage() {
         params.set('status', nextStatus);
       }
 
-      if (nextType === 'all') {
+      if (nextType === 'dag') {
         params.delete('type');
       } else {
         params.set('type', nextType);
@@ -251,6 +259,7 @@ export default function GitSyncPage() {
         : [],
     [status?.items]
   );
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const publishableKey = useMemo(() => {
     return syncRows
@@ -356,6 +365,7 @@ export default function GitSyncPage() {
         setPublishModal({ open: false });
         setDiffModal({ open: false });
         setCommitMessage('');
+        setPublishForce(false);
         setSelectedDags(new Set());
         userTouchedSelectionRef.current = false;
         mutateStatus();
@@ -417,13 +427,18 @@ export default function GitSyncPage() {
 
   const filteredRows = useMemo(
     () =>
-      syncRows.filter(({ item, kind }) => {
-        const typeMatches = typeFilter === 'all' || kind === typeFilter;
+      syncRows.filter(({ itemId, item, kind }) => {
+        const typeMatches = kind === typeFilter;
         const statusMatches =
           statusFilter === 'all' || item.status === statusFilter;
-        return typeMatches && statusMatches;
+        const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
+        const searchMatches =
+          normalizedQuery === '' ||
+          itemId.toLowerCase().includes(normalizedQuery) ||
+          item.displayName.toLowerCase().includes(normalizedQuery);
+        return typeMatches && statusMatches && searchMatches;
       }),
-    [syncRows, typeFilter, statusFilter]
+    [syncRows, typeFilter, statusFilter, deferredSearchQuery]
   );
 
   const allVisibleItemIDs = useMemo(
@@ -463,7 +478,6 @@ export default function GitSyncPage() {
 
   const typeCounts = useMemo(() => {
     const counts: Record<TypeFilter, number> = {
-      all: syncRows.length,
       dag: 0,
       memory: 0,
       skill: 0,
@@ -486,7 +500,7 @@ export default function GitSyncPage() {
     };
 
     for (const { item, kind } of syncRows) {
-      if (typeFilter !== 'all' && kind !== typeFilter) {
+      if (kind !== typeFilter) {
         continue;
       }
       counts.all += 1;
@@ -542,6 +556,10 @@ export default function GitSyncPage() {
   );
 
   const publishableSelectedCount = publishableSelectedIds.length;
+  const publishItemStatus = publishModal.itemId
+    ? rowByID.get(publishModal.itemId)?.item.status
+    : undefined;
+  const canForcePublish = publishItemStatus === SyncStatus.conflict;
 
   const selectedCounts = useMemo(() => {
     let dag = 0;
@@ -562,12 +580,6 @@ export default function GitSyncPage() {
   }, [selectedDags, rowByID]);
 
   const emptyStateMessage = useMemo(() => {
-    if (typeFilter === 'all' && statusFilter === 'all') {
-      return 'No items found';
-    }
-    if (typeFilter === 'all') {
-      return `No ${statusFilter} items`;
-    }
     const typeLabelMap: Record<string, string> = {
       dag: 'DAG',
       memory: 'memory',
@@ -576,11 +588,17 @@ export default function GitSyncPage() {
       doc: 'doc',
     };
     const typeLabel = typeLabelMap[typeFilter] || typeFilter;
+    if (searchQuery.trim()) {
+      if (statusFilter === 'all') {
+        return `No ${typeLabel} items matching "${searchQuery.trim()}"`;
+      }
+      return `No ${typeLabel} items with ${statusFilter} status matching "${searchQuery.trim()}"`;
+    }
     if (statusFilter === 'all') {
       return `No ${typeLabel} items`;
     }
     return `No ${typeLabel} items with ${statusFilter} status`;
-  }, [statusFilter, typeFilter]);
+  }, [searchQuery, statusFilter, typeFilter]);
 
   const missingCount = status?.counts?.missing || 0;
 
@@ -724,9 +742,18 @@ export default function GitSyncPage() {
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {({ all: 'All', dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls', doc: 'Docs' } as Record<string, string>)[f]} ({typeCounts[f]})
+              {({ dag: 'DAGs', memory: 'Memory', skill: 'Skills', soul: 'Souls', doc: 'Docs' } as Record<string, string>)[f]} ({typeCounts[f]})
             </button>
           ))}
+        </div>
+        <div className="w-full max-w-sm">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search items..."
+            className="h-8 text-xs"
+            aria-label="Search git sync items"
+          />
         </div>
         {selectedCounts.total > 0 && (
           <span className="text-xs text-muted-foreground">
@@ -977,7 +1004,12 @@ export default function GitSyncPage() {
       {/* Publish Modal */}
       <Dialog
         open={publishModal.open}
-        onOpenChange={(open) => setPublishModal({ open })}
+        onOpenChange={(open) => {
+          setPublishModal({ open });
+          if (!open) {
+            setPublishForce(false);
+          }
+        }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1008,23 +1040,38 @@ export default function GitSyncPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !isPublishing) {
                     e.preventDefault();
-                    handlePublish(publishModal.itemId);
+                    handlePublish(publishModal.itemId, publishForce);
                   }
                 }}
               />
             </div>
+            {canForcePublish && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="publish-force"
+                  checked={publishForce}
+                  onCheckedChange={(checked) => setPublishForce(checked === true)}
+                />
+                <Label htmlFor="publish-force" className="text-xs">
+                  Force publish (override conflict)
+                </Label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPublishModal({ open: false })}
+              onClick={() => {
+                setPublishModal({ open: false });
+                setPublishForce(false);
+              }}
             >
               Cancel
             </Button>
             <Button
               size="sm"
-              onClick={() => handlePublish(publishModal.itemId)}
+              onClick={() => handlePublish(publishModal.itemId, publishForce)}
               disabled={isPublishing}
             >
               {isPublishing ? (

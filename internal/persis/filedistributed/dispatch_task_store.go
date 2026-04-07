@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 )

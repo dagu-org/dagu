@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/proto/convert"
-	"github.com/dagu-org/dagu/internal/service/coordinator"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/proto/convert"
+	"github.com/dagucloud/dagu/internal/service/coordinator"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 )
 
 // StatusPusher sends status updates to coordinator via gRPC

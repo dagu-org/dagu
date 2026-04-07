@@ -15,12 +15,12 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/agentoauth"
-	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/llm"
-	"github.com/dagu-org/dagu/internal/service/eventstore"
+	api "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/agentoauth"
+	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

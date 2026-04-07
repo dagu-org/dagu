@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dagu-org/dagu/internal/cmn/eval"
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/core"
 )
 
 // PresolvedEnvPrefix is the env var prefix used to transport pre-resolved

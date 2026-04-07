@@ -4,7 +4,7 @@ setlocal
 REM Copyright (C) 2026 Yota Hamada
 REM SPDX-License-Identifier: GPL-3.0-or-later
 
-set "PS1_URL=https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.ps1"
+set "PS1_URL=https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.ps1"
 set "TEMP_PS1=%TEMP%\dagu-installer-%RANDOM%.ps1"
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^

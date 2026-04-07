@@ -6,8 +6,8 @@ package intg_test
 import (
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 

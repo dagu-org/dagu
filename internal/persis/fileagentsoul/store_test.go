@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

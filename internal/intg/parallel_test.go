@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1185,7 +1185,7 @@ steps:
 // TestIssue1658_ParallelCallExpandedParamsSplitting tests that when a call step
 // uses parallel with items, params passed via variable expansion are correctly
 // split into individual KEY=VALUE pairs after expansion.
-// See: https://github.com/dagu-org/dagu/issues/1658
+// See: https://github.com/dagucloud/dagu/issues/1658
 func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
 	cases := []struct {
 		name            string
@@ -1377,7 +1377,7 @@ steps:
 
 // TestIssue1790_ParallelCallPathItemResolution verifies that `${ITEM}` is
 // resolved inside `call:` before each parallel sub-DAG is loaded.
-// See: https://github.com/dagu-org/dagu/issues/1790
+// See: https://github.com/dagucloud/dagu/issues/1790
 func TestIssue1790_ParallelCallPathItemResolution(t *testing.T) {
 	th := test.Setup(t)
 

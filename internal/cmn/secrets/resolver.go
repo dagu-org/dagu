@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core"
 )
 
 // Resolver fetches secret values from a specific backend.

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	apigen "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	"github.com/dagu-org/dagu/internal/gitsync"
+	apigen "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/gitsync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

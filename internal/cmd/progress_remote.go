@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/core/exec"
-	"github.com/dagu-org/dagu/internal/output"
-	"github.com/dagu-org/dagu/internal/proto/convert"
-	coordinatorv1 "github.com/dagu-org/dagu/proto/coordinator/v1"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/output"
+	"github.com/dagucloud/dagu/internal/proto/convert"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"golang.org/x/term"
 )
 

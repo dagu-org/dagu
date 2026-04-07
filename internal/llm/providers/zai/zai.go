@@ -14,7 +14,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/llm"
 )
 
 const (

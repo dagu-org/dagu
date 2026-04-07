@@ -1191,7 +1191,7 @@ func TestGetLatestRelease(t *testing.T) {
 		Name:       "Release v1.30.3",
 		Draft:      false,
 		Prerelease: false,
-		HTMLURL:    "https://github.com/dagu-org/dagu/releases/tag/v1.30.3",
+		HTMLURL:    "https://github.com/dagucloud/dagu/releases/tag/v1.30.3",
 		Assets: []Asset{
 			{Name: "dagu_1.30.3_darwin_arm64.tar.gz", BrowserDownloadURL: "https://example.com/asset"},
 		},

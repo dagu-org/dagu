@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	bundledskills "github.com/dagu-org/dagu/skills"
+	bundledskills "github.com/dagucloud/dagu/skills"
 )
 
 const examplesMarkerFile = ".examples-created"

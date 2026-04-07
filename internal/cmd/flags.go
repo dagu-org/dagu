@@ -4,7 +4,7 @@
 package cmd
 
 import (
-	"github.com/dagu-org/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

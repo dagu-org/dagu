@@ -44,6 +44,10 @@ const TRACKED_STATUSES = [
   Status.Rejected,
 ] as const;
 
+const DASHBOARD_VISIBLE_STATUSES = TRACKED_STATUSES.filter(
+  (status) => status !== Status.Queued
+);
+
 function createEmptyMetrics(): Metrics {
   const metrics: Partial<Metrics> = {};
   for (const status of TRACKED_STATUSES) {
@@ -249,6 +253,7 @@ function Dashboard(): React.ReactElement | null {
       fromDate: dateRange.startDate,
       toDate: dateRange.endDate,
       name: selectedDAGName,
+      status: DASHBOARD_VISIBLE_STATUSES,
       ...(dashboardPageLimit !== undefined
         ? { limit: dashboardPageLimit }
         : {}),
@@ -508,14 +513,6 @@ function Dashboard(): React.ReactElement | null {
                 {metrics[Status.Running]}
               </span>
               <span className="text-xs">active</span>
-            </div>
-          )}
-          {metrics[Status.Queued] > 0 && (
-            <div className="flex items-baseline gap-1">
-              <span className="text-lg sm:text-xl font-light tabular-nums text-foreground">
-                {metrics[Status.Queued]}
-              </span>
-              <span className="text-xs">queued</span>
             </div>
           )}
           {metrics[Status.Waiting] > 0 && (

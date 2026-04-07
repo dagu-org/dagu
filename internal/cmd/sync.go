@@ -11,7 +11,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/dagu-org/dagu/internal/gitsync"
+	"github.com/dagucloud/dagu/internal/gitsync"
 	"github.com/spf13/cobra"
 )
 

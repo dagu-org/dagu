@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/auth"
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/llm"
 )
 
 // MessageType identifies the type of message in a session.

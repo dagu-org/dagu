@@ -15,8 +15,8 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-org/dagu/internal/core"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/test"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -286,7 +286,7 @@ steps:
 			},
 		},
 		{
-			// Test for: https://github.com/dagu-org/dagu/issues/1589
+			// Test for: https://github.com/dagucloud/dagu/issues/1589
 			// Shell field allows DRY approach to wrapping commands with a shell
 			name: "ShellFieldBasic",
 			dagConfigFunc: func(_ string) string {
@@ -861,7 +861,7 @@ steps:
 			},
 		},
 		{
-			// Regression test for: https://github.com/dagu-org/dagu/issues/1565
+			// Regression test for: https://github.com/dagucloud/dagu/issues/1565
 			// When container.command is specified without a top-level command,
 			// the container.command should be executed and output should be captured.
 			name: "ContainerCommandWithOutput",
@@ -882,7 +882,7 @@ steps:
 			},
 		},
 		{
-			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Regression test for: https://github.com/dagucloud/dagu/issues/1709
 			// Step-level container with shell field should execute commands
 			// through the shell, just like DAG-level container does.
 			// Uses arithmetic expansion which requires shell interpretation.
@@ -903,7 +903,7 @@ steps:
 			},
 		},
 		{
-			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Regression test for: https://github.com/dagucloud/dagu/issues/1709
 			// Step-level container with shell field should support pipe operators.
 			// Without shell wrapping, the pipe character is passed as a literal
 			// argument to echo instead of being interpreted as a pipe.
@@ -924,7 +924,7 @@ steps:
 			},
 		},
 		{
-			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Regression test for: https://github.com/dagucloud/dagu/issues/1709
 			// Step-level container with shell field should support && operators.
 			// Without shell wrapping, && is passed as a literal argument.
 			name: "StepContainerShellWithOperators",
@@ -944,7 +944,7 @@ steps:
 			},
 		},
 		{
-			// Regression test for: https://github.com/dagu-org/dagu/issues/1709
+			// Regression test for: https://github.com/dagucloud/dagu/issues/1709
 			// Step-level container with shell field should support environment
 			// variable expansion via the shell.
 			name: "StepContainerShellVariableExpansion",
@@ -1220,7 +1220,7 @@ steps:
 			},
 		},
 		{
-			// Test for: https://github.com/dagu-org/dagu/issues/1589
+			// Test for: https://github.com/dagucloud/dagu/issues/1589
 			// Shell field should work in exec mode
 			name: "ShellField_ExecMode",
 			dagConfig: fmt.Sprintf(`

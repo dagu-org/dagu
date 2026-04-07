@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 )
 
 // requestHangup is intentionally a no-op on Windows because there is no

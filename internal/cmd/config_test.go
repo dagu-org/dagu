@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagucloud/dagu/internal/cmd"
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

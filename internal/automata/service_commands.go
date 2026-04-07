@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/llm"
+	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/llm"
 	"github.com/google/uuid"
 )
 

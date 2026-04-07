@@ -19,14 +19,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dagu-org/dagu.git"
+    "url": "git+https://github.com/dagucloud/dagu.git"
   },
   "author": "Yota Hamada",
   "license": "SEE LICENSE.md",
   "bugs": {
-    "url": "https://github.com/dagu-org/dagu/issues"
+    "url": "https://github.com/dagucloud/dagu/issues"
   },
-  "homepage": "https://github.com/dagu-org/dagu#readme",
+  "homepage": "https://github.com/dagucloud/dagu#readme",
   "devDependencies": {
     "@babel/core": "7.28.6",
     "@babel/preset-react": "7.27.1",

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	apiv1 "github.com/dagu-org/dagu/api/v1"
-	"github.com/dagu-org/dagu/internal/cmn/config"
-	workspacepkg "github.com/dagu-org/dagu/internal/workspace"
+	apiv1 "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	workspacepkg "github.com/dagucloud/dagu/internal/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
