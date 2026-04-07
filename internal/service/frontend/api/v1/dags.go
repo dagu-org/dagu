@@ -1148,9 +1148,9 @@ func (a *API) startPreparedDAGRunWithOptions(
 ) error {
 	// Check if this DAG should be dispatched to the coordinator for distributed execution
 	if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
-		timeout := 5 * time.Second
+		timeout := 10 * time.Second
 		if osrt.GOOS == "windows" {
-			timeout = 10 * time.Second
+			timeout = 20 * time.Second
 		}
 		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, dispatchParams, opts.tags)
 	}
@@ -1188,9 +1188,9 @@ func (a *API) startPreparedDAGRunWithOptions(
 		return fmt.Errorf("error starting DAG: %w", err)
 	}
 
-	timeout := 5 * time.Second
+	timeout := 10 * time.Second
 	if osrt.GOOS == "windows" {
-		timeout = 10 * time.Second
+		timeout = 20 * time.Second
 	}
 
 	if !a.waitForDAGStatusChange(ctx, dag, opts.dagRunID, timeout) {
