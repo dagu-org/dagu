@@ -726,7 +726,7 @@ func TestListWithSortAndOrder(t *testing.T) {
 		{"GAMMA-dag", "GAMMA-dag"},
 	}
 
-	// Create files with some time delay to ensure different modification times
+	// Create files and set explicit modification times for deterministic ordering
 	for i, dag := range dags {
 		content := fmt.Sprintf(`name: %s
 steps:
@@ -735,10 +735,10 @@ steps:
 		err := store.Create(ctx, dag.fileName, []byte(content))
 		require.NoError(t, err)
 
-		// Add a small delay between file creations to ensure different mod times
-		if i < len(dags)-1 {
-			time.Sleep(10 * time.Millisecond)
-		}
+		// Set explicit mod times so sort-by-time tests are deterministic
+		modTime := time.Now().Add(time.Duration(i) * time.Second)
+		filePath := filepath.Join(tmpDir, dag.fileName+".yaml")
+		require.NoError(t, os.Chtimes(filePath, modTime, modTime))
 	}
 
 	// Test 1: Sort by name ascending (default)
@@ -928,10 +928,10 @@ steps:
 		err := store.Create(ctx, name, []byte(content))
 		require.NoError(t, err)
 
-		// Add delay to ensure different mod times
-		if i < len(dagNames)-1 {
-			time.Sleep(5 * time.Millisecond)
-		}
+		// Set explicit mod times so sort-by-time tests are deterministic
+		modTime := time.Now().Add(time.Duration(i) * time.Second)
+		filePath := filepath.Join(tmpDir, name+".yaml")
+		require.NoError(t, os.Chtimes(filePath, modTime, modTime))
 	}
 
 	// Test 1: Name sort ascending with pagination

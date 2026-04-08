@@ -4,18 +4,22 @@
 package cmd_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSchedulerCommand(t *testing.T) {
 	t.Run("StartScheduler", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Scheduler started")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 
@@ -27,7 +31,9 @@ func TestSchedulerCommand(t *testing.T) {
 	t.Run("StartSchedulerWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "dagu_test")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 

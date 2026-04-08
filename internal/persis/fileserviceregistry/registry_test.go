@@ -117,14 +117,14 @@ func TestRegistry_Heartbeat(t *testing.T) {
 
 	// Heartbeat already started by Register method
 
-	// Wait for heartbeat to update
-	time.Sleep(200 * time.Millisecond)
-
-	// Verify heartbeat was updated
-	members2, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
-	require.NoError(t, err)
-	require.Len(t, members2, 1)
-	assert.Equal(t, members1[0].ID, members2[0].ID)
+	// Wait for heartbeat to update the instance file
+	require.Eventually(t, func() bool {
+		members2, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
+		if err != nil || len(members2) != 1 {
+			return false
+		}
+		return members2[0].ID == members1[0].ID
+	}, 5*time.Second, 20*time.Millisecond)
 }
 
 func TestRegistry_UnregisterRemovesInstance(t *testing.T) {
@@ -215,11 +215,11 @@ func TestRegistry_HeartbeatRecreatesFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.NoFileExists(t, instanceFile)
 
-	// Wait for heartbeat to recreate it
-	time.Sleep(200 * time.Millisecond)
-
-	// Verify file was recreated
-	assert.FileExists(t, instanceFile)
+	// Wait for heartbeat to recreate the file
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(instanceFile)
+		return err == nil
+	}, 5*time.Second, 20*time.Millisecond)
 
 	// Verify content is correct
 	info, err := readInstanceFile(instanceFile)

@@ -144,11 +144,8 @@ func TestCleaner_PeriodicCleanup(t *testing.T) {
 	c := newCleaner(tmpDir, "test-service")
 	defer c.stop()
 
-	// Since cleanup runs with random intervals (5-60 minutes), we can't wait for it
-	// Instead, test that the cleaner can be started and stopped without issues
-	time.Sleep(50 * time.Millisecond)
-
-	// Stop the cleaner
+	// Since cleanup runs with random intervals (5-60 minutes), we can't wait for it.
+	// Just verify the cleaner can be started and stopped without issues.
 	c.stop()
 
 	// File might still exist (cleanup hasn't run yet due to random interval)
@@ -327,7 +324,7 @@ func TestCleaner_RandomInterval(t *testing.T) {
 	intervals := make([]time.Duration, 10)
 	for i := range intervals {
 		intervals[i] = c.randomInterval()
-		time.Sleep(1 * time.Millisecond) // Ensure different UnixNano values
+		time.Sleep(1 * time.Millisecond) // ensure different timestamps for UnixNano-based seed
 	}
 
 	// All intervals should be within range

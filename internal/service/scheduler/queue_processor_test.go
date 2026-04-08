@@ -162,7 +162,6 @@ func TestQueueProcessor_LocalQueueAlwaysFIFO(t *testing.T) {
 	require.Equal(t, 1, f.getQueue("local-dag").getMaxConcurrency())
 
 	f.processor.ProcessQueueItems(f.ctx, "local-dag")
-	time.Sleep(200 * time.Millisecond)
 
 	// Verify maxConcurrency is STILL 1 (not updated to DAG's 5)
 	assert.Equal(t, 1, f.getQueue("local-dag").getMaxConcurrency(), "Local queue should always have maxConcurrency=1")
@@ -180,7 +179,6 @@ func TestQueueProcessor_GlobalQueue(t *testing.T) {
 	require.Equal(t, 3, f.getQueue("global-queue").getMaxConcurrency())
 
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")
-	time.Sleep(200 * time.Millisecond)
 	assert.Contains(t, f.logs(), "count=3")
 }
 
@@ -190,7 +188,6 @@ func TestQueueProcessor_ItemsRemainOnFailure(t *testing.T) {
 		simulateQueue(1, false)
 
 	f.processor.ProcessQueueItems(f.ctx, "fifo-dag")
-	time.Sleep(150 * time.Millisecond)
 
 	items, err := f.queueStore.List(f.ctx, "fifo-dag")
 	require.NoError(t, err)
@@ -223,7 +220,6 @@ func TestQueueProcessor_ConcurrencyLimit(t *testing.T) {
 
 	// Process with maxConcurrency=1
 	f.processor.ProcessQueueItems(f.ctx, "conc-dag")
-	time.Sleep(100 * time.Millisecond)
 
 	// Should only process 1 item at a time, leaving 2 in queue
 	items, err := f.queueStore.List(f.ctx, "conc-dag")
@@ -561,7 +557,6 @@ func TestQueueProcessor_GlobalQueueIgnoresDAGMaxActiveRuns(t *testing.T) {
 
 	// Process items
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")
-	time.Sleep(200 * time.Millisecond)
 
 	// Verify maxConcurrency is STILL 5 (not overwritten by DAG's maxActiveRuns=1)
 	assert.Equal(t, 5, f.getQueue("global-queue").getMaxConcurrency(), "Global queue maxConcurrency should NOT be overwritten by DAG")
@@ -594,7 +589,6 @@ func TestQueueProcessor_GlobalQueueViaLoop(t *testing.T) {
 
 	// Process
 	f.processor.ProcessQueueItems(f.ctx, "global-queue")
-	time.Sleep(200 * time.Millisecond)
 
 	// Verify all 3 items processed
 	t.Logf("Logs: %s", f.logs())

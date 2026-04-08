@@ -44,29 +44,43 @@ func TestNode(t *testing.T) {
 	t.Run("Signal", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCommand("sleep 3"))
+		readyFile := filepath.Join(t.TempDir(), "ready")
+		node := setupNode(t, withNodeCommand(fmt.Sprintf("sh -c 'touch %s; sleep 30'", readyFile)))
 		go func() {
-			time.Sleep(100 * time.Millisecond)
+			require.Eventually(t, func() bool {
+				_, err := os.Stat(readyFile)
+				return err == nil
+			}, 5*time.Second, 5*time.Millisecond)
 			node.Signal(node.Context, syscall.SIGTERM, false)
 		}()
 
 		node.SetStatus(core.NodeRunning)
 
-		node.ExecuteFail(t, "signal: terminated")
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		err := node.Node.Execute(node.execContext(dagRunID))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "signal: terminated")
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCommand("sleep 3"), withNodeSignalOnStop("SIGINT"))
+		readyFile := filepath.Join(t.TempDir(), "ready")
+		node := setupNode(t, withNodeCommand(fmt.Sprintf("sh -c 'touch %s; sleep 30'", readyFile)), withNodeSignalOnStop("SIGINT"))
 		go func() {
-			time.Sleep(100 * time.Millisecond)
+			require.Eventually(t, func() bool {
+				_, err := os.Stat(readyFile)
+				return err == nil
+			}, 5*time.Second, 5*time.Millisecond)
 			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
 		}()
 
 		node.SetStatus(core.NodeRunning)
 
-		node.ExecuteFail(t, "signal: interrupt")
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		err := node.Node.Execute(node.execContext(dagRunID))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "signal: interrupt")
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 	})
 	t.Run("LogOutput", func(t *testing.T) {

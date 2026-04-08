@@ -43,18 +43,15 @@ func TestStartAndShutdownServer(t *testing.T) {
 	require.NoError(t, err)
 
 	client := sock.NewClient(tmpFile.Name())
-	listen := make(chan error)
-	go func() {
-		for range listen {
-		}
-	}()
+	listen := make(chan error, 1)
 
 	go func() {
 		err := unixServer.Serve(context.Background(), listen)
 		require.True(t, errors.Is(err, sock.ErrServerRequestedShutdown))
 	}()
 
-	time.Sleep(time.Millisecond * 50)
+	// Wait for the server to signal it is ready.
+	require.NoError(t, <-listen)
 
 	ret, err := client.Request(http.MethodPost, "/")
 	require.NoError(t, err)
@@ -62,9 +59,11 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	_ = unixServer.Shutdown(context.Background())
 
-	time.Sleep(time.Millisecond * 50)
-	_, err = client.Request(http.MethodPost, "/")
-	require.Error(t, err)
+	// Wait for the server to finish shutting down.
+	require.Eventually(t, func() bool {
+		_, err := client.Request(http.MethodPost, "/")
+		return err != nil
+	}, 5*time.Second, 10*time.Millisecond)
 }
 
 func TestNoResponse(t *testing.T) {
@@ -83,18 +82,15 @@ func TestNoResponse(t *testing.T) {
 	require.NoError(t, err)
 
 	client := sock.NewClient(tmpFile.Name())
-	listen := make(chan error)
-	go func() {
-		for range listen {
-		}
-	}()
+	listen := make(chan error, 1)
 
 	go func() {
 		err = unixServer.Serve(context.Background(), listen)
 		_ = unixServer.Shutdown(context.Background())
 	}()
 
-	time.Sleep(time.Millisecond * 50)
+	// Wait for the server to signal it is ready.
+	require.NoError(t, <-listen)
 
 	_, err = client.Request(http.MethodGet, "/")
 	require.Error(t, err)
@@ -114,18 +110,15 @@ func TestErrorResponse(t *testing.T) {
 	require.NoError(t, err)
 
 	client := sock.NewClient(tmpFile.Name())
-	listen := make(chan error)
-	go func() {
-		for range listen {
-		}
-	}()
+	listen := make(chan error, 1)
 
 	go func() {
 		err = unixServer.Serve(context.Background(), listen)
 		_ = unixServer.Shutdown(context.Background())
 	}()
 
-	time.Sleep(time.Millisecond * 50)
+	// Wait for the server to signal it is ready.
+	require.NoError(t, <-listen)
 
 	_, err = client.Request(http.MethodGet, "/")
 	require.Error(t, err)

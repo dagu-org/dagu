@@ -25,10 +25,7 @@ func TestSubPub_Subscribe(t *testing.T) {
 
 		next := sp.Subscribe(ctx, 0)
 
-		go func() {
-			time.Sleep(10 * time.Millisecond)
-			sp.Publish(1, "hello")
-		}()
+		sp.Publish(1, "hello")
 
 		msg, ok := next()
 		assert.True(t, ok)
@@ -44,10 +41,7 @@ func TestSubPub_Subscribe(t *testing.T) {
 		next1 := sp.Subscribe(ctx, 0)
 		next2 := sp.Subscribe(ctx, 0)
 
-		go func() {
-			time.Sleep(10 * time.Millisecond)
-			sp.Publish(1, "shared")
-		}()
+		sp.Publish(1, "shared")
 
 		msg1, ok1 := next1()
 		msg2, ok2 := next2()
@@ -70,16 +64,16 @@ func TestSubPub_Publish(t *testing.T) {
 		defer cancel()
 
 		next := sp.Subscribe(ctx, 5)
-		received := collectMessages(next)
 
 		sp.Publish(3, "old")     // seqID 3 <= 5, should NOT be received
 		sp.Publish(5, "current") // seqID 5 <= 5, should NOT be received
 		sp.Publish(6, "new")     // seqID 6 > 5, SHOULD be received
 
-		time.Sleep(50 * time.Millisecond)
-		cancel()
+		msg, ok := next()
+		require.True(t, ok)
+		assert.Equal(t, "new", msg)
 
-		assert.Equal(t, []string{"new"}, <-received)
+		cancel()
 	})
 
 	t.Run("updates subscriber seqID after receiving", func(t *testing.T) {
@@ -90,16 +84,20 @@ func TestSubPub_Publish(t *testing.T) {
 		defer cancel()
 
 		next := sp.Subscribe(ctx, 0)
-		received := collectMessages(next)
 
 		sp.Publish(1, 1)
 		sp.Publish(2, 2)
 		sp.Publish(3, 3)
 
-		time.Sleep(50 * time.Millisecond)
-		cancel()
+		var received []int
+		for range 3 {
+			msg, ok := next()
+			require.True(t, ok)
+			received = append(received, msg)
+		}
 
-		assert.Equal(t, []int{1, 2, 3}, <-received)
+		assert.Equal(t, []int{1, 2, 3}, received)
+		cancel()
 	})
 }
 
@@ -133,12 +131,20 @@ func TestSubPub_Broadcast(t *testing.T) {
 			close(received2)
 		}()
 
-		time.Sleep(10 * time.Millisecond)
 		sp.Broadcast("announcement")
-		time.Sleep(50 * time.Millisecond)
 
-		assert.Equal(t, "announcement", <-received1)
-		assert.Equal(t, "announcement", <-received2)
+		select {
+		case msg := <-received1:
+			assert.Equal(t, "announcement", msg)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for subscriber 1")
+		}
+		select {
+		case msg := <-received2:
+			assert.Equal(t, "announcement", msg)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for subscriber 2")
+		}
 	})
 }
 
@@ -159,13 +165,12 @@ func TestSubPub_ContextCancellation(t *testing.T) {
 			done <- ok
 		}()
 
-		time.Sleep(10 * time.Millisecond)
 		cancel()
 
 		select {
 		case ok := <-done:
 			assert.False(t, ok)
-		case <-time.After(time.Second):
+		case <-time.After(5 * time.Second):
 			t.Fatal("next did not return after context cancellation")
 		}
 	})
@@ -179,9 +184,11 @@ func TestSubPub_ContextCancellation(t *testing.T) {
 		_ = sp.Subscribe(ctx, 0)
 		cancel()
 
-		time.Sleep(10 * time.Millisecond)
-
-		sp.Publish(1, "test")
+		// Publish should not panic even after subscriber context is canceled.
+		require.Eventually(t, func() bool {
+			sp.Publish(1, "test")
+			return true
+		}, 5*time.Second, 10*time.Millisecond)
 	})
 }
 
@@ -232,12 +239,14 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 
 		var wg sync.WaitGroup
 		receivedCounts := make([]atomic.Int32, numSubscribers)
+		subscribersReady := make(chan struct{}, numSubscribers)
 
 		for i := range numSubscribers {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
 				next := sp.Subscribe(ctx, 0)
+				subscribersReady <- struct{}{}
 				for {
 					_, ok := next()
 					if !ok {
@@ -248,7 +257,9 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 			}(i)
 		}
 
-		time.Sleep(20 * time.Millisecond)
+		for range numSubscribers {
+			<-subscribersReady
+		}
 
 		var publishWg sync.WaitGroup
 		for i := range numMessages {
@@ -260,7 +271,15 @@ func TestSubPub_ConcurrentAccess(t *testing.T) {
 		}
 		publishWg.Wait()
 
-		time.Sleep(100 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			for i := range receivedCounts {
+				if receivedCounts[i].Load() == 0 {
+					return false
+				}
+			}
+			return true
+		}, 5*time.Second, 10*time.Millisecond)
+
 		cancel()
 		wg.Wait()
 
@@ -326,21 +345,4 @@ func TestMakeReceiver(t *testing.T) {
 		_, ok = receiver()
 		assert.False(t, ok)
 	})
-}
-
-func collectMessages[K any](next func() (K, bool)) <-chan []K {
-	result := make(chan []K, 1)
-	go func() {
-		var msgs []K
-		for {
-			msg, ok := next()
-			if !ok {
-				result <- msgs
-				close(result)
-				return
-			}
-			msgs = append(msgs, msg)
-		}
-	}()
-	return result
 }

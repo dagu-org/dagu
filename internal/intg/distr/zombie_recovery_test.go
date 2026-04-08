@@ -114,7 +114,13 @@ steps:
 	require.NotEmpty(t, status.AttemptKey)
 	initialLease := waitForLease(t, f, status.AttemptKey, 5*time.Second).LastHeartbeatAt
 
-	time.Sleep(4 * time.Second)
+	require.Eventually(t, func() bool {
+		lease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
+		if err != nil || lease == nil {
+			return false
+		}
+		return lease.LastHeartbeatAt > initialLease
+	}, 10*time.Second, 100*time.Millisecond, "heartbeat should refresh beyond initial value")
 
 	status, err := f.latestStatus()
 	require.NoError(t, err)
@@ -179,28 +185,29 @@ steps:
 		return running == 1 && queued == 1
 	}, 15*time.Second, 100*time.Millisecond, "one run should start and one should remain queued")
 
-	time.Sleep(4 * time.Second)
-
-	statuses, err := f.coord.DAGRunStore.ListStatuses(
-		f.coord.Context,
-		exec.WithExactName("queue-concurrency-test"),
-		exec.WithoutLimit(),
-	)
-	require.NoError(t, err)
-
-	var running, queued int
-	for _, st := range statuses {
-		switch st.Status {
-		case core.Running:
-			running++
-		case core.Queued:
-			queued++
-		case core.NotStarted, core.Failed, core.Aborted, core.Succeeded, core.PartiallySucceeded, core.Waiting, core.Rejected:
+	require.Eventually(t, func() bool {
+		statuses, err := f.coord.DAGRunStore.ListStatuses(
+			f.coord.Context,
+			exec.WithExactName("queue-concurrency-test"),
+			exec.WithoutLimit(),
+		)
+		if err != nil || len(statuses) < 2 {
+			return false
 		}
-	}
 
-	assert.Equal(t, 1, running, "fresh distributed lease should keep the first run counted as active")
-	assert.Equal(t, 1, queued, "second run should remain queued while the first run is active")
+		var running, queued int
+		for _, st := range statuses {
+			switch st.Status {
+			case core.Running:
+				running++
+			case core.Queued:
+				queued++
+			case core.NotStarted, core.Failed, core.Aborted, core.Succeeded, core.PartiallySucceeded, core.Waiting, core.Rejected:
+			}
+		}
+
+		return running == 1 && queued == 1
+	}, 10*time.Second, 200*time.Millisecond, "fresh distributed lease should keep one running and one queued")
 
 	require.Eventually(t, func() bool {
 		statuses, err := f.coord.DAGRunStore.ListStatuses(

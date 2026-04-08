@@ -284,7 +284,7 @@ func TestRunner(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 200) // wait for step 2 to start
+			waitForNodeStatus(plan.Plan, "2", core.NodeRunning, 5*time.Second)
 			plan.cancel(t)
 		}()
 
@@ -372,9 +372,15 @@ func TestRunner(t *testing.T) {
 		)
 
 		go func() {
-			// Create file after first retry (50ms) but before second (150ms) so that
-			// the first attempt and first retry fail, ensuring RetryCount > 0.
-			time.Sleep(time.Millisecond * 120)
+			// Wait until at least one retry has happened before creating the file
+			// so that the first attempt and first retry both fail.
+			for {
+				node := plan.GetNodeByName("1")
+				if node != nil && node.State().RetryCount > 0 {
+					break
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
 
 			// Create file during the retry interval
 			f, err := os.Create(file)
@@ -509,7 +515,7 @@ func TestRunner(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 30) // wait for step 1 to start
+			waitForNodeStatus(plan.Plan, "1", core.NodeRunning, 5*time.Second)
 			plan.signal(syscall.SIGTERM)
 		}()
 
@@ -546,7 +552,7 @@ func TestRunner(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 30) // wait for step 1 to start
+			waitForNodeStatus(plan.Plan, "1", core.NodeRunning, 5*time.Second)
 			plan.signal(syscall.SIGTERM)
 		}()
 
@@ -565,7 +571,7 @@ func TestRunner(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 250)
+			waitForNodeDoneCount(plan.Plan, "1", 1, 5*time.Second)
 			plan.cancel(t)
 		}()
 
@@ -608,7 +614,7 @@ func TestRunner(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			time.Sleep(time.Millisecond * 100)
+			waitForNodeStatus(plan.Plan, "1", core.NodeRunning, 5*time.Second)
 			plan.signal(syscall.SIGTERM)
 			close(done)
 		}()
@@ -1516,7 +1522,7 @@ func TestRunner_SignalHandling(t *testing.T) {
 		done := make(chan bool, 1)
 
 		go func() {
-			time.Sleep(100 * time.Millisecond)
+			waitForNodeStatus(plan.Plan, "1", core.NodeRunning, 5*time.Second)
 			r.runner.Signal(r.Context, plan.Plan, syscall.SIGTERM, done, false)
 		}()
 
@@ -1546,7 +1552,7 @@ func TestRunner_SignalHandling(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(100 * time.Millisecond)
+			waitForNodeStatus(plan.Plan, "1", core.NodeRunning, 5*time.Second)
 			r.runner.Signal(r.Context, plan.Plan, syscall.SIGKILL, nil, true)
 		}()
 
@@ -1721,8 +1727,7 @@ func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 	plan := r.newPlan(t, successStep("1"))
 
 	go func() {
-		// Wait for main step to complete and handler to start
-		time.Sleep(200 * time.Millisecond)
+		waitForHandlerNodeStatus(r.runner, core.HandlerOnExit, core.NodeRunning, 5*time.Second)
 		r.runner.Cancel(plan.Plan)
 	}()
 
@@ -1746,7 +1751,7 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 	)
 
 	go func() {
-		time.Sleep(350 * time.Millisecond)
+		waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
 		r.runner.Cancel(plan.Plan)
 	}()
 
@@ -1838,7 +1843,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(200 * time.Millisecond)
+			waitForNodeStatus(plan.Plan, "1", core.NodeRunning, 5*time.Second)
 			plan.signal(syscall.SIGTERM)
 		}()
 
@@ -2017,8 +2022,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			// Wait long enough for at least 2 iterations (interval is 20ms, but CI can be slow)
-			time.Sleep(time.Millisecond * 200)
+			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2057,8 +2061,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			// Delay long enough that the first run and condition check see "continue"
-			time.Sleep(150 * time.Millisecond)
+			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
 			err := os.WriteFile(counterFile, []byte("stop"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2100,7 +2103,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 100)
+			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2139,8 +2142,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			// Delay long enough that the first run and condition check see "waiting"
-			time.Sleep(150 * time.Millisecond)
+			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
 			err := os.WriteFile(counterFile, []byte("ready"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2189,7 +2191,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			time.Sleep(time.Millisecond * 100)
+			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()

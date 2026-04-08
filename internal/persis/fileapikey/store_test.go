@@ -568,7 +568,6 @@ func TestStore_FileCache(t *testing.T) {
 		require.NoError(t, err)
 
 		filePath := filepath.Join(tmpDir, key.ID+".json")
-		time.Sleep(10 * time.Millisecond)
 
 		modifiedData := []byte(`{
   "id": "` + key.ID + `",
@@ -583,6 +582,10 @@ func TestStore_FileCache(t *testing.T) {
 }`)
 		err = os.WriteFile(filePath, modifiedData, 0600)
 		require.NoError(t, err)
+
+		// Ensure file mod time differs from cached entry so stale detection triggers
+		futureTime := time.Now().Add(10 * time.Second)
+		require.NoError(t, os.Chtimes(filePath, futureTime, futureTime))
 
 		// Read should detect stale cache and reload
 		retrieved, err := store.GetByID(ctx, key.ID)

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,8 +50,10 @@ func TestWorkerHealthServerStartsAndStops(t *testing.T) {
 func TestWorkerHealthServerStaysHealthyDuringHeartbeatFailures(t *testing.T) {
 	t.Parallel()
 
+	var heartbeatCalls atomic.Int32
 	client := newMockRemoteCoordinatorClient()
 	client.HeartbeatFunc = func(context.Context, *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error) {
+		heartbeatCalls.Add(1)
 		return nil, errors.New("heartbeat failed")
 	}
 
@@ -66,7 +69,9 @@ func TestWorkerHealthServerStaysHealthyDuringHeartbeatFailures(t *testing.T) {
 	baseURL := requireWorkerHealthServerURL(t, w.healthServer)
 	requireHealthyWorkerHealth(t, baseURL)
 
-	time.Sleep(1500 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		return heartbeatCalls.Load() >= 2
+	}, 5*time.Second, 10*time.Millisecond, "expected at least 2 heartbeat failures")
 	requireHealthyWorkerHealth(t, baseURL)
 
 	stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

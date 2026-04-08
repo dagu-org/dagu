@@ -458,8 +458,9 @@ func TestMultiplexerOnDemandTopicOnlyRefetchesOnWake(t *testing.T) {
 	require.NoError(t, topic.sendSnapshot(context.Background(), result.session, 1))
 	assert.EqualValues(t, 1, fetches.Load())
 
-	time.Sleep(100 * time.Millisecond)
-	assert.EqualValues(t, 1, fetches.Load())
+	require.Never(t, func() bool {
+		return fetches.Load() != 1
+	}, 200*time.Millisecond, 20*time.Millisecond, "on-demand topic should not refetch without a wake")
 
 	mux.WakeTopic(TopicTypeDAGRun, "test/run-1")
 

@@ -428,8 +428,13 @@ steps:
 			dag.Steps[i].Commands = []core.CommandEntry{{Command: "true", CmdWithArgs: "true"}}
 		}
 
-		// Sleep to ensure timestamps will be different
-		time.Sleep(1 * time.Second)
+		// Wait until the current time (RFC3339, second precision) differs
+		// from the previous FinishedAt timestamps so that retried steps
+		// are guaranteed to have a newer formatted timestamp.
+		prev := time.Now().Format(time.RFC3339)
+		for time.Now().Format(time.RFC3339) == prev {
+			time.Sleep(10 * time.Millisecond)
+		}
 
 		// Retry from step '5' using StepRetry
 		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
@@ -511,9 +516,6 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Stop the DAG
 		dagAgent.Abort()
-
-		// Give the process a moment to handle the signal and update status
-		time.Sleep(100 * time.Millisecond)
 
 		dag.AssertLatestStatus(t, core.Aborted)
 	})

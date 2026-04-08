@@ -13,6 +13,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagucloud/dagu/internal/core"
@@ -627,7 +628,11 @@ func waitForContainerRunning(ctx context.Context, dockerClient *client.Client, c
 		if inspect.State.Running {
 			return nil
 		}
-		time.Sleep(pollInterval)
+		select {
+		case <-time.After(pollInterval):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return fmt.Errorf("timeout waiting for container %s to be running", containerID)
 }
@@ -635,19 +640,15 @@ func waitForContainerRunning(ctx context.Context, dockerClient *client.Client, c
 func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Client, containerID string, timeout, pollInterval time.Duration) bool {
 	t.Helper()
 
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
+	var stopped = assert.Eventually(t, func() bool {
 		inspect, err := inspectContainer(th.Context, dockerClient, containerID)
 		if err != nil {
-			// Container might have been removed or doesn't exist
 			return true
 		}
-		if !inspect.State.Running {
-			return true
-		}
-		time.Sleep(pollInterval)
-	}
-	return false
+		return !inspect.State.Running
+	}, timeout, pollInterval)
+
+	return stopped
 }
 
 // TestStepLevelContainer tests the new step-level container syntax

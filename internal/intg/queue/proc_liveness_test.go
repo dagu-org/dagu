@@ -36,10 +36,10 @@ steps:
 	f.WaitForStatus(runID, core.Running, 10*time.Second)
 
 	ref := exec.NewDAGRunRef(f.dag.Name, runID)
-	time.Sleep(2 * time.Second)
-	alive, err := f.th.ProcStore.IsRunAlive(f.th.Context, f.dag.ProcGroup(), ref)
-	require.NoError(t, err)
-	require.True(t, alive)
+	require.Eventually(t, func() bool {
+		alive, err := f.th.ProcStore.IsRunAlive(f.th.Context, f.dag.ProcGroup(), ref)
+		return err == nil && alive
+	}, 10*time.Second, 100*time.Millisecond, "proc heartbeat should report run as alive")
 
 	f.WaitForStatus(runID, core.Succeeded, 20*time.Second)
 }

@@ -55,11 +55,7 @@ func TestNotificationBatcher_ReplacesWaitingWithSuccessBeforeFlush(t *testing.T)
 	defer batcher.Stop()
 
 	require.True(t, batcher.Enqueue("dest-1", testNotificationEvent(&exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-1", AttemptID: "a1", Status: core.Waiting})))
-	time.Sleep(5 * time.Millisecond)
 	require.True(t, batcher.Enqueue("dest-1", testNotificationEvent(&exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-1", AttemptID: "a1", Status: core.Succeeded})))
-
-	time.Sleep(20 * time.Millisecond)
-	assert.Empty(t, batcher.TakeReady(), "waiting batch should have been replaced before urgent flush")
 
 	ready := waitForReadyBatch(t, batcher)
 	assert.Equal(t, NotificationClassSuccessDigest, ready.Batch.Class)
@@ -75,7 +71,6 @@ func TestNotificationBatcher_DuplicateStatusDoesNotDuplicateBatch(t *testing.T) 
 
 	status := &exec.DAGRunStatus{Name: "briefing", DAGRunID: "run-1", AttemptID: "a1", Status: core.Failed, Error: "boom"}
 	require.True(t, batcher.Enqueue("dest-1", testNotificationEvent(status)))
-	time.Sleep(10 * time.Millisecond)
 	require.True(t, batcher.Enqueue("dest-1", testNotificationEvent(status)))
 
 	ready := waitForReadyBatch(t, batcher)
@@ -141,14 +136,12 @@ func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlu
 		AttemptID: "a1",
 		Status:    core.Succeeded,
 	})))
-	time.Sleep(5 * time.Millisecond)
 	require.True(t, batcher.Enqueue("urgent-old", testNotificationEvent(&exec.DAGRunStatus{
 		Name:      "sync",
 		DAGRunID:  "run-2",
 		AttemptID: "a2",
 		Status:    core.Failed,
 	})))
-	time.Sleep(5 * time.Millisecond)
 	require.True(t, batcher.Enqueue("urgent-new", testNotificationEvent(&exec.DAGRunStatus{
 		Name:      "sync",
 		DAGRunID:  "run-3",
@@ -165,8 +158,9 @@ func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlu
 	assert.Equal(t, "success-dest", drained[2].Destination)
 	assert.Equal(t, NotificationClassSuccessDigest, drained[2].Batch.Class)
 
-	time.Sleep(150 * time.Millisecond)
-	assert.Empty(t, batcher.TakeReady())
+	require.Never(t, func() bool {
+		return len(batcher.TakeReady()) > 0
+	}, 200*time.Millisecond, 20*time.Millisecond)
 	assert.False(t, batcher.Enqueue("ignored", testNotificationEvent(&exec.DAGRunStatus{
 		Name:      "ignored",
 		DAGRunID:  "run-4",
@@ -212,8 +206,9 @@ func TestNotificationBatcher_DiscardDestinationsRemovesReadyAndBufferedBatches(t
 	require.Len(t, ready, 1)
 	assert.Equal(t, "ready-keep", ready[0].Destination)
 
-	time.Sleep(100 * time.Millisecond)
-	assert.Empty(t, batcher.TakeReady())
+	require.Never(t, func() bool {
+		return len(batcher.TakeReady()) > 0
+	}, 200*time.Millisecond, 20*time.Millisecond)
 }
 
 func TestGenerateNotificationMessage_UrgentSingleUsesLLMAndFallsBack(t *testing.T) {

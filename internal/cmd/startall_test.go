@@ -5,18 +5,24 @@ package cmd_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAll", func(t *testing.T) {
 		th := test.SetupCommand(t, test.WithCoordinatorEnabled())
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				out := th.LoggingOutput.String()
+				return strings.Contains(out, "Scheduler initialization") &&
+					strings.Contains(out, "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
@@ -33,7 +39,10 @@ func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAllWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				out := th.LoggingOutput.String()
+				return strings.Contains(out, "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
