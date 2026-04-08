@@ -155,8 +155,10 @@ func TestGetDAGDetails_NonExistent_Returns404(t *testing.T) {
 	_, err := api.GetDAGDetails(context.Background(), openapi.GetDAGDetailsRequestObject{
 		FileName: "does-not-exist",
 	})
-	// Should return an error (which becomes a 404)
-	require.Error(t, err)
+	var apiErr *localapi.Error
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, 404, apiErr.HTTPStatus)
+	require.Equal(t, openapi.ErrorCodeNotFound, apiErr.Code)
 }
 
 func TestGetDAGDetailsAndSpecIncludeNextRun(t *testing.T) {

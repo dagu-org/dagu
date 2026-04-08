@@ -318,8 +318,12 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 	// BuildFlagAllowBuildErrors is set, or the raw error otherwise.
 	errorDAG := func(err error) (*core.DAG, error) {
 		if ctx.opts.Has(BuildFlagAllowBuildErrors) {
+			name := ctx.opts.Name
+			if name == "" {
+				name = defaultName(filePath)
+			}
 			return &core.DAG{
-				Name:        defaultName(filePath),
+				Name:        name,
 				Location:    filePath,
 				SourceFile:  filePath,
 				BuildErrors: []error{err},
