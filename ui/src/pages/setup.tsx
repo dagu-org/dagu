@@ -525,12 +525,7 @@ export default function SetupPage() {
                             <SelectContent>
                               {filteredPresets.map((p) => (
                                 <SelectItem key={p.name} value={p.name}>
-                                  <span>{p.name}</span>
-                                  {p.description && (
-                                    <span className="text-muted-foreground ml-1">
-                                      — {p.description}
-                                    </span>
-                                  )}
+                                  {p.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
