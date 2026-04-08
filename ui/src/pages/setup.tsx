@@ -100,7 +100,7 @@ export default function SetupPage() {
 
   // Re-fetch auth providers when entering step 2 (after step 1 stored the JWT)
   useEffect(() => {
-    if (currentStep === 2) {
+    if (currentStep === 2 && refreshProviders) {
       void refreshProviders().catch(() => {});
     }
   }, [currentStep, refreshProviders]);

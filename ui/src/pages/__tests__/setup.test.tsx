@@ -217,7 +217,7 @@ beforeEach(() => {
     remoteNode: 'local',
     isLoading: false,
     error: null,
-    refreshProviders: vi.fn(),
+    refreshProviders: vi.fn().mockResolvedValue([]),
     startLogin: startLoginMock,
     completeLogin: completeLoginMock,
     disconnect: disconnectMock,
