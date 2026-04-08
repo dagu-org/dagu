@@ -186,9 +186,9 @@ export function ProviderAuthCard({
           className
         )}
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
+        <div className={cn('flex flex-col gap-3', !compact && 'sm:flex-row sm:items-start sm:justify-between')}>
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-medium">{provider.name}</p>
               <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
