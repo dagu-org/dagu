@@ -6,6 +6,7 @@ package cmd_test
 import (
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +19,9 @@ func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Server is starting")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		port := findPort(t)
@@ -31,7 +34,9 @@ func TestServerCommand(t *testing.T) {
 	t.Run("StartServerWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "54321")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		th.RunCommand(t, cmd.Server(), test.CmdTest{

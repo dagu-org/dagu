@@ -23,6 +23,7 @@ import (
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -216,26 +217,10 @@ func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 
 // WaitDrain waits for the queue to empty.
 func (f *fixture) WaitDrain(timeout time.Duration) *fixture {
-	deadline := time.Now().Add(timeout)
-	var (
-		lastCount int
-		lastErr   error
-	)
-	for time.Now().Before(deadline) {
+	require.Eventually(f.t, func() bool {
 		items, err := f.th.QueueStore.List(f.th.Context, f.queue)
-		if err == nil {
-			lastCount = len(items)
-			if lastCount == 0 {
-				return f
-			}
-		} else {
-			lastErr = err
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(f.t, lastErr)
-	f.t.Fatalf("timed out waiting for queue %s to drain; %d item(s) remaining", f.queue, lastCount)
+		return err == nil && len(items) == 0
+	}, timeout, 200*time.Millisecond, "timed out waiting for queue %s to drain", f.queue)
 	return f
 }
 
@@ -302,21 +287,25 @@ func (f *fixture) WaitForStatusMatch(
 ) (*exec.DAGRunStatus, error) {
 	f.t.Helper()
 
-	deadline := time.Now().Add(timeout)
+	var matched *exec.DAGRunStatus
 	var lastErr error
-	for time.Now().Before(deadline) {
+	ok := assert.Eventually(f.t, func() bool {
 		status, err := f.Status(runID)
-		if err == nil {
-			if match(status) {
-				return status, nil
-			}
-		} else {
+		if err != nil {
 			lastErr = err
+			return false
 		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		if match(status) {
+			matched = status
+			return true
+		}
+		return false
+	}, timeout, 50*time.Millisecond)
 
-	return nil, fmt.Errorf("timed out waiting for matching status for run %s: %w", runID, lastErr)
+	if !ok {
+		return nil, fmt.Errorf("timed out waiting for matching status for run %s: %w", runID, lastErr)
+	}
+	return matched, nil
 }
 
 // AssertConcurrent verifies all DAGs started within maxDiff of each other.
@@ -349,19 +338,17 @@ func (f *fixture) waitForRecentStatus(timeout time.Duration, match func(exec.DAG
 	f.t.Helper()
 
 	var matched exec.DAGRunStatus
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
+	require.Eventually(f.t, func() bool {
 		for _, status := range f.th.DAGRunMgr.ListRecentStatus(f.th.Context, f.dag.Name, 10) {
 			if match(status) {
 				matched = status
-				return matched
+				return true
 			}
 		}
-		time.Sleep(200 * time.Millisecond)
-	}
+		return false
+	}, timeout, 200*time.Millisecond, "timed out waiting for recent status match")
 
-	f.t.Fatalf("timed out waiting for recent status match")
-	return exec.DAGRunStatus{}
+	return matched
 }
 
 type runStatusOptions struct {

@@ -156,8 +156,10 @@ func TestPollerTaskDispatch(t *testing.T) {
 		// Run poller in background
 		go poller.Run(ctx)
 
-		// Wait for executions
-		time.Sleep(500 * time.Millisecond)
+		// Wait for all 3 tasks to be executed
+		require.Eventually(t, func() bool {
+			return atomic.LoadInt32(&executionCount) >= 3
+		}, 5*time.Second, 10*time.Millisecond)
 		cancel()
 
 		// Should have executed 3 tasks
@@ -205,7 +207,9 @@ func TestPollerErrorHandling(t *testing.T) {
 		go poller.Run(ctx)
 
 		// Wait for execution attempt
-		time.Sleep(200 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			return executionAttempted.Load()
+		}, 5*time.Second, 10*time.Millisecond)
 		cancel()
 
 		// Verify execution was attempted despite error
@@ -282,8 +286,9 @@ func TestPollerContextCancellation(t *testing.T) {
 		})
 
 		// Wait for poll to start
-		time.Sleep(100 * time.Millisecond)
-		assert.True(t, pollStarted.Load(), "Poll should have started")
+		require.Eventually(t, func() bool {
+			return pollStarted.Load()
+		}, 5*time.Second, 10*time.Millisecond, "Poll should have started")
 
 		// Cancel and wait for completion
 		cancel()
@@ -324,8 +329,9 @@ func TestPollerContextCancellation(t *testing.T) {
 		})
 
 		// Wait for execution to start
-		time.Sleep(100 * time.Millisecond)
-		assert.True(t, executionStarted.Load())
+		require.Eventually(t, func() bool {
+			return executionStarted.Load()
+		}, 5*time.Second, 10*time.Millisecond, "Execution should have started")
 
 		// Cancel should stop execution
 		cancel()

@@ -1404,6 +1404,42 @@ steps:
 		assert.NotEmpty(t, dag.BuildErrors)
 	})
 
+	t.Run("WithAllowBuildErrors_YAMLSyntaxError", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, `
+this is not valid yaml: [unterminated
+  - broken: {nope
+`)
+		// Without AllowBuildErrors, this should fail
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+
+		// With AllowBuildErrors, it should return a DAG with errors captured
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithAllowBuildErrors())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		assert.NotEmpty(t, dag.BuildErrors)
+		assert.Equal(t, testDAG, dag.Location)
+	})
+
+	t.Run("WithAllowBuildErrors_EmptyFile", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := createTempYAMLFile(t, ``)
+
+		// Without AllowBuildErrors, this should fail
+		_, err := spec.Load(context.Background(), testDAG)
+		require.Error(t, err)
+
+		// With AllowBuildErrors, it should return a DAG with errors captured
+		dag, err := spec.Load(context.Background(), testDAG, spec.WithAllowBuildErrors())
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		assert.NotEmpty(t, dag.BuildErrors)
+		assert.Equal(t, testDAG, dag.Location)
+	})
+
 	t.Run("SkipSchemaValidation", func(t *testing.T) {
 		t.Parallel()
 

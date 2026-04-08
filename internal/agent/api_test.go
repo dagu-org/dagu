@@ -24,6 +24,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// sseRecorder wraps httptest.ResponseRecorder with a channel that signals
+// when the handler has written its first response data (meaning headers are set).
+// This avoids a data race from polling rec.Header() concurrently with the handler.
+type sseRecorder struct {
+	*httptest.ResponseRecorder
+	ready chan struct{}
+	once  sync.Once
+}
+
+func newSSERecorder() *sseRecorder {
+	return &sseRecorder{
+		ResponseRecorder: httptest.NewRecorder(),
+		ready:            make(chan struct{}),
+	}
+}
+
+func (r *sseRecorder) Write(b []byte) (int, error) {
+	n, err := r.ResponseRecorder.Write(b)
+	r.once.Do(func() { close(r.ready) })
+	return n, err
+}
+
 // apiTestSetup contains the common test infrastructure for API tests.
 type apiTestSetup struct {
 	api         *API
@@ -635,7 +657,7 @@ func TestAPI_HandleStream(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/agent/sessions/"+sessID+"/stream", nil)
 		req = req.WithContext(ctx)
-		rec := httptest.NewRecorder()
+		rec := newSSERecorder()
 
 		done := make(chan struct{})
 		go func() {
@@ -643,7 +665,11 @@ func TestAPI_HandleStream(t *testing.T) {
 			setup.router.ServeHTTP(rec, req)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-rec.ready:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for SSE stream")
+		}
 		cancel()
 		<-done
 
@@ -693,7 +719,7 @@ func TestAPI_HandleStream(t *testing.T) {
 			"/api/v1/agent/sessions/"+parentSess.ID+"/stream",
 			nil,
 		).WithContext(ctx)
-		rec := httptest.NewRecorder()
+		rec := newSSERecorder()
 
 		done := make(chan struct{})
 		go func() {
@@ -701,7 +727,11 @@ func TestAPI_HandleStream(t *testing.T) {
 			r.ServeHTTP(rec, req)
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-rec.ready:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for SSE stream")
+		}
 		cancel()
 		<-done
 

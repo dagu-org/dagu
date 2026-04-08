@@ -26,21 +26,17 @@ func TestProcHandle(t *testing.T) {
 	ctx := context.Background()
 	err := proc.startHeartbeat(ctx)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = proc.Stop(ctx)
+	})
 
-	done := make(chan struct{})
-
-	go func() {
-		time.Sleep(10 * time.Millisecond) // short sleep for check file existence
-		err := proc.Stop(ctx)
-		require.NoError(t, err)
-		close(done)
-	}()
-
-	// Check if the file is created
+	// File is created synchronously by startHeartbeat
 	_, err = os.Stat(fileName)
 	require.NoError(t, err)
 
-	<-done
+	// Stop the process
+	err = proc.Stop(ctx)
+	require.NoError(t, err)
 
 	// Check if the file is deleted
 	_, err = os.Stat(fileName)

@@ -318,22 +318,24 @@ steps:
     command: "echo test"
 `)
 
-	// Create multiple runs
-	for range 3 {
+	// Create multiple runs, waiting for each to succeed before starting the next
+	for i := range 3 {
 		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dag.Location}})
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	require.Eventually(t, func() bool {
-		statuses, _ := th.DAGRunStore.ListStatuses(ctx)
-		count := 0
-		for _, s := range statuses {
-			if s.Name == "test-limit" && s.Status == core.Succeeded {
-				count++
+		expected := i + 1
+		require.Eventually(t, func() bool {
+			statuses, err := th.DAGRunStore.ListStatuses(ctx)
+			if err != nil {
+				return false
 			}
-		}
-		return count >= 3
-	}, 10*time.Second, 200*time.Millisecond)
+			count := 0
+			for _, s := range statuses {
+				if s.Name == "test-limit" && s.Status == core.Succeeded {
+					count++
+				}
+			}
+			return count >= expected
+		}, 10*time.Second, 100*time.Millisecond)
+	}
 
 	// Test limit - verify command runs successfully with --limit flag.
 	// Stdout table output is not captured, so we just verify no error.

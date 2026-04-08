@@ -146,10 +146,7 @@ func TestSessionManager_SetWorking(t *testing.T) {
 		ctx := t.Context()
 		next := sm.Subscribe(ctx)
 
-		go func() {
-			time.Sleep(20 * time.Millisecond)
-			sm.SetWorking(true)
-		}()
+		sm.SetWorking(true)
 
 		done := make(chan struct{})
 		go func() {
@@ -162,8 +159,7 @@ func TestSessionManager_SetWorking(t *testing.T) {
 
 		select {
 		case <-done:
-			// Success - broadcast received
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(5 * time.Second):
 			t.Fatal("timeout waiting for broadcast")
 		}
 	})
@@ -224,7 +220,9 @@ func TestSessionManager_AcceptUserMessage(t *testing.T) {
 		sm := NewSessionManager(SessionManagerConfig{})
 		_ = sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
 
-		time.Sleep(50 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			return len(sm.GetMessages()) > 0
+		}, 5*time.Second, 10*time.Millisecond)
 
 		msgs := sm.GetMessages()
 		require.NotEmpty(t, msgs)
@@ -308,10 +306,7 @@ func TestSessionManager_Subscribe(t *testing.T) {
 
 		next := sm.Subscribe(ctx)
 
-		go func() {
-			time.Sleep(20 * time.Millisecond)
-			sm.SetWorking(true)
-		}()
+		sm.SetWorking(true)
 
 		resp, ok := next()
 		assert.True(t, ok)
@@ -398,7 +393,9 @@ func TestSessionManager_Cancel(t *testing.T) {
 		sm := NewSessionManager(SessionManagerConfig{})
 		_ = sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
 
-		time.Sleep(50 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			return sm.IsWorking()
+		}, 5*time.Second, 10*time.Millisecond)
 
 		err := sm.Cancel(context.Background())
 		assert.NoError(t, err)
@@ -569,14 +566,13 @@ func TestSessionManager_LastActivity(t *testing.T) {
 		sm := NewSessionManager(SessionManagerConfig{})
 		initialActivity := sm.LastActivity()
 
-		time.Sleep(10 * time.Millisecond)
-
 		provider := newStopProvider("hi")
 		_ = sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
 		defer func() { _ = sm.Cancel(context.Background()) }()
 
-		updatedActivity := sm.LastActivity()
-		assert.True(t, updatedActivity.After(initialActivity), "LastActivity should be updated after AcceptUserMessage")
+		require.Eventually(t, func() bool {
+			return sm.LastActivity().After(initialActivity)
+		}, 5*time.Second, 10*time.Millisecond, "LastActivity should be updated after AcceptUserMessage")
 	})
 }
 
@@ -666,10 +662,7 @@ func TestSessionManager_SetWorkingBroadcastsCost(t *testing.T) {
 
 		next := sm.Subscribe(ctx)
 
-		go func() {
-			time.Sleep(20 * time.Millisecond)
-			sm.SetWorking(true)
-		}()
+		sm.SetWorking(true)
 
 		done := make(chan struct{})
 		go func() {
@@ -683,8 +676,7 @@ func TestSessionManager_SetWorkingBroadcastsCost(t *testing.T) {
 
 		select {
 		case <-done:
-			// Success
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(5 * time.Second):
 			t.Fatal("timeout waiting for broadcast")
 		}
 	})
@@ -766,7 +758,10 @@ func TestSessionManager_ConcurrentMessages(t *testing.T) {
 		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m",
 			"message-"+string(rune('0'+i)))
 		require.NoError(t, err)
-		time.Sleep(10 * time.Millisecond)
+		expected := i + 1
+		require.Eventually(t, func() bool {
+			return len(sm.GetMessages()) >= expected
+		}, 5*time.Second, 10*time.Millisecond)
 	}
 
 	require.Eventually(t, func() bool {
@@ -841,16 +836,15 @@ func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) 
 
 	initialActivity := sm.LastActivity()
 
-	time.Sleep(10 * time.Millisecond)
-
 	_, err := sm.RecordExternalMessage(context.Background(), Message{
 		Type:    MessageTypeAssistant,
 		Content: "update activity",
 	})
 	require.NoError(t, err)
 
-	updatedActivity := sm.LastActivity()
-	assert.True(t, updatedActivity.After(initialActivity), "LastActivity should be updated after RecordExternalMessage")
+	require.Eventually(t, func() bool {
+		return sm.LastActivity().After(initialActivity)
+	}, 5*time.Second, 10*time.Millisecond, "LastActivity should be updated after RecordExternalMessage")
 }
 
 func TestSessionManager_RecordExternalMessage_AppendsToActiveLoopHistory(t *testing.T) {
@@ -1045,10 +1039,11 @@ func TestSessionManager_RecordHeartbeat(t *testing.T) {
 		sm := NewSessionManager(SessionManagerConfig{ID: "hb-test"})
 		initialActivity := sm.LastActivity()
 
-		time.Sleep(10 * time.Millisecond)
 		sm.RecordHeartbeat()
 
-		assert.True(t, sm.LastActivity().After(initialActivity))
+		require.Eventually(t, func() bool {
+			return sm.LastActivity().After(initialActivity)
+		}, 5*time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("is thread-safe", func(t *testing.T) {
@@ -1109,7 +1104,6 @@ func TestSessionManager_CreateWaitUserResponseFunc(t *testing.T) {
 			return sm.LastHeartbeat().After(firstHB)
 		}, time.Second, 5*time.Millisecond)
 
-		time.Sleep(30 * time.Millisecond)
 		require.True(t, sm.SubmitUserResponse(UserPromptResponse{
 			PromptID:          "approval-1",
 			SelectedOptionIDs: []string{"approve"},
@@ -1209,10 +1203,17 @@ func TestSessionManager_CreateWaitUserResponseFunc(t *testing.T) {
 		}
 
 		require.Eventually(t, func() bool { return !sm.HasPendingPrompt() }, time.Second, 5*time.Millisecond)
-		time.Sleep(15 * time.Millisecond)
-		stableHB := sm.LastHeartbeat()
-		time.Sleep(20 * time.Millisecond)
-		assert.Equal(t, stableHB, sm.LastHeartbeat(), "heartbeat should stop after wait timeout")
+		// Wait for the heartbeat goroutine to fully stop, then verify it remains stable.
+		require.Eventually(t, func() bool {
+			hb1 := sm.LastHeartbeat()
+			for range 5 {
+				<-time.After(10 * time.Millisecond)
+				if sm.LastHeartbeat() != hb1 {
+					return false
+				}
+			}
+			return true
+		}, 5*time.Second, 10*time.Millisecond, "heartbeat should stop after wait timeout")
 	})
 }
 
@@ -1543,7 +1544,9 @@ func TestSessionManager_AcceptUserMessage_RoutesToPendingPrompt(t *testing.T) {
 		// Start the loop first so ensureLoop is a no-op.
 		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "setup")
 		require.NoError(t, err)
-		time.Sleep(50 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			return len(sm.GetMessages()) > 0
+		}, 5*time.Second, 10*time.Millisecond)
 
 		// Register a pending prompt.
 		ch := make(chan UserPromptResponse, 1)
@@ -1591,7 +1594,9 @@ func TestSessionManager_AcceptUserMessage_RoutesToPendingPrompt(t *testing.T) {
 		// Start the loop.
 		err := sm.AcceptUserMessage(context.Background(), provider, "m", "m", "setup")
 		require.NoError(t, err)
-		time.Sleep(50 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			return len(sm.GetMessages()) > 0
+		}, 5*time.Second, 10*time.Millisecond)
 
 		// Register a pending prompt with a full channel.
 		ch := make(chan UserPromptResponse, 1)

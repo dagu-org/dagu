@@ -196,12 +196,15 @@ steps:
 	err = a.Run(th.Context)
 	require.Error(t, err)
 
-	// Wait a bit for the handler file to be written
-	time.Sleep(100 * time.Millisecond)
+	// Wait for the handler file to be written
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(dagMarkerFile)
+		return err == nil
+	}, 5*time.Second, 50*time.Millisecond, "DAG's failure handler should have written marker file")
 
 	// Verify DAG's own handler ran
 	dagOutput, err := os.ReadFile(dagMarkerFile)
-	require.NoError(t, err, "DAG's failure handler should have written marker file")
+	require.NoError(t, err)
 	require.Contains(t, string(dagOutput), "DAG", "DAG's own failure handler should have run")
 
 	// Verify base handler did NOT run

@@ -37,6 +37,7 @@ func TestDialTimeout(t *testing.T) {
 	srv, err := sock.NewServer(
 		f.Name(),
 		func(w http.ResponseWriter, _ *http.Request) {
+			// Simulate a very slow handler to trigger client timeout.
 			time.Sleep(time.Second * 3100)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
@@ -44,13 +45,14 @@ func TestDialTimeout(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	listen := make(chan error, 1)
 	go func() {
-		_ = srv.Serve(context.Background(), nil)
+		_ = srv.Serve(context.Background(), listen)
 	}()
 
-	time.Sleep(time.Millisecond * 500)
+	// Wait for the server to signal it is ready.
+	require.NoError(t, <-listen)
 
-	require.NoError(t, err)
 	client := sock.NewClient(f.Name())
 	_, err = client.Request("GET", "/status")
 	require.Error(t, err)

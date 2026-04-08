@@ -180,6 +180,8 @@ func TestManager_EnsureValidRefreshesOnceConcurrently(t *testing.T) {
 		AccountID:    "acct-1",
 	}))
 
+	refreshStarted := make(chan struct{})
+	refreshDone := make(chan struct{})
 	provider := &stubProvider{
 		startAuthFlow: func(context.Context) (*oauthFlow, error) {
 			return nil, nil
@@ -188,7 +190,8 @@ func TestManager_EnsureValidRefreshesOnceConcurrently(t *testing.T) {
 			return nil, nil
 		},
 		refresh: func(_ context.Context, cred *Credential) (*Credential, error) {
-			time.Sleep(20 * time.Millisecond)
+			close(refreshStarted)
+			<-refreshDone
 			return &Credential{
 				Provider:     cred.Provider,
 				AccessToken:  "fresh-access",
@@ -219,6 +222,10 @@ func TestManager_EnsureValidRefreshesOnceConcurrently(t *testing.T) {
 			results <- cred
 		})
 	}
+
+	<-refreshStarted
+	close(refreshDone)
+
 	wg.Wait()
 	close(results)
 	close(errors)

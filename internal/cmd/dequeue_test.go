@@ -6,7 +6,6 @@ package cmd_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/core"
@@ -154,7 +153,6 @@ steps:
 		exec.QueuePriorityLow,
 		exec.NewDAGRunRef(dag.Name, "stale-run"),
 	))
-	time.Sleep(10 * time.Millisecond)
 
 	th.RunCommand(t, cmd.Enqueue(), test.CmdTest{
 		Name: "Enqueue",

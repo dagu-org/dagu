@@ -726,19 +726,14 @@ func TestListWithSortAndOrder(t *testing.T) {
 		{"GAMMA-dag", "GAMMA-dag"},
 	}
 
-	// Create files with some time delay to ensure different modification times
-	for i, dag := range dags {
+	// Create files for sorting tests (these tests assert name-based sorting)
+	for _, dag := range dags {
 		content := fmt.Sprintf(`name: %s
 steps:
   - name: step1
     command: echo "%s"`, dag.name, dag.name)
 		err := store.Create(ctx, dag.fileName, []byte(content))
 		require.NoError(t, err)
-
-		// Add a small delay between file creations to ensure different mod times
-		if i < len(dags)-1 {
-			time.Sleep(10 * time.Millisecond)
-		}
 	}
 
 	// Test 1: Sort by name ascending (default)
@@ -920,18 +915,13 @@ func TestListWithSortingAndPagination(t *testing.T) {
 		"romeo-dag", "quebec-dag", "papa-dag", "oscar-dag",
 	}
 
-	for i, name := range dagNames {
+	for _, name := range dagNames {
 		content := fmt.Sprintf(`name: %s
 steps:
   - name: step1
     command: echo "%s"`, name, name)
 		err := store.Create(ctx, name, []byte(content))
 		require.NoError(t, err)
-
-		// Add delay to ensure different mod times
-		if i < len(dagNames)-1 {
-			time.Sleep(5 * time.Millisecond)
-		}
 	}
 
 	// Test 1: Name sort ascending with pagination

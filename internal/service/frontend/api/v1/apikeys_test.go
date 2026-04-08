@@ -406,15 +406,13 @@ func TestAPIKeys_LastUsedAtUpdated(t *testing.T) {
 		WithBearerToken(apiKey).
 		ExpectStatus(http.StatusOK).Send(t)
 
-	// Wait a moment for async update to complete
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify last_used_at is now populated
-	getResp2 := server.Client().Get("/api/v1/api-keys/" + keyID).
-		WithBearerToken(token).
-		ExpectStatus(http.StatusOK).Send(t)
-
-	var getResult2 api.APIKeyResponse
-	getResp2.Unmarshal(t, &getResult2)
-	require.NotNil(t, getResult2.ApiKey.LastUsedAt, "last_used_at should be populated after API key usage")
+	// Wait for async update to complete
+	require.Eventually(t, func() bool {
+		resp := server.Client().Get("/api/v1/api-keys/" + keyID).
+			WithBearerToken(token).
+			ExpectStatus(http.StatusOK).Send(t)
+		var result api.APIKeyResponse
+		resp.Unmarshal(t, &result)
+		return result.ApiKey.LastUsedAt != nil
+	}, 5*time.Second, 50*time.Millisecond, "last_used_at should be populated after API key usage")
 }

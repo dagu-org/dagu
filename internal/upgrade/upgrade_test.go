@@ -1376,8 +1376,10 @@ func TestDownloadErrors(t *testing.T) {
 	})
 
 	t.Run("context cancellation", func(t *testing.T) {
+		blocked := make(chan struct{})
+		defer close(blocked)
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(100 * time.Millisecond)
+			<-blocked
 			_, _ = w.Write([]byte("content"))
 		}))
 		defer server.Close()

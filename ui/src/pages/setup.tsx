@@ -79,6 +79,7 @@ export default function SetupPage() {
     providerMap,
     isLoading: authLoading,
     error: authError,
+    refreshProviders,
     startLogin,
     completeLogin,
     disconnect,
@@ -96,6 +97,13 @@ export default function SetupPage() {
       navigate('/login', { replace: true });
     }
   }, [setupRequired, setupDone, navigate]);
+
+  // Re-fetch auth providers when entering step 2 (after step 1 stored the JWT)
+  useEffect(() => {
+    if (currentStep === 2 && refreshProviders) {
+      void refreshProviders().catch(() => {});
+    }
+  }, [currentStep, refreshProviders]);
 
   // Fetch presets when entering step 2
   const fetchPresets = useCallback(async () => {
@@ -277,7 +285,7 @@ export default function SetupPage() {
       }
 
       updateConfig({ agentEnabled: true });
-      navigate('/', { replace: true, state: { openAgent: true } });
+      navigate('/', { replace: true });
     } catch (err) {
       setStep2Error(err instanceof Error ? err.message : 'Configuration failed');
     } finally {
@@ -310,7 +318,7 @@ export default function SetupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/50">
-      <div className="w-full max-w-sm p-6 space-y-6">
+      <div className="w-full max-w-md p-6 space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold">{config.title || 'Dagu'}</h1>
@@ -517,12 +525,7 @@ export default function SetupPage() {
                             <SelectContent>
                               {filteredPresets.map((p) => (
                                 <SelectItem key={p.name} value={p.name}>
-                                  <span>{p.name}</span>
-                                  {p.description && (
-                                    <span className="text-muted-foreground ml-1">
-                                      — {p.description}
-                                    </span>
-                                  )}
+                                  {p.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>

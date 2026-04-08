@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -33,8 +34,8 @@ func TestSendEvent_UnblocksOnQuit(t *testing.T) {
 		close(done)
 	}()
 
-	// Give sendEvent time to block
-	time.Sleep(50 * time.Millisecond)
+	// Yield to let sendEvent goroutine enter the blocking select
+	runtime.Gosched()
 
 	// Close quit — this should unblock sendEvent
 	close(er.quit)
@@ -66,8 +67,8 @@ func TestSendEvent_UnblocksOnContextCancel(t *testing.T) {
 		close(done)
 	}()
 
-	// Give sendEvent time to block
-	time.Sleep(50 * time.Millisecond)
+	// Yield to let sendEvent goroutine enter the blocking select
+	runtime.Gosched()
 
 	// Cancel context — this should unblock sendEvent
 	cancel()

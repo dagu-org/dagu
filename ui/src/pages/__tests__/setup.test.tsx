@@ -217,7 +217,7 @@ beforeEach(() => {
     remoteNode: 'local',
     isLoading: false,
     error: null,
-    refreshProviders: vi.fn(),
+    refreshProviders: vi.fn().mockResolvedValue([]),
     startLogin: startLoginMock,
     completeLogin: completeLoginMock,
     disconnect: disconnectMock,
@@ -280,7 +280,6 @@ describe('SetupPage', () => {
     expect(updateConfigMock).toHaveBeenCalledWith({ agentEnabled: true });
     expect(navigateMock).toHaveBeenCalledWith('/', {
       replace: true,
-      state: { openAgent: true },
     });
   });
 

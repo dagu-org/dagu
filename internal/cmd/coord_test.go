@@ -5,6 +5,7 @@ package cmd_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,9 @@ func TestCoordinatorCommand(t *testing.T) {
 	t.Run("StartCoordinator", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		port := findPort(t)
@@ -35,7 +38,9 @@ func TestCoordinatorCommand(t *testing.T) {
 	t.Run("StartCoordinatorWithHost", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		port := findPort(t)
@@ -48,7 +53,9 @@ func TestCoordinatorCommand(t *testing.T) {
 	t.Run("StartCoordinatorWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
@@ -60,7 +67,9 @@ func TestCoordinatorCommand(t *testing.T) {
 	t.Run("StartCoordinatorWithTLS", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		port := findPort(t)
@@ -78,7 +87,9 @@ func TestCoordinatorCommand(t *testing.T) {
 	t.Run("StartCoordinatorWithMutualTLS", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		port := findPort(t)
@@ -97,7 +108,9 @@ func TestCoordinatorCommand(t *testing.T) {
 	t.Run("StartCoordinatorWithAdvertiseAddress", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
+			require.Eventually(t, func() bool {
+				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
+			}, 5*time.Second, 50*time.Millisecond)
 			th.Cancel()
 		}()
 		port := findPort(t)

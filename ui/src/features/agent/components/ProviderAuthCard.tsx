@@ -186,9 +186,9 @@ export function ProviderAuthCard({
           className
         )}
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
+        <div className={cn('flex flex-col gap-3', !compact && 'sm:flex-row sm:items-start sm:justify-between')}>
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-medium">{provider.name}</p>
               <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
@@ -299,7 +299,7 @@ export function ProviderAuthCard({
           <DialogHeader>
             <DialogTitle>Connect {provider.name}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Authenticate in your browser, then paste the failed localhost redirect URL or the raw authorization code here.
+              Link your ChatGPT Plus or Pro subscription to use OpenAI Codex models.
             </DialogDescription>
           </DialogHeader>
 
@@ -310,19 +310,18 @@ export function ProviderAuthCard({
               </div>
             )}
 
-            <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p>1. Open the login page in your browser and finish the ChatGPT sign-in flow.</p>
-                  <p>2. When the browser redirects to `http://localhost:1455/auth/callback`, copy the full URL from the address bar.</p>
-                  <p>3. Paste that URL below. If you only have the code value, paste it into the authorization code field instead.</p>
-                </div>
-              </div>
+            <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm space-y-3">
+              <p className="font-medium">How it works</p>
+              <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                <li>A ChatGPT login page should have opened in your browser. If not, copy the URL below and open it manually.</li>
+                <li>Sign in with the account that has a ChatGPT Plus or Pro subscription.</li>
+                <li>After signing in, your browser will redirect to a <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">localhost:1455</code> page that <span className="font-medium text-foreground">won't load</span> — this is expected.</li>
+                <li>Copy the <span className="font-medium text-foreground">entire URL</span> from your browser's address bar and paste it into the "Callback URL" field below.</li>
+              </ol>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="provider-auth-url" className="text-sm">Authorization URL</Label>
+              <Label htmlFor="provider-auth-url" className="text-sm">Login URL</Label>
               <div className="flex gap-2">
                 <Input
                   id="provider-auth-url"
@@ -335,7 +334,7 @@ export function ProviderAuthCard({
                   size="sm"
                   variant="outline"
                   className="h-9 shrink-0"
-                  onClick={() => loginFlow && handleCopy(loginFlow.authUrl, 'Authorization URL copied')}
+                  onClick={() => loginFlow && handleCopy(loginFlow.authUrl, 'Login URL copied')}
                   disabled={!loginFlow}
                 >
                   <Copy className="h-4 w-4" />
@@ -351,32 +350,35 @@ export function ProviderAuthCard({
                   <ExternalLink className="h-4 w-4" />
                 </Button>
               </div>
-              {loginFlow?.instructions && (
-                <p className="text-xs text-muted-foreground">{loginFlow.instructions}</p>
-              )}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="provider-redirect-url" className="text-sm">Redirect URL</Label>
+              <Label htmlFor="provider-redirect-url" className="text-sm">Callback URL</Label>
               <Textarea
                 id="provider-redirect-url"
                 value={redirectUrl}
                 onChange={(event) => setRedirectUrl(event.target.value)}
-                placeholder="http://localhost:1455/auth/callback?code=...&state=..."
-                className="min-h-24 font-mono text-xs"
+                placeholder="Paste the full URL from your browser's address bar here, e.g. http://localhost:1455/auth/callback?code=...&state=..."
+                className="min-h-20 font-mono text-xs"
               />
+              <p className="text-xs text-muted-foreground">
+                This is the URL your browser landed on after signing in. It starts with <code className="rounded bg-muted px-1 py-0.5">http://localhost:1455/auth/callback?...</code>
+              </p>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="provider-auth-code" className="text-sm">Authorization Code</Label>
-              <Input
-                id="provider-auth-code"
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                placeholder="Paste only the code if you do not have the full redirect URL"
-                className="font-mono text-xs"
-              />
-            </div>
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer hover:text-foreground">I only have an authorization code</summary>
+              <div className="mt-2 space-y-1.5">
+                <Label htmlFor="provider-auth-code" className="text-sm">Authorization Code</Label>
+                <Input
+                  id="provider-auth-code"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="Paste the code value only"
+                  className="font-mono text-xs"
+                />
+              </div>
+            </details>
           </div>
 
           <DialogFooter>

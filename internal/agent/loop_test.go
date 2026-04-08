@@ -375,10 +375,15 @@ func TestLoop_Go(t *testing.T) {
 
 		select {
 		case <-done:
-			time.Sleep(10 * time.Millisecond)
 		case <-time.After(1500 * time.Millisecond):
 			t.Fatal("timeout waiting for LLM call")
 		}
+
+		require.Eventually(t, func() bool {
+			loop.mu.Lock()
+			defer loop.mu.Unlock()
+			return loop.totalUsage.TotalTokens > 0
+		}, 5*time.Second, 10*time.Millisecond)
 
 		loop.mu.Lock()
 		usage := loop.totalUsage
@@ -929,9 +934,17 @@ func runLoopForDuration(t *testing.T, loop *Loop, duration time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
-	go func() { _ = loop.Go(ctx) }()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = loop.Go(ctx)
+	}()
 
-	time.Sleep(duration)
+	select {
+	case <-done:
+	case <-time.After(duration + 5*time.Second):
+		t.Fatal("runLoopForDuration: loop did not finish within timeout")
+	}
 }
 
 // newEchoTool creates a simple tool that returns its input as output.

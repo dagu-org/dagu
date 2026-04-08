@@ -28,7 +28,7 @@ func TestStartUptime(t *testing.T) {
 			t.Error("startTime was not initialized")
 		}
 
-		// Wait for at least 2 seconds to ensure multiple updates
+		// Advance fake time by 2 seconds (synctest makes time.Sleep instant).
 		time.Sleep(2 * time.Second)
 		synctest.Wait()
 
@@ -43,6 +43,7 @@ func TestStartUptime(t *testing.T) {
 		// Test goroutine cleanup
 		cancel()
 		previousUptime := GetUptime()
+		// Advance fake time to verify goroutine stopped after cancellation.
 		time.Sleep(2 * time.Second)
 		synctest.Wait()
 
@@ -78,7 +79,7 @@ func TestUptimeAccuracy(t *testing.T) {
 		// Start uptime tracking
 		StartUptime(ctx)
 
-		// Wait for 3.5 seconds
+		// Advance fake time by 3.5 seconds (synctest makes time.Sleep instant).
 		time.Sleep(3500 * time.Millisecond)
 		synctest.Wait()
 
