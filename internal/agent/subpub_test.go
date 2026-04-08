@@ -185,10 +185,9 @@ func TestSubPub_ContextCancellation(t *testing.T) {
 		cancel()
 
 		// Publish should not panic even after subscriber context is canceled.
-		require.Eventually(t, func() bool {
+		require.NotPanics(t, func() {
 			sp.Publish(1, "test")
-			return true
-		}, 5*time.Second, 10*time.Millisecond)
+		})
 	})
 }
 

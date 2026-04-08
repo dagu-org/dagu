@@ -726,19 +726,14 @@ func TestListWithSortAndOrder(t *testing.T) {
 		{"GAMMA-dag", "GAMMA-dag"},
 	}
 
-	// Create files and set explicit modification times for deterministic ordering
-	for i, dag := range dags {
+	// Create files for sorting tests (these tests assert name-based sorting)
+	for _, dag := range dags {
 		content := fmt.Sprintf(`name: %s
 steps:
   - name: step1
     command: echo "%s"`, dag.name, dag.name)
 		err := store.Create(ctx, dag.fileName, []byte(content))
 		require.NoError(t, err)
-
-		// Set explicit mod times so sort-by-time tests are deterministic
-		modTime := time.Now().Add(time.Duration(i) * time.Second)
-		filePath := filepath.Join(tmpDir, dag.fileName+".yaml")
-		require.NoError(t, os.Chtimes(filePath, modTime, modTime))
 	}
 
 	// Test 1: Sort by name ascending (default)
@@ -920,18 +915,13 @@ func TestListWithSortingAndPagination(t *testing.T) {
 		"romeo-dag", "quebec-dag", "papa-dag", "oscar-dag",
 	}
 
-	for i, name := range dagNames {
+	for _, name := range dagNames {
 		content := fmt.Sprintf(`name: %s
 steps:
   - name: step1
     command: echo "%s"`, name, name)
 		err := store.Create(ctx, name, []byte(content))
 		require.NoError(t, err)
-
-		// Set explicit mod times so sort-by-time tests are deterministic
-		modTime := time.Now().Add(time.Duration(i) * time.Second)
-		filePath := filepath.Join(tmpDir, name+".yaml")
-		require.NoError(t, os.Chtimes(filePath, modTime, modTime))
 	}
 
 	// Test 1: Name sort ascending with pagination

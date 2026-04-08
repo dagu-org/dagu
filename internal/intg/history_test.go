@@ -323,7 +323,10 @@ steps:
 		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dag.Location}})
 		expected := i + 1
 		require.Eventually(t, func() bool {
-			statuses, _ := th.DAGRunStore.ListStatuses(ctx)
+			statuses, err := th.DAGRunStore.ListStatuses(ctx)
+			if err != nil {
+				return false
+			}
 			count := 0
 			for _, s := range statuses {
 				if s.Name == "test-limit" && s.Status == core.Succeeded {

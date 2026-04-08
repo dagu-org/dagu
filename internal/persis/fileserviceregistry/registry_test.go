@@ -110,20 +110,16 @@ func TestRegistry_Heartbeat(t *testing.T) {
 	require.NoError(t, err)
 	defer registry.Unregister(ctx)
 
-	// Get initial heartbeat time
-	members1, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
+	// Get the initial mtime of the instance file
+	instanceFile := instanceFilePath(tmpDir, string(exec.ServiceNameCoordinator), hostInfo.ID)
+	initialInfo, err := os.Stat(instanceFile)
 	require.NoError(t, err)
-	require.Len(t, members1, 1)
 
-	// Heartbeat already started by Register method
-
-	// Wait for heartbeat to update the instance file
+	// Heartbeat already started by Register method.
+	// Wait for heartbeat to update the instance file (mtime should advance).
 	require.Eventually(t, func() bool {
-		members2, err := registry.GetServiceMembers(ctx, exec.ServiceNameCoordinator)
-		if err != nil || len(members2) != 1 {
-			return false
-		}
-		return members2[0].ID == members1[0].ID
+		info, err := os.Stat(instanceFile)
+		return err == nil && info.ModTime().After(initialInfo.ModTime())
 	}, 5*time.Second, 20*time.Millisecond)
 }
 

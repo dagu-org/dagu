@@ -374,7 +374,14 @@ func TestRunner(t *testing.T) {
 		go func() {
 			// Wait until at least one retry has happened before creating the file
 			// so that the first attempt and first retry both fail.
+			deadline := time.After(5 * time.Second)
 			for {
+				select {
+				case <-deadline:
+					t.Error("timed out waiting for retry count to increment")
+					return
+				default:
+				}
 				node := plan.GetNodeByName("1")
 				if node != nil && node.State().RetryCount > 0 {
 					break

@@ -185,7 +185,8 @@ steps:
 		return running == 1 && queued == 1
 	}, 15*time.Second, 100*time.Millisecond, "one run should start and one should remain queued")
 
-	require.Eventually(t, func() bool {
+	// Verify the state is stable: concurrency limit keeps one running and one queued.
+	require.Never(t, func() bool {
 		statuses, err := f.coord.DAGRunStore.ListStatuses(
 			f.coord.Context,
 			exec.WithExactName("queue-concurrency-test"),
@@ -206,8 +207,9 @@ steps:
 			}
 		}
 
-		return running == 1 && queued == 1
-	}, 10*time.Second, 200*time.Millisecond, "fresh distributed lease should keep one running and one queued")
+		// Return true (violation) if state has drifted from the expected 1 running + 1 queued.
+		return running != 1 || queued != 1
+	}, 2*time.Second, 200*time.Millisecond, "distributed lease should keep one running and one queued")
 
 	require.Eventually(t, func() bool {
 		statuses, err := f.coord.DAGRunStore.ListStatuses(

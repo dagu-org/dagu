@@ -26,6 +26,9 @@ func TestProcHandle(t *testing.T) {
 	ctx := context.Background()
 	err := proc.startHeartbeat(ctx)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = proc.Stop(ctx)
+	})
 
 	// File is created synchronously by startHeartbeat
 	_, err = os.Stat(fileName)

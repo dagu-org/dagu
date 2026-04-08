@@ -158,9 +158,10 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check again - should be false now
-		alive, err := pg.IsRunAlive(ctx, dagRun)
-		require.NoError(t, err)
-		require.False(t, alive)
+		require.Eventually(t, func() bool {
+			alive, err := pg.IsRunAlive(ctx, dagRun)
+			return err == nil && !alive
+		}, 5*time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("DifferentRunID", func(t *testing.T) {

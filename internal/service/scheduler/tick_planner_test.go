@@ -1306,9 +1306,12 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 
 	wg.Wait()
 
-	// Wait for drain goroutine to process remaining events from the channel
+	// Wait for drain goroutine to process all events by verifying
+	// all 50 DAGs are present in the planner's state.
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	require.Eventually(t, func() bool {
-		return len(eventCh) == 0
+		planned := tp.Plan(context.Background(), now)
+		return len(planned) == 50
 	}, 5*time.Second, 10*time.Millisecond)
 
 	cancel()

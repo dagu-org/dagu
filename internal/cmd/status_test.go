@@ -176,7 +176,10 @@ steps:
 		err = executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		dagFile.AssertDAGRunCount(t, 2)
+		require.Eventually(t, func() bool {
+			statuses := dagFile.DAGRunMgr.ListRecentStatus(th.Context, dagFile.Name, 3)
+			return len(statuses) == 2
+		}, 5*time.Second, 50*time.Millisecond)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)

@@ -11,19 +11,21 @@ import (
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/test"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAll", func(t *testing.T) {
 		th := test.SetupCommand(t, test.WithCoordinatorEnabled())
 		go func() {
-			require.Eventually(t, func() bool {
+			for {
 				out := th.LoggingOutput.String()
-				return strings.Contains(out, "Scheduler initialization") &&
-					strings.Contains(out, "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
+				if strings.Contains(out, "Scheduler initialization") &&
+					strings.Contains(out, "Coordinator initialization") {
+					th.Cancel()
+					return
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
 		}()
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{
@@ -39,11 +41,14 @@ func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAllWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			require.Eventually(t, func() bool {
+			for {
 				out := th.LoggingOutput.String()
-				return strings.Contains(out, "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
+				if strings.Contains(out, "Coordinator initialization") {
+					th.Cancel()
+					return
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
 		}()
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{
