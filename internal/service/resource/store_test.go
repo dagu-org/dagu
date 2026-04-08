@@ -53,7 +53,7 @@ func TestMemoryStore_GetHistoryFiltering(t *testing.T) {
 		// Add old data
 		store.Add(1.0, 1.0, 1.0, 1.0, 0, 0, 0, 0)
 
-		// Wait 2+ seconds so old point is at least 2 seconds in the past
+		// Deterministic: synctest.Test intercepts time.Sleep to advance the fake clock.
 		time.Sleep(2100 * time.Millisecond)
 
 		// Add new data

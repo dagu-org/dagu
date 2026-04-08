@@ -5,6 +5,7 @@ package cmd_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,8 +17,15 @@ func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAll", func(t *testing.T) {
 		th := test.SetupCommand(t, test.WithCoordinatorEnabled())
 		go func() {
-			time.Sleep(time.Millisecond * 500)
-			th.Cancel()
+			for {
+				out := th.LoggingOutput.String()
+				if strings.Contains(out, "Scheduler initialization") &&
+					strings.Contains(out, "Coordinator initialization") {
+					th.Cancel()
+					return
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
 		}()
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{
@@ -33,8 +41,14 @@ func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAllWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
 		go func() {
-			time.Sleep(time.Millisecond * 500)
-			th.Cancel()
+			for {
+				out := th.LoggingOutput.String()
+				if strings.Contains(out, "Coordinator initialization") {
+					th.Cancel()
+					return
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
 		}()
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{

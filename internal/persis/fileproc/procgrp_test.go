@@ -31,26 +31,18 @@ func TestProcGroup(t *testing.T) {
 	}))
 	require.NoError(t, err, "failed to get proc")
 
-	// Start the process
+	// Start the process (file is created synchronously by startHeartbeat)
 	err = proc.startHeartbeat(ctx)
 	require.NoError(t, err, "failed to start proc")
-
-	// Stop the process after a short delay
-	done := make(chan struct{})
-	go func() {
-		time.Sleep(time.Millisecond * 100) // Give some time for the file to be created
-		err := proc.Stop(ctx)
-		require.NoError(t, err, "failed to stop proc")
-		close(done)
-	}()
 
 	// Check if the count is 1
 	count, err := procFiles.Count(ctx)
 	require.NoError(t, err, "failed to count proc files")
 	require.Equal(t, 1, count, "expected 1 proc file")
 
-	// Wait for the process to stop
-	<-done
+	// Stop the process
+	err = proc.Stop(ctx)
+	require.NoError(t, err, "failed to stop proc")
 
 	// Check if the count is 0
 	count, err = procFiles.Count(ctx)
@@ -151,26 +143,25 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		proc, err := pg.Acquire(ctx, testProcMetaFromRun(dagRun))
 		require.NoError(t, err)
 
-		// Start heartbeat
+		// Start heartbeat (file is created synchronously)
 		err = proc.startHeartbeat(ctx)
 		require.NoError(t, err)
 
-		// Give a moment for the heartbeat to write
-		time.Sleep(time.Millisecond * 50)
-
 		// Check if the run is alive
-		alive, err := pg.IsRunAlive(ctx, dagRun)
-		require.NoError(t, err)
-		require.True(t, alive)
+		require.Eventually(t, func() bool {
+			alive, err := pg.IsRunAlive(ctx, dagRun)
+			return err == nil && alive
+		}, 5*time.Second, 10*time.Millisecond)
 
 		// Stop the process
 		err = proc.Stop(ctx)
 		require.NoError(t, err)
 
 		// Check again - should be false now
-		alive, err = pg.IsRunAlive(ctx, dagRun)
-		require.NoError(t, err)
-		require.False(t, alive)
+		require.Eventually(t, func() bool {
+			alive, err := pg.IsRunAlive(ctx, dagRun)
+			return err == nil && !alive
+		}, 5*time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("DifferentRunID", func(t *testing.T) {
@@ -182,12 +173,15 @@ func TestProcGroup_IsRunAlive(t *testing.T) {
 		proc1, err := pg.Acquire(ctx, testProcMetaFromRun(dagRun1))
 		require.NoError(t, err)
 
-		// Start heartbeat
+		// Start heartbeat (file is created synchronously)
 		err = proc1.startHeartbeat(ctx)
 		require.NoError(t, err)
 
-		// Give a moment for the heartbeat to write
-		time.Sleep(time.Millisecond * 50)
+		// Wait until the original run is alive
+		require.Eventually(t, func() bool {
+			alive, err := pg.IsRunAlive(ctx, dagRun1)
+			return err == nil && alive
+		}, 5*time.Second, 10*time.Millisecond)
 
 		// Check for a different run ID
 		dagRun2 := exec.DAGRunRef{

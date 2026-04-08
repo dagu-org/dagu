@@ -62,10 +62,10 @@ steps:
 		return details.DagRun.Status == api.Status(core.Running)
 	}, 5*time.Second, 50*time.Millisecond)
 
-	time.Sleep(2 * time.Second)
-	alive, err := server.ProcStore.IsRunAlive(server.Context, dagName, ref)
-	require.NoError(t, err)
-	require.True(t, alive)
+	require.Eventually(t, func() bool {
+		alive, err := server.ProcStore.IsRunAlive(server.Context, dagName, ref)
+		return err == nil && alive
+	}, 10*time.Second, 50*time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		statusResp := server.Client().Get(fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)).

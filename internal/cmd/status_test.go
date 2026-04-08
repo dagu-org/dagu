@@ -80,7 +80,7 @@ func TestStatusCommand(t *testing.T) {
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
@@ -139,7 +139,7 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location, "--params=custom1 custom2"})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
@@ -156,7 +156,7 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location, "--run-id=" + runID})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location, "--run-id=" + runID})
 		require.NoError(t, err)
@@ -171,17 +171,18 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		err = executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			statuses := dagFile.DAGRunMgr.ListRecentStatus(th.Context, dagFile.Name, 3)
+			return len(statuses) == 2
+		}, 5*time.Second, 50*time.Millisecond)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
-
-		dagFile.AssertDAGRunCount(t, 2)
 	})
 
 	t.Run("StatusDAGWithSkippedSteps", func(t *testing.T) {
@@ -288,7 +289,7 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
@@ -303,7 +304,7 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
@@ -338,7 +339,7 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		ctx := context.Background()
 		dag, err := th.DAGStore.GetMetadata(ctx, dagFile.Location)
@@ -361,7 +362,7 @@ steps:
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		time.Sleep(200 * time.Millisecond)
+		dagFile.AssertLatestStatus(t, core.Succeeded)
 
 		err = executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)

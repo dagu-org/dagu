@@ -121,7 +121,6 @@ func TestCleanupCommand(t *testing.T) {
 		}()
 
 		// Wait for DAG to start running
-		time.Sleep(time.Millisecond * 200)
 		dag.AssertLatestStatus(t, core.Running)
 
 		// Try to cleanup while running (nothing to delete since only active run exists)

@@ -540,7 +540,6 @@ func TestDelegateTool_ContextCancellation(t *testing.T) {
 		}, singleTaskInput("cancelled"))
 	}()
 
-	time.Sleep(50 * time.Millisecond)
 	cancel()
 
 	select {

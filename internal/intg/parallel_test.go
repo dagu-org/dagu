@@ -428,8 +428,6 @@ steps:
 		return err == nil && strings.TrimSpace(string(data)) == "1"
 	}, 10*time.Second, 50*time.Millisecond, "expected first attempt to increment counter")
 
-	time.Sleep(300 * time.Millisecond)
-
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 		if err != nil {
@@ -454,13 +452,10 @@ steps:
 	require.Len(t, finalStatus.Nodes, 1)
 	require.Equal(t, core.NodeAborted, finalStatus.Nodes[0].Status)
 
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
+	require.Never(t, func() bool {
 		data, readErr := os.ReadFile(counterFile)
-		require.NoError(t, readErr)
-		require.Equal(t, "1", strings.TrimSpace(string(data)), "retry should not launch after abort")
-		time.Sleep(50 * time.Millisecond)
-	}
+		return readErr != nil || strings.TrimSpace(string(data)) != "1"
+	}, 3*time.Second, 50*time.Millisecond, "retry should not launch after abort")
 }
 
 func TestParallelExecution_DeterministicIDs(t *testing.T) {

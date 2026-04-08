@@ -452,13 +452,11 @@ func TestResolver_Members_CacheExpiration(t *testing.T) {
 	err = writeInstanceFile(filename, &instance2)
 	require.NoError(t, err)
 
-	// Wait for cache to expire
-	time.Sleep(150 * time.Millisecond)
-
-	// Third call - cache expired, should read from disk again
-	members3, err := finder.members(ctx)
-	require.NoError(t, err)
-	assert.Len(t, members3, 2) // Now sees both instances
+	// Poll until cache expires and the new instance is visible
+	require.Eventually(t, func() bool {
+		members3, err := finder.members(ctx)
+		return err == nil && len(members3) == 2
+	}, 5*time.Second, 20*time.Millisecond)
 }
 
 func TestResolver_Members_NoCacheForEmptyMembers(t *testing.T) {

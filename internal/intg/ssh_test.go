@@ -670,16 +670,11 @@ func waitForSSHReady(t *testing.T, server *sshServerContainer) {
 	config := buildSSHClientConfig(t, server)
 	addr := net.JoinHostPort("127.0.0.1", server.hostPort)
 
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
-		if trySSHConnection(t, addr, config) {
-			t.Logf("SSH server ready on port %s", server.hostPort)
-			return
-		}
-		time.Sleep(1 * time.Second)
-	}
+	require.Eventually(t, func() bool {
+		return trySSHConnection(t, addr, config)
+	}, 30*time.Second, time.Second, "SSH server failed to become ready on port %s", server.hostPort)
 
-	t.Fatalf("SSH server failed to become ready on port %s", server.hostPort)
+	t.Logf("SSH server ready on port %s", server.hostPort)
 }
 
 // buildSSHClientConfig creates an SSH client config for testing.

@@ -42,8 +42,19 @@ func TestWorkerStart(t *testing.T) {
 			done <- w.Start(ctx)
 		}()
 
-		// Give worker time to start polling
-		time.Sleep(100 * time.Millisecond)
+		// Wait for worker to register via heartbeat
+		require.Eventually(t, func() bool {
+			workers, err := coord.GetCoordinatorClient(t).GetWorkers(context.Background())
+			if err != nil {
+				return false
+			}
+			for _, wk := range workers {
+				if wk.WorkerId == "test-worker" {
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 10*time.Millisecond, "Worker did not register via heartbeat")
 
 		// Stop worker by cancelling context
 		cancel()
@@ -79,7 +90,6 @@ func TestWorkerStart(t *testing.T) {
 		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
 				pollCount.Add(1)
-				time.Sleep(50 * time.Millisecond)
 				return nil
 			},
 		})
@@ -89,12 +99,21 @@ func TestWorkerStart(t *testing.T) {
 			_ = w.Start(ctx)
 		}()
 
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
+		// Wait for worker to register via heartbeat
+		require.Eventually(t, func() bool {
+			workers, err := coord.GetCoordinatorClient(t).GetWorkers(context.Background())
+			if err != nil {
+				return false
+			}
+			for _, wk := range workers {
+				if wk.WorkerId == "test-worker" {
+					return true
+				}
+			}
+			return false
+		}, 5*time.Second, 10*time.Millisecond, "Worker did not register via heartbeat")
 
 		// Dispatch multiple tasks
-		// Note: We have 3 pollers, so we can dispatch 3 tasks immediately
-		// For the remaining tasks, we need to allow time for workers to re-poll
 		for i := range 5 {
 			task := &coordinatorv1.Task{
 				DagRunId:   "run-" + string(rune('a'+i)),
@@ -105,15 +124,18 @@ func TestWorkerStart(t *testing.T) {
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
 
-			// After dispatching first 3 tasks, add delay to allow workers to complete
-			// and re-poll (tasks take 100ms to execute in this test)
+			// After dispatching first batch, wait for a poller to become free
 			if i >= 2 {
-				time.Sleep(120 * time.Millisecond)
+				require.Eventually(t, func() bool {
+					return pollCount.Load() >= int32(i)
+				}, 5*time.Second, 10*time.Millisecond)
 			}
 		}
 
-		// Wait for tasks to be processed
-		time.Sleep(200 * time.Millisecond)
+		// Wait for all tasks to be processed
+		require.Eventually(t, func() bool {
+			return pollCount.Load() >= 5
+		}, 5*time.Second, 10*time.Millisecond, "Not all tasks were processed")
 
 		// Should have processed multiple tasks
 		assert.GreaterOrEqual(t, pollCount.Load(), int32(3))
@@ -166,8 +188,8 @@ func TestWorkerTaskExecution(t *testing.T) {
 			_ = w.Start(ctx)
 		}()
 
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
+		// Wait for worker to register via heartbeat
+		requireWorkerRegistered(t, coord, "test-worker")
 
 		// Dispatch task to coordinator
 		err := coord.DispatchTask(t, expectedTask)
@@ -232,15 +254,17 @@ func TestWorkerTaskExecution(t *testing.T) {
 			_ = w.Start(ctx)
 		}()
 
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
+		// Wait for worker to register via heartbeat
+		requireWorkerRegistered(t, coord, "test-worker")
 
 		// Dispatch task
 		err := coord.DispatchTask(t, task)
 		require.NoError(t, err)
 
 		// Wait for execution attempt
-		time.Sleep(200 * time.Millisecond)
+		require.Eventually(t, func() bool {
+			return executionAttempted.Load()
+		}, 5*time.Second, 10*time.Millisecond, "Task execution was not attempted")
 
 		// Task should have been attempted despite error
 		assert.True(t, executionAttempted.Load())
@@ -302,15 +326,18 @@ func TestWorkerWithLabels(t *testing.T) {
 		go func() { _ = w1.Start(ctx) }()
 		go func() { _ = w2.Start(ctx) }()
 
-		// Give workers time to connect
-		time.Sleep(100 * time.Millisecond)
+		// Wait for both workers to register via heartbeat
+		requireWorkerRegistered(t, coord, "worker-1")
+		requireWorkerRegistered(t, coord, "worker-2")
 
 		// Dispatch task
 		err := coord.DispatchTask(t, task)
 		require.NoError(t, err)
 
-		// Wait for task execution
-		time.Sleep(400 * time.Millisecond)
+		// Wait for the labeled worker to execute
+		require.Eventually(t, func() bool {
+			return w2Executed.Load()
+		}, 5*time.Second, 10*time.Millisecond, "Worker with labels did not execute")
 
 		// Only worker with matching labels should execute
 		assert.False(t, w1Executed.Load(), "Worker without labels should not execute")
@@ -335,7 +362,7 @@ func TestWorkerHeartbeat(t *testing.T) {
 		// Create worker
 		w := createTestWorker(t, "heartbeat-worker", 3, coord)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		// Start worker
@@ -343,8 +370,19 @@ func TestWorkerHeartbeat(t *testing.T) {
 			_ = w.Start(ctx)
 		}()
 
-		// Wait for heartbeats to be sent
-		time.Sleep(2 * time.Second)
+		// Wait for heartbeat to register the worker with expected stats
+		require.Eventually(t, func() bool {
+			workers, err := coord.GetCoordinatorClient(t).GetWorkers(context.Background())
+			if err != nil {
+				return false
+			}
+			for _, wk := range workers {
+				if wk.WorkerId == "heartbeat-worker" {
+					return wk.TotalPollers == 3 && wk.LastHeartbeatAt != 0
+				}
+			}
+			return false
+		}, 5*time.Second, 10*time.Millisecond, "Worker should be registered via heartbeats")
 
 		// Get workers from coordinator to verify heartbeats
 		workers, err := coord.GetCoordinatorClient(t).GetWorkers(context.Background())
@@ -352,11 +390,11 @@ func TestWorkerHeartbeat(t *testing.T) {
 
 		// Should have our worker registered
 		var found bool
-		for _, worker := range workers {
-			if worker.WorkerId == "heartbeat-worker" {
+		for _, wk := range workers {
+			if wk.WorkerId == "heartbeat-worker" {
 				found = true
-				assert.Equal(t, int32(3), worker.TotalPollers)
-				assert.NotZero(t, worker.LastHeartbeatAt)
+				assert.Equal(t, int32(3), wk.TotalPollers)
+				assert.NotZero(t, wk.LastHeartbeatAt)
 				break
 			}
 		}
@@ -420,17 +458,21 @@ func TestRunningTaskTracking(t *testing.T) {
 		var activeTasksMu sync.Mutex
 		activeTasks := make(map[string]bool)
 		taskStarted := make(chan string, 5)
+		releaseTasks := make(chan struct{})
 
 		w.SetHandler(&mockHandler{
-			ExecuteFunc: func(_ context.Context, task *coordinatorv1.Task) error {
+			ExecuteFunc: func(ctx context.Context, task *coordinatorv1.Task) error {
 				activeTasksMu.Lock()
 				activeTasks[task.DagRunId] = true
 				activeTasksMu.Unlock()
 
 				taskStarted <- task.DagRunId
 
-				// Hold task for a bit
-				time.Sleep(100 * time.Millisecond)
+				// Hold task until released or context cancelled
+				select {
+				case <-releaseTasks:
+				case <-ctx.Done():
+				}
 
 				activeTasksMu.Lock()
 				delete(activeTasks, task.DagRunId)
@@ -447,8 +489,8 @@ func TestRunningTaskTracking(t *testing.T) {
 			_ = w.Start(ctx)
 		}()
 
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
+		// Wait for worker to register via heartbeat
+		requireWorkerRegistered(t, coord, "task-tracker")
 
 		// Create first 3 tasks to fill all pollers
 		for i := range 3 {
@@ -466,7 +508,7 @@ func TestRunningTaskTracking(t *testing.T) {
 			select {
 			case <-taskStarted:
 				// Task started
-			case <-time.After(2 * time.Second):
+			case <-time.After(5 * time.Second):
 				t.Fatal("Tasks did not start within timeout")
 			}
 		}
@@ -477,9 +519,17 @@ func TestRunningTaskTracking(t *testing.T) {
 		activeTasksMu.Unlock()
 		assert.Equal(t, 3, activeCount, "Should have 3 active tasks")
 
-		// Now dispatch 2 more tasks after some have completed
-		time.Sleep(120 * time.Millisecond) // Wait for at least one task to complete
+		// Release all held tasks so pollers become free
+		close(releaseTasks)
 
+		// Wait for at least one task to complete
+		require.Eventually(t, func() bool {
+			activeTasksMu.Lock()
+			defer activeTasksMu.Unlock()
+			return len(activeTasks) < 3
+		}, 5*time.Second, 10*time.Millisecond, "No tasks completed")
+
+		// Dispatch 2 more tasks
 		for i := 3; i < 5; i++ {
 			task := &coordinatorv1.Task{
 				DagRunId:   "task-" + string(rune('a'+i)),
@@ -488,7 +538,6 @@ func TestRunningTaskTracking(t *testing.T) {
 			}
 			err := coord.DispatchTask(t, task)
 			require.NoError(t, err)
-			time.Sleep(10 * time.Millisecond) // Small delay between tasks
 		}
 
 		// Stop worker
@@ -577,6 +626,22 @@ func createTestWorker(t *testing.T, workerID string, maxActiveRuns int, coord *t
 	return worker.NewWorker(workerID, maxActiveRuns, coordinatorClient, labels, &config.Config{})
 }
 
+func requireWorkerRegistered(t *testing.T, coord *test.Coordinator, workerID string) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		workers, err := coord.GetCoordinatorClient(t).GetWorkers(context.Background())
+		if err != nil {
+			return false
+		}
+		for _, wk := range workers {
+			if wk.WorkerId == workerID {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 10*time.Millisecond, "Worker %q did not register via heartbeat", workerID)
+}
+
 func TestWorkerCancellation(t *testing.T) {
 	t.Run("CancelClaimedTaskBeforeExecutionWhenOwnerRejectsAttempt", func(t *testing.T) {
 		mockCoordinatorCli := newMockCoordinatorCli()
@@ -655,8 +720,9 @@ func TestWorkerCancellation(t *testing.T) {
 			t.Fatal("worker did not execute the next task after the rejected claim")
 		}
 
-		time.Sleep(1200 * time.Millisecond)
-		assert.Equal(t, int32(2), validationCalls.Load(), "rejected claims must not remain registered for owner heartbeats")
+		assert.Never(t, func() bool {
+			return validationCalls.Load() > 2
+		}, 1200*time.Millisecond, 50*time.Millisecond, "rejected claims must not remain registered for owner heartbeats")
 
 		cancel()
 		_ = w.Stop(context.Background())
@@ -740,6 +806,21 @@ func TestWorkerCancellation(t *testing.T) {
 		// Track if task was cancelled via context
 		taskCancelled := make(chan bool, 1)
 
+		// Set up poll to return the task that will be cancelled
+		var taskDispatched atomic.Bool
+		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			if taskDispatched.Swap(true) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			return &coordinatorv1.Task{
+				DagRunId:   cancelledRunID,
+				Target:     "test.yaml",
+				Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+				AttemptKey: cancelledAttemptKey,
+			}, nil
+		})
+
 		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(ctx context.Context, _ *coordinatorv1.Task) error {
 				// Wait for cancellation signal from context
@@ -761,25 +842,6 @@ func TestWorkerCancellation(t *testing.T) {
 		go func() {
 			_ = w.Start(ctx)
 		}()
-
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
-
-		// Dispatch a task with the ID that will be cancelled
-		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
-			// Return task once then wait
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			default:
-				return &coordinatorv1.Task{
-					DagRunId:   cancelledRunID,
-					Target:     "test.yaml",
-					Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
-					AttemptKey: cancelledAttemptKey,
-				}, nil
-			}
-		})
 
 		// Wait for task to be cancelled
 		select {
@@ -811,10 +873,23 @@ func TestWorkerCancellation(t *testing.T) {
 		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
 
 		taskExecuted := make(chan bool, 1)
+
+		// Set up poll to return a task with a DIFFERENT ID than what will be cancelled
+		var taskDispatched atomic.Bool
+		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
+			if taskDispatched.Swap(true) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			return &coordinatorv1.Task{
+				DagRunId:   "different-task-id",
+				Target:     "test.yaml",
+				Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
+			}, nil
+		})
+
 		w.SetHandler(&mockHandler{
 			ExecuteFunc: func(_ context.Context, _ *coordinatorv1.Task) error {
-				// Task should complete normally (not cancelled)
-				time.Sleep(50 * time.Millisecond)
 				taskExecuted <- true
 				return nil
 			},
@@ -828,28 +903,11 @@ func TestWorkerCancellation(t *testing.T) {
 			_ = w.Start(ctx)
 		}()
 
-		// Give worker time to connect
-		time.Sleep(100 * time.Millisecond)
-
-		// Dispatch a task with a DIFFERENT ID than what will be cancelled
-		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			default:
-				return &coordinatorv1.Task{
-					DagRunId:   "different-task-id",
-					Target:     "test.yaml",
-					Definition: "name: test\nsteps:\n  - name: step1\n    command: echo hello",
-				}, nil
-			}
-		})
-
 		// Task should complete normally
 		select {
 		case executed := <-taskExecuted:
 			assert.True(t, executed, "Task should have executed normally")
-		case <-time.After(2 * time.Second):
+		case <-time.After(5 * time.Second):
 			t.Fatal("Timeout waiting for task execution")
 		}
 
@@ -898,16 +956,6 @@ func TestWorkerCancellation(t *testing.T) {
 			},
 		})
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		// Start worker
-		go func() {
-			_ = w.Start(ctx)
-		}()
-
-		time.Sleep(100 * time.Millisecond)
-
 		// Setup poll to return tasks
 		var taskIndex atomic.Int32
 		mockCoordinatorCli.SetPollFunc(func(ctx context.Context, _ backoff.RetryPolicy, _ *coordinatorv1.PollRequest) (*coordinatorv1.Task, error) {
@@ -927,6 +975,14 @@ func TestWorkerCancellation(t *testing.T) {
 				return nil, nil
 			}
 		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Start worker
+		go func() {
+			_ = w.Start(ctx)
+		}()
 
 		// Wait for cancellations
 		cancelledCount := 0

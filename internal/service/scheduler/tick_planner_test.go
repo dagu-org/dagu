@@ -1306,8 +1306,13 @@ func TestTickPlanner_ConcurrentPlanAndEvents(t *testing.T) {
 
 	wg.Wait()
 
-	// Allow drain goroutine to process remaining events
-	time.Sleep(50 * time.Millisecond)
+	// Wait for drain goroutine to process all events by verifying
+	// all 50 DAGs are present in the planner's state.
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	require.Eventually(t, func() bool {
+		planned := tp.Plan(context.Background(), now)
+		return len(planned) == 50
+	}, 5*time.Second, 10*time.Millisecond)
 
 	cancel()
 	tp.Stop(context.Background())
@@ -1527,10 +1532,8 @@ func TestTickPlanner_StartStop(t *testing.T) {
 	ctx := context.Background()
 	tp.Start(ctx)
 
-	// Let goroutines start
-	time.Sleep(50 * time.Millisecond)
-
-	// Stop should not hang
+	// Stop should not hang; Start uses wg.Add(2) synchronously so Stop
+	// can be called immediately without waiting for the goroutines to begin.
 	done := make(chan struct{})
 	go func() {
 		tp.Stop(ctx)

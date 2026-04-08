@@ -1850,7 +1850,7 @@ func TestConnectionManager_AcquireRelease_Concurrent(t *testing.T) {
 	for range numGoroutines {
 		wg.Go(func() {
 			cm.Acquire()
-			// Simulate some work
+			// Intentional sleep to simulate concurrent work under contention.
 			time.Sleep(10 * time.Millisecond)
 			_ = cm.Release()
 		})

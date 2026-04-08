@@ -170,6 +170,8 @@ func TestManager_ShutdownWaitsForActiveSessionsOnly(t *testing.T) {
 		require.NoError(t, lease.Activate(&Connection{ID: "conn-1"}))
 
 		go func() {
+			// Intentional sleep: simulates a session that takes time before releasing.
+			// The test verifies that Shutdown blocks until the lease is freed.
 			time.Sleep(100 * time.Millisecond)
 			lease.Release()
 		}()
@@ -207,6 +209,8 @@ func TestManager_ShutdownObservesCleanupWithinRemainingBudget(t *testing.T) {
 	require.NoError(t, lease.Activate(&Connection{ID: "conn-1"}))
 
 	go func() {
+		// Intentional sleep: simulates cleanup delay to verify Shutdown
+		// completes within the remaining context budget.
 		time.Sleep(50 * time.Millisecond)
 		lease.Release()
 	}()
@@ -230,6 +234,8 @@ func TestManager_ShutdownReturnsPromptlyWhenDeadlineExpires(t *testing.T) {
 	require.NoError(t, lease.Activate(&Connection{ID: "conn-1"}))
 
 	go func() {
+		// Intentional sleep: simulates a lease released after the context
+		// deadline so the test can verify Shutdown returns promptly on expiry.
 		time.Sleep(50 * time.Millisecond)
 		lease.Release()
 	}()

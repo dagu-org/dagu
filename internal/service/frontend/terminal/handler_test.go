@@ -136,23 +136,21 @@ func dialTerminal(server test.Server, token string) (*websocket.Conn, *http.Resp
 func waitForTerminalSlot(t *testing.T, server test.Server, token string) {
 	t.Helper()
 
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	require.Eventually(t, func() bool {
 		conn, resp, err := dialTerminal(server, token)
 		if resp != nil && resp.Body != nil {
 			_ = resp.Body.Close()
 		}
 		if err == nil {
 			_ = conn.Close(websocket.StatusNormalClosure, "verification complete")
-			return
+			return true
 		}
 		if resp == nil || resp.StatusCode != http.StatusTooManyRequests {
-			t.Fatalf("unexpected dial failure while waiting for slot release: %v", err)
+			t.Errorf("unexpected dial failure while waiting for slot release: %v", err)
+			return true
 		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	t.Fatal("terminal slot was not released within 5 seconds")
+		return false
+	}, 5*time.Second, 50*time.Millisecond, "terminal slot was not released within timeout")
 }
 
 func sendInput(t *testing.T, conn *websocket.Conn, input string) {

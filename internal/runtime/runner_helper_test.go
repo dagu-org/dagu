@@ -410,6 +410,54 @@ func agentStep(name string, depends ...string) core.Step {
 	return newStep(name, withDepends(depends...), withExecutorType(core.ExecutorTypeAgent))
 }
 
+// waitForNodeStatus polls until the named node reaches the given status or
+// the timeout expires.
+func waitForNodeStatus(plan *runtime.Plan, name string, status core.NodeStatus, timeout time.Duration) {
+	deadline := time.After(timeout)
+	for {
+		if node := plan.GetNodeByName(name); node != nil && node.State().Status == status {
+			return
+		}
+		select {
+		case <-deadline:
+			return
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+}
+
+// waitForNodeDoneCount polls until the named node's DoneCount reaches at
+// least the given value or the timeout expires.
+func waitForNodeDoneCount(plan *runtime.Plan, name string, minCount int, timeout time.Duration) {
+	deadline := time.After(timeout)
+	for {
+		if node := plan.GetNodeByName(name); node != nil && node.State().DoneCount >= minCount {
+			return
+		}
+		select {
+		case <-deadline:
+			return
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+}
+
+// waitForHandlerNodeStatus polls until the runner's handler node for the given
+// handler type reaches the specified status or the timeout expires.
+func waitForHandlerNodeStatus(r *runtime.Runner, handler core.HandlerType, status core.NodeStatus, timeout time.Duration) {
+	deadline := time.After(timeout)
+	for {
+		if node := r.HandlerNode(handler); node != nil && node.State().Status == status {
+			return
+		}
+		select {
+		case <-deadline:
+			return
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+}
+
 func init() {
 	chat.RegisterMockExecutors()
 	agentstep.RegisterMockExecutors()

@@ -33,8 +33,6 @@ func TestStopCommand(t *testing.T) {
 			close(done)
 		}()
 
-		time.Sleep(time.Millisecond * 100)
-
 		// Wait for the dag-run running.
 		dag.AssertLatestStatus(t, core.Running)
 
@@ -63,8 +61,6 @@ func TestStopCommand(t *testing.T) {
 			th.RunCommand(t, cmd.Start(), test.CmdTest{Args: args})
 			close(done)
 		}()
-
-		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the dag-run running
 		dag.AssertLatestStatus(t, core.Running)
