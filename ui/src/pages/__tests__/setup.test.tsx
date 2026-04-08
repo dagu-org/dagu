@@ -280,7 +280,6 @@ describe('SetupPage', () => {
     expect(updateConfigMock).toHaveBeenCalledWith({ agentEnabled: true });
     expect(navigateMock).toHaveBeenCalledWith('/', {
       replace: true,
-      state: { openAgent: true },
     });
   });
 

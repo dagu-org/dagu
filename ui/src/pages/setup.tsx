@@ -285,7 +285,7 @@ export default function SetupPage() {
       }
 
       updateConfig({ agentEnabled: true });
-      navigate('/', { replace: true, state: { openAgent: true } });
+      navigate('/', { replace: true });
     } catch (err) {
       setStep2Error(err instanceof Error ? err.message : 'Configuration failed');
     } finally {
