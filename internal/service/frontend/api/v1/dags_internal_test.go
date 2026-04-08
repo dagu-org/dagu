@@ -6,6 +6,7 @@ package api_test
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -89,6 +90,73 @@ steps:
 	require.Len(t, sseResp.Dags, 1)
 	require.NotNil(t, sseResp.Dags[0].NextRun)
 	require.True(t, listResp.Dags[0].NextRun.Equal(*sseResp.Dags[0].NextRun))
+}
+
+func TestGetDAGDetails_InvalidYAML_Returns200WithErrors(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+
+	// Write an invalid YAML file directly to the DAGs directory
+	invalidYAML := `this is not valid yaml: [unterminated`
+	dagFile := helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "invalid-dag", []byte(invalidYAML))
+	fileName := filepath.Base(dagFile)
+	// Strip .yaml extension to match how the API resolves filenames
+	fileName = fileName[:len(fileName)-len(".yaml")]
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.GetDAGDetails(context.Background(), openapi.GetDAGDetailsRequestObject{
+		FileName: fileName,
+	})
+	// Should NOT return an error (which would become a 404/500)
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.GetDAGDetails200JSONResponse)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+
+	// Should contain build errors describing the YAML parse failure
+	require.NotEmpty(t, resp.Errors, "expected build errors for invalid YAML")
+
+	// File path should still be set
+	require.NotNil(t, resp.FilePath)
+	require.NotEmpty(t, *resp.FilePath)
+}
+
+func TestGetDAGDetails_NonExistent_Returns404(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	_, err := api.GetDAGDetails(context.Background(), openapi.GetDAGDetailsRequestObject{
+		FileName: "does-not-exist",
+	})
+	// Should return an error (which becomes a 404)
+	require.Error(t, err)
 }
 
 func TestGetDAGDetailsAndSpecIncludeNextRun(t *testing.T) {

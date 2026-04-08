@@ -371,9 +371,16 @@ func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunH
 func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsRequestObject) (api.GetDAGDetailsResponseObject, error) {
 	resp, err := a.getDAGDetailsData(ctx, request.FileName)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, &Error{
+				HTTPStatus: http.StatusNotFound,
+				Code:       api.ErrorCodeNotFound,
+				Message:    err.Error(),
+			}
+		}
 		return nil, &Error{
-			HTTPStatus: http.StatusNotFound,
-			Code:       api.ErrorCodeNotFound,
+			HTTPStatus: http.StatusInternalServerError,
+			Code:       api.ErrorCodeInternalError,
 			Message:    err.Error(),
 		}
 	}
@@ -384,7 +391,7 @@ func (a *API) GetDAGDetails(ctx context.Context, request api.GetDAGDetailsReques
 func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDAGDetails200JSONResponse, error) {
 	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
 	if err != nil {
-		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("DAG %s not found", fileName)
+		return api.GetDAGDetails200JSONResponse{}, fmt.Errorf("failed to load DAG %s: %w", fileName, err)
 	}
 
 	dagStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)

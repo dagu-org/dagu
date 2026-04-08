@@ -314,6 +314,20 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 
 	ctx = ctx.WithFile(filePath)
 
+	// errorDAG returns a minimal DAG with the error recorded when
+	// BuildFlagAllowBuildErrors is set, or the raw error otherwise.
+	errorDAG := func(err error) (*core.DAG, error) {
+		if ctx.opts.Has(BuildFlagAllowBuildErrors) {
+			return &core.DAG{
+				Name:        defaultName(filePath),
+				Location:    filePath,
+				SourceFile:  filePath,
+				BuildErrors: []error{err},
+			}, nil
+		}
+		return nil, err
+	}
+
 	// Load base manifest if specified.
 	// Priority: embedded content (BaseConfigContent) > file path (Base).
 	var baseDef *dag
@@ -324,27 +338,27 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 			baseRaw = ctx.opts.BaseConfigContent
 			raw, err := unmarshalData(baseRaw)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal embedded base config: %w", err)
+				return errorDAG(fmt.Errorf("failed to unmarshal embedded base config: %w", err))
 			}
 			baseDef, err = decode(raw)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode embedded base config: %w", err)
+				return errorDAG(fmt.Errorf("failed to decode embedded base config: %w", err))
 			}
 		} else if ctx.opts.Base != "" {
 			baseRaw, err = os.ReadFile(ctx.opts.Base) //nolint:gosec
 			if err != nil {
 				if !os.IsNotExist(err) {
-					return nil, fmt.Errorf("failed to read base config: %w", err)
+					return errorDAG(fmt.Errorf("failed to read base config: %w", err))
 				}
 				// File doesn't exist — skip base config gracefully
 			} else {
 				raw, err := unmarshalData(baseRaw)
 				if err != nil {
-					return nil, fmt.Errorf("failed to unmarshal base config: %w", err)
+					return errorDAG(fmt.Errorf("failed to unmarshal base config: %w", err))
 				}
 				baseDef, err = decode(raw)
 				if err != nil {
-					return nil, fmt.Errorf("failed to decode base config: %w", err)
+					return errorDAG(fmt.Errorf("failed to decode base config: %w", err))
 				}
 			}
 		}
@@ -353,21 +367,11 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 	// Load all DAGs from the file
 	dags, err := loadDAGsFromFile(ctx, filePath, baseDef)
 	if err != nil {
-		if ctx.opts.Has(BuildFlagAllowBuildErrors) {
-			// Return a minimal core.DAG with the error recorded
-			dag := &core.DAG{
-				Name:        defaultName(filePath),
-				Location:    filePath,
-				SourceFile:  filePath,
-				BuildErrors: []error{err},
-			}
-			return dag, nil
-		}
-		return nil, err
+		return errorDAG(err)
 	}
 
 	if len(dags) == 0 {
-		return nil, fmt.Errorf("no DAGs found in file %q", filePath)
+		return errorDAG(fmt.Errorf("no DAGs found in file %q", filePath))
 	}
 
 	// Get the main core.DAG (first one)
@@ -379,7 +383,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 		for i := 1; i < len(dags); i++ {
 			subDAG := dags[i]
 			if subDAG.Name == "" {
-				return nil, fmt.Errorf("child core.DAG at index %d must have a name", i)
+				return errorDAG(fmt.Errorf("child core.DAG at index %d must have a name", i))
 			}
 			mainDAG.LocalDAGs[subDAG.Name] = subDAG
 		}
