@@ -79,6 +79,7 @@ export default function SetupPage() {
     providerMap,
     isLoading: authLoading,
     error: authError,
+    refreshProviders,
     startLogin,
     completeLogin,
     disconnect,
@@ -96,6 +97,13 @@ export default function SetupPage() {
       navigate('/login', { replace: true });
     }
   }, [setupRequired, setupDone, navigate]);
+
+  // Re-fetch auth providers when entering step 2 (after step 1 stored the JWT)
+  useEffect(() => {
+    if (currentStep === 2) {
+      void refreshProviders().catch(() => {});
+    }
+  }, [currentStep, refreshProviders]);
 
   // Fetch presets when entering step 2
   const fetchPresets = useCallback(async () => {
