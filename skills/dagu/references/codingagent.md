@@ -1,59 +1,38 @@
 # Coding Agent Integration
 
-Use AI coding agent CLIs (Claude Code, Codex, Gemini, etc.) as DAG steps for non-interactive, prompt-driven automation.
+Use `type: harness` to run AI coding agent CLIs as DAG steps. The harness executor spawns the CLI as a subprocess in non-interactive mode.
 
-## Agent CLI Quick Reference
+## Supported Providers
 
-| Agent | Non-interactive command | Stdin | Model flag | API key env var |
-|-------|------------------------|-------|------------|-----------------|
-| Claude Code | `claude -p "prompt"` | `\| claude -p "prompt"` | `--model` | `ANTHROPIC_API_KEY` |
-| Codex | `codex exec "prompt"` | `\| codex exec -` | `-m` / `--model` | `CODEX_API_KEY` |
-| Gemini CLI | `gemini -p "prompt"` | `\| gemini -p "prompt"` | `-m` / `--model` | `GEMINI_API_KEY` |
-| OpenCode | `opencode run "prompt"` | `\| opencode -p "prompt"` | `-m` / `--model` | Provider-specific |
-| Aider | `aider -m "prompt" --yes-always` | `--message-file /dev/stdin` | `--model` | Provider-specific |
-| Kiro CLI | `kiro-cli chat --no-interactive --trust-all-tools "prompt"` | N/A | Settings-based | `kiro-cli login` |
+| Provider | Binary | CLI invocation | API key env var |
+|----------|--------|----------------|-----------------|
+| `claude` | `claude` | `claude -p "<prompt>"` | `ANTHROPIC_API_KEY` |
+| `codex` | `codex` | `codex exec "<prompt>"` | `CODEX_API_KEY` |
+| `opencode` | `opencode` | `opencode run "<prompt>"` | Provider-specific |
+| `pi` | `pi` | `pi -p "<prompt>"` | Provider-specific (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.) |
 
-## Critical: Nested Session Prevention (Claude Code only)
-
-When Dagu is launched from inside Claude Code, environment variables leak into child steps and cause `claude -p` to hang. **Unset these right before every `claude -p` call:**
-
-```yaml
-script: |
-  unset CLAUDECODE
-  unset ANTHROPIC_API_KEY
-  claude -p "your prompt"
-```
-
-- `CLAUDECODE` — If inherited, `claude -p` detects a "nested session" and **hangs indefinitely**.
-- `ANTHROPIC_API_KEY` — The parent session may inject a session-scoped key invalid for standalone calls. Unsetting lets `claude -p` use its own auth.
-
-**Only needed for `claude -p` steps.** Other agents are unaffected.
+The binary must be pre-installed in `PATH`. If missing, the step fails at setup time.
 
 ## Pattern 1: Single Agent Step
 
-Use `params` for user-configurable prompts and `env` for defaults (model, agent, system prompt).
-
 ```yaml
-description: "Run a coding agent with a user-provided prompt"
-
-env:
-  - CLAUDE_MODEL: claude-sonnet-4-6
-
 params:
   - PROMPT: "Explain the main function in this project"
 
 steps:
-  - id: run_agent
-    script: |
-      unset CLAUDECODE
-      unset ANTHROPIC_API_KEY
-      claude -p --model "${CLAUDE_MODEL}" "${PROMPT}"
+  - name: run_agent
+    type: harness
+    command: "${PROMPT}"
+    config:
+      provider: claude
+      model: sonnet
+      bare: true
     output: RESULT
 ```
 
 ## Pattern 2: Multi-Agent Pipeline
 
-Chain agents, passing output via `${step_id.stdout}` file references.
+Chain agents, passing output between steps via `${step_id.stdout}` file references or `output:` variables.
 
 ```yaml
 description: "Research pipeline: research, review, refine"
@@ -64,105 +43,199 @@ params:
 
 steps:
   - id: research
-    description: "Deep research using Claude"
-    script: |
-      unset CLAUDECODE
-      unset ANTHROPIC_API_KEY
-      claude -p "Research every approach to: ${topic}. List all approaches with pros, cons, and when to use each."
+    name: research
+    type: harness
+    command: "Research every approach to: ${topic}. List all approaches with pros, cons, and when to use each."
+    config:
+      provider: claude
+      model: sonnet
+      bare: true
     output: RESEARCH
 
   - id: review
-    description: "Review research for gaps using Codex"
+    name: review
+    type: harness
     script: |
-      PROMPT_FILE=$(mktemp)
-      {
-        echo "Review this research for completeness and gaps:"
-        echo ""
-        cat "${research.stdout}"
-      } > "$PROMPT_FILE"
-      codex exec --skip-git-repo-check - < "$PROMPT_FILE"
-      rm -f "$PROMPT_FILE"
+      Review this research for completeness and gaps:
+
+      ${RESEARCH}
+    command: "Review the research provided on stdin for completeness and gaps"
+    config:
+      provider: codex
+      effort: high
+      skip_git_repo_check: true
     depends: [research]
     output: REVIEW
 
   - id: refine
-    description: "Refine with review feedback using Claude"
+    name: refine
+    type: harness
     script: |
-      unset CLAUDECODE
-      unset ANTHROPIC_API_KEY
-      {
-        echo "=== Research ==="
-        cat "${research.stdout}"
-        echo ""
-        echo "=== Review Feedback ==="
-        cat "${review.stdout}"
-      } | claude -p "Refine this research incorporating the review feedback provided via stdin."
+      === Research ===
+      ${RESEARCH}
+
+      === Review Feedback ===
+      ${REVIEW}
+    command: "Refine this research incorporating the review feedback provided via stdin."
+    config:
+      provider: claude
+      model: sonnet
+      bare: true
     depends: [review]
     output: REFINED
 ```
 
-**Key technique:** `${step_id.stdout}` is a **file path** to the step's captured stdout. Use `cat "${step_id.stdout}"` to read its content. Use `output:` to capture stdout into a variable for string interpolation.
+`command:` is the prompt passed to the CLI flag. `script:` content is piped to the CLI's stdin as supplementary context.
 
-## Agent Quick Examples
+## Pattern 3: Parameterized Model Selection
+
+```yaml
+params:
+  - PROVIDER: claude
+  - MODEL: sonnet
+  - EFFORT: high
+  - PROMPT: "Analyze this codebase"
+
+steps:
+  - name: agent
+    type: harness
+    command: "${PROMPT}"
+    config:
+      provider: "${PROVIDER}"
+      model: "${MODEL}"
+      effort: "${EFFORT}"
+    output: RESULT
+```
+
+## Provider Examples
 
 ### Claude Code
-```bash
-claude -p "your prompt"                              # basic
-claude -p --model opus "your prompt"                 # model selection
-cat file.py | claude -p "Review this code"           # stdin
-claude -p --max-turns 5 "your prompt"                # limit turns
+
+```yaml
+steps:
+  - name: task
+    type: harness
+    command: "Write tests for the auth module"
+    config:
+      provider: claude
+      model: sonnet
+      effort: high
+      max_turns: 20
+      max_budget_usd: 2.00
+      permission_mode: auto
+      allowed_tools: "Bash,Read,Edit"
+      bare: true
+    timeout_sec: 300
+    output: RESULT
 ```
 
-### OpenAI Codex CLI
-```bash
-codex exec "your prompt"                             # basic
-cat prompt.txt | codex exec -                        # stdin
-codex exec --full-auto "your prompt"                 # auto mode
-codex exec --skip-git-repo-check "your prompt"       # non-git dirs
-```
+### OpenAI Codex
 
-### Gemini CLI
-```bash
-gemini -p "your prompt"                              # basic
-gemini -p -m gemini-3.1-pro-preview "your prompt"    # model selection
-cat data.json | gemini -p "Analyze this data"        # stdin
+```yaml
+steps:
+  - name: task
+    type: harness
+    command: "Fix failing tests in src/"
+    config:
+      provider: codex
+      model: gpt-5.4
+      effort: high
+      sandbox: workspace-write
+      ephemeral: true
+      skip_git_repo_check: true
+    timeout_sec: 300
 ```
 
 ### OpenCode
-```bash
-opencode run "your prompt"                           # basic
-opencode run --model anthropic/claude-sonnet-4-6 "prompt"  # model selection
+
+```yaml
+steps:
+  - name: task
+    type: harness
+    command: "Refactor the database layer"
+    config:
+      provider: opencode
+      model: anthropic/claude-sonnet-4-20250514
+      output_format: json
+    timeout_sec: 300
 ```
 
-### Aider
-```bash
-aider -m "Add error handling" --yes-always main.go   # basic (edits files directly)
-aider -m "Fix bug" --model claude-sonnet-4-6 --yes-always --no-auto-commits buggy.py
+### Pi
+
+```yaml
+steps:
+  - name: task
+    type: harness
+    command: "Design a rate limiting middleware"
+    config:
+      provider: pi
+      pi_provider: anthropic
+      model: claude-sonnet-4-20250514
+      thinking: high
+      tools: read,bash
+    timeout_sec: 300
 ```
-Note: Aider's `-m` is `--message` (not `--model`). Capture changes via `git diff` in a subsequent step.
 
-### Kiro CLI
-```bash
-kiro-cli chat --no-interactive --trust-all-tools "your prompt"
-kiro-cli chat --no-interactive --trust-tools read,write,shell "prompt"  # limited tools
+## Effort Mapping
+
+The `effort` field is translated differently per provider:
+
+| Effort | Claude | Codex | OpenCode | Pi |
+|--------|--------|-------|----------|-----|
+| `low` | `--effort low` | (no effect) | (no effect) | `--thinking low` |
+| `medium` | `--effort medium` | (no effect) | (no effect) | `--thinking medium` |
+| `high` | `--effort high` | `--full-auto` | (no effect) | `--thinking high` |
+| `max` | `--effort max` | `--full-auto` | (no effect) | `--thinking xhigh` |
+
+## Stdin Piping
+
+If the step has a `script:` field, its content is piped to the CLI's stdin. The `command:` field is always the prompt (passed via the CLI's prompt flag).
+
+```yaml
+steps:
+  - name: review
+    type: harness
+    command: "Review this code for security issues"
+    script: |
+      func handleLogin(w http.ResponseWriter, r *http.Request) {
+          username := r.FormValue("username")
+          query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+          db.Query(query)
+      }
+    config:
+      provider: claude
+      model: sonnet
 ```
-Note: Auth via `kiro-cli login`. Model selection via `kiro-cli settings chat.defaultModel "model-name"`.
 
-## Tips
+## extra_flags Escape Hatch
 
-1. **Use cheaper models for simple tasks** — Reserve powerful models for complex reasoning; use fast/cheap models for formatting, classification, slug generation, etc.
+For CLI flags not yet modeled in config, use `extra_flags`:
 
-   | Tier | Claude Code | Codex | Gemini CLI |
-   |------|-------------|-------|------------|
-   | Cheap/fast | `haiku` | `gpt-5.1-codex-mini` | `gemini-2.0-flash` |
-   | Balanced | `sonnet` | `gpt-5.4` | `gemini-2.5-flash` |
-   | Most capable | `opus` | `gpt-5.3-codex` | `gemini-3.1-pro-preview` |
+```yaml
+steps:
+  - name: task
+    type: harness
+    command: "Summarize the project"
+    config:
+      provider: claude
+      extra_flags:
+        - "--verbose"
+        - "--no-session-persistence"
+```
 
-2. **Prompt as a parameter** — Expose the core prompt via `params:` so users can customize from UI/CLI without editing the DAG.
-3. **env for defaults** — Use `env:` for default model names, agent selection, and system prompts.
-4. **Large prompts via stdin** — Pipe file contents via stdin rather than embedding in args to avoid quoting issues and arg length limits.
-5. **Temp files for complex input** — When combining multiple sources, write to a temp file and pipe it in.
-6. **Working directory matters** — Agents that modify files operate relative to the working dir. Use `working_dir:` or `cd` in the script.
-7. **Output capture** — Use `output: VAR_NAME` for variable interpolation; use `${step_id.stdout}` for file-path-based access.
-8. **Timeouts** — Set generous `timeout_sec:` (300-600s+) on agent steps to avoid premature kills.
-9. **Retry on transient failures** — Add `retry_policy: { limit: 3, interval_sec: 30 }` to handle rate limits and network errors.
+## Notes
+
+1. **Model tiers** — Use cheaper models for simple tasks, reserve expensive models for complex reasoning.
+
+   | Tier | Claude | Codex |
+   |------|--------|-------|
+   | Cheap/fast | `haiku` | `gpt-5.1-codex-mini` |
+   | Balanced | `sonnet` | `gpt-5.4` |
+   | Most capable | `opus` | `gpt-5.3-codex` |
+
+2. **Prompt as a parameter** — Expose the prompt via `params:` so users can customize from UI/CLI without editing the DAG.
+3. **Timeouts** — Set `timeout_sec:` (300-600s+) on agent steps. Agent CLIs can run for minutes.
+4. **Retry on transient failures** — Add `retry_policy: { limit: 3, interval_sec: 30 }` to handle rate limits and network errors.
+5. **Working directory** — Use `working_dir:` on the step or `dir:` at the DAG level. The CLI operates relative to this directory.
+6. **Output capture** — Use `output: VAR_NAME` for variable interpolation; use `${step_id.stdout}` for file-path-based access.
+7. **Exit codes** — 0 = success, 1 = CLI error, 124 = step timed out. Last 1KB of stderr is included in the error message on failure.

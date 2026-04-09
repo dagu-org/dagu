@@ -401,6 +401,69 @@ steps:
 
 Agent config fields (under `agent:`): `model`, `tools` (with `enabled` list and optional `bash_policy`), `skills` (skill IDs), `soul` (soul ID), `memory` (`enabled` bool), `prompt` (appended to system prompt), `max_iterations` (default 50), `safe_mode` (enable command approval, default true), `web_search`. Also accepts `messages:` at step level.
 
+## harness
+
+Run coding agent CLIs (Claude Code, Codex, OpenCode, Pi) as DAG steps. The CLI binary must be pre-installed in `PATH`.
+
+```yaml
+steps:
+  - name: generate-tests
+    type: harness
+    command: "Write unit tests for the auth module"
+    config:
+      provider: claude
+      model: sonnet
+      effort: high
+      max_turns: 20
+      output_format: json
+    output: RESULT
+```
+
+The `command` field is the prompt. The `config.provider` field is required.
+
+Common config fields (all providers):
+- `provider` — **Required.** `claude`, `codex`, `opencode`, or `pi`
+- `model` — Model name passed to `--model`
+- `effort` — `low`, `medium`, `high`, `max`. Claude: `--effort`. Codex: high/max → `--full-auto`. Pi: mapped to `--thinking` level.
+- `max_turns` — Max agentic iterations (Claude: `--max-turns`)
+- `output_format` — `text`, `json`, `stream-json`. Claude: `--output-format`. Codex: `--json`. OpenCode: `--format`. Pi: `--mode`.
+- `extra_flags` — String array of additional CLI flags appended verbatim
+
+Claude-specific:
+- `allowed_tools` — `--allowedTools` (e.g., `"Bash,Read,Edit"`)
+- `disallowed_tools` — `--disallowedTools`
+- `permission_mode` — `--permission-mode` (e.g., `auto`, `plan`, `bypassPermissions`)
+- `system_prompt` — `--system-prompt`
+- `append_system_prompt` — `--append-system-prompt`
+- `max_budget_usd` — `--max-budget-usd`
+- `bare` — `--bare` (skip hooks, skills, MCP, CLAUDE.md auto-discovery)
+- `add_dir` — `--add-dir`
+- `worktree` — `--worktree`
+
+Codex-specific:
+- `full_auto` — `--full-auto`
+- `sandbox` — `--sandbox` (`read-only`, `workspace-write`, `danger-full-access`)
+- `output_schema` — `--output-schema`
+- `ephemeral` — `--ephemeral`
+- `skip_git_repo_check` — `--skip-git-repo-check`
+
+OpenCode-specific:
+- `agent` — `--agent`
+- `file` — `--file`
+- `title` — `--title`
+
+Pi-specific:
+- `thinking` — `--thinking` (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`). Overrides `effort` if both set.
+- `pi_provider` — `--provider` (LLM provider: `anthropic`, `openai`, etc.)
+- `tools` — `--tools`
+- `no_tools` — `--no-tools`
+- `no_extensions` — `--no-extensions`
+- `session` — `--session`
+
+If the step has a `script:` field, its content is piped to the CLI's stdin.
+
+Exit codes: 0 = success, 1 = CLI error, 124 = step timed out.
+
 ## router
 
 Conditional routing based on expression value. Routes reference existing step names — they do not define inline steps.
