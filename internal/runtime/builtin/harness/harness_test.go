@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -508,6 +509,148 @@ func TestHarnessExecutorRun_CreatesWorkingDir(t *testing.T) {
 	assert.Contains(t, stdout.String(), workDir)
 }
 
+func TestHarnessExecutorRun_UsesPATHFromRuntimeEnv(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping shell-based test on Windows")
+	}
+
+	binDir := t.TempDir()
+	binName := "path-provider"
+	binPath := filepath.Join(binDir, binName)
+	require.NoError(t, os.WriteFile(binPath, []byte("#!/bin/sh\necho \"resolved from path\"\n"), 0o755))
+
+	dag := &core.DAG{
+		Name:       "harness-path",
+		WorkingDir: t.TempDir(),
+		Harnesses: core.HarnessDefinitions{
+			"custom": {
+				Binary:     binName,
+				PromptMode: core.HarnessPromptModeArg,
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
+		},
+	}
+	step := core.Step{
+		Name:     "step1",
+		Commands: []core.CommandEntry{{Command: "hello"}},
+		ExecutorConfig: core.ExecutorConfig{
+			Type:   "harness",
+			Config: map[string]any{"provider": "custom"},
+		},
+	}
+
+	ctx := newHarnessTestContext(t, dag, step, "PATH="+binDir)
+	exec, err := newHarness(ctx, step)
+	require.NoError(t, err)
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exec.SetStdout(&stdout)
+	exec.SetStderr(&stderr)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "resolved from path\n", stdout.String())
+	assert.Empty(t, stderr.String())
+}
+
+func TestHarnessExecutorRun_ResolvesRelativeBinaryFromWorkingDir(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping shell-based test on Windows")
+	}
+
+	workDir := t.TempDir()
+	binPath := filepath.Join(workDir, "bin", "agent")
+	require.NoError(t, os.MkdirAll(filepath.Dir(binPath), 0o755))
+	require.NoError(t, os.WriteFile(binPath, []byte("#!/bin/sh\necho \"resolved from workdir\"\n"), 0o755))
+
+	dag := &core.DAG{
+		Name:       "harness-workdir",
+		WorkingDir: workDir,
+		Harnesses: core.HarnessDefinitions{
+			"custom": {
+				Binary:     "./bin/agent",
+				PromptMode: core.HarnessPromptModeArg,
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
+		},
+	}
+	step := core.Step{
+		Name:     "step1",
+		Commands: []core.CommandEntry{{Command: "hello"}},
+		ExecutorConfig: core.ExecutorConfig{
+			Type:   "harness",
+			Config: map[string]any{"provider": "custom"},
+		},
+	}
+
+	ctx := newHarnessTestContext(t, dag, step)
+	exec, err := newHarness(ctx, step)
+	require.NoError(t, err)
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exec.SetStdout(&stdout)
+	exec.SetStderr(&stderr)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "resolved from workdir\n", stdout.String())
+	assert.Empty(t, stderr.String())
+}
+
+func TestHarnessExecutorRun_FallbackBinaryOptionalUntilNeeded(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping shell-based test on Windows")
+	}
+
+	primary := writeHarnessTestBinary(t, "primary", "#!/bin/sh\necho \"primary ok\"\nexit 0\n")
+
+	dag := &core.DAG{
+		Name:       "harness-fallback",
+		WorkingDir: t.TempDir(),
+		Harnesses: core.HarnessDefinitions{
+			"primary": {
+				Binary:     primary,
+				PromptMode: core.HarnessPromptModeArg,
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
+			"fallback": {
+				Binary:     "definitely-missing-harness-binary",
+				PromptMode: core.HarnessPromptModeArg,
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
+		},
+	}
+	step := core.Step{
+		Name:     "step1",
+		Commands: []core.CommandEntry{{Command: "hello"}},
+		ExecutorConfig: core.ExecutorConfig{
+			Type: "harness",
+			Config: map[string]any{
+				"provider": "primary",
+				"fallback": []any{
+					map[string]any{"provider": "fallback"},
+				},
+			},
+		},
+	}
+
+	ctx := newHarnessTestContext(t, dag, step)
+	exec, err := newHarness(ctx, step)
+	require.NoError(t, err)
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exec.SetStdout(&stdout)
+	exec.SetStderr(&stderr)
+
+	err = exec.Run(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "primary ok\n", stdout.String())
+	assert.Empty(t, stderr.String())
+}
+
 func TestExtractPrompt(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		assert.Equal(t, "", extractPrompt(core.Step{}))
@@ -587,4 +730,21 @@ func mustFallback(t *testing.T, value any) []map[string]any {
 		t.Fatalf("unexpected fallback type %T", value)
 		return nil
 	}
+}
+
+func newHarnessTestContext(t *testing.T, dag *core.DAG, step core.Step, envs ...string) context.Context {
+	t.Helper()
+
+	if dag == nil {
+		dag = &core.DAG{Name: "harness-test", WorkingDir: t.TempDir()}
+	}
+	if dag.Name == "" {
+		dag.Name = "harness-test"
+	}
+	if dag.WorkingDir == "" {
+		dag.WorkingDir = t.TempDir()
+	}
+
+	ctx := runtime.NewContext(context.Background(), dag, "run-1", "", runtime.WithEnvVars(envs...))
+	return runtime.WithEnv(ctx, runtime.NewEnv(ctx, step))
 }

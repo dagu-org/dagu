@@ -4,7 +4,6 @@
 package harness
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -72,11 +72,9 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 		stdout, err := e.runOnce(ctx, cfg)
 		if err == nil {
 			e.exitCode = 0
-			if len(stdout) > 0 {
-				if _, writeErr := e.stdoutWriter().Write(stdout); writeErr != nil {
-					e.exitCode = 1
-					return fmt.Errorf("harness: failed to write stdout: %w", writeErr)
-				}
+			if writeErr := e.writeStdout(stdout); writeErr != nil {
+				e.exitCode = 1
+				return fmt.Errorf("harness: failed to write stdout: %w", writeErr)
 			}
 			return nil
 		}
@@ -106,14 +104,12 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) ([]byte, error) {
+func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) (*os.File, error) {
 	e.mu.Lock()
 
 	env := runtime.GetEnv(ctx)
 	tw := executor.NewTailWriterWithEncoding(e.stderrWriter(), 0, env.LogEncodingCharset)
 	e.stderrTail = tw
-
-	var stdout bytes.Buffer
 	args, stdin, err := cfg.buildInvocation(e.prompt, e.script)
 	if err != nil {
 		e.exitCode = 1
@@ -121,16 +117,37 @@ func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) ([]by
 		return nil, err
 	}
 
-	cmd := exec.CommandContext(ctx, cfg.binaryName(), args...)
+	binaryPath, err := resolveBinaryPath(cfg.binaryName(), e.workDir, runtime.AllEnvsMap(ctx))
+	if err != nil {
+		e.exitCode = exitCodeFromError(err)
+		e.mu.Unlock()
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, fmt.Errorf("harness: %q CLI not found in PATH; install it first: %w", cfg.binaryName(), err)
+		}
+		return nil, fmt.Errorf("harness: failed to resolve binary %q: %w", cfg.binaryName(), err)
+	}
+
+	stdout, err := newStdoutSpool()
+	if err != nil {
+		e.exitCode = 1
+		e.mu.Unlock()
+		return nil, fmt.Errorf("harness: failed to create stdout spool: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, binaryPath, args...)
+	if len(cmd.Args) > 0 {
+		cmd.Args[0] = cfg.binaryName()
+	}
 	cmd.Env = append(cmd.Env, runtime.AllEnvs(ctx)...)
 	cmd.Dir = e.workDir
-	cmd.Stdout = &stdout
+	cmd.Stdout = stdout
 	cmd.Stderr = tw
 	cmdutil.SetupCommand(cmd)
 
 	if cmd.Dir != "" {
 		if err := os.MkdirAll(cmd.Dir, 0o750); err != nil {
 			e.exitCode = 1
+			_ = cleanupStdoutSpool(stdout)
 			e.mu.Unlock()
 			return nil, fmt.Errorf("harness: failed to create working directory: %w", err)
 		}
@@ -144,6 +161,7 @@ func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) ([]by
 
 	if err := cmd.Start(); err != nil {
 		e.exitCode = exitCodeFromError(err)
+		_ = cleanupStdoutSpool(stdout)
 		e.mu.Unlock()
 		if tail := tw.Tail(); tail != "" {
 			return nil, fmt.Errorf("%w\nrecent stderr:\n%s", err, tail)
@@ -162,17 +180,36 @@ func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) ([]by
 		_ = e.Kill(os.Kill)
 		<-waitDone
 		e.exitCode = 124
+		_ = cleanupStdoutSpool(stdout)
 		return nil, ctx.Err()
 	case err := <-waitDone:
 		if err != nil {
 			e.exitCode = exitCodeFromError(err)
+			_ = cleanupStdoutSpool(stdout)
 			if tail := tw.Tail(); tail != "" {
 				return nil, fmt.Errorf("%w\nrecent stderr:\n%s", err, tail)
 			}
 			return nil, err
 		}
-		return stdout.Bytes(), nil
+		if _, err := stdout.Seek(0, io.SeekStart); err != nil {
+			e.exitCode = 1
+			_ = cleanupStdoutSpool(stdout)
+			return nil, fmt.Errorf("harness: failed to rewind stdout spool: %w", err)
+		}
+		return stdout, nil
 	}
+}
+
+func (e *harnessExecutor) writeStdout(stdout *os.File) error {
+	if stdout == nil {
+		return nil
+	}
+	defer func() {
+		_ = cleanupStdoutSpool(stdout)
+	}()
+
+	_, err := io.Copy(e.stdoutWriter(), stdout)
+	return err
 }
 
 func (e *harnessExecutor) stdoutWriter() io.Writer {
@@ -311,12 +348,6 @@ func buildProviderConfigs(cfg map[string]any, defs core.HarnessDefinitions) ([]p
 				return nil, err
 			}
 			return nil, fmt.Errorf("harness: invalid fallback[%d]: %w", i-1, err)
-		}
-		if _, err := exec.LookPath(resolved.binaryName()); err != nil {
-			if i == 0 {
-				return nil, fmt.Errorf("harness: %q CLI not found in PATH; install it first: %w", resolved.binaryName(), err)
-			}
-			return nil, fmt.Errorf("harness: fallback[%d] %q CLI not found in PATH; install it first: %w", i-1, resolved.binaryName(), err)
 		}
 		resolved.flags = attempts[i]
 		configs = append(configs, resolved)
@@ -665,6 +696,89 @@ func cloneDefinition(def *core.HarnessDefinition) *core.HarnessDefinition {
 
 func isTemplatedValue(value string) bool {
 	return strings.Contains(value, "${")
+}
+
+func resolveBinaryPath(binaryName, workDir string, envs map[string]string) (string, error) {
+	if strings.TrimSpace(binaryName) == "" {
+		return "", fmt.Errorf("empty binary name")
+	}
+
+	if hasPathSeparator(binaryName) {
+		candidate := binaryName
+		if !filepath.IsAbs(candidate) && workDir != "" {
+			candidate = filepath.Join(workDir, candidate)
+		}
+		resolved, err := exec.LookPath(candidate)
+		if err != nil {
+			return "", err
+		}
+		return resolved, nil
+	}
+
+	pathValue := ""
+	if envs != nil {
+		pathValue = envs["PATH"]
+	}
+	if pathValue == "" {
+		pathValue = os.Getenv("PATH")
+	}
+
+	baseDir := workDir
+	if baseDir == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("resolve working directory for PATH lookup: %w", err)
+		}
+		baseDir = wd
+	}
+
+	var lastErr error
+	for _, dir := range filepath.SplitList(pathValue) {
+		if dir == "" {
+			dir = "."
+		}
+		if !filepath.IsAbs(dir) {
+			dir = filepath.Join(baseDir, dir)
+		}
+		candidate := filepath.Join(dir, binaryName)
+		resolved, err := exec.LookPath(candidate)
+		if err == nil {
+			return resolved, nil
+		}
+		if !errors.Is(err, exec.ErrNotFound) {
+			lastErr = err
+		}
+	}
+
+	if lastErr != nil {
+		return "", lastErr
+	}
+	return "", &exec.Error{Name: binaryName, Err: exec.ErrNotFound}
+}
+
+func hasPathSeparator(path string) bool {
+	return strings.Contains(path, string(os.PathSeparator)) || strings.Contains(path, "/")
+}
+
+func newStdoutSpool() (*os.File, error) {
+	return os.CreateTemp("", "dagu-harness-stdout-*")
+}
+
+func cleanupStdoutSpool(file *os.File) error {
+	if file == nil {
+		return nil
+	}
+
+	name := file.Name()
+	closeErr := file.Close()
+	removeErr := os.Remove(name)
+	if closeErr != nil {
+		return closeErr
+	}
+	if removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+		return removeErr
+	}
+	return nil
 }
 
 func exitCodeFromError(err error) int {
