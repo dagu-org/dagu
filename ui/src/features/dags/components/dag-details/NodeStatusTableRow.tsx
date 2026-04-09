@@ -16,6 +16,7 @@ import {
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { getExecutorCommand } from '@/lib/executor-utils';
+import { isHarnessStep } from '@/lib/harness-step';
 import { isActiveNodeStatus } from '@/lib/status-utils';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
@@ -48,6 +49,7 @@ import StyledTableRow from '../../../../ui/StyledTableRow';
 import { NodeStatusChip } from '../common';
 import { InlineLogViewer } from '../common/InlineLogViewer';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
+import HarnessStepSummary from './HarnessStepSummary';
 import { SubDAGRunsList } from './SubDAGRunsList';
 
 /**
@@ -515,14 +517,15 @@ function NodeStatusTableRow({
           {/* Combined Command & Args */}
           <TableCell>
             <div className="space-y-1.5">
-              {node.step.commands && node.step.commands.length > 0 ? (
+              {isHarnessStep(node.step) ? (
+                <HarnessStepSummary step={node.step} />
+              ) : node.step.commands && node.step.commands.length > 0 ? (
                 <CommandDisplay
                   commands={node.step.commands}
                   icon="code"
                   maxLength={50}
                 />
               ) : (
-                // Executor-specific display
                 (() => {
                   const execCmd = getExecutorCommand(node.step);
                   if (execCmd) {
@@ -543,7 +546,7 @@ function NodeStatusTableRow({
                   return null;
                 })()
               )}
-              {node.step.script && (
+              {node.step.script && !isHarnessStep(node.step) && (
                 <ScriptBadge
                   script={node.step.script}
                   stepName={node.step.name}
@@ -928,12 +931,16 @@ function NodeStatusTableRow({
       {/* Command section */}
       <div className="mb-3">
         <div className="text-xs font-medium text-foreground/90 mb-1">
-          {node.step.commands && node.step.commands.length > 1
-            ? 'Commands:'
-            : 'Command:'}
+          {isHarnessStep(node.step)
+            ? 'Execution:'
+            : node.step.commands && node.step.commands.length > 1
+              ? 'Commands:'
+              : 'Command:'}
         </div>
         <div className="space-y-1.5">
-          {node.step.commands && node.step.commands.length > 0 ? (
+          {isHarnessStep(node.step) ? (
+            <HarnessStepSummary step={node.step} />
+          ) : node.step.commands && node.step.commands.length > 0 ? (
             <div className="space-y-1.5">
               {node.step.commands.map((entry, idx) => {
                 const fullCmd =
@@ -974,7 +981,7 @@ function NodeStatusTableRow({
             })()
           )}
 
-          {node.step.script && (
+          {node.step.script && !isHarnessStep(node.step) && (
             <ScriptBadge script={node.step.script} stepName={node.step.name} />
           )}
         </div>
