@@ -3313,6 +3313,17 @@
           "then": {
             "required": ["prompt_flag"]
           }
+        },
+        {
+          "if": {
+            "required": ["prompt_flag"]
+          },
+          "then": {
+            "properties": {
+              "prompt_mode": { "const": "flag" }
+            },
+            "required": ["prompt_mode"]
+          }
         }
       ],
       "properties": {

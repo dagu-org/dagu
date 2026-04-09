@@ -842,6 +842,23 @@ steps:
 			wantErr: "harnesses",
 		},
 		{
+			name: "RejectPromptFlagOutsideFlagPromptMode",
+			spec: `
+harnesses:
+  gemini:
+    binary: gemini
+    prompt_mode: stdin
+    prompt_flag: --prompt
+
+steps:
+  - type: harness
+    command: Summarize the repository state
+    config:
+      provider: gemini
+`,
+			wantErr: "harnesses",
+		},
+		{
 			name: "RejectInvalidFallbackShape",
 			spec: `
 harness:

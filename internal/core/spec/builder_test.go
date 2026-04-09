@@ -3167,6 +3167,23 @@ steps:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `conflicts with built-in provider`)
 	})
+
+	t.Run("PromptFlagOutsideFlagModeFailsBuild", func(t *testing.T) {
+		yaml := `
+harnesses:
+  gemini:
+    binary: gemini
+    prompt_mode: stdin
+    prompt_flag: --prompt
+steps:
+  - command: "Review this repository"
+    config:
+      provider: gemini
+`
+		_, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `prompt_flag is only valid when prompt_mode is flag`)
+	})
 }
 
 func mustHarnessFallback(t *testing.T, value any) []map[string]any {
