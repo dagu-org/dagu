@@ -4,7 +4,8 @@
  * @module features/dags/components/dag-editor
  */
 import BorderedBox from '@/ui/BorderedBox';
-import { AlertTriangle, Save, Undo2 } from 'lucide-react';
+import { AlertTriangle, Save, Sparkles, Undo2 } from 'lucide-react';
+import { useAgentChatContext } from '@/features/agent';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { components } from '../../../../api/v1/schema';
@@ -15,6 +16,7 @@ import { Tab, Tabs } from '../../../../components/ui/tabs';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
+import { useUserPreferences } from '../../../../contexts/UserPreference';
 import { useClient, useQuery } from '../../../../hooks/api';
 import { useContentEditor } from '../../../../hooks/useContentEditor';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
@@ -29,6 +31,8 @@ import { FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
 import DAGEditorWithDocs from './DAGEditorWithDocs';
 import ExternalChangeDialog from './ExternalChangeDialog';
+import ImproveDAGDefinitionModal from './ImproveDAGDefinitionModal';
+import { buildImproveDAGDefinitionPrompt } from './improveDagDefinitionPrompt';
 
 /**
  * Props for the DAGSpec component
@@ -38,25 +42,38 @@ type Props = {
   fileName: string;
   /** Local DAGs from parent (optional, avoids redundant fetch) */
   localDags?: components['schemas']['LocalDag'][];
+  /** Latest DAG run details for improvement context */
+  latestDAGRun?: components['schemas']['DAGRunDetails'];
 };
 
 /**
  * DAGSpec displays and allows editing of a DAG specification
  * including visualization, attributes, steps, and YAML definition
  */
-function DAGSpec({ fileName, localDags }: Props) {
+function DAGSpec({ fileName, localDags, latestDAGRun }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
   const config = useConfig();
+  const { preferences } = useUserPreferences();
   const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
   const { setHasUnsavedChanges } = useUnsavedChanges();
+  const {
+    clearSession: clearAgentSession,
+    openChat,
+    setPendingUserMessage,
+    setSessionId,
+    setSessionState,
+  } = useAgentChatContext();
 
   // Editability is derived from permissions; no explicit toggle
   const editable = !!config.permissions.writeDags;
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState('parent');
+  const [isImproveModalOpen, setIsImproveModalOpen] = React.useState(false);
+  const [isLaunchingImproveSession, setIsLaunchingImproveSession] =
+    React.useState(false);
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
@@ -270,6 +287,77 @@ function DAGSpec({ fileName, localDags }: Props) {
   // Check if we have local DAGs
   const hasLocalDags = localDags && localDags.length > 0;
 
+  const handleImproveSubmit = React.useCallback(
+    async (userPrompt: string) => {
+      if (localHasUnsavedChanges) {
+        showError(
+          'Save or discard local edits first',
+          'The agent can only improve the saved DAG definition that exists on disk.'
+        );
+        return;
+      }
+
+      setIsLaunchingImproveSession(true);
+      clearAgentSession();
+      setPendingUserMessage(userPrompt);
+
+      const { data: sessionData, error } = await client.POST('/agent/sessions', {
+        params: {
+          query: { remoteNode },
+        },
+        body: {
+          message: buildImproveDAGDefinitionPrompt({
+            dagFile: fileName,
+            dagName: data?.dag?.name || fileName,
+            latestDAGRun,
+            userPrompt,
+          }),
+          dagContexts: [
+            {
+              dagFile: fileName,
+              dagRunId: latestDAGRun?.dagRunId,
+            },
+          ],
+          safeMode: preferences.safeMode,
+        },
+      });
+
+      if (error || !sessionData) {
+        setPendingUserMessage(null);
+        setIsLaunchingImproveSession(false);
+        showError(
+          error?.message || 'Failed to start improvement session',
+          'Please try again after the agent service is available.'
+        );
+        return;
+      }
+
+      setSessionId(sessionData.sessionId);
+      setSessionState({
+        session_id: sessionData.sessionId,
+        working: true,
+      });
+      setIsImproveModalOpen(false);
+      setIsLaunchingImproveSession(false);
+      openChat();
+    },
+    [
+      localHasUnsavedChanges,
+      clearAgentSession,
+      setPendingUserMessage,
+      client,
+      remoteNode,
+      fileName,
+      data?.dag?.name,
+      latestDAGRun,
+      preferences.safeMode,
+      setSessionId,
+      setSessionState,
+      openChat,
+      showError,
+    ]
+  );
+
   // Helper function to render DAG content (Graph, Attributes, Steps, Errors)
   const renderDAGContent = (
     dag: components['schemas']['DAGDetails'],
@@ -423,6 +511,21 @@ function DAGSpec({ fileName, localDags }: Props) {
                   headerActions={
                     editable ? (
                       <>
+                        <Button
+                          variant="outline"
+                          title={
+                            localHasUnsavedChanges
+                              ? 'Save or discard local changes before using agent improvement'
+                              : 'Start a fresh agent session to improve this DAG definition'
+                          }
+                          disabled={
+                            localHasUnsavedChanges || isLaunchingImproveSession
+                          }
+                          onClick={() => setIsImproveModalOpen(true)}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Improve
+                        </Button>
                         {localHasUnsavedChanges && (
                           <Button
                             variant="ghost"
@@ -448,6 +551,15 @@ function DAGSpec({ fileName, localDags }: Props) {
                       </>
                     ) : undefined
                   }
+                />
+                <ImproveDAGDefinitionModal
+                  isOpen={isImproveModalOpen}
+                  onClose={() => setIsImproveModalOpen(false)}
+                  onSubmit={handleImproveSubmit}
+                  dagFile={fileName}
+                  dagName={data?.dag?.name}
+                  latestDAGRun={latestDAGRun}
+                  isLoading={isLaunchingImproveSession}
                 />
               </div>
             </React.Fragment>

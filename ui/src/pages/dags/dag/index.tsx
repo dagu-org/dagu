@@ -247,6 +247,7 @@ function DAGDetails() {
                   filePath={dagData.filePath}
                   dag={dagData.dag}
                   currentDAGRun={displayDAGRun}
+                  latestDAGRun={dagData.latestDAGRun}
                   refreshFn={refreshData}
                   formatDuration={formatDuration}
                   activeTab={tab}
