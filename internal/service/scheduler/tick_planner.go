@@ -136,9 +136,10 @@ type TickPlanner struct {
 	lastPlanResult []PlannedRun
 
 	// lifecycle
-	started atomic.Bool
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
+	lifecycleMu sync.Mutex
+	started     atomic.Bool
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
 }
 
 // plannerEntry tracks a single DAG's scheduling metadata.
@@ -871,6 +872,9 @@ func (tp *TickPlanner) Flush(ctx context.Context) {
 
 // Start launches the internal goroutines (event drainer + watermark flusher).
 func (tp *TickPlanner) Start(ctx context.Context) {
+	tp.lifecycleMu.Lock()
+	defer tp.lifecycleMu.Unlock()
+
 	if !tp.started.CompareAndSwap(false, true) {
 		return
 	}
@@ -888,8 +892,13 @@ func (tp *TickPlanner) Start(ctx context.Context) {
 
 // Stop cancels internal goroutines, waits for them, and performs a final flush.
 func (tp *TickPlanner) Stop(ctx context.Context) {
-	if tp.cancel != nil {
-		tp.cancel()
+	tp.lifecycleMu.Lock()
+	cancel := tp.cancel
+	tp.cancel = nil
+	tp.lifecycleMu.Unlock()
+
+	if cancel != nil {
+		cancel()
 	}
 	tp.wg.Wait()
 	tp.Flush(ctx)

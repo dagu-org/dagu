@@ -72,6 +72,25 @@ func TestCache_Invalidate(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestCache_InvalidateAll(t *testing.T) {
+	t.Parallel()
+
+	cache := NewCache[string]("test", 100, time.Hour)
+	tmpDir := t.TempDir()
+
+	for i := range 2 {
+		filePath := filepath.Join(tmpDir, fmt.Sprintf("test-%d.txt", i))
+		require.NoError(t, os.WriteFile(filePath, []byte("content"), 0644))
+		fi, err := os.Stat(filePath)
+		require.NoError(t, err)
+		cache.Store(filePath, "test-data", fi)
+	}
+
+	assert.Equal(t, 2, cache.Size())
+	cache.InvalidateAll()
+	assert.Equal(t, 0, cache.Size())
+}
+
 func TestCache_CapacityLimit(t *testing.T) {
 	t.Parallel()
 

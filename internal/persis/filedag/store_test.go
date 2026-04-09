@@ -15,6 +15,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/persis/filedag/dagindex"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 
 	"github.com/stretchr/testify/assert"
@@ -553,6 +554,109 @@ steps:
 	invalidSpec := `invalid: yaml: content: [unclosed`
 	_, err = store.LoadSpec(ctx, []byte(invalidSpec))
 	require.Error(t, err)
+}
+
+func TestLoadSpecWithBaseGraphType(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-load-spec-base-graph")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	baseConfig := filepath.Join(tmpDir, "base.yaml")
+	require.NoError(t, os.WriteFile(baseConfig, []byte("type: graph\n"), 0600))
+
+	store := New(tmpDir, WithBaseConfig(baseConfig), WithSkipExamples(true))
+	ctx := context.Background()
+
+	dag, err := store.LoadSpec(ctx, []byte(`name: base-graph-dag
+steps:
+  - name: build
+    command: echo build
+  - name: test
+    command: echo test
+    depends: [build]
+`))
+	require.NoError(t, err)
+	require.Equal(t, core.TypeGraph, dag.Type)
+	require.Len(t, dag.Steps, 2)
+	require.Equal(t, []string{"build"}, dag.Steps[1].Depends)
+}
+
+func TestGetMetadataRefreshesCacheWhenBaseConfigChanges(t *testing.T) {
+	rootDir := t.TempDir()
+	dagDir := filepath.Join(rootDir, "dags")
+	require.NoError(t, os.MkdirAll(dagDir, 0750))
+
+	baseConfig := filepath.Join(rootDir, "base.yaml")
+	require.NoError(t, os.WriteFile(baseConfig, []byte("type: graph\n"), 0600))
+
+	cache := fileutil.NewCache[*core.DAG]("dag_definition", 16, time.Hour)
+	store := New(
+		dagDir,
+		WithBaseConfig(baseConfig),
+		WithFileCache(cache),
+		WithSkipExamples(true),
+	)
+	ctx := context.Background()
+
+	require.NoError(t, os.WriteFile(filepath.Join(dagDir, "cache-refresh.yaml"), []byte(`name: cache-refresh
+steps:
+  - name: step1
+    command: echo "hello"
+`), 0600))
+
+	dag, err := store.GetMetadata(ctx, "cache-refresh")
+	require.NoError(t, err)
+	require.Equal(t, 1, cache.Size())
+
+	time.Sleep(10 * time.Millisecond)
+	require.NoError(t, os.WriteFile(baseConfig, []byte("type: chain\n"), 0600))
+
+	reloaded, err := store.GetMetadata(ctx, "cache-refresh")
+	require.NoError(t, err)
+	require.NotSame(t, dag, reloaded)
+	require.Equal(t, 1, cache.Size())
+}
+
+func TestListRebuildsIndexWhenBaseConfigChanges(t *testing.T) {
+	rootDir := t.TempDir()
+	dagDir := filepath.Join(rootDir, "dags")
+	require.NoError(t, os.MkdirAll(dagDir, 0750))
+
+	baseConfig := filepath.Join(rootDir, "base.yaml")
+	require.NoError(t, os.WriteFile(baseConfig, []byte("type: graph\n"), 0600))
+
+	store := New(dagDir, WithBaseConfig(baseConfig), WithSkipExamples(true))
+	ctx := context.Background()
+
+	require.NoError(t, os.WriteFile(filepath.Join(dagDir, "index-refresh.yaml"), []byte(`name: index-refresh
+tags:
+  - env=dev
+steps:
+  - name: step1
+    command: echo "hello"
+`), 0600))
+
+	result, errList, err := store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 1)
+
+	indexPath := filepath.Join(dagDir, dagindex.IndexFileName)
+	indexInfoBefore, err := os.Stat(indexPath)
+	require.NoError(t, err)
+
+	time.Sleep(10 * time.Millisecond)
+	require.NoError(t, os.WriteFile(baseConfig, []byte("type: chain\n"), 0600))
+
+	result, errList, err = store.List(ctx, exec.ListDAGsOptions{})
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 1)
+
+	indexInfoAfter, err := os.Stat(indexPath)
+	require.NoError(t, err)
+	require.True(t, indexInfoAfter.ModTime().After(indexInfoBefore.ModTime()))
 }
 
 func TestListWithPagination(t *testing.T) {

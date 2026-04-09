@@ -75,6 +75,11 @@ func (c *Cache[T]) Invalidate(fileName string) {
 	c.lru.Remove(fileName)
 }
 
+// InvalidateAll removes all cached items.
+func (c *Cache[T]) InvalidateAll() {
+	c.lru.Purge()
+}
+
 // LoadLatest gets the latest version of an item, loading it if stale or missing
 func (c *Cache[T]) LoadLatest(
 	filePath string, loader func() (T, error),

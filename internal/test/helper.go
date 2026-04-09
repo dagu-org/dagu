@@ -28,6 +28,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	exec1 "github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/persis/filebaseconfig"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
 	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filedistributed"
@@ -243,7 +244,21 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	ctx = config.WithConfig(ctx, cfg)
 
-	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
+	if cfg.Paths.BaseConfig != "" {
+		baseConfigStore, err := filebaseconfig.New(
+			cfg.Paths.BaseConfig,
+			filebaseconfig.WithSkipDefault(cfg.Core.SkipExamples),
+		)
+		require.NoError(t, err)
+		require.NoError(t, baseConfigStore.Initialize())
+	}
+
+	dagStore := filedag.New(
+		cfg.Paths.DAGsDir,
+		filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir),
+		filedag.WithBaseConfig(cfg.Paths.BaseConfig),
+		filedag.WithSkipExamples(true),
+	)
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := newProcStore(cfg)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)

@@ -118,5 +118,5 @@ steps:
 		Provider: "env",
 		Key:      "SECRET_SOURCE",
 	}, persisted.Secrets[0])
-	require.Equal(t, []string{".env.secret"}, persisted.Dotenv)
+	require.Equal(t, []string{".env", ".env.secret"}, persisted.Dotenv)
 }
