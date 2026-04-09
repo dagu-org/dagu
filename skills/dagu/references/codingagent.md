@@ -138,7 +138,7 @@ steps:
     command: "Fix failing tests in src/"
     config:
       provider: codex
-      model: gpt-5.4
+      model: gpt-5-codex
       effort: high
       sandbox: workspace-write
       ephemeral: true
@@ -229,9 +229,9 @@ steps:
 
    | Tier | Claude | Codex |
    |------|--------|-------|
-   | Cheap/fast | `haiku` | `gpt-5.1-codex-mini` |
-   | Balanced | `sonnet` | `gpt-5.4` |
-   | Most capable | `opus` | `gpt-5.3-codex` |
+   | Cheap/fast | `haiku` | `codex-mini-latest` |
+   | Balanced | `sonnet` | `gpt-5-codex` |
+   | Most capable | `opus` | `GPT-5.3-Codex` |
 
 2. **Prompt as a parameter** — Expose the prompt via `params:` so users can customize from UI/CLI without editing the DAG.
 3. **Timeouts** — Set `timeout_sec:` (300-600s+) on agent steps. Agent CLIs can run for minutes.

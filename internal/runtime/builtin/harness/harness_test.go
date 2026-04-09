@@ -204,6 +204,13 @@ func TestPiProvider_BuildArgs(t *testing.T) {
 		assert.Contains(t, args, "--no-extensions")
 	})
 
+	t.Run("no_tools_overrides_tools", func(t *testing.T) {
+		cfg := &harnessConfig{NoTools: true, Tools: "read,bash"}
+		args := p.BuildArgs(cfg, "prompt")
+		assert.Contains(t, args, "--no-tools")
+		assert.NotContains(t, args, "--tools")
+	})
+
 	t.Run("effort_maps_to_thinking", func(t *testing.T) {
 		cfg := &harnessConfig{Effort: "max"}
 		args := p.BuildArgs(cfg, "prompt")
@@ -284,6 +291,15 @@ func TestDecodeConfig(t *testing.T) {
 func TestValidateHarnessStep(t *testing.T) {
 	t.Run("missing_commands", func(t *testing.T) {
 		err := validateHarnessStep(core.Step{
+			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{"provider": "claude"}},
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "command field (prompt) is required")
+	})
+
+	t.Run("empty_prompt", func(t *testing.T) {
+		err := validateHarnessStep(core.Step{
+			Commands:       []core.CommandEntry{{Command: ""}},
 			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{"provider": "claude"}},
 		})
 		assert.Error(t, err)

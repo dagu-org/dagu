@@ -27,10 +27,10 @@ var _ executor.ExitCoder = (*harnessExecutor)(nil)
 type harnessConfig struct {
 	// Common fields
 	Provider     string `mapstructure:"provider"`      // required: claude | codex | opencode | pi
-	Model        string `mapstructure:"model"`          // provider-specific model name
-	Effort       string `mapstructure:"effort"`         // low | medium | high | max
-	MaxTurns     int    `mapstructure:"max_turns"`      // max agentic iterations
-	OutputFormat string `mapstructure:"output_format"`  // text | json | stream-json
+	Model        string `mapstructure:"model"`         // provider-specific model name
+	Effort       string `mapstructure:"effort"`        // low | medium | high | max
+	MaxTurns     int    `mapstructure:"max_turns"`     // max agentic iterations
+	OutputFormat string `mapstructure:"output_format"` // text | json | stream-json
 
 	// Claude-specific
 	AllowedTools       string  `mapstructure:"allowed_tools"`
@@ -212,7 +212,7 @@ func extractPrompt(step core.Step) string {
 }
 
 func validateHarnessStep(step core.Step) error {
-	if len(step.Commands) == 0 {
+	if len(step.Commands) == 0 || extractPrompt(step) == "" {
 		return fmt.Errorf("harness: command field (prompt) is required")
 	}
 	cfg := step.ExecutorConfig.Config

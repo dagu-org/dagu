@@ -32,11 +32,10 @@ func (p *piProvider) BuildArgs(cfg *harnessConfig, prompt string) []string {
 		}
 	}
 
-	if cfg.Tools != "" {
-		args = append(args, "--tools", cfg.Tools)
-	}
 	if cfg.NoTools {
 		args = append(args, "--no-tools")
+	} else if cfg.Tools != "" {
+		args = append(args, "--tools", cfg.Tools)
 	}
 	if cfg.NoExtensions {
 		args = append(args, "--no-extensions")
