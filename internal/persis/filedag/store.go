@@ -115,6 +115,7 @@ func New(baseDir string, opts ...Option) exec.DAGStore {
 		fileCache:             options.FileCache,
 		searchPaths:           searchPaths,
 		baseConfigPath:        options.BaseConfigPath,
+		baseConfigState:       describeBaseConfigState(options.BaseConfigPath),
 		skipExamples:          options.SkipExamples,
 		skipDirectoryCreation: options.SkipDirectoryCreation,
 	}
@@ -127,21 +128,19 @@ type Storage struct {
 	fileCache             *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
 	searchPaths           []string                   // Additional search paths for DAG files
 	baseConfigPath        string                     // Optional base config file applied when loading DAGs
+	baseConfigState       string                     // Last observed base config file state for cache/index invalidation
 	skipExamples          bool                       // Skip creating example DAGs
 	skipDirectoryCreation bool                       // Skip creating base directory (for worker mode)
+	baseConfigMu          sync.Mutex                 // Protects base config state refresh and invalidation
 	indexMu               sync.Mutex                 // Protects index load/rebuild/invalidate
 }
 
 func (store *Storage) useCachedLoads() bool {
-	return store.fileCache != nil && !store.hasBaseConfig()
+	return store.fileCache != nil
 }
 
 func (store *Storage) useIndexedMetadata() bool {
-	return !store.hasBaseConfig()
-}
-
-func (store *Storage) hasBaseConfig() bool {
-	return store.baseConfigPath != "" && fileExists(store.baseConfigPath)
+	return true
 }
 
 func (store *Storage) defaultLoadOptions(opts ...spec.LoadOption) []spec.LoadOption {
@@ -151,6 +150,43 @@ func (store *Storage) defaultLoadOptions(opts ...spec.LoadOption) []spec.LoadOpt
 	}
 	loadOpts = append(loadOpts, opts...)
 	return loadOpts
+}
+
+func (store *Storage) refreshBaseConfigState() {
+	if store.baseConfigPath == "" {
+		return
+	}
+
+	state := describeBaseConfigState(store.baseConfigPath)
+
+	store.baseConfigMu.Lock()
+	defer store.baseConfigMu.Unlock()
+
+	if state == store.baseConfigState {
+		return
+	}
+
+	if store.fileCache != nil {
+		store.fileCache.InvalidateAll()
+	}
+	store.invalidateIndex()
+	store.baseConfigState = state
+}
+
+func describeBaseConfigState(path string) string {
+	if path == "" {
+		return ""
+	}
+
+	fi, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "missing"
+		}
+		return "error:" + err.Error()
+	}
+
+	return fmt.Sprintf("%d:%d", fi.Size(), fi.ModTime().UnixNano())
 }
 
 // Initialize ensures the storage is ready and creates example DAGs if needed
@@ -164,6 +200,7 @@ func (store *Storage) GetMetadata(ctx context.Context, name string) (*core.DAG, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, store.searchPaths, err)
 	}
+	store.refreshBaseConfigState()
 	loadOpts := store.defaultLoadOptions(
 		spec.OnlyMetadata(),
 		spec.WithoutEval(),
@@ -306,6 +343,8 @@ func (store *Storage) loadOrRebuildIndex(ctx context.Context) []*indexv1.DAGInde
 		return nil
 	}
 
+	store.refreshBaseConfigState()
+
 	store.indexMu.Lock()
 	defer store.indexMu.Unlock()
 
@@ -354,7 +393,7 @@ func (store *Storage) loadOrRebuildIndex(ctx context.Context) []*indexv1.DAGInde
 
 	// Rebuild.
 	logger.Info(ctx, "Rebuilding DAG definition index", tag.Dir(store.baseDir))
-	idx := dagindex.Build(ctx, store.baseDir, yamlFiles, flags)
+	idx := dagindex.Build(ctx, store.baseDir, yamlFiles, flags, store.defaultLoadOptions()...)
 	if err := dagindex.Write(indexPath, idx); err != nil {
 		logger.Warn(ctx, "Failed to write DAG definition index", tag.Error(err))
 	}

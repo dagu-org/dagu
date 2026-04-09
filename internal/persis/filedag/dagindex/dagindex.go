@@ -86,7 +86,13 @@ func Load(indexPath string, yamlFiles []YAMLFileMeta, flags SuspendFlags) []*ind
 }
 
 // Build constructs a fresh index by loading every YAML file with metadata-only semantics.
-func Build(ctx context.Context, dagDir string, yamlFiles []YAMLFileMeta, flags SuspendFlags) *indexv1.DAGIndex {
+func Build(
+	ctx context.Context,
+	dagDir string,
+	yamlFiles []YAMLFileMeta,
+	flags SuspendFlags,
+	loadOpts ...spec.LoadOption,
+) *indexv1.DAGIndex {
 	idx := &indexv1.DAGIndex{
 		Version:     IndexVersion,
 		BuiltAtUnix: time.Now().Unix(),
@@ -105,12 +111,16 @@ func Build(ctx context.Context, dagDir string, yamlFiles []YAMLFileMeta, flags S
 			ModTime:  f.ModTime,
 		}
 
-		dag, err := spec.Load(ctx, filePath,
+		opts := make([]spec.LoadOption, 0, len(loadOpts)+4)
+		opts = append(opts, loadOpts...)
+		opts = append(opts,
 			spec.OnlyMetadata(),
 			spec.WithoutEval(),
 			spec.SkipSchemaValidation(),
 			spec.WithAllowBuildErrors(),
 		)
+
+		dag, err := spec.Load(ctx, filePath, opts...)
 		if err != nil {
 			entry.Name = strings.TrimSuffix(f.Name, filepath.Ext(f.Name))
 			entry.LoadError = err.Error()
