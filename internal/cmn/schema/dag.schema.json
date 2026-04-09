@@ -3302,6 +3302,19 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["binary"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "prompt_mode": { "const": "flag" }
+            },
+            "required": ["prompt_mode"]
+          },
+          "then": {
+            "required": ["prompt_flag"]
+          }
+        }
+      ],
       "properties": {
         "binary": {
           "type": "string",
@@ -3356,7 +3369,7 @@
       "type": "object",
       "propertyNames": {
         "not": {
-          "enum": ["binary", "prompt_args"]
+          "enum": ["binary", "prompt_args", "fallback"]
         }
       },
       "properties": {

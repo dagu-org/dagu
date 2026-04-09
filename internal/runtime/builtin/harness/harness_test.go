@@ -68,6 +68,19 @@ func TestConfigToFlags(t *testing.T) {
 		}, flags)
 	})
 
+	t.Run("builtin_flags_normalize_underscores", func(t *testing.T) {
+		flags := configToFlags(map[string]any{
+			"full_auto":           true,
+			"max_turns":           20,
+			"skip_git_repo_check": true,
+		}, nil)
+		assert.Equal(t, []string{
+			"--full-auto",
+			"--max-turns", "20",
+			"--skip-git-repo-check",
+		}, flags)
+	})
+
 	t.Run("definition_overrides_flag_tokens", func(t *testing.T) {
 		flags := configToFlags(map[string]any{
 			"provider":   "gemini",
@@ -178,6 +191,18 @@ func TestValidateHarnessStep(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("multiple_commands_rejected", func(t *testing.T) {
+		err := validateHarnessStep(core.Step{
+			Commands: []core.CommandEntry{
+				{Command: "prompt one"},
+				{Command: "prompt two"},
+			},
+			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{"provider": "claude"}},
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "multiple commands")
+	})
+
 	t.Run("invalid_fallback_shape", func(t *testing.T) {
 		err := validateHarnessStep(core.Step{
 			Commands: []core.CommandEntry{{Command: "prompt"}},
@@ -188,6 +213,25 @@ func TestValidateHarnessStep(t *testing.T) {
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "fallback[0]")
+	})
+
+	t.Run("nested_fallback_rejected", func(t *testing.T) {
+		err := validateHarnessStep(core.Step{
+			Commands: []core.CommandEntry{{Command: "prompt"}},
+			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{
+				"provider": "claude",
+				"fallback": []any{
+					map[string]any{
+						"provider": "codex",
+						"fallback": []any{
+							map[string]any{"provider": "copilot"},
+						},
+					},
+				},
+			}},
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "config.fallback is not supported")
 	})
 }
 
@@ -269,6 +313,22 @@ func TestBuildProviderConfigs(t *testing.T) {
 		require.Len(t, configs, 2)
 		assert.Equal(t, primary, configs[0].binaryName())
 		assert.Equal(t, fallback, configs[1].binaryName())
+	})
+
+	t.Run("reject_nested_fallback", func(t *testing.T) {
+		_, err := buildProviderConfigs(map[string]any{
+			"provider": "claude",
+			"fallback": []any{
+				map[string]any{
+					"provider": "codex",
+					"fallback": []any{
+						map[string]any{"provider": "copilot"},
+					},
+				},
+			},
+		}, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "config.fallback is not supported")
 	})
 }
 
@@ -651,6 +711,25 @@ func TestHarnessExecutorRun_FallbackBinaryOptionalUntilNeeded(t *testing.T) {
 	assert.Empty(t, stderr.String())
 }
 
+func TestNewHarnessRejectsMultipleCommands(t *testing.T) {
+	step := core.Step{
+		Name: "step1",
+		Commands: []core.CommandEntry{
+			{Command: "hello"},
+			{Command: "goodbye"},
+		},
+		ExecutorConfig: core.ExecutorConfig{
+			Type:   "harness",
+			Config: map[string]any{"provider": "claude"},
+		},
+	}
+
+	ctx := newHarnessTestContext(t, nil, step)
+	_, err := newHarness(ctx, step)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple commands")
+}
+
 func TestExtractPrompt(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		assert.Equal(t, "", extractPrompt(core.Step{}))
@@ -686,6 +765,23 @@ func TestGetProvider(t *testing.T) {
 			assert.Equal(t, name, p.Name())
 		})
 	}
+}
+
+func TestRegisterProviderPanicsOnDuplicate(t *testing.T) {
+	dupName := "duplicate-test-provider"
+	delete(providers, dupName)
+	t.Cleanup(func() {
+		delete(providers, dupName)
+	})
+
+	registerProvider(stubProvider{name: dupName})
+	require.PanicsWithValue(
+		t,
+		`harness: duplicate provider registration "duplicate-test-provider"`,
+		func() {
+			registerProvider(stubProvider{name: dupName})
+		},
+	)
 }
 
 func TestExitCodeFromError(t *testing.T) {
@@ -748,3 +844,13 @@ func newHarnessTestContext(t *testing.T, dag *core.DAG, step core.Step, envs ...
 	ctx := runtime.NewContext(context.Background(), dag, "run-1", "", runtime.WithEnvVars(envs...))
 	return runtime.WithEnv(ctx, runtime.NewEnv(ctx, step))
 }
+
+type stubProvider struct {
+	name string
+}
+
+func (p stubProvider) Name() string { return p.name }
+
+func (p stubProvider) BinaryName() string { return p.name }
+
+func (p stubProvider) BaseArgs(prompt string) []string { return []string{prompt} }

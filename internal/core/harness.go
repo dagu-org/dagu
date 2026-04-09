@@ -3,7 +3,10 @@
 
 package core
 
-import "maps"
+import (
+	"maps"
+	"sort"
+)
 
 type HarnessPromptMode string
 
@@ -62,6 +65,7 @@ func BuiltinHarnessProviderNames() []string {
 	for name := range builtinHarnessProviders {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 

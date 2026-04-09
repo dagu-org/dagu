@@ -12,7 +12,7 @@ Use `type: harness` to run AI coding agent CLIs as DAG steps. The harness execut
 | `opencode` | `opencode` | `opencode run "<prompt>" [flags]` |
 | `pi` | `pi` | `pi -p "<prompt>" [flags]` |
 
-The binary must be pre-installed in `PATH`. If missing, the step fails at setup time.
+The selected attempt's binary must be resolvable when it runs. Built-in providers use `PATH`; custom harnesses can use a binary name or an explicit path resolved from the step working directory.
 
 ## How Config Works
 
@@ -28,6 +28,7 @@ All non-reserved config keys are passed directly as CLI flags:
 - `key: true` → `--key`
 - `key: false` → omitted
 - `key: 123` → `--key 123`
+- built-in providers also normalize `snake_case` keys to kebab-case flags, so `max_turns` becomes `--max-turns`
 
 Reserved keys are `provider` and `fallback`.
 
@@ -150,6 +151,7 @@ steps:
   - id: review
     name: review
     type: harness
+    # Interpolated before execution, then piped to the harness CLI on stdin.
     script: |
       Review this research for completeness and gaps:
 
@@ -216,7 +218,7 @@ steps:
       max-turns: 20
       max-budget-usd: 2.00
       permission-mode: auto
-      allowedTools: "Bash,Read,Edit"
+      allowed-tools: "Bash,Read,Edit"
       bare: true
     timeout_sec: 300
     output: RESULT

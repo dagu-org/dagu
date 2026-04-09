@@ -25,7 +25,11 @@ type Provider interface {
 var providers = map[string]Provider{}
 
 func registerProvider(p Provider) {
-	providers[p.Name()] = p
+	name := p.Name()
+	if _, exists := providers[name]; exists {
+		panic(fmt.Sprintf("harness: duplicate provider registration %q", name))
+	}
+	providers[name] = p
 }
 
 func getProvider(name string) (Provider, error) {

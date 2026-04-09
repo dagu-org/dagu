@@ -239,7 +239,8 @@ var reservedKeys = map[string]bool{
 //   - number → --key N
 //   - []any → --key v1 --key v2 (repeated)
 //
-// Reserved keys are skipped. Keys are sorted for deterministic output.
+// Reserved keys are skipped. Built-in providers normalize snake_case keys to
+// kebab-case. Keys are sorted for deterministic output.
 func configToFlags(cfg map[string]any, definition *core.HarnessDefinition) []string {
 	keys := make([]string, 0, len(cfg))
 	for k := range cfg {
@@ -304,6 +305,10 @@ func configToFlags(cfg map[string]any, definition *core.HarnessDefinition) []str
 }
 
 func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) {
+	if err := validatePromptCommand(step); err != nil {
+		return nil, err
+	}
+
 	cfg := normalizeConfigMap(step.ExecutorConfig.Config)
 	var defs core.HarnessDefinitions
 	env := runtime.GetEnv(ctx)
@@ -331,6 +336,10 @@ func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) 
 }
 
 func buildProviderConfigs(cfg map[string]any, defs core.HarnessDefinitions) ([]providerConfig, error) {
+	if err := validateProviderConfigs(cfg); err != nil {
+		return nil, err
+	}
+
 	primary, fallbacks, err := extractFallbackConfigs(cfg)
 	if err != nil {
 		return nil, err
@@ -542,15 +551,29 @@ func extractPrompt(step core.Step) string {
 }
 
 func validateHarnessStep(step core.Step) error {
-	if len(step.Commands) == 0 || extractPrompt(step) == "" {
-		return fmt.Errorf("harness: command field (prompt) is required")
+	if err := validatePromptCommand(step); err != nil {
+		return err
 	}
 	cfg := step.ExecutorConfig.Config
 	if cfg == nil {
 		return fmt.Errorf("harness: config is required")
 	}
 
-	if err := validateProviderConfig(cfg); err != nil {
+	return validateProviderConfigs(cfg)
+}
+
+func validatePromptCommand(step core.Step) error {
+	if len(step.Commands) > 1 {
+		return fmt.Errorf("harness: executor does not support multiple commands")
+	}
+	if len(step.Commands) == 0 || extractPrompt(step) == "" {
+		return fmt.Errorf("harness: command field (prompt) is required")
+	}
+	return nil
+}
+
+func validateProviderConfigs(cfg map[string]any) error {
+	if err := validateProviderConfig(cfg, true); err != nil {
 		return err
 	}
 
@@ -559,21 +582,25 @@ func validateHarnessStep(step core.Step) error {
 		return err
 	}
 	for i := range fallbacks {
-		if err := validateProviderConfig(fallbacks[i]); err != nil {
+		if err := validateProviderConfig(fallbacks[i], false); err != nil {
 			return fmt.Errorf("harness: invalid fallback[%d]: %w", i, err)
 		}
 	}
-
 	return nil
 }
 
-func validateProviderConfig(cfg map[string]any) error {
+func validateProviderConfig(cfg map[string]any, allowFallback bool) error {
 	providerStr, _ := cfg["provider"].(string)
 	if _, exists := cfg["binary"]; exists {
 		return fmt.Errorf("harness: config.binary is not supported; define a named harness under top-level harnesses and reference it via config.provider")
 	}
 	if _, exists := cfg["prompt_args"]; exists {
 		return fmt.Errorf("harness: config.prompt_args is not supported; define a named harness under top-level harnesses and reference it via config.provider")
+	}
+	if !allowFallback {
+		if _, exists := cfg["fallback"]; exists {
+			return fmt.Errorf("harness: config.fallback is not supported inside fallback providers")
+		}
 	}
 	if providerStr == "" {
 		return fmt.Errorf("harness: config.provider is required")
@@ -649,6 +676,9 @@ func flagTokenForKey(key string, definition *core.HarnessDefinition) string {
 		if token, ok := definition.OptionFlags[key]; ok && strings.TrimSpace(token) != "" {
 			return token
 		}
+	}
+	if definition == nil {
+		key = strings.ReplaceAll(key, "_", "-")
 	}
 	if definition != nil && definition.FlagStyle == core.HarnessFlagStyleSingleDash {
 		return "-" + key

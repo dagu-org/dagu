@@ -403,7 +403,7 @@ Agent config fields (under `agent:`): `model`, `tools` (with `enabled` list and 
 
 ## harness
 
-Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as DAG steps. The CLI binary must be pre-installed in `PATH`.
+Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as DAG steps. The selected attempt's binary must be resolvable when it runs, either from `PATH` or from an explicit path in a custom harness definition.
 
 ```yaml
 harnesses:
@@ -428,7 +428,7 @@ steps:
     output: RESULT
 ```
 
-The `command` field is the prompt. `config.provider` can reference either a built-in provider or a named custom entry under top-level `harnesses:`. All non-reserved keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Reserved keys are `provider` and `fallback`.
+The `command` field is the prompt. `config.provider` can reference either a built-in provider or a named custom entry under top-level `harnesses:`. All non-reserved keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Built-in providers also normalize `snake_case` keys to kebab-case flag names. Reserved keys are `provider` and `fallback`.
 
 Supported providers: `claude`, `codex`, `copilot`, `opencode`, `pi`.
 

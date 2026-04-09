@@ -826,6 +826,22 @@ steps:
 `,
 		},
 		{
+			name: "RequirePromptFlagForFlagPromptMode",
+			spec: `
+harnesses:
+  gemini:
+    binary: gemini
+    prompt_mode: flag
+
+steps:
+  - type: harness
+    command: Summarize the repository state
+    config:
+      provider: gemini
+`,
+			wantErr: "harnesses",
+		},
+		{
 			name: "RejectInvalidFallbackShape",
 			spec: `
 harness:
@@ -837,6 +853,21 @@ steps:
   - command: Write tests
 `,
 			wantErr: "harness",
+		},
+		{
+			name: "RejectNestedFallbackInFallbackProvider",
+			spec: `
+steps:
+  - type: harness
+    command: Write tests
+    config:
+      provider: claude
+      fallback:
+        - provider: codex
+          fallback:
+            - provider: copilot
+`,
+			wantErr: "steps",
 		},
 	}
 
