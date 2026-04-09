@@ -8259,7 +8259,7 @@ components:
               type: boolean
               description: "Whether this DAG-run still has a usable source file on disk, so reschedule can load the current spec from that file instead of the stored historical YAML snapshot."
             sourceFileName:
-              type: string
+              $ref: "#/components/schemas/DAGFileName"
               description: "File name of the source DAG definition, derived from the DAG-run's source file path. Only set when the source file still exists on disk. Can be used to navigate to the DAG definition page."
           required:
             - rootDAGRunName

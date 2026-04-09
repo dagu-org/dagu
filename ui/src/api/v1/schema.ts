@@ -3313,7 +3313,7 @@ export interface components {
             /** @description Whether this DAG-run still has a usable source file on disk, so reschedule can load the current spec from that file instead of the stored historical YAML snapshot. */
             specFromFile?: boolean;
             /** @description File name of the source DAG definition, derived from the DAG-run's source file path. Only set when the source file still exists on disk. Can be used to navigate to the DAG definition page. */
-            sourceFileName?: string;
+            sourceFileName?: components["schemas"]["DAGFileName"];
         };
         /** @description Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings. */
         DAGRunOutputs: {

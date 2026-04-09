@@ -3260,7 +3260,11 @@ func (a *API) dagRunSourceInfo(ctx context.Context, attempt exec.DAGRunAttempt) 
 	if err != nil {
 		return true, ""
 	}
-	if !strings.HasPrefix(absSource, absDAGsDir+string(filepath.Separator)) {
+	rel, err := filepath.Rel(absDAGsDir, absSource)
+	if err != nil {
+		return true, ""
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return true, ""
 	}
 	base := filepath.Base(dag.SourceFile)
