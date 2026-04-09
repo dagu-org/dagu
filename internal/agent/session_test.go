@@ -409,6 +409,21 @@ func TestSessionManager_Cancel(t *testing.T) {
 		err := sm.Cancel(context.Background())
 		assert.NoError(t, err)
 	})
+
+	t.Run("ignores late working pulse after cancel", func(t *testing.T) {
+		t.Parallel()
+
+		sm := NewSessionManager(SessionManagerConfig{})
+		sm.SetWorking(true)
+
+		err := sm.Cancel(context.Background())
+		require.NoError(t, err)
+		assert.False(t, sm.IsWorking())
+
+		// Simulate a late callback from the loop goroutine after cancellation.
+		sm.SetWorking(true)
+		assert.False(t, sm.IsWorking())
+	})
 }
 
 func TestSessionManager_GetMessages(t *testing.T) {
