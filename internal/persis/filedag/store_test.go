@@ -555,6 +555,32 @@ steps:
 	require.Error(t, err)
 }
 
+func TestLoadSpecWithBaseGraphType(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-load-spec-base-graph")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	baseConfig := filepath.Join(tmpDir, "base.yaml")
+	require.NoError(t, os.WriteFile(baseConfig, []byte("type: graph\n"), 0600))
+
+	store := New(tmpDir, WithBaseConfig(baseConfig), WithSkipExamples(true))
+	ctx := context.Background()
+
+	dag, err := store.LoadSpec(ctx, []byte(`name: base-graph-dag
+steps:
+  - name: build
+    command: echo build
+  - name: test
+    command: echo test
+    depends: [build]
+`))
+	require.NoError(t, err)
+	require.Equal(t, core.TypeGraph, dag.Type)
+	require.Len(t, dag.Steps, 2)
+	require.Equal(t, []string{"build"}, dag.Steps[1].Depends)
+}
+
 func TestListWithPagination(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-list-pagination")
 	defer func() {

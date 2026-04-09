@@ -40,6 +40,7 @@ type Options struct {
 	FlagsBaseDir          string                     // Base directory for flag store
 	FileCache             *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
 	SearchPaths           []string                   // Additional search paths for DAG files
+	BaseConfigPath        string                     // Optional base config file applied when loading DAGs
 	SkipExamples          bool                       // Skip creating example DAGs
 	SkipDirectoryCreation bool                       // Skip creating base directory (for worker mode)
 }
@@ -62,6 +63,14 @@ func WithFlagsBaseDir(dir string) Option {
 func WithSearchPaths(paths []string) Option {
 	return func(o *Options) {
 		o.SearchPaths = paths
+	}
+}
+
+// WithBaseConfig returns a DAGRepositoryOption that sets the base config file
+// used when loading DAGs from the store.
+func WithBaseConfig(path string) Option {
+	return func(o *Options) {
+		o.BaseConfigPath = path
 	}
 }
 
@@ -105,6 +114,7 @@ func New(baseDir string, opts ...Option) exec.DAGStore {
 		flagsBaseDir:          options.FlagsBaseDir,
 		fileCache:             options.FileCache,
 		searchPaths:           searchPaths,
+		baseConfigPath:        options.BaseConfigPath,
 		skipExamples:          options.SkipExamples,
 		skipDirectoryCreation: options.SkipDirectoryCreation,
 	}
@@ -116,9 +126,31 @@ type Storage struct {
 	flagsBaseDir          string                     // Base directory for flag store
 	fileCache             *fileutil.Cache[*core.DAG] // Optional cache for DAG objects
 	searchPaths           []string                   // Additional search paths for DAG files
+	baseConfigPath        string                     // Optional base config file applied when loading DAGs
 	skipExamples          bool                       // Skip creating example DAGs
 	skipDirectoryCreation bool                       // Skip creating base directory (for worker mode)
 	indexMu               sync.Mutex                 // Protects index load/rebuild/invalidate
+}
+
+func (store *Storage) useCachedLoads() bool {
+	return store.fileCache != nil && !store.hasBaseConfig()
+}
+
+func (store *Storage) useIndexedMetadata() bool {
+	return !store.hasBaseConfig()
+}
+
+func (store *Storage) hasBaseConfig() bool {
+	return store.baseConfigPath != "" && fileExists(store.baseConfigPath)
+}
+
+func (store *Storage) defaultLoadOptions(opts ...spec.LoadOption) []spec.LoadOption {
+	loadOpts := make([]spec.LoadOption, 0, len(opts)+1)
+	if store.baseConfigPath != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfig(store.baseConfigPath))
+	}
+	loadOpts = append(loadOpts, opts...)
+	return loadOpts
 }
 
 // Initialize ensures the storage is ready and creates example DAGs if needed
@@ -132,19 +164,16 @@ func (store *Storage) GetMetadata(ctx context.Context, name string) (*core.DAG, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s in search paths (%v): %w", name, store.searchPaths, err)
 	}
-	if store.fileCache == nil {
-		return spec.Load(ctx, filePath,
-			spec.OnlyMetadata(),
-			spec.WithoutEval(),
-			spec.SkipSchemaValidation(),
-		)
+	loadOpts := store.defaultLoadOptions(
+		spec.OnlyMetadata(),
+		spec.WithoutEval(),
+		spec.SkipSchemaValidation(),
+	)
+	if !store.useCachedLoads() {
+		return spec.Load(ctx, filePath, loadOpts...)
 	}
 	return store.fileCache.LoadLatest(filePath, func() (*core.DAG, error) {
-		return spec.Load(ctx, filePath,
-			spec.OnlyMetadata(),
-			spec.WithoutEval(),
-			spec.SkipSchemaValidation(),
-		)
+		return spec.Load(ctx, filePath, loadOpts...)
 	})
 }
 
@@ -154,8 +183,7 @@ func (store *Storage) GetDetails(ctx context.Context, name string, opts ...spec.
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
 	}
-	var loadOpts []spec.LoadOption
-	loadOpts = append(loadOpts, opts...)
+	loadOpts := store.defaultLoadOptions(opts...)
 	loadOpts = append(loadOpts, spec.WithoutEval())
 
 	dat, err := spec.Load(ctx, filePath, loadOpts...)
@@ -183,18 +211,18 @@ const defaultPerm os.FileMode = 0600
 
 func (store *Storage) LoadSpec(ctx context.Context, yamlSpec []byte, opts ...spec.LoadOption) (*core.DAG, error) {
 	// Validate the spec before saving it.
-	opts = append(slices.Clone(opts), spec.WithoutEval())
-	return spec.LoadYAML(ctx, yamlSpec, opts...)
+	loadOpts := store.defaultLoadOptions(slices.Clone(opts)...)
+	loadOpts = append(loadOpts, spec.WithoutEval())
+	return spec.LoadYAML(ctx, yamlSpec, loadOpts...)
 }
 
 // UpdateSpec updates the specification of a DAG by its name.
 func (store *Storage) UpdateSpec(ctx context.Context, name string, yamlSpec []byte) error {
 	// Validate the spec before saving it.
-	dag, err := spec.LoadYAML(ctx,
-		yamlSpec,
-		spec.WithoutEval(),
+	dag, err := spec.LoadYAML(ctx, yamlSpec, store.defaultLoadOptions(
 		spec.WithName(name),
-	)
+		spec.WithoutEval(),
+	)...)
 	if err != nil {
 		return err
 	}
@@ -274,6 +302,10 @@ func (store *Storage) ensureDirExist() error {
 // loadOrRebuildIndex returns validated index entries, rebuilding if necessary.
 // Returns nil on any failure (caller falls back to direct scan).
 func (store *Storage) loadOrRebuildIndex(ctx context.Context) []*indexv1.DAGIndexEntry {
+	if !store.useIndexedMetadata() {
+		return nil
+	}
+
 	store.indexMu.Lock()
 	defer store.indexMu.Unlock()
 
@@ -389,12 +421,12 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			}
 
 			filePath := filepath.Join(store.baseDir, entry.Name())
-			dag, err := spec.Load(ctx, filePath,
+			dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
 				spec.OnlyMetadata(),
 				spec.WithoutEval(),
 				spec.SkipSchemaValidation(),
 				spec.WithAllowBuildErrors(),
-			)
+			)...)
 			if err != nil {
 				errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
 				continue
@@ -579,11 +611,11 @@ func (store *Storage) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
 				continue
 			}
-			dag, err := spec.Load(ctx, filePath,
+			dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
 				spec.OnlyMetadata(),
 				spec.WithoutEval(),
 				spec.SkipSchemaValidation(),
-			)
+			)...)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue

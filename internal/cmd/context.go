@@ -722,6 +722,7 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 		c.Config.Paths.DAGsDir,
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
 		filedag.WithSearchPaths(searchPaths),
+		filedag.WithBaseConfig(c.Config.Paths.BaseConfig),
 		filedag.WithFileCache(cfg.Cache),
 		filedag.WithSkipExamples(c.Config.Core.SkipExamples),
 		filedag.WithSkipDirectoryCreation(cfg.SkipDirectoryCreation),

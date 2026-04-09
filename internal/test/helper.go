@@ -243,7 +243,12 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	ctx = config.WithConfig(ctx, cfg)
 
-	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
+	dagStore := filedag.New(
+		cfg.Paths.DAGsDir,
+		filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir),
+		filedag.WithBaseConfig(cfg.Paths.BaseConfig),
+		filedag.WithSkipExamples(true),
+	)
 	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
 	procStore := newProcStore(cfg)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
