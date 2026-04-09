@@ -335,7 +335,11 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           </div>
 
           <div className={activeTab === 'spec' ? 'visible' : 'hidden'}>
-            <DAGEditButtons fileName={fileName || ''} />
+            <DAGEditButtons
+              fileName={fileName || ''}
+              dagName={dag?.name || fileName || ''}
+              latestDAGRun={latestDAGRun}
+            />
           </div>
         </div>
         <div className="flex-1 flex flex-col min-h-0">
@@ -350,7 +354,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               key={fileName}
               fileName={fileName}
               localDags={localDags}
-              latestDAGRun={latestDAGRun}
             />
           ) : null}
           {activeTab === 'history' ? (
