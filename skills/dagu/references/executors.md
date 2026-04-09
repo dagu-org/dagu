@@ -403,7 +403,7 @@ Agent config fields (under `agent:`): `model`, `tools` (with `enabled` list and 
 
 ## harness
 
-Run coding agent CLIs (Claude Code, Codex, OpenCode, Pi) as DAG steps. The CLI binary must be pre-installed in `PATH`.
+Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as DAG steps. The CLI binary must be pre-installed in `PATH`.
 
 ```yaml
 steps:
@@ -414,51 +414,13 @@ steps:
       provider: claude
       model: sonnet
       effort: high
-      max_turns: 20
-      output_format: json
+      bare: true
     output: RESULT
 ```
 
-The `command` field is the prompt. The `config.provider` field is required.
+The `command` field is the prompt. `config.provider` is required. All other config keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Config keys are the exact CLI flag names without the `--` prefix — refer to each provider's CLI documentation for available flags and model names.
 
-Common config fields (all providers):
-- `provider` — **Required.** `claude`, `codex`, `opencode`, or `pi`
-- `model` — Model name passed to `--model`
-- `effort` — `low`, `medium`, `high`, `max`. Claude: `--effort`. Codex: high/max → `--full-auto`. Pi: mapped to `--thinking` level.
-- `max_turns` — Max agentic iterations (Claude: `--max-turns`)
-- `output_format` — `text`, `json`, `stream-json`. Claude: `--output-format`. Codex: `--json`. OpenCode: `--format`. Pi: `--mode`.
-- `extra_flags` — String array of additional CLI flags appended verbatim
-
-Claude-specific:
-- `allowed_tools` — `--allowedTools` (e.g., `"Bash,Read,Edit"`)
-- `disallowed_tools` — `--disallowedTools`
-- `permission_mode` — `--permission-mode` (e.g., `auto`, `plan`, `bypassPermissions`)
-- `system_prompt` — `--system-prompt`
-- `append_system_prompt` — `--append-system-prompt`
-- `max_budget_usd` — `--max-budget-usd`
-- `bare` — `--bare` (skip hooks, skills, MCP, CLAUDE.md auto-discovery)
-- `add_dir` — `--add-dir`
-- `worktree` — `--worktree`
-
-Codex-specific:
-- `full_auto` — `--full-auto`
-- `sandbox` — `--sandbox` (`read-only`, `workspace-write`, `danger-full-access`)
-- `output_schema` — `--output-schema`
-- `ephemeral` — `--ephemeral`
-- `skip_git_repo_check` — `--skip-git-repo-check`
-
-OpenCode-specific:
-- `agent` — `--agent`
-- `file` — `--file`
-- `title` — `--title`
-
-Pi-specific:
-- `thinking` — `--thinking` (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`). Overrides `effort` if both set.
-- `pi_provider` — `--provider` (LLM provider: `anthropic`, `openai`, etc.)
-- `tools` — `--tools`
-- `no_tools` — `--no-tools`
-- `no_extensions` — `--no-extensions`
-- `session` — `--session`
+Supported providers: `claude`, `codex`, `copilot`, `opencode`, `pi`.
 
 If the step has a `script:` field, its content is piped to the CLI's stdin.
 
