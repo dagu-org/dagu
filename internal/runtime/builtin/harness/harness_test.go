@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -765,6 +766,16 @@ func TestGetProvider(t *testing.T) {
 			assert.Equal(t, name, p.Name())
 		})
 	}
+}
+
+func TestBuiltinProvidersStayInSyncWithCoreList(t *testing.T) {
+	registered := make([]string, 0, len(providers))
+	for name := range providers {
+		registered = append(registered, name)
+	}
+	sort.Strings(registered)
+
+	assert.Equal(t, core.BuiltinHarnessProviderNames(), registered)
 }
 
 func TestRegisterProviderPanicsOnDuplicate(t *testing.T) {
