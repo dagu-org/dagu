@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec"
+	_ "github.com/dagucloud/dagu/internal/runtime/builtin/harness"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -300,6 +301,101 @@ steps:
 		assert.Equal(t, []string{"single@example.com"}, dag.WaitMail.To)
 		assert.Equal(t, "[WAIT]", dag.WaitMail.Prefix)
 		assert.False(t, dag.WaitMail.AttachLogs)
+	})
+}
+
+func TestLoad_HarnessDefinitionsBaseConfigMerge(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SameNameOverrideReplacesWholeDefinition", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+    option_flags:
+      model: --model
+steps:
+  - command: echo base
+`)
+		child := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: aider
+    prompt_mode: stdin
+steps:
+  - type: harness
+    command: Review this repository
+    config:
+      provider: gemini
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Contains(t, dag.Harnesses, "gemini")
+
+		def := dag.Harnesses["gemini"]
+		require.NotNil(t, def)
+		assert.Equal(t, "aider", def.Binary)
+		assert.Nil(t, def.PrefixArgs)
+		assert.Equal(t, core.HarnessPromptModeStdin, def.PromptMode)
+		assert.Empty(t, def.PromptFlag)
+		assert.Nil(t, def.OptionFlags)
+	})
+
+	t.Run("NullEntryDeletesInheritedDefinition", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: gemini
+    prompt_mode: flag
+    prompt_flag: --prompt
+steps:
+  - command: echo base
+`)
+		child := createTempYAMLFile(t, `
+harnesses:
+  gemini: null
+steps:
+  - command: echo child
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		assert.Nil(t, dag.Harnesses)
+	})
+
+	t.Run("NullDeletionMakesReferenceInvalid", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: gemini
+    prompt_mode: flag
+    prompt_flag: --prompt
+steps:
+  - command: echo base
+`)
+		child := createTempYAMLFile(t, `
+harnesses:
+  gemini: null
+steps:
+  - type: harness
+    command: Review this repository
+    config:
+      provider: gemini
+`)
+
+		_, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `unknown provider "gemini"`)
 	})
 }
 

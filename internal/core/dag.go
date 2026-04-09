@@ -232,6 +232,9 @@ type DAG struct {
 	// Steps with type: harness inherit this configuration.
 	// Excluded from JSON: may contain API key references or provider-specific secrets.
 	Harness *HarnessConfig `json:"-"`
+	// Harnesses contains reusable custom harness definitions available to harness steps.
+	// Excluded from JSON: derived from DAG/base config and rebuilt from YAML when needed.
+	Harnesses HarnessDefinitions `json:"-"`
 	// Kubernetes contains the default Kubernetes executor configuration for the DAG.
 	// Steps with type: k8s or type: kubernetes inherit this configuration.
 	// Excluded from JSON: may contain secret references.
@@ -314,6 +317,9 @@ func (d *DAG) Clone() *DAG {
 	}
 	if d.Harness != nil {
 		clone.Harness = cloneHarnessConfig(d.Harness)
+	}
+	if d.Harnesses != nil {
+		clone.Harnesses = cloneHarnessDefinitions(d.Harnesses)
 	}
 	if d.Kubernetes != nil {
 		clone.Kubernetes = cloneKubernetesConfig(d.Kubernetes)

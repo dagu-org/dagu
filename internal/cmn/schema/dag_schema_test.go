@@ -807,14 +807,20 @@ steps:
 `,
 		},
 		{
-			name: "CustomBinaryProvider",
+			name: "CustomNamedProvider",
 			spec: `
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+
 steps:
   - type: harness
     command: Summarize the repository state
     config:
-      binary: gemini
-      prompt_args: ["-p"]
+      provider: gemini
       model: gemini-2.5-pro
       yolo: true
 `,
@@ -831,18 +837,6 @@ steps:
   - command: Write tests
 `,
 			wantErr: "harness",
-		},
-		{
-			name: "RejectProviderAndBinaryTogether",
-			spec: `
-steps:
-  - type: harness
-    command: Summarize the repository state
-    config:
-      provider: claude
-      binary: gemini
-`,
-			wantErr: "steps",
 		},
 	}
 

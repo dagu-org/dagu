@@ -406,23 +406,29 @@ Agent config fields (under `agent:`): `model`, `tools` (with `enabled` list and 
 Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as DAG steps. The CLI binary must be pre-installed in `PATH`.
 
 ```yaml
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+
 harness:
-  provider: claude
-  model: sonnet
-  bare: true
+  provider: gemini
+  model: gemini-2.5-pro
   fallback:
-    - provider: codex
-      full-auto: true
+    - provider: claude
+      model: sonnet
 
 steps:
   - name: generate-tests
     command: "Write unit tests for the auth module"
     config:
-      effort: high
+      yolo: true
     output: RESULT
 ```
 
-The `command` field is the prompt. Harness config can use either `provider` for built-in CLIs or `binary` plus optional `prompt_args` for custom CLIs. All non-reserved keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Reserved keys are `provider`, `binary`, `prompt_args`, and `fallback`.
+The `command` field is the prompt. `config.provider` can reference either a built-in provider or a named custom entry under top-level `harnesses:`. All non-reserved keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Reserved keys are `provider` and `fallback`.
 
 Supported providers: `claude`, `codex`, `copilot`, `opencode`, `pi`.
 
@@ -430,7 +436,16 @@ Top-level `harness:` acts as a DAG-wide default. Step-level config overlays the 
 
 `provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
 
-If the step has a `script:` field, its content is piped to the CLI's stdin.
+Custom `harnesses:` definitions describe how to invoke arbitrary harness CLIs:
+- `binary`
+- `prefix_args`
+- `prompt_mode`: `arg`, `flag`, or `stdin`
+- `prompt_flag` for `flag` mode
+- `prompt_position`: `before_flags` or `after_flags`
+- `flag_style`: `gnu_long` or `single_dash`
+- `option_flags` to override specific flag tokens
+
+If the step has a `script:` field, its content is piped to stdin for built-in providers and custom `arg`/`flag` harnesses. For custom `stdin` harnesses, stdin receives the prompt followed by a blank line and the script when both are present.
 
 If the primary attempt fails and the context is still active, harness tries fallback configs in order. Failed-attempt stdout is discarded, but stderr remains visible in logs.
 

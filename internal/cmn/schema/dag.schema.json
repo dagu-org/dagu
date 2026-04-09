@@ -725,6 +725,10 @@
       "$ref": "#/definitions/harnessDefaultsConfig",
       "description": "Default harness configuration for coding-agent steps in the DAG. Steps with type: harness inherit these defaults, and steps without an explicit type are treated as harness steps when this block is present. Step-level config overrides primary keys and replaces DAG-level fallback when fallback is set."
     },
+    "harnesses": {
+      "$ref": "#/definitions/harnessDefinitions",
+      "description": "Reusable custom harness definitions available to harness steps. Each definition describes how to invoke a named harness CLI; steps reference definitions via config.provider."
+    },
     "steps": {
       "oneOf": [
         {
@@ -3294,60 +3298,90 @@
       ],
       "description": "Harness flag value. Scalars become a single CLI flag value; arrays become repeated flags."
     },
-    "harnessProviderConfig": {
+    "harnessNamedDefinition": {
       "type": "object",
+      "additionalProperties": false,
+      "required": ["binary"],
       "properties": {
-        "provider": {
-          "type": "string",
-          "description": "Built-in harness provider name such as claude, codex, copilot, opencode, or pi. Supports ${VAR} interpolation."
-        },
         "binary": {
           "type": "string",
-          "description": "Custom CLI binary name or path for a non-built-in provider. Supports ${VAR} interpolation."
+          "description": "CLI binary name or path for the custom harness."
         },
-        "prompt_args": {
+        "prefix_args": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Base CLI arguments used to pass the prompt for custom binaries. Defaults to ['-p'] when omitted."
+          "description": "Arguments that always appear before prompt placement and runtime flags."
+        },
+        "prompt_mode": {
+          "type": "string",
+          "enum": ["arg", "flag", "stdin"],
+          "description": "How the prompt is passed to the CLI."
+        },
+        "prompt_flag": {
+          "type": "string",
+          "description": "Flag token used when prompt_mode is flag."
+        },
+        "prompt_position": {
+          "type": "string",
+          "enum": ["before_flags", "after_flags"],
+          "description": "Whether prompt tokens appear before or after runtime flags."
+        },
+        "flag_style": {
+          "type": "string",
+          "enum": ["gnu_long", "single_dash"],
+          "description": "Default flag prefix style for runtime options that do not have an explicit option_flags override."
+        },
+        "option_flags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Per-option override mapping from config key to exact CLI flag token."
+        }
+      }
+    },
+    "harnessDefinitions": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/definitions/harnessNamedDefinition" },
+          { "type": "null" }
+        ]
+      },
+      "description": "Reusable named custom harness definitions. Null entries remove inherited definitions from base config."
+    },
+    "harnessProviderConfig": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "enum": ["binary", "prompt_args"]
+        }
+      },
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Harness provider name. May reference a built-in provider such as claude, codex, copilot, opencode, or pi, or a custom top-level harnesses entry. Supports ${VAR} interpolation."
         }
       },
       "additionalProperties": {
         "$ref": "#/definitions/harnessConfigValue"
       },
-      "allOf": [
-        {
-          "anyOf": [
-            { "required": ["provider"] },
-            { "required": ["binary"] }
-          ]
-        },
-        {
-          "not": {
-            "required": ["provider", "binary"]
-          }
-        }
-      ],
-      "description": "Primary or fallback harness provider configuration. Reserved keys are provider, binary, and prompt_args; all other keys are passed through to the CLI as flags."
+      "required": ["provider"],
+      "description": "Primary or fallback harness provider configuration. Reserved keys are provider and fallback; all other keys are passed through to the CLI as flags."
     },
     "harnessExecutorConfig": {
       "type": "object",
+      "propertyNames": {
+        "not": {
+          "enum": ["binary", "prompt_args"]
+        }
+      },
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Built-in harness provider name such as claude, codex, copilot, opencode, or pi. Supports ${VAR} interpolation."
-        },
-        "binary": {
-          "type": "string",
-          "description": "Custom CLI binary name or path for a non-built-in provider. Supports ${VAR} interpolation."
-        },
-        "prompt_args": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Base CLI arguments used to pass the prompt for custom binaries. Defaults to ['-p'] when omitted."
+          "description": "Harness provider name. May reference a built-in provider such as claude, codex, copilot, opencode, or pi, or a custom top-level harnesses entry. Supports ${VAR} interpolation."
         },
         "fallback": {
           "type": "array",
@@ -3360,33 +3394,16 @@
       "additionalProperties": {
         "$ref": "#/definitions/harnessConfigValue"
       },
-      "allOf": [
-        {
-          "not": {
-            "required": ["provider", "binary"]
-          }
-        }
-      ],
-      "description": "Harness step configuration. Unknown keys are passed through to the CLI as flags. When no DAG-level harness defaults exist, specify either provider or binary."
+      "description": "Harness step configuration. Unknown keys are passed through to the CLI as flags. When no DAG-level harness defaults exist, specify provider."
     },
     "harnessDefaultsConfig": {
       "allOf": [
         {
           "$ref": "#/definitions/harnessExecutorConfig"
         },
-        {
-          "anyOf": [
-            { "required": ["provider"] },
-            { "required": ["binary"] }
-          ]
-        },
-        {
-          "not": {
-            "required": ["provider", "binary"]
-          }
-        }
+        { "required": ["provider"] }
       ],
-      "description": "DAG-level harness defaults. Specify either provider or binary, plus optional CLI flags and fallback providers."
+      "description": "DAG-level harness defaults. Specify provider plus optional CLI flags and fallback providers."
     },
     "kubernetesKeySelector": {
       "type": "object",

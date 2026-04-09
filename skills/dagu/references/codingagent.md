@@ -16,10 +16,11 @@ The binary must be pre-installed in `PATH`. If missing, the step fails at setup 
 
 ## How Config Works
 
-Harness supports both built-in providers and custom binaries:
+Harness supports built-in providers and named custom harness definitions:
 
 - `config.provider` selects a built-in provider such as `claude`, `codex`, or `copilot`
-- `config.binary` + optional `config.prompt_args` define a custom CLI invocation
+- top-level `harnesses.<name>` defines how to invoke a custom harness CLI
+- `config.provider` can point at either a built-in provider or a custom `harnesses:` entry
 
 All non-reserved config keys are passed directly as CLI flags:
 
@@ -28,9 +29,42 @@ All non-reserved config keys are passed directly as CLI flags:
 - `key: false` → omitted
 - `key: 123` → `--key 123`
 
-Reserved keys are `provider`, `binary`, `prompt_args`, and `fallback`.
+Reserved keys are `provider` and `fallback`.
 
 `provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
+
+## Custom Harness Registry
+
+Define reusable custom harness adapters once at the DAG level:
+
+```yaml
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+    option_flags:
+      model: --model
+
+steps:
+  - name: review
+    type: harness
+    command: "Review the current branch"
+    config:
+      provider: gemini
+      model: gemini-2.5-pro
+```
+
+Custom harness definition fields:
+
+- `binary` — CLI binary or path
+- `prefix_args` — args that always appear before prompt placement and runtime flags
+- `prompt_mode` — `arg`, `flag`, or `stdin`
+- `prompt_flag` — required when `prompt_mode: flag`
+- `prompt_position` — `before_flags` or `after_flags`
+- `flag_style` — `gnu_long` or `single_dash`
+- `option_flags` — per-option override from config key to exact flag token
 
 ## DAG-Level Defaults and Fallback
 
@@ -146,7 +180,7 @@ steps:
     output: REFINED
 ```
 
-`command:` is the prompt passed to the CLI flag. `script:` content is piped to the CLI's stdin as supplementary context.
+`command:` is the prompt. For built-in providers and custom `arg`/`flag` harnesses, `script:` is piped to stdin as supplementary context. For custom `stdin` harnesses, stdin receives the prompt, then a blank line, then the script when both are present.
 
 ## Pattern 3: Parameterized
 

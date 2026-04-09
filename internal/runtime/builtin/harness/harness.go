@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"sort"
@@ -27,8 +28,10 @@ var _ executor.Executor = (*harnessExecutor)(nil)
 var _ executor.ExitCoder = (*harnessExecutor)(nil)
 
 type providerConfig struct {
-	provider Provider
-	flags    map[string]any
+	name       string
+	provider   Provider
+	definition *core.HarnessDefinition
+	flags      map[string]any
 }
 
 type harnessExecutor struct {
@@ -89,10 +92,10 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 				"harness: attempt %d/%d with %s failed; trying fallback %d/%d with %s\n",
 				i+1,
 				len(e.configs),
-				cfg.provider.Name(),
+				cfg.name,
 				i+2,
 				len(e.configs),
-				next.provider.Name(),
+				next.name,
 			)
 		}
 	}
@@ -111,10 +114,14 @@ func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) ([]by
 	e.stderrTail = tw
 
 	var stdout bytes.Buffer
-	args := cfg.provider.BaseArgs(e.prompt)
-	args = append(args, configToFlags(cfg.flags)...)
+	args, stdin, err := cfg.buildInvocation(e.prompt, e.script)
+	if err != nil {
+		e.exitCode = 1
+		e.mu.Unlock()
+		return nil, err
+	}
 
-	cmd := exec.CommandContext(ctx, cfg.provider.BinaryName(), args...)
+	cmd := exec.CommandContext(ctx, cfg.binaryName(), args...)
 	cmd.Env = append(cmd.Env, runtime.AllEnvs(ctx)...)
 	cmd.Dir = e.workDir
 	cmd.Stdout = &stdout
@@ -129,8 +136,8 @@ func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) ([]by
 		}
 	}
 
-	if e.script != "" {
-		cmd.Stdin = strings.NewReader(e.script)
+	if stdin != nil {
+		cmd.Stdin = stdin
 	}
 
 	e.cmd = cmd
@@ -184,10 +191,8 @@ func (e *harnessExecutor) stderrWriter() io.Writer {
 
 // reservedKeys are config keys consumed by the harness executor itself, not passed as CLI flags.
 var reservedKeys = map[string]bool{
-	"provider":    true,
-	"binary":      true,
-	"prompt_args": true,
-	"fallback":    true,
+	"provider": true,
+	"fallback": true,
 }
 
 // configToFlags converts config map entries into CLI flags.
@@ -198,7 +203,7 @@ var reservedKeys = map[string]bool{
 //   - []any → --key v1 --key v2 (repeated)
 //
 // Reserved keys are skipped. Keys are sorted for deterministic output.
-func configToFlags(cfg map[string]any) []string {
+func configToFlags(cfg map[string]any, definition *core.HarnessDefinition) []string {
 	keys := make([]string, 0, len(cfg))
 	for k := range cfg {
 		if reservedKeys[k] {
@@ -210,7 +215,7 @@ func configToFlags(cfg map[string]any) []string {
 
 	var args []string
 	for _, key := range keys {
-		flag := "--" + key
+		flag := flagTokenForKey(key, definition)
 		switch v := cfg[key].(type) {
 		case bool:
 			if v {
@@ -263,7 +268,12 @@ func configToFlags(cfg map[string]any) []string {
 
 func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) {
 	cfg := normalizeConfigMap(step.ExecutorConfig.Config)
-	configs, err := buildProviderConfigs(cfg)
+	var defs core.HarnessDefinitions
+	env := runtime.GetEnv(ctx)
+	if env.DAG != nil {
+		defs = env.DAG.Harnesses
+	}
+	configs, err := buildProviderConfigs(cfg, defs)
 	if err != nil {
 		return nil, err
 	}
@@ -272,8 +282,6 @@ func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) 
 	if prompt == "" {
 		return nil, fmt.Errorf("harness: command field (prompt) is required")
 	}
-
-	env := runtime.GetEnv(ctx)
 
 	return &harnessExecutor{
 		stdout:  os.Stdout,
@@ -285,7 +293,7 @@ func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) 
 	}, nil
 }
 
-func buildProviderConfigs(cfg map[string]any) ([]providerConfig, error) {
+func buildProviderConfigs(cfg map[string]any, defs core.HarnessDefinitions) ([]providerConfig, error) {
 	primary, fallbacks, err := extractFallbackConfigs(cfg)
 	if err != nil {
 		return nil, err
@@ -297,23 +305,21 @@ func buildProviderConfigs(cfg map[string]any) ([]providerConfig, error) {
 
 	configs := make([]providerConfig, 0, len(attempts))
 	for i := range attempts {
-		provider, err := resolveProvider(attempts[i])
+		resolved, err := resolveProvider(attempts[i], defs)
 		if err != nil {
 			if i == 0 {
 				return nil, err
 			}
 			return nil, fmt.Errorf("harness: invalid fallback[%d]: %w", i-1, err)
 		}
-		if _, err := exec.LookPath(provider.BinaryName()); err != nil {
+		if _, err := exec.LookPath(resolved.binaryName()); err != nil {
 			if i == 0 {
-				return nil, fmt.Errorf("harness: %q CLI not found in PATH; install it first: %w", provider.BinaryName(), err)
+				return nil, fmt.Errorf("harness: %q CLI not found in PATH; install it first: %w", resolved.binaryName(), err)
 			}
-			return nil, fmt.Errorf("harness: fallback[%d] %q CLI not found in PATH; install it first: %w", i-1, provider.BinaryName(), err)
+			return nil, fmt.Errorf("harness: fallback[%d] %q CLI not found in PATH; install it first: %w", i-1, resolved.binaryName(), err)
 		}
-		configs = append(configs, providerConfig{
-			provider: provider,
-			flags:    attempts[i],
-		})
+		resolved.flags = attempts[i]
+		configs = append(configs, resolved)
 	}
 
 	return configs, nil
@@ -355,72 +361,33 @@ func fallbackConfigsFromValue(raw any) ([]map[string]any, error) {
 	}
 }
 
-// resolveProvider returns a Provider from either a built-in name or a custom binary definition.
-//
-// Built-in: config.provider = "claude" (uses registered provider)
-// Custom:   config.binary = "gemini", config.prompt_args = ["-p"] (user-defined)
-//
-// prompt_args defines the base CLI arguments for passing the prompt. The prompt
-// string is appended after these args. For example, prompt_args: ["-p"] produces
-// ["gemini", "-p", "<prompt>", ...flags]. Defaults to ["-p"] if omitted.
-func resolveProvider(cfg map[string]any) (Provider, error) {
+func resolveProvider(cfg map[string]any, defs core.HarnessDefinitions) (providerConfig, error) {
 	providerName, _ := cfg["provider"].(string)
-	binaryName, _ := cfg["binary"].(string)
-
-	switch {
-	case providerName != "" && binaryName != "":
-		return nil, fmt.Errorf("harness: specify either provider or binary, not both")
-	case providerName != "":
-		if isTemplatedValue(providerName) {
-			return nil, fmt.Errorf("harness: unresolved provider template %q", providerName)
-		}
-		return getProvider(providerName)
-	case binaryName != "":
-		if isTemplatedValue(binaryName) {
-			return nil, fmt.Errorf("harness: unresolved binary template %q", binaryName)
-		}
-		promptArgs, err := promptArgsFromConfig(cfg["prompt_args"])
+	if providerName == "" {
+		return providerConfig{}, fmt.Errorf("harness: config.provider is required")
+	}
+	if isTemplatedValue(providerName) {
+		return providerConfig{}, fmt.Errorf("harness: unresolved provider template %q", providerName)
+	}
+	if core.IsBuiltinHarnessProvider(providerName) {
+		provider, err := getProvider(providerName)
 		if err != nil {
-			return nil, err
+			return providerConfig{}, err
 		}
-		return &customProvider{binary: binaryName, promptArgs: promptArgs}, nil
-	default:
-		return nil, fmt.Errorf("harness: config.provider or config.binary is required")
+		return providerConfig{
+			name:     provider.Name(),
+			provider: provider,
+		}, nil
 	}
-}
-
-func promptArgsFromConfig(raw any) ([]string, error) {
-	if raw == nil {
-		return []string{"-p"}, nil
-	}
-
-	switch v := raw.(type) {
-	case []string:
-		return append([]string(nil), v...), nil
-	case []any:
-		args := make([]string, len(v))
-		for i := range v {
-			args[i] = fmt.Sprint(v[i])
+	if defs != nil {
+		if def, ok := defs[providerName]; ok && def != nil {
+			return providerConfig{
+				name:       providerName,
+				definition: cloneDefinition(def),
+			}, nil
 		}
-		return args, nil
-	default:
-		return nil, fmt.Errorf("harness: config.prompt_args must be an array")
 	}
-}
-
-// customProvider is a user-defined provider specified via config.binary and config.prompt_args.
-type customProvider struct {
-	binary     string
-	promptArgs []string
-}
-
-func (p *customProvider) Name() string       { return p.binary }
-func (p *customProvider) BinaryName() string { return p.binary }
-
-func (p *customProvider) BaseArgs(prompt string) []string {
-	args := make([]string, len(p.promptArgs))
-	copy(args, p.promptArgs)
-	return append(args, prompt)
+	return providerConfig{}, fmt.Errorf("harness: unknown provider %q; registered: %v", providerName, knownProviders(defs))
 }
 
 func normalizeConfigMap(cfg map[string]any) map[string]any {
@@ -571,19 +538,129 @@ func validateHarnessStep(step core.Step) error {
 
 func validateProviderConfig(cfg map[string]any) error {
 	providerStr, _ := cfg["provider"].(string)
-	binaryStr, _ := cfg["binary"].(string)
-	if providerStr == "" && binaryStr == "" {
-		return fmt.Errorf("harness: config.provider or config.binary is required")
+	if _, exists := cfg["binary"]; exists {
+		return fmt.Errorf("harness: config.binary is not supported; define a named harness under top-level harnesses and reference it via config.provider")
 	}
-	if providerStr != "" && binaryStr != "" {
-		return fmt.Errorf("harness: specify either provider or binary, not both")
+	if _, exists := cfg["prompt_args"]; exists {
+		return fmt.Errorf("harness: config.prompt_args is not supported; define a named harness under top-level harnesses and reference it via config.provider")
 	}
-	if providerStr != "" && !isTemplatedValue(providerStr) {
-		if _, err := getProvider(providerStr); err != nil {
-			return err
-		}
+	if providerStr == "" {
+		return fmt.Errorf("harness: config.provider is required")
 	}
 	return nil
+}
+
+func (cfg providerConfig) binaryName() string {
+	if cfg.provider != nil {
+		return cfg.provider.BinaryName()
+	}
+	if cfg.definition != nil {
+		return cfg.definition.Binary
+	}
+	return ""
+}
+
+func (cfg providerConfig) buildInvocation(prompt, script string) ([]string, io.Reader, error) {
+	if cfg.provider != nil {
+		args := cfg.provider.BaseArgs(prompt)
+		args = append(args, configToFlags(cfg.flags, nil)...)
+
+		if script == "" {
+			return args, nil, nil
+		}
+		return args, strings.NewReader(script), nil
+	}
+
+	if cfg.definition == nil {
+		return nil, nil, fmt.Errorf("harness: provider %q is not configured", cfg.name)
+	}
+
+	args := append([]string(nil), cfg.definition.PrefixArgs...)
+	flags := configToFlags(cfg.flags, cfg.definition)
+
+	switch cfg.definition.PromptMode {
+	case core.HarnessPromptModeArg:
+		promptArgs := []string{prompt}
+		if cfg.definition.PromptPosition == core.HarnessPromptPositionAfterFlags {
+			args = append(args, flags...)
+			args = append(args, promptArgs...)
+		} else {
+			args = append(args, promptArgs...)
+			args = append(args, flags...)
+		}
+		if script == "" {
+			return args, nil, nil
+		}
+		return args, strings.NewReader(script), nil
+	case core.HarnessPromptModeFlag:
+		promptArgs := []string{cfg.definition.PromptFlag, prompt}
+		if cfg.definition.PromptPosition == core.HarnessPromptPositionAfterFlags {
+			args = append(args, flags...)
+			args = append(args, promptArgs...)
+		} else {
+			args = append(args, promptArgs...)
+			args = append(args, flags...)
+		}
+		if script == "" {
+			return args, nil, nil
+		}
+		return args, strings.NewReader(script), nil
+	case core.HarnessPromptModeStdin:
+		args = append(args, flags...)
+		return args, strings.NewReader(promptAndScript(prompt, script)), nil
+	default:
+		return nil, nil, fmt.Errorf("harness: unsupported prompt_mode %q for provider %q", cfg.definition.PromptMode, cfg.name)
+	}
+}
+
+func flagTokenForKey(key string, definition *core.HarnessDefinition) string {
+	if definition != nil && definition.OptionFlags != nil {
+		if token, ok := definition.OptionFlags[key]; ok && strings.TrimSpace(token) != "" {
+			return token
+		}
+	}
+	if definition != nil && definition.FlagStyle == core.HarnessFlagStyleSingleDash {
+		return "-" + key
+	}
+	return "--" + key
+}
+
+func promptAndScript(prompt, script string) string {
+	switch {
+	case prompt == "":
+		return script
+	case script == "":
+		return prompt
+	default:
+		return prompt + "\n\n" + script
+	}
+}
+
+func knownProviders(defs core.HarnessDefinitions) []string {
+	names := core.BuiltinHarnessProviderNames()
+	for name, def := range defs {
+		if def == nil {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func cloneDefinition(def *core.HarnessDefinition) *core.HarnessDefinition {
+	if def == nil {
+		return nil
+	}
+	return &core.HarnessDefinition{
+		Binary:         def.Binary,
+		PrefixArgs:     append([]string(nil), def.PrefixArgs...),
+		PromptMode:     def.PromptMode,
+		PromptFlag:     def.PromptFlag,
+		PromptPosition: def.PromptPosition,
+		FlagStyle:      def.FlagStyle,
+		OptionFlags:    maps.Clone(def.OptionFlags),
+	}
 }
 
 func isTemplatedValue(value string) bool {

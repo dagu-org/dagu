@@ -11,9 +11,7 @@ import (
 var configSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"provider":    {Type: "string", Description: "Built-in provider name (claude, codex, copilot, opencode, pi)"},
-		"binary":      {Type: "string", Description: "Custom CLI binary name (alternative to provider)"},
-		"prompt_args": {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Base args for passing the prompt to a custom binary (default: [\"-p\"])"},
+		"provider": {Type: "string", Description: "Harness provider name. May reference a built-in provider or a custom top-level harnesses entry."},
 		"fallback": {
 			Type: "array",
 			Items: &jsonschema.Schema{
@@ -22,7 +20,7 @@ var configSchema = &jsonschema.Schema{
 			Description: "Ordered alternative provider configs tried after the primary config fails",
 		},
 	},
-	// Either provider or binary is required (validated in Go).
+	// provider is required (validated in Go).
 	// All other keys are passed through as CLI flags.
 }
 

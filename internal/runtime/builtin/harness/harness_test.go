@@ -5,6 +5,7 @@ package harness
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -42,13 +43,11 @@ func TestProviderBaseArgs(t *testing.T) {
 func TestConfigToFlags(t *testing.T) {
 	t.Run("reserved_keys_skipped", func(t *testing.T) {
 		flags := configToFlags(map[string]any{
-			"provider":    "claude",
-			"binary":      "gemini",
-			"prompt_args": []any{"-p"},
+			"provider": "claude",
 			"fallback": []any{
 				map[string]any{"provider": "codex"},
 			},
-		})
+		}, nil)
 		assert.Empty(t, flags)
 	})
 
@@ -58,13 +57,28 @@ func TestConfigToFlags(t *testing.T) {
 			"max-turns":      20,
 			"max-budget-usd": 5.5,
 			"allow-tool":     []any{"shell(git:*)", "write"},
-		})
+		}, nil)
 		assert.Equal(t, []string{
 			"--allow-tool", "shell(git:*)",
 			"--allow-tool", "write",
 			"--bare",
 			"--max-budget-usd", "5.5",
 			"--max-turns", "20",
+		}, flags)
+	})
+
+	t.Run("definition_overrides_flag_tokens", func(t *testing.T) {
+		flags := configToFlags(map[string]any{
+			"provider":   "gemini",
+			"model":      "gemini-2.5-pro",
+			"allow-tool": []any{"shell(git:*)"},
+		}, &core.HarnessDefinition{
+			FlagStyle:   core.HarnessFlagStyleSingleDash,
+			OptionFlags: map[string]string{"allow-tool": "--allowedTool"},
+		})
+		assert.Equal(t, []string{
+			"--allowedTool", "shell(git:*)",
+			"-model", "gemini-2.5-pro",
 		}, flags)
 	})
 }
@@ -133,34 +147,13 @@ func TestValidateHarnessStep(t *testing.T) {
 		assert.Contains(t, err.Error(), "config is required")
 	})
 
-	t.Run("missing_provider_and_binary", func(t *testing.T) {
+	t.Run("missing_provider", func(t *testing.T) {
 		err := validateHarnessStep(core.Step{
 			Commands:       []core.CommandEntry{{Command: "prompt"}},
 			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{}},
 		})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "provider or config.binary")
-	})
-
-	t.Run("both_provider_and_binary", func(t *testing.T) {
-		err := validateHarnessStep(core.Step{
-			Commands: []core.CommandEntry{{Command: "prompt"}},
-			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{
-				"provider": "claude",
-				"binary":   "gemini",
-			}},
-		})
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "either provider or binary")
-	})
-
-	t.Run("unknown_literal_provider", func(t *testing.T) {
-		err := validateHarnessStep(core.Step{
-			Commands:       []core.CommandEntry{{Command: "prompt"}},
-			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{"provider": "unknown"}},
-		})
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown provider")
+		assert.Contains(t, err.Error(), "config.provider is required")
 	})
 
 	t.Run("templated_provider_allowed", func(t *testing.T) {
@@ -199,31 +192,46 @@ func TestValidateHarnessStep(t *testing.T) {
 
 func TestResolveProvider(t *testing.T) {
 	t.Run("builtin", func(t *testing.T) {
-		p, err := resolveProvider(map[string]any{"provider": "claude"})
+		cfg, err := resolveProvider(map[string]any{"provider": "claude"}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "claude", p.BinaryName())
-		assert.Equal(t, []string{"-p", "hello"}, p.BaseArgs("hello"))
+		assert.Equal(t, "claude", cfg.binaryName())
+
+		args, stdin, err := cfg.buildInvocation("hello", "context")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"-p", "hello"}, args)
+		assert.Equal(t, "context", mustReadAll(t, stdin))
 	})
 
-	t.Run("custom_binary_default_prompt_args", func(t *testing.T) {
-		p, err := resolveProvider(map[string]any{"binary": "gemini"})
-		require.NoError(t, err)
-		assert.Equal(t, "gemini", p.BinaryName())
-		assert.Equal(t, []string{"-p", "hello"}, p.BaseArgs("hello"))
-	})
-
-	t.Run("custom_binary_with_prompt_args", func(t *testing.T) {
-		p, err := resolveProvider(map[string]any{
-			"binary":      "aider",
-			"prompt_args": []any{"-m"},
+	t.Run("custom_definition", func(t *testing.T) {
+		cfg, err := resolveProvider(map[string]any{"provider": "gemini"}, core.HarnessDefinitions{
+			"gemini": {
+				Binary:     "gemini",
+				PrefixArgs: []string{"run"},
+				PromptMode: core.HarnessPromptModeFlag,
+				PromptFlag: "--prompt",
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "aider", p.BinaryName())
-		assert.Equal(t, []string{"-m", "hello"}, p.BaseArgs("hello"))
+		assert.Equal(t, "gemini", cfg.binaryName())
+
+		cfg.flags = map[string]any{"provider": "gemini", "model": "gemini-2.5-pro"}
+		args, stdin, err := cfg.buildInvocation("hello", "context")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"run", "--prompt", "hello", "--model", "gemini-2.5-pro"}, args)
+		assert.Equal(t, "context", mustReadAll(t, stdin))
+	})
+
+	t.Run("deleted_definition_is_unknown", func(t *testing.T) {
+		_, err := resolveProvider(map[string]any{"provider": "gemini"}, core.HarnessDefinitions{
+			"gemini": nil,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown provider")
 	})
 
 	t.Run("templated_provider_runtime_error", func(t *testing.T) {
-		_, err := resolveProvider(map[string]any{"provider": "${PROVIDER}"})
+		_, err := resolveProvider(map[string]any{"provider": "${PROVIDER}"}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unresolved provider template")
 	})
@@ -237,17 +245,126 @@ func TestBuildProviderConfigs(t *testing.T) {
 
 		primary := writeHarnessTestBinary(t, "primary", "#!/bin/sh\nexit 0\n")
 		fallback := writeHarnessTestBinary(t, "fallback", "#!/bin/sh\nexit 0\n")
+		defs := core.HarnessDefinitions{
+			"primary": {
+				Binary:     primary,
+				PromptMode: core.HarnessPromptModeArg,
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
+			"fallback": {
+				Binary:     fallback,
+				PromptMode: core.HarnessPromptModeArg,
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
+		}
 
 		configs, err := buildProviderConfigs(map[string]any{
-			"binary": primary,
+			"provider": "primary",
 			"fallback": []any{
-				map[string]any{"binary": fallback},
+				map[string]any{"provider": "fallback"},
 			},
-		})
+		}, defs)
 		require.NoError(t, err)
 		require.Len(t, configs, 2)
-		assert.Equal(t, primary, configs[0].provider.BinaryName())
-		assert.Equal(t, fallback, configs[1].provider.BinaryName())
+		assert.Equal(t, primary, configs[0].binaryName())
+		assert.Equal(t, fallback, configs[1].binaryName())
+	})
+}
+
+func TestProviderConfigBuildInvocation(t *testing.T) {
+	t.Run("arg_mode_before_flags", func(t *testing.T) {
+		cfg := providerConfig{
+			name: "gemini",
+			definition: &core.HarnessDefinition{
+				Binary:         "gemini",
+				PrefixArgs:     []string{"run"},
+				PromptMode:     core.HarnessPromptModeArg,
+				PromptPosition: core.HarnessPromptPositionBeforeFlags,
+				FlagStyle:      core.HarnessFlagStyleGNULong,
+			},
+			flags: map[string]any{
+				"provider": "gemini",
+				"model":    "gemini-2.5-pro",
+			},
+		}
+
+		args, stdin, err := cfg.buildInvocation("hello", "context")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"run", "hello", "--model", "gemini-2.5-pro"}, args)
+		assert.Equal(t, "context", mustReadAll(t, stdin))
+	})
+
+	t.Run("arg_mode_after_flags", func(t *testing.T) {
+		cfg := providerConfig{
+			name: "aider",
+			definition: &core.HarnessDefinition{
+				Binary:         "aider",
+				PrefixArgs:     []string{"exec"},
+				PromptMode:     core.HarnessPromptModeArg,
+				PromptPosition: core.HarnessPromptPositionAfterFlags,
+				FlagStyle:      core.HarnessFlagStyleSingleDash,
+			},
+			flags: map[string]any{
+				"provider": "aider",
+				"model":    "sonnet",
+			},
+		}
+
+		args, stdin, err := cfg.buildInvocation("hello", "context")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"exec", "-model", "sonnet", "hello"}, args)
+		assert.Equal(t, "context", mustReadAll(t, stdin))
+	})
+
+	t.Run("flag_mode", func(t *testing.T) {
+		cfg := providerConfig{
+			name: "gemini",
+			definition: &core.HarnessDefinition{
+				Binary:         "gemini",
+				PrefixArgs:     []string{"run"},
+				PromptMode:     core.HarnessPromptModeFlag,
+				PromptFlag:     "--prompt",
+				PromptPosition: core.HarnessPromptPositionBeforeFlags,
+				FlagStyle:      core.HarnessFlagStyleGNULong,
+				OptionFlags:    map[string]string{"allow-tool": "--allowedTool"},
+			},
+			flags: map[string]any{
+				"provider":   "gemini",
+				"model":      "gemini-2.5-pro",
+				"allow-tool": []any{"shell(git:*)"},
+			},
+		}
+
+		args, stdin, err := cfg.buildInvocation("hello", "context")
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			"run",
+			"--prompt", "hello",
+			"--allowedTool", "shell(git:*)",
+			"--model", "gemini-2.5-pro",
+		}, args)
+		assert.Equal(t, "context", mustReadAll(t, stdin))
+	})
+
+	t.Run("stdin_mode", func(t *testing.T) {
+		cfg := providerConfig{
+			name: "llm",
+			definition: &core.HarnessDefinition{
+				Binary:     "llm",
+				PrefixArgs: []string{"run"},
+				PromptMode: core.HarnessPromptModeStdin,
+				FlagStyle:  core.HarnessFlagStyleGNULong,
+			},
+			flags: map[string]any{
+				"provider": "llm",
+				"model":    "o3",
+			},
+		}
+
+		args, stdin, err := cfg.buildInvocation("hello", "context")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"run", "--model", "o3"}, args)
+		assert.Equal(t, "hello\n\ncontext", mustReadAll(t, stdin))
 	})
 }
 
@@ -271,8 +388,24 @@ exit 0
 		stdout: &strings.Builder{},
 		stderr: &strings.Builder{},
 		configs: []providerConfig{
-			{provider: &customProvider{binary: primary, promptArgs: []string{}}, flags: map[string]any{}},
-			{provider: &customProvider{binary: fallback, promptArgs: []string{}}, flags: map[string]any{}},
+			{
+				name: "primary",
+				definition: &core.HarnessDefinition{
+					Binary:     primary,
+					PromptMode: core.HarnessPromptModeArg,
+					FlagStyle:  core.HarnessFlagStyleGNULong,
+				},
+				flags: map[string]any{"provider": "primary"},
+			},
+			{
+				name: "fallback",
+				definition: &core.HarnessDefinition{
+					Binary:     fallback,
+					PromptMode: core.HarnessPromptModeArg,
+					FlagStyle:  core.HarnessFlagStyleGNULong,
+				},
+				flags: map[string]any{"provider": "fallback"},
+			},
 		},
 		prompt: "hello",
 	}
@@ -308,8 +441,24 @@ exit 1
 		stdout: &stdout,
 		stderr: &stderr,
 		configs: []providerConfig{
-			{provider: &customProvider{binary: primary, promptArgs: []string{}}, flags: map[string]any{}},
-			{provider: &customProvider{binary: fallback, promptArgs: []string{}}, flags: map[string]any{}},
+			{
+				name: "primary",
+				definition: &core.HarnessDefinition{
+					Binary:     primary,
+					PromptMode: core.HarnessPromptModeArg,
+					FlagStyle:  core.HarnessFlagStyleGNULong,
+				},
+				flags: map[string]any{"provider": "primary"},
+			},
+			{
+				name: "fallback",
+				definition: &core.HarnessDefinition{
+					Binary:     fallback,
+					PromptMode: core.HarnessPromptModeArg,
+					FlagStyle:  core.HarnessFlagStyleGNULong,
+				},
+				flags: map[string]any{"provider": "fallback"},
+			},
 		},
 		prompt: "hello",
 	}
@@ -339,7 +488,15 @@ func TestHarnessExecutorRun_CreatesWorkingDir(t *testing.T) {
 		stdout: &stdout,
 		stderr: &stderr,
 		configs: []providerConfig{
-			{provider: &customProvider{binary: bin, promptArgs: []string{}}, flags: map[string]any{}},
+			{
+				name: "pwd",
+				definition: &core.HarnessDefinition{
+					Binary:     bin,
+					PromptMode: core.HarnessPromptModeArg,
+					FlagStyle:  core.HarnessFlagStyleGNULong,
+				},
+				flags: map[string]any{"provider": "pwd"},
+			},
 		},
 		prompt:  "hello",
 		workDir: workDir,
@@ -399,6 +556,17 @@ func writeHarnessTestBinary(t *testing.T, name, content string) string {
 	path := filepath.Join(t.TempDir(), name)
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o755))
 	return path
+}
+
+func mustReadAll(t *testing.T, reader io.Reader) string {
+	t.Helper()
+
+	if reader == nil {
+		return ""
+	}
+	data, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	return string(data)
 }
 
 func mustFallback(t *testing.T, value any) []map[string]any {

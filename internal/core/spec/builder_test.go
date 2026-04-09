@@ -3114,6 +3114,59 @@ steps:
 		require.Len(t, fallback, 1)
 		assert.Equal(t, "${PROVIDER}", fallback[0]["provider"])
 	})
+
+	t.Run("StepUsesCustomHarnessFromRegistry", func(t *testing.T) {
+		yaml := `
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+harness:
+  provider: gemini
+steps:
+  - name: step1
+    command: "Review this repository"
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.NotNil(t, dag.Harnesses)
+		require.Contains(t, dag.Harnesses, "gemini")
+
+		assert.Equal(t, "harness", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "gemini", dag.Steps[0].ExecutorConfig.Config["provider"])
+		assert.Equal(t, "gemini", dag.Harnesses["gemini"].Binary)
+		assert.Equal(t, []string{"run"}, dag.Harnesses["gemini"].PrefixArgs)
+	})
+
+	t.Run("UnknownCustomHarnessProviderFailsBuild", func(t *testing.T) {
+		yaml := `
+steps:
+  - name: step1
+    type: harness
+    command: "Review this repository"
+    config:
+      provider: gemini
+`
+		_, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `unknown provider "gemini"`)
+	})
+
+	t.Run("BuiltinHarnessNameCollisionFailsBuild", func(t *testing.T) {
+		yaml := `
+harnesses:
+  claude:
+    binary: gemini
+steps:
+  - command: "Review this repository"
+`
+		_, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `conflicts with built-in provider`)
+	})
 }
 
 func mustHarnessFallback(t *testing.T, value any) []map[string]any {

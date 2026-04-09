@@ -1271,6 +1271,24 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	if isKubernetesExecutorType(result.ExecutorConfig.Type) && ctx.dag != nil && ctx.dag.Kubernetes != nil {
 		result.ExecutorConfig.Config = mergeKubernetesExecutorConfig(ctx.dag.Kubernetes, result.ExecutorConfig.Config)
 	}
+	if result.ExecutorConfig.Type == "harness" {
+		var defs core.HarnessDefinitions
+		if ctx.dag != nil {
+			defs = ctx.dag.Harnesses
+		}
+		if err := validateHarnessProviderConfig(defs, result.ExecutorConfig.Config); err != nil {
+			return err
+		}
+		fallbacks, err := extractHarnessFallback(cloneHarnessSpecMap(result.ExecutorConfig.Config))
+		if err != nil {
+			return err
+		}
+		for i := range fallbacks {
+			if err := validateHarnessProviderConfig(defs, fallbacks[i]); err != nil {
+				return fmt.Errorf("harness: invalid fallback[%d]: %w", i, err)
+			}
+		}
+	}
 
 	return nil
 }
