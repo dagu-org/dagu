@@ -9,13 +9,14 @@ import (
 )
 
 var configSchema = &jsonschema.Schema{
-	Type:     "object",
-	Required: []string{"provider"},
+	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
-		"provider": {Type: "string", Description: "Coding agent CLI provider (e.g., claude, codex, copilot, opencode, pi)"},
+		"provider":    {Type: "string", Description: "Built-in provider name (claude, codex, copilot, opencode, pi)"},
+		"binary":      {Type: "string", Description: "Custom CLI binary name (alternative to provider)"},
+		"prompt_args": {Type: "array", Items: &jsonschema.Schema{Type: "string"}, Description: "Base args for passing the prompt to a custom binary (default: [\"-p\"])"},
 	},
+	// Either provider or binary is required (validated in Go).
 	// All other keys are passed through as CLI flags.
-	// No additional properties are restricted.
 }
 
 func init() {

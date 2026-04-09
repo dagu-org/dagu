@@ -113,6 +113,13 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 	}
 }
 
+// reservedKeys are config keys consumed by the harness executor itself, not passed as CLI flags.
+var reservedKeys = map[string]bool{
+	"provider":    true,
+	"binary":      true,
+	"prompt_args": true,
+}
+
 // configToFlags converts config map entries into CLI flags.
 // Keys become --key, values are type-dependent:
 //   - string → --key value
@@ -120,11 +127,12 @@ func (e *harnessExecutor) Run(ctx context.Context) error {
 //   - number → --key N
 //   - []any → --key v1 --key v2 (repeated)
 //
-// The "provider" key is skipped. Keys are sorted for deterministic output.
+// Reserved keys (provider, binary, prompt_args) are skipped.
+// Keys are sorted for deterministic output.
 func configToFlags(cfg map[string]any) []string {
 	keys := make([]string, 0, len(cfg))
 	for k := range cfg {
-		if k == "provider" {
+		if reservedKeys[k] {
 			continue
 		}
 		keys = append(keys, k)
@@ -163,12 +171,7 @@ func configToFlags(cfg map[string]any) []string {
 func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) {
 	cfg := step.ExecutorConfig.Config
 
-	providerName, _ := cfg["provider"].(string)
-	if providerName == "" {
-		return nil, fmt.Errorf("harness: config.provider is required")
-	}
-
-	provider, err := getProvider(providerName)
+	provider, err := resolveProvider(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +196,54 @@ func newHarness(ctx context.Context, step core.Step) (executor.Executor, error) 
 		script:   step.Script,
 		workDir:  env.WorkingDir,
 	}, nil
+}
+
+// resolveProvider returns a Provider from either a built-in name or a custom binary definition.
+//
+// Built-in: config.provider = "claude" (uses registered provider)
+// Custom:   config.binary = "gemini", config.prompt_args = ["-p"] (user-defined)
+//
+// prompt_args defines the base CLI arguments for passing the prompt. The prompt
+// string is appended after these args. For example, prompt_args: ["-p"] produces
+// ["gemini", "-p", "<prompt>", ...flags]. Defaults to ["-p"] if omitted.
+func resolveProvider(cfg map[string]any) (Provider, error) {
+	providerName, _ := cfg["provider"].(string)
+	binaryName, _ := cfg["binary"].(string)
+
+	switch {
+	case providerName != "" && binaryName != "":
+		return nil, fmt.Errorf("harness: specify either provider or binary, not both")
+	case providerName != "":
+		return getProvider(providerName)
+	case binaryName != "":
+		promptArgs := []string{"-p"}
+		if raw, ok := cfg["prompt_args"]; ok {
+			if arr, ok := raw.([]any); ok {
+				promptArgs = make([]string, len(arr))
+				for i, v := range arr {
+					promptArgs[i] = fmt.Sprint(v)
+				}
+			}
+		}
+		return &customProvider{binary: binaryName, promptArgs: promptArgs}, nil
+	default:
+		return nil, fmt.Errorf("harness: config.provider or config.binary is required")
+	}
+}
+
+// customProvider is a user-defined provider specified via config.binary and config.prompt_args.
+type customProvider struct {
+	binary     string
+	promptArgs []string
+}
+
+func (p *customProvider) Name() string       { return p.binary }
+func (p *customProvider) BinaryName() string { return p.binary }
+
+func (p *customProvider) BaseArgs(prompt string) []string {
+	args := make([]string, len(p.promptArgs))
+	copy(args, p.promptArgs)
+	return append(args, prompt)
 }
 
 func extractPrompt(step core.Step) string {
@@ -220,16 +271,18 @@ func validateHarnessStep(step core.Step) error {
 	if cfg == nil {
 		return fmt.Errorf("harness: config is required")
 	}
-	provider, ok := cfg["provider"]
-	if !ok || provider == "" {
-		return fmt.Errorf("harness: config.provider is required")
+	providerStr, _ := cfg["provider"].(string)
+	binaryStr, _ := cfg["binary"].(string)
+	if providerStr == "" && binaryStr == "" {
+		return fmt.Errorf("harness: config.provider or config.binary is required")
 	}
-	providerStr, ok := provider.(string)
-	if !ok {
-		return fmt.Errorf("harness: config.provider must be a string")
+	if providerStr != "" && binaryStr != "" {
+		return fmt.Errorf("harness: specify either provider or binary, not both")
 	}
-	if _, err := getProvider(providerStr); err != nil {
-		return err
+	if providerStr != "" {
+		if _, err := getProvider(providerStr); err != nil {
+			return err
+		}
 	}
 	return nil
 }

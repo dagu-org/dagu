@@ -37,8 +37,12 @@ func TestConfigToFlags(t *testing.T) {
 		assert.Empty(t, configToFlags(nil))
 	})
 
-	t.Run("provider_skipped", func(t *testing.T) {
-		flags := configToFlags(map[string]any{"provider": "claude"})
+	t.Run("reserved_keys_skipped", func(t *testing.T) {
+		flags := configToFlags(map[string]any{
+			"provider":    "claude",
+			"binary":      "gemini",
+			"prompt_args": []any{"-p"},
+		})
 		assert.Empty(t, flags)
 	})
 
@@ -148,13 +152,22 @@ func TestValidateHarnessStep(t *testing.T) {
 		assert.Contains(t, err.Error(), "config is required")
 	})
 
-	t.Run("missing_provider", func(t *testing.T) {
+	t.Run("missing_provider_and_binary", func(t *testing.T) {
 		err := validateHarnessStep(core.Step{
 			Commands:       []core.CommandEntry{{Command: "prompt"}},
 			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{}},
 		})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "provider")
+		assert.Contains(t, err.Error(), "provider or config.binary")
+	})
+
+	t.Run("both_provider_and_binary", func(t *testing.T) {
+		err := validateHarnessStep(core.Step{
+			Commands:       []core.CommandEntry{{Command: "prompt"}},
+			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{"provider": "claude", "binary": "gemini"}},
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "either provider or binary")
 	})
 
 	t.Run("unknown_provider", func(t *testing.T) {
@@ -175,6 +188,14 @@ func TestValidateHarnessStep(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+
+	t.Run("valid_custom_binary", func(t *testing.T) {
+		err := validateHarnessStep(core.Step{
+			Commands:       []core.CommandEntry{{Command: "prompt"}},
+			ExecutorConfig: core.ExecutorConfig{Config: map[string]any{"binary": "gemini"}},
+		})
+		assert.NoError(t, err)
+	})
 }
 
 func TestExtractPrompt(t *testing.T) {
@@ -217,6 +238,52 @@ func TestGetProvider(t *testing.T) {
 		_, err := getProvider("unknown")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown provider")
+	})
+}
+
+func TestResolveProvider(t *testing.T) {
+	t.Run("builtin", func(t *testing.T) {
+		p, err := resolveProvider(map[string]any{"provider": "claude"})
+		require.NoError(t, err)
+		assert.Equal(t, "claude", p.BinaryName())
+		assert.Equal(t, []string{"-p", "hello"}, p.BaseArgs("hello"))
+	})
+
+	t.Run("custom_binary_default_prompt_args", func(t *testing.T) {
+		p, err := resolveProvider(map[string]any{"binary": "gemini"})
+		require.NoError(t, err)
+		assert.Equal(t, "gemini", p.BinaryName())
+		assert.Equal(t, []string{"-p", "hello"}, p.BaseArgs("hello"))
+	})
+
+	t.Run("custom_binary_with_prompt_args", func(t *testing.T) {
+		p, err := resolveProvider(map[string]any{
+			"binary":      "aider",
+			"prompt_args": []any{"-m"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "aider", p.BinaryName())
+		assert.Equal(t, []string{"-m", "hello"}, p.BaseArgs("hello"))
+	})
+
+	t.Run("custom_binary_multi_prompt_args", func(t *testing.T) {
+		p, err := resolveProvider(map[string]any{
+			"binary":      "kiro-cli",
+			"prompt_args": []any{"chat", "--no-interactive", "--trust-all-tools"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "kiro-cli", p.BinaryName())
+		assert.Equal(t, []string{"chat", "--no-interactive", "--trust-all-tools", "hello"}, p.BaseArgs("hello"))
+	})
+
+	t.Run("both_fails", func(t *testing.T) {
+		_, err := resolveProvider(map[string]any{"provider": "claude", "binary": "gemini"})
+		assert.Error(t, err)
+	})
+
+	t.Run("neither_fails", func(t *testing.T) {
+		_, err := resolveProvider(map[string]any{})
+		assert.Error(t, err)
 	})
 }
 
