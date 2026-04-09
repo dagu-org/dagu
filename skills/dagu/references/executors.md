@@ -406,23 +406,33 @@ Agent config fields (under `agent:`): `model`, `tools` (with `enabled` list and 
 Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as DAG steps. The CLI binary must be pre-installed in `PATH`.
 
 ```yaml
+harness:
+  provider: claude
+  model: sonnet
+  bare: true
+  fallback:
+    - provider: codex
+      full-auto: true
+
 steps:
   - name: generate-tests
-    type: harness
     command: "Write unit tests for the auth module"
     config:
-      provider: claude
-      model: sonnet
       effort: high
-      bare: true
     output: RESULT
 ```
 
-The `command` field is the prompt. `config.provider` is required. All other config keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Config keys are the exact CLI flag names without the `--` prefix — refer to each provider's CLI documentation for available flags and model names.
+The `command` field is the prompt. Harness config can use either `provider` for built-in CLIs or `binary` plus optional `prompt_args` for custom CLIs. All non-reserved keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Reserved keys are `provider`, `binary`, `prompt_args`, and `fallback`.
 
 Supported providers: `claude`, `codex`, `copilot`, `opencode`, `pi`.
 
+Top-level `harness:` acts as a DAG-wide default. Step-level config overlays the DAG-level primary config, and step-level `fallback` replaces the DAG-level `fallback`. If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`.
+
+`provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
+
 If the step has a `script:` field, its content is piped to the CLI's stdin.
+
+If the primary attempt fails and the context is still active, harness tries fallback configs in order. Failed-attempt stdout is discarded, but stderr remains visible in logs.
 
 Exit codes: 0 = success, 1 = CLI error, 124 = step timed out.
 

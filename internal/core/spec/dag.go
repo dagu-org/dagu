@@ -131,6 +131,9 @@ type dag struct {
 	// Redis is the default Redis configuration for all redis steps in this DAG.
 	// Steps can override this configuration by specifying their own config fields.
 	Redis *redisConfig `yaml:"redis,omitempty"`
+	// Harness is the default harness configuration for all harness steps in this DAG.
+	// Steps can override primary config keys and replace fallback entirely.
+	Harness map[string]any `yaml:"harness,omitempty"`
 	// Kubernetes is the default Kubernetes configuration for explicit k8s steps in this DAG.
 	// Steps can override this configuration by specifying their own config fields.
 	Kubernetes map[string]any `yaml:"kubernetes,omitempty"`
@@ -451,6 +454,7 @@ var fullTransformers = []transform{
 	{"s3", newTransformer("S3", buildS3)},
 	{"llm", newTransformer("LLM", buildLLM)},
 	{"redis", newTransformer("Redis", buildRedis)},
+	{"harness", newTransformer("Harness", buildHarness)},
 	{"kubernetes", newTransformer("Kubernetes", buildKubernetes)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
 	{"dotenv", newTransformer("Dotenv", buildDotenv)},
@@ -1703,11 +1707,107 @@ func buildRedis(_ BuildContext, d *dag) (*core.RedisConfig, error) {
 	}, nil
 }
 
+func buildHarness(_ BuildContext, d *dag) (*core.HarnessConfig, error) {
+	if d.Harness == nil {
+		return nil, nil
+	}
+
+	config := cloneHarnessSpecMap(d.Harness)
+	fallbacks, err := extractHarnessFallback(config)
+	if err != nil {
+		return nil, core.NewValidationError("harness", d.Harness, err)
+	}
+
+	if err := core.ValidateExecutorConfig("harness", config); err != nil {
+		return nil, core.NewValidationError("harness", d.Harness, err)
+	}
+	for i := range fallbacks {
+		if err := core.ValidateExecutorConfig("harness", fallbacks[i]); err != nil {
+			return nil, core.NewValidationError(fmt.Sprintf("harness.fallback[%d]", i), fallbacks[i], err)
+		}
+	}
+
+	return &core.HarnessConfig{
+		Config:   config,
+		Fallback: fallbacks,
+	}, nil
+}
+
 func buildSecrets(_ BuildContext, d *dag) ([]core.SecretRef, error) {
 	if len(d.Secrets) == 0 {
 		return nil, nil
 	}
 	return parseSecretRefs(d.Secrets)
+}
+
+func extractHarnessFallback(config map[string]any) ([]map[string]any, error) {
+	raw, ok := config["fallback"]
+	if !ok {
+		return nil, nil
+	}
+	delete(config, "fallback")
+
+	switch v := raw.(type) {
+	case nil:
+		return nil, nil
+	case []map[string]any:
+		return cloneHarnessSpecFallback(v), nil
+	case []any:
+		fallbacks := make([]map[string]any, len(v))
+		for i := range v {
+			item, ok := v[i].(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("harness: fallback[%d] must be an object", i)
+			}
+			fallbacks[i] = cloneHarnessSpecMap(item)
+		}
+		return fallbacks, nil
+	default:
+		return nil, fmt.Errorf("harness: fallback must be an array of objects")
+	}
+}
+
+func cloneHarnessSpecMap(cfg map[string]any) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+
+	cloned := make(map[string]any, len(cfg))
+	for key, value := range cfg {
+		cloned[key] = cloneHarnessSpecValue(value)
+	}
+	return cloned
+}
+
+func cloneHarnessSpecFallback(cfgs []map[string]any) []map[string]any {
+	if cfgs == nil {
+		return nil
+	}
+
+	cloned := make([]map[string]any, len(cfgs))
+	for i := range cfgs {
+		cloned[i] = cloneHarnessSpecMap(cfgs[i])
+	}
+	return cloned
+}
+
+func cloneHarnessSpecValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return cloneHarnessSpecMap(v)
+	case []any:
+		cloned := make([]any, len(v))
+		for i := range v {
+			cloned[i] = cloneHarnessSpecValue(v[i])
+		}
+		return cloned
+	case []string:
+		return append([]string(nil), v...)
+	case []map[string]any:
+		return cloneHarnessSpecFallback(v)
+	default:
+		return value
+	}
 }
 
 func buildDotenv(_ BuildContext, d *dag) ([]string, error) {

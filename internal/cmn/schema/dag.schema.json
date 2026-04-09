@@ -721,6 +721,10 @@
       "$ref": "#/definitions/llmConfig",
       "description": "Default LLM configuration for all chat steps in the DAG. Steps with type: chat inherit this configuration if they don't specify their own llm field. If a step specifies llm, it completely overrides the DAG-level configuration."
     },
+    "harness": {
+      "$ref": "#/definitions/harnessDefaultsConfig",
+      "description": "Default harness configuration for coding-agent steps in the DAG. Steps with type: harness inherit these defaults, and steps without an explicit type are treated as harness steps when this block is present. Step-level config overrides primary keys and replaces DAG-level fallback when fallback is set."
+    },
     "steps": {
       "oneOf": [
         {
@@ -1724,6 +1728,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "harness" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/harnessExecutorConfig" }
             }
           }
         },
@@ -3260,6 +3272,122 @@
       ],
       "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
     },
+    "harnessConfigScalar": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" }
+      ],
+      "description": "Scalar harness flag value."
+    },
+    "harnessConfigValue": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/harnessConfigScalar"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/harnessConfigScalar"
+          }
+        }
+      ],
+      "description": "Harness flag value. Scalars become a single CLI flag value; arrays become repeated flags."
+    },
+    "harnessProviderConfig": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Built-in harness provider name such as claude, codex, copilot, opencode, or pi. Supports ${VAR} interpolation."
+        },
+        "binary": {
+          "type": "string",
+          "description": "Custom CLI binary name or path for a non-built-in provider. Supports ${VAR} interpolation."
+        },
+        "prompt_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Base CLI arguments used to pass the prompt for custom binaries. Defaults to ['-p'] when omitted."
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/harnessConfigValue"
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            { "required": ["provider"] },
+            { "required": ["binary"] }
+          ]
+        },
+        {
+          "not": {
+            "required": ["provider", "binary"]
+          }
+        }
+      ],
+      "description": "Primary or fallback harness provider configuration. Reserved keys are provider, binary, and prompt_args; all other keys are passed through to the CLI as flags."
+    },
+    "harnessExecutorConfig": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Built-in harness provider name such as claude, codex, copilot, opencode, or pi. Supports ${VAR} interpolation."
+        },
+        "binary": {
+          "type": "string",
+          "description": "Custom CLI binary name or path for a non-built-in provider. Supports ${VAR} interpolation."
+        },
+        "prompt_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Base CLI arguments used to pass the prompt for custom binaries. Defaults to ['-p'] when omitted."
+        },
+        "fallback": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/harnessProviderConfig"
+          },
+          "description": "Ordered fallback harness provider configs tried after the primary config fails. The fallback key is reserved and is not passed through as a CLI flag."
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/harnessConfigValue"
+      },
+      "allOf": [
+        {
+          "not": {
+            "required": ["provider", "binary"]
+          }
+        }
+      ],
+      "description": "Harness step configuration. Unknown keys are passed through to the CLI as flags. When no DAG-level harness defaults exist, specify either provider or binary."
+    },
+    "harnessDefaultsConfig": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/harnessExecutorConfig"
+        },
+        {
+          "anyOf": [
+            { "required": ["provider"] },
+            { "required": ["binary"] }
+          ]
+        },
+        {
+          "not": {
+            "required": ["provider", "binary"]
+          }
+        }
+      ],
+      "description": "DAG-level harness defaults. Specify either provider or binary, plus optional CLI flags and fallback providers."
+    },
     "kubernetesKeySelector": {
       "type": "object",
       "additionalProperties": false,
@@ -4707,6 +4835,7 @@
         "postgres",
         "sqlite",
         "redis",
+        "harness",
         "router",
         "agent"
       ],
@@ -4830,6 +4959,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "harness" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/harnessExecutorConfig" }
             }
           }
         },

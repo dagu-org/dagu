@@ -16,6 +16,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec"
+	_ "github.com/dagucloud/dagu/internal/runtime/builtin/harness"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -2938,6 +2939,201 @@ steps:
 		// Explicit type should override DAG-level redis inference
 		assert.Equal(t, "command", dag.Steps[0].ExecutorConfig.Type)
 	})
+}
+
+func TestHarnessInheritance(t *testing.T) {
+	t.Run("StepInheritsHarnessFromDAG", func(t *testing.T) {
+		yaml := `
+harness:
+  provider: claude
+  model: sonnet
+  bare: true
+  fallback:
+    - provider: codex
+      full-auto: true
+steps:
+  - name: step1
+    type: harness
+    command: "Write tests"
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.NotNil(t, dag.Harness)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		assert.Equal(t, "harness", step.ExecutorConfig.Type)
+		assert.Equal(t, "claude", step.ExecutorConfig.Config["provider"])
+		assert.Equal(t, "sonnet", step.ExecutorConfig.Config["model"])
+		assert.Equal(t, true, step.ExecutorConfig.Config["bare"])
+		fallback := mustHarnessFallback(t, step.ExecutorConfig.Config["fallback"])
+		require.Len(t, fallback, 1)
+		assert.Equal(t, "codex", fallback[0]["provider"])
+		assert.Equal(t, true, fallback[0]["full-auto"])
+	})
+
+	t.Run("StepOverridesPrimaryConfigAndInheritsFallback", func(t *testing.T) {
+		yaml := `
+harness:
+  provider: claude
+  model: sonnet
+  bare: true
+  fallback:
+    - provider: codex
+      full-auto: true
+steps:
+  - name: step1
+    type: harness
+    command: "Fix bugs"
+    config:
+      model: opus
+      effort: high
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		step := dag.Steps[0]
+
+		assert.Equal(t, "claude", step.ExecutorConfig.Config["provider"])
+		assert.Equal(t, "opus", step.ExecutorConfig.Config["model"])
+		assert.Equal(t, "high", step.ExecutorConfig.Config["effort"])
+		assert.Equal(t, true, step.ExecutorConfig.Config["bare"])
+
+		fallback := mustHarnessFallback(t, step.ExecutorConfig.Config["fallback"])
+		require.Len(t, fallback, 1)
+		assert.Equal(t, "codex", fallback[0]["provider"])
+	})
+
+	t.Run("StepFallbackReplacesDAGFallback", func(t *testing.T) {
+		yaml := `
+harness:
+  provider: claude
+  model: sonnet
+  fallback:
+    - provider: codex
+      full-auto: true
+steps:
+  - name: step1
+    type: harness
+    command: "Generate docs"
+    config:
+      provider: copilot
+      fallback:
+        - provider: claude
+          model: haiku
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		step := dag.Steps[0]
+
+		assert.Equal(t, "copilot", step.ExecutorConfig.Config["provider"])
+		fallback := mustHarnessFallback(t, step.ExecutorConfig.Config["fallback"])
+		require.Len(t, fallback, 1)
+		assert.Equal(t, "claude", fallback[0]["provider"])
+		assert.Equal(t, "haiku", fallback[0]["model"])
+	})
+
+	t.Run("EmptyStepFallbackDisablesInheritedFallback", func(t *testing.T) {
+		yaml := `
+harness:
+  provider: claude
+  fallback:
+    - provider: codex
+      full-auto: true
+steps:
+  - name: step1
+    type: harness
+    command: "No retries"
+    config:
+      fallback: []
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		step := dag.Steps[0]
+
+		fallback := mustHarnessFallback(t, step.ExecutorConfig.Config["fallback"])
+		assert.Empty(t, fallback)
+	})
+
+	t.Run("HarnessTypeInferenceFromDAG", func(t *testing.T) {
+		yaml := `
+harness:
+  provider: claude
+  model: sonnet
+steps:
+  - name: step1
+    command: "Write tests"
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		assert.Equal(t, "harness", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "claude", dag.Steps[0].ExecutorConfig.Config["provider"])
+		assert.Equal(t, "sonnet", dag.Steps[0].ExecutorConfig.Config["model"])
+	})
+
+	t.Run("ExplicitTypeOverridesDAGHarness", func(t *testing.T) {
+		yaml := `
+harness:
+  provider: claude
+  model: sonnet
+steps:
+  - name: step1
+    type: command
+    command: echo hello
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		assert.Equal(t, "command", dag.Steps[0].ExecutorConfig.Type)
+		assert.Empty(t, dag.Steps[0].ExecutorConfig.Config)
+	})
+
+	t.Run("ParameterizedProviderBuilds", func(t *testing.T) {
+		yaml := `
+params:
+  - PROVIDER: claude
+harness:
+  provider: "${PROVIDER}"
+  model: sonnet
+  fallback:
+    - provider: "${PROVIDER}"
+      model: haiku
+steps:
+  - name: step1
+    command: "Analyze this codebase"
+`
+		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		assert.Equal(t, "harness", dag.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "${PROVIDER}", dag.Steps[0].ExecutorConfig.Config["provider"])
+		fallback := mustHarnessFallback(t, dag.Steps[0].ExecutorConfig.Config["fallback"])
+		require.Len(t, fallback, 1)
+		assert.Equal(t, "${PROVIDER}", fallback[0]["provider"])
+	})
+}
+
+func mustHarnessFallback(t *testing.T, value any) []map[string]any {
+	t.Helper()
+
+	switch v := value.(type) {
+	case []map[string]any:
+		return v
+	case []any:
+		ret := make([]map[string]any, len(v))
+		for i := range v {
+			item, ok := v[i].(map[string]any)
+			require.True(t, ok, "fallback[%d] should be a map[string]any", i)
+			ret[i] = item
+		}
+		return ret
+	default:
+		t.Fatalf("unexpected fallback type %T", value)
+		return nil
+	}
 }
 
 func TestStepLevelEnv(t *testing.T) {

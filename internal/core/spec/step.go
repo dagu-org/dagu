@@ -1256,12 +1256,17 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 			result.ExecutorConfig.Type = "ssh"
 		} else if ctx.dag.Redis != nil {
 			result.ExecutorConfig.Type = "redis"
+		} else if ctx.dag.Harness != nil {
+			result.ExecutorConfig.Type = "harness"
 		}
 	}
 
 	// Merge DAG-level Redis config into step config (step takes precedence)
 	if result.ExecutorConfig.Type == "redis" && ctx.dag != nil && ctx.dag.Redis != nil {
 		mergeRedisConfig(ctx.dag.Redis, result.ExecutorConfig.Config)
+	}
+	if result.ExecutorConfig.Type == "harness" && ctx.dag != nil && ctx.dag.Harness != nil {
+		result.ExecutorConfig.Config = mergeHarnessConfig(ctx.dag.Harness, s.Config)
 	}
 	if isKubernetesExecutorType(result.ExecutorConfig.Type) && ctx.dag != nil && ctx.dag.Kubernetes != nil {
 		result.ExecutorConfig.Config = mergeKubernetesExecutorConfig(ctx.dag.Kubernetes, result.ExecutorConfig.Config)
@@ -1292,6 +1297,31 @@ func mergeRedisConfig(dagRedis *core.RedisConfig, stepConfig map[string]any) {
 	setIfMissing("sentinel_addrs", dagRedis.SentinelAddrs)
 	setIfMissing("cluster_addrs", dagRedis.ClusterAddrs)
 	setIfMissing("max_retries", dagRedis.MaxRetries)
+}
+
+func mergeHarnessConfig(dagHarness *core.HarnessConfig, stepConfig map[string]any) map[string]any {
+	merged := cloneHarnessSpecMap(stepConfig)
+	if merged == nil {
+		merged = make(map[string]any)
+	}
+
+	if dagHarness == nil {
+		return merged
+	}
+
+	for key, value := range dagHarness.Config {
+		if _, exists := merged[key]; !exists {
+			merged[key] = cloneHarnessSpecValue(value)
+		}
+	}
+
+	if _, exists := stepConfig["fallback"]; exists {
+		merged["fallback"] = cloneHarnessSpecValue(stepConfig["fallback"])
+	} else if dagHarness.Fallback != nil {
+		merged["fallback"] = cloneHarnessSpecValue(dagHarness.Fallback)
+	}
+
+	return merged
 }
 
 // isRedisZeroValue checks if a value is a zero value for Redis config merging.

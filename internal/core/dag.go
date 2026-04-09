@@ -228,6 +228,10 @@ type DAG struct {
 	// Steps with type: redis inherit this configuration.
 	// Excluded from JSON: may contain password.
 	Redis *RedisConfig `json:"-"`
+	// Harness contains the default harness executor configuration for the DAG.
+	// Steps with type: harness inherit this configuration.
+	// Excluded from JSON: may contain API key references or provider-specific secrets.
+	Harness *HarnessConfig `json:"-"`
 	// Kubernetes contains the default Kubernetes executor configuration for the DAG.
 	// Steps with type: k8s or type: kubernetes inherit this configuration.
 	// Excluded from JSON: may contain secret references.
@@ -307,6 +311,9 @@ func (d *DAG) Clone() *DAG {
 	clone.dotenvOnce = sync.Once{}
 	if d.PresolvedBuildEnv != nil {
 		clone.PresolvedBuildEnv = maps.Clone(d.PresolvedBuildEnv)
+	}
+	if d.Harness != nil {
+		clone.Harness = cloneHarnessConfig(d.Harness)
 	}
 	if d.Kubernetes != nil {
 		clone.Kubernetes = cloneKubernetesConfig(d.Kubernetes)
@@ -688,10 +695,73 @@ type RedisConfig struct {
 	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
+// HarnessConfig contains the default harness executor configuration for the DAG.
+// Steps with type: harness inherit Config as their primary attempt and Fallback
+// as ordered alternative provider configs.
+type HarnessConfig struct {
+	// Config contains the primary provider selection and CLI flags.
+	Config map[string]any `json:"-"`
+	// Fallback contains ordered alternative provider configs tried on failure.
+	Fallback []map[string]any `json:"-"`
+}
+
 // KubernetesConfig contains default Kubernetes executor configuration for the DAG.
 // It stores the raw executor config map so step-level overrides can be merged
 // using executor-specific semantics during DAG build.
 type KubernetesConfig map[string]any
+
+func cloneHarnessConfig(cfg *HarnessConfig) *HarnessConfig {
+	if cfg == nil {
+		return nil
+	}
+	return &HarnessConfig{
+		Config:   cloneHarnessConfigMap(cfg.Config),
+		Fallback: cloneHarnessFallbackConfigs(cfg.Fallback),
+	}
+}
+
+func cloneHarnessConfigMap(cfg map[string]any) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+
+	cloned := make(map[string]any, len(cfg))
+	for key, value := range cfg {
+		cloned[key] = cloneHarnessValue(value)
+	}
+	return cloned
+}
+
+func cloneHarnessFallbackConfigs(cfgs []map[string]any) []map[string]any {
+	if cfgs == nil {
+		return nil
+	}
+
+	cloned := make([]map[string]any, len(cfgs))
+	for i := range cfgs {
+		cloned[i] = cloneHarnessConfigMap(cfgs[i])
+	}
+	return cloned
+}
+
+func cloneHarnessValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return cloneHarnessConfigMap(v)
+	case []any:
+		cloned := make([]any, len(v))
+		for i := range v {
+			cloned[i] = cloneHarnessValue(v[i])
+		}
+		return cloned
+	case []string:
+		return append([]string(nil), v...)
+	case []map[string]any:
+		return cloneHarnessFallbackConfigs(v)
+	default:
+		return value
+	}
+}
 
 func cloneKubernetesConfig(cfg KubernetesConfig) KubernetesConfig {
 	if cfg == nil {

@@ -16,14 +16,64 @@ The binary must be pre-installed in `PATH`. If missing, the step fails at setup 
 
 ## How Config Works
 
-`config.provider` is required. All other config keys are passed directly as CLI flags:
+Harness supports both built-in providers and custom binaries:
+
+- `config.provider` selects a built-in provider such as `claude`, `codex`, or `copilot`
+- `config.binary` + optional `config.prompt_args` define a custom CLI invocation
+
+All non-reserved config keys are passed directly as CLI flags:
 
 - `key: "value"` → `--key value`
 - `key: true` → `--key`
 - `key: false` → omitted
 - `key: 123` → `--key 123`
 
-Config keys are the exact CLI flag names without the `--` prefix. Look up the provider's CLI documentation for available flags and current model names.
+Reserved keys are `provider`, `binary`, `prompt_args`, and `fallback`.
+
+`provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
+
+## DAG-Level Defaults and Fallback
+
+Use top-level `harness:` to define shared defaults for every harness step in the DAG.
+
+```yaml
+harness:
+  provider: claude
+  model: sonnet
+  bare: true
+  fallback:
+    - provider: codex
+      full-auto: true
+    - provider: copilot
+      yolo: true
+      silent: true
+
+steps:
+  - name: step1
+    command: "Write tests"
+
+  - name: step2
+    command: "Fix bugs"
+    config:
+      model: opus
+      effort: high
+
+  - name: step3
+    type: harness
+    command: "Generate docs"
+    config:
+      provider: copilot
+      fallback:
+        - provider: claude
+          model: haiku
+```
+
+Merge rules:
+
+- DAG-level primary config is the base
+- Step-level config overlays it
+- Step-level `fallback` replaces DAG-level `fallback`
+- If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`
 
 ## Pattern 1: Single Agent Step
 
@@ -31,14 +81,14 @@ Config keys are the exact CLI flag names without the `--` prefix. Look up the pr
 params:
   - PROMPT: "Explain the main function in this project"
 
+harness:
+  provider: claude
+  model: sonnet
+  bare: true
+
 steps:
   - name: run_agent
-    type: harness
     command: "${PROMPT}"
-    config:
-      provider: claude
-      model: sonnet
-      bare: true
     output: RESULT
 ```
 
@@ -207,3 +257,4 @@ steps:
 5. **Working directory** — Use `working_dir:` on the step. The CLI operates relative to this directory.
 6. **Output capture** — Use `output: VAR_NAME` for variable interpolation; use `${step_id.stdout}` for file-path-based access.
 7. **Exit codes** — 0 = success, 1 = CLI error, 124 = step timed out. Last 1KB of stderr is included in the error message on failure.
+8. **Fallback behavior** — If the primary harness config fails and the context is still active, fallback configs are tried in order. Failed-attempt stdout is discarded; stderr remains visible in logs.

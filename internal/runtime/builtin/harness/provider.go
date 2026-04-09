@@ -3,7 +3,10 @@
 
 package harness
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // Provider defines how a coding agent CLI is invoked.
 type Provider interface {
@@ -32,6 +35,7 @@ func getProvider(name string) (Provider, error) {
 		for k := range providers {
 			names = append(names, k)
 		}
+		sort.Strings(names)
 		return nil, fmt.Errorf("harness: unknown provider %q; registered: %v", name, names)
 	}
 	return p, nil

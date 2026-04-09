@@ -775,6 +775,93 @@ steps:
 	}
 }
 
+func TestDAGSchemaHarness(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "RootDefaultsAndFallback",
+			spec: `
+harness:
+  provider: claude
+  model: sonnet
+  bare: true
+  fallback:
+    - provider: codex
+      full-auto: true
+
+steps:
+  - command: Write tests
+
+  - type: harness
+    command: Fix bugs
+    config:
+      model: opus
+      effort: high
+`,
+		},
+		{
+			name: "CustomBinaryProvider",
+			spec: `
+steps:
+  - type: harness
+    command: Summarize the repository state
+    config:
+      binary: gemini
+      prompt_args: ["-p"]
+      model: gemini-2.5-pro
+      yolo: true
+`,
+		},
+		{
+			name: "RejectInvalidFallbackShape",
+			spec: `
+harness:
+  provider: claude
+  fallback:
+    provider: codex
+
+steps:
+  - command: Write tests
+`,
+			wantErr: "harness",
+		},
+		{
+			name: "RejectProviderAndBinaryTogether",
+			spec: `
+steps:
+  - type: harness
+    command: Summarize the repository state
+    config:
+      provider: claude
+      binary: gemini
+`,
+			wantErr: "steps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
 func TestDAGSchemaRepoCopyMatchesEmbeddedSchema(t *testing.T) {
 	t.Parallel()
 
