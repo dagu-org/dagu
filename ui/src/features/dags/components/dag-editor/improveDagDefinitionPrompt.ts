@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components, NodeStatus } from '@/api/v1/schema';
 
 type DAGRunDetails = components['schemas']['DAGRunDetails'];
@@ -11,6 +14,9 @@ export type BuildImproveDAGDefinitionPromptInput = {
 
 const MAX_PROBLEM_STEPS = 5;
 const MAX_VALUE_LENGTH = 240;
+const REDACTED_VALUE = '<REDACTED>';
+const SENSITIVE_KEY_PATTERN =
+  /(pass(word)?|secret|token|api[-_]?key|authorization|credential|private[-_]?key|access[-_]?token|refresh[-_]?token)/i;
 
 const PROBLEMATIC_NODE_STATUSES = new Set<number>([
   NodeStatus.Running,
@@ -121,14 +127,39 @@ function countProblemSteps(nodes: components['schemas']['Node'][]): number {
 
 function formatParams(params: string): string {
   try {
-    return truncate(JSON.stringify(JSON.parse(params)));
+    return truncate(JSON.stringify(redactSensitive(JSON.parse(params))));
   } catch {
-    return truncate(cleanInline(params));
+    return truncate(maskInlineSecrets(cleanInline(params)));
   }
 }
 
 function cleanInline(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function redactSensitive(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitive(item));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, val]) => [
+        key,
+        SENSITIVE_KEY_PATTERN.test(key) ? REDACTED_VALUE : redactSensitive(val),
+      ])
+    );
+  }
+  if (typeof value === 'string') {
+    return maskInlineSecrets(value);
+  }
+  return value;
+}
+
+function maskInlineSecrets(value: string): string {
+  return value.replace(
+    /\b(password|pass|secret|token|api[_-]?key|authorization|credential|private[_-]?key|access[_-]?token|refresh[_-]?token)\b\s*[:=]\s*([^\s,;]+)/gi,
+    (_match, key: string) => `${key}=<REDACTED>`
+  );
 }
 
 function truncate(value: string, limit: number = MAX_VALUE_LENGTH): string {

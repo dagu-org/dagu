@@ -85,6 +85,7 @@ function DAGSpec({ fileName, localDags, latestDAGRun }: Props) {
   // Reference to save function and refresh callback for keyboard shortcut
   const saveHandlerRef = React.useRef<(() => Promise<void>) | null>(null);
   const refreshCallbackRef = React.useRef<(() => void) | null>(null);
+  const improveLaunchInFlightRef = React.useRef(false);
 
   /**
    * Handle flowchart direction change and save preference to cookie
@@ -289,6 +290,9 @@ function DAGSpec({ fileName, localDags, latestDAGRun }: Props) {
 
   const handleImproveSubmit = React.useCallback(
     async (userPrompt: string) => {
+      if (improveLaunchInFlightRef.current) {
+        return;
+      }
       if (localHasUnsavedChanges) {
         showError(
           'Save or discard local edits first',
@@ -297,49 +301,60 @@ function DAGSpec({ fileName, localDags, latestDAGRun }: Props) {
         return;
       }
 
+      improveLaunchInFlightRef.current = true;
       setIsLaunchingImproveSession(true);
-      clearAgentSession();
-      setPendingUserMessage(userPrompt);
 
-      const { data: sessionData, error } = await client.POST('/agent/sessions', {
-        params: {
-          query: { remoteNode },
-        },
-        body: {
-          message: buildImproveDAGDefinitionPrompt({
-            dagFile: fileName,
-            dagName: data?.dag?.name || fileName,
-            latestDAGRun,
-            userPrompt,
-          }),
-          dagContexts: [
-            {
+      try {
+        clearAgentSession();
+        setPendingUserMessage(userPrompt);
+
+        const { data: sessionData, error } = await client.POST('/agent/sessions', {
+          params: {
+            query: { remoteNode },
+          },
+          body: {
+            message: buildImproveDAGDefinitionPrompt({
               dagFile: fileName,
-              dagRunId: latestDAGRun?.dagRunId,
-            },
-          ],
-          safeMode: preferences.safeMode,
-        },
-      });
+              dagName: data?.dag?.name || fileName,
+              latestDAGRun,
+              userPrompt,
+            }),
+            dagContexts: [
+              {
+                dagFile: fileName,
+                dagRunId: latestDAGRun?.dagRunId,
+              },
+            ],
+            safeMode: preferences.safeMode,
+          },
+        });
 
-      if (error || !sessionData) {
+        if (error || !sessionData) {
+          setPendingUserMessage(null);
+          showError(
+            error?.message || 'Failed to start improvement session',
+            'Please try again after the agent service is available.'
+          );
+          return;
+        }
+
+        setSessionId(sessionData.sessionId);
+        setSessionState({
+          session_id: sessionData.sessionId,
+          working: true,
+        });
+        setIsImproveModalOpen(false);
+        openChat();
+      } catch {
         setPendingUserMessage(null);
-        setIsLaunchingImproveSession(false);
         showError(
-          error?.message || 'Failed to start improvement session',
+          'Failed to start improvement session',
           'Please try again after the agent service is available.'
         );
-        return;
+      } finally {
+        improveLaunchInFlightRef.current = false;
+        setIsLaunchingImproveSession(false);
       }
-
-      setSessionId(sessionData.sessionId);
-      setSessionState({
-        session_id: sessionData.sessionId,
-        working: true,
-      });
-      setIsImproveModalOpen(false);
-      setIsLaunchingImproveSession(false);
-      openChat();
     },
     [
       localHasUnsavedChanges,

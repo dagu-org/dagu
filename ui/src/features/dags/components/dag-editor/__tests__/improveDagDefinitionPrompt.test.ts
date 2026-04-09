@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import {
   NodeStatus,
   NodeStatusLabel,
@@ -75,5 +78,33 @@ describe('improveDagDefinitionPrompt', () => {
     expect(formatLatestDAGRunDetail()).toBe(
       '- No latest run details are available for this DAG yet.'
     );
+  });
+
+  it('redacts sensitive params before adding them to the prompt summary', () => {
+    const detail = formatLatestDAGRunDetail({
+      dagRunId: 'run-2',
+      name: 'example',
+      status: Status.Success,
+      statusLabel: StatusLabel.succeeded,
+      startedAt: '2026-04-09T10:00:00Z',
+      finishedAt: '2026-04-09T10:01:00Z',
+      rootDAGRunName: 'example',
+      rootDAGRunId: 'run-2',
+      log: '/tmp/example.log',
+      autoRetryCount: 0,
+      params: JSON.stringify({
+        username: 'alice',
+        api_key: 'super-secret-value',
+        nested: {
+          access_token: 'abcdef',
+        },
+      }),
+      nodes: [],
+    });
+
+    expect(detail).toContain('"api_key":"<REDACTED>"');
+    expect(detail).toContain('"access_token":"<REDACTED>"');
+    expect(detail).not.toContain('super-secret-value');
+    expect(detail).not.toContain('abcdef');
   });
 });

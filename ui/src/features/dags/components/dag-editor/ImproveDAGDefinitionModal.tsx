@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components, StatusLabel } from '@/api/v1/schema';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -86,20 +89,20 @@ export default function ImproveDAGDefinitionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="gap-3 p-3 pr-10 sm:max-w-xl">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4 text-primary" />
             Improve DAG Definition
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs leading-5">
             Start a fresh agent session with this DAG reference, the latest run
             details, and your request.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-2">
-          <div className="rounded-xl border border-border bg-muted/40 p-4">
+        <div className="grid gap-3 py-1">
+          <div className="rounded-lg border border-border bg-slate-200 p-3 dark:bg-slate-700">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{dagFile}</Badge>
               {dagName && dagName !== dagFile ? (
@@ -119,7 +122,7 @@ export default function ImproveDAGDefinitionModal({
               )}
             </div>
 
-            <p className="mt-3 text-sm text-muted-foreground">
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
               Focus the agent on reliability, readability, timeouts, retries,
               dependency structure, step naming, or any other improvement you
               want applied to this DAG definition.
@@ -139,7 +142,7 @@ export default function ImproveDAGDefinitionModal({
               }}
               onKeyDown={handleKeyDown}
               placeholder="Example: tighten retries and timeouts, clarify step names, and make failures easier to debug from the latest run."
-              className="min-h-32"
+              className="min-h-28 bg-slate-200 px-3 py-1 dark:bg-slate-700"
               autoFocus
               disabled={isLoading}
             />
