@@ -1560,7 +1560,11 @@ func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string
 
 func (a *API) toDAGRunDetailsWithSpecSource(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) api.DAGRunDetails {
 	details := ToDAGRunDetails(status)
-	details.SpecFromFile = ptrOf(a.dagRunSpecFromFile(ctx, attempt))
+	specFromFile, sourceFileName := a.dagRunSourceInfo(ctx, attempt)
+	details.SpecFromFile = ptrOf(specFromFile)
+	if sourceFileName != "" {
+		details.SourceFileName = ptrOf(sourceFileName)
+	}
 	return details
 }
 
@@ -3235,15 +3239,33 @@ func (a *API) loadCurrentRescheduleDAG(ctx context.Context, sourceFile, nameOver
 	return dag, nil
 }
 
-func (a *API) dagRunSpecFromFile(ctx context.Context, attempt exec.DAGRunAttempt) bool {
+func (a *API) dagRunSourceInfo(ctx context.Context, attempt exec.DAGRunAttempt) (specFromFile bool, sourceFileName string) {
 	if attempt == nil {
-		return false
+		return false, ""
 	}
 	dag, err := attempt.ReadDAG(ctx)
 	if err != nil || dag == nil {
-		return false
+		return false, ""
 	}
-	return dag.SourceFile != "" && fileExists(dag.SourceFile)
+	if dag.SourceFile == "" || !fileExists(dag.SourceFile) {
+		return false, ""
+	}
+	// Only return sourceFileName if the file is under the DAGs directory,
+	// since the definition page route only resolves files within it.
+	absSource, err := filepath.Abs(dag.SourceFile)
+	if err != nil {
+		return true, ""
+	}
+	absDAGsDir, err := filepath.Abs(a.config.Paths.DAGsDir)
+	if err != nil {
+		return true, ""
+	}
+	if !strings.HasPrefix(absSource, absDAGsDir+string(filepath.Separator)) {
+		return true, ""
+	}
+	base := filepath.Base(dag.SourceFile)
+	ext := filepath.Ext(base)
+	return true, strings.TrimSuffix(base, ext)
 }
 
 func fileExists(path string) bool {
