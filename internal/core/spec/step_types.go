@@ -57,6 +57,7 @@ var builtinStepTypeNames = map[string]struct{}{
 	"gha":           {},
 	"github-action": {},
 	"github_action": {},
+	"harness":       {},
 	"http":          {},
 	"jq":            {},
 	"k8s":           {},

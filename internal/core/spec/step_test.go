@@ -968,6 +968,25 @@ func TestBuildStepCommand(t *testing.T) {
 	}
 }
 
+func TestBuildStepCommand_MultilineHarnessPromptStaysCommand(t *testing.T) {
+	t.Parallel()
+
+	s := &step{Command: "hey\nyou"}
+	result := &core.Step{
+		ExecutorConfig: core.ExecutorConfig{
+			Type:   "harness",
+			Config: map[string]any{"provider": "passthrough"},
+		},
+	}
+
+	err := buildStepCommand(testStepBuildContext(), s, result)
+	require.NoError(t, err)
+	assert.Empty(t, result.Script)
+	assert.Equal(t, []core.CommandEntry{
+		{CmdWithArgs: "hey\nyou"},
+	}, result.Commands)
+}
+
 func TestBuildStepCommand_MultipleCommands(t *testing.T) {
 	t.Parallel()
 

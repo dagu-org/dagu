@@ -21,6 +21,10 @@ type BuildContext struct {
 	index int
 
 	customStepTypes *customStepTypeRegistry
+	// baseDAG contains the built base-config DAG for the current document.
+	// It is used while building child handlers and steps so DAG-level defaults
+	// inherited from base config are visible during executor inference.
+	baseDAG *core.DAG
 
 	// buildEnv is a temporary map used during core.DAG building to pass env vars to params
 	// This is not serialized and is cleared after build completes

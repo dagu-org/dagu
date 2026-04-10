@@ -302,6 +302,12 @@ func (sm *SessionManager) updateWorkingState(working bool) (string, string, floa
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
+	// Ignore late working=true pulses from a loop that is already being
+	// canceled. ensureLoop clears canceling before starting new work.
+	if working && sm.canceling {
+		return "", "", 0, false, false, nil, false, false
+	}
+
 	if sm.working == working {
 		if working {
 			sm.promptsMu.Lock()
