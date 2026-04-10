@@ -55,7 +55,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
                   Step Name
                 </TableHead>
                 <TableHead className="w-[15%]">
-                  Command
+                  Execution
                 </TableHead>
                 <TableHead className="w-[15%]">
                   Last Run

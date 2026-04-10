@@ -945,6 +945,17 @@ func buildSingleCommand(val string, result *core.Step) error {
 		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
 	}
 
+	// Harness uses command as a prompt, so preserve multiline text as a single
+	// command entry instead of reclassifying it as an inline script.
+	if strings.Contains(val, "\n") && result.ExecutorConfig.Type == "harness" {
+		result.Commands = []core.CommandEntry{
+			{
+				CmdWithArgs: val,
+			},
+		}
+		return nil
+	}
+
 	// If the value is multi-line, treat it as a script
 	if strings.Contains(val, "\n") {
 		result.Script = val
@@ -1256,6 +1267,8 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 			result.ExecutorConfig.Type = "ssh"
 		} else if ctx.dag.Redis != nil {
 			result.ExecutorConfig.Type = "redis"
+		} else if ctx.dag.Harness != nil {
+			result.ExecutorConfig.Type = "harness"
 		}
 	}
 
@@ -1263,8 +1276,29 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	if result.ExecutorConfig.Type == "redis" && ctx.dag != nil && ctx.dag.Redis != nil {
 		mergeRedisConfig(ctx.dag.Redis, result.ExecutorConfig.Config)
 	}
+	if result.ExecutorConfig.Type == "harness" && ctx.dag != nil && ctx.dag.Harness != nil {
+		result.ExecutorConfig.Config = mergeHarnessConfig(ctx.dag.Harness, s.Config)
+	}
 	if isKubernetesExecutorType(result.ExecutorConfig.Type) && ctx.dag != nil && ctx.dag.Kubernetes != nil {
 		result.ExecutorConfig.Config = mergeKubernetesExecutorConfig(ctx.dag.Kubernetes, result.ExecutorConfig.Config)
+	}
+	if result.ExecutorConfig.Type == "harness" {
+		var defs core.HarnessDefinitions
+		if ctx.dag != nil {
+			defs = ctx.dag.Harnesses
+		}
+		if err := validateHarnessProviderConfig(defs, result.ExecutorConfig.Config); err != nil {
+			return err
+		}
+		fallbacks, err := extractHarnessFallback(cloneHarnessSpecMap(result.ExecutorConfig.Config))
+		if err != nil {
+			return err
+		}
+		for i := range fallbacks {
+			if err := validateHarnessProviderConfig(defs, fallbacks[i]); err != nil {
+				return fmt.Errorf("harness: invalid fallback[%d]: %w", i, err)
+			}
+		}
 	}
 
 	return nil
@@ -1292,6 +1326,31 @@ func mergeRedisConfig(dagRedis *core.RedisConfig, stepConfig map[string]any) {
 	setIfMissing("sentinel_addrs", dagRedis.SentinelAddrs)
 	setIfMissing("cluster_addrs", dagRedis.ClusterAddrs)
 	setIfMissing("max_retries", dagRedis.MaxRetries)
+}
+
+func mergeHarnessConfig(dagHarness *core.HarnessConfig, stepConfig map[string]any) map[string]any {
+	merged := cloneHarnessSpecMap(stepConfig)
+	if merged == nil {
+		merged = make(map[string]any)
+	}
+
+	if dagHarness == nil {
+		return merged
+	}
+
+	for key, value := range dagHarness.Config {
+		if _, exists := merged[key]; !exists {
+			merged[key] = cloneHarnessSpecValue(value)
+		}
+	}
+
+	if _, exists := stepConfig["fallback"]; exists {
+		merged["fallback"] = cloneHarnessSpecValue(stepConfig["fallback"])
+	} else if dagHarness.Fallback != nil {
+		merged["fallback"] = cloneHarnessSpecValue(dagHarness.Fallback)
+	}
+
+	return merged
 }
 
 // isRedisZeroValue checks if a value is a zero value for Redis config merging.

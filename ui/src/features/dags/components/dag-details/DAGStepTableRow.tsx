@@ -10,11 +10,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { isHarnessStep } from '@/lib/harness-step';
 import { getExecutorCommand } from '@/lib/executor-utils';
 import { ArrowRight, Code, Folder, GitBranch, GitFork, Mail, RefreshCw } from 'lucide-react';
 import { components } from '../../../../api/v1/schema';
 import { Badge } from '../../../../components/ui/badge';
 import { TableCell, TableRow } from '../../../../components/ui/table';
+import HarnessStepSummary from './HarnessStepSummary';
 
 /**
  * Props for the DAGStepTableRow component
@@ -103,15 +105,15 @@ function DAGStepTableRow({ step, index }: Props) {
       {/* Execution */}
       <TableCell>
         <div className="space-y-1.5">
-          {/* Command & Args */}
-          {step.commands && step.commands.length > 0 ? (
+          {isHarnessStep(step) ? (
+            <HarnessStepSummary step={step} />
+          ) : step.commands && step.commands.length > 0 ? (
             <CommandDisplay
               commands={step.commands}
               icon="terminal"
               maxLength={50}
             />
           ) : (
-            // Executor-specific display
             (() => {
               const execCmd = getExecutorCommand(step);
               if (execCmd) {

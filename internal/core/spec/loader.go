@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -551,6 +552,7 @@ func processDAGDocument(
 		if err != nil {
 			return nil, err
 		}
+		docCtx.baseDAG = dest
 	} else {
 		dest = new(core.DAG)
 	}
@@ -732,6 +734,68 @@ func (*mergeTransformer) Transformer(
 
 			merged := mergeKubernetesConfigMaps(dstCfg, map[string]any(srcCfg))
 			dst.Set(reflect.ValueOf(core.KubernetesConfig(merged)))
+			return nil
+		}
+	}
+
+	if typ == reflect.TypeFor[core.HarnessDefinitions]() {
+		return func(dst, src reflect.Value) error {
+			if !dst.CanSet() || !src.IsValid() || src.IsNil() {
+				return nil
+			}
+
+			srcDefs := src.Interface().(core.HarnessDefinitions)
+			if len(srcDefs) == 0 {
+				return nil
+			}
+
+			cloneDef := func(def *core.HarnessDefinition) *core.HarnessDefinition {
+				if def == nil {
+					return nil
+				}
+				return &core.HarnessDefinition{
+					Binary:         def.Binary,
+					PrefixArgs:     append([]string(nil), def.PrefixArgs...),
+					PromptMode:     def.PromptMode,
+					PromptFlag:     def.PromptFlag,
+					PromptPosition: def.PromptPosition,
+					FlagStyle:      def.FlagStyle,
+					OptionFlags:    maps.Clone(def.OptionFlags),
+				}
+			}
+
+			cloneDefs := func(defs core.HarnessDefinitions) core.HarnessDefinitions {
+				if defs == nil {
+					return nil
+				}
+				cloned := make(core.HarnessDefinitions, len(defs))
+				for name, def := range defs {
+					cloned[name] = cloneDef(def)
+				}
+				return cloned
+			}
+
+			var merged core.HarnessDefinitions
+			if !dst.IsNil() {
+				merged = cloneDefs(dst.Interface().(core.HarnessDefinitions))
+			} else {
+				merged = make(core.HarnessDefinitions)
+			}
+
+			for name, def := range srcDefs {
+				if def == nil {
+					delete(merged, name)
+					continue
+				}
+				merged[name] = cloneDef(def)
+			}
+
+			if len(merged) == 0 {
+				dst.Set(reflect.Zero(typ))
+				return nil
+			}
+
+			dst.Set(reflect.ValueOf(merged))
 			return nil
 		}
 	}

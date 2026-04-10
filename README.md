@@ -287,7 +287,7 @@ For more examples, see the [Examples documentation](https://docs.dagu.sh/writing
 
 ## Built-in Executors
 
-Dagu includes 17 built-in step executors. Each runs within the Dagu process (or worker) — no plugins or external runtimes required.
+Dagu includes built-in step executors. Each runs within the Dagu process (or worker) — no plugins or external runtimes required.
 
 | Executor | Purpose |
 |----------|---------|
@@ -295,19 +295,18 @@ Dagu includes 17 built-in step executors. Each runs within the Dagu process (or 
 | `docker` | Run containers with registry auth, volume mounts, resource limits |
 | `kubernetes` | Execute Kubernetes Pods with resource requests, service accounts, namespaces |
 | `ssh` | Remote command execution with key-based auth and SFTP file transfer |
+| `harness` | Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as workflow steps |
+| `agent` | Multi-step LLM agent execution with tool calling |
+| `mail` | Send email via SMTP |
+| `template` | Text generation with template rendering |
 | `http` | HTTP requests (GET, POST, PUT, DELETE) with headers and authentication |
 | `sql` | Query PostgreSQL and SQLite with parameterized queries and result capture |
 | `redis` | Redis commands, pipelines, and Lua scripts |
 | `s3` | Upload, download, list, and delete S3 objects |
 | `jq` | JSON transformation using jq expressions |
-| `mail` | Send email via SMTP |
 | `archive` | Create zip/tar archives with glob patterns |
 | `dag` | Invoke another DAG as a sub-workflow with parameter passing |
 | `router` | Conditional step routing based on expressions |
-| `template` | Text generation with template rendering |
-| `chat` | LLM inference (OpenAI, Anthropic, Google Gemini, OpenRouter) |
-| `agentstep` | Multi-step LLM agent execution with tool calling |
-| `gha` | GitHub Actions execution |
 
 See [step type documentation](https://docs.dagu.sh/step-types/shell) for configuration details of each executor.
 

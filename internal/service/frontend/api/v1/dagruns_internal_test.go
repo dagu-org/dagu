@@ -301,3 +301,44 @@ func TestGetDAGRunDetailsReturnsClientClosedRequestWhenReadCanceled(t *testing.T
 	require.Equal(t, openapiv1.ErrorCodeInternalError, canceledResp.Body.Code)
 	require.Equal(t, "dag-run details request canceled", canceledResp.Body.Message)
 }
+
+func TestRebuildDAGRunSnapshotFromYAMLRestoresHarnessConfig(t *testing.T) {
+	t.Parallel()
+
+	dag := &core.DAG{
+		Name: "snapshot-harness",
+		YamlData: []byte(`
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+harness:
+  provider: gemini
+  model: gemini-2.5-pro
+  fallback:
+    - provider: claude
+      model: sonnet
+steps:
+  - command: "Review the repository"
+`),
+	}
+
+	restored, err := rebuildDAGRunSnapshotFromYAML(context.Background(), dag)
+	require.NoError(t, err)
+	require.Same(t, dag, restored)
+
+	require.NotNil(t, restored.Harness)
+	assert.Equal(t, "gemini", restored.Harness.Config["provider"])
+	assert.Equal(t, "gemini-2.5-pro", restored.Harness.Config["model"])
+	require.Len(t, restored.Harness.Fallback, 1)
+	assert.Equal(t, "claude", restored.Harness.Fallback[0]["provider"])
+
+	require.NotNil(t, restored.Harnesses)
+	require.Contains(t, restored.Harnesses, "gemini")
+	require.NotNil(t, restored.Harnesses["gemini"])
+	assert.Equal(t, "gemini", restored.Harnesses["gemini"].Binary)
+	assert.Equal(t, core.HarnessPromptModeFlag, restored.Harnesses["gemini"].PromptMode)
+	assert.Equal(t, "--prompt", restored.Harnesses["gemini"].PromptFlag)
+}

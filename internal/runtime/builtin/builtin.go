@@ -11,6 +11,7 @@ import (
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/dag"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/docker"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/gha"
+	_ "github.com/dagucloud/dagu/internal/runtime/builtin/harness"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/http"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/jq"
 	_ "github.com/dagucloud/dagu/internal/runtime/builtin/kubernetes"
