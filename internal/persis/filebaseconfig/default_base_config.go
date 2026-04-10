@@ -142,6 +142,25 @@ retry_policy:
 #   # Send error_mail when this step fails.
 #   mail_on_error: true
 
+# -- Custom Step Types --
+# Define reusable step types that expand into builtin-backed steps at load time.
+# The call-site config becomes typed input validated by input_schema.
+# step_types:
+#   greet:
+#     type: command
+#     input_schema:
+#       type: object
+#       additionalProperties: false
+#       required: [message]
+#       properties:
+#         message:
+#           type: string
+#     template:
+#       exec:
+#         command: /bin/echo
+#         args:
+#           - {$input: message}
+
 # -- Lifecycle Handlers --
 # Hooks that run on DAG events. Each handler is a full step definition (supports command,
 # shell, env, timeout_sec, etc. — not limited to a simple command string).

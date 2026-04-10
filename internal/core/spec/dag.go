@@ -67,6 +67,8 @@ type dag struct {
 	Env types.EnvValue `yaml:"env,omitempty"`
 	// HandlerOn is the handler configuration.
 	HandlerOn handlerOn `yaml:"handler_on,omitempty"`
+	// StepTypes defines custom step types that expand to builtin-backed steps.
+	StepTypes map[string]customStepTypeSpec `yaml:"step_types,omitempty"`
 	// Steps is the list of steps to run.
 	Steps any `yaml:"steps,omitempty"` // []step or map[string]step
 	// SMTP is the SMTP configuration.
@@ -1731,9 +1733,7 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 		if s == nil {
 			return nil, nil
 		}
-		s.Name = name.String()
-		applyDefaults(s, defs, nil)
-		return s.build(buildCtx)
+		return buildStepFromSpec(buildCtx, 0, s, nil, map[string]struct{}{}, defs, name.String())
 	}
 
 	if handlerOn.Init, err = buildHandler(d.HandlerOn.Init, core.HandlerOnInit); err != nil {
@@ -1928,11 +1928,8 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 
 		var steps []core.Step
 		for name, st := range stepsMap {
-			st.Name = name
-			names[st.Name] = struct{}{}
 			rawStep, _ := v[name].(map[string]any)
-			applyDefaults(&st, defs, rawStep)
-			builtStep, err := st.build(buildCtx)
+			builtStep, err := buildStepFromSpec(buildCtx, 0, &st, rawStep, names, defs, name)
 			if err != nil {
 				return nil, err
 			}

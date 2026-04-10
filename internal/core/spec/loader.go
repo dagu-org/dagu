@@ -544,6 +544,12 @@ func processDAGDocument(
 		docCtx.opts.Flags &^= BuildFlagValidateRuntimeParams
 	}
 
+	customStepTypes, err := buildCustomStepTypeRegistry(stepTypesOf(baseDef), stepTypesOf(spec))
+	if err != nil {
+		return nil, err
+	}
+	docCtx = docCtx.WithCustomStepTypes(customStepTypes)
+
 	// Build a fresh base core.DAG from base manifest if provided
 	var dest *core.DAG
 	if baseDef != nil {
@@ -595,6 +601,11 @@ func buildBaseDAG(ctx BuildContext, baseDef *dag) (*core.DAG, error) {
 	// Don't parse parameters for the base core.DAG
 	buildCtx.opts.Parameters = ""
 	buildCtx.opts.ParametersList = nil
+	customStepTypes, err := buildCustomStepTypeRegistry(stepTypesOf(baseDef), nil)
+	if err != nil {
+		return nil, err
+	}
+	buildCtx = buildCtx.WithCustomStepTypes(customStepTypes)
 
 	// Build the base core.DAG
 	baseDAG, err := baseDef.build(buildCtx)
@@ -609,6 +620,13 @@ func buildBaseDAG(ctx BuildContext, baseDef *dag) (*core.DAG, error) {
 	}
 
 	return baseDAG, nil
+}
+
+func stepTypesOf(d *dag) map[string]customStepTypeSpec {
+	if d == nil {
+		return nil
+	}
+	return d.StepTypes
 }
 
 func shouldInheritType(doc map[string]any, baseDef, spec *dag) bool {
