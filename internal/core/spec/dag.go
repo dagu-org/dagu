@@ -131,6 +131,11 @@ type dag struct {
 	// Redis is the default Redis configuration for all redis steps in this DAG.
 	// Steps can override this configuration by specifying their own config fields.
 	Redis *redisConfig `yaml:"redis,omitempty"`
+	// Harnesses contains reusable custom harness definitions available to harness steps.
+	Harnesses map[string]any `yaml:"harnesses,omitempty"`
+	// Harness is the default harness configuration for all harness steps in this DAG.
+	// Steps can override primary config keys and replace fallback entirely.
+	Harness map[string]any `yaml:"harness,omitempty"`
 	// Kubernetes is the default Kubernetes configuration for explicit k8s steps in this DAG.
 	// Steps can override this configuration by specifying their own config fields.
 	Kubernetes map[string]any `yaml:"kubernetes,omitempty"`
@@ -451,6 +456,8 @@ var fullTransformers = []transform{
 	{"s3", newTransformer("S3", buildS3)},
 	{"llm", newTransformer("LLM", buildLLM)},
 	{"redis", newTransformer("Redis", buildRedis)},
+	{"harnesses", newTransformer("Harnesses", buildHarnesses)},
+	{"harness", newTransformer("Harness", buildHarness)},
 	{"kubernetes", newTransformer("Kubernetes", buildKubernetes)},
 	{"secrets", newTransformer("Secrets", buildSecrets)},
 	{"dotenv", newTransformer("Dotenv", buildDotenv)},
@@ -524,6 +531,16 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
 
+	buildResult := result
+	if ctx.baseDAG != nil {
+		merged, err := composeBuildDAGContext(ctx.baseDAG, result)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to compose inherited DAG context: %w", err))
+		} else {
+			buildResult = merged
+		}
+	}
+
 	// Add deprecation warning for max_active_runs on local queues.
 	// Both max_active_runs > 1 (concurrency) and max_active_runs < 0 (queue bypass) are deprecated.
 	if result.Queue == "" && (result.MaxActiveRuns > 1 || result.MaxActiveRuns < 0) {
@@ -547,13 +564,13 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 
 	// Build handlers and steps directly (they need access to partially built result)
 	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
-		if handlerOn, err := buildHandlers(ctx, d, result); err != nil {
+		if handlerOn, err := buildHandlers(ctx, d, buildResult); err != nil {
 			errs = append(errs, core.NewValidationError("handlers", nil, err))
 		} else {
 			result.HandlerOn = handlerOn
 		}
 
-		if steps, err := buildSteps(ctx, d, result); err != nil {
+		if steps, err := buildSteps(ctx, d, buildResult); err != nil {
 			errs = append(errs, core.NewValidationError("steps", nil, err))
 		} else {
 			result.Steps = steps
@@ -594,6 +611,19 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	}
 
 	return result, nil
+}
+
+func composeBuildDAGContext(base, current *core.DAG) (*core.DAG, error) {
+	if base == nil {
+		return current, nil
+	}
+
+	effective := base.Clone()
+	if err := merge(effective, current); err != nil {
+		return nil, err
+	}
+
+	return effective, nil
 }
 
 // Builder functions - each returns a value instead of modifying result
@@ -1703,11 +1733,384 @@ func buildRedis(_ BuildContext, d *dag) (*core.RedisConfig, error) {
 	}, nil
 }
 
+func buildHarnesses(_ BuildContext, d *dag) (core.HarnessDefinitions, error) {
+	defs, err := parseHarnessDefinitions(d.Harnesses)
+	if err != nil {
+		return nil, err
+	}
+	return defs, nil
+}
+
+func parseHarnessDefinitions(raw map[string]any) (core.HarnessDefinitions, error) {
+	if raw == nil {
+		return nil, nil
+	}
+
+	defs := make(core.HarnessDefinitions, len(raw))
+	for name, value := range raw {
+		trimmedName := strings.TrimSpace(name)
+		if trimmedName == "" {
+			return nil, core.NewValidationError("harnesses", name, fmt.Errorf("harness name is required"))
+		}
+		if core.IsBuiltinHarnessProvider(trimmedName) {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("harnesses.%s", trimmedName),
+				value,
+				fmt.Errorf("custom harness name %q conflicts with built-in provider", trimmedName),
+			)
+		}
+		if value == nil {
+			defs[trimmedName] = nil
+			continue
+		}
+
+		specMap, ok := value.(map[string]any)
+		if !ok {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("harnesses.%s", trimmedName),
+				value,
+				fmt.Errorf("harness definition must be an object or null"),
+			)
+		}
+
+		def, err := parseHarnessDefinition(trimmedName, specMap)
+		if err != nil {
+			return nil, err
+		}
+		defs[trimmedName] = def
+	}
+
+	return defs, nil
+}
+
+func parseHarnessDefinition(name string, raw map[string]any) (*core.HarnessDefinition, error) {
+	def := &core.HarnessDefinition{
+		PromptMode:     core.HarnessPromptModeArg,
+		PromptPosition: core.HarnessPromptPositionBeforeFlags,
+		FlagStyle:      core.HarnessFlagStyleGNULong,
+	}
+
+	for key, value := range raw {
+		switch key {
+		case "binary":
+			binary, ok := value.(string)
+			if !ok {
+				return nil, core.NewValidationError(
+					fmt.Sprintf("harnesses.%s.binary", name),
+					value,
+					fmt.Errorf("binary must be a string"),
+				)
+			}
+			def.Binary = strings.TrimSpace(binary)
+		case "prefix_args":
+			prefixArgs, err := harnessStringSlice(value)
+			if err != nil {
+				return nil, core.NewValidationError(fmt.Sprintf("harnesses.%s.prefix_args", name), value, err)
+			}
+			def.PrefixArgs = prefixArgs
+		case "prompt_mode":
+			mode, ok := value.(string)
+			if !ok {
+				return nil, core.NewValidationError(
+					fmt.Sprintf("harnesses.%s.prompt_mode", name),
+					value,
+					fmt.Errorf("prompt_mode must be a string"),
+				)
+			}
+			def.PromptMode = core.HarnessPromptMode(strings.TrimSpace(mode))
+		case "prompt_flag":
+			promptFlag, ok := value.(string)
+			if !ok {
+				return nil, core.NewValidationError(
+					fmt.Sprintf("harnesses.%s.prompt_flag", name),
+					value,
+					fmt.Errorf("prompt_flag must be a string"),
+				)
+			}
+			def.PromptFlag = strings.TrimSpace(promptFlag)
+		case "prompt_position":
+			position, ok := value.(string)
+			if !ok {
+				return nil, core.NewValidationError(
+					fmt.Sprintf("harnesses.%s.prompt_position", name),
+					value,
+					fmt.Errorf("prompt_position must be a string"),
+				)
+			}
+			def.PromptPosition = core.HarnessPromptPosition(strings.TrimSpace(position))
+		case "flag_style":
+			flagStyle, ok := value.(string)
+			if !ok {
+				return nil, core.NewValidationError(
+					fmt.Sprintf("harnesses.%s.flag_style", name),
+					value,
+					fmt.Errorf("flag_style must be a string"),
+				)
+			}
+			def.FlagStyle = core.HarnessFlagStyle(strings.TrimSpace(flagStyle))
+		case "option_flags":
+			optionFlags, err := harnessStringMap(value)
+			if err != nil {
+				return nil, core.NewValidationError(fmt.Sprintf("harnesses.%s.option_flags", name), value, err)
+			}
+			def.OptionFlags = optionFlags
+		default:
+			return nil, core.NewValidationError(
+				fmt.Sprintf("harnesses.%s.%s", name, key),
+				value,
+				fmt.Errorf("unknown harness definition key %q", key),
+			)
+		}
+	}
+
+	if def.Binary == "" {
+		return nil, core.NewValidationError(
+			fmt.Sprintf("harnesses.%s.binary", name),
+			raw["binary"],
+			fmt.Errorf("binary is required"),
+		)
+	}
+
+	switch def.PromptMode {
+	case core.HarnessPromptModeArg, core.HarnessPromptModeFlag, core.HarnessPromptModeStdin:
+	default:
+		return nil, core.NewValidationError(
+			fmt.Sprintf("harnesses.%s.prompt_mode", name),
+			def.PromptMode,
+			fmt.Errorf("prompt_mode must be one of: arg, flag, stdin"),
+		)
+	}
+
+	switch def.PromptPosition {
+	case core.HarnessPromptPositionBeforeFlags, core.HarnessPromptPositionAfterFlags:
+	default:
+		return nil, core.NewValidationError(
+			fmt.Sprintf("harnesses.%s.prompt_position", name),
+			def.PromptPosition,
+			fmt.Errorf("prompt_position must be one of: before_flags, after_flags"),
+		)
+	}
+
+	switch def.FlagStyle {
+	case core.HarnessFlagStyleGNULong, core.HarnessFlagStyleSingleDash:
+	default:
+		return nil, core.NewValidationError(
+			fmt.Sprintf("harnesses.%s.flag_style", name),
+			def.FlagStyle,
+			fmt.Errorf("flag_style must be one of: gnu_long, single_dash"),
+		)
+	}
+
+	if def.PromptMode == core.HarnessPromptModeFlag && def.PromptFlag == "" {
+		return nil, core.NewValidationError(
+			fmt.Sprintf("harnesses.%s.prompt_flag", name),
+			raw["prompt_flag"],
+			fmt.Errorf("prompt_flag is required when prompt_mode is flag"),
+		)
+	}
+
+	if def.PromptMode != core.HarnessPromptModeFlag && def.PromptFlag != "" {
+		return nil, core.NewValidationError(
+			fmt.Sprintf("harnesses.%s.prompt_flag", name),
+			def.PromptFlag,
+			fmt.Errorf("prompt_flag is only valid when prompt_mode is flag"),
+		)
+	}
+
+	return def, nil
+}
+
+func harnessStringSlice(raw any) ([]string, error) {
+	switch v := raw.(type) {
+	case nil:
+		return nil, nil
+	case []string:
+		return append([]string(nil), v...), nil
+	case []any:
+		values := make([]string, len(v))
+		for i := range v {
+			s, ok := v[i].(string)
+			if !ok {
+				return nil, fmt.Errorf("value at index %d must be a string", i)
+			}
+			values[i] = strings.TrimSpace(s)
+		}
+		return values, nil
+	default:
+		return nil, fmt.Errorf("must be an array of strings")
+	}
+}
+
+func harnessStringMap(raw any) (map[string]string, error) {
+	switch v := raw.(type) {
+	case nil:
+		return nil, nil
+	case map[string]string:
+		return maps.Clone(v), nil
+	case map[string]any:
+		values := make(map[string]string, len(v))
+		for key, item := range v {
+			s, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("value for key %q must be a string", key)
+			}
+			values[key] = strings.TrimSpace(s)
+		}
+		return values, nil
+	default:
+		return nil, fmt.Errorf("must be an object with string values")
+	}
+}
+
+func buildHarness(ctx BuildContext, d *dag) (*core.HarnessConfig, error) {
+	if d.Harness == nil {
+		return nil, nil
+	}
+
+	config := cloneHarnessSpecMap(d.Harness)
+	fallbacks, err := extractHarnessFallback(config)
+	if err != nil {
+		return nil, core.NewValidationError("harness", d.Harness, err)
+	}
+
+	if err := core.ValidateExecutorConfig("harness", config); err != nil {
+		return nil, core.NewValidationError("harness", d.Harness, err)
+	}
+	defs, err := parseHarnessDefinitions(d.Harnesses)
+	if err != nil {
+		return nil, err
+	}
+	if ctx.baseDAG != nil && ctx.baseDAG.Harnesses != nil {
+		effective := ctx.baseDAG.Clone()
+		if defs != nil {
+			if err := merge(effective, &core.DAG{Harnesses: defs}); err != nil {
+				return nil, err
+			}
+		}
+		defs = effective.Harnesses
+	}
+	if err := validateHarnessProviderConfig(defs, config); err != nil {
+		return nil, core.NewValidationError("harness", d.Harness, err)
+	}
+	for i := range fallbacks {
+		if err := core.ValidateExecutorConfig("harness", fallbacks[i]); err != nil {
+			return nil, core.NewValidationError(fmt.Sprintf("harness.fallback[%d]", i), fallbacks[i], err)
+		}
+		if err := validateHarnessProviderConfig(defs, fallbacks[i]); err != nil {
+			return nil, core.NewValidationError(fmt.Sprintf("harness.fallback[%d]", i), fallbacks[i], err)
+		}
+	}
+
+	return &core.HarnessConfig{
+		Config:   config,
+		Fallback: fallbacks,
+	}, nil
+}
+
 func buildSecrets(_ BuildContext, d *dag) ([]core.SecretRef, error) {
 	if len(d.Secrets) == 0 {
 		return nil, nil
 	}
 	return parseSecretRefs(d.Secrets)
+}
+
+func extractHarnessFallback(config map[string]any) ([]map[string]any, error) {
+	raw, ok := config["fallback"]
+	if !ok {
+		return nil, nil
+	}
+	delete(config, "fallback")
+
+	switch v := raw.(type) {
+	case nil:
+		return nil, nil
+	case []map[string]any:
+		return cloneHarnessSpecFallback(v), nil
+	case []any:
+		fallbacks := make([]map[string]any, len(v))
+		for i := range v {
+			item, ok := v[i].(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("harness: fallback[%d] must be an object", i)
+			}
+			fallbacks[i] = cloneHarnessSpecMap(item)
+		}
+		return fallbacks, nil
+	default:
+		return nil, fmt.Errorf("harness: fallback must be an array of objects")
+	}
+}
+
+func validateHarnessProviderConfig(defs core.HarnessDefinitions, cfg map[string]any) error {
+	if cfg == nil {
+		return fmt.Errorf("harness: config is required")
+	}
+	if _, exists := cfg["binary"]; exists {
+		return fmt.Errorf("harness: config.binary is not supported; define a named harness under top-level harnesses and reference it via config.provider")
+	}
+	if _, exists := cfg["prompt_args"]; exists {
+		return fmt.Errorf("harness: config.prompt_args is not supported; define a named harness under top-level harnesses and reference it via config.provider")
+	}
+
+	providerName, _ := cfg["provider"].(string)
+	if strings.TrimSpace(providerName) == "" {
+		return fmt.Errorf("harness: config.provider is required")
+	}
+	if strings.Contains(providerName, "${") {
+		return nil
+	}
+	if core.IsBuiltinHarnessProvider(providerName) {
+		return nil
+	}
+	if defs != nil {
+		if def, ok := defs[providerName]; ok && def != nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("harness: unknown provider %q", providerName)
+}
+
+func cloneHarnessSpecMap(cfg map[string]any) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+
+	cloned := make(map[string]any, len(cfg))
+	for key, value := range cfg {
+		cloned[key] = cloneHarnessSpecValue(value)
+	}
+	return cloned
+}
+
+func cloneHarnessSpecFallback(cfgs []map[string]any) []map[string]any {
+	if cfgs == nil {
+		return nil
+	}
+
+	cloned := make([]map[string]any, len(cfgs))
+	for i := range cfgs {
+		cloned[i] = cloneHarnessSpecMap(cfgs[i])
+	}
+	return cloned
+}
+
+func cloneHarnessSpecValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return cloneHarnessSpecMap(v)
+	case []any:
+		cloned := make([]any, len(v))
+		for i := range v {
+			cloned[i] = cloneHarnessSpecValue(v[i])
+		}
+		return cloned
+	case []string:
+		return append([]string(nil), v...)
+	case []map[string]any:
+		return cloneHarnessSpecFallback(v)
+	default:
+		return value
+	}
 }
 
 func buildDotenv(_ BuildContext, d *dag) ([]string, error) {

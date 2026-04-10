@@ -721,6 +721,14 @@
       "$ref": "#/definitions/llmConfig",
       "description": "Default LLM configuration for all chat steps in the DAG. Steps with type: chat inherit this configuration if they don't specify their own llm field. If a step specifies llm, it completely overrides the DAG-level configuration."
     },
+    "harness": {
+      "$ref": "#/definitions/harnessDefaultsConfig",
+      "description": "Default harness configuration for coding-agent steps in the DAG. Steps with type: harness inherit these defaults, and steps without an explicit type are treated as harness steps when this block is present. Step-level config overrides primary keys and replaces DAG-level fallback when fallback is set."
+    },
+    "harnesses": {
+      "$ref": "#/definitions/harnessDefinitions",
+      "description": "Reusable custom harness definitions available to harness steps. Each definition describes how to invoke a named harness CLI; steps reference definitions via config.provider."
+    },
     "steps": {
       "oneOf": [
         {
@@ -1426,7 +1434,7 @@
               "description": "Named parameters as key-value pairs"
             }
           ],
-          "description": "Parameters for the step. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array format: named parameters as key-value objects preserving rich types (numbers, booleans, nested objects). 3) Object format: named parameters as simple key-value pairs. For sub-DAG execution (when 'call' or 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). Rich types are preserved when passing to executors that support them."
+          "description": "Parameters for the step. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array format: named parameters as key-value objects preserving rich types (numbers, booleans, nested objects). 3) Object format: named parameters as simple key-value pairs. For sub-DAG execution (when 'call' or 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. Rich types are preserved when passing to executors that support them."
         },
         "parallel": {
           "oneOf": [
@@ -1666,18 +1674,6 @@
           }
         },
         {
-          "if": {
-            "properties": {
-              "type": { "enum": ["gha", "github_action", "github-action"] }
-            }
-          },
-          "then": {
-            "properties": {
-              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
-            }
-          }
-        },
-        {
           "if": { "properties": { "type": { "const": "archive" } } },
           "then": {
             "properties": {
@@ -1724,6 +1720,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "harness" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/harnessExecutorConfig" }
             }
           }
         },
@@ -2486,91 +2490,6 @@
       },
       "description": "Configuration for JQ JSON query executor."
     },
-    "ghaExecutorConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "runner": {
-          "type": "string",
-          "default": "node:24-bookworm",
-          "description": "Docker image to use as the runner for executing the GitHub Action."
-        },
-        "auto_remove": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically remove containers after execution."
-        },
-        "network": {
-          "type": "string",
-          "description": "Docker network mode (e.g., 'host', 'bridge', or custom network name)."
-        },
-        "github_instance": {
-          "type": "string",
-          "default": "github.com",
-          "description": "GitHub instance hostname for action resolution. Use for GitHub Enterprise."
-        },
-        "docker_socket": {
-          "type": "string",
-          "description": "Custom Docker socket path. Leave empty for default."
-        },
-        "artifacts": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "path": {
-              "type": "string",
-              "description": "Path for artifact server storage."
-            },
-            "port": {
-              "type": "string",
-              "description": "Port for artifact server."
-            }
-          },
-          "description": "Artifact server configuration for GitHub Actions."
-        },
-        "reuse_containers": {
-          "type": "boolean",
-          "default": false,
-          "description": "Reuse containers between runs for faster execution."
-        },
-        "force_rebuild": {
-          "type": "boolean",
-          "default": false,
-          "description": "Force rebuild of action images."
-        },
-        "container_options": {
-          "type": "string",
-          "description": "Additional Docker run options as a string."
-        },
-        "privileged": {
-          "type": "boolean",
-          "default": false,
-          "description": "Run containers in privileged mode. WARNING: Security risk, avoid in production."
-        },
-        "capabilities": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "add": {
-              "oneOf": [
-                { "type": "string" },
-                { "type": "array", "items": { "type": "string" } }
-              ],
-              "description": "Linux capabilities to add to the container."
-            },
-            "drop": {
-              "oneOf": [
-                { "type": "string" },
-                { "type": "array", "items": { "type": "string" } }
-              ],
-              "description": "Linux capabilities to drop from the container."
-            }
-          },
-          "description": "Linux capabilities configuration for container security."
-        }
-      },
-      "description": "Configuration for running GitHub Actions locally using nektos/act."
-    },
     "archiveExecutorConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -3259,6 +3178,159 @@
         }
       ],
       "description": "Redis executor configuration for executing Redis commands, managing cache, pub/sub, streams, and distributed locks."
+    },
+    "harnessConfigScalar": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" }
+      ],
+      "description": "Scalar harness flag value."
+    },
+    "harnessConfigValue": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/harnessConfigScalar"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/harnessConfigScalar"
+          }
+        }
+      ],
+      "description": "Harness flag value. Scalars become a single CLI flag value; arrays become repeated flags."
+    },
+    "harnessNamedDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binary"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "prompt_mode": { "const": "flag" }
+            },
+            "required": ["prompt_mode"]
+          },
+          "then": {
+            "required": ["prompt_flag"]
+          }
+        },
+        {
+          "if": {
+            "required": ["prompt_flag"]
+          },
+          "then": {
+            "properties": {
+              "prompt_mode": { "const": "flag" }
+            },
+            "required": ["prompt_mode"]
+          }
+        }
+      ],
+      "properties": {
+        "binary": {
+          "type": "string",
+          "description": "CLI binary name or path for the custom harness."
+        },
+        "prefix_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments that always appear before prompt placement and runtime flags."
+        },
+        "prompt_mode": {
+          "type": "string",
+          "enum": ["arg", "flag", "stdin"],
+          "description": "How the prompt is passed to the CLI."
+        },
+        "prompt_flag": {
+          "type": "string",
+          "description": "Flag token used when prompt_mode is flag."
+        },
+        "prompt_position": {
+          "type": "string",
+          "enum": ["before_flags", "after_flags"],
+          "description": "Whether prompt tokens appear before or after runtime flags."
+        },
+        "flag_style": {
+          "type": "string",
+          "enum": ["gnu_long", "single_dash"],
+          "description": "Default flag prefix style for runtime options that do not have an explicit option_flags override."
+        },
+        "option_flags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Per-option override mapping from config key to exact CLI flag token."
+        }
+      }
+    },
+    "harnessDefinitions": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/definitions/harnessNamedDefinition" },
+          { "type": "null" }
+        ]
+      },
+      "description": "Reusable named custom harness definitions. Null entries remove inherited definitions from base config."
+    },
+    "harnessProviderConfig": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "enum": ["binary", "prompt_args", "fallback"]
+        }
+      },
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Harness provider name. May reference a built-in provider such as claude, codex, copilot, opencode, or pi, or a custom top-level harnesses entry. Supports ${VAR} interpolation."
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/harnessConfigValue"
+      },
+      "required": ["provider"],
+      "description": "Primary or fallback harness provider configuration. Reserved keys are provider and fallback; all other keys are passed through to the CLI as flags."
+    },
+    "harnessExecutorConfig": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "enum": ["binary", "prompt_args"]
+        }
+      },
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Harness provider name. May reference a built-in provider such as claude, codex, copilot, opencode, or pi, or a custom top-level harnesses entry. Supports ${VAR} interpolation."
+        },
+        "fallback": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/harnessProviderConfig"
+          },
+          "description": "Ordered fallback harness provider configs tried after the primary config fails. The fallback key is reserved and is not passed through as a CLI flag."
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/harnessConfigValue"
+      },
+      "description": "Harness step configuration. Unknown keys are passed through to the CLI as flags. When no DAG-level harness defaults exist, specify provider."
+    },
+    "harnessDefaultsConfig": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/harnessExecutorConfig"
+        },
+        { "required": ["provider"] }
+      ],
+      "description": "DAG-level harness defaults. Specify provider plus optional CLI flags and fallback providers."
     },
     "kubernetesKeySelector": {
       "type": "object",
@@ -4696,9 +4768,6 @@
         "ssh",
         "s3",
         "jq",
-        "gha",
-        "github_action",
-        "github-action",
         "dag",
         "subworkflow",
         "parallel",
@@ -4707,10 +4776,11 @@
         "postgres",
         "sqlite",
         "redis",
+        "harness",
         "router",
         "agent"
       ],
-      "description": "Type of executor to use for this step, including aliases such as k8s / kubernetes and gha / github_action / github-action."
+      "description": "Type of executor to use for this step, including aliases such as k8s / kubernetes."
     },
     "executorConfig": {
       "type": "object",
@@ -4772,18 +4842,6 @@
           }
         },
         {
-          "if": {
-            "properties": {
-              "type": { "enum": ["gha", "github_action", "github-action"] }
-            }
-          },
-          "then": {
-            "properties": {
-              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
-            }
-          }
-        },
-        {
           "if": { "properties": { "type": { "const": "archive" } } },
           "then": {
             "properties": {
@@ -4830,6 +4888,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "harness" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/harnessExecutorConfig" }
             }
           }
         },

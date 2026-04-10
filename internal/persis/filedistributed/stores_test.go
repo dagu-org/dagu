@@ -22,8 +22,11 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := NewDispatchTaskStore(filepath.Join(t.TempDir(), "distributed"))
 	claimTimeout := 500 * time.Millisecond
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(claimTimeout),
+	)
 
 	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
 		DagRunId:       "run-a",
@@ -64,6 +67,19 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, secondClaim)
 
+	// GPU task remains claimable only by matching workers while the CPU claim
+	// is still outstanding.
+	gpuClaim, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-3",
+		PollerID:     "poller-3",
+		Labels:       map[string]string{"type": "gpu"},
+		Owner:        exec.CoordinatorEndpoint{ID: "coord-c"},
+		ClaimTimeout: time.Second,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, gpuClaim)
+	assert.Equal(t, "run-a", gpuClaim.Task.DagRunId)
+
 	var reclaimed *exec.ClaimedDispatchTask
 	require.Eventually(t, func() bool {
 		var claimErr error
@@ -83,18 +99,6 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 
 	_, err = store.GetClaim(ctx, claimed.ClaimToken)
 	assert.ErrorIs(t, err, exec.ErrDispatchTaskNotFound)
-
-	// GPU task remains claimable only by matching workers.
-	gpuClaim, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
-		WorkerID:     "worker-3",
-		PollerID:     "poller-3",
-		Labels:       map[string]string{"type": "gpu"},
-		Owner:        exec.CoordinatorEndpoint{ID: "coord-c"},
-		ClaimTimeout: time.Second,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, gpuClaim)
-	assert.Equal(t, "run-a", gpuClaim.Task.DagRunId)
 }
 
 func TestDispatchTaskStore_ConcurrentClaimIsExclusive(t *testing.T) {
@@ -215,6 +219,149 @@ func TestDispatchTaskStore_CountOutstandingByQueueAndAttempt(t *testing.T) {
 	hasOutstanding, err = store.HasOutstandingAttempt(ctx, "attempt-key-a", time.Second)
 	require.NoError(t, err)
 	assert.False(t, hasOutstanding)
+}
+
+func TestDispatchTaskStore_StalePendingReservationsExpire(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	reservationTTL := 500 * time.Millisecond
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(reservationTTL),
+	)
+
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-stale",
+		Target:     "dag-stale",
+		QueueName:  "queue-a",
+		AttemptId:  "attempt-stale",
+		AttemptKey: "attempt-key-stale",
+	}))
+	agePendingDispatchTasks(t, store, 2*time.Second)
+
+	count, err := store.CountOutstandingByQueue(ctx, "queue-a", reservationTTL)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+
+	hasOutstanding, err := store.HasOutstandingAttempt(ctx, "attempt-key-stale", reservationTTL)
+	require.NoError(t, err)
+	assert.False(t, hasOutstanding)
+
+	claimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-1",
+		PollerID:     "poller-1",
+		ClaimTimeout: reservationTTL,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, claimed)
+
+	pendingFiles, err := sortedFiles(store.pendingDir())
+	require.NoError(t, err)
+	assert.Empty(t, pendingFiles)
+}
+
+func TestDispatchTaskStore_ExpiredClaimsRefreshPendingAge(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	reservationTTL := 500 * time.Millisecond
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(reservationTTL),
+	)
+
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-claim-refresh",
+		Target:     "dag-claim-refresh",
+		QueueName:  "queue-a",
+		AttemptId:  "attempt-claim-refresh",
+		AttemptKey: "attempt-key-claim-refresh",
+	}))
+
+	claimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-1",
+		PollerID:     "poller-1",
+		ClaimTimeout: reservationTTL,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+
+	ageClaimedDispatchTask(t, store, claimed.ClaimToken, 2*time.Second, 2*time.Second)
+
+	reclaimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-2",
+		PollerID:     "poller-2",
+		ClaimTimeout: reservationTTL,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, reclaimed)
+	assert.Equal(t, "run-claim-refresh", reclaimed.Task.DagRunId)
+	assert.Equal(t, "worker-2", reclaimed.WorkerID)
+}
+
+func TestDispatchTaskStore_UsesStoreReservationTTLForCleanup(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	reservationTTL := 5 * time.Second
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(reservationTTL),
+	)
+
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-shared-ttl",
+		Target:     "dag-shared-ttl",
+		QueueName:  "queue-a",
+		AttemptId:  "attempt-shared-ttl",
+		AttemptKey: "attempt-key-shared-ttl",
+	}))
+	agePendingDispatchTasks(t, store, 2*time.Second)
+
+	count, err := store.CountOutstandingByQueue(ctx, "queue-a", time.Millisecond)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	hasOutstanding, err := store.HasOutstandingAttempt(ctx, "attempt-key-shared-ttl", time.Millisecond)
+	require.NoError(t, err)
+	assert.True(t, hasOutstanding)
+
+	claimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-1",
+		PollerID:     "poller-1",
+		ClaimTimeout: time.Millisecond,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	assert.Equal(t, "run-shared-ttl", claimed.Task.DagRunId)
+}
+
+func agePendingDispatchTasks(t *testing.T, store *DispatchTaskStore, age time.Duration) {
+	t.Helper()
+
+	files, err := sortedFiles(store.pendingDir())
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	targetTime := time.Now().Add(-age).UTC().UnixMilli()
+	for _, path := range files {
+		record, err := store.readTaskFile(path)
+		require.NoError(t, err)
+		record.EnqueuedAt = targetTime
+		require.NoError(t, writeJSONAtomic(path, record))
+	}
+}
+
+func ageClaimedDispatchTask(t *testing.T, store *DispatchTaskStore, claimToken string, pendingAge, claimAge time.Duration) {
+	t.Helper()
+
+	path := store.claimPath(claimToken)
+	record, err := store.readTaskFile(path)
+	require.NoError(t, err)
+	record.EnqueuedAt = time.Now().Add(-pendingAge).UTC().UnixMilli()
+	record.ClaimedAt = time.Now().Add(-claimAge).UTC().UnixMilli()
+	require.NoError(t, writeJSONAtomic(path, record))
 }
 
 func TestWorkerHeartbeatStore_UpsertListAndDeleteStale(t *testing.T) {

@@ -93,11 +93,10 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 	}
 
 	// Load the DAG spec
-	dag, err := spec.LoadYAML(ctx,
+	dag, err := a.dagStore.LoadSpec(ctx,
 		[]byte(request.Body.Spec),
 		spec.WithName(name),
 		spec.WithAllowBuildErrors(),
-		spec.WithoutEval(),
 	)
 
 	var errs []string
@@ -147,10 +146,9 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 
 	var yamlSpec []byte
 	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
-		_, err := spec.LoadYAML(ctx,
+		_, err := a.dagStore.LoadSpec(ctx,
 			[]byte(*request.Body.Spec),
 			spec.WithName(request.Body.Name),
-			spec.WithoutEval(),
 		)
 
 		if err != nil {
@@ -229,11 +227,10 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		return nil, err
 	}
 
-	dag, err := spec.LoadYAML(ctx,
+	dag, err := a.dagStore.LoadSpec(ctx,
 		[]byte(yamlSpec),
 		spec.WithName(request.FileName),
 		spec.WithAllowBuildErrors(),
-		spec.WithoutEval(),
 	)
 	var errs []string
 

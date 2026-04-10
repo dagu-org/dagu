@@ -551,6 +551,8 @@ func rebuildDAGRunSnapshotFromYAML(ctx context.Context, dag *core.DAG) (*core.DA
 	dag.SMTP = fresh.SMTP
 	dag.SSH = fresh.SSH
 	dag.RegistryAuths = fresh.RegistryAuths
+	dag.Harness = fresh.Harness
+	dag.Harnesses = fresh.Harnesses
 
 	core.InitializeDefaults(dag)
 
