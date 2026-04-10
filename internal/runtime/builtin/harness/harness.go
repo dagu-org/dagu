@@ -37,6 +37,10 @@ type providerConfig struct {
 	flags      map[string]any
 }
 
+type defaultConfigProvider interface {
+	DefaultConfig() map[string]any
+}
+
 type harnessExecutor struct {
 	mu         sync.Mutex
 	cmd        *exec.Cmd
@@ -362,7 +366,7 @@ func buildProviderConfigs(cfg map[string]any, defs core.HarnessDefinitions) ([]p
 			}
 			return nil, fmt.Errorf("harness: invalid fallback[%d]: %w", i-1, err)
 		}
-		resolved.flags = attempts[i]
+		resolved.flags = mergeProviderDefaultConfig(resolved.provider, attempts[i])
 		configs = append(configs, resolved)
 	}
 
@@ -432,6 +436,24 @@ func resolveProvider(cfg map[string]any, defs core.HarnessDefinitions) (provider
 		}
 	}
 	return providerConfig{}, fmt.Errorf("harness: unknown provider %q; registered: %v", providerName, knownProviders(defs))
+}
+
+func mergeProviderDefaultConfig(provider Provider, cfg map[string]any) map[string]any {
+	merged := cloneConfigMap(cfg)
+	if provider == nil {
+		return merged
+	}
+	defaultProvider, ok := provider.(defaultConfigProvider)
+	if !ok {
+		return merged
+	}
+	defaults := defaultProvider.DefaultConfig()
+	if len(defaults) == 0 {
+		return merged
+	}
+	withDefaults := cloneConfigMap(defaults)
+	maps.Copy(withDefaults, merged)
+	return withDefaults
 }
 
 func normalizeConfigMap(cfg map[string]any) map[string]any {

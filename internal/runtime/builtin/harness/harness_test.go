@@ -42,6 +42,14 @@ func TestProviderBaseArgs(t *testing.T) {
 	}
 }
 
+func TestProviderDefaultConfig(t *testing.T) {
+	t.Run("codex", func(t *testing.T) {
+		provider, ok := any(&codexProvider{}).(defaultConfigProvider)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{"skip_git_repo_check": true}, provider.DefaultConfig())
+	})
+}
+
 func TestConfigToFlags(t *testing.T) {
 	t.Run("reserved_keys_skipped", func(t *testing.T) {
 		flags := configToFlags(map[string]any{
@@ -330,6 +338,31 @@ func TestBuildProviderConfigs(t *testing.T) {
 		}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "config.fallback is not supported")
+	})
+
+	t.Run("builtin_provider_defaults_are_applied", func(t *testing.T) {
+		configs, err := buildProviderConfigs(map[string]any{
+			"provider": "codex",
+		}, nil)
+		require.NoError(t, err)
+		require.Len(t, configs, 1)
+		assert.Equal(t, map[string]any{
+			"provider":            "codex",
+			"skip_git_repo_check": true,
+		}, configs[0].flags)
+	})
+
+	t.Run("builtin_provider_defaults_can_be_overridden", func(t *testing.T) {
+		configs, err := buildProviderConfigs(map[string]any{
+			"provider":            "codex",
+			"skip_git_repo_check": false,
+		}, nil)
+		require.NoError(t, err)
+		require.Len(t, configs, 1)
+		assert.Equal(t, map[string]any{
+			"provider":            "codex",
+			"skip_git_repo_check": false,
+		}, configs[0].flags)
 	})
 }
 

@@ -19,6 +19,98 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCodexHarnessAddsSkipGitRepoCheckByDefault(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses shell script as a fake codex binary")
+	}
+
+	binDir := t.TempDir()
+	codexPath := filepath.Join(binDir, "codex")
+	require.NoError(t, os.WriteFile(codexPath, []byte(`#!/bin/sh
+for arg in "$@"; do
+  if [ "$arg" = "--skip-git-repo-check" ]; then
+    printf 'codex ok'
+    exit 0
+  fi
+done
+echo "missing --skip-git-repo-check" >&2
+exit 1
+`), 0o755))
+
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	th := test.SetupCommand(t, test.WithBuiltExecutable())
+	th.CreateDAGFile(t, "harness_codex_defaults.yaml", `
+steps:
+  - type: harness
+    config:
+      provider: codex
+    command: hello
+    output: RESULT
+`)
+
+	dagRunID := uuid.Must(uuid.NewV7()).String()
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
+		Args:        []string{"start", "--run-id", dagRunID, "harness_codex_defaults"},
+		ExpectedOut: []string{"DAG run finished"},
+	})
+
+	ref := exec.NewDAGRunRef("harness_codex_defaults", dagRunID)
+	attempt, err := th.DAGRunStore.FindAttempt(context.Background(), ref)
+	require.NoError(t, err)
+
+	status, err := attempt.ReadStatus(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, status.Status)
+	require.Len(t, status.Nodes, 1)
+
+	stdout, err := os.ReadFile(status.Nodes[0].Stdout)
+	require.NoError(t, err)
+	require.Equal(t, "codex ok", string(stdout))
+}
+
+func TestHarnessMultilineCommandPrompt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses cat as a fake harness provider")
+	}
+
+	th := test.SetupCommand(t)
+	th.CreateDAGFile(t, "harness_multiline_prompt.yaml", `
+harnesses:
+  passthrough:
+    binary: cat
+    prompt_mode: stdin
+
+steps:
+  - name: review
+    type: harness
+    config:
+      provider: passthrough
+    command: |
+      hey
+      you
+`)
+
+	dagRunID := uuid.Must(uuid.NewV7()).String()
+	th.RunCommand(t, cmd.Start(), test.CmdTest{
+		Args:        []string{"start", "--run-id", dagRunID, "harness_multiline_prompt"},
+		ExpectedOut: []string{"DAG run finished"},
+	})
+
+	ref := exec.NewDAGRunRef("harness_multiline_prompt", dagRunID)
+	attempt, err := th.DAGRunStore.FindAttempt(context.Background(), ref)
+	require.NoError(t, err)
+
+	status, err := attempt.ReadStatus(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, core.Succeeded, status.Status)
+	require.Len(t, status.Nodes, 1)
+	require.Equal(t, "harness", status.Nodes[0].Step.ExecutorConfig.Type)
+
+	stdout, err := os.ReadFile(status.Nodes[0].Stdout)
+	require.NoError(t, err)
+	require.Equal(t, "hey\nyou", string(stdout))
+}
+
 func TestRetryRestoresHarnessConfigFromBaseConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("uses cat as a fake harness provider")

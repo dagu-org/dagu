@@ -945,6 +945,17 @@ func buildSingleCommand(val string, result *core.Step) error {
 		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
 	}
 
+	// Harness uses command as a prompt, so preserve multiline text as a single
+	// command entry instead of reclassifying it as an inline script.
+	if strings.Contains(val, "\n") && result.ExecutorConfig.Type == "harness" {
+		result.Commands = []core.CommandEntry{
+			{
+				CmdWithArgs: val,
+			},
+		}
+		return nil
+	}
+
 	// If the value is multi-line, treat it as a script
 	if strings.Contains(val, "\n") {
 		result.Script = val
