@@ -18,7 +18,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const dispatchTaskStoreVersion = 1
+const (
+	dispatchTaskStoreVersion      = 1
+	defaultDispatchReservationTTL = 30 * time.Second
+)
 
 type DispatchTaskStore struct {
 	baseDir string
@@ -74,7 +77,7 @@ func (s *DispatchTaskStore) ClaimNext(_ context.Context, claim exec.DispatchTask
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := s.recycleExpiredClaims(claim.ClaimTimeout); err != nil {
+	if err := s.recycleExpiredReservations(claim.ClaimTimeout); err != nil {
 		return nil, err
 	}
 
@@ -228,9 +231,7 @@ func (s *DispatchTaskStore) HasOutstandingAttempt(_ context.Context, attemptKey 
 }
 
 func (s *DispatchTaskStore) recycleExpiredClaims(claimTimeout time.Duration) error {
-	if claimTimeout <= 0 {
-		claimTimeout = 30 * time.Second
-	}
+	claimTimeout = normalizeDispatchReservationTTL(claimTimeout)
 
 	files, err := sortedFiles(s.claimsDir())
 	if err != nil {
@@ -247,24 +248,18 @@ func (s *DispatchTaskStore) recycleExpiredClaims(claimTimeout time.Duration) err
 			return readErr
 		}
 
-		var claimedAt time.Time
-		if record.ClaimedAt > 0 {
-			claimedAt = time.UnixMilli(record.ClaimedAt).UTC()
-		}
-		if claimedAt.IsZero() {
-			info, statErr := os.Stat(claimPath)
-			if statErr != nil {
-				if os.IsNotExist(statErr) {
-					continue
-				}
-				return statErr
+		claimedAt, err := recordTimestamp(claimPath, record.ClaimedAt)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
 			}
-			claimedAt = info.ModTime().UTC()
+			return err
 		}
 		if now.Sub(claimedAt) < claimTimeout {
 			continue
 		}
 
+		record.EnqueuedAt = now.UnixMilli()
 		record.ClaimToken = ""
 		record.ClaimedAt = 0
 		record.WorkerID = ""
@@ -287,11 +282,55 @@ func (s *DispatchTaskStore) recycleExpiredClaims(claimTimeout time.Duration) err
 	return nil
 }
 
+func (s *DispatchTaskStore) recycleExpiredPending(pendingTTL time.Duration) error {
+	pendingTTL = normalizeDispatchReservationTTL(pendingTTL)
+
+	files, err := sortedFiles(s.pendingDir())
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+	for _, pendingPath := range files {
+		record, readErr := s.readTaskFile(pendingPath)
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return readErr
+		}
+
+		enqueuedAt, err := recordTimestamp(pendingPath, record.EnqueuedAt)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if now.Sub(enqueuedAt) < pendingTTL {
+			continue
+		}
+
+		if err := os.Remove(pendingPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove expired pending dispatch task %s: %w", pendingPath, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *DispatchTaskStore) recycleExpiredReservations(reservationTTL time.Duration) error {
+	if err := s.recycleExpiredClaims(reservationTTL); err != nil {
+		return err
+	}
+	return s.recycleExpiredPending(reservationTTL)
+}
+
 func (s *DispatchTaskStore) snapshotOutstandingPaths(claimTimeout time.Duration) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := s.recycleExpiredClaims(claimTimeout); err != nil {
+	if err := s.recycleExpiredReservations(claimTimeout); err != nil {
 		return nil, err
 	}
 
@@ -316,6 +355,25 @@ func (s *DispatchTaskStore) readTaskFile(path string) (*dispatchTaskFile, error)
 		return nil, err
 	}
 	return &record, nil
+}
+
+func normalizeDispatchReservationTTL(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return defaultDispatchReservationTTL
+	}
+	return ttl
+}
+
+func recordTimestamp(path string, unixMillis int64) (time.Time, error) {
+	if unixMillis > 0 {
+		return time.UnixMilli(unixMillis).UTC(), nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime().UTC(), nil
 }
 
 func cloneTask(task *coordinatorv1.Task) *coordinatorv1.Task {
