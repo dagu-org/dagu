@@ -70,6 +70,9 @@ type dag struct {
 	// handlerOnRaw preserves raw handler maps so explicit zero-value call-site
 	// overrides remain distinguishable from omission during build.
 	handlerOnRaw map[string]map[string]any
+	// defaultsRaw preserves the authored defaults map so explicit zero/empty
+	// DAG-local overrides can replace inherited base defaults during merge.
+	defaultsRaw map[string]any
 	// StepTypes defines custom step types that expand to builtin-backed steps.
 	StepTypes map[string]customStepTypeSpec `yaml:"step_types,omitempty"`
 	// Steps is the list of steps to run.
@@ -2159,7 +2162,7 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 	if err != nil {
 		return handlerOn, err
 	}
-	defs := mergeDefaults(ctx.baseDefaults, localDefs)
+	defs := mergeDefaults(ctx.baseDefaults, localDefs, d.defaultsRaw)
 
 	// buildHandler is a helper that builds a single handler step.
 	buildHandler := func(s *step, name core.HandlerType) (*core.Step, error) {
@@ -2274,7 +2277,7 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 	if err != nil {
 		return nil, err
 	}
-	defs := mergeDefaults(ctx.baseDefaults, localDefs)
+	defs := mergeDefaults(ctx.baseDefaults, localDefs, d.defaultsRaw)
 
 	switch v := d.Steps.(type) {
 	case nil:

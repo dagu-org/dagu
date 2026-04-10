@@ -1841,6 +1841,35 @@ steps:
 		require.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
 	})
 
+	t.Run("BaseConfigDefaultsAllowExplicitClears", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 300
+  env:
+    - BASE_ONLY: base-only
+  preconditions:
+    - condition: "test -f /base"
+`)
+		child := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 0
+  env: []
+  preconditions: []
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.Zero(t, dag.Steps[0].Timeout)
+		require.Empty(t, dag.Steps[0].Env)
+		require.Empty(t, dag.Steps[0].Preconditions)
+	})
+
 	t.Run("BaseConfigDAGRetryPolicy", func(t *testing.T) {
 		t.Parallel()
 

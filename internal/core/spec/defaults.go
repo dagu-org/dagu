@@ -167,7 +167,7 @@ func applyDefaults(s *step, d *defaults, raw map[string]any) {
 	}
 }
 
-func mergeDefaults(base, override *defaults) *defaults {
+func mergeDefaults(base, override *defaults, overrideRaw map[string]any) *defaults {
 	if base == nil {
 		return override
 	}
@@ -176,41 +176,56 @@ func mergeDefaults(base, override *defaults) *defaults {
 	}
 
 	merged := *base
-	if !override.ContinueOn.IsZero() {
+
+	shouldOverride := func(key string, hasValue bool) bool {
+		if overrideRaw != nil {
+			_, ok := overrideRaw[key]
+			return ok
+		}
+		return hasValue
+	}
+
+	if shouldOverride("continue_on", !override.ContinueOn.IsZero()) {
 		merged.ContinueOn = override.ContinueOn
 	}
-	if override.RetryPolicy != nil {
+	if shouldOverride("retry_policy", override.RetryPolicy != nil) {
 		merged.RetryPolicy = override.RetryPolicy
 	}
-	if override.RepeatPolicy != nil {
+	if shouldOverride("repeat_policy", override.RepeatPolicy != nil) {
 		merged.RepeatPolicy = override.RepeatPolicy
 	}
-	if override.TimeoutSec != 0 {
+	if shouldOverride("timeout_sec", override.TimeoutSec != 0) {
 		merged.TimeoutSec = override.TimeoutSec
 	}
-	if override.MailOnError != nil {
+	if shouldOverride("mail_on_error", override.MailOnError != nil) {
 		merged.MailOnError = override.MailOnError
 	}
-	if override.SignalOnStop != nil {
+	if shouldOverride("signal_on_stop", override.SignalOnStop != nil) {
 		merged.SignalOnStop = override.SignalOnStop
 	}
-	if !override.Env.IsZero() {
-		merged.Env = override.Env.Prepend(merged.Env)
+	if shouldOverride("env", !override.Env.IsZero()) {
+		if len(override.Env.Entries()) == 0 {
+			merged.Env = override.Env
+		} else {
+			merged.Env = override.Env.Prepend(merged.Env)
+		}
 	}
-	if override.Preconditions != nil {
-		if merged.Preconditions == nil {
+	if shouldOverride("preconditions", override.Preconditions != nil) {
+		if isEmptyPreconditionsValue(override.Preconditions) {
+			merged.Preconditions = override.Preconditions
+		} else if merged.Preconditions == nil {
 			merged.Preconditions = override.Preconditions
 		} else {
 			merged.Preconditions = combinePreconditions(merged.Preconditions, override.Preconditions)
 		}
 	}
-	if override.Agent != nil {
-		merged.Agent = mergeAgentDefaults(merged.Agent, override.Agent)
+	if shouldOverride("agent", override.Agent != nil) {
+		merged.Agent = mergeAgentDefaults(merged.Agent, override.Agent, nestedRawMap(overrideRaw, "agent"))
 	}
 	return &merged
 }
 
-func mergeAgentDefaults(base, override *agentDefaults) *agentDefaults {
+func mergeAgentDefaults(base, override *agentDefaults, overrideRaw map[string]any) *agentDefaults {
 	if base == nil {
 		return override
 	}
@@ -219,31 +234,62 @@ func mergeAgentDefaults(base, override *agentDefaults) *agentDefaults {
 	}
 
 	merged := *base
-	if override.Model != "" {
+
+	shouldOverride := func(key string, hasValue bool) bool {
+		if overrideRaw != nil {
+			_, ok := overrideRaw[key]
+			return ok
+		}
+		return hasValue
+	}
+
+	if shouldOverride("model", override.Model != "") {
 		merged.Model = override.Model
 	}
-	if override.Tools != nil {
+	if shouldOverride("tools", override.Tools != nil) {
 		merged.Tools = override.Tools
 	}
-	if override.Skills != nil {
+	if shouldOverride("skills", override.Skills != nil) {
 		merged.Skills = append([]string(nil), override.Skills...)
 	}
-	if override.Soul != "" {
+	if shouldOverride("soul", override.Soul != "") {
 		merged.Soul = override.Soul
 	}
-	if override.Memory != nil {
+	if shouldOverride("memory", override.Memory != nil) {
 		merged.Memory = override.Memory
 	}
-	if override.Prompt != "" {
+	if shouldOverride("prompt", override.Prompt != "") {
 		merged.Prompt = override.Prompt
 	}
-	if override.MaxIterations != nil {
+	if shouldOverride("max_iterations", override.MaxIterations != nil) {
 		merged.MaxIterations = override.MaxIterations
 	}
-	if override.SafeMode != nil {
+	if shouldOverride("safe_mode", override.SafeMode != nil) {
 		merged.SafeMode = override.SafeMode
 	}
 	return &merged
+}
+
+func nestedRawMap(raw map[string]any, key string) map[string]any {
+	if raw == nil {
+		return nil
+	}
+	value, ok := raw[key].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return value
+}
+
+func isEmptyPreconditionsValue(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return true
+	case []any:
+		return len(v) == 0
+	default:
+		return false
+	}
 }
 
 // combinePreconditions merges two precondition values into a single []any slice.

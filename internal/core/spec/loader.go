@@ -874,6 +874,7 @@ func decode(cm map[string]any) (*dag, error) {
 	err = withSnakeCaseKeyHint(err)
 	if err == nil {
 		c.handlerOnRaw = extractRawHandlerOn(cm)
+		c.defaultsRaw = extractRawDefaults(cm)
 	}
 
 	return c, err
@@ -897,6 +898,14 @@ func extractRawHandlerOn(cm map[string]any) map[string]map[string]any {
 		return nil
 	}
 	return cloned
+}
+
+func extractRawDefaults(cm map[string]any) map[string]any {
+	rawDefaults, ok := cm["defaults"].(map[string]any)
+	if !ok || len(rawDefaults) == 0 {
+		return nil
+	}
+	return cloneMap(rawDefaults)
 }
 
 // TypedUnionDecodeHook returns a decode hook that handles our typed union types.

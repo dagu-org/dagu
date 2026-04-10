@@ -18,7 +18,6 @@ func TestCustomStepTypes_WorkerWithoutLocalBaseConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("direct exec integration uses /bin/echo")
 	}
-	t.Parallel()
 
 	baseDir := t.TempDir()
 	baseConfigPath := filepath.Join(baseDir, "base.yaml")
@@ -66,7 +65,6 @@ func TestCustomStepTypes_SubDAGBaseConfigPropagation(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("direct exec integration uses /bin/echo")
 	}
-	t.Parallel()
 
 	baseDir := t.TempDir()
 	baseConfigPath := filepath.Join(baseDir, "base.yaml")
@@ -104,7 +102,7 @@ steps:
     type: greet
     config:
       message: propagated-custom
-`, withLogPersistence(), withBaseConfigPath(baseConfigPath), withLabels(map[string]string{"type": "test-worker"}))
+`, withLogPersistence(), withBaseConfigPath(baseConfigPath), withWorkerBaseConfigPath("/nonexistent/base.yaml"), withLabels(map[string]string{"type": "test-worker"}))
 	defer f.cleanup()
 
 	f.dagWrapper.Agent().RunSuccess(t)
@@ -118,7 +116,6 @@ func TestCustomStepTypes_WorkerWithoutLocalBaseConfig_DefaultPrecedence(t *testi
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh is required for the env precedence integration test")
 	}
-	t.Parallel()
 
 	baseDir := t.TempDir()
 	baseConfigPath := filepath.Join(baseDir, "base.yaml")

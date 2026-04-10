@@ -263,9 +263,9 @@ func TestMergeDefaults(t *testing.T) {
 		base := &defaults{TimeoutSec: 10}
 		override := &defaults{TimeoutSec: 20}
 
-		require.Nil(t, mergeDefaults(nil, nil))
-		require.Same(t, base, mergeDefaults(base, nil))
-		require.Same(t, override, mergeDefaults(nil, override))
+		require.Nil(t, mergeDefaults(nil, nil, nil))
+		require.Same(t, base, mergeDefaults(base, nil, nil))
+		require.Same(t, override, mergeDefaults(nil, override, nil))
 	})
 
 	t.Run("OverrideReplacementAndComposeAdditiveFields", func(t *testing.T) {
@@ -312,7 +312,7 @@ func TestMergeDefaults(t *testing.T) {
 			},
 		}
 
-		merged := mergeDefaults(base, override)
+		merged := mergeDefaults(base, override, nil)
 		require.NotNil(t, merged)
 		require.NotSame(t, base, merged)
 		require.True(t, merged.ContinueOn.Skipped())
@@ -352,6 +352,44 @@ func TestMergeDefaults(t *testing.T) {
 		require.Equal(t, []string{"base-skill"}, base.Agent.Skills)
 		require.Equal(t, "base prompt", base.Agent.Prompt)
 	})
+
+	t.Run("ExplicitZeroAndEmptyOverridesWithRaw", func(t *testing.T) {
+		t.Parallel()
+
+		base := &defaults{
+			TimeoutSec:    600,
+			Env:           envValueMap(map[string]string{"BASE_ONLY": "base-only"}),
+			Preconditions: []any{"base-check"},
+			Agent: &agentDefaults{
+				Model:  "base-model",
+				Prompt: "base prompt",
+				Soul:   "base-soul",
+			},
+		}
+		overrideRaw := map[string]any{
+			"timeout_sec":   0,
+			"env":           []any{},
+			"preconditions": []any{},
+			"agent": map[string]any{
+				"prompt": "",
+				"soul":   "",
+			},
+		}
+		override, err := decodeDefaults(overrideRaw)
+		require.NoError(t, err)
+
+		merged := mergeDefaults(base, override, overrideRaw)
+		require.NotNil(t, merged)
+		require.Zero(t, merged.TimeoutSec)
+		require.Empty(t, merged.Env.Entries())
+		preconditions, ok := merged.Preconditions.([]any)
+		require.True(t, ok)
+		require.Empty(t, preconditions)
+		require.NotNil(t, merged.Agent)
+		require.Equal(t, "base-model", merged.Agent.Model)
+		require.Empty(t, merged.Agent.Prompt)
+		require.Empty(t, merged.Agent.Soul)
+	})
 }
 
 func TestMergeAgentDefaults(t *testing.T) {
@@ -366,9 +404,9 @@ func TestMergeAgentDefaults(t *testing.T) {
 		base := &agentDefaults{Model: "base"}
 		override := &agentDefaults{Model: "override"}
 
-		require.Nil(t, mergeAgentDefaults(nil, nil))
-		require.Same(t, base, mergeAgentDefaults(base, nil))
-		require.Same(t, override, mergeAgentDefaults(nil, override))
+		require.Nil(t, mergeAgentDefaults(nil, nil, nil))
+		require.Same(t, base, mergeAgentDefaults(base, nil, nil))
+		require.Same(t, override, mergeAgentDefaults(nil, override, nil))
 	})
 
 	t.Run("OverrideFields", func(t *testing.T) {
@@ -395,7 +433,7 @@ func TestMergeAgentDefaults(t *testing.T) {
 			SafeMode:      boolPtr(false),
 		}
 
-		merged := mergeAgentDefaults(base, override)
+		merged := mergeAgentDefaults(base, override, nil)
 		require.NotNil(t, merged)
 		require.NotSame(t, base, merged)
 		require.Equal(t, "override-model", merged.Model)
@@ -412,6 +450,27 @@ func TestMergeAgentDefaults(t *testing.T) {
 		require.Equal(t, "base prompt", base.Prompt)
 		require.Equal(t, 5, *base.MaxIterations)
 		require.True(t, *base.SafeMode)
+	})
+
+	t.Run("ExplicitEmptyStringsWithRaw", func(t *testing.T) {
+		t.Parallel()
+
+		base := &agentDefaults{
+			Model:  "base-model",
+			Prompt: "base prompt",
+			Soul:   "base-soul",
+		}
+		overrideRaw := map[string]any{
+			"prompt": "",
+			"soul":   "",
+		}
+		override := &agentDefaults{}
+
+		merged := mergeAgentDefaults(base, override, overrideRaw)
+		require.NotNil(t, merged)
+		require.Equal(t, "base-model", merged.Model)
+		require.Empty(t, merged.Prompt)
+		require.Empty(t, merged.Soul)
 	})
 }
 

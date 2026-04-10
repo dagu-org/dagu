@@ -106,26 +106,35 @@ func buildCustomStepTypeRegistry(base, local map[string]customStepTypeSpec) (*cu
 	}
 
 	for name, spec := range base {
-		def, err := validateCustomStepTypeSpec(name, spec)
-		if err != nil {
-			return nil, err
-		}
-		registry.entries[name] = def
-	}
-
-	for name, spec := range local {
-		if _, exists := registry.entries[name]; exists {
+		normalizedName := strings.TrimSpace(name)
+		if _, exists := registry.entries[normalizedName]; exists {
 			return nil, core.NewValidationError(
-				fmt.Sprintf("step_types.%s", name),
-				name,
-				fmt.Errorf("duplicate custom step type %q is defined in both base config and DAG", name),
+				fmt.Sprintf("step_types.%s", normalizedName),
+				normalizedName,
+				fmt.Errorf("duplicate custom step type %q is defined in base config", normalizedName),
 			)
 		}
 		def, err := validateCustomStepTypeSpec(name, spec)
 		if err != nil {
 			return nil, err
 		}
-		registry.entries[name] = def
+		registry.entries[normalizedName] = def
+	}
+
+	for name, spec := range local {
+		normalizedName := strings.TrimSpace(name)
+		if _, exists := registry.entries[normalizedName]; exists {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("step_types.%s", normalizedName),
+				normalizedName,
+				fmt.Errorf("duplicate custom step type %q is defined in both base config and DAG", normalizedName),
+			)
+		}
+		def, err := validateCustomStepTypeSpec(name, spec)
+		if err != nil {
+			return nil, err
+		}
+		registry.entries[normalizedName] = def
 	}
 
 	return registry, nil

@@ -160,6 +160,44 @@ steps:
 	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
 }
 
+func TestCustomStepTypes_BaseConfigRegistryNormalizesLookupKeys(t *testing.T) {
+	t.Parallel()
+
+	baseYAML := []byte(`
+step_types:
+  " greet ":
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+`)
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-base-normalized
+steps:
+  - type: greet
+    config:
+      message: hello-from-normalized-base
+`), WithBaseConfigContent(baseYAML))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "greet_1", step.Name)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"hello-from-normalized-base"}, step.Commands[0].Args)
+	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
+}
+
 func TestCustomStepTypes_BaseConfigDefaultsApplyBeforeTemplate(t *testing.T) {
 	t.Parallel()
 
@@ -213,6 +251,41 @@ step_types:
 
 	_, err := LoadYAML(context.Background(), []byte(`
 name: custom-step-duplicate
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+steps:
+  - type: greet
+`), WithBaseConfigContent(baseYAML))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `duplicate custom step type "greet"`)
+}
+
+func TestCustomStepTypes_DuplicateNameAcrossScopesAfterNormalization(t *testing.T) {
+	t.Parallel()
+
+	baseYAML := []byte(`
+step_types:
+  " greet ":
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+`)
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-duplicate-normalized
 step_types:
   greet:
     type: command

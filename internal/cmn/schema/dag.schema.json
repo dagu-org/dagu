@@ -1136,18 +1136,6 @@
     "step": {
       "type": "object",
       "additionalProperties": false,
-      "allOf": [
-        {
-          "not": {
-            "required": ["exec", "command"]
-          }
-        },
-        {
-          "not": {
-            "required": ["exec", "script"]
-          }
-        }
-      ],
       "properties": {
         "name": {
           "type": "string",
@@ -1651,6 +1639,16 @@
         }
       },
       "allOf": [
+        {
+          "not": {
+            "required": ["exec", "command"]
+          }
+        },
+        {
+          "not": {
+            "required": ["exec", "script"]
+          }
+        },
         {
           "if": { "properties": { "type": { "const": "http" } } },
           "then": {
@@ -4819,6 +4817,9 @@
     },
     "customStepTypes": {
       "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+      },
       "additionalProperties": {
         "$ref": "#/definitions/customStepTypeDefinition"
       },
