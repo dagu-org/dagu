@@ -368,10 +368,8 @@ func (f *testFixture) startSchedulerWithOptions(
 	startTimer := time.NewTimer(startupTimeout)
 	defer startTimer.Stop()
 
-	for {
-		if f.scheduler.IsRunning() {
-			break
-		}
+	for !f.scheduler.IsRunning() {
+
 		startErr = f.pollSchedulerErr()
 		if startErr != nil {
 			break
