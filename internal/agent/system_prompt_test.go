@@ -149,6 +149,7 @@ func TestGenerateSystemPrompt(t *testing.T) {
 			GlobalMemory: "Remembered context.",
 			DAGMemory:    "DAG context.",
 			DAGName:      "my-etl",
+			MemoryDir:    "/dags/memory",
 			ReadOnly:     true,
 		}
 

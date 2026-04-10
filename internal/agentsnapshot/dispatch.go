@@ -34,7 +34,11 @@ func BuildFromPaths(
 		}
 	}
 
-	if !agent.NeedsSnapshotForDAG(ctx, dag, resolve) {
+	needsSnapshot, err := agent.NeedsSnapshotForDAG(ctx, dag, resolve)
+	if err != nil {
+		return nil, err
+	}
+	if !needsSnapshot {
 		return nil, nil
 	}
 

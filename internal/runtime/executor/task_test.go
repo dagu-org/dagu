@@ -428,8 +428,11 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		task := &coordinatorv1.Task{}
 		snapshot := []byte("agent-snapshot")
+		want := append([]byte(nil), snapshot...)
 		executor.WithAgentSnapshot(snapshot)(task)
+		snapshot[0] = 'X'
 
-		assert.Equal(t, snapshot, task.AgentSnapshot)
+		assert.Equal(t, want, task.AgentSnapshot)
+		assert.NotEqual(t, snapshot, task.AgentSnapshot)
 	})
 }

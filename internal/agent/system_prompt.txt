@@ -63,7 +63,7 @@ Use any loaded memory as context only. Do not attempt to create, update, or dele
 </memory_mode>
 {{end}}
 
-{{if .Memory.MemoryDir}}
+{{if and .Memory.MemoryDir (not .Memory.ReadOnly)}}
 <memory_paths>
 - Memory directory: {{.Memory.MemoryDir}}
 - Global memory: {{.Memory.MemoryDir}}/MEMORY.md

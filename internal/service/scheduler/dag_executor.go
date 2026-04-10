@@ -253,9 +253,6 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 }
 
 func buildSnapshotBuilder(paths config.PathsConfig, dagStore exec.DAGStore) func(context.Context, *core.DAG) ([]byte, error) {
-	if dagStore == nil {
-		return nil
-	}
 	return func(ctx context.Context, dag *core.DAG) ([]byte, error) {
 		return agentsnapshot.BuildFromPaths(ctx, dag, paths, dagStore)
 	}

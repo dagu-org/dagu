@@ -22,6 +22,8 @@ const (
 	SnapshotVersion = 1
 	// DefaultSnapshotMaxBytes is the maximum compressed payload size for a worker snapshot.
 	DefaultSnapshotMaxBytes = 4 * 1024 * 1024
+	// maxUncompressedSnapshotBytes bounds worker-side gzip expansion during decode.
+	maxUncompressedSnapshotBytes = DefaultSnapshotMaxBytes
 )
 
 var (
@@ -111,9 +113,12 @@ func UnmarshalSnapshot(payload []byte) (*Snapshot, error) {
 		_ = zr.Close()
 	}()
 
-	raw, err := io.ReadAll(zr)
+	raw, err := io.ReadAll(io.LimitReader(zr, maxUncompressedSnapshotBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read agent snapshot: %w", err)
+	}
+	if len(raw) > maxUncompressedSnapshotBytes {
+		return nil, fmt.Errorf("agent snapshot exceeds max uncompressed size: > %d bytes", maxUncompressedSnapshotBytes)
 	}
 
 	var snapshot Snapshot
@@ -139,7 +144,10 @@ func BuildSnapshotForDAG(
 		return nil, fmt.Errorf("dag is required")
 	}
 
-	reqs := collectSnapshotRequirements(ctx, dag, opts.ResolveDAG)
+	reqs, err := collectSnapshotRequirements(ctx, dag, opts.ResolveDAG)
+	if err != nil {
+		return nil, err
+	}
 	if !reqs.hasAgentSteps {
 		return nil, nil
 	}
@@ -208,7 +216,7 @@ func BuildSnapshotForDAG(
 		if stores.MemoryStore == nil {
 			return nil, fmt.Errorf("agent memory store not available for distributed agent execution")
 		}
-		memory, err := snapshotMemory(ctx, stores.MemoryStore, reqs.sortedDAGNames())
+		memory, err := snapshotMemory(ctx, stores.MemoryStore, reqs.sortedMemoryDAGNames())
 		if err != nil {
 			return nil, err
 		}
@@ -233,11 +241,15 @@ func BuildSnapshotForDAG(
 
 // NeedsSnapshotForDAG reports whether the DAG graph contains any agent steps
 // that require a distributed agent snapshot.
-func NeedsSnapshotForDAG(ctx context.Context, dag *core.DAG, resolve DAGResolver) bool {
+func NeedsSnapshotForDAG(ctx context.Context, dag *core.DAG, resolve DAGResolver) (bool, error) {
 	if dag == nil {
-		return false
+		return false, nil
 	}
-	return collectSnapshotRequirements(ctx, dag, resolve).hasAgentSteps
+	reqs, err := collectSnapshotRequirements(ctx, dag, resolve)
+	if err != nil {
+		return false, err
+	}
+	return reqs.hasAgentSteps, nil
 }
 
 func snapshotModels(ctx context.Context, store ModelStore, ids []string) ([]*ModelConfig, error) {
@@ -259,14 +271,10 @@ func snapshotSkills(ctx context.Context, store SkillStore, ids []string) ([]*Ski
 	skills := make([]*Skill, 0, len(ids))
 	for _, id := range ids {
 		skill, err := store.GetByID(ctx, id)
-		switch {
-		case err == nil:
-			skills = append(skills, skill)
-		case errors.Is(err, ErrSkillNotFound):
-			continue
-		default:
+		if err != nil {
 			return nil, fmt.Errorf("load skill %q for snapshot: %w", id, err)
 		}
+		skills = append(skills, skill)
 	}
 	sort.Slice(skills, func(i, j int) bool {
 		return skills[i].Name < skills[j].Name
@@ -278,14 +286,10 @@ func snapshotSouls(ctx context.Context, store SoulStore, ids []string) ([]*Soul,
 	souls := make([]*Soul, 0, len(ids))
 	for _, id := range ids {
 		soul, err := store.GetByID(ctx, id)
-		switch {
-		case err == nil:
-			souls = append(souls, soul)
-		case errors.Is(err, ErrSoulNotFound):
-			continue
-		default:
+		if err != nil {
 			return nil, fmt.Errorf("load soul %q for snapshot: %w", id, err)
 		}
+		souls = append(souls, soul)
 	}
 	sort.Slice(souls, func(i, j int) bool {
 		return souls[i].Name < souls[j].Name
@@ -317,6 +321,7 @@ func snapshotMemory(ctx context.Context, store MemoryStore, dagNames []string) (
 type snapshotRequirements struct {
 	visited          map[string]struct{}
 	dagNames         map[string]struct{}
+	memoryDAGNames   map[string]struct{}
 	modelIDs         map[string]struct{}
 	skillIDs         map[string]struct{}
 	soulIDs          map[string]struct{}
@@ -327,32 +332,37 @@ type snapshotRequirements struct {
 
 func newSnapshotRequirements() *snapshotRequirements {
 	return &snapshotRequirements{
-		visited:  make(map[string]struct{}),
-		dagNames: make(map[string]struct{}),
-		modelIDs: make(map[string]struct{}),
-		skillIDs: make(map[string]struct{}),
-		soulIDs:  make(map[string]struct{}),
+		visited:        make(map[string]struct{}),
+		dagNames:       make(map[string]struct{}),
+		memoryDAGNames: make(map[string]struct{}),
+		modelIDs:       make(map[string]struct{}),
+		skillIDs:       make(map[string]struct{}),
+		soulIDs:        make(map[string]struct{}),
 	}
 }
 
-func collectSnapshotRequirements(ctx context.Context, dag *core.DAG, resolve DAGResolver) *snapshotRequirements {
+func collectSnapshotRequirements(ctx context.Context, dag *core.DAG, resolve DAGResolver) (*snapshotRequirements, error) {
 	reqs := newSnapshotRequirements()
-	reqs.walk(ctx, dag, resolve)
-	return reqs
+	if err := reqs.walk(ctx, dag, resolve); err != nil {
+		return nil, err
+	}
+	return reqs, nil
 }
 
-func (r *snapshotRequirements) walk(ctx context.Context, dag *core.DAG, resolve DAGResolver) {
+func (r *snapshotRequirements) walk(ctx context.Context, dag *core.DAG, resolve DAGResolver) error {
 	if dag == nil {
-		return
+		return nil
 	}
 	if _, ok := r.visited[dag.Name]; ok {
-		return
+		return nil
 	}
 	r.visited[dag.Name] = struct{}{}
 	r.dagNames[dag.Name] = struct{}{}
 
 	for _, step := range dag.Steps {
-		r.collectStep(ctx, dag, &step, resolve)
+		if err := r.collectStep(ctx, dag, &step, resolve); err != nil {
+			return err
+		}
 	}
 
 	handlers := []*core.Step{
@@ -364,7 +374,9 @@ func (r *snapshotRequirements) walk(ctx context.Context, dag *core.DAG, resolve 
 		dag.HandlerOn.Wait,
 	}
 	for _, handler := range handlers {
-		r.collectStep(ctx, dag, handler, resolve)
+		if err := r.collectStep(ctx, dag, handler, resolve); err != nil {
+			return err
+		}
 	}
 
 	localNames := make([]string, 0, len(dag.LocalDAGs))
@@ -373,13 +385,16 @@ func (r *snapshotRequirements) walk(ctx context.Context, dag *core.DAG, resolve 
 	}
 	sort.Strings(localNames)
 	for _, name := range localNames {
-		r.walk(ctx, dag.LocalDAGs[name], resolve)
+		if err := r.walk(ctx, dag.LocalDAGs[name], resolve); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (r *snapshotRequirements) collectStep(ctx context.Context, dag *core.DAG, step *core.Step, resolve DAGResolver) {
+func (r *snapshotRequirements) collectStep(ctx context.Context, dag *core.DAG, step *core.Step, resolve DAGResolver) error {
 	if step == nil {
-		return
+		return nil
 	}
 
 	if step.Agent != nil {
@@ -400,31 +415,35 @@ func (r *snapshotRequirements) collectStep(ctx context.Context, dag *core.DAG, s
 		}
 		if step.Agent.Memory != nil && step.Agent.Memory.Enabled {
 			r.needsMemory = true
+			if dag != nil && dag.Name != "" {
+				r.memoryDAGNames[dag.Name] = struct{}{}
+			}
 		}
 	}
 
 	if step.SubDAG == nil {
-		return
+		return nil
 	}
 
 	target := strings.TrimSpace(step.SubDAG.Name)
 	if target == "" || strings.Contains(target, "${") {
-		return
+		return nil
 	}
 
 	if dag != nil && dag.LocalDAGs != nil {
 		if local := dag.LocalDAGs[target]; local != nil {
-			r.walk(ctx, local, resolve)
-			return
+			return r.walk(ctx, local, resolve)
 		}
 	}
 
 	if resolve == nil {
-		return
+		return nil
 	}
-	if child, err := resolve(ctx, target); err == nil {
-		r.walk(ctx, child, resolve)
+	child, err := resolve(ctx, target)
+	if err != nil {
+		return fmt.Errorf("resolve subdag %q for snapshot: %w", target, err)
 	}
+	return r.walk(ctx, child, resolve)
 }
 
 func (r *snapshotRequirements) sortedModelIDs() []string {
@@ -441,6 +460,10 @@ func (r *snapshotRequirements) sortedSoulIDs() []string {
 
 func (r *snapshotRequirements) sortedDAGNames() []string {
 	return sortedKeys(r.dagNames)
+}
+
+func (r *snapshotRequirements) sortedMemoryDAGNames() []string {
+	return sortedKeys(r.memoryDAGNames)
 }
 
 func sortedKeys(set map[string]struct{}) []string {
