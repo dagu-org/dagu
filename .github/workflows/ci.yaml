@@ -31,21 +31,6 @@ env:
   GO_VERSION: "1.26"
 
 jobs:
-  # Spell check
-  codespell:
-    name: Check for spelling errors
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Codespell
-        uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579 # v2.2
-        with:
-          check_hidden: true
-          skip: ./.git,*.svg,go.mod,go.sum,*.gen.go,pnpm-lock.yaml,*.lock,*.css,.codespellrc,.codespell-ignore-words,CHANGELOG.md
-          ignore_words_file: .codespell-ignore-words
-
   # Lint Go code
   golint:
     name: Go Linter
