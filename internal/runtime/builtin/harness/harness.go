@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/dagucloud/dagu/internal/runtime/executor"
@@ -26,6 +27,8 @@ import (
 
 var _ executor.Executor = (*harnessExecutor)(nil)
 var _ executor.ExitCoder = (*harnessExecutor)(nil)
+
+const failedStdoutTailLimit = 1024
 
 type providerConfig struct {
 	name       string
@@ -163,10 +166,7 @@ func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) (*os.
 		e.exitCode = exitCodeFromError(err)
 		_ = cleanupStdoutSpool(stdout)
 		e.mu.Unlock()
-		if tail := tw.Tail(); tail != "" {
-			return nil, fmt.Errorf("%w\nrecent stderr:\n%s", err, tail)
-		}
-		return nil, err
+		return nil, formatProcessFailure(err, tw.Tail(), "")
 	}
 	e.mu.Unlock()
 
@@ -185,11 +185,15 @@ func (e *harnessExecutor) runOnce(ctx context.Context, cfg providerConfig) (*os.
 	case err := <-waitDone:
 		if err != nil {
 			e.exitCode = exitCodeFromError(err)
+			stdoutTail, tailErr := readSpoolTail(stdout, failedStdoutTailLimit, env.LogEncodingCharset)
 			_ = cleanupStdoutSpool(stdout)
-			if tail := tw.Tail(); tail != "" {
-				return nil, fmt.Errorf("%w\nrecent stderr:\n%s", err, tail)
+			if tailErr != nil {
+				return nil, fmt.Errorf("harness: failed to read stdout tail: %w", tailErr)
 			}
-			return nil, err
+			if stdoutTail != "" {
+				_, _ = fmt.Fprintf(e.stderrWriter(), "recent stdout (tail):\n%s\n", stdoutTail)
+			}
+			return nil, formatProcessFailure(err, tw.Tail(), stdoutTail)
 		}
 		if _, err := stdout.Seek(0, io.SeekStart); err != nil {
 			e.exitCode = 1
@@ -809,6 +813,48 @@ func cleanupStdoutSpool(file *os.File) error {
 		return removeErr
 	}
 	return nil
+}
+
+func readSpoolTail(file *os.File, max int, encoding string) (string, error) {
+	if file == nil || max <= 0 {
+		return "", nil
+	}
+
+	info, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	if info.Size() == 0 {
+		return "", nil
+	}
+
+	start := int64(0)
+	if info.Size() > int64(max) {
+		start = info.Size() - int64(max)
+	}
+
+	buf := make([]byte, info.Size()-start)
+	if _, err := file.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+
+	return strings.TrimRight(fileutil.DecodeString(encoding, buf), "\r\n"), nil
+}
+
+func formatProcessFailure(err error, stderrTail, stdoutTail string) error {
+	stderrTail = strings.TrimRight(stderrTail, "\r\n")
+	stdoutTail = strings.TrimRight(stdoutTail, "\r\n")
+
+	switch {
+	case stderrTail != "" && stdoutTail != "":
+		return fmt.Errorf("%w\nrecent stderr:\n%s\nrecent stdout:\n%s", err, stderrTail, stdoutTail)
+	case stderrTail != "":
+		return fmt.Errorf("%w\nrecent stderr:\n%s", err, stderrTail)
+	case stdoutTail != "":
+		return fmt.Errorf("%w\nrecent stdout:\n%s", err, stdoutTail)
+	default:
+		return err
+	}
 }
 
 func exitCodeFromError(err error) int {

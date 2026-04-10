@@ -484,6 +484,45 @@ exit 0
 	assert.Equal(t, 0, exec.ExitCode())
 }
 
+func TestHarnessExecutorRun_IncludesFailedStdoutInError(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping shell-based test on Windows")
+	}
+
+	primary := writeHarnessTestBinary(t, "primary", `#!/bin/sh
+echo "provider auth failed"
+exit 1
+`)
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exec := &harnessExecutor{
+		stdout: &stdout,
+		stderr: &stderr,
+		configs: []providerConfig{
+			{
+				name: "primary",
+				definition: &core.HarnessDefinition{
+					Binary:     primary,
+					PromptMode: core.HarnessPromptModeArg,
+					FlagStyle:  core.HarnessFlagStyleGNULong,
+				},
+				flags: map[string]any{"provider": "primary"},
+			},
+		},
+		prompt: "hello",
+	}
+
+	err := exec.Run(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "recent stdout:")
+	assert.Contains(t, err.Error(), "provider auth failed")
+	assert.Contains(t, stderr.String(), "recent stdout (tail):")
+	assert.Contains(t, stderr.String(), "provider auth failed")
+	assert.Empty(t, stdout.String())
+	assert.Equal(t, 1, exec.ExitCode())
+}
+
 func TestHarnessExecutorRun_ContextCancellationSkipsFallback(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipping shell-based test on Windows")
