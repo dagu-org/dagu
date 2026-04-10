@@ -67,6 +67,9 @@ type dag struct {
 	Env types.EnvValue `yaml:"env,omitempty"`
 	// HandlerOn is the handler configuration.
 	HandlerOn handlerOn `yaml:"handler_on,omitempty"`
+	// handlerOnRaw preserves raw handler maps so explicit zero-value call-site
+	// overrides remain distinguishable from omission during build.
+	handlerOnRaw map[string]map[string]any
 	// StepTypes defines custom step types that expand to builtin-backed steps.
 	StepTypes map[string]customStepTypeSpec `yaml:"step_types,omitempty"`
 	// Steps is the list of steps to run.
@@ -164,6 +167,32 @@ type handlerOn struct {
 	Abort   *step `yaml:"abort,omitempty"`   // Step to execute on abort
 	Exit    *step `yaml:"exit,omitempty"`    // Step to execute on exit
 	Wait    *step `yaml:"wait,omitempty"`    // Step to execute when DAG enters wait status (approval)
+}
+
+func (d *dag) rawHandler(name core.HandlerType) map[string]any {
+	if d == nil || d.handlerOnRaw == nil {
+		return nil
+	}
+
+	var key string
+	switch name {
+	case core.HandlerOnInit:
+		key = "init"
+	case core.HandlerOnSuccess:
+		key = "success"
+	case core.HandlerOnFailure:
+		key = "failure"
+	case core.HandlerOnAbort:
+		key = "abort"
+	case core.HandlerOnExit:
+		key = "exit"
+	case core.HandlerOnWait:
+		key = "wait"
+	default:
+		return nil
+	}
+
+	return d.handlerOnRaw[key]
 }
 
 // smtpConfig defines the SMTP configuration.
@@ -2137,7 +2166,7 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 		if s == nil {
 			return nil, nil
 		}
-		return buildStepFromSpec(buildCtx, 0, s, nil, map[string]struct{}{}, defs, name.String())
+		return buildStepFromSpec(buildCtx, 0, s, d.rawHandler(name), map[string]struct{}{}, defs, name.String())
 	}
 
 	if handlerOn.Init, err = buildHandler(d.HandlerOn.Init, core.HandlerOnInit); err != nil {

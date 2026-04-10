@@ -150,6 +150,25 @@ func buildCustomStepTypeRegistry(base, local map[string]customStepTypeSpec) (*cu
 	return registry, nil
 }
 
+func expandedCustomStepExecutorType(targetType string, rendered map[string]any) string {
+	targetType = strings.TrimSpace(targetType)
+	switch targetType {
+	case "":
+		return ""
+	case "command", "shell":
+		// Preserve the implicit command executor for ordinary command/script
+		// templates so DAG-level container/ssh/redis/harness inference matches
+		// plain command steps. Keep explicit command/shell typing for exec
+		// templates because exec is defined as a direct-command form.
+		if _, hasExec := rendered["exec"]; !hasExec {
+			return ""
+		}
+		return targetType
+	default:
+		return targetType
+	}
+}
+
 func validateCustomStepTypeSpec(name string, spec customStepTypeSpec) (*customStepType, error) {
 	name = strings.TrimSpace(name)
 	if !customStepTypeNameRegexp.MatchString(name) {
@@ -438,7 +457,9 @@ func buildCustomStepFromSpec(
 			err,
 		)
 	}
-	rendered["type"] = customType.Type
+	if expandedType := expandedCustomStepExecutorType(customType.Type, rendered); expandedType != "" {
+		rendered["type"] = expandedType
+	}
 
 	expandedSpec, err := decodeStep(rendered)
 	if err != nil {

@@ -872,8 +872,31 @@ func decode(cm map[string]any) (*dag, error) {
 	})
 	err := md.Decode(cm)
 	err = withSnakeCaseKeyHint(err)
+	if err == nil {
+		c.handlerOnRaw = extractRawHandlerOn(cm)
+	}
 
 	return c, err
+}
+
+func extractRawHandlerOn(cm map[string]any) map[string]map[string]any {
+	rawHandlers, ok := cm["handler_on"].(map[string]any)
+	if !ok || len(rawHandlers) == 0 {
+		return nil
+	}
+
+	cloned := make(map[string]map[string]any, len(rawHandlers))
+	for key, value := range rawHandlers {
+		rawStep, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		cloned[key] = cloneMap(rawStep)
+	}
+	if len(cloned) == 0 {
+		return nil
+	}
+	return cloned
 }
 
 // TypedUnionDecodeHook returns a decode hook that handles our typed union types.

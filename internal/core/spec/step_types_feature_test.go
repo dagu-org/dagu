@@ -56,6 +56,72 @@ steps:
 	assert.Equal(t, "Send a greeting", step.Description)
 }
 
+func TestCustomStepTypes_CommandTargetInheritsDAGLevelContainer(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-inherit-container
+container:
+  exec: shared-runner
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ json .input.message }}
+steps:
+  - type: greet
+    config:
+      message: hello-from-container
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "container", step.ExecutorConfig.Type)
+	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"hello-from-container"}, step.Commands[0].Args)
+}
+
+func TestCustomStepTypes_CommandTargetWithoutExecUsesImplicitCommandExecutor(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-implicit-command
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ json .input.message }}
+steps:
+  - type: greet
+    config:
+      message: hello-inline
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Empty(t, step.ExecutorConfig.Type)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, "echo", step.Commands[0].Command)
+	assert.Equal(t, []string{"hello-inline"}, step.Commands[0].Args)
+}
+
 func TestCustomStepTypes_BaseConfigRegistry(t *testing.T) {
 	t.Parallel()
 
@@ -229,6 +295,46 @@ steps:
 	assert.Equal(t, "greet", dag.HandlerOn.Success.ExecutorConfig.Metadata["custom_type"])
 	require.Len(t, dag.HandlerOn.Success.Commands, 1)
 	assert.Equal(t, []string{"handler-ok"}, dag.HandlerOn.Success.Commands[0].Args)
+}
+
+func TestCustomStepTypes_HandlerAllowsExplicitZeroValueOverrides(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-handler-zero-overrides
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+      timeout_sec: 15
+      mail_on_error: true
+handler_on:
+  success:
+    type: greet
+    config:
+      message: handler-ok
+    timeout_sec: 0
+    mail_on_error: false
+steps:
+  - command: echo run
+`))
+	require.NoError(t, err)
+	require.NotNil(t, dag.HandlerOn.Success)
+	assert.Equal(t, "onSuccess", dag.HandlerOn.Success.Name)
+	assert.Zero(t, dag.HandlerOn.Success.Timeout)
+	assert.False(t, dag.HandlerOn.Success.MailOnError)
+	assert.Equal(t, "greet", dag.HandlerOn.Success.ExecutorConfig.Metadata["custom_type"])
 }
 
 func TestCustomStepTypes_TemplateFieldsOverrideDefaults(t *testing.T) {
