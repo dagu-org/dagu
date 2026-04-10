@@ -1571,11 +1571,11 @@
         },
         "type": {
           "$ref": "#/definitions/executorType",
-          "description": "Executor type for this step. This is the new format replacing executor.type. Cannot be used together with 'executor' field."
+          "description": "Builtin executor type or a custom step type name declared in step_types or base config. If omitted, Dagu infers the builtin type from other step fields. Cannot be used together with 'executor' field."
         },
         "config": {
           "$ref": "#/definitions/executorConfig",
-          "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
+          "description": "Executor-specific configuration. For builtin types, this is the executor config object. For custom step types, this is the validated input object defined by step_types.<name>.input_schema. Cannot be used together with 'executor' field."
         },
         "llm": {
           "$ref": "#/definitions/llmConfig",
@@ -4761,7 +4761,7 @@
       "properties": {
         "type": {
           "$ref": "#/definitions/builtinExecutorType",
-          "description": "Builtin executor type that this custom step expands to."
+          "description": "Builtin executor type or builtin alias that this custom step expands to. Custom step types cannot target other custom step types."
         },
         "description": {
           "type": "string",
@@ -4797,7 +4797,7 @@
           "description": "Explicit argv entries passed to the executable without shell parsing."
         }
       },
-      "description": "Structured direct-exec form for command steps."
+      "description": "Structured direct-exec form for command steps. Runs an executable with explicit argv and no shell parsing."
     },
     "executorConfig": {
       "type": "object",
