@@ -335,22 +335,6 @@ steps:
 
 Config fields: `source` (required), `destination` (required for create), `format` (`zip`, `tar`, `tar.gz`, etc.; inferred from filename if omitted), `compression_level`, `password` (extract/list only), `overwrite`, `strip_components`, `include`/`exclude` (glob patterns).
 
-## gha
-
-Run GitHub Actions locally. Aliases: `gha`, `github_action`, `github-action`.
-
-```yaml
-steps:
-  - name: checkout
-    type: gha
-    command: "actions/checkout@v4"
-    config:
-      runner: catthehacker/ubuntu:act-latest
-      auto_remove: true
-```
-
-Config fields: `runner` (Docker image), `auto_remove`, `network`, `privileged`, `github_instance`, `reuse_containers`, `force_rebuild`. Step-level: `command` (action reference), `params` (action inputs).
-
 ## chat
 
 LLM chat step.
