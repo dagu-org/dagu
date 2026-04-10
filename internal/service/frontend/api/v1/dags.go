@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/agentsnapshot"
 	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
@@ -1089,6 +1090,11 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 	taskOpts = append(taskOpts, executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)))
 	if dag.SourceFile != "" {
 		taskOpts = append(taskOpts, executor.WithSourceFile(dag.SourceFile))
+	}
+	if snapshot, err := agentsnapshot.BuildFromPaths(ctx, dag, a.config.Paths, a.dagStore); err != nil {
+		return fmt.Errorf("build distributed agent snapshot: %w", err)
+	} else if len(snapshot) > 0 {
+		taskOpts = append(taskOpts, executor.WithAgentSnapshot(snapshot))
 	}
 
 	task := executor.CreateTask(

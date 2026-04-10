@@ -143,6 +143,7 @@ func ProcessQueuedInlineRun(t *testing.T, server Server, queueName string) {
 			server.SubCmdBuilder,
 			server.Config.DefaultExecMode,
 			server.Config.Paths.BaseConfig,
+			nil,
 		),
 		config.Queues{
 			Enabled: true,

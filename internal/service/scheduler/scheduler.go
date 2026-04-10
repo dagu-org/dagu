@@ -113,14 +113,23 @@ func newScheduler(
 	lockDir := filepath.Join(cfg.Paths.DataDir, "scheduler", "locks")
 	dirLock := dirlock.New(lockDir, lockOpts)
 	subCmdBuilder := runtime.NewSubCmdBuilder(cfg)
-	dagExecutor := NewDAGExecutor(coordinatorCli, subCmdBuilder, cfg.DefaultExecMode, cfg.Paths.BaseConfig)
+	dagStore := er.DAGStore()
+	dagExecutor := NewDAGExecutor(
+		coordinatorCli,
+		subCmdBuilder,
+		cfg.DefaultExecMode,
+		cfg.Paths.BaseConfig,
+		buildSnapshotBuilder(cfg.Paths, dagStore),
+	)
 	healthServer := NewHealthServer(cfg.Scheduler.Port)
 
 	// Resolve IsSuspended once at construction time and wire the event channel.
 	eventCh := make(chan DAGChangeEvent)
 	var isSuspended IsSuspendedFunc
+	if dagStore != nil {
+		isSuspended = dagStore.IsSuspended
+	}
 	if impl, ok := er.(*entryReaderImpl); ok {
-		isSuspended = impl.dagStore.IsSuspended
 		impl.setEvents(eventCh)
 	}
 	processor := NewQueueProcessor(

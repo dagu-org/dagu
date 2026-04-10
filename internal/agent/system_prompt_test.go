@@ -142,6 +142,26 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "If no DAG context is available, ask the user before writing to Global memory")
 	})
 
+	t.Run("read-only memory omits writable guidance and paths", func(t *testing.T) {
+		t.Parallel()
+		env := EnvironmentInfo{DAGsDir: "/dags"}
+		mem := MemoryContent{
+			GlobalMemory: "Remembered context.",
+			DAGMemory:    "DAG context.",
+			DAGName:      "my-etl",
+			MemoryDir:    "/dags/memory",
+			ReadOnly:     true,
+		}
+
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Memory: mem, Role: auth.RoleViewer})
+
+		assert.Contains(t, result, "<memory_mode>")
+		assert.Contains(t, result, "Memory is read-only execution context in this run.")
+		assert.Contains(t, result, "Do not attempt to persist memory in this run.")
+		assert.NotContains(t, result, "<memory_paths>")
+		assert.NotContains(t, result, "<memory_management>")
+	})
+
 	t.Run("lists skills individually when under threshold", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}

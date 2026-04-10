@@ -209,6 +209,7 @@ steps:
 			f.th.SubCmdBuilder,
 			f.th.Config.DefaultExecMode,
 			f.th.Config.Paths.BaseConfig,
+			nil,
 		),
 		config.Queues{
 			Enabled: true,

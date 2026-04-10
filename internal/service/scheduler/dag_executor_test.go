@@ -28,7 +28,7 @@ steps:
 `)
 	coordinatorCli := coordinator.New(th.ServiceRegistry, coordinator.DefaultConfig())
 
-	dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder, config.ExecutionModeLocal, "")
+	dagExecutor := scheduler.NewDAGExecutor(coordinatorCli, th.SubCmdBuilder, config.ExecutionModeLocal, "", nil)
 	t.Cleanup(func() {
 		dagExecutor.Close(th.Context)
 	})
@@ -74,7 +74,7 @@ steps:
 	})
 
 	t.Run("HandleJob_Local_ExecutesDirectly", func(t *testing.T) {
-		localExecutor := scheduler.NewDAGExecutor(nil, th.SubCmdBuilder, config.ExecutionModeLocal, "")
+		localExecutor := scheduler.NewDAGExecutor(nil, th.SubCmdBuilder, config.ExecutionModeLocal, "", nil)
 
 		dag, err := spec.Load(context.Background(), testDAG.Location)
 		require.NoError(t, err)

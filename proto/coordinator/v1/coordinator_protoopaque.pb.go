@@ -7,7 +7,7 @@
 // 	protoc        v6.31.1
 // source: proto/coordinator/v1/coordinator.proto
 
-//go:build !protoopaque
+//go:build protoopaque
 
 package coordinatorv1
 
@@ -167,12 +167,12 @@ func (x LogStreamType) Number() protoreflect.EnumNumber {
 
 // Request message for polling a task.
 type PollRequest struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	PollerId      string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"`                                                       // Unique ID for this poll request
-	Labels        map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Worker labels for task matching
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_WorkerId string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_PollerId string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3"`
+	xxx_hidden_Labels   map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *PollRequest) Reset() {
@@ -202,35 +202,35 @@ func (x *PollRequest) ProtoReflect() protoreflect.Message {
 
 func (x *PollRequest) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *PollRequest) GetPollerId() string {
 	if x != nil {
-		return x.PollerId
+		return x.xxx_hidden_PollerId
 	}
 	return ""
 }
 
 func (x *PollRequest) GetLabels() map[string]string {
 	if x != nil {
-		return x.Labels
+		return x.xxx_hidden_Labels
 	}
 	return nil
 }
 
 func (x *PollRequest) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *PollRequest) SetPollerId(v string) {
-	x.PollerId = v
+	x.xxx_hidden_PollerId = v
 }
 
 func (x *PollRequest) SetLabels(v map[string]string) {
-	x.Labels = v
+	x.xxx_hidden_Labels = v
 }
 
 type PollRequest_builder struct {
@@ -245,18 +245,18 @@ func (b0 PollRequest_builder) Build() *PollRequest {
 	m0 := &PollRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.WorkerId = b.WorkerId
-	x.PollerId = b.PollerId
-	x.Labels = b.Labels
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_PollerId = b.PollerId
+	x.xxx_hidden_Labels = b.Labels
 	return m0
 }
 
 // Response message for polling a task.
 type PollResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Task          *Task                  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"` // The task to process.
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Task *Task                  `protobuf:"bytes,1,opt,name=task,proto3"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *PollResponse) Reset() {
@@ -286,24 +286,24 @@ func (x *PollResponse) ProtoReflect() protoreflect.Message {
 
 func (x *PollResponse) GetTask() *Task {
 	if x != nil {
-		return x.Task
+		return x.xxx_hidden_Task
 	}
 	return nil
 }
 
 func (x *PollResponse) SetTask(v *Task) {
-	x.Task = v
+	x.xxx_hidden_Task = v
 }
 
 func (x *PollResponse) HasTask() bool {
 	if x == nil {
 		return false
 	}
-	return x.Task != nil
+	return x.xxx_hidden_Task != nil
 }
 
 func (x *PollResponse) ClearTask() {
-	x.Task = nil
+	x.xxx_hidden_Task = nil
 }
 
 type PollResponse_builder struct {
@@ -316,16 +316,16 @@ func (b0 PollResponse_builder) Build() *PollResponse {
 	m0 := &PollResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Task = b.Task
+	x.xxx_hidden_Task = b.Task
 	return m0
 }
 
 // Request message for dispatching a task.
 type DispatchRequest struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Task          *Task                  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Task *Task                  `protobuf:"bytes,1,opt,name=task,proto3"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *DispatchRequest) Reset() {
@@ -355,24 +355,24 @@ func (x *DispatchRequest) ProtoReflect() protoreflect.Message {
 
 func (x *DispatchRequest) GetTask() *Task {
 	if x != nil {
-		return x.Task
+		return x.xxx_hidden_Task
 	}
 	return nil
 }
 
 func (x *DispatchRequest) SetTask(v *Task) {
-	x.Task = v
+	x.xxx_hidden_Task = v
 }
 
 func (x *DispatchRequest) HasTask() bool {
 	if x == nil {
 		return false
 	}
-	return x.Task != nil
+	return x.xxx_hidden_Task != nil
 }
 
 func (x *DispatchRequest) ClearTask() {
-	x.Task = nil
+	x.xxx_hidden_Task = nil
 }
 
 type DispatchRequest_builder struct {
@@ -385,13 +385,13 @@ func (b0 DispatchRequest_builder) Build() *DispatchRequest {
 	m0 := &DispatchRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Task = b.Task
+	x.xxx_hidden_Task = b.Task
 	return m0
 }
 
 // Response message for dispatching a task.
 type DispatchResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -435,48 +435,35 @@ func (b0 DispatchResponse_builder) Build() *DispatchResponse {
 
 // Task to process.
 type Task struct {
-	state            protoimpl.MessageState `protogen:"hybrid.v1"`
-	Operation        Operation              `protobuf:"varint,6,opt,name=operation,proto3,enum=coordinator.v1.Operation" json:"operation,omitempty"`
-	RootDagRunName   string                 `protobuf:"bytes,1,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
-	RootDagRunId     string                 `protobuf:"bytes,2,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
-	ParentDagRunName string                 `protobuf:"bytes,3,opt,name=parent_dag_run_name,json=parentDagRunName,proto3" json:"parent_dag_run_name,omitempty"`
-	ParentDagRunId   string                 `protobuf:"bytes,4,opt,name=parent_dag_run_id,json=parentDagRunId,proto3" json:"parent_dag_run_id,omitempty"`
-	DagRunId         string                 `protobuf:"bytes,5,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
-	Target           string                 `protobuf:"bytes,7,opt,name=target,proto3" json:"target,omitempty"`                                                                                                                  // DAG name or path
-	Params           string                 `protobuf:"bytes,8,opt,name=params,proto3" json:"params,omitempty"`                                                                                                                  // Optional: parameters
-	Step             string                 `protobuf:"bytes,9,opt,name=step,proto3" json:"step,omitempty"`                                                                                                                      // Optional: specific step (for RETRY)
-	WorkerSelector   map[string]string      `protobuf:"bytes,10,rep,name=worker_selector,json=workerSelector,proto3" json:"worker_selector,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Required worker labels for execution
-	Definition       string                 `protobuf:"bytes,11,opt,name=definition,proto3" json:"definition,omitempty"`                                                                                                         // Optional: DAG definition (YAML) for local DAGs
-	WorkerId         string                 `protobuf:"bytes,12,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`                                                                                             // ID of the worker that will execute this task
-	// Previous status for OPERATION_RETRY in shared-nothing mode.
-	// When set, workers can retry without needing local DAGRunStore access.
-	PreviousStatus *DAGRunStatusProto `protobuf:"bytes,13,opt,name=previous_status,json=previousStatus,proto3" json:"previous_status,omitempty"`
-	// Attempt ID created by coordinator. Workers use this to create attempts with the same ID.
-	AttemptId string `protobuf:"bytes,14,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	// Globally unique attempt identifier for cancellation tracking.
-	AttemptKey string `protobuf:"bytes,15,opt,name=attempt_key,json=attemptKey,proto3" json:"attempt_key,omitempty"`
-	// Additional tags (comma-separated key=value or key-only) to apply to the DAG run.
-	Tags string `protobuf:"bytes,16,opt,name=tags,proto3" json:"tags,omitempty"`
-	// Base config YAML content for workers (avoids relying on local base config files).
-	BaseConfig string `protobuf:"bytes,17,opt,name=base_config,json=baseConfig,proto3" json:"base_config,omitempty"`
-	// RFC 3339 timestamp of when this task was originally scheduled.
-	ScheduleTime string `protobuf:"bytes,18,opt,name=schedule_time,json=scheduleTime,proto3" json:"schedule_time,omitempty"`
-	// Enables parent-managed step retries for this task.
-	ExternalStepRetry bool `protobuf:"varint,19,opt,name=external_step_retry,json=externalStepRetry,proto3" json:"external_step_retry,omitempty"`
-	// Queue/proc-group name used for distributed queue capacity accounting.
-	QueueName string `protobuf:"bytes,20,opt,name=queue_name,json=queueName,proto3" json:"queue_name,omitempty"`
-	// Coordinator instance that owns this task after claim.
-	OwnerCoordinatorId   string `protobuf:"bytes,21,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3" json:"owner_coordinator_id,omitempty"`
-	OwnerCoordinatorHost string `protobuf:"bytes,22,opt,name=owner_coordinator_host,json=ownerCoordinatorHost,proto3" json:"owner_coordinator_host,omitempty"`
-	OwnerCoordinatorPort int32  `protobuf:"varint,23,opt,name=owner_coordinator_port,json=ownerCoordinatorPort,proto3" json:"owner_coordinator_port,omitempty"`
-	// Durable token identifying the shared task claim.
-	ClaimToken string `protobuf:"bytes,24,opt,name=claim_token,json=claimToken,proto3" json:"claim_token,omitempty"`
-	// Original DAG file path for provenance-aware reschedule-from-file behavior.
-	SourceFile string `protobuf:"bytes,25,opt,name=source_file,json=sourceFile,proto3" json:"source_file,omitempty"`
-	// Opaque execution-scoped agent settings snapshot for distributed workers.
-	AgentSnapshot []byte `protobuf:"bytes,26,opt,name=agent_snapshot,json=agentSnapshot,proto3" json:"agent_snapshot,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Operation            Operation              `protobuf:"varint,6,opt,name=operation,proto3,enum=coordinator.v1.Operation"`
+	xxx_hidden_RootDagRunName       string                 `protobuf:"bytes,1,opt,name=root_dag_run_name,json=rootDagRunName,proto3"`
+	xxx_hidden_RootDagRunId         string                 `protobuf:"bytes,2,opt,name=root_dag_run_id,json=rootDagRunId,proto3"`
+	xxx_hidden_ParentDagRunName     string                 `protobuf:"bytes,3,opt,name=parent_dag_run_name,json=parentDagRunName,proto3"`
+	xxx_hidden_ParentDagRunId       string                 `protobuf:"bytes,4,opt,name=parent_dag_run_id,json=parentDagRunId,proto3"`
+	xxx_hidden_DagRunId             string                 `protobuf:"bytes,5,opt,name=dag_run_id,json=dagRunId,proto3"`
+	xxx_hidden_Target               string                 `protobuf:"bytes,7,opt,name=target,proto3"`
+	xxx_hidden_Params               string                 `protobuf:"bytes,8,opt,name=params,proto3"`
+	xxx_hidden_Step                 string                 `protobuf:"bytes,9,opt,name=step,proto3"`
+	xxx_hidden_WorkerSelector       map[string]string      `protobuf:"bytes,10,rep,name=worker_selector,json=workerSelector,proto3" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	xxx_hidden_Definition           string                 `protobuf:"bytes,11,opt,name=definition,proto3"`
+	xxx_hidden_WorkerId             string                 `protobuf:"bytes,12,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_PreviousStatus       *DAGRunStatusProto     `protobuf:"bytes,13,opt,name=previous_status,json=previousStatus,proto3"`
+	xxx_hidden_AttemptId            string                 `protobuf:"bytes,14,opt,name=attempt_id,json=attemptId,proto3"`
+	xxx_hidden_AttemptKey           string                 `protobuf:"bytes,15,opt,name=attempt_key,json=attemptKey,proto3"`
+	xxx_hidden_Tags                 string                 `protobuf:"bytes,16,opt,name=tags,proto3"`
+	xxx_hidden_BaseConfig           string                 `protobuf:"bytes,17,opt,name=base_config,json=baseConfig,proto3"`
+	xxx_hidden_ScheduleTime         string                 `protobuf:"bytes,18,opt,name=schedule_time,json=scheduleTime,proto3"`
+	xxx_hidden_ExternalStepRetry    bool                   `protobuf:"varint,19,opt,name=external_step_retry,json=externalStepRetry,proto3"`
+	xxx_hidden_QueueName            string                 `protobuf:"bytes,20,opt,name=queue_name,json=queueName,proto3"`
+	xxx_hidden_OwnerCoordinatorId   string                 `protobuf:"bytes,21,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3"`
+	xxx_hidden_OwnerCoordinatorHost string                 `protobuf:"bytes,22,opt,name=owner_coordinator_host,json=ownerCoordinatorHost,proto3"`
+	xxx_hidden_OwnerCoordinatorPort int32                  `protobuf:"varint,23,opt,name=owner_coordinator_port,json=ownerCoordinatorPort,proto3"`
+	xxx_hidden_ClaimToken           string                 `protobuf:"bytes,24,opt,name=claim_token,json=claimToken,proto3"`
+	xxx_hidden_SourceFile           string                 `protobuf:"bytes,25,opt,name=source_file,json=sourceFile,proto3"`
+	xxx_hidden_AgentSnapshot        []byte                 `protobuf:"bytes,26,opt,name=agent_snapshot,json=agentSnapshot,proto3"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *Task) Reset() {
@@ -506,302 +493,302 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 func (x *Task) GetOperation() Operation {
 	if x != nil {
-		return x.Operation
+		return x.xxx_hidden_Operation
 	}
 	return Operation_OPERATION_UNSPECIFIED
 }
 
 func (x *Task) GetRootDagRunName() string {
 	if x != nil {
-		return x.RootDagRunName
+		return x.xxx_hidden_RootDagRunName
 	}
 	return ""
 }
 
 func (x *Task) GetRootDagRunId() string {
 	if x != nil {
-		return x.RootDagRunId
+		return x.xxx_hidden_RootDagRunId
 	}
 	return ""
 }
 
 func (x *Task) GetParentDagRunName() string {
 	if x != nil {
-		return x.ParentDagRunName
+		return x.xxx_hidden_ParentDagRunName
 	}
 	return ""
 }
 
 func (x *Task) GetParentDagRunId() string {
 	if x != nil {
-		return x.ParentDagRunId
+		return x.xxx_hidden_ParentDagRunId
 	}
 	return ""
 }
 
 func (x *Task) GetDagRunId() string {
 	if x != nil {
-		return x.DagRunId
+		return x.xxx_hidden_DagRunId
 	}
 	return ""
 }
 
 func (x *Task) GetTarget() string {
 	if x != nil {
-		return x.Target
+		return x.xxx_hidden_Target
 	}
 	return ""
 }
 
 func (x *Task) GetParams() string {
 	if x != nil {
-		return x.Params
+		return x.xxx_hidden_Params
 	}
 	return ""
 }
 
 func (x *Task) GetStep() string {
 	if x != nil {
-		return x.Step
+		return x.xxx_hidden_Step
 	}
 	return ""
 }
 
 func (x *Task) GetWorkerSelector() map[string]string {
 	if x != nil {
-		return x.WorkerSelector
+		return x.xxx_hidden_WorkerSelector
 	}
 	return nil
 }
 
 func (x *Task) GetDefinition() string {
 	if x != nil {
-		return x.Definition
+		return x.xxx_hidden_Definition
 	}
 	return ""
 }
 
 func (x *Task) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *Task) GetPreviousStatus() *DAGRunStatusProto {
 	if x != nil {
-		return x.PreviousStatus
+		return x.xxx_hidden_PreviousStatus
 	}
 	return nil
 }
 
 func (x *Task) GetAttemptId() string {
 	if x != nil {
-		return x.AttemptId
+		return x.xxx_hidden_AttemptId
 	}
 	return ""
 }
 
 func (x *Task) GetAttemptKey() string {
 	if x != nil {
-		return x.AttemptKey
+		return x.xxx_hidden_AttemptKey
 	}
 	return ""
 }
 
 func (x *Task) GetTags() string {
 	if x != nil {
-		return x.Tags
+		return x.xxx_hidden_Tags
 	}
 	return ""
 }
 
 func (x *Task) GetBaseConfig() string {
 	if x != nil {
-		return x.BaseConfig
+		return x.xxx_hidden_BaseConfig
 	}
 	return ""
 }
 
 func (x *Task) GetScheduleTime() string {
 	if x != nil {
-		return x.ScheduleTime
+		return x.xxx_hidden_ScheduleTime
 	}
 	return ""
 }
 
 func (x *Task) GetExternalStepRetry() bool {
 	if x != nil {
-		return x.ExternalStepRetry
+		return x.xxx_hidden_ExternalStepRetry
 	}
 	return false
 }
 
 func (x *Task) GetQueueName() string {
 	if x != nil {
-		return x.QueueName
+		return x.xxx_hidden_QueueName
 	}
 	return ""
 }
 
 func (x *Task) GetOwnerCoordinatorId() string {
 	if x != nil {
-		return x.OwnerCoordinatorId
+		return x.xxx_hidden_OwnerCoordinatorId
 	}
 	return ""
 }
 
 func (x *Task) GetOwnerCoordinatorHost() string {
 	if x != nil {
-		return x.OwnerCoordinatorHost
+		return x.xxx_hidden_OwnerCoordinatorHost
 	}
 	return ""
 }
 
 func (x *Task) GetOwnerCoordinatorPort() int32 {
 	if x != nil {
-		return x.OwnerCoordinatorPort
+		return x.xxx_hidden_OwnerCoordinatorPort
 	}
 	return 0
 }
 
 func (x *Task) GetClaimToken() string {
 	if x != nil {
-		return x.ClaimToken
+		return x.xxx_hidden_ClaimToken
 	}
 	return ""
 }
 
 func (x *Task) GetSourceFile() string {
 	if x != nil {
-		return x.SourceFile
+		return x.xxx_hidden_SourceFile
 	}
 	return ""
 }
 
 func (x *Task) GetAgentSnapshot() []byte {
 	if x != nil {
-		return x.AgentSnapshot
+		return x.xxx_hidden_AgentSnapshot
 	}
 	return nil
 }
 
 func (x *Task) SetOperation(v Operation) {
-	x.Operation = v
+	x.xxx_hidden_Operation = v
 }
 
 func (x *Task) SetRootDagRunName(v string) {
-	x.RootDagRunName = v
+	x.xxx_hidden_RootDagRunName = v
 }
 
 func (x *Task) SetRootDagRunId(v string) {
-	x.RootDagRunId = v
+	x.xxx_hidden_RootDagRunId = v
 }
 
 func (x *Task) SetParentDagRunName(v string) {
-	x.ParentDagRunName = v
+	x.xxx_hidden_ParentDagRunName = v
 }
 
 func (x *Task) SetParentDagRunId(v string) {
-	x.ParentDagRunId = v
+	x.xxx_hidden_ParentDagRunId = v
 }
 
 func (x *Task) SetDagRunId(v string) {
-	x.DagRunId = v
+	x.xxx_hidden_DagRunId = v
 }
 
 func (x *Task) SetTarget(v string) {
-	x.Target = v
+	x.xxx_hidden_Target = v
 }
 
 func (x *Task) SetParams(v string) {
-	x.Params = v
+	x.xxx_hidden_Params = v
 }
 
 func (x *Task) SetStep(v string) {
-	x.Step = v
+	x.xxx_hidden_Step = v
 }
 
 func (x *Task) SetWorkerSelector(v map[string]string) {
-	x.WorkerSelector = v
+	x.xxx_hidden_WorkerSelector = v
 }
 
 func (x *Task) SetDefinition(v string) {
-	x.Definition = v
+	x.xxx_hidden_Definition = v
 }
 
 func (x *Task) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *Task) SetPreviousStatus(v *DAGRunStatusProto) {
-	x.PreviousStatus = v
+	x.xxx_hidden_PreviousStatus = v
 }
 
 func (x *Task) SetAttemptId(v string) {
-	x.AttemptId = v
+	x.xxx_hidden_AttemptId = v
 }
 
 func (x *Task) SetAttemptKey(v string) {
-	x.AttemptKey = v
+	x.xxx_hidden_AttemptKey = v
 }
 
 func (x *Task) SetTags(v string) {
-	x.Tags = v
+	x.xxx_hidden_Tags = v
 }
 
 func (x *Task) SetBaseConfig(v string) {
-	x.BaseConfig = v
+	x.xxx_hidden_BaseConfig = v
 }
 
 func (x *Task) SetScheduleTime(v string) {
-	x.ScheduleTime = v
+	x.xxx_hidden_ScheduleTime = v
 }
 
 func (x *Task) SetExternalStepRetry(v bool) {
-	x.ExternalStepRetry = v
+	x.xxx_hidden_ExternalStepRetry = v
 }
 
 func (x *Task) SetQueueName(v string) {
-	x.QueueName = v
+	x.xxx_hidden_QueueName = v
 }
 
 func (x *Task) SetOwnerCoordinatorId(v string) {
-	x.OwnerCoordinatorId = v
+	x.xxx_hidden_OwnerCoordinatorId = v
 }
 
 func (x *Task) SetOwnerCoordinatorHost(v string) {
-	x.OwnerCoordinatorHost = v
+	x.xxx_hidden_OwnerCoordinatorHost = v
 }
 
 func (x *Task) SetOwnerCoordinatorPort(v int32) {
-	x.OwnerCoordinatorPort = v
+	x.xxx_hidden_OwnerCoordinatorPort = v
 }
 
 func (x *Task) SetClaimToken(v string) {
-	x.ClaimToken = v
+	x.xxx_hidden_ClaimToken = v
 }
 
 func (x *Task) SetSourceFile(v string) {
-	x.SourceFile = v
+	x.xxx_hidden_SourceFile = v
 }
 
 func (x *Task) SetAgentSnapshot(v []byte) {
 	if v == nil {
 		v = []byte{}
 	}
-	x.AgentSnapshot = v
+	x.xxx_hidden_AgentSnapshot = v
 }
 
 func (x *Task) HasPreviousStatus() bool {
 	if x == nil {
 		return false
 	}
-	return x.PreviousStatus != nil
+	return x.xxx_hidden_PreviousStatus != nil
 }
 
 func (x *Task) ClearPreviousStatus() {
-	x.PreviousStatus = nil
+	x.xxx_hidden_PreviousStatus = nil
 }
 
 type Task_builder struct {
@@ -852,38 +839,38 @@ func (b0 Task_builder) Build() *Task {
 	m0 := &Task{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Operation = b.Operation
-	x.RootDagRunName = b.RootDagRunName
-	x.RootDagRunId = b.RootDagRunId
-	x.ParentDagRunName = b.ParentDagRunName
-	x.ParentDagRunId = b.ParentDagRunId
-	x.DagRunId = b.DagRunId
-	x.Target = b.Target
-	x.Params = b.Params
-	x.Step = b.Step
-	x.WorkerSelector = b.WorkerSelector
-	x.Definition = b.Definition
-	x.WorkerId = b.WorkerId
-	x.PreviousStatus = b.PreviousStatus
-	x.AttemptId = b.AttemptId
-	x.AttemptKey = b.AttemptKey
-	x.Tags = b.Tags
-	x.BaseConfig = b.BaseConfig
-	x.ScheduleTime = b.ScheduleTime
-	x.ExternalStepRetry = b.ExternalStepRetry
-	x.QueueName = b.QueueName
-	x.OwnerCoordinatorId = b.OwnerCoordinatorId
-	x.OwnerCoordinatorHost = b.OwnerCoordinatorHost
-	x.OwnerCoordinatorPort = b.OwnerCoordinatorPort
-	x.ClaimToken = b.ClaimToken
-	x.SourceFile = b.SourceFile
-	x.AgentSnapshot = b.AgentSnapshot
+	x.xxx_hidden_Operation = b.Operation
+	x.xxx_hidden_RootDagRunName = b.RootDagRunName
+	x.xxx_hidden_RootDagRunId = b.RootDagRunId
+	x.xxx_hidden_ParentDagRunName = b.ParentDagRunName
+	x.xxx_hidden_ParentDagRunId = b.ParentDagRunId
+	x.xxx_hidden_DagRunId = b.DagRunId
+	x.xxx_hidden_Target = b.Target
+	x.xxx_hidden_Params = b.Params
+	x.xxx_hidden_Step = b.Step
+	x.xxx_hidden_WorkerSelector = b.WorkerSelector
+	x.xxx_hidden_Definition = b.Definition
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_PreviousStatus = b.PreviousStatus
+	x.xxx_hidden_AttemptId = b.AttemptId
+	x.xxx_hidden_AttemptKey = b.AttemptKey
+	x.xxx_hidden_Tags = b.Tags
+	x.xxx_hidden_BaseConfig = b.BaseConfig
+	x.xxx_hidden_ScheduleTime = b.ScheduleTime
+	x.xxx_hidden_ExternalStepRetry = b.ExternalStepRetry
+	x.xxx_hidden_QueueName = b.QueueName
+	x.xxx_hidden_OwnerCoordinatorId = b.OwnerCoordinatorId
+	x.xxx_hidden_OwnerCoordinatorHost = b.OwnerCoordinatorHost
+	x.xxx_hidden_OwnerCoordinatorPort = b.OwnerCoordinatorPort
+	x.xxx_hidden_ClaimToken = b.ClaimToken
+	x.xxx_hidden_SourceFile = b.SourceFile
+	x.xxx_hidden_AgentSnapshot = b.AgentSnapshot
 	return m0
 }
 
 // Request message for getting workers.
 type GetWorkersRequest struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -927,10 +914,10 @@ func (b0 GetWorkersRequest_builder) Build() *GetWorkersRequest {
 
 // Response message for getting workers.
 type GetWorkersResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Workers       []*WorkerInfo          `protobuf:"bytes,1,rep,name=workers,proto3" json:"workers,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Workers *[]*WorkerInfo         `protobuf:"bytes,1,rep,name=workers,proto3"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *GetWorkersResponse) Reset() {
@@ -960,13 +947,15 @@ func (x *GetWorkersResponse) ProtoReflect() protoreflect.Message {
 
 func (x *GetWorkersResponse) GetWorkers() []*WorkerInfo {
 	if x != nil {
-		return x.Workers
+		if x.xxx_hidden_Workers != nil {
+			return *x.xxx_hidden_Workers
+		}
 	}
 	return nil
 }
 
 func (x *GetWorkersResponse) SetWorkers(v []*WorkerInfo) {
-	x.Workers = v
+	x.xxx_hidden_Workers = &v
 }
 
 type GetWorkersResponse_builder struct {
@@ -979,25 +968,24 @@ func (b0 GetWorkersResponse_builder) Build() *GetWorkersResponse {
 	m0 := &GetWorkersResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Workers = b.Workers
+	x.xxx_hidden_Workers = &b.Workers
 	return m0
 }
 
 // Information about a worker and its pollers.
 type WorkerInfo struct {
-	state       protoimpl.MessageState `protogen:"hybrid.v1"`
-	WorkerId    string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	PollerId    string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3" json:"poller_id,omitempty"` // Deprecated: Only used for backward compatibility
-	Labels      map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ConnectedAt int64                  `protobuf:"varint,4,opt,name=connected_at,json=connectedAt,proto3" json:"connected_at,omitempty"` // Unix timestamp in seconds
-	// Aggregated stats from heartbeat
-	TotalPollers    int32              `protobuf:"varint,5,opt,name=total_pollers,json=totalPollers,proto3" json:"total_pollers,omitempty"`
-	BusyPollers     int32              `protobuf:"varint,6,opt,name=busy_pollers,json=busyPollers,proto3" json:"busy_pollers,omitempty"`
-	RunningTasks    []*RunningTask     `protobuf:"bytes,7,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`
-	LastHeartbeatAt int64              `protobuf:"varint,8,opt,name=last_heartbeat_at,json=lastHeartbeatAt,proto3" json:"last_heartbeat_at,omitempty"`                             // Unix timestamp of last heartbeat
-	HealthStatus    WorkerHealthStatus `protobuf:"varint,9,opt,name=health_status,json=healthStatus,proto3,enum=coordinator.v1.WorkerHealthStatus" json:"health_status,omitempty"` // Health status based on heartbeat recency
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_WorkerId        string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_PollerId        string                 `protobuf:"bytes,2,opt,name=poller_id,json=pollerId,proto3"`
+	xxx_hidden_Labels          map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	xxx_hidden_ConnectedAt     int64                  `protobuf:"varint,4,opt,name=connected_at,json=connectedAt,proto3"`
+	xxx_hidden_TotalPollers    int32                  `protobuf:"varint,5,opt,name=total_pollers,json=totalPollers,proto3"`
+	xxx_hidden_BusyPollers     int32                  `protobuf:"varint,6,opt,name=busy_pollers,json=busyPollers,proto3"`
+	xxx_hidden_RunningTasks    *[]*RunningTask        `protobuf:"bytes,7,rep,name=running_tasks,json=runningTasks,proto3"`
+	xxx_hidden_LastHeartbeatAt int64                  `protobuf:"varint,8,opt,name=last_heartbeat_at,json=lastHeartbeatAt,proto3"`
+	xxx_hidden_HealthStatus    WorkerHealthStatus     `protobuf:"varint,9,opt,name=health_status,json=healthStatus,proto3,enum=coordinator.v1.WorkerHealthStatus"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *WorkerInfo) Reset() {
@@ -1027,101 +1015,103 @@ func (x *WorkerInfo) ProtoReflect() protoreflect.Message {
 
 func (x *WorkerInfo) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *WorkerInfo) GetPollerId() string {
 	if x != nil {
-		return x.PollerId
+		return x.xxx_hidden_PollerId
 	}
 	return ""
 }
 
 func (x *WorkerInfo) GetLabels() map[string]string {
 	if x != nil {
-		return x.Labels
+		return x.xxx_hidden_Labels
 	}
 	return nil
 }
 
 func (x *WorkerInfo) GetConnectedAt() int64 {
 	if x != nil {
-		return x.ConnectedAt
+		return x.xxx_hidden_ConnectedAt
 	}
 	return 0
 }
 
 func (x *WorkerInfo) GetTotalPollers() int32 {
 	if x != nil {
-		return x.TotalPollers
+		return x.xxx_hidden_TotalPollers
 	}
 	return 0
 }
 
 func (x *WorkerInfo) GetBusyPollers() int32 {
 	if x != nil {
-		return x.BusyPollers
+		return x.xxx_hidden_BusyPollers
 	}
 	return 0
 }
 
 func (x *WorkerInfo) GetRunningTasks() []*RunningTask {
 	if x != nil {
-		return x.RunningTasks
+		if x.xxx_hidden_RunningTasks != nil {
+			return *x.xxx_hidden_RunningTasks
+		}
 	}
 	return nil
 }
 
 func (x *WorkerInfo) GetLastHeartbeatAt() int64 {
 	if x != nil {
-		return x.LastHeartbeatAt
+		return x.xxx_hidden_LastHeartbeatAt
 	}
 	return 0
 }
 
 func (x *WorkerInfo) GetHealthStatus() WorkerHealthStatus {
 	if x != nil {
-		return x.HealthStatus
+		return x.xxx_hidden_HealthStatus
 	}
 	return WorkerHealthStatus_WORKER_HEALTH_STATUS_UNSPECIFIED
 }
 
 func (x *WorkerInfo) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *WorkerInfo) SetPollerId(v string) {
-	x.PollerId = v
+	x.xxx_hidden_PollerId = v
 }
 
 func (x *WorkerInfo) SetLabels(v map[string]string) {
-	x.Labels = v
+	x.xxx_hidden_Labels = v
 }
 
 func (x *WorkerInfo) SetConnectedAt(v int64) {
-	x.ConnectedAt = v
+	x.xxx_hidden_ConnectedAt = v
 }
 
 func (x *WorkerInfo) SetTotalPollers(v int32) {
-	x.TotalPollers = v
+	x.xxx_hidden_TotalPollers = v
 }
 
 func (x *WorkerInfo) SetBusyPollers(v int32) {
-	x.BusyPollers = v
+	x.xxx_hidden_BusyPollers = v
 }
 
 func (x *WorkerInfo) SetRunningTasks(v []*RunningTask) {
-	x.RunningTasks = v
+	x.xxx_hidden_RunningTasks = &v
 }
 
 func (x *WorkerInfo) SetLastHeartbeatAt(v int64) {
-	x.LastHeartbeatAt = v
+	x.xxx_hidden_LastHeartbeatAt = v
 }
 
 func (x *WorkerInfo) SetHealthStatus(v WorkerHealthStatus) {
-	x.HealthStatus = v
+	x.xxx_hidden_HealthStatus = v
 }
 
 type WorkerInfo_builder struct {
@@ -1143,26 +1133,26 @@ func (b0 WorkerInfo_builder) Build() *WorkerInfo {
 	m0 := &WorkerInfo{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.WorkerId = b.WorkerId
-	x.PollerId = b.PollerId
-	x.Labels = b.Labels
-	x.ConnectedAt = b.ConnectedAt
-	x.TotalPollers = b.TotalPollers
-	x.BusyPollers = b.BusyPollers
-	x.RunningTasks = b.RunningTasks
-	x.LastHeartbeatAt = b.LastHeartbeatAt
-	x.HealthStatus = b.HealthStatus
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_PollerId = b.PollerId
+	x.xxx_hidden_Labels = b.Labels
+	x.xxx_hidden_ConnectedAt = b.ConnectedAt
+	x.xxx_hidden_TotalPollers = b.TotalPollers
+	x.xxx_hidden_BusyPollers = b.BusyPollers
+	x.xxx_hidden_RunningTasks = &b.RunningTasks
+	x.xxx_hidden_LastHeartbeatAt = b.LastHeartbeatAt
+	x.xxx_hidden_HealthStatus = b.HealthStatus
 	return m0
 }
 
 // Request message for heartbeat.
 type HeartbeatRequest struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	Labels        map[string]string      `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Stats         *WorkerStats           `protobuf:"bytes,3,opt,name=stats,proto3" json:"stats,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_WorkerId string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_Labels   map[string]string      `protobuf:"bytes,2,rep,name=labels,proto3" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	xxx_hidden_Stats    *WorkerStats           `protobuf:"bytes,3,opt,name=stats,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *HeartbeatRequest) Reset() {
@@ -1192,46 +1182,46 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 func (x *HeartbeatRequest) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *HeartbeatRequest) GetLabels() map[string]string {
 	if x != nil {
-		return x.Labels
+		return x.xxx_hidden_Labels
 	}
 	return nil
 }
 
 func (x *HeartbeatRequest) GetStats() *WorkerStats {
 	if x != nil {
-		return x.Stats
+		return x.xxx_hidden_Stats
 	}
 	return nil
 }
 
 func (x *HeartbeatRequest) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *HeartbeatRequest) SetLabels(v map[string]string) {
-	x.Labels = v
+	x.xxx_hidden_Labels = v
 }
 
 func (x *HeartbeatRequest) SetStats(v *WorkerStats) {
-	x.Stats = v
+	x.xxx_hidden_Stats = v
 }
 
 func (x *HeartbeatRequest) HasStats() bool {
 	if x == nil {
 		return false
 	}
-	return x.Stats != nil
+	return x.xxx_hidden_Stats != nil
 }
 
 func (x *HeartbeatRequest) ClearStats() {
-	x.Stats = nil
+	x.xxx_hidden_Stats = nil
 }
 
 type HeartbeatRequest_builder struct {
@@ -1246,20 +1236,18 @@ func (b0 HeartbeatRequest_builder) Build() *HeartbeatRequest {
 	m0 := &HeartbeatRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.WorkerId = b.WorkerId
-	x.Labels = b.Labels
-	x.Stats = b.Stats
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_Labels = b.Labels
+	x.xxx_hidden_Stats = b.Stats
 	return m0
 }
 
 // Response message for heartbeat.
 type HeartbeatResponse struct {
-	state protoimpl.MessageState `protogen:"hybrid.v1"`
-	// List of DAG runs that should be cancelled by the worker.
-	// Workers check this on each heartbeat and cancel matching running tasks.
-	CancelledRuns []*CancelledRun `protobuf:"bytes,1,rep,name=cancelled_runs,json=cancelledRuns,proto3" json:"cancelled_runs,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_CancelledRuns *[]*CancelledRun       `protobuf:"bytes,1,rep,name=cancelled_runs,json=cancelledRuns,proto3"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *HeartbeatResponse) Reset() {
@@ -1289,13 +1277,15 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 func (x *HeartbeatResponse) GetCancelledRuns() []*CancelledRun {
 	if x != nil {
-		return x.CancelledRuns
+		if x.xxx_hidden_CancelledRuns != nil {
+			return *x.xxx_hidden_CancelledRuns
+		}
 	}
 	return nil
 }
 
 func (x *HeartbeatResponse) SetCancelledRuns(v []*CancelledRun) {
-	x.CancelledRuns = v
+	x.xxx_hidden_CancelledRuns = &v
 }
 
 type HeartbeatResponse_builder struct {
@@ -1310,16 +1300,16 @@ func (b0 HeartbeatResponse_builder) Build() *HeartbeatResponse {
 	m0 := &HeartbeatResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.CancelledRuns = b.CancelledRuns
+	x.xxx_hidden_CancelledRuns = &b.CancelledRuns
 	return m0
 }
 
 type AckTaskClaimRequest struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	ClaimToken    string                 `protobuf:"bytes,2,opt,name=claim_token,json=claimToken,proto3" json:"claim_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_WorkerId   string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_ClaimToken string                 `protobuf:"bytes,2,opt,name=claim_token,json=claimToken,proto3"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AckTaskClaimRequest) Reset() {
@@ -1349,24 +1339,24 @@ func (x *AckTaskClaimRequest) ProtoReflect() protoreflect.Message {
 
 func (x *AckTaskClaimRequest) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *AckTaskClaimRequest) GetClaimToken() string {
 	if x != nil {
-		return x.ClaimToken
+		return x.xxx_hidden_ClaimToken
 	}
 	return ""
 }
 
 func (x *AckTaskClaimRequest) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *AckTaskClaimRequest) SetClaimToken(v string) {
-	x.ClaimToken = v
+	x.xxx_hidden_ClaimToken = v
 }
 
 type AckTaskClaimRequest_builder struct {
@@ -1380,17 +1370,17 @@ func (b0 AckTaskClaimRequest_builder) Build() *AckTaskClaimRequest {
 	m0 := &AckTaskClaimRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.WorkerId = b.WorkerId
-	x.ClaimToken = b.ClaimToken
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_ClaimToken = b.ClaimToken
 	return m0
 }
 
 type AckTaskClaimResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Accepted bool                   `protobuf:"varint,1,opt,name=accepted,proto3"`
+	xxx_hidden_Error    string                 `protobuf:"bytes,2,opt,name=error,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AckTaskClaimResponse) Reset() {
@@ -1420,24 +1410,24 @@ func (x *AckTaskClaimResponse) ProtoReflect() protoreflect.Message {
 
 func (x *AckTaskClaimResponse) GetAccepted() bool {
 	if x != nil {
-		return x.Accepted
+		return x.xxx_hidden_Accepted
 	}
 	return false
 }
 
 func (x *AckTaskClaimResponse) GetError() string {
 	if x != nil {
-		return x.Error
+		return x.xxx_hidden_Error
 	}
 	return ""
 }
 
 func (x *AckTaskClaimResponse) SetAccepted(v bool) {
-	x.Accepted = v
+	x.xxx_hidden_Accepted = v
 }
 
 func (x *AckTaskClaimResponse) SetError(v string) {
-	x.Error = v
+	x.xxx_hidden_Error = v
 }
 
 type AckTaskClaimResponse_builder struct {
@@ -1451,18 +1441,18 @@ func (b0 AckTaskClaimResponse_builder) Build() *AckTaskClaimResponse {
 	m0 := &AckTaskClaimResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Accepted = b.Accepted
-	x.Error = b.Error
+	x.xxx_hidden_Accepted = b.Accepted
+	x.xxx_hidden_Error = b.Error
 	return m0
 }
 
 type RunHeartbeatRequest struct {
-	state              protoimpl.MessageState `protogen:"hybrid.v1"`
-	WorkerId           string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	OwnerCoordinatorId string                 `protobuf:"bytes,2,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3" json:"owner_coordinator_id,omitempty"`
-	RunningTasks       []*RunningTask         `protobuf:"bytes,3,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                         protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_WorkerId           string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_OwnerCoordinatorId string                 `protobuf:"bytes,2,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3"`
+	xxx_hidden_RunningTasks       *[]*RunningTask        `protobuf:"bytes,3,rep,name=running_tasks,json=runningTasks,proto3"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
 }
 
 func (x *RunHeartbeatRequest) Reset() {
@@ -1492,35 +1482,37 @@ func (x *RunHeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 func (x *RunHeartbeatRequest) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *RunHeartbeatRequest) GetOwnerCoordinatorId() string {
 	if x != nil {
-		return x.OwnerCoordinatorId
+		return x.xxx_hidden_OwnerCoordinatorId
 	}
 	return ""
 }
 
 func (x *RunHeartbeatRequest) GetRunningTasks() []*RunningTask {
 	if x != nil {
-		return x.RunningTasks
+		if x.xxx_hidden_RunningTasks != nil {
+			return *x.xxx_hidden_RunningTasks
+		}
 	}
 	return nil
 }
 
 func (x *RunHeartbeatRequest) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *RunHeartbeatRequest) SetOwnerCoordinatorId(v string) {
-	x.OwnerCoordinatorId = v
+	x.xxx_hidden_OwnerCoordinatorId = v
 }
 
 func (x *RunHeartbeatRequest) SetRunningTasks(v []*RunningTask) {
-	x.RunningTasks = v
+	x.xxx_hidden_RunningTasks = &v
 }
 
 type RunHeartbeatRequest_builder struct {
@@ -1535,17 +1527,17 @@ func (b0 RunHeartbeatRequest_builder) Build() *RunHeartbeatRequest {
 	m0 := &RunHeartbeatRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.WorkerId = b.WorkerId
-	x.OwnerCoordinatorId = b.OwnerCoordinatorId
-	x.RunningTasks = b.RunningTasks
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_OwnerCoordinatorId = b.OwnerCoordinatorId
+	x.xxx_hidden_RunningTasks = &b.RunningTasks
 	return m0
 }
 
 type RunHeartbeatResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	CancelledRuns []*CancelledRun        `protobuf:"bytes,1,rep,name=cancelled_runs,json=cancelledRuns,proto3" json:"cancelled_runs,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_CancelledRuns *[]*CancelledRun       `protobuf:"bytes,1,rep,name=cancelled_runs,json=cancelledRuns,proto3"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *RunHeartbeatResponse) Reset() {
@@ -1575,13 +1567,15 @@ func (x *RunHeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 func (x *RunHeartbeatResponse) GetCancelledRuns() []*CancelledRun {
 	if x != nil {
-		return x.CancelledRuns
+		if x.xxx_hidden_CancelledRuns != nil {
+			return *x.xxx_hidden_CancelledRuns
+		}
 	}
 	return nil
 }
 
 func (x *RunHeartbeatResponse) SetCancelledRuns(v []*CancelledRun) {
-	x.CancelledRuns = v
+	x.xxx_hidden_CancelledRuns = &v
 }
 
 type RunHeartbeatResponse_builder struct {
@@ -1594,16 +1588,16 @@ func (b0 RunHeartbeatResponse_builder) Build() *RunHeartbeatResponse {
 	m0 := &RunHeartbeatResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.CancelledRuns = b.CancelledRuns
+	x.xxx_hidden_CancelledRuns = &b.CancelledRuns
 	return m0
 }
 
 // Information about a cancelled DAG run.
 type CancelledRun struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	AttemptKey    string                 `protobuf:"bytes,1,opt,name=attempt_key,json=attemptKey,proto3" json:"attempt_key,omitempty"` // Globally unique attempt identifier to cancel
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_AttemptKey string                 `protobuf:"bytes,1,opt,name=attempt_key,json=attemptKey,proto3"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *CancelledRun) Reset() {
@@ -1633,13 +1627,13 @@ func (x *CancelledRun) ProtoReflect() protoreflect.Message {
 
 func (x *CancelledRun) GetAttemptKey() string {
 	if x != nil {
-		return x.AttemptKey
+		return x.xxx_hidden_AttemptKey
 	}
 	return ""
 }
 
 func (x *CancelledRun) SetAttemptKey(v string) {
-	x.AttemptKey = v
+	x.xxx_hidden_AttemptKey = v
 }
 
 type CancelledRun_builder struct {
@@ -1652,18 +1646,18 @@ func (b0 CancelledRun_builder) Build() *CancelledRun {
 	m0 := &CancelledRun{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.AttemptKey = b.AttemptKey
+	x.xxx_hidden_AttemptKey = b.AttemptKey
 	return m0
 }
 
 // Worker statistics reported via heartbeat.
 type WorkerStats struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	TotalPollers  int32                  `protobuf:"varint,1,opt,name=total_pollers,json=totalPollers,proto3" json:"total_pollers,omitempty"` // Total number of pollers
-	BusyPollers   int32                  `protobuf:"varint,2,opt,name=busy_pollers,json=busyPollers,proto3" json:"busy_pollers,omitempty"`    // Number currently processing tasks
-	RunningTasks  []*RunningTask         `protobuf:"bytes,3,rep,name=running_tasks,json=runningTasks,proto3" json:"running_tasks,omitempty"`  // Details of running tasks
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_TotalPollers int32                  `protobuf:"varint,1,opt,name=total_pollers,json=totalPollers,proto3"`
+	xxx_hidden_BusyPollers  int32                  `protobuf:"varint,2,opt,name=busy_pollers,json=busyPollers,proto3"`
+	xxx_hidden_RunningTasks *[]*RunningTask        `protobuf:"bytes,3,rep,name=running_tasks,json=runningTasks,proto3"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *WorkerStats) Reset() {
@@ -1693,35 +1687,37 @@ func (x *WorkerStats) ProtoReflect() protoreflect.Message {
 
 func (x *WorkerStats) GetTotalPollers() int32 {
 	if x != nil {
-		return x.TotalPollers
+		return x.xxx_hidden_TotalPollers
 	}
 	return 0
 }
 
 func (x *WorkerStats) GetBusyPollers() int32 {
 	if x != nil {
-		return x.BusyPollers
+		return x.xxx_hidden_BusyPollers
 	}
 	return 0
 }
 
 func (x *WorkerStats) GetRunningTasks() []*RunningTask {
 	if x != nil {
-		return x.RunningTasks
+		if x.xxx_hidden_RunningTasks != nil {
+			return *x.xxx_hidden_RunningTasks
+		}
 	}
 	return nil
 }
 
 func (x *WorkerStats) SetTotalPollers(v int32) {
-	x.TotalPollers = v
+	x.xxx_hidden_TotalPollers = v
 }
 
 func (x *WorkerStats) SetBusyPollers(v int32) {
-	x.BusyPollers = v
+	x.xxx_hidden_BusyPollers = v
 }
 
 func (x *WorkerStats) SetRunningTasks(v []*RunningTask) {
-	x.RunningTasks = v
+	x.xxx_hidden_RunningTasks = &v
 }
 
 type WorkerStats_builder struct {
@@ -1736,25 +1732,25 @@ func (b0 WorkerStats_builder) Build() *WorkerStats {
 	m0 := &WorkerStats{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.TotalPollers = b.TotalPollers
-	x.BusyPollers = b.BusyPollers
-	x.RunningTasks = b.RunningTasks
+	x.xxx_hidden_TotalPollers = b.TotalPollers
+	x.xxx_hidden_BusyPollers = b.BusyPollers
+	x.xxx_hidden_RunningTasks = &b.RunningTasks
 	return m0
 }
 
 // Information about a running task.
 type RunningTask struct {
-	state            protoimpl.MessageState `protogen:"hybrid.v1"`
-	DagRunId         string                 `protobuf:"bytes,1,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
-	DagName          string                 `protobuf:"bytes,2,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
-	StartedAt        int64                  `protobuf:"varint,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"` // Unix timestamp in seconds
-	RootDagRunName   string                 `protobuf:"bytes,4,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
-	RootDagRunId     string                 `protobuf:"bytes,5,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
-	ParentDagRunName string                 `protobuf:"bytes,6,opt,name=parent_dag_run_name,json=parentDagRunName,proto3" json:"parent_dag_run_name,omitempty"`
-	ParentDagRunId   string                 `protobuf:"bytes,7,opt,name=parent_dag_run_id,json=parentDagRunId,proto3" json:"parent_dag_run_id,omitempty"`
-	AttemptKey       string                 `protobuf:"bytes,8,opt,name=attempt_key,json=attemptKey,proto3" json:"attempt_key,omitempty"` // Globally unique attempt identifier
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                       protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_DagRunId         string                 `protobuf:"bytes,1,opt,name=dag_run_id,json=dagRunId,proto3"`
+	xxx_hidden_DagName          string                 `protobuf:"bytes,2,opt,name=dag_name,json=dagName,proto3"`
+	xxx_hidden_StartedAt        int64                  `protobuf:"varint,3,opt,name=started_at,json=startedAt,proto3"`
+	xxx_hidden_RootDagRunName   string                 `protobuf:"bytes,4,opt,name=root_dag_run_name,json=rootDagRunName,proto3"`
+	xxx_hidden_RootDagRunId     string                 `protobuf:"bytes,5,opt,name=root_dag_run_id,json=rootDagRunId,proto3"`
+	xxx_hidden_ParentDagRunName string                 `protobuf:"bytes,6,opt,name=parent_dag_run_name,json=parentDagRunName,proto3"`
+	xxx_hidden_ParentDagRunId   string                 `protobuf:"bytes,7,opt,name=parent_dag_run_id,json=parentDagRunId,proto3"`
+	xxx_hidden_AttemptKey       string                 `protobuf:"bytes,8,opt,name=attempt_key,json=attemptKey,proto3"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *RunningTask) Reset() {
@@ -1784,90 +1780,90 @@ func (x *RunningTask) ProtoReflect() protoreflect.Message {
 
 func (x *RunningTask) GetDagRunId() string {
 	if x != nil {
-		return x.DagRunId
+		return x.xxx_hidden_DagRunId
 	}
 	return ""
 }
 
 func (x *RunningTask) GetDagName() string {
 	if x != nil {
-		return x.DagName
+		return x.xxx_hidden_DagName
 	}
 	return ""
 }
 
 func (x *RunningTask) GetStartedAt() int64 {
 	if x != nil {
-		return x.StartedAt
+		return x.xxx_hidden_StartedAt
 	}
 	return 0
 }
 
 func (x *RunningTask) GetRootDagRunName() string {
 	if x != nil {
-		return x.RootDagRunName
+		return x.xxx_hidden_RootDagRunName
 	}
 	return ""
 }
 
 func (x *RunningTask) GetRootDagRunId() string {
 	if x != nil {
-		return x.RootDagRunId
+		return x.xxx_hidden_RootDagRunId
 	}
 	return ""
 }
 
 func (x *RunningTask) GetParentDagRunName() string {
 	if x != nil {
-		return x.ParentDagRunName
+		return x.xxx_hidden_ParentDagRunName
 	}
 	return ""
 }
 
 func (x *RunningTask) GetParentDagRunId() string {
 	if x != nil {
-		return x.ParentDagRunId
+		return x.xxx_hidden_ParentDagRunId
 	}
 	return ""
 }
 
 func (x *RunningTask) GetAttemptKey() string {
 	if x != nil {
-		return x.AttemptKey
+		return x.xxx_hidden_AttemptKey
 	}
 	return ""
 }
 
 func (x *RunningTask) SetDagRunId(v string) {
-	x.DagRunId = v
+	x.xxx_hidden_DagRunId = v
 }
 
 func (x *RunningTask) SetDagName(v string) {
-	x.DagName = v
+	x.xxx_hidden_DagName = v
 }
 
 func (x *RunningTask) SetStartedAt(v int64) {
-	x.StartedAt = v
+	x.xxx_hidden_StartedAt = v
 }
 
 func (x *RunningTask) SetRootDagRunName(v string) {
-	x.RootDagRunName = v
+	x.xxx_hidden_RootDagRunName = v
 }
 
 func (x *RunningTask) SetRootDagRunId(v string) {
-	x.RootDagRunId = v
+	x.xxx_hidden_RootDagRunId = v
 }
 
 func (x *RunningTask) SetParentDagRunName(v string) {
-	x.ParentDagRunName = v
+	x.xxx_hidden_ParentDagRunName = v
 }
 
 func (x *RunningTask) SetParentDagRunId(v string) {
-	x.ParentDagRunId = v
+	x.xxx_hidden_ParentDagRunId = v
 }
 
 func (x *RunningTask) SetAttemptKey(v string) {
-	x.AttemptKey = v
+	x.xxx_hidden_AttemptKey = v
 }
 
 type RunningTask_builder struct {
@@ -1887,25 +1883,25 @@ func (b0 RunningTask_builder) Build() *RunningTask {
 	m0 := &RunningTask{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.DagRunId = b.DagRunId
-	x.DagName = b.DagName
-	x.StartedAt = b.StartedAt
-	x.RootDagRunName = b.RootDagRunName
-	x.RootDagRunId = b.RootDagRunId
-	x.ParentDagRunName = b.ParentDagRunName
-	x.ParentDagRunId = b.ParentDagRunId
-	x.AttemptKey = b.AttemptKey
+	x.xxx_hidden_DagRunId = b.DagRunId
+	x.xxx_hidden_DagName = b.DagName
+	x.xxx_hidden_StartedAt = b.StartedAt
+	x.xxx_hidden_RootDagRunName = b.RootDagRunName
+	x.xxx_hidden_RootDagRunId = b.RootDagRunId
+	x.xxx_hidden_ParentDagRunName = b.ParentDagRunName
+	x.xxx_hidden_ParentDagRunId = b.ParentDagRunId
+	x.xxx_hidden_AttemptKey = b.AttemptKey
 	return m0
 }
 
 // Request message for reporting DAG run status.
 type ReportStatusRequest struct {
-	state              protoimpl.MessageState `protogen:"hybrid.v1"`
-	WorkerId           string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	Status             *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	OwnerCoordinatorId string                 `protobuf:"bytes,3,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3" json:"owner_coordinator_id,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                         protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_WorkerId           string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_Status             *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3"`
+	xxx_hidden_OwnerCoordinatorId string                 `protobuf:"bytes,3,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
 }
 
 func (x *ReportStatusRequest) Reset() {
@@ -1935,46 +1931,46 @@ func (x *ReportStatusRequest) ProtoReflect() protoreflect.Message {
 
 func (x *ReportStatusRequest) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *ReportStatusRequest) GetStatus() *DAGRunStatusProto {
 	if x != nil {
-		return x.Status
+		return x.xxx_hidden_Status
 	}
 	return nil
 }
 
 func (x *ReportStatusRequest) GetOwnerCoordinatorId() string {
 	if x != nil {
-		return x.OwnerCoordinatorId
+		return x.xxx_hidden_OwnerCoordinatorId
 	}
 	return ""
 }
 
 func (x *ReportStatusRequest) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *ReportStatusRequest) SetStatus(v *DAGRunStatusProto) {
-	x.Status = v
+	x.xxx_hidden_Status = v
 }
 
 func (x *ReportStatusRequest) SetOwnerCoordinatorId(v string) {
-	x.OwnerCoordinatorId = v
+	x.xxx_hidden_OwnerCoordinatorId = v
 }
 
 func (x *ReportStatusRequest) HasStatus() bool {
 	if x == nil {
 		return false
 	}
-	return x.Status != nil
+	return x.xxx_hidden_Status != nil
 }
 
 func (x *ReportStatusRequest) ClearStatus() {
-	x.Status = nil
+	x.xxx_hidden_Status = nil
 }
 
 type ReportStatusRequest_builder struct {
@@ -1989,19 +1985,19 @@ func (b0 ReportStatusRequest_builder) Build() *ReportStatusRequest {
 	m0 := &ReportStatusRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.WorkerId = b.WorkerId
-	x.Status = b.Status
-	x.OwnerCoordinatorId = b.OwnerCoordinatorId
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_Status = b.Status
+	x.xxx_hidden_OwnerCoordinatorId = b.OwnerCoordinatorId
 	return m0
 }
 
 // Response message for reporting DAG run status.
 type ReportStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Accepted bool                   `protobuf:"varint,1,opt,name=accepted,proto3"`
+	xxx_hidden_Error    string                 `protobuf:"bytes,2,opt,name=error,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ReportStatusResponse) Reset() {
@@ -2031,24 +2027,24 @@ func (x *ReportStatusResponse) ProtoReflect() protoreflect.Message {
 
 func (x *ReportStatusResponse) GetAccepted() bool {
 	if x != nil {
-		return x.Accepted
+		return x.xxx_hidden_Accepted
 	}
 	return false
 }
 
 func (x *ReportStatusResponse) GetError() string {
 	if x != nil {
-		return x.Error
+		return x.xxx_hidden_Error
 	}
 	return ""
 }
 
 func (x *ReportStatusResponse) SetAccepted(v bool) {
-	x.Accepted = v
+	x.xxx_hidden_Accepted = v
 }
 
 func (x *ReportStatusResponse) SetError(v string) {
-	x.Error = v
+	x.xxx_hidden_Error = v
 }
 
 type ReportStatusResponse_builder struct {
@@ -2062,17 +2058,17 @@ func (b0 ReportStatusResponse_builder) Build() *ReportStatusResponse {
 	m0 := &ReportStatusResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Accepted = b.Accepted
-	x.Error = b.Error
+	x.xxx_hidden_Accepted = b.Accepted
+	x.xxx_hidden_Error = b.Error
 	return m0
 }
 
 // Full DAG run status (JSON-serialized execution.DAGRunStatus).
 type DAGRunStatusProto struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	JsonData      string                 `protobuf:"bytes,1,opt,name=json_data,json=jsonData,proto3" json:"json_data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_JsonData string                 `protobuf:"bytes,1,opt,name=json_data,json=jsonData,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *DAGRunStatusProto) Reset() {
@@ -2102,13 +2098,13 @@ func (x *DAGRunStatusProto) ProtoReflect() protoreflect.Message {
 
 func (x *DAGRunStatusProto) GetJsonData() string {
 	if x != nil {
-		return x.JsonData
+		return x.xxx_hidden_JsonData
 	}
 	return ""
 }
 
 func (x *DAGRunStatusProto) SetJsonData(v string) {
-	x.JsonData = v
+	x.xxx_hidden_JsonData = v
 }
 
 type DAGRunStatusProto_builder struct {
@@ -2121,30 +2117,27 @@ func (b0 DAGRunStatusProto_builder) Build() *DAGRunStatusProto {
 	m0 := &DAGRunStatusProto{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.JsonData = b.JsonData
+	x.xxx_hidden_JsonData = b.JsonData
 	return m0
 }
 
 // Log chunk sent from worker to coordinator.
 type LogChunk struct {
-	state      protoimpl.MessageState `protogen:"hybrid.v1"`
-	WorkerId   string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	DagRunId   string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
-	DagName    string                 `protobuf:"bytes,3,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
-	StepName   string                 `protobuf:"bytes,4,opt,name=step_name,json=stepName,proto3" json:"step_name,omitempty"`
-	StreamType LogStreamType          `protobuf:"varint,5,opt,name=stream_type,json=streamType,proto3,enum=coordinator.v1.LogStreamType" json:"stream_type,omitempty"`
-	Data       []byte                 `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`
-	Sequence   uint64                 `protobuf:"varint,7,opt,name=sequence,proto3" json:"sequence,omitempty"`              // For ordering
-	IsFinal    bool                   `protobuf:"varint,8,opt,name=is_final,json=isFinal,proto3" json:"is_final,omitempty"` // Last chunk for this step
-	// Root DAG info for sub-DAGs
-	RootDagRunName string `protobuf:"bytes,9,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
-	RootDagRunId   string `protobuf:"bytes,10,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
-	// Attempt ID for the DAG run
-	AttemptId string `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	// Owner coordinator used to validate owner-bound log writes.
-	OwnerCoordinatorId string `protobuf:"bytes,12,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3" json:"owner_coordinator_id,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                         protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_WorkerId           string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3"`
+	xxx_hidden_DagRunId           string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3"`
+	xxx_hidden_DagName            string                 `protobuf:"bytes,3,opt,name=dag_name,json=dagName,proto3"`
+	xxx_hidden_StepName           string                 `protobuf:"bytes,4,opt,name=step_name,json=stepName,proto3"`
+	xxx_hidden_StreamType         LogStreamType          `protobuf:"varint,5,opt,name=stream_type,json=streamType,proto3,enum=coordinator.v1.LogStreamType"`
+	xxx_hidden_Data               []byte                 `protobuf:"bytes,6,opt,name=data,proto3"`
+	xxx_hidden_Sequence           uint64                 `protobuf:"varint,7,opt,name=sequence,proto3"`
+	xxx_hidden_IsFinal            bool                   `protobuf:"varint,8,opt,name=is_final,json=isFinal,proto3"`
+	xxx_hidden_RootDagRunName     string                 `protobuf:"bytes,9,opt,name=root_dag_run_name,json=rootDagRunName,proto3"`
+	xxx_hidden_RootDagRunId       string                 `protobuf:"bytes,10,opt,name=root_dag_run_id,json=rootDagRunId,proto3"`
+	xxx_hidden_AttemptId          string                 `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3"`
+	xxx_hidden_OwnerCoordinatorId string                 `protobuf:"bytes,12,opt,name=owner_coordinator_id,json=ownerCoordinatorId,proto3"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
 }
 
 func (x *LogChunk) Reset() {
@@ -2174,137 +2167,137 @@ func (x *LogChunk) ProtoReflect() protoreflect.Message {
 
 func (x *LogChunk) GetWorkerId() string {
 	if x != nil {
-		return x.WorkerId
+		return x.xxx_hidden_WorkerId
 	}
 	return ""
 }
 
 func (x *LogChunk) GetDagRunId() string {
 	if x != nil {
-		return x.DagRunId
+		return x.xxx_hidden_DagRunId
 	}
 	return ""
 }
 
 func (x *LogChunk) GetDagName() string {
 	if x != nil {
-		return x.DagName
+		return x.xxx_hidden_DagName
 	}
 	return ""
 }
 
 func (x *LogChunk) GetStepName() string {
 	if x != nil {
-		return x.StepName
+		return x.xxx_hidden_StepName
 	}
 	return ""
 }
 
 func (x *LogChunk) GetStreamType() LogStreamType {
 	if x != nil {
-		return x.StreamType
+		return x.xxx_hidden_StreamType
 	}
 	return LogStreamType_LOG_STREAM_TYPE_UNSPECIFIED
 }
 
 func (x *LogChunk) GetData() []byte {
 	if x != nil {
-		return x.Data
+		return x.xxx_hidden_Data
 	}
 	return nil
 }
 
 func (x *LogChunk) GetSequence() uint64 {
 	if x != nil {
-		return x.Sequence
+		return x.xxx_hidden_Sequence
 	}
 	return 0
 }
 
 func (x *LogChunk) GetIsFinal() bool {
 	if x != nil {
-		return x.IsFinal
+		return x.xxx_hidden_IsFinal
 	}
 	return false
 }
 
 func (x *LogChunk) GetRootDagRunName() string {
 	if x != nil {
-		return x.RootDagRunName
+		return x.xxx_hidden_RootDagRunName
 	}
 	return ""
 }
 
 func (x *LogChunk) GetRootDagRunId() string {
 	if x != nil {
-		return x.RootDagRunId
+		return x.xxx_hidden_RootDagRunId
 	}
 	return ""
 }
 
 func (x *LogChunk) GetAttemptId() string {
 	if x != nil {
-		return x.AttemptId
+		return x.xxx_hidden_AttemptId
 	}
 	return ""
 }
 
 func (x *LogChunk) GetOwnerCoordinatorId() string {
 	if x != nil {
-		return x.OwnerCoordinatorId
+		return x.xxx_hidden_OwnerCoordinatorId
 	}
 	return ""
 }
 
 func (x *LogChunk) SetWorkerId(v string) {
-	x.WorkerId = v
+	x.xxx_hidden_WorkerId = v
 }
 
 func (x *LogChunk) SetDagRunId(v string) {
-	x.DagRunId = v
+	x.xxx_hidden_DagRunId = v
 }
 
 func (x *LogChunk) SetDagName(v string) {
-	x.DagName = v
+	x.xxx_hidden_DagName = v
 }
 
 func (x *LogChunk) SetStepName(v string) {
-	x.StepName = v
+	x.xxx_hidden_StepName = v
 }
 
 func (x *LogChunk) SetStreamType(v LogStreamType) {
-	x.StreamType = v
+	x.xxx_hidden_StreamType = v
 }
 
 func (x *LogChunk) SetData(v []byte) {
 	if v == nil {
 		v = []byte{}
 	}
-	x.Data = v
+	x.xxx_hidden_Data = v
 }
 
 func (x *LogChunk) SetSequence(v uint64) {
-	x.Sequence = v
+	x.xxx_hidden_Sequence = v
 }
 
 func (x *LogChunk) SetIsFinal(v bool) {
-	x.IsFinal = v
+	x.xxx_hidden_IsFinal = v
 }
 
 func (x *LogChunk) SetRootDagRunName(v string) {
-	x.RootDagRunName = v
+	x.xxx_hidden_RootDagRunName = v
 }
 
 func (x *LogChunk) SetRootDagRunId(v string) {
-	x.RootDagRunId = v
+	x.xxx_hidden_RootDagRunId = v
 }
 
 func (x *LogChunk) SetAttemptId(v string) {
-	x.AttemptId = v
+	x.xxx_hidden_AttemptId = v
 }
 
 func (x *LogChunk) SetOwnerCoordinatorId(v string) {
-	x.OwnerCoordinatorId = v
+	x.xxx_hidden_OwnerCoordinatorId = v
 }
 
 type LogChunk_builder struct {
@@ -2331,29 +2324,29 @@ func (b0 LogChunk_builder) Build() *LogChunk {
 	m0 := &LogChunk{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.WorkerId = b.WorkerId
-	x.DagRunId = b.DagRunId
-	x.DagName = b.DagName
-	x.StepName = b.StepName
-	x.StreamType = b.StreamType
-	x.Data = b.Data
-	x.Sequence = b.Sequence
-	x.IsFinal = b.IsFinal
-	x.RootDagRunName = b.RootDagRunName
-	x.RootDagRunId = b.RootDagRunId
-	x.AttemptId = b.AttemptId
-	x.OwnerCoordinatorId = b.OwnerCoordinatorId
+	x.xxx_hidden_WorkerId = b.WorkerId
+	x.xxx_hidden_DagRunId = b.DagRunId
+	x.xxx_hidden_DagName = b.DagName
+	x.xxx_hidden_StepName = b.StepName
+	x.xxx_hidden_StreamType = b.StreamType
+	x.xxx_hidden_Data = b.Data
+	x.xxx_hidden_Sequence = b.Sequence
+	x.xxx_hidden_IsFinal = b.IsFinal
+	x.xxx_hidden_RootDagRunName = b.RootDagRunName
+	x.xxx_hidden_RootDagRunId = b.RootDagRunId
+	x.xxx_hidden_AttemptId = b.AttemptId
+	x.xxx_hidden_OwnerCoordinatorId = b.OwnerCoordinatorId
 	return m0
 }
 
 // Response message for log streaming.
 type StreamLogsResponse struct {
-	state          protoimpl.MessageState `protogen:"hybrid.v1"`
-	ChunksReceived uint64                 `protobuf:"varint,1,opt,name=chunks_received,json=chunksReceived,proto3" json:"chunks_received,omitempty"`
-	BytesWritten   uint64                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
-	Error          string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ChunksReceived uint64                 `protobuf:"varint,1,opt,name=chunks_received,json=chunksReceived,proto3"`
+	xxx_hidden_BytesWritten   uint64                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3"`
+	xxx_hidden_Error          string                 `protobuf:"bytes,3,opt,name=error,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *StreamLogsResponse) Reset() {
@@ -2383,35 +2376,35 @@ func (x *StreamLogsResponse) ProtoReflect() protoreflect.Message {
 
 func (x *StreamLogsResponse) GetChunksReceived() uint64 {
 	if x != nil {
-		return x.ChunksReceived
+		return x.xxx_hidden_ChunksReceived
 	}
 	return 0
 }
 
 func (x *StreamLogsResponse) GetBytesWritten() uint64 {
 	if x != nil {
-		return x.BytesWritten
+		return x.xxx_hidden_BytesWritten
 	}
 	return 0
 }
 
 func (x *StreamLogsResponse) GetError() string {
 	if x != nil {
-		return x.Error
+		return x.xxx_hidden_Error
 	}
 	return ""
 }
 
 func (x *StreamLogsResponse) SetChunksReceived(v uint64) {
-	x.ChunksReceived = v
+	x.xxx_hidden_ChunksReceived = v
 }
 
 func (x *StreamLogsResponse) SetBytesWritten(v uint64) {
-	x.BytesWritten = v
+	x.xxx_hidden_BytesWritten = v
 }
 
 func (x *StreamLogsResponse) SetError(v string) {
-	x.Error = v
+	x.xxx_hidden_Error = v
 }
 
 type StreamLogsResponse_builder struct {
@@ -2426,23 +2419,21 @@ func (b0 StreamLogsResponse_builder) Build() *StreamLogsResponse {
 	m0 := &StreamLogsResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.ChunksReceived = b.ChunksReceived
-	x.BytesWritten = b.BytesWritten
-	x.Error = b.Error
+	x.xxx_hidden_ChunksReceived = b.ChunksReceived
+	x.xxx_hidden_BytesWritten = b.BytesWritten
+	x.xxx_hidden_Error = b.Error
 	return m0
 }
 
 // Request message for getting DAG run status.
 type GetDAGRunStatusRequest struct {
-	state    protoimpl.MessageState `protogen:"hybrid.v1"`
-	DagName  string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`      // Name of the DAG
-	DagRunId string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"` // ID of the DAG run
-	// Root DAG run info for sub-DAG queries (optional).
-	// When set, the coordinator looks up the status as a sub-DAG.
-	RootDagRunName string `protobuf:"bytes,3,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
-	RootDagRunId   string `protobuf:"bytes,4,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_DagName        string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3"`
+	xxx_hidden_DagRunId       string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3"`
+	xxx_hidden_RootDagRunName string                 `protobuf:"bytes,3,opt,name=root_dag_run_name,json=rootDagRunName,proto3"`
+	xxx_hidden_RootDagRunId   string                 `protobuf:"bytes,4,opt,name=root_dag_run_id,json=rootDagRunId,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *GetDAGRunStatusRequest) Reset() {
@@ -2472,46 +2463,46 @@ func (x *GetDAGRunStatusRequest) ProtoReflect() protoreflect.Message {
 
 func (x *GetDAGRunStatusRequest) GetDagName() string {
 	if x != nil {
-		return x.DagName
+		return x.xxx_hidden_DagName
 	}
 	return ""
 }
 
 func (x *GetDAGRunStatusRequest) GetDagRunId() string {
 	if x != nil {
-		return x.DagRunId
+		return x.xxx_hidden_DagRunId
 	}
 	return ""
 }
 
 func (x *GetDAGRunStatusRequest) GetRootDagRunName() string {
 	if x != nil {
-		return x.RootDagRunName
+		return x.xxx_hidden_RootDagRunName
 	}
 	return ""
 }
 
 func (x *GetDAGRunStatusRequest) GetRootDagRunId() string {
 	if x != nil {
-		return x.RootDagRunId
+		return x.xxx_hidden_RootDagRunId
 	}
 	return ""
 }
 
 func (x *GetDAGRunStatusRequest) SetDagName(v string) {
-	x.DagName = v
+	x.xxx_hidden_DagName = v
 }
 
 func (x *GetDAGRunStatusRequest) SetDagRunId(v string) {
-	x.DagRunId = v
+	x.xxx_hidden_DagRunId = v
 }
 
 func (x *GetDAGRunStatusRequest) SetRootDagRunName(v string) {
-	x.RootDagRunName = v
+	x.xxx_hidden_RootDagRunName = v
 }
 
 func (x *GetDAGRunStatusRequest) SetRootDagRunId(v string) {
-	x.RootDagRunId = v
+	x.xxx_hidden_RootDagRunId = v
 }
 
 type GetDAGRunStatusRequest_builder struct {
@@ -2529,21 +2520,21 @@ func (b0 GetDAGRunStatusRequest_builder) Build() *GetDAGRunStatusRequest {
 	m0 := &GetDAGRunStatusRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.DagName = b.DagName
-	x.DagRunId = b.DagRunId
-	x.RootDagRunName = b.RootDagRunName
-	x.RootDagRunId = b.RootDagRunId
+	x.xxx_hidden_DagName = b.DagName
+	x.xxx_hidden_DagRunId = b.DagRunId
+	x.xxx_hidden_RootDagRunName = b.RootDagRunName
+	x.xxx_hidden_RootDagRunId = b.RootDagRunId
 	return m0
 }
 
 // Response message for getting DAG run status.
 type GetDAGRunStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Found         bool                   `protobuf:"varint,1,opt,name=found,proto3" json:"found,omitempty"`  // Whether the DAG run was found
-	Status        *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // The status (only set if found)
-	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`   // Error message if any
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Found  bool                   `protobuf:"varint,1,opt,name=found,proto3"`
+	xxx_hidden_Status *DAGRunStatusProto     `protobuf:"bytes,2,opt,name=status,proto3"`
+	xxx_hidden_Error  string                 `protobuf:"bytes,3,opt,name=error,proto3"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetDAGRunStatusResponse) Reset() {
@@ -2573,46 +2564,46 @@ func (x *GetDAGRunStatusResponse) ProtoReflect() protoreflect.Message {
 
 func (x *GetDAGRunStatusResponse) GetFound() bool {
 	if x != nil {
-		return x.Found
+		return x.xxx_hidden_Found
 	}
 	return false
 }
 
 func (x *GetDAGRunStatusResponse) GetStatus() *DAGRunStatusProto {
 	if x != nil {
-		return x.Status
+		return x.xxx_hidden_Status
 	}
 	return nil
 }
 
 func (x *GetDAGRunStatusResponse) GetError() string {
 	if x != nil {
-		return x.Error
+		return x.xxx_hidden_Error
 	}
 	return ""
 }
 
 func (x *GetDAGRunStatusResponse) SetFound(v bool) {
-	x.Found = v
+	x.xxx_hidden_Found = v
 }
 
 func (x *GetDAGRunStatusResponse) SetStatus(v *DAGRunStatusProto) {
-	x.Status = v
+	x.xxx_hidden_Status = v
 }
 
 func (x *GetDAGRunStatusResponse) SetError(v string) {
-	x.Error = v
+	x.xxx_hidden_Error = v
 }
 
 func (x *GetDAGRunStatusResponse) HasStatus() bool {
 	if x == nil {
 		return false
 	}
-	return x.Status != nil
+	return x.xxx_hidden_Status != nil
 }
 
 func (x *GetDAGRunStatusResponse) ClearStatus() {
-	x.Status = nil
+	x.xxx_hidden_Status = nil
 }
 
 type GetDAGRunStatusResponse_builder struct {
@@ -2627,22 +2618,21 @@ func (b0 GetDAGRunStatusResponse_builder) Build() *GetDAGRunStatusResponse {
 	m0 := &GetDAGRunStatusResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Found = b.Found
-	x.Status = b.Status
-	x.Error = b.Error
+	x.xxx_hidden_Found = b.Found
+	x.xxx_hidden_Status = b.Status
+	x.xxx_hidden_Error = b.Error
 	return m0
 }
 
 // Request message for cancelling a DAG run.
 type RequestCancelRequest struct {
-	state    protoimpl.MessageState `protogen:"hybrid.v1"`
-	DagName  string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3" json:"dag_name,omitempty"`
-	DagRunId string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3" json:"dag_run_id,omitempty"`
-	// Root DAG run info for sub-DAG cancellation
-	RootDagRunName string `protobuf:"bytes,3,opt,name=root_dag_run_name,json=rootDagRunName,proto3" json:"root_dag_run_name,omitempty"`
-	RootDagRunId   string `protobuf:"bytes,4,opt,name=root_dag_run_id,json=rootDagRunId,proto3" json:"root_dag_run_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_DagName        string                 `protobuf:"bytes,1,opt,name=dag_name,json=dagName,proto3"`
+	xxx_hidden_DagRunId       string                 `protobuf:"bytes,2,opt,name=dag_run_id,json=dagRunId,proto3"`
+	xxx_hidden_RootDagRunName string                 `protobuf:"bytes,3,opt,name=root_dag_run_name,json=rootDagRunName,proto3"`
+	xxx_hidden_RootDagRunId   string                 `protobuf:"bytes,4,opt,name=root_dag_run_id,json=rootDagRunId,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *RequestCancelRequest) Reset() {
@@ -2672,46 +2662,46 @@ func (x *RequestCancelRequest) ProtoReflect() protoreflect.Message {
 
 func (x *RequestCancelRequest) GetDagName() string {
 	if x != nil {
-		return x.DagName
+		return x.xxx_hidden_DagName
 	}
 	return ""
 }
 
 func (x *RequestCancelRequest) GetDagRunId() string {
 	if x != nil {
-		return x.DagRunId
+		return x.xxx_hidden_DagRunId
 	}
 	return ""
 }
 
 func (x *RequestCancelRequest) GetRootDagRunName() string {
 	if x != nil {
-		return x.RootDagRunName
+		return x.xxx_hidden_RootDagRunName
 	}
 	return ""
 }
 
 func (x *RequestCancelRequest) GetRootDagRunId() string {
 	if x != nil {
-		return x.RootDagRunId
+		return x.xxx_hidden_RootDagRunId
 	}
 	return ""
 }
 
 func (x *RequestCancelRequest) SetDagName(v string) {
-	x.DagName = v
+	x.xxx_hidden_DagName = v
 }
 
 func (x *RequestCancelRequest) SetDagRunId(v string) {
-	x.DagRunId = v
+	x.xxx_hidden_DagRunId = v
 }
 
 func (x *RequestCancelRequest) SetRootDagRunName(v string) {
-	x.RootDagRunName = v
+	x.xxx_hidden_RootDagRunName = v
 }
 
 func (x *RequestCancelRequest) SetRootDagRunId(v string) {
-	x.RootDagRunId = v
+	x.xxx_hidden_RootDagRunId = v
 }
 
 type RequestCancelRequest_builder struct {
@@ -2728,20 +2718,20 @@ func (b0 RequestCancelRequest_builder) Build() *RequestCancelRequest {
 	m0 := &RequestCancelRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.DagName = b.DagName
-	x.DagRunId = b.DagRunId
-	x.RootDagRunName = b.RootDagRunName
-	x.RootDagRunId = b.RootDagRunId
+	x.xxx_hidden_DagName = b.DagName
+	x.xxx_hidden_DagRunId = b.DagRunId
+	x.xxx_hidden_RootDagRunName = b.RootDagRunName
+	x.xxx_hidden_RootDagRunId = b.RootDagRunId
 	return m0
 }
 
 // Response message for cancelling a DAG run.
 type RequestCancelResponse struct {
-	state         protoimpl.MessageState `protogen:"hybrid.v1"`
-	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Accepted bool                   `protobuf:"varint,1,opt,name=accepted,proto3"`
+	xxx_hidden_Error    string                 `protobuf:"bytes,2,opt,name=error,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RequestCancelResponse) Reset() {
@@ -2771,24 +2761,24 @@ func (x *RequestCancelResponse) ProtoReflect() protoreflect.Message {
 
 func (x *RequestCancelResponse) GetAccepted() bool {
 	if x != nil {
-		return x.Accepted
+		return x.xxx_hidden_Accepted
 	}
 	return false
 }
 
 func (x *RequestCancelResponse) GetError() string {
 	if x != nil {
-		return x.Error
+		return x.xxx_hidden_Error
 	}
 	return ""
 }
 
 func (x *RequestCancelResponse) SetAccepted(v bool) {
-	x.Accepted = v
+	x.xxx_hidden_Accepted = v
 }
 
 func (x *RequestCancelResponse) SetError(v string) {
-	x.Error = v
+	x.xxx_hidden_Error = v
 }
 
 type RequestCancelResponse_builder struct {
@@ -2802,8 +2792,8 @@ func (b0 RequestCancelResponse_builder) Build() *RequestCancelResponse {
 	m0 := &RequestCancelResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.Accepted = b.Accepted
-	x.Error = b.Error
+	x.xxx_hidden_Accepted = b.Accepted
+	x.xxx_hidden_Error = b.Error
 	return m0
 }
 
