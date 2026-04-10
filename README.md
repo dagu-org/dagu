@@ -44,6 +44,22 @@ For a quick look at how workflows are defined, see the [examples](https://docs.d
 
 **Legacy script orchestration.** Wrap existing shell scripts, Python scripts, HTTP calls, or any executable into workflow steps without modifying them. Dagu orchestrates execution order, captures stdout/stderr, and handles retries and error propagation around your existing code.
 
+## Why Dagu?
+
+```sh
+  Traditional Orchestrator           Dagu
+  ┌────────────────────────┐        ┌──────────────────┐
+  │  Web Server            │        │                  │
+  │  Scheduler             │        │  dagu start-all  │
+  │  Worker(s)             │        │                  │
+  │  PostgreSQL            │        └──────────────────┘
+  │  Redis / RabbitMQ      │         Single binary.
+  │  Python runtime        │         Zero dependencies.
+  └────────────────────────┘         Just run it.
+    6+ services to manage
+```
+
+
 ## Architecture
 
 Dagu can run in three configurations:
@@ -54,7 +70,7 @@ Dagu can run in three configurations:
 
 **Headless** — Run without the web UI (`DAGU_HEADLESS=true`). Useful for CI/CD environments or when Dagu is managed through the CLI or API only.
 
-```
+```sh
 Standalone:
 
   ┌─────────────────────────────────────────┐
@@ -104,13 +120,13 @@ Distributed:
 
 **macOS/Linux:**
 
-```bash
+```sh
 curl -fsSL https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.sh | bash
 ```
 
 **Homebrew:**
 
-```bash
+```sh
 brew install dagu
 ```
 
@@ -122,13 +138,13 @@ irm https://raw.githubusercontent.com/dagucloud/dagu/main/scripts/installer.ps1 
 
 **Docker:**
 
-```bash
+```sh
 docker run --rm -v ~/.dagu:/var/lib/dagu -p 8080:8080 ghcr.io/dagucloud/dagu:latest dagu start-all
 ```
 
 **Kubernetes (Helm):**
 
-```bash
+```sh
 helm repo add dagu https://dagucloud.github.io/dagu
 helm repo update
 helm install dagu dagu/dagu --set persistence.storageClass=<your-rwx-storage-class>
@@ -140,7 +156,7 @@ The script installers run a guided wizard that can add Dagu to your PATH, set it
 
 ### Create and run a workflow
 
-```bash
+```sh
 cat > ./hello.yaml << 'EOF'
 steps:
   - echo "Hello from Dagu!"
@@ -152,7 +168,7 @@ dagu start hello.yaml
 
 ### Start the server
 
-```bash
+```sh
 dagu start-all
 ```
 
@@ -386,7 +402,7 @@ The coordinator/worker architecture distributes DAG execution across multiple ma
 - **Health checks**: HTTP health endpoints on coordinator and workers for load balancer integration
 - **Queue system**: File-based persistent queue with configurable concurrency limits
 
-```bash
+```sh
 # Start coordinator
 dagu coord
 
@@ -521,7 +537,7 @@ Full configuration reference: [docs.dagu.sh/server-admin/reference](https://docs
 
 **Prerequisites:** [Go 1.26+](https://go.dev/doc/install), [Node.js](https://nodejs.org/en/download/), [pnpm](https://pnpm.io/installation)
 
-```bash
+```sh
 git clone https://github.com/dagucloud/dagu.git && cd dagu
 make build    # Build frontend + Go binary
 make test     # Run tests with race detection
