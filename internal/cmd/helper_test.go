@@ -287,3 +287,30 @@ registry_auths:
 	require.Equal(t, "${REGISTRY_USER}", result.RegistryAuths["registry.example.com"].Username)
 	require.Equal(t, "${REGISTRY_PASSWORD}", result.RegistryAuths["registry.example.com"].Password)
 }
+
+func TestRestoreDAGFromStatus_RestoresHarnessConfigFromBaseConfig(t *testing.T) {
+	dag := &core.DAG{
+		Name: "test-dag",
+		YamlData: []byte(`
+steps:
+  - command: Review the repository
+`),
+		BaseConfigData: []byte(`
+harnesses:
+  passthrough:
+    binary: cat
+    prompt_mode: stdin
+harness:
+  provider: passthrough
+`),
+	}
+	status := &exec.DAGRunStatus{}
+
+	result, err := restoreDAGFromStatus(context.Background(), dag, status)
+	require.NoError(t, err)
+	require.NotNil(t, result.Harness)
+	assert.Equal(t, "passthrough", result.Harness.Config["provider"])
+	require.NotNil(t, result.Harnesses)
+	require.Contains(t, result.Harnesses, "passthrough")
+	assert.Equal(t, "cat", result.Harnesses["passthrough"].Binary)
+}

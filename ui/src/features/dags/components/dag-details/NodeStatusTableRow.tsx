@@ -546,7 +546,7 @@ function NodeStatusTableRow({
                   return null;
                 })()
               )}
-              {node.step.script && !isHarnessStep(node.step) && (
+              {node.step.script && (
                 <ScriptBadge
                   script={node.step.script}
                   stepName={node.step.name}
@@ -981,7 +981,7 @@ function NodeStatusTableRow({
             })()
           )}
 
-          {node.step.script && !isHarnessStep(node.step) && (
+          {node.step.script && (
             <ScriptBadge script={node.step.script} stepName={node.step.name} />
           )}
         </div>

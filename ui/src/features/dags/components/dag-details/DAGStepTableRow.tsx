@@ -136,7 +136,7 @@ function DAGStepTableRow({ step, index }: Props) {
           )}
 
           {/* Script */}
-          {step.script && !isHarnessStep(step) && (
+          {step.script && (
             <ScriptBadge script={step.script} stepName={step.name} />
           )}
 

@@ -531,6 +531,16 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	// Run the transformer pipeline
 	errs := runTransformers(ctx, d, result)
 
+	buildResult := result
+	if ctx.baseDAG != nil {
+		merged, err := composeBuildDAGContext(ctx.baseDAG, result)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to compose inherited DAG context: %w", err))
+		} else {
+			buildResult = merged
+		}
+	}
+
 	// Add deprecation warning for max_active_runs on local queues.
 	// Both max_active_runs > 1 (concurrency) and max_active_runs < 0 (queue bypass) are deprecated.
 	if result.Queue == "" && (result.MaxActiveRuns > 1 || result.MaxActiveRuns < 0) {
@@ -554,13 +564,13 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 
 	// Build handlers and steps directly (they need access to partially built result)
 	if !ctx.opts.Has(BuildFlagOnlyMetadata) {
-		if handlerOn, err := buildHandlers(ctx, d, result); err != nil {
+		if handlerOn, err := buildHandlers(ctx, d, buildResult); err != nil {
 			errs = append(errs, core.NewValidationError("handlers", nil, err))
 		} else {
 			result.HandlerOn = handlerOn
 		}
 
-		if steps, err := buildSteps(ctx, d, result); err != nil {
+		if steps, err := buildSteps(ctx, d, buildResult); err != nil {
 			errs = append(errs, core.NewValidationError("steps", nil, err))
 		} else {
 			result.Steps = steps
@@ -601,6 +611,19 @@ func (d *dag) build(ctx BuildContext) (*core.DAG, error) {
 	}
 
 	return result, nil
+}
+
+func composeBuildDAGContext(base, current *core.DAG) (*core.DAG, error) {
+	if base == nil {
+		return current, nil
+	}
+
+	effective := base.Clone()
+	if err := merge(effective, current); err != nil {
+		return nil, err
+	}
+
+	return effective, nil
 }
 
 // Builder functions - each returns a value instead of modifying result
@@ -1939,7 +1962,7 @@ func harnessStringMap(raw any) (map[string]string, error) {
 	}
 }
 
-func buildHarness(_ BuildContext, d *dag) (*core.HarnessConfig, error) {
+func buildHarness(ctx BuildContext, d *dag) (*core.HarnessConfig, error) {
 	if d.Harness == nil {
 		return nil, nil
 	}
@@ -1956,6 +1979,15 @@ func buildHarness(_ BuildContext, d *dag) (*core.HarnessConfig, error) {
 	defs, err := parseHarnessDefinitions(d.Harnesses)
 	if err != nil {
 		return nil, err
+	}
+	if ctx.baseDAG != nil && ctx.baseDAG.Harnesses != nil {
+		effective := ctx.baseDAG.Clone()
+		if defs != nil {
+			if err := merge(effective, &core.DAG{Harnesses: defs}); err != nil {
+				return nil, err
+			}
+		}
+		defs = effective.Harnesses
 	}
 	if err := validateHarnessProviderConfig(defs, config); err != nil {
 		return nil, core.NewValidationError("harness", d.Harness, err)

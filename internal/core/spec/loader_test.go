@@ -399,6 +399,64 @@ steps:
 	})
 }
 
+func TestLoad_BaseHarnessConfigBuildsChildSteps(t *testing.T) {
+	t.Parallel()
+
+	t.Run("InheritsBaseHarnessDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  passthrough:
+    binary: cat
+    prompt_mode: stdin
+harness:
+  provider: passthrough
+`)
+		child := createTempYAMLFile(t, `
+steps:
+  - command: Review the repository
+    script: |
+      summarize the current branch
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		assert.Equal(t, "harness", step.ExecutorConfig.Type)
+		assert.Equal(t, "passthrough", step.ExecutorConfig.Config["provider"])
+		assert.Equal(t, "summarize the current branch", step.Script)
+	})
+
+	t.Run("ChildStepCanReferenceBaseHarnessDefinition", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  passthrough:
+    binary: cat
+    prompt_mode: stdin
+`)
+		child := createTempYAMLFile(t, `
+steps:
+  - type: harness
+    command: Review the repository
+    config:
+      provider: passthrough
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		assert.Equal(t, "harness", step.ExecutorConfig.Type)
+		assert.Equal(t, "passthrough", step.ExecutorConfig.Config["provider"])
+	})
+}
+
 func TestLoadBaseConfig(t *testing.T) {
 	t.Parallel()
 

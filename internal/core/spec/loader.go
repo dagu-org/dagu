@@ -552,6 +552,7 @@ func processDAGDocument(
 		if err != nil {
 			return nil, err
 		}
+		docCtx.baseDAG = dest
 	} else {
 		dest = new(core.DAG)
 	}
