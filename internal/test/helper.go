@@ -529,7 +529,11 @@ func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 	err = os.WriteFile(testFile, []byte(yamlContent), 0600)
 	require.NoError(t, err, "failed to write test DAG")
 
-	dag, err := spec.Load(h.Context, testFile)
+	loadOpts := []spec.LoadOption{}
+	if h.Config.Paths.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfig(h.Config.Paths.BaseConfig))
+	}
+	dag, err := spec.Load(h.Context, testFile, loadOpts...)
 	require.NoError(t, err, "failed to load test DAG")
 
 	return DAG{

@@ -1,0 +1,97 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package intg_test
+
+import (
+	"os"
+	"runtime"
+	"testing"
+
+	"github.com/dagucloud/dagu/internal/test"
+	"github.com/stretchr/testify/require"
+)
+
+func TestCustomStepTypes_DAGLocalExec(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("direct exec integration uses /bin/echo")
+	}
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+name: custom-step-local
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+        repeat:
+          type: integer
+          default: 2
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+          - {$input: repeat}
+steps:
+  - name: greet-user
+    type: greet
+    config:
+      message: "*.go"
+    output: OUT
+`)
+	dag.Agent().RunSuccess(t)
+
+	dag.AssertOutputs(t, map[string]any{
+		"OUT": "*.go 2",
+	})
+}
+
+func TestCustomStepTypes_BaseConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("direct exec integration uses /bin/echo")
+	}
+	t.Parallel()
+
+	th := test.Setup(t)
+	require.NoError(t, os.WriteFile(th.Config.Paths.BaseConfig, []byte(`
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+`), 0600))
+
+	dag := th.DAG(t, `
+name: custom-step-base
+steps:
+  - name: greet-user
+    type: greet
+    config:
+      message: "hello from base"
+    output: OUT
+`)
+	dag.Agent().RunSuccess(t)
+
+	dag.AssertOutputs(t, map[string]any{
+		"OUT": "hello from base",
+	})
+}
