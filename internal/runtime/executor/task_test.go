@@ -422,4 +422,14 @@ func TestTaskOption_Functions(t *testing.T) {
 
 		assert.Equal(t, "/dags/test-dag.yaml", task.SourceFile)
 	})
+
+	t.Run("WithAgentSnapshot", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+		snapshot := []byte("agent-snapshot")
+		executor.WithAgentSnapshot(snapshot)(task)
+
+		assert.Equal(t, snapshot, task.AgentSnapshot)
+	})
 }

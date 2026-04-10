@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/agentsnapshot"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -58,6 +59,7 @@ type DAGExecutor struct {
 	subCmdBuilder   *runtime.SubCmdBuilder
 	defaultExecMode config.ExecutionMode
 	baseConfigPath  string
+	snapshotBuilder func(context.Context, *core.DAG) ([]byte, error)
 }
 
 // NewDAGExecutor creates a new DAGExecutor instance.
@@ -66,12 +68,14 @@ func NewDAGExecutor(
 	subCmdBuilder *runtime.SubCmdBuilder,
 	defaultExecMode config.ExecutionMode,
 	baseConfigPath string,
+	snapshotBuilder func(context.Context, *core.DAG) ([]byte, error),
 ) *DAGExecutor {
 	return &DAGExecutor{
 		coordinatorCli:  coordinatorCli,
 		subCmdBuilder:   subCmdBuilder,
 		defaultExecMode: defaultExecMode,
 		baseConfigPath:  baseConfigPath,
+		snapshotBuilder: snapshotBuilder,
 	}
 }
 
@@ -156,6 +160,15 @@ func (e *DAGExecutor) ExecuteDAG(
 		if scheduleTime != "" {
 			taskOpts = append(taskOpts, executor.WithScheduleTime(scheduleTime))
 		}
+		if e.snapshotBuilder != nil {
+			snapshot, err := e.snapshotBuilder(ctx, dag)
+			if err != nil {
+				return fmt.Errorf("build distributed agent snapshot: %w", err)
+			}
+			if len(snapshot) > 0 {
+				taskOpts = append(taskOpts, executor.WithAgentSnapshot(snapshot))
+			}
+		}
 		task := executor.CreateTask(
 			dag.Name,
 			string(dag.YamlData),
@@ -237,6 +250,15 @@ func (e *DAGExecutor) dispatchToCoordinator(ctx context.Context, task *coordinat
 	)
 
 	return nil
+}
+
+func buildSnapshotBuilder(paths config.PathsConfig, dagStore exec.DAGStore) func(context.Context, *core.DAG) ([]byte, error) {
+	if dagStore == nil {
+		return nil
+	}
+	return func(ctx context.Context, dag *core.DAG) ([]byte, error) {
+		return agentsnapshot.BuildFromPaths(ctx, dag, paths, dagStore)
+	}
 }
 
 // Restart restarts a DAG unconditionally.

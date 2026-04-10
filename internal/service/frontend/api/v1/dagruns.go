@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/agentsnapshot"
 	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/cmn/buildenv"
 	"github.com/dagucloud/dagu/internal/cmn/collections"
@@ -2004,6 +2005,11 @@ func (a *API) retryDAGRun(ctx context.Context, dagName, dagRunID, retryDagRunID,
 		}
 		if stepName != "" {
 			opts = append(opts, executor.WithStep(stepName))
+		}
+		if snapshot, err := agentsnapshot.BuildFromPaths(ctx, dag, a.config.Paths, a.dagStore); err != nil {
+			return retryDAGRunResult{}, fmt.Errorf("build distributed agent snapshot: %w", err)
+		} else if len(snapshot) > 0 {
+			opts = append(opts, executor.WithAgentSnapshot(snapshot))
 		}
 
 		task := executor.CreateTask(
