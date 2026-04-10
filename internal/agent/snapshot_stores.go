@@ -6,6 +6,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -132,9 +133,7 @@ func NewSnapshotMemoryStore(memory *MemorySnapshot) MemoryStore {
 		return nil
 	}
 	perDAG := make(map[string]string, len(memory.PerDAG))
-	for dagName, content := range memory.PerDAG {
-		perDAG[dagName] = content
-	}
+	maps.Copy(perDAG, memory.PerDAG)
 	return &snapshotMemoryStore{
 		global: memory.Global,
 		perDAG: perDAG,
@@ -330,14 +329,8 @@ func paginateSnapshotResult[T any](items []T, paginator exec.Paginator) *exec.Pa
 		pg = exec.DefaultPaginator()
 	}
 	total := len(items)
-	offset := pg.Offset()
-	if offset > total {
-		offset = total
-	}
-	end := offset + pg.Limit()
-	if end > total {
-		end = total
-	}
+	offset := min(pg.Offset(), total)
+	end := min(offset+pg.Limit(), total)
 	result := exec.NewPaginatedResult(items[offset:end], total, pg)
 	return &result
 }
