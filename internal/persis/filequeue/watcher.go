@@ -30,13 +30,14 @@ type watcher struct {
 	quit        chan struct{}
 	notifyCh    chan struct{}
 	wg          sync.WaitGroup
+	stopOnce    sync.Once
 }
 
 func newWatcher(baseDir string) exec.QueueWatcher {
 	w := &watcher{
 		baseDir:  baseDir,
 		quit:     make(chan struct{}),
-		notifyCh: make(chan struct{}),
+		notifyCh: make(chan struct{}, 1),
 	}
 	return w
 }
@@ -71,14 +72,20 @@ func (w *watcher) loop(ctx context.Context) {
 			return
 		case <-w.quit:
 			return
-		case event := <-eventsCh:
+		case event, ok := <-eventsCh:
+			if !ok {
+				return
+			}
 			if w.handleFileEvent(ctx, event) {
 				select {
 				case w.notifyCh <- struct{}{}:
 				default:
 				}
 			}
-		case err := <-errorsCh:
+		case err, ok := <-errorsCh:
+			if !ok {
+				return
+			}
 			logger.Error(ctx, "File watcher error", tag.Error(err))
 		}
 	}
@@ -86,11 +93,15 @@ func (w *watcher) loop(ctx context.Context) {
 
 // Stop implements execution.QueueWatcher.
 func (w *watcher) Stop(ctx context.Context) {
-	if err := w.fileWatcher.Close(); err != nil {
-		logger.Error(ctx, "Failed to stop file watcher", tag.Error(err))
-	}
-	w.quit <- struct{}{}
-	w.wg.Wait()
+	w.stopOnce.Do(func() {
+		if w.fileWatcher != nil {
+			if err := w.fileWatcher.Close(); err != nil {
+				logger.Error(ctx, "Failed to stop file watcher", tag.Error(err))
+			}
+		}
+		close(w.quit)
+		w.wg.Wait()
+	})
 }
 
 // setupWatcher sets up the file watcher for the base directory and existing subdirectories
