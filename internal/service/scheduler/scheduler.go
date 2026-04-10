@@ -47,8 +47,9 @@ type Scheduler struct {
 	zombieDetector      *ZombieDetector // Zombie DAG run detector
 	instanceID          string          // Unique instance identifier for service registry
 	queueProcessor      *QueueProcessor // Processor for queued DAG runs
-	retryScanner        *RetryScanner   // DAG-level retry scanner
-	planner             *TickPlanner    // Unified scheduling decision module
+	queueWatcher        exec.QueueWatcher
+	retryScanner        *RetryScanner // DAG-level retry scanner
+	planner             *TickPlanner  // Unified scheduling decision module
 	stopOnce            sync.Once
 	lock                sync.Mutex
 	lifecycleMu         sync.Mutex
@@ -66,6 +67,7 @@ type startupState struct {
 	serviceRegistered      bool
 	lockAcquired           bool
 	healthServerStarted    bool
+	queueWatcherStarted    bool
 	queueProcessorStarted  bool
 	entryReaderInitialized bool
 	plannerStarted         bool
@@ -341,6 +343,9 @@ func (s *Scheduler) cleanupFailedStartup(state startupState) {
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cleanupCancel()
 
+	if state.queueWatcherStarted {
+		s.stopQueueWatcher(cleanupCtx)
+	}
 	if state.queueProcessorStarted {
 		s.queueProcessor.Stop()
 	}
@@ -387,6 +392,24 @@ func (s *Scheduler) stopHealthServer(ctx context.Context, failureMsg string) {
 func (s *Scheduler) closeDAGExecutor(ctx context.Context) {
 	if s.dagExecutor != nil {
 		s.dagExecutor.Close(ctx)
+	}
+}
+
+func (s *Scheduler) setQueueWatcher(w exec.QueueWatcher) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.queueWatcher = w
+}
+
+func (s *Scheduler) stopQueueWatcher(ctx context.Context) {
+	s.lock.Lock()
+	queueWatcher := s.queueWatcher
+	s.queueWatcher = nil
+	s.lock.Unlock()
+
+	if queueWatcher != nil {
+		queueWatcher.Stop(ctx)
 	}
 }
 
@@ -477,6 +500,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		logger.Error(ctx, "Failed to start queue watcher", tag.Error(err))
 		return err
 	}
+	s.setQueueWatcher(queueWatcher)
+	state.queueWatcherStarted = true
 	s.queueProcessor.Start(ctx, notifyCh)
 	state.queueProcessorStarted = true
 
@@ -676,7 +701,7 @@ func (s *Scheduler) IsRunning() bool {
 func (s *Scheduler) Stop(ctx context.Context) {
 	s.stopOnce.Do(func() {
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(3)
 
 		var startupCancel context.CancelFunc
 		var zd *ZombieDetector
@@ -691,6 +716,11 @@ func (s *Scheduler) Stop(ctx context.Context) {
 		if startupCancel != nil {
 			startupCancel()
 		}
+
+		go func() {
+			defer wg.Done()
+			s.stopQueueWatcher(ctx)
+		}()
 
 		go func() {
 			defer wg.Done()
