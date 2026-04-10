@@ -129,8 +129,9 @@ func WithServerOptions(serverOpts ...frontend.ServerOption) HelperOption {
 	}
 }
 
-// WithStaleThresholds overrides the stale heartbeat and lease thresholds on the
-// coordinator handler. Useful for tests that need faster zombie detection.
+// WithStaleThresholds overrides the shared heartbeat and lease staleness
+// thresholds used by distributed test helpers. Useful for tests that need
+// faster zombie detection or dispatch reservation expiry.
 func WithStaleThresholds(heartbeat, lease time.Duration) HelperOption {
 	return func(opts *Options) {
 		opts.StaleHeartbeatThreshold = heartbeat
@@ -264,7 +265,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
-	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
+	var dispatchStoreOpts []filedistributed.DispatchTaskStoreOption
+	if options.StaleLeaseThreshold > 0 {
+		dispatchStoreOpts = append(dispatchStoreOpts, filedistributed.WithDispatchReservationTTL(options.StaleLeaseThreshold))
+	}
+	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir, dispatchStoreOpts...)
 	workerHeartbeatStore := filedistributed.NewWorkerHeartbeatStore(distributedDir)
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)

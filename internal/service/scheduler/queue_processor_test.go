@@ -110,12 +110,16 @@ func (f *queueFixture) withProcessor(cfg config.Queues, opts ...QueueProcessorOp
 	options := append([]QueueProcessorOption{
 		WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
 		WithDAGRunLeaseStore(f.leaseStore),
-		WithDispatchTaskStore(f.dispatchStore),
 	}, opts...)
 	f.processor = NewQueueProcessor(f.queueStore, f.dagRunStore, f.procStore,
 		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}}), config.ExecutionModeLocal, ""),
 		cfg, options...,
 	)
+	f.dispatchStore = filedistributed.NewDispatchTaskStore(
+		f.distributedDir,
+		filedistributed.WithDispatchReservationTTL(f.processor.leaseStaleThresholdOrDefault()),
+	)
+	f.processor.dispatchTaskStore = f.dispatchStore
 	return f
 }
 

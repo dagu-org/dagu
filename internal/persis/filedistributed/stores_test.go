@@ -22,8 +22,11 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := NewDispatchTaskStore(filepath.Join(t.TempDir(), "distributed"))
 	claimTimeout := 500 * time.Millisecond
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(claimTimeout),
+	)
 
 	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
 		DagRunId:       "run-a",
@@ -222,8 +225,11 @@ func TestDispatchTaskStore_StalePendingReservationsExpire(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := NewDispatchTaskStore(filepath.Join(t.TempDir(), "distributed"))
 	reservationTTL := 500 * time.Millisecond
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(reservationTTL),
+	)
 
 	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
 		DagRunId:   "run-stale",
@@ -259,8 +265,11 @@ func TestDispatchTaskStore_ExpiredClaimsRefreshPendingAge(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	store := NewDispatchTaskStore(filepath.Join(t.TempDir(), "distributed"))
 	reservationTTL := 500 * time.Millisecond
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(reservationTTL),
+	)
 
 	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
 		DagRunId:   "run-claim-refresh",
@@ -289,6 +298,43 @@ func TestDispatchTaskStore_ExpiredClaimsRefreshPendingAge(t *testing.T) {
 	require.NotNil(t, reclaimed)
 	assert.Equal(t, "run-claim-refresh", reclaimed.Task.DagRunId)
 	assert.Equal(t, "worker-2", reclaimed.WorkerID)
+}
+
+func TestDispatchTaskStore_UsesStoreReservationTTLForCleanup(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	reservationTTL := 5 * time.Second
+	store := NewDispatchTaskStore(
+		filepath.Join(t.TempDir(), "distributed"),
+		WithDispatchReservationTTL(reservationTTL),
+	)
+
+	require.NoError(t, store.Enqueue(ctx, &coordinatorv1.Task{
+		DagRunId:   "run-shared-ttl",
+		Target:     "dag-shared-ttl",
+		QueueName:  "queue-a",
+		AttemptId:  "attempt-shared-ttl",
+		AttemptKey: "attempt-key-shared-ttl",
+	}))
+	agePendingDispatchTasks(t, store, 2*time.Second)
+
+	count, err := store.CountOutstandingByQueue(ctx, "queue-a", time.Millisecond)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	hasOutstanding, err := store.HasOutstandingAttempt(ctx, "attempt-key-shared-ttl", time.Millisecond)
+	require.NoError(t, err)
+	assert.True(t, hasOutstanding)
+
+	claimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-1",
+		PollerID:     "poller-1",
+		ClaimTimeout: time.Millisecond,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	assert.Equal(t, "run-shared-ttl", claimed.Task.DagRunId)
 }
 
 func agePendingDispatchTasks(t *testing.T, store *DispatchTaskStore, age time.Duration) {

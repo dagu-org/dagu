@@ -344,8 +344,10 @@ func (f *testFixture) startSchedulerWithOptions(
 	}
 
 	schedulerCtx, schedulerCancel := f.schedulerCtx, f.schedulerCancel
+	ownsSchedulerCtx := false
 	if schedulerCtx == nil || schedulerCancel == nil {
 		schedulerCtx, schedulerCancel = context.WithCancel(f.coord.Context)
+		ownsSchedulerCtx = true
 	}
 	schedulerErrCh := make(chan error, 1)
 
@@ -360,13 +362,38 @@ func (f *testFixture) startSchedulerWithOptions(
 	}(schedulerInst, schedulerCtx, schedulerErrCh)
 
 	var startErr error
-	require.Eventually(f.t, func() bool {
+	startTicker := time.NewTicker(50 * time.Millisecond)
+	defer startTicker.Stop()
+
+	startTimer := time.NewTimer(startupTimeout)
+	defer startTimer.Stop()
+
+	for {
 		if f.scheduler.IsRunning() {
-			return true
+			break
 		}
 		startErr = f.pollSchedulerErr()
-		return startErr != nil
-	}, startupTimeout, 50*time.Millisecond, "scheduler did not start in time")
+		if startErr != nil {
+			break
+		}
+
+		select {
+		case <-startTicker.C:
+		case <-startTimer.C:
+			if ownsSchedulerCtx && schedulerCancel != nil {
+				schedulerCancel()
+				require.Eventually(f.t, func() bool {
+					startErr = f.pollSchedulerErr()
+					return startErr != nil
+				}, time.Second, 25*time.Millisecond, "scheduler startup did not stop after cancellation")
+			}
+
+			if startErr != nil {
+				require.FailNow(f.t, fmt.Sprintf("scheduler did not start in time: %v", startErr))
+			}
+			require.FailNow(f.t, "scheduler did not start in time")
+		}
+	}
 	require.NoError(f.t, startErr)
 }
 
