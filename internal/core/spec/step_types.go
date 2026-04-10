@@ -356,7 +356,7 @@ func renderCustomStepTemplateString(stepTypeName string, text string, data map[s
 
 func resolveCustomStepInputRef(input any, path string) (any, error) {
 	current := input
-	for _, segment := range strings.Split(strings.TrimSpace(path), ".") {
+	for segment := range strings.SplitSeq(strings.TrimSpace(path), ".") {
 		if segment == "" {
 			return nil, fmt.Errorf("path contains an empty segment")
 		}
@@ -444,11 +444,12 @@ func buildCustomStepFromSpec(
 	if err != nil {
 		return nil, fmt.Errorf("step type %q: failed to decode expanded template: %w", customType.Name, err)
 	}
+	applyDefaults(expandedSpec, defs, rendered)
 	builtStep, err := buildConcreteStep(ctx, expandedSpec)
 	if err != nil {
 		return nil, fmt.Errorf("step type %q (resolves to %q): %w", customType.Name, customType.Type, err)
 	}
-	if err := applyCustomStepCallSiteOverrides(ctx, builtStep, callSite, raw, defs, forcedName); err != nil {
+	if err := applyCustomStepCallSiteOverrides(ctx, builtStep, callSite, raw, forcedName); err != nil {
 		return nil, fmt.Errorf("step type %q: %w", customType.Name, err)
 	}
 	if builtStep.ExecutorConfig.Metadata == nil {
@@ -527,10 +528,9 @@ func applyCustomStepCallSiteOverrides(
 	dst *core.Step,
 	callSite *step,
 	raw map[string]any,
-	defs *defaults,
 	forcedName bool,
 ) error {
-	presence := resolveCustomStepCallSitePresence(raw, callSite, defs, forcedName)
+	presence := resolveCustomStepCallSitePresence(raw, callSite, forcedName)
 	if presence["name"] {
 		dst.Name = strings.TrimSpace(callSite.Name)
 	}
@@ -594,7 +594,7 @@ func applyCustomStepCallSiteOverrides(
 		if err != nil {
 			return err
 		}
-		dst.Preconditions = preconditions
+		dst.Preconditions = append(dst.Preconditions, preconditions...)
 	}
 	if presence["signal_on_stop"] {
 		signalOnStop, err := buildStepSignalOnStop(ctx, callSite)
@@ -608,7 +608,7 @@ func applyCustomStepCallSiteOverrides(
 		if err != nil {
 			return err
 		}
-		dst.Env = envs
+		dst.Env = append(dst.Env, envs...)
 	}
 	if presence["timeout_sec"] {
 		timeout, err := buildStepTimeout(ctx, callSite)
@@ -656,7 +656,7 @@ func applyCustomStepCallSiteOverrides(
 	return nil
 }
 
-func resolveCustomStepCallSitePresence(raw map[string]any, callSite *step, defs *defaults, forcedName bool) map[string]bool {
+func resolveCustomStepCallSitePresence(raw map[string]any, callSite *step, forcedName bool) map[string]bool {
 	presence := make(map[string]bool, len(customStepAllowedCallSiteFields))
 	hasRaw := func(key string) bool {
 		if raw == nil {
@@ -729,32 +729,6 @@ func resolveCustomStepCallSitePresence(raw map[string]any, callSite *step, defs 
 		}
 		if callSite.Approval != nil {
 			presence["approval"] = true
-		}
-	}
-	if defs != nil {
-		if !presence["continue_on"] && !defs.ContinueOn.IsZero() {
-			presence["continue_on"] = true
-		}
-		if !presence["retry_policy"] && defs.RetryPolicy != nil {
-			presence["retry_policy"] = true
-		}
-		if !presence["repeat_policy"] && defs.RepeatPolicy != nil {
-			presence["repeat_policy"] = true
-		}
-		if !presence["timeout_sec"] && defs.TimeoutSec != 0 {
-			presence["timeout_sec"] = true
-		}
-		if !presence["mail_on_error"] && defs.MailOnError != nil {
-			presence["mail_on_error"] = true
-		}
-		if !presence["signal_on_stop"] && defs.SignalOnStop != nil {
-			presence["signal_on_stop"] = true
-		}
-		if !presence["env"] && !defs.Env.IsZero() {
-			presence["env"] = true
-		}
-		if !presence["preconditions"] && defs.Preconditions != nil {
-			presence["preconditions"] = true
 		}
 	}
 	return presence

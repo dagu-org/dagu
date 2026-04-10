@@ -2126,10 +2126,11 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	var handlerOn core.HandlerOn
 
-	defs, err := decodeDefaults(d.Defaults)
+	localDefs, err := decodeDefaults(d.Defaults)
 	if err != nil {
 		return handlerOn, err
 	}
+	defs := mergeDefaults(ctx.baseDefaults, localDefs)
 
 	// buildHandler is a helper that builds a single handler step.
 	buildHandler := func(s *step, name core.HandlerType) (*core.Step, error) {
@@ -2240,10 +2241,11 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	names := make(map[string]struct{})
 
-	defs, err := decodeDefaults(d.Defaults)
+	localDefs, err := decodeDefaults(d.Defaults)
 	if err != nil {
 		return nil, err
 	}
+	defs := mergeDefaults(ctx.baseDefaults, localDefs)
 
 	switch v := d.Steps.(type) {
 	case nil:

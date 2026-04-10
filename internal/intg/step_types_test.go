@@ -142,3 +142,50 @@ steps:
 		"OUT": "hello from base",
 	})
 }
+
+func TestCustomStepTypes_DefaultPrecedence(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("integration uses /bin/sh")
+	}
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh is required for the env precedence integration test")
+	}
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+name: custom-step-default-precedence
+defaults:
+  env:
+    - LAYERED: default
+    - DEFAULT_ONLY: default-only
+step_types:
+  show_env:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/sh
+        args:
+          - -c
+          - printf '%s|%s|%s' "$LAYERED" "$DEFAULT_ONLY" "$TEMPLATE_ONLY"
+      env:
+        - LAYERED: template
+        - TEMPLATE_ONLY: template-only
+steps:
+  - name: show-layered-env
+    type: show_env
+    env:
+      - LAYERED: call
+    output: OUT
+`)
+	dag.Agent().RunSuccess(t)
+
+	dag.AssertOutputs(t, map[string]any{
+		"OUT": "call|default-only|template-only",
+	})
+}

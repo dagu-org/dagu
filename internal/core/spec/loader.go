@@ -558,6 +558,10 @@ func processDAGDocument(
 		if err != nil {
 			return nil, err
 		}
+		docCtx.baseDefaults, err = decodeDefaults(baseDef.Defaults)
+		if err != nil {
+			return nil, err
+		}
 		docCtx.baseDAG = dest
 	} else {
 		dest = new(core.DAG)

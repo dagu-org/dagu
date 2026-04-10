@@ -167,6 +167,85 @@ func applyDefaults(s *step, d *defaults, raw map[string]any) {
 	}
 }
 
+func mergeDefaults(base, override *defaults) *defaults {
+	if base == nil {
+		return override
+	}
+	if override == nil {
+		return base
+	}
+
+	merged := *base
+	if !override.ContinueOn.IsZero() {
+		merged.ContinueOn = override.ContinueOn
+	}
+	if override.RetryPolicy != nil {
+		merged.RetryPolicy = override.RetryPolicy
+	}
+	if override.RepeatPolicy != nil {
+		merged.RepeatPolicy = override.RepeatPolicy
+	}
+	if override.TimeoutSec != 0 {
+		merged.TimeoutSec = override.TimeoutSec
+	}
+	if override.MailOnError != nil {
+		merged.MailOnError = override.MailOnError
+	}
+	if override.SignalOnStop != nil {
+		merged.SignalOnStop = override.SignalOnStop
+	}
+	if !override.Env.IsZero() {
+		merged.Env = override.Env.Prepend(merged.Env)
+	}
+	if override.Preconditions != nil {
+		if merged.Preconditions == nil {
+			merged.Preconditions = override.Preconditions
+		} else {
+			merged.Preconditions = combinePreconditions(merged.Preconditions, override.Preconditions)
+		}
+	}
+	if override.Agent != nil {
+		merged.Agent = mergeAgentDefaults(merged.Agent, override.Agent)
+	}
+	return &merged
+}
+
+func mergeAgentDefaults(base, override *agentDefaults) *agentDefaults {
+	if base == nil {
+		return override
+	}
+	if override == nil {
+		return base
+	}
+
+	merged := *base
+	if override.Model != "" {
+		merged.Model = override.Model
+	}
+	if override.Tools != nil {
+		merged.Tools = override.Tools
+	}
+	if override.Skills != nil {
+		merged.Skills = append([]string(nil), override.Skills...)
+	}
+	if override.Soul != "" {
+		merged.Soul = override.Soul
+	}
+	if override.Memory != nil {
+		merged.Memory = override.Memory
+	}
+	if override.Prompt != "" {
+		merged.Prompt = override.Prompt
+	}
+	if override.MaxIterations != nil {
+		merged.MaxIterations = override.MaxIterations
+	}
+	if override.SafeMode != nil {
+		merged.SafeMode = override.SafeMode
+	}
+	return &merged
+}
+
 // combinePreconditions merges two precondition values into a single []any slice.
 // Both values are normalized to arrays and concatenated (first before second).
 func combinePreconditions(first, second any) []any {

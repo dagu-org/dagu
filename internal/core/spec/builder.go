@@ -25,6 +25,9 @@ type BuildContext struct {
 	// It is used while building child handlers and steps so DAG-level defaults
 	// inherited from base config are visible during executor inference.
 	baseDAG *core.DAG
+	// baseDefaults contains decoded step defaults inherited from base config.
+	// They are merged with DAG-local defaults before building steps and handlers.
+	baseDefaults *defaults
 
 	// buildEnv is a temporary map used during core.DAG building to pass env vars to params
 	// This is not serialized and is cleared after build completes
@@ -344,7 +347,6 @@ func buildStepFromSpec(
 	if forcedName != "" {
 		stCopy.Name = forcedName
 	}
-	applyDefaults(&stCopy, defs, raw)
 
 	var builtStep *core.Step
 	var err error
@@ -357,6 +359,7 @@ func buildStepFromSpec(
 		}
 	}
 	if builtStep == nil {
+		applyDefaults(&stCopy, defs, raw)
 		builtStep, err = buildConcreteStep(ctx, &stCopy)
 		if err != nil {
 			return nil, err
