@@ -520,6 +520,10 @@
       },
       "description": "Lifecycle event hooks that define commands to execute at various points in the DAG lifecycle: init (before steps), success, failure, abort, and exit (always runs last)."
     },
+    "step_types": {
+      "$ref": "#/definitions/customStepTypes",
+      "description": "Reusable custom step type definitions for this DAG. Base config and DAG-local step_types are merged per document, and duplicate names across scopes are rejected."
+    },
     "smtp": {
       "type": "object",
       "properties": {
@@ -1165,6 +1169,10 @@
           ],
           "description": "Command(s) to execute. Can be a single shell command string, or an array of commands to run sequentially (stops on first failure)."
         },
+        "exec": {
+          "$ref": "#/definitions/stepExec",
+          "description": "Structured direct-exec form for running a binary with explicit argv and no shell parsing. Mutually exclusive with command and script."
+        },
         "shell": {
           "oneOf": [
             {
@@ -1559,11 +1567,11 @@
         },
         "type": {
           "$ref": "#/definitions/executorType",
-          "description": "Executor type for this step. This is the new format replacing executor.type. Cannot be used together with 'executor' field."
+          "description": "Builtin executor type or a custom step type name declared in step_types or base config. If omitted, Dagu infers the builtin type from other step fields. Cannot be used together with 'executor' field."
         },
         "config": {
           "$ref": "#/definitions/executorConfig",
-          "description": "Executor-specific configuration. This is the new format replacing executor.config. Cannot be used together with 'executor' field."
+          "description": "Executor-specific configuration. For builtin types, this is the executor config object. For custom step types, this is the validated input object defined by step_types.<name>.input_schema. Cannot be used together with 'executor' field."
         },
         "llm": {
           "$ref": "#/definitions/llmConfig",
@@ -1631,6 +1639,16 @@
         }
       },
       "allOf": [
+        {
+          "not": {
+            "required": ["exec", "command"]
+          }
+        },
+        {
+          "not": {
+            "required": ["exec", "script"]
+          }
+        },
         {
           "if": { "properties": { "type": { "const": "http" } } },
           "then": {
@@ -4754,7 +4772,7 @@
       },
       "description": "A single bash command policy rule."
     },
-    "executorType": {
+    "builtinExecutorType": {
       "type": "string",
       "enum": [
         "command",
@@ -4778,9 +4796,79 @@
         "redis",
         "harness",
         "router",
-        "agent"
+        "agent",
+        "sftp",
+        "template"
       ],
       "description": "Type of executor to use for this step, including aliases such as k8s / kubernetes."
+    },
+    "executorType": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/builtinExecutorType"
+        },
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+          "description": "Custom step type name declared in step_types or base config."
+        }
+      ],
+      "description": "Builtin executor type or a custom step type name declared in step_types."
+    },
+    "customStepTypes": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/customStepTypeDefinition"
+      },
+      "description": "Custom step type definitions keyed by user-defined type name."
+    },
+    "customStepTypeDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "input_schema", "template"],
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/builtinExecutorType",
+          "description": "Builtin executor type or builtin alias that this custom step expands to. Custom step types cannot target other custom step types."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description applied when the expanded step does not set its own description."
+        },
+        "input_schema": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Inline JSON Schema object used to validate and default the custom step's config input."
+        },
+        "template": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Step fragment template expanded at build time. Use {$input: path.to.value} for typed injection and Go template strings for string interpolation."
+        }
+      },
+      "description": "Definition of a reusable custom step type."
+    },
+    "stepExec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Executable path or binary name to run directly."
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": ["string", "number", "boolean"]
+          },
+          "description": "Explicit argv entries passed to the executable without shell parsing."
+        }
+      },
+      "description": "Structured direct-exec form for command steps. Runs an executable with explicit argv and no shell parsing."
     },
     "executorConfig": {
       "type": "object",

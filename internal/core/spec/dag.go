@@ -67,6 +67,14 @@ type dag struct {
 	Env types.EnvValue `yaml:"env,omitempty"`
 	// HandlerOn is the handler configuration.
 	HandlerOn handlerOn `yaml:"handler_on,omitempty"`
+	// handlerOnRaw preserves raw handler maps so explicit zero-value call-site
+	// overrides remain distinguishable from omission during build.
+	handlerOnRaw map[string]map[string]any
+	// defaultsRaw preserves the authored defaults map so explicit zero/empty
+	// DAG-local overrides can replace inherited base defaults during merge.
+	defaultsRaw map[string]any
+	// StepTypes defines custom step types that expand to builtin-backed steps.
+	StepTypes map[string]customStepTypeSpec `yaml:"step_types,omitempty"`
 	// Steps is the list of steps to run.
 	Steps any `yaml:"steps,omitempty"` // []step or map[string]step
 	// SMTP is the SMTP configuration.
@@ -162,6 +170,32 @@ type handlerOn struct {
 	Abort   *step `yaml:"abort,omitempty"`   // Step to execute on abort
 	Exit    *step `yaml:"exit,omitempty"`    // Step to execute on exit
 	Wait    *step `yaml:"wait,omitempty"`    // Step to execute when DAG enters wait status (approval)
+}
+
+func (d *dag) rawHandler(name core.HandlerType) map[string]any {
+	if d == nil || d.handlerOnRaw == nil {
+		return nil
+	}
+
+	var key string
+	switch name {
+	case core.HandlerOnInit:
+		key = "init"
+	case core.HandlerOnSuccess:
+		key = "success"
+	case core.HandlerOnFailure:
+		key = "failure"
+	case core.HandlerOnAbort:
+		key = "abort"
+	case core.HandlerOnExit:
+		key = "exit"
+	case core.HandlerOnWait:
+		key = "wait"
+	default:
+		return nil
+	}
+
+	return d.handlerOnRaw[key]
 }
 
 // smtpConfig defines the SMTP configuration.
@@ -2124,19 +2158,18 @@ func buildHandlers(ctx BuildContext, d *dag, result *core.DAG) (core.HandlerOn, 
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	var handlerOn core.HandlerOn
 
-	defs, err := decodeDefaults(d.Defaults)
+	localDefs, err := decodeDefaults(d.Defaults)
 	if err != nil {
 		return handlerOn, err
 	}
+	defs := mergeDefaults(ctx.baseDefaults, localDefs, d.defaultsRaw)
 
 	// buildHandler is a helper that builds a single handler step.
 	buildHandler := func(s *step, name core.HandlerType) (*core.Step, error) {
 		if s == nil {
 			return nil, nil
 		}
-		s.Name = name.String()
-		applyDefaults(s, defs, nil)
-		return s.build(buildCtx)
+		return buildStepFromSpec(buildCtx, 0, s, d.rawHandler(name), map[string]struct{}{}, defs, name.String())
 	}
 
 	if handlerOn.Init, err = buildHandler(d.HandlerOn.Init, core.HandlerOnInit); err != nil {
@@ -2240,10 +2273,11 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 	buildCtx := StepBuildContext{BuildContext: ctx, dag: result}
 	names := make(map[string]struct{})
 
-	defs, err := decodeDefaults(d.Defaults)
+	localDefs, err := decodeDefaults(d.Defaults)
 	if err != nil {
 		return nil, err
 	}
+	defs := mergeDefaults(ctx.baseDefaults, localDefs, d.defaultsRaw)
 
 	switch v := d.Steps.(type) {
 	case nil:
@@ -2331,11 +2365,8 @@ func buildSteps(ctx BuildContext, d *dag, result *core.DAG) ([]core.Step, error)
 
 		var steps []core.Step
 		for name, st := range stepsMap {
-			st.Name = name
-			names[st.Name] = struct{}{}
 			rawStep, _ := v[name].(map[string]any)
-			applyDefaults(&st, defs, rawStep)
-			builtStep, err := st.build(buildCtx)
+			builtStep, err := buildStepFromSpec(buildCtx, 0, &st, rawStep, names, defs, name)
 			if err != nil {
 				return nil, err
 			}

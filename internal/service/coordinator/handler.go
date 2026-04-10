@@ -383,7 +383,11 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return nil, nil
 	}
 
-	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
+	loadOpts := []spec.LoadOption{spec.WithName(task.Target)}
+	if task.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent([]byte(task.BaseConfig)))
+	}
+	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}
@@ -531,7 +535,11 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		return nil, fmt.Errorf("failed to create sub-attempt: %w", err)
 	}
 
-	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), spec.WithName(task.Target))
+	loadOpts := []spec.LoadOption{spec.WithName(task.Target)}
+	if task.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfigContent([]byte(task.BaseConfig)))
+	}
+	dag, err := spec.LoadYAML(ctx, []byte(task.Definition), loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DAG definition: %w", err)
 	}

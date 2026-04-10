@@ -20,10 +20,14 @@ type BuildContext struct {
 	opts  BuildOpts
 	index int
 
+	customStepTypes *customStepTypeRegistry
 	// baseDAG contains the built base-config DAG for the current document.
 	// It is used while building child handlers and steps so DAG-level defaults
 	// inherited from base config are visible during executor inference.
 	baseDAG *core.DAG
+	// baseDefaults contains decoded step defaults inherited from base config.
+	// They are merged with DAG-local defaults before building steps and handlers.
+	baseDefaults *defaults
 
 	// buildEnv is a temporary map used during core.DAG building to pass env vars to params
 	// This is not serialized and is cleared after build completes
@@ -69,6 +73,12 @@ func (c BuildContext) WithOpts(opts BuildOpts) BuildContext {
 func (c BuildContext) WithFile(file string) BuildContext {
 	copy := c
 	copy.file = file
+	return copy
+}
+
+func (c BuildContext) WithCustomStepTypes(registry *customStepTypeRegistry) BuildContext {
+	copy := c
+	copy.customStepTypes = registry
 	return copy
 }
 
@@ -230,7 +240,9 @@ func generateTypedStepName(existingNames map[string]struct{}, step *core.Step, i
 	var prefix string
 
 	// Determine prefix based on the built step's properties
-	if step.ExecutorConfig.Type != "" {
+	if customType, _ := step.ExecutorConfig.Metadata["custom_type"].(string); customType != "" {
+		prefix = customType
+	} else if step.ExecutorConfig.Type != "" {
 		prefix = step.ExecutorConfig.Type
 	} else if step.Container != nil {
 		prefix = "docker"
@@ -277,8 +289,7 @@ func normalizeStepData(ctx BuildContext, data []any) []any {
 	return normalized
 }
 
-// buildStepFromRaw build core.Step from give raw data (map[string]any)
-func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}, defs *defaults) (*core.Step, error) {
+func decodeStep(raw map[string]any) (*step, error) {
 	var st step
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
@@ -289,11 +300,10 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	if err := md.Decode(raw); err != nil {
 		return nil, core.NewValidationError("steps", raw, withSnakeCaseKeyHint(err))
 	}
-	applyDefaults(&st, defs, raw)
-	builtStep, err := st.build(ctx)
-	if err != nil {
-		return nil, err
-	}
+	return &st, nil
+}
+
+func finalizeBuiltStepName(names map[string]struct{}, builtStep *core.Step, idx int) {
 	if builtStep.Name == "" {
 		if builtStep.ID != "" {
 			builtStep.Name = builtStep.ID
@@ -305,6 +315,57 @@ func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names m
 	// subsequent auto-generated names skip it. generateTypedStepName already
 	// registers internally, but map[string]struct{} insertion is idempotent.
 	names[builtStep.Name] = struct{}{}
+}
+
+func buildConcreteStep(ctx StepBuildContext, s *step) (*core.Step, error) {
+	return s.build(ctx)
+}
+
+// buildStepFromRaw build core.Step from give raw data (map[string]any)
+func buildStepFromRaw(ctx StepBuildContext, idx int, raw map[string]any, names map[string]struct{}, defs *defaults) (*core.Step, error) {
+	st, err := decodeStep(raw)
+	if err != nil {
+		return nil, err
+	}
+	builtStep, err := buildStepFromSpec(ctx, idx, st, raw, names, defs, "")
+	if err != nil {
+		return nil, err
+	}
+	return builtStep, nil
+}
+
+func buildStepFromSpec(
+	ctx StepBuildContext,
+	idx int,
+	st *step,
+	raw map[string]any,
+	names map[string]struct{},
+	defs *defaults,
+	forcedName string,
+) (*core.Step, error) {
+	stCopy := *st
+	if forcedName != "" {
+		stCopy.Name = forcedName
+	}
+
+	var builtStep *core.Step
+	var err error
+	if registry := ctx.customStepTypes; registry != nil {
+		if customType, ok := registry.Lookup(stCopy.Type); ok {
+			builtStep, err = buildCustomStepFromSpec(ctx, &stCopy, raw, defs, customType, forcedName != "")
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if builtStep == nil {
+		applyDefaults(&stCopy, defs, raw)
+		builtStep, err = buildConcreteStep(ctx, &stCopy)
+		if err != nil {
+			return nil, err
+		}
+	}
+	finalizeBuiltStepName(names, builtStep, idx)
 	return builtStep, nil
 }
 

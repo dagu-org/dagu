@@ -545,10 +545,20 @@ func processDAGDocument(
 		docCtx.opts.Flags &^= BuildFlagValidateRuntimeParams
 	}
 
+	customStepTypes, err := buildCustomStepTypeRegistry(stepTypesOf(baseDef), stepTypesOf(spec))
+	if err != nil {
+		return nil, err
+	}
+	docCtx = docCtx.WithCustomStepTypes(customStepTypes)
+
 	// Build a fresh base core.DAG from base manifest if provided
 	var dest *core.DAG
 	if baseDef != nil {
 		dest, err = buildBaseDAG(docCtx, baseDef)
+		if err != nil {
+			return nil, err
+		}
+		docCtx.baseDefaults, err = decodeDefaults(baseDef.Defaults)
 		if err != nil {
 			return nil, err
 		}
@@ -597,6 +607,11 @@ func buildBaseDAG(ctx BuildContext, baseDef *dag) (*core.DAG, error) {
 	// Don't parse parameters for the base core.DAG
 	buildCtx.opts.Parameters = ""
 	buildCtx.opts.ParametersList = nil
+	customStepTypes, err := buildCustomStepTypeRegistry(stepTypesOf(baseDef), nil)
+	if err != nil {
+		return nil, err
+	}
+	buildCtx = buildCtx.WithCustomStepTypes(customStepTypes)
 
 	// Build the base core.DAG
 	baseDAG, err := baseDef.build(buildCtx)
@@ -611,6 +626,13 @@ func buildBaseDAG(ctx BuildContext, baseDef *dag) (*core.DAG, error) {
 	}
 
 	return baseDAG, nil
+}
+
+func stepTypesOf(d *dag) map[string]customStepTypeSpec {
+	if d == nil {
+		return nil
+	}
+	return d.StepTypes
 }
 
 func shouldInheritType(doc map[string]any, baseDef, spec *dag) bool {
@@ -850,8 +872,40 @@ func decode(cm map[string]any) (*dag, error) {
 	})
 	err := md.Decode(cm)
 	err = withSnakeCaseKeyHint(err)
+	if err == nil {
+		c.handlerOnRaw = extractRawHandlerOn(cm)
+		c.defaultsRaw = extractRawDefaults(cm)
+	}
 
 	return c, err
+}
+
+func extractRawHandlerOn(cm map[string]any) map[string]map[string]any {
+	rawHandlers, ok := cm["handler_on"].(map[string]any)
+	if !ok || len(rawHandlers) == 0 {
+		return nil
+	}
+
+	cloned := make(map[string]map[string]any, len(rawHandlers))
+	for key, value := range rawHandlers {
+		rawStep, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		cloned[key] = cloneMap(rawStep)
+	}
+	if len(cloned) == 0 {
+		return nil
+	}
+	return cloned
+}
+
+func extractRawDefaults(cm map[string]any) map[string]any {
+	rawDefaults, ok := cm["defaults"].(map[string]any)
+	if !ok || len(rawDefaults) == 0 {
+		return nil
+	}
+	return cloneMap(rawDefaults)
 }
 
 // TypedUnionDecodeHook returns a decode hook that handles our typed union types.

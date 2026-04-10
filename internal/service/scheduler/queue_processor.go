@@ -24,6 +24,7 @@ import (
 )
 
 const queueAgeWarningThreshold = 2 * time.Minute
+const queueProcessMinInterval = 3 * time.Second
 
 var (
 	errProcessorClosed = errors.New("processor closed")
@@ -150,13 +151,15 @@ func NewQueueProcessor(
 	opts ...QueueProcessorOption,
 ) *QueueProcessor {
 	p := &QueueProcessor{
-		queueStore:          queueStore,
-		dagRunStore:         dagRunStore,
-		procStore:           procStore,
-		dagExecutor:         dagExecutor,
-		wakeUpCh:            make(chan struct{}, 1),
-		quit:                make(chan struct{}),
-		prevTime:            time.Now(),
+		queueStore:  queueStore,
+		dagRunStore: dagRunStore,
+		procStore:   procStore,
+		dagExecutor: dagExecutor,
+		wakeUpCh:    make(chan struct{}, 1),
+		quit:        make(chan struct{}),
+		// Seed prevTime in the past so Start()'s initial wake-up is not
+		// throttled by the minimum processing interval.
+		prevTime:            time.Now().Add(-queueProcessMinInterval),
 		backoffConfig:       DefaultBackoffConfig(),
 		leaseStaleThreshold: exec.DefaultStaleLeaseThreshold,
 		isSuspended:         func(context.Context, string) bool { return false },
@@ -232,7 +235,7 @@ func (p *QueueProcessor) loop(ctx context.Context) {
 			return
 		case <-p.quit:
 			return
-		case <-time.After(time.Until(p.prevTime.Add(3 * time.Second))):
+		case <-time.After(time.Until(p.prevTime.Add(queueProcessMinInterval))):
 			p.prevTime = time.Now()
 		}
 
