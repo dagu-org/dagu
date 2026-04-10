@@ -113,6 +113,17 @@ func WithBaseConfig(content string) TaskOption {
 	}
 }
 
+// WithAgentSnapshot sets the opaque worker agent snapshot on the task.
+func WithAgentSnapshot(snapshot []byte) TaskOption {
+	return func(task *coordinatorv1.Task) {
+		if len(snapshot) == 0 {
+			task.AgentSnapshot = nil
+			return
+		}
+		task.AgentSnapshot = append([]byte(nil), snapshot...)
+	}
+}
+
 // WithExternalStepRetry enables parent-managed step retries for the dispatched task.
 func WithExternalStepRetry(enabled bool) TaskOption {
 	return func(task *coordinatorv1.Task) {

@@ -95,7 +95,7 @@ type step struct {
 	// Can be a string (existing container name to exec into) or an object (container configuration).
 	Container any `yaml:"container,omitempty"`
 
-	// Type specifies the executor type (ssh, http, jq, mail, docker, gha, archive).
+	// Type specifies the executor type (ssh, http, jq, mail, docker, archive).
 	Type string `yaml:"type,omitempty"`
 
 	// Config contains executor-specific configuration.

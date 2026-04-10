@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 )
 
@@ -32,4 +33,8 @@ func (er *mockJobManager) Stop() {
 
 func (er *mockJobManager) DAGs() []*core.DAG {
 	return er.LoadedDAGs
+}
+
+func (*mockJobManager) DAGStore() exec.DAGStore {
+	return nil
 }

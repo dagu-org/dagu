@@ -511,7 +511,13 @@ func startWorkerProcess(t *testing.T, f *testFixture, workerID, labels string) (
 	}()
 
 	t.Cleanup(func() {
-		if cmd.Process != nil && (cmd.ProcessState == nil || !cmd.ProcessState.Exited()) {
+		select {
+		case <-done:
+			return
+		default:
+		}
+
+		if cmd.Process != nil {
 			_ = cmdutil.KillProcessGroup(cmd, os.Kill)
 		}
 		select {

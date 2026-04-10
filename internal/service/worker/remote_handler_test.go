@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/cmn/backoff"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
@@ -636,6 +637,107 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		require.NotNil(t, statusPusher)
 		require.NotNil(t, logStreamer)
 	})
+}
+
+func TestAgentStoresFromSnapshot_HydratesSnapshotStores(t *testing.T) {
+	t.Parallel()
+
+	handler := &remoteTaskHandler{}
+	payload, err := agent.MarshalSnapshot(&agent.Snapshot{
+		Config: &agent.Config{
+			Enabled:        true,
+			DefaultModelID: "model-default",
+		},
+		Models: []*agent.ModelConfig{
+			{
+				ID:       "model-default",
+				Name:     "Default",
+				Provider: "openai",
+				Model:    "gpt-5.4",
+				APIKey:   "test-key",
+			},
+		},
+		Skills: []*agent.Skill{
+			{ID: "skill-one", Name: "Skill One", Knowledge: "knowledge"},
+		},
+		Souls: []*agent.Soul{
+			{ID: "helper", Name: "Helper", Content: "be precise"},
+		},
+		Memory: &agent.MemorySnapshot{
+			Global: "global memory",
+			PerDAG: map[string]string{"snapshot-dag": "dag memory"},
+		},
+	})
+	require.NoError(t, err)
+
+	stores, err := handler.agentStoresFromSnapshot(payload)
+	require.NoError(t, err)
+	require.NotNil(t, stores.configStore)
+	require.NotNil(t, stores.modelStore)
+	require.NotNil(t, stores.skillStore)
+	require.NotNil(t, stores.soulStore)
+	require.NotNil(t, stores.memoryStore)
+	assert.Nil(t, stores.oauthManager)
+
+	cfg, err := stores.configStore.Load(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "model-default", cfg.DefaultModelID)
+	model, err := stores.modelStore.GetByID(context.Background(), "model-default")
+	require.NoError(t, err)
+	assert.Equal(t, "gpt-5.4", model.Model)
+	skill, err := stores.skillStore.GetByID(context.Background(), "skill-one")
+	require.NoError(t, err)
+	assert.Equal(t, "Skill One", skill.Name)
+	soul, err := stores.soulStore.GetByID(context.Background(), "helper")
+	require.NoError(t, err)
+	assert.Equal(t, "Helper", soul.Name)
+	globalMemory, err := stores.memoryStore.LoadGlobalMemory(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "global memory", globalMemory)
+}
+
+func TestHandleStart_InvalidSnapshotReportsInitFailure(t *testing.T) {
+	t.Parallel()
+
+	var reported *coordinatorv1.ReportStatusRequest
+	client := newMockRemoteCoordinatorClient()
+	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+		reported = req
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	handler := NewRemoteTaskHandler(RemoteTaskHandlerConfig{
+		WorkerID:          "worker-1",
+		CoordinatorClient: client,
+		Config:            &config.Config{},
+	})
+
+	task := &coordinatorv1.Task{
+		Operation:      coordinatorv1.Operation_OPERATION_START,
+		Target:         "snapshot-dag",
+		RootDagRunName: "snapshot-dag",
+		RootDagRunId:   "run-1",
+		DagRunId:       "run-1",
+		Definition: `
+steps:
+  - name: main
+    command: echo hello
+`,
+		AgentSnapshot: []byte("not-a-valid-snapshot"),
+	}
+
+	err := handler.Handle(context.Background(), task)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "hydrate agent snapshot")
+	require.NotNil(t, reported)
+	require.NotNil(t, reported.Status)
+
+	status, convErr := convert.ProtoToDAGRunStatus(reported.Status)
+	require.NoError(t, convErr)
+	assert.Equal(t, core.Failed, status.Status)
+	assert.Equal(t, "snapshot-dag", status.Name)
+	assert.Equal(t, "run-1", status.DAGRunID)
+	assert.Contains(t, status.Error, "hydrate agent snapshot")
 }
 
 func TestCreateAgentEnv(t *testing.T) {
@@ -1570,7 +1672,7 @@ steps:
 	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", "", root, parent, statusPusher, logStreamer, false, nil, nil)
+	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", "", root, parent, statusPusher, logStreamer, false, nil, nil, nil)
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {
@@ -1614,7 +1716,7 @@ steps:
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID
-	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil, nil)
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil, nil, nil)
 
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")

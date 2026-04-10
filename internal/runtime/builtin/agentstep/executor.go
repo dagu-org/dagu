@@ -408,11 +408,16 @@ func loadMemoryContent(ctx context.Context, store agent.MemoryStore, dagName str
 	if dagName != "" {
 		dagMem, _ = store.LoadDAGMemory(ctx, dagName)
 	}
+	readOnly := false
+	if roStore, ok := store.(agent.SnapshotReadOnlyMemoryStore); ok {
+		readOnly = roStore.MemoryReadOnly()
+	}
 	return agent.MemoryContent{
 		GlobalMemory: global,
 		DAGMemory:    dagMem,
 		DAGName:      dagName,
 		MemoryDir:    store.MemoryDir(),
+		ReadOnly:     readOnly,
 	}
 }
 

@@ -155,4 +155,5 @@ type MemoryContent struct {
 	DAGMemory    string // Contents of per-DAG MEMORY.md (truncated)
 	DAGName      string // Name of the DAG (empty if no DAG context)
 	MemoryDir    string // Root memory directory path
+	ReadOnly     bool   // Memory is execution-scoped read-only context
 }

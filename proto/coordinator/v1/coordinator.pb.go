@@ -472,7 +472,9 @@ type Task struct {
 	// Durable token identifying the shared task claim.
 	ClaimToken string `protobuf:"bytes,24,opt,name=claim_token,json=claimToken,proto3" json:"claim_token,omitempty"`
 	// Original DAG file path for provenance-aware reschedule-from-file behavior.
-	SourceFile    string `protobuf:"bytes,25,opt,name=source_file,json=sourceFile,proto3" json:"source_file,omitempty"`
+	SourceFile string `protobuf:"bytes,25,opt,name=source_file,json=sourceFile,proto3" json:"source_file,omitempty"`
+	// Opaque execution-scoped agent settings snapshot for distributed workers.
+	AgentSnapshot []byte `protobuf:"bytes,26,opt,name=agent_snapshot,json=agentSnapshot,proto3" json:"agent_snapshot,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -677,6 +679,13 @@ func (x *Task) GetSourceFile() string {
 	return ""
 }
 
+func (x *Task) GetAgentSnapshot() []byte {
+	if x != nil {
+		return x.AgentSnapshot
+	}
+	return nil
+}
+
 func (x *Task) SetOperation(v Operation) {
 	x.Operation = v
 }
@@ -777,6 +786,13 @@ func (x *Task) SetSourceFile(v string) {
 	x.SourceFile = v
 }
 
+func (x *Task) SetAgentSnapshot(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.AgentSnapshot = v
+}
+
 func (x *Task) HasPreviousStatus() bool {
 	if x == nil {
 		return false
@@ -828,6 +844,8 @@ type Task_builder struct {
 	ClaimToken string
 	// Original DAG file path for provenance-aware reschedule-from-file behavior.
 	SourceFile string
+	// Opaque execution-scoped agent settings snapshot for distributed workers.
+	AgentSnapshot []byte
 }
 
 func (b0 Task_builder) Build() *Task {
@@ -859,6 +877,7 @@ func (b0 Task_builder) Build() *Task {
 	x.OwnerCoordinatorPort = b.OwnerCoordinatorPort
 	x.ClaimToken = b.ClaimToken
 	x.SourceFile = b.SourceFile
+	x.AgentSnapshot = b.AgentSnapshot
 	return m0
 }
 
@@ -2804,7 +2823,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xb5\b\n" +
+	"\x10DispatchResponse\"\xdc\b\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -2840,7 +2859,8 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\vclaim_token\x18\x18 \x01(\tR\n" +
 	"claimToken\x12\x1f\n" +
 	"\vsource_file\x18\x19 \x01(\tR\n" +
-	"sourceFile\x1aA\n" +
+	"sourceFile\x12%\n" +
+	"\x0eagent_snapshot\x18\x1a \x01(\fR\ragentSnapshot\x1aA\n" +
 	"\x13WorkerSelectorEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +

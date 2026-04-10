@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,6 +27,8 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileagentconfig"
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
 	"github.com/dagucloud/dagu/internal/persis/fileagentoauth"
+	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
+	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filememory"
 	"github.com/dagucloud/dagu/internal/proto/convert"
 	"github.com/dagucloud/dagu/internal/runtime"
@@ -128,8 +131,12 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 	}
 
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
-
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil, taskExtraEnvs(task))
+	err = h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil, task.AgentSnapshot, taskExtraEnvs(task))
+	var initErr *taskInitError
+	if errors.As(err, &initErr) {
+		h.reportTaskInitFailure(ctx, task, root, parent, statusPusher, initErr.err)
+	}
+	return err
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
@@ -164,11 +171,16 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
 	triggerType := exec.PreservedQueueTriggerType(status)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
+	err = h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
 		target:      status,
 		stepName:    task.Step,
 		triggerType: triggerType,
-	}, taskExtraEnvs(task))
+	}, task.AgentSnapshot, taskExtraEnvs(task))
+	var initErr *taskInitError
+	if errors.As(err, &initErr) {
+		h.reportTaskInitFailure(ctx, task, root, parent, statusPusher, initErr.err)
+	}
+	return err
 }
 
 func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, owner exec.HostInfo, loadErr error) {
@@ -200,6 +212,45 @@ func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coo
 	}
 }
 
+func (h *remoteTaskHandler) reportTaskInitFailure(
+	ctx context.Context,
+	task *coordinatorv1.Task,
+	root exec.DAGRunRef,
+	parent exec.DAGRunRef,
+	statusPusher *remote.StatusPusher,
+	initErr error,
+) {
+	if statusPusher == nil || initErr == nil {
+		return
+	}
+
+	finishedAt := stringutil.FormatTime(time.Now())
+	logger.Warn(ctx, "Failed to initialize DAG on worker",
+		tag.Target(task.Target),
+		tag.RunID(task.DagRunId),
+		tag.Error(initErr),
+	)
+	status := exec.DAGRunStatus{
+		Root:       root,
+		Parent:     parent,
+		Name:       task.Target,
+		DAGRunID:   task.DagRunId,
+		AttemptID:  task.AttemptId,
+		Status:     core.Failed,
+		FinishedAt: finishedAt,
+		Error:      initErr.Error(),
+		Params:     task.Params,
+	}
+
+	if err := statusPusher.Push(ctx, status); err != nil {
+		logger.Warn(ctx, "Failed to report init failure status",
+			tag.Target(task.Target),
+			tag.RunID(task.DagRunId),
+			tag.Error(err),
+		)
+	}
+}
+
 func sanitizeTaskLoadError(target string, loadErr error) string {
 	message := loadErr.Error()
 	rest, ok := strings.CutPrefix(message, "failed to load DAG from ")
@@ -224,8 +275,29 @@ type retryConfig struct {
 type agentStoreBundle struct {
 	configStore  agent.ConfigStore
 	modelStore   agent.ModelStore
+	skillStore   agent.SkillStore
+	soulStore    agent.SoulStore
 	memoryStore  agent.MemoryStore
 	oauthManager *agentoauth.Manager
+}
+
+type taskInitError struct {
+	err error
+}
+
+func (e *taskInitError) Error() string {
+	return e.err.Error()
+}
+
+func (e *taskInitError) Unwrap() error {
+	return e.err
+}
+
+func newTaskInitError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &taskInitError{err: err}
 }
 
 func taskExtraEnvs(task *coordinatorv1.Task) []string {
@@ -254,7 +326,7 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 	return statusPusher, logStreamer
 }
 
-// agentStores creates the agent config, model, memory, and OAuth stores from the config paths.
+// agentStores creates the agent config, model, skill, soul, memory, and OAuth stores from the config paths.
 func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 	acs, err := fileagentconfig.New(h.config.Paths.DataDir)
 	if err != nil {
@@ -271,12 +343,35 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{configStore: acs}
 	}
 
+	skillsDir := filepath.Join(h.config.Paths.DAGsDir, "skills")
+	ss, err := fileagentskill.New(skillsDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent skill store", tag.Error(err))
+		return agentStoreBundle{
+			configStore: acs,
+			modelStore:  ams,
+		}
+	}
+
+	soulsDir := filepath.Join(h.config.Paths.DAGsDir, "souls")
+	soulStore, err := fileagentsoul.New(ctx, soulsDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent soul store", tag.Error(err))
+		return agentStoreBundle{
+			configStore: acs,
+			modelStore:  ams,
+			skillStore:  ss,
+		}
+	}
+
 	ms, err := filememory.New(h.config.Paths.DAGsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create agent memory store", tag.Error(err))
 		return agentStoreBundle{
 			configStore: acs,
 			modelStore:  ams,
+			skillStore:  ss,
+			soulStore:   soulStore,
 		}
 	}
 
@@ -286,6 +381,8 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{
 			configStore: acs,
 			modelStore:  ams,
+			skillStore:  ss,
+			soulStore:   soulStore,
 			memoryStore: ms,
 		}
 	}
@@ -293,9 +390,37 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 	return agentStoreBundle{
 		configStore:  acs,
 		modelStore:   ams,
+		skillStore:   ss,
+		soulStore:    soulStore,
 		memoryStore:  ms,
 		oauthManager: oauthManager,
 	}
+}
+
+func (h *remoteTaskHandler) agentStoresFromSnapshot(snapshotPayload []byte) (agentStoreBundle, error) {
+	snapshot, err := agent.UnmarshalSnapshot(snapshotPayload)
+	if err != nil {
+		return agentStoreBundle{}, err
+	}
+	if snapshot == nil {
+		return agentStoreBundle{}, fmt.Errorf("agent snapshot is empty")
+	}
+
+	stores := agent.NewSnapshotStores(snapshot)
+	if stores.ConfigStore == nil {
+		return agentStoreBundle{}, fmt.Errorf("agent snapshot is missing config")
+	}
+	if stores.ModelStore == nil {
+		return agentStoreBundle{}, fmt.Errorf("agent snapshot is missing models")
+	}
+
+	return agentStoreBundle{
+		configStore: stores.ConfigStore,
+		modelStore:  stores.ModelStore,
+		skillStore:  stores.SkillStore,
+		soulStore:   stores.SoulStore,
+		memoryStore: stores.MemoryStore,
+	}, nil
 }
 
 // loadDAG loads the DAG from task definition.
@@ -387,19 +512,20 @@ func (h *remoteTaskHandler) executeDAGRun(
 	logStreamer *remote.LogStreamer,
 	queuedRun bool,
 	retry *retryConfig,
+	agentSnapshot []byte,
 	extraEnvs []string,
 ) error {
 	// Create temporary directory for local operations
 	env, err := h.createAgentEnv(ctx, dagRunID)
 	if err != nil {
-		return err
+		return newTaskInitError(err)
 	}
 	defer env.cleanup()
 
 	// Open scheduler log file for writing
 	logFile, err := os.OpenFile(env.logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler log file: %w", err)
+		return newTaskInitError(fmt.Errorf("failed to create scheduler log file: %w", err))
 	}
 	defer func() {
 		if closeErr := logFile.Close(); closeErr != nil {
@@ -424,7 +550,15 @@ func (h *remoteTaskHandler) executeDAGRun(
 	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logWriter)))
 
 	// Create agent stores for agent step execution
-	agentStores := h.agentStores(ctx)
+	var agentStores agentStoreBundle
+	if len(agentSnapshot) > 0 {
+		agentStores, err = h.agentStoresFromSnapshot(agentSnapshot)
+		if err != nil {
+			return newTaskInitError(fmt.Errorf("hydrate agent snapshot: %w", err))
+		}
+	} else {
+		agentStores = h.agentStores(ctx)
+	}
 
 	// Build agent options
 	opts := rtagent.Options{
@@ -442,6 +576,8 @@ func (h *remoteTaskHandler) executeDAGRun(
 		DefaultExecMode:   h.config.DefaultExecMode,
 		AgentConfigStore:  agentStores.configStore,
 		AgentModelStore:   agentStores.modelStore,
+		AgentSkillStore:   agentStores.skillStore,
+		AgentSoulStore:    agentStores.soulStore,
 		AgentMemoryStore:  agentStores.memoryStore,
 		AgentOAuthManager: agentStores.oauthManager,
 		ScheduleTime:      scheduleTime,

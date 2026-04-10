@@ -264,3 +264,7 @@ func (*staticEntryReader) Stop() {}
 func (*staticEntryReader) DAGs() []*core.DAG {
 	return nil
 }
+
+func (*staticEntryReader) DAGStore() exec.DAGStore {
+	return nil
+}

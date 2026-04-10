@@ -1454,7 +1454,7 @@
               "description": "Named parameters as key-value pairs"
             }
           ],
-          "description": "Parameters for the step. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array format: named parameters as key-value objects preserving rich types (numbers, booleans, nested objects). 3) Object format: named parameters as simple key-value pairs. For sub-DAG execution (when 'call' or 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. For 'gha' executor, these are passed as action inputs (the 'with:' section in GitHub Actions syntax). Rich types are preserved when passing to executors that support them."
+          "description": "Parameters for the step. Supports three formats: 1) String format: space-separated positional parameters (e.g., 'arg1 arg2') accessible as $1, $2. 2) Array format: named parameters as key-value objects preserving rich types (numbers, booleans, nested objects). 3) Object format: named parameters as simple key-value pairs. For sub-DAG execution (when 'call' or 'run' is specified), these are passed to the sub DAG and accessible as ${KEY}. Rich types are preserved when passing to executors that support them."
         },
         "parallel": {
           "oneOf": [
@@ -1690,18 +1690,6 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/jqExecutorConfig" }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": { "enum": ["gha", "github_action", "github-action"] }
-            }
-          },
-          "then": {
-            "properties": {
-              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
             }
           }
         },
@@ -2521,91 +2509,6 @@
         }
       },
       "description": "Configuration for JQ JSON query executor."
-    },
-    "ghaExecutorConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "runner": {
-          "type": "string",
-          "default": "node:24-bookworm",
-          "description": "Docker image to use as the runner for executing the GitHub Action."
-        },
-        "auto_remove": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically remove containers after execution."
-        },
-        "network": {
-          "type": "string",
-          "description": "Docker network mode (e.g., 'host', 'bridge', or custom network name)."
-        },
-        "github_instance": {
-          "type": "string",
-          "default": "github.com",
-          "description": "GitHub instance hostname for action resolution. Use for GitHub Enterprise."
-        },
-        "docker_socket": {
-          "type": "string",
-          "description": "Custom Docker socket path. Leave empty for default."
-        },
-        "artifacts": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "path": {
-              "type": "string",
-              "description": "Path for artifact server storage."
-            },
-            "port": {
-              "type": "string",
-              "description": "Port for artifact server."
-            }
-          },
-          "description": "Artifact server configuration for GitHub Actions."
-        },
-        "reuse_containers": {
-          "type": "boolean",
-          "default": false,
-          "description": "Reuse containers between runs for faster execution."
-        },
-        "force_rebuild": {
-          "type": "boolean",
-          "default": false,
-          "description": "Force rebuild of action images."
-        },
-        "container_options": {
-          "type": "string",
-          "description": "Additional Docker run options as a string."
-        },
-        "privileged": {
-          "type": "boolean",
-          "default": false,
-          "description": "Run containers in privileged mode. WARNING: Security risk, avoid in production."
-        },
-        "capabilities": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "add": {
-              "oneOf": [
-                { "type": "string" },
-                { "type": "array", "items": { "type": "string" } }
-              ],
-              "description": "Linux capabilities to add to the container."
-            },
-            "drop": {
-              "oneOf": [
-                { "type": "string" },
-                { "type": "array", "items": { "type": "string" } }
-              ],
-              "description": "Linux capabilities to drop from the container."
-            }
-          },
-          "description": "Linux capabilities configuration for container security."
-        }
-      },
-      "description": "Configuration for running GitHub Actions locally using nektos/act."
     },
     "archiveExecutorConfig": {
       "type": "object",
@@ -4885,9 +4788,6 @@
         "ssh",
         "s3",
         "jq",
-        "gha",
-        "github_action",
-        "github-action",
         "dag",
         "subworkflow",
         "parallel",
@@ -4902,7 +4802,7 @@
         "sftp",
         "template"
       ],
-      "description": "Type of executor to use for this step, including aliases such as k8s / kubernetes and gha / github_action / github-action."
+      "description": "Type of executor to use for this step, including aliases such as k8s / kubernetes."
     },
     "executorType": {
       "anyOf": [
@@ -5025,18 +4925,6 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/jqExecutorConfig" }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": { "enum": ["gha", "github_action", "github-action"] }
-            }
-          },
-          "then": {
-            "properties": {
-              "config": { "$ref": "#/definitions/ghaExecutorConfig" }
             }
           }
         },

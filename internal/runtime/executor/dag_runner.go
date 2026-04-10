@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/agentsnapshot"
 	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -256,13 +257,18 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		return nil, errRootDAGRunNotSet
 	}
 
+	taskOpts, err := e.coordinatorTaskOptions(ctx, WithTaskParams(runParams.Params))
+	if err != nil {
+		return nil, err
+	}
+
 	// Build task for coordinator dispatch using DAG.CreateTask
 	task := CreateTask(
 		e.DAG.Name,
 		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_START,
 		runParams.RunID,
-		e.coordinatorTaskOptions(ctx, WithTaskParams(runParams.Params))...,
+		taskOpts...,
 	)
 
 	taskCtx := logger.WithValues(ctx,
@@ -290,21 +296,26 @@ func (e *SubDAGExecutor) buildCoordinatorRetryTask(
 		return nil, errRootDAGRunNotSet
 	}
 
+	taskOpts, err := e.coordinatorTaskOptions(
+		ctx,
+		WithStep(stepName),
+		WithPreviousStatus(previousStatus),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	task := CreateTask(
 		e.DAG.Name,
 		string(e.DAG.YamlData),
 		coordinatorv1.Operation_OPERATION_RETRY,
 		runParams.RunID,
-		e.coordinatorTaskOptions(
-			ctx,
-			WithStep(stepName),
-			WithPreviousStatus(previousStatus),
-		)...,
+		taskOpts...,
 	)
 	return task, nil
 }
 
-func (e *SubDAGExecutor) coordinatorTaskOptions(ctx context.Context, extra ...TaskOption) []TaskOption {
+func (e *SubDAGExecutor) coordinatorTaskOptions(ctx context.Context, extra ...TaskOption) ([]TaskOption, error) {
 	rCtx := exec.GetContext(ctx)
 
 	// Prefer the sub-DAG base config and fall back to the parent's base config.
@@ -328,8 +339,15 @@ func (e *SubDAGExecutor) coordinatorTaskOptions(ctx context.Context, extra ...Ta
 	if e.externalStepRetry {
 		options = append(options, WithExternalStepRetry(true))
 	}
+	snapshot, err := agentsnapshot.BuildFromContext(ctx, e.DAG)
+	if err != nil {
+		return nil, fmt.Errorf("build distributed agent snapshot: %w", err)
+	}
+	if len(snapshot) > 0 {
+		options = append(options, WithAgentSnapshot(snapshot))
+	}
 	options = append(options, extra...)
-	return options
+	return options, nil
 }
 
 // Cleanup removes any temporary files created for local DAGs.
