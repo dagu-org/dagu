@@ -55,6 +55,53 @@ steps:
 	})
 }
 
+func TestCustomStepTypes_DAGLocalScriptShebang(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("script shebang integration uses /bin/sh and /bin/bash")
+	}
+	if _, err := os.Stat("/bin/bash"); err != nil {
+		t.Skip("/bin/bash is required for the shebang integration test")
+	}
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh is required for the shebang integration test")
+	}
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+name: custom-step-script-shebang
+shell: /bin/sh
+step_types:
+  bash_snippet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      script: |
+        #!/bin/bash
+        msg={{ json .input.message }}
+        parts=("ignored" "$msg")
+        printf '%s\n' "${parts[1]}"
+steps:
+  - name: run-bash-template
+    type: bash_snippet
+    config:
+      message: xxx
+    output: OUT
+`)
+	dag.Agent().RunSuccess(t)
+
+	dag.AssertOutputs(t, map[string]any{
+		"OUT": "xxx",
+	})
+}
+
 func TestCustomStepTypes_BaseConfig(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("direct exec integration uses /bin/echo")
