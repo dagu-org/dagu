@@ -44,10 +44,8 @@ func TestMain(m *testing.M) {
 	for _, t := range []string{"kubernetes", "k8s"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{Command: true})
 	}
-	// archive and gha: support command only
-	for _, t := range []string{"archive", "github_action", "github-action", "gha"} {
-		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{Command: true})
-	}
+	// archive: supports command only
+	core.RegisterExecutorCapabilities("archive", core.ExecutorCapabilities{Command: true})
 	// dag/subworkflow/parallel: support SubDAG and WorkerSelector
 	for _, t := range []string{"dag", "subworkflow", "parallel"} {
 		core.RegisterExecutorCapabilities(t, core.ExecutorCapabilities{
@@ -2017,24 +2015,6 @@ func TestValidateMultipleCommands(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:         "MultipleCommands_GithubActionExecutor_Underscore",
-			executorType: "github_action",
-			commands: []core.CommandEntry{
-				{Command: "actions/checkout@v3"},
-				{Command: "actions/setup-go@v4"},
-			},
-			wantErr: true,
-		},
-		{
-			name:         "MultipleCommands_GithubActionExecutor_Hyphen",
-			executorType: "github-action",
-			commands: []core.CommandEntry{
-				{Command: "actions/checkout@v3"},
-				{Command: "actions/setup-go@v4"},
-			},
-			wantErr: true,
-		},
-		{
 			name:         "MultipleCommands_MailExecutor",
 			executorType: "mail",
 			commands: []core.CommandEntry{
@@ -2154,12 +2134,6 @@ func TestValidateScript(t *testing.T) {
 		{
 			name:         "ScriptWithArchiveExecutor",
 			executorType: "archive",
-			script:       "echo hello",
-			wantErr:      true,
-		},
-		{
-			name:         "ScriptWithGHAExecutor",
-			executorType: "gha",
 			script:       "echo hello",
 			wantErr:      true,
 		},
