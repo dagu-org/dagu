@@ -39,6 +39,7 @@ type fixtureConfig struct {
 	workerCount             int
 	workerLabels            map[string]string
 	logPersistence          bool
+	configMutators          []func(*config.Config)
 	dagsDir                 string
 	baseConfigPath          string
 	workerBaseConfigPath    string // Override worker's base config path (for testing embedded base config)
@@ -70,6 +71,12 @@ func withLabels(labels map[string]string) fixtureOption {
 
 func withLogPersistence() fixtureOption {
 	return func(c *fixtureConfig) { c.logPersistence = true }
+}
+
+func withConfigMutator(mutator func(*config.Config)) fixtureOption {
+	return func(c *fixtureConfig) {
+		c.configMutators = append(c.configMutators, mutator)
+	}
 }
 
 func withDAGsDir(dir string) fixtureOption {
@@ -163,6 +170,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	}
 	if cfg.staleHeartbeatThreshold > 0 || cfg.staleLeaseThreshold > 0 {
 		coordOpts = append(coordOpts, test.WithStaleThresholds(cfg.staleHeartbeatThreshold, cfg.staleLeaseThreshold))
+	}
+	for _, mutate := range cfg.configMutators {
+		coordOpts = append(coordOpts, test.WithConfigMutator(mutate))
 	}
 
 	coord := test.SetupCoordinator(t, coordOpts...)
@@ -335,7 +345,7 @@ func (f *testFixture) startSchedulerWithOptions(
 
 	schedulerCtx, schedulerCancel := f.schedulerCtx, f.schedulerCancel
 	if schedulerCtx == nil || schedulerCancel == nil {
-		schedulerCtx, schedulerCancel = context.WithTimeout(f.coord.Context, startupTimeout)
+		schedulerCtx, schedulerCancel = context.WithCancel(f.coord.Context)
 	}
 	schedulerErrCh := make(chan error, 1)
 
