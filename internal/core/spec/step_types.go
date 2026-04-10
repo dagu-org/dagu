@@ -14,6 +14,8 @@ import (
 	gotemplate "text/template"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/spec/types"
+	"github.com/goccy/go-yaml"
 	"github.com/google/jsonschema-go/jsonschema"
 )
 
@@ -74,27 +76,6 @@ var builtinStepTypeNames = map[string]struct{}{
 	"ssh":           {},
 	"subworkflow":   {},
 	"template":      {},
-}
-
-var customStepAllowedCallSiteFields = map[string]struct{}{
-	"approval":        {},
-	"continue_on":     {},
-	"depends":         {},
-	"description":     {},
-	"env":             {},
-	"id":              {},
-	"log_output":      {},
-	"mail_on_error":   {},
-	"name":            {},
-	"output":          {},
-	"preconditions":   {},
-	"repeat_policy":   {},
-	"retry_policy":    {},
-	"signal_on_stop":  {},
-	"stderr":          {},
-	"stdout":          {},
-	"timeout_sec":     {},
-	"worker_selector": {},
 }
 
 var customStepForbiddenCallSiteFields = map[string]struct{}{
@@ -457,21 +438,19 @@ func buildCustomStepFromSpec(
 			err,
 		)
 	}
-	if expandedType := expandedCustomStepExecutorType(customType.Type, rendered); expandedType != "" {
-		rendered["type"] = expandedType
+	mergedRaw, err := mergeCustomStepRaw(rendered, callSite, raw, customType, forcedName)
+	if err != nil {
+		return nil, fmt.Errorf("step type %q: %w", customType.Name, err)
 	}
 
-	expandedSpec, err := decodeStep(rendered)
+	expandedSpec, err := decodeStep(mergedRaw)
 	if err != nil {
 		return nil, fmt.Errorf("step type %q: failed to decode expanded template: %w", customType.Name, err)
 	}
-	applyDefaults(expandedSpec, defs, rendered)
+	applyDefaults(expandedSpec, defs, mergedRaw)
 	builtStep, err := buildConcreteStep(ctx, expandedSpec)
 	if err != nil {
 		return nil, fmt.Errorf("step type %q (resolves to %q): %w", customType.Name, customType.Type, err)
-	}
-	if err := applyCustomStepCallSiteOverrides(ctx, builtStep, callSite, raw, forcedName); err != nil {
-		return nil, fmt.Errorf("step type %q: %w", customType.Name, err)
 	}
 	if builtStep.ExecutorConfig.Metadata == nil {
 		builtStep.ExecutorConfig.Metadata = make(map[string]any, 1)
@@ -481,6 +460,107 @@ func buildCustomStepFromSpec(
 		builtStep.Description = customType.Description
 	}
 	return builtStep, nil
+}
+
+func mergeCustomStepRaw(
+	rendered map[string]any,
+	callSite *step,
+	raw map[string]any,
+	customType *customStepType,
+	forcedName bool,
+) (map[string]any, error) {
+	merged := cloneMap(rendered)
+	if expandedType := expandedCustomStepExecutorType(customType.Type, rendered); expandedType != "" {
+		merged["type"] = expandedType
+	}
+
+	callSiteRaw, err := customStepCallSiteRaw(callSite, raw, forcedName)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range callSiteRaw {
+		switch key {
+		case "config", "type":
+			continue
+		case "env":
+			combined, err := mergeCustomStepEnvRaw(merged[key], value)
+			if err != nil {
+				return nil, core.NewValidationError("env", value, err)
+			}
+			merged[key] = combined
+		case "preconditions":
+			if current := merged[key]; current != nil {
+				merged[key] = combinePreconditions(current, cloneAny(value))
+			} else {
+				merged[key] = cloneAny(value)
+			}
+		default:
+			merged[key] = cloneAny(value)
+		}
+	}
+
+	return merged, nil
+}
+
+func customStepCallSiteRaw(callSite *step, raw map[string]any, forcedName bool) (map[string]any, error) {
+	if raw != nil {
+		cloned := cloneMap(raw)
+		if forcedName && callSite != nil {
+			cloned["name"] = callSite.Name
+		}
+		return cloned, nil
+	}
+	if callSite == nil {
+		return nil, nil
+	}
+
+	yamlBytes, err := yaml.Marshal(callSite)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal custom step call site: %w", err)
+	}
+
+	var decoded map[string]any
+	if err := yaml.Unmarshal(yamlBytes, &decoded); err != nil {
+		return nil, fmt.Errorf("failed to decode custom step call site: %w", err)
+	}
+	if forcedName {
+		decoded["name"] = callSite.Name
+	}
+	return decoded, nil
+}
+
+func mergeCustomStepEnvRaw(base, override any) (any, error) {
+	switch {
+	case base == nil:
+		return cloneAny(override), nil
+	case override == nil:
+		return cloneAny(base), nil
+	}
+
+	baseEnv, err := decodeViaYAML[types.EnvValue](base)
+	if err != nil {
+		return nil, fmt.Errorf("invalid template env: %w", err)
+	}
+	overrideEnv, err := decodeViaYAML[types.EnvValue](override)
+	if err != nil {
+		return nil, fmt.Errorf("invalid call-site env: %w", err)
+	}
+
+	combined := overrideEnv.Prepend(baseEnv)
+	return envValueToRaw(combined), nil
+}
+
+func envValueToRaw(value types.EnvValue) any {
+	entries := value.Entries()
+	if len(entries) == 0 {
+		return nil
+	}
+
+	raw := make([]any, 0, len(entries))
+	for _, entry := range entries {
+		raw = append(raw, map[string]any{entry.Key: entry.Value})
+	}
+	return raw
 }
 
 func validateCustomStepCallSiteFields(callSite *step, raw map[string]any) error {
@@ -542,215 +622,4 @@ func validateCustomStepCallSiteFields(callSite *step, raw map[string]any) error 
 		return core.NewValidationError("value", callSite.Value, fmt.Errorf("field %q is not allowed when using a custom step type", "value"))
 	}
 	return nil
-}
-
-func applyCustomStepCallSiteOverrides(
-	ctx StepBuildContext,
-	dst *core.Step,
-	callSite *step,
-	raw map[string]any,
-	forcedName bool,
-) error {
-	presence := resolveCustomStepCallSitePresence(raw, callSite, forcedName)
-	if presence["name"] {
-		dst.Name = strings.TrimSpace(callSite.Name)
-	}
-	if presence["id"] {
-		dst.ID = strings.TrimSpace(callSite.ID)
-	}
-	if presence["description"] {
-		dst.Description = strings.TrimSpace(callSite.Description)
-	}
-	if presence["stdout"] {
-		dst.Stdout = strings.TrimSpace(callSite.Stdout)
-	}
-	if presence["stderr"] {
-		dst.Stderr = strings.TrimSpace(callSite.Stderr)
-	}
-	if presence["log_output"] {
-		logOutput, err := buildStepLogOutput(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.LogOutput = logOutput
-	}
-	if presence["depends"] {
-		depends, err := buildStepDepends(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.Depends = depends
-		explicitNoDeps, err := buildStepExplicitlyNoDeps(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.ExplicitlyNoDeps = explicitNoDeps
-	}
-	if presence["continue_on"] {
-		continueOn, err := buildStepContinueOn(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.ContinueOn = continueOn
-	}
-	if presence["retry_policy"] {
-		retryPolicy, err := buildStepRetryPolicy(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.RetryPolicy = retryPolicy
-	}
-	if presence["repeat_policy"] {
-		repeatPolicy, err := buildStepRepeatPolicy(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.RepeatPolicy = repeatPolicy
-	}
-	if presence["mail_on_error"] {
-		dst.MailOnError = callSite.MailOnError
-	}
-	if presence["preconditions"] {
-		preconditions, err := buildStepPreconditions(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.Preconditions = append(dst.Preconditions, preconditions...)
-	}
-	if presence["signal_on_stop"] {
-		signalOnStop, err := buildStepSignalOnStop(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.SignalOnStop = signalOnStop
-	}
-	if presence["env"] {
-		envs, err := buildStepEnvs(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.Env = append(dst.Env, envs...)
-	}
-	if presence["timeout_sec"] {
-		timeout, err := buildStepTimeout(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.Timeout = timeout
-	}
-	if presence["worker_selector"] {
-		workerSelector, err := buildStepWorkerSelector(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.WorkerSelector = workerSelector
-	}
-	if presence["output"] {
-		output, err := buildStepOutput(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.Output = output
-		outputKey, err := buildStepOutputKey(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.OutputKey = outputKey
-		outputOmit, err := buildStepOutputOmit(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.OutputOmit = outputOmit
-		outputSchema, err := buildStepOutputSchema(ctx, callSite)
-		if err != nil {
-			return err
-		}
-		dst.OutputSchema = outputSchema
-	}
-	if presence["approval"] {
-		temp := &core.Step{}
-		if err := buildStepApproval(ctx, callSite, temp); err != nil {
-			return err
-		}
-		dst.Approval = temp.Approval
-	}
-	return nil
-}
-
-func resolveCustomStepCallSitePresence(raw map[string]any, callSite *step, forcedName bool) map[string]bool {
-	presence := make(map[string]bool, len(customStepAllowedCallSiteFields))
-	hasRaw := func(key string) bool {
-		if raw == nil {
-			return false
-		}
-		_, ok := raw[key]
-		return ok
-	}
-
-	for key := range customStepAllowedCallSiteFields {
-		presence[key] = hasRaw(key)
-	}
-	if forcedName {
-		presence["name"] = true
-	}
-	if callSite == nil {
-		return presence
-	}
-	if raw == nil {
-		if strings.TrimSpace(callSite.Name) != "" {
-			presence["name"] = true
-		}
-		if strings.TrimSpace(callSite.ID) != "" {
-			presence["id"] = true
-		}
-		if strings.TrimSpace(callSite.Description) != "" {
-			presence["description"] = true
-		}
-		if strings.TrimSpace(callSite.Stdout) != "" {
-			presence["stdout"] = true
-		}
-		if strings.TrimSpace(callSite.Stderr) != "" {
-			presence["stderr"] = true
-		}
-		if !callSite.LogOutput.IsZero() {
-			presence["log_output"] = true
-		}
-		if !callSite.Depends.IsZero() {
-			presence["depends"] = true
-		}
-		if !callSite.ContinueOn.IsZero() {
-			presence["continue_on"] = true
-		}
-		if callSite.RetryPolicy != nil {
-			presence["retry_policy"] = true
-		}
-		if callSite.RepeatPolicy != nil {
-			presence["repeat_policy"] = true
-		}
-		if callSite.MailOnError {
-			presence["mail_on_error"] = true
-		}
-		if callSite.Preconditions != nil {
-			presence["preconditions"] = true
-		}
-		if callSite.SignalOnStop != nil {
-			presence["signal_on_stop"] = true
-		}
-		if !callSite.Env.IsZero() {
-			presence["env"] = true
-		}
-		if callSite.TimeoutSec != 0 {
-			presence["timeout_sec"] = true
-		}
-		if len(callSite.WorkerSelector) > 0 {
-			presence["worker_selector"] = true
-		}
-		if callSite.Output != nil {
-			presence["output"] = true
-		}
-		if callSite.Approval != nil {
-			presence["approval"] = true
-		}
-	}
-	return presence
 }
