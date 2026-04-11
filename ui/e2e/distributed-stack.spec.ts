@@ -4,6 +4,8 @@ const DAG_FILE = 'e2e-distributed-queue.yaml';
 const DAG_NAME = 'e2e-distributed-queue';
 const QUEUE_NAME = 'e2e-shared';
 const WORKER_ID = 'worker-1';
+const STEP_NAME = 'hold-and-report';
+const EXPECTED_STEP_OUTPUT = 'e2e distributed worker ok';
 
 type QueueDetails = {
   name: string;
@@ -21,7 +23,11 @@ type WorkersResponse = {
   }>;
 };
 
-test('exercises the web UI against the real distributed queue stack', async ({
+type LogResponse = {
+  content: string;
+};
+
+test('exercises the web UI against the real distributed shared-nothing worker stack', async ({
   page,
   request,
 }) => {
@@ -121,6 +127,18 @@ test('exercises the web UI against the real distributed queue stack', async ({
     page.getByText('No DAG runs are currently executing in this queue.')
   ).toBeVisible();
   await expect(page.getByText('No queued items in this queue.')).toBeVisible();
+
+  // Shared-nothing workers execute remotely and expose step logs through the coordinator.
+  await expect
+    .poll(() => getStepStdout(request, firstRunId), {
+      timeout: 30_000,
+    })
+    .toContain(EXPECTED_STEP_OUTPUT);
+  await expect
+    .poll(() => getStepStdout(request, secondRunId), {
+      timeout: 30_000,
+    })
+    .toContain(EXPECTED_STEP_OUTPUT);
 });
 
 async function enqueueRunFromUI(page: Page): Promise<string> {
@@ -174,6 +192,20 @@ async function getWorkers(
   const response = await request.get('/api/v1/workers');
   expect(response.ok()).toBeTruthy();
   return (await response.json()) as WorkersResponse;
+}
+
+async function getStepStdout(
+  request: APIRequestContext,
+  dagRunId: string
+): Promise<string> {
+  const response = await request.get(
+    `/api/v1/dag-runs/${encodeURIComponent(DAG_NAME)}/${encodeURIComponent(
+      dagRunId
+    )}/steps/${encodeURIComponent(STEP_NAME)}/log?stream=stdout`
+  );
+  expect(response.ok()).toBeTruthy();
+  const body = (await response.json()) as LogResponse;
+  return body.content;
 }
 
 async function waitForWorkerState(

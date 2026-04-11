@@ -55,6 +55,7 @@ worker:
   health_port: 0
   labels:
     role: e2e
+  # Static coordinator discovery forces the worker down the shared-nothing path.
   coordinators:
     - 127.0.0.1:${COORDINATOR_PORT}
 scheduler:
