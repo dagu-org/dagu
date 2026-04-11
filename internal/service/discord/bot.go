@@ -212,9 +212,15 @@ func (b *Bot) handleMessageCreate(ctx context.Context, m *discordgo.MessageCreat
 		return
 	}
 
+	var pendingPrompt string
+	if cs, ok := b.getChat(channelID); ok {
+		pendingPrompt = cs.PendingPromptID()
+	}
+
 	// In guild channels, when respond_to_all is disabled, only handle
-	// messages that @mention the bot.
-	if !isDM && !b.cfg.RespondToAll && !wasMentioned {
+	// messages that @mention the bot. Pending prompt replies are the only
+	// exception so button flows can be completed with plain text.
+	if !isDM && !b.cfg.RespondToAll && !wasMentioned && pendingPrompt == "" {
 		return
 	}
 
@@ -229,7 +235,6 @@ func (b *Bot) handleMessageCreate(ctx context.Context, m *discordgo.MessageCreat
 		}
 	}
 
-	pendingPrompt := cs.PendingPromptID()
 	if pendingPrompt != "" {
 		b.submitPromptResponse(ctx, cs, channelID, pendingPrompt, text)
 		return
@@ -260,8 +265,9 @@ func (b *Bot) handleInteractionCreate(ctx context.Context, i *discordgo.Interact
 	sid, ownerUID := cs.ActiveSession()
 	cs.ClearPendingPrompt()
 
+	b.ackInteraction(i.Interaction)
+
 	if sid == "" {
-		b.ackInteraction(i.Interaction)
 		return
 	}
 
@@ -277,29 +283,31 @@ func (b *Bot) handleInteractionCreate(ctx context.Context, i *discordgo.Interact
 			slog.String("prompt", promptID),
 			slog.String("error", err.Error()),
 		)
-		b.ackInteraction(i.Interaction)
 		b.sendText(channelID, fmt.Sprintf("Failed to submit response: %s", err.Error()))
 		return
 	}
 
+	b.updateInteractionMessage(channelID, i.Message, optionID)
+}
+
+func (b *Bot) updateInteractionMessage(channelID string, msg *discordgo.Message, optionID string) {
 	// Update the original message in-place to show the selection and remove
 	// the now-consumed buttons.
 	updatedContent := ""
-	if i.Message != nil {
-		updatedContent = i.Message.Content + "\n\nSelected: " + optionID
+	if msg != nil {
+		updatedContent = msg.Content + "\n\nSelected: " + optionID
 	} else {
 		updatedContent = "Selected: " + optionID
 	}
 
 	emptyComponents := []discordgo.MessageComponent{}
-	err := b.client.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseUpdateMessage,
-		Data: &discordgo.InteractionResponseData{
-			Content:    updatedContent,
-			Components: emptyComponents,
-		},
-	})
-	if err != nil {
+	if msg == nil {
+		return
+	}
+
+	edit := discordgo.NewMessageEdit(channelID, msg.ID).SetContent(updatedContent)
+	edit.Components = &emptyComponents
+	if _, err := b.client.ChannelMessageEditComplex(edit); err != nil {
 		b.logger.Warn("Failed to update interaction message", slog.String("error", err.Error()))
 	}
 }
@@ -784,6 +792,20 @@ func (b *Bot) getOrCreateChat(channelID string) *chatState {
 	return val.(*chatState)
 }
 
+func (b *Bot) getOrCreateNotificationChat(channelID string) *chatState {
+	key := notificationChatKey(channelID)
+	val, _ := b.chats.LoadOrStore(key, &chatState{channelID: channelID})
+	return val.(*chatState)
+}
+
+func (b *Bot) getChat(channelID string) (*chatState, bool) {
+	val, ok := b.chats.Load(channelID)
+	if !ok {
+		return nil, false
+	}
+	return val.(*chatState), true
+}
+
 // resetChat clears the session state for a chat.
 func (b *Bot) resetChat(cs *chatState) {
 	if cancel := cs.Reset(); cancel != nil {
@@ -815,6 +837,10 @@ func (b *Bot) clearPendingMessages(cs *chatState) {
 
 func (b *Bot) subscriptionActive(cs *chatState, sessionID string) bool {
 	return cs.SubscriptionActive(sessionID)
+}
+
+func notificationChatKey(channelID string) string {
+	return "notifications:" + channelID
 }
 
 // ---------------------------------------------------------------------------

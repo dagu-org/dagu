@@ -91,7 +91,7 @@ func (m *DAGRunMonitor) FlushNotificationBatch(ctx context.Context, channelID st
 // flushChannel appends the notification batch into the channel-scoped session.
 func (m *DAGRunMonitor) flushChannel(ctx context.Context, channelID string, batch chatbridge.NotificationBatch, allowLLM bool) bool {
 	user := m.bot.userIdentity(channelID)
-	cs := m.bot.getOrCreateChat(channelID)
+	cs := m.bot.getOrCreateNotificationChat(channelID)
 	sessionID := m.currentSessionID(cs)
 	msg := m.buildNotificationMessage(ctx, sessionID, user, batch, allowLLM)
 	sessionID, stored, ok := m.appendNotification(ctx, cs, sessionID, user, chatbridge.NotificationBatchDAGName(batch), msg)
