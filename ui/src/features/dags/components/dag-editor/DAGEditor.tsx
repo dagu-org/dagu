@@ -3,6 +3,7 @@
  *
  * @module features/dags/components/dag-editor
  */
+import type { JSONSchema } from '@/lib/schema-utils';
 import { cn } from '@/lib/utils';
 import MonacoEditor, { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
@@ -11,7 +12,6 @@ import {
   type JSONSchema as MonacoJSONSchema,
 } from 'monaco-yaml';
 import { useEffect, useRef } from 'react';
-import type { JSONSchema } from '@/lib/schema-utils';
 
 // Get schema URL from config (getConfig() is available at module load time)
 declare function getConfig(): { basePath: string };

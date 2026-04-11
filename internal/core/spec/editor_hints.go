@@ -53,14 +53,26 @@ func InheritedCustomStepTypeEditorHints(baseConfig []byte) ([]CustomStepTypeEdit
 	hints := make([]CustomStepTypeEditorHint, 0, len(names))
 	for _, name := range names {
 		entry := registry.entries[name]
-		hint, ok, err := editorHintForCustomStepType(entry)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
+		if entry == nil || entry.InputSchema == nil || entry.InputSchema.Schema() == nil {
 			continue
 		}
-		hints = append(hints, hint)
+
+		schemaData, err := json.Marshal(entry.InputSchema.Schema())
+		if err != nil {
+			return nil, fmt.Errorf("marshal input schema for %q: %w", entry.Name, err)
+		}
+
+		var schemaMap map[string]any
+		if err := json.Unmarshal(schemaData, &schemaMap); err != nil {
+			return nil, fmt.Errorf("unmarshal input schema for %q: %w", entry.Name, err)
+		}
+
+		hints = append(hints, CustomStepTypeEditorHint{
+			Name:        entry.Name,
+			TargetType:  entry.Type,
+			Description: entry.Description,
+			InputSchema: schemaMap,
+		})
 	}
 
 	return hints, nil

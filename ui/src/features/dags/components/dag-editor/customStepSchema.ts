@@ -1,9 +1,9 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import type { components } from '../../../../api/v1/schema';
-import { parse as parseYaml } from 'yaml';
 import { dereferenceSchema, type JSONSchema } from '@/lib/schema-utils';
+import { parse as parseYaml } from 'yaml';
+import type { components } from '../../../../api/v1/schema';
 
 export interface EditorCustomStepTypeHint {
   name: string;
@@ -212,7 +212,10 @@ function collectStepSchemaPaths(schema: JSONSchema): string[][] {
   const pathMap = new Map<string, string[]>();
 
   visitSchemas(schema, (candidate, path) => {
-    if (candidate.$ref === '#/definitions/step' || isStepSchemaCandidate(candidate)) {
+    if (
+      candidate.$ref === '#/definitions/step' ||
+      isStepSchemaCandidate(candidate)
+    ) {
       pathMap.set(path.join('/'), path);
     }
   });

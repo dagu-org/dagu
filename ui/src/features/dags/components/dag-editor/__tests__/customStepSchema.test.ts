@@ -1,18 +1,18 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { describe, expect, it } from 'vitest';
-import {
-  buildAugmentedDAGSchema,
-  extractLocalCustomStepTypeHints,
-  mergeCustomStepTypeHints,
-} from '../customStepSchema';
 import {
   dereferenceSchema,
   getSchemaAtPath,
   toPropertyInfo,
   type JSONSchema,
 } from '@/lib/schema-utils';
+import { describe, expect, it } from 'vitest';
+import {
+  buildAugmentedDAGSchema,
+  extractLocalCustomStepTypeHints,
+  mergeCustomStepTypeHints,
+} from '../customStepSchema';
 
 const baseSchema: JSONSchema = {
   type: 'object',
@@ -178,11 +178,11 @@ steps:
   - type: greet
 `
     );
-    const propertyInfo = toPropertyInfo(
-      typeSchema,
+    const propertyInfo = toPropertyInfo(typeSchema, 'type', [
+      'steps',
+      '0',
       'type',
-      ['steps', '0', 'type']
-    );
+    ]);
 
     expect(propertyInfo?.enum).toEqual(
       expect.arrayContaining(['command', 'greet'])
@@ -304,10 +304,11 @@ steps:
       },
     });
 
-    const valueSchema = getSchemaAtPath(
-      recursiveSchema,
-      ['node', 'next', 'value']
-    );
+    const valueSchema = getSchemaAtPath(recursiveSchema, [
+      'node',
+      'next',
+      'value',
+    ]);
     const propertyInfo = toPropertyInfo(
       recursiveSchema.properties?.node as JSONSchema,
       'node',

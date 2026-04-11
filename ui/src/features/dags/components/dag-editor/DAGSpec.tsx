@@ -27,7 +27,6 @@ import LoadingIndicator from '../../../../ui/LoadingIndicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
 import { FlowchartType, Graph } from '../visualization';
-import DAGAttributes from './DAGAttributes';
 import {
   buildAugmentedDAGSchema,
   customStepTypeHintsEqual,
@@ -35,6 +34,7 @@ import {
   mergeCustomStepTypeHints,
   toInheritedCustomStepTypeHints,
 } from './customStepSchema';
+import DAGAttributes from './DAGAttributes';
 import DAGEditorWithDocs from './DAGEditorWithDocs';
 import ExternalChangeDialog from './ExternalChangeDialog';
 
