@@ -54,13 +54,18 @@ function EditorSkeleton({ className }: { className?: string }) {
  * DAGSpecReadOnly fetches and displays a DAG specification in readonly mode
  * with the Schema Documentation sidebar available for reference.
  */
-function DAGSpecReadOnly({ dagName, dagRunId, subDAGRunId, className }: DAGSpecReadOnlyProps) {
+function DAGSpecReadOnly({
+  dagName,
+  dagRunId,
+  subDAGRunId,
+  className,
+}: DAGSpecReadOnlyProps) {
   const appBarContext = React.useContext(AppBarContext);
 
   // Select endpoint based on whether this is a subdag
   const endpoint = subDAGRunId
-    ? '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/spec' as const
-    : '/dag-runs/{name}/{dagRunId}/spec' as const;
+    ? ('/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/spec' as const)
+    : ('/dag-runs/{name}/{dagRunId}/spec' as const);
 
   // Build path params conditionally
   const pathParams = subDAGRunId
@@ -103,6 +108,11 @@ function DAGSpecReadOnly({ dagName, dagRunId, subDAGRunId, className }: DAGSpecR
       value={data.spec}
       readOnly={true}
       className={className}
+      modelUri={`inmemory://dagu/dag-runs/${encodeURIComponent(
+        dagName
+      )}/${encodeURIComponent(dagRunId)}/${encodeURIComponent(
+        subDAGRunId ?? 'root'
+      )}.yaml`}
     />
   );
 }

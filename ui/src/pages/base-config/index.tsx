@@ -125,11 +125,12 @@ function BaseConfigPage(): React.ReactNode {
 
       <DAGEditorWithDocs
         value={
-          editable ? currentValue ?? data?.spec ?? '' : data?.spec ?? ''
+          editable ? (currentValue ?? data?.spec ?? '') : (data?.spec ?? '')
         }
         readOnly={!editable}
         onChange={editable ? handleChange : undefined}
         className="min-h-[400px]"
+        modelUri="inmemory://dagu/base-config.yaml"
         headerActions={
           editable ? (
             <>

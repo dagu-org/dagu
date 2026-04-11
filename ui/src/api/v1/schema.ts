@@ -3215,6 +3215,24 @@ export interface components {
             tags?: string[];
             runConfig?: components["schemas"]["RunConfig"];
         };
+        /** @description Editor-only metadata used to synthesize per-document schema hints */
+        DAGEditorHints: {
+            /** @description Custom step types inherited from base config and available to the current DAG */
+            inheritedCustomStepTypes: components["schemas"]["InheritedCustomStepTypeHint"][];
+        };
+        /** @description Resolved editor hint for an inherited custom step type */
+        InheritedCustomStepTypeHint: {
+            /** @description Custom step type name */
+            name: string;
+            /** @description Builtin executor type that the custom step expands to */
+            targetType: string;
+            /** @description Optional custom step description */
+            description?: string;
+            /** @description Resolved JSON Schema object used to validate and document config input */
+            inputSchema: {
+                [key: string]: unknown;
+            };
+        };
         /** @description Scalar parameter value */
         ParamScalar: string | number | boolean;
         /** @description Typed metadata for a single DAG parameter */
@@ -5965,6 +5983,7 @@ export interface operations {
                         errors: string[];
                         /** @description The DAG specification in YAML format */
                         spec?: string;
+                        editorHints?: components["schemas"]["DAGEditorHints"];
                     };
                 };
             };

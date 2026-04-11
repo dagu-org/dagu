@@ -1,4 +1,4 @@
-import type { JSONSchema } from '@/lib/schema-utils';
+import { dereferenceSchema, type JSONSchema } from '@/lib/schema-utils';
 import React, {
   createContext,
   useContext,
@@ -28,52 +28,6 @@ const SchemaContext = createContext<SchemaContextValue>({
 // Cache the dereferenced schema at module level
 let cachedSchema: JSONSchema | null = null;
 let cachePromise: Promise<JSONSchema> | null = null;
-
-/**
- * Resolves all $ref pointers in a JSON Schema
- * Only handles internal references (#/definitions/...)
- */
-function dereferenceSchema(schema: JSONSchema): JSONSchema {
-  const definitions = schema.definitions || {};
-
-  function resolveRef(ref: string): JSONSchema {
-    if (!ref.startsWith('#/definitions/')) {
-      return {};
-    }
-    const defName = ref.replace('#/definitions/', '');
-    return definitions[defName] || {};
-  }
-
-  function processNode(node: unknown): unknown {
-    if (!node || typeof node !== 'object') {
-      return node;
-    }
-
-    if (Array.isArray(node)) {
-      return node.map(processNode);
-    }
-
-    const obj = node as Record<string, unknown>;
-
-    // If node has $ref, replace with resolved reference
-    if (typeof obj.$ref === 'string') {
-      const resolved = resolveRef(obj.$ref);
-      // Merge with any other properties (like description overrides)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { $ref: _ref, ...rest } = obj;
-      return processNode({ ...resolved, ...rest });
-    }
-
-    // Process all properties recursively
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = processNode(value);
-    }
-    return result;
-  }
-
-  return processNode(schema) as JSONSchema;
-}
 
 async function loadAndDereferenceSchema(): Promise<JSONSchema> {
   if (cachedSchema) {

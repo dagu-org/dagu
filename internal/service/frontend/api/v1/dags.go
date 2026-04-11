@@ -427,7 +427,57 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 		LocalDags:    localDAGs,
 		Errors:       extractBuildErrors(dag.BuildErrors),
 		Spec:         &yamlSpec,
+		EditorHints:  a.buildDAGEditorHints(ctx, dag, fileName),
 	}, nil
+}
+
+func (a *API) buildDAGEditorHints(ctx context.Context, dag *core.DAG, fileName string) *api.DAGEditorHints {
+	baseConfigData := dag.BaseConfigData
+	if len(baseConfigData) == 0 && a.config.Paths.BaseConfig != "" {
+		raw, err := os.ReadFile(a.config.Paths.BaseConfig) //nolint:gosec
+		switch {
+		case err == nil:
+			baseConfigData = raw
+		case errors.Is(err, os.ErrNotExist):
+			// No base config is a valid state.
+		default:
+			logger.Warn(ctx, "Failed to read base config for DAG editor hints",
+				slog.String("dagFile", fileName),
+				tag.Error(err),
+			)
+			return nil
+		}
+	}
+
+	hints, err := spec.InheritedCustomStepTypeEditorHints(baseConfigData)
+	if err != nil {
+		logger.Warn(ctx, "Failed to build inherited custom step editor hints",
+			slog.String("dagFile", fileName),
+			tag.Error(err),
+		)
+		return nil
+	}
+	if len(hints) == 0 {
+		return nil
+	}
+
+	editorHints := make([]api.InheritedCustomStepTypeHint, 0, len(hints))
+	for _, hint := range hints {
+		apiHint := api.InheritedCustomStepTypeHint{
+			InputSchema: hint.InputSchema,
+			Name:        hint.Name,
+			TargetType:  hint.TargetType,
+		}
+		if hint.Description != "" {
+			desc := hint.Description
+			apiHint.Description = &desc
+		}
+		editorHints = append(editorHints, apiHint)
+	}
+
+	return &api.DAGEditorHints{
+		InheritedCustomStepTypes: editorHints,
+	}
 }
 
 // extractBuildErrors converts a slice of errors to a slice of strings.
