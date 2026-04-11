@@ -1017,4 +1017,3 @@ func TestDelegateTool_ParentTracksDelegate(t *testing.T) {
 	assert.Equal(t, DelegateStatusCompleted, delegates[0].Status)
 	assert.Equal(t, "track delegate", delegates[0].Task)
 }
-

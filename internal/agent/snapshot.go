@@ -36,9 +36,9 @@ var (
 // Snapshot carries execution-scoped agent settings for distributed workers.
 type Snapshot struct {
 	Version int             `json:"version"`
-	Config *Config        `json:"config,omitempty"`
-	Models []*ModelConfig `json:"models,omitempty"`
-	Souls  []*Soul        `json:"souls,omitempty"`
+	Config  *Config         `json:"config,omitempty"`
+	Models  []*ModelConfig  `json:"models,omitempty"`
+	Souls   []*Soul         `json:"souls,omitempty"`
 	Memory  *MemorySnapshot `json:"memory,omitempty"`
 }
 

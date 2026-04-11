@@ -99,8 +99,8 @@ type SessionManagerConfig struct {
 	InputCostPer1M  float64
 	OutputCostPer1M float64
 	ThinkingEffort  llm.ThinkingEffort
-	MemoryStore MemoryStore
-	DAGName     string
+	MemoryStore     MemoryStore
+	DAGName         string
 	SessionStore    SessionStore
 	// ParentSessionID links this session to its parent (non-empty = sub-session).
 	ParentSessionID string
@@ -817,7 +817,7 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		RecordMessage: sm.createRecordMessageFunc(),
 		Logger:        sm.logger,
 		SystemPrompt: GenerateSystemPrompt(SystemPromptParams{
-			Env:  sm.environment,
+			Env:    sm.environment,
 			Memory: memory,
 			Role:   sm.user.Role,
 			Soul:   sm.soul,

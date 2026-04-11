@@ -45,8 +45,8 @@ const soulPlaceholder = "\x00__SOUL_CONTENT__\x00"
 // systemPromptData contains all data for template rendering.
 type systemPromptData struct {
 	EnvironmentInfo
-	CurrentDAG      *CurrentDAG
-	Memory          MemoryContent
+	CurrentDAG  *CurrentDAG
+	Memory      MemoryContent
 	User        *UserCapabilities
 	SoulContent string
 }
@@ -82,8 +82,8 @@ func GenerateSystemPrompt(p SystemPromptParams) string {
 		EnvironmentInfo: env,
 		CurrentDAG:      currentDAG,
 		Memory:          memory,
-		User:        buildUserCapabilities(role),
-		SoulContent: templateSoulContent,
+		User:            buildUserCapabilities(role),
+		SoulContent:     templateSoulContent,
 	}
 	if err := systemPromptTemplate.Execute(&buf, data); err != nil {
 		return fallbackPrompt(env)

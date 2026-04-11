@@ -227,15 +227,15 @@ func (e *Executor) Run(ctx context.Context) error {
 	webSearch := resolveWebSearch(stepCfg, agentCfg)
 
 	loop := agent.NewLoop(agent.LoopConfig{
-		Provider:      provider,
-		Model:         modelCfg.Model,
-		Tools:         tools,
-		History:       contextToLLMHistory(e.contextMessages),
-		SystemPrompt:  systemPrompt,
-		SafeMode:      safeMode,
-		Hooks:         hooks,
-		Logger:        slog.Default(),
-		WebSearch: webSearch,
+		Provider:     provider,
+		Model:        modelCfg.Model,
+		Tools:        tools,
+		History:      contextToLLMHistory(e.contextMessages),
+		SystemPrompt: systemPrompt,
+		SafeMode:     safeMode,
+		Hooks:        hooks,
+		Logger:       slog.Default(),
+		WebSearch:    webSearch,
 		RecordMessage: func(_ context.Context, msg agent.Message) {
 			logMessage(stderr, msg)
 			converted := convertMessage(msg, modelCfg)

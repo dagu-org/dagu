@@ -495,16 +495,16 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	var delegate *DelegateContext
 	if tc.Function.Name == delegateToolName && l.registry != nil {
 		delegate = &DelegateContext{
-			Provider:      provider,
-			Model:         model,
-			SystemPrompt:  l.systemPrompt,
-			Tools:         l.tools,
-			Hooks:         l.hooks,
-			Logger:        l.logger,
-			SessionStore:  l.sessionStore,
-			ParentID:      l.sessionID,
-			User:          user,
-			Registry:      l.registry,
+			Provider:     provider,
+			Model:        model,
+			SystemPrompt: l.systemPrompt,
+			Tools:        l.tools,
+			Hooks:        l.hooks,
+			Logger:       l.logger,
+			SessionStore: l.sessionStore,
+			ParentID:     l.sessionID,
+			User:         user,
+			Registry:     l.registry,
 		}
 	}
 

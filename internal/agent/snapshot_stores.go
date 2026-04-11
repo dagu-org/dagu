@@ -48,8 +48,8 @@ func NewSnapshotStores(snapshot *Snapshot) SnapshotStores {
 
 	stores := SnapshotStores{
 		ConfigStore: NewSnapshotConfigStore(snapshot.Config),
-		ModelStore: NewSnapshotModelStore(snapshot.Models),
-		SoulStore:  NewSnapshotSoulStore(snapshot.Souls),
+		ModelStore:  NewSnapshotModelStore(snapshot.Models),
+		SoulStore:   NewSnapshotSoulStore(snapshot.Souls),
 	}
 	if snapshot.Memory != nil {
 		stores.MemoryStore = NewSnapshotMemoryStore(snapshot.Memory)
