@@ -330,6 +330,9 @@ func TestLoad_Env(t *testing.T) {
 			Slack: SlackBotConfig{
 				InterestedEventTypes: DefaultBotInterestedEventTypes,
 			},
+			Discord: DiscordBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+			},
 		},
 		DefaultExecMode: ExecutionModeLocal,
 		Warnings:        nil,
@@ -758,6 +761,9 @@ scheduler:
 				InterestedEventTypes: DefaultBotInterestedEventTypes,
 			},
 			Slack: SlackBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+			},
+			Discord: DiscordBotConfig{
 				InterestedEventTypes: DefaultBotInterestedEventTypes,
 			},
 		},

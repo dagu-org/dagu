@@ -1166,6 +1166,7 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	cfg.Bots.SafeMode = true
 	cfg.Bots.Telegram.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
 	cfg.Bots.Slack.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
+	cfg.Bots.Discord.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
 
 	// Check env var override for provider
 	if provider := l.v.GetString("bots.provider"); provider != "" {
@@ -1235,6 +1236,33 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		}
 		if def.Bots.Slack.RespondToAll != nil {
 			cfg.Bots.Slack.RespondToAll = *def.Bots.Slack.RespondToAll
+		}
+	}
+
+	// Default Discord respond_to_all to true
+	cfg.Bots.Discord.RespondToAll = true
+
+	// Check env var override for Discord token
+	if token := l.v.GetString("bots.discord.token"); token != "" {
+		cfg.Bots.Discord.Token = token
+	}
+	if raw, ok := lookupInterestedEventTypesEnv("BOTS_DISCORD_INTERESTED_EVENT_TYPES"); ok {
+		cfg.Bots.Discord.InterestedEventTypes = parseInterestedEventTypes(raw)
+	}
+
+	if def.Bots.Discord != nil {
+		if cfg.Bots.Discord.Token == "" {
+			cfg.Bots.Discord.Token = def.Bots.Discord.Token
+		}
+		if len(def.Bots.Discord.AllowedChannelIDs) > 0 {
+			cfg.Bots.Discord.AllowedChannelIDs = def.Bots.Discord.AllowedChannelIDs
+		}
+		if def.Bots.Discord.InterestedEventTypes != nil &&
+			!hasInterestedEventTypesEnv("BOTS_DISCORD_INTERESTED_EVENT_TYPES") {
+			cfg.Bots.Discord.InterestedEventTypes = parseInterestedEventTypesSlice(def.Bots.Discord.InterestedEventTypes)
+		}
+		if def.Bots.Discord.RespondToAll != nil {
+			cfg.Bots.Discord.RespondToAll = *def.Bots.Discord.RespondToAll
 		}
 	}
 }
@@ -1751,6 +1779,10 @@ var envBindings = []envBinding{
 	{key: "bots.slack.allowed_channel_ids", env: "BOTS_SLACK_ALLOWED_CHANNEL_IDS"},
 	{key: "bots.slack.interested_event_types", env: "BOTS_SLACK_INTERESTED_EVENT_TYPES"},
 	{key: "bots.slack.respond_to_all", env: "BOTS_SLACK_RESPOND_TO_ALL"},
+	{key: "bots.discord.token", env: "BOTS_DISCORD_TOKEN"},
+	{key: "bots.discord.allowed_channel_ids", env: "BOTS_DISCORD_ALLOWED_CHANNEL_IDS"},
+	{key: "bots.discord.interested_event_types", env: "BOTS_DISCORD_INTERESTED_EVENT_TYPES"},
+	{key: "bots.discord.respond_to_all", env: "BOTS_DISCORD_RESPOND_TO_ALL"},
 
 	// License
 	{key: "license.key", env: "LICENSE_KEY"},

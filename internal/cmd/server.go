@@ -16,6 +16,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/service/discord"
 	"github.com/dagucloud/dagu/internal/service/frontend"
 	"github.com/dagucloud/dagu/internal/service/resource"
 	daguslack "github.com/dagucloud/dagu/internal/service/slack"
@@ -170,6 +171,31 @@ func runServer(ctx *Context, _ []string) error {
 					}
 				}()
 				logger.Info(serviceCtx, "Slack bot started")
+			}
+
+		case config.BotProviderDiscord:
+			discordBot, discordErr := discord.New(
+				discord.Config{
+					Token:                 ctx.Config.Bots.Discord.Token,
+					AllowedChannelIDs:     ctx.Config.Bots.Discord.AllowedChannelIDs,
+					InterestedEventTypes:  ctx.Config.Bots.Discord.InterestedEventTypes,
+					RespondToAll:          ctx.Config.Bots.Discord.RespondToAll,
+					SafeMode:              ctx.Config.Bots.SafeMode,
+					EventService:          ctx.EventService,
+					NotificationStateFile: filepath.Join(ctx.Config.Paths.DataDir, "bots", "discord", "notifications.json"),
+				},
+				agentAPI,
+				slog.Default(),
+			)
+			if discordErr != nil {
+				logger.Warn(serviceCtx, "Failed to initialize Discord bot", tag.Error(discordErr))
+			} else {
+				go func() {
+					if runErr := discordBot.Run(signalCtx); runErr != nil {
+						logger.Error(serviceCtx, "Discord bot failed", tag.Error(runErr))
+					}
+				}()
+				logger.Info(serviceCtx, "Discord bot started")
 			}
 
 		case config.BotProviderNone:
