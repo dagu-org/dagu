@@ -27,7 +27,6 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileagentconfig"
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
 	"github.com/dagucloud/dagu/internal/persis/fileagentoauth"
-	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
 	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filememory"
 	"github.com/dagucloud/dagu/internal/proto/convert"
@@ -275,7 +274,6 @@ type retryConfig struct {
 type agentStoreBundle struct {
 	configStore  agent.ConfigStore
 	modelStore   agent.ModelStore
-	skillStore   agent.SkillStore
 	soulStore    agent.SoulStore
 	memoryStore  agent.MemoryStore
 	oauthManager *agentoauth.Manager
@@ -326,7 +324,7 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 	return statusPusher, logStreamer
 }
 
-// agentStores creates the agent config, model, skill, soul, memory, and OAuth stores from the config paths.
+// agentStores creates the agent config, model, soul, memory, and OAuth stores from the config paths.
 func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 	acs, err := fileagentconfig.New(h.config.Paths.DataDir)
 	if err != nil {
@@ -343,16 +341,6 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{configStore: acs}
 	}
 
-	skillsDir := filepath.Join(h.config.Paths.DAGsDir, "skills")
-	ss, err := fileagentskill.New(skillsDir)
-	if err != nil {
-		logger.Warn(ctx, "Failed to create agent skill store", tag.Error(err))
-		return agentStoreBundle{
-			configStore: acs,
-			modelStore:  ams,
-		}
-	}
-
 	soulsDir := filepath.Join(h.config.Paths.DAGsDir, "souls")
 	soulStore, err := fileagentsoul.New(ctx, soulsDir)
 	if err != nil {
@@ -360,7 +348,6 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{
 			configStore: acs,
 			modelStore:  ams,
-			skillStore:  ss,
 		}
 	}
 
@@ -370,7 +357,6 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{
 			configStore: acs,
 			modelStore:  ams,
-			skillStore:  ss,
 			soulStore:   soulStore,
 		}
 	}
@@ -381,7 +367,6 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{
 			configStore: acs,
 			modelStore:  ams,
-			skillStore:  ss,
 			soulStore:   soulStore,
 			memoryStore: ms,
 		}
@@ -390,7 +375,6 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 	return agentStoreBundle{
 		configStore:  acs,
 		modelStore:   ams,
-		skillStore:   ss,
 		soulStore:    soulStore,
 		memoryStore:  ms,
 		oauthManager: oauthManager,
@@ -417,7 +401,6 @@ func (h *remoteTaskHandler) agentStoresFromSnapshot(snapshotPayload []byte) (age
 	return agentStoreBundle{
 		configStore: stores.ConfigStore,
 		modelStore:  stores.ModelStore,
-		skillStore:  stores.SkillStore,
 		soulStore:   stores.SoulStore,
 		memoryStore: stores.MemoryStore,
 	}, nil
@@ -576,7 +559,6 @@ func (h *remoteTaskHandler) executeDAGRun(
 		DefaultExecMode:   h.config.DefaultExecMode,
 		AgentConfigStore:  agentStores.configStore,
 		AgentModelStore:   agentStores.modelStore,
-		AgentSkillStore:   agentStores.skillStore,
 		AgentSoulStore:    agentStores.soulStore,
 		AgentMemoryStore:  agentStores.memoryStore,
 		AgentOAuthManager: agentStores.oauthManager,

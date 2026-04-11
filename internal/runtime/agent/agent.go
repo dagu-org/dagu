@@ -180,8 +180,6 @@ type Agent struct {
 	agentModelStore agentpkg.ModelStore
 	// agentMemoryStore is the agent memory store for agent step execution.
 	agentMemoryStore agentpkg.MemoryStore
-	// agentSkillStore is the agent skill store for agent step execution.
-	agentSkillStore agentpkg.SkillStore
 	// agentSoulStore is the agent soul store for agent step execution.
 	agentSoulStore agentpkg.SoulStore
 	// agentOAuthManager resolves subscription-backed provider credentials.
@@ -268,8 +266,6 @@ type Options struct {
 	AgentModelStore agentpkg.ModelStore
 	// AgentMemoryStore is the agent memory store for agent step execution.
 	AgentMemoryStore agentpkg.MemoryStore
-	// AgentSkillStore is the agent skill store for agent step execution.
-	AgentSkillStore agentpkg.SkillStore
 	// AgentSoulStore is the agent soul store for agent step execution.
 	AgentSoulStore agentpkg.SoulStore
 	// AgentOAuthManager resolves subscription-backed provider credentials.
@@ -318,7 +314,6 @@ func New(
 		agentConfigStore:           opts.AgentConfigStore,
 		agentModelStore:            opts.AgentModelStore,
 		agentMemoryStore:           opts.AgentMemoryStore,
-		agentSkillStore:            opts.AgentSkillStore,
 		agentSoulStore:             opts.AgentSoulStore,
 		agentOAuthManager:          opts.AgentOAuthManager,
 		agentRemoteContextResolver: opts.AgentRemoteContextResolver,
@@ -509,9 +504,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.agentMemoryStore != nil {
 		ctx = agentpkg.WithMemoryStore(ctx, a.agentMemoryStore)
-	}
-	if a.agentSkillStore != nil {
-		ctx = agentpkg.WithSkillStore(ctx, a.agentSkillStore)
 	}
 	if a.agentSoulStore != nil {
 		ctx = agentpkg.WithSoulStore(ctx, a.agentSoulStore)

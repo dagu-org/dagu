@@ -16,7 +16,6 @@ import (
 type configStoreKey struct{}
 type modelStoreKey struct{}
 type memoryStoreKey struct{}
-type skillStoreKey struct{}
 type soulStoreKey struct{}
 type remoteContextResolverKey struct{}
 type oauthManagerKey struct{}
@@ -54,18 +53,6 @@ func WithMemoryStore(ctx context.Context, s MemoryStore) context.Context {
 // Returns nil if no MemoryStore is set.
 func GetMemoryStore(ctx context.Context) MemoryStore {
 	s, _ := ctx.Value(memoryStoreKey{}).(MemoryStore)
-	return s
-}
-
-// WithSkillStore injects a SkillStore into the context.
-func WithSkillStore(ctx context.Context, s SkillStore) context.Context {
-	return context.WithValue(ctx, skillStoreKey{}, s)
-}
-
-// GetSkillStore retrieves a SkillStore from the context.
-// Returns nil if no SkillStore is set.
-func GetSkillStore(ctx context.Context) SkillStore {
-	s, _ := ctx.Value(skillStoreKey{}).(SkillStore)
 	return s
 }
 

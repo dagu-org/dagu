@@ -234,17 +234,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		filepath.Join(cfg.Paths.DataDir, "agent", "references"),
 	)
 
-	var agentSkillStore agent.SkillStore
-	skillsDir := filepath.Join(cfg.Paths.DAGsDir, "skills")
-	if fileagentskill.SeedExampleSkills(skillsDir) && agentConfigStore != nil {
-		autoEnableExampleSkills(ctx, agentConfigStore)
-	}
-	if skillStore, skillErr := fileagentskill.New(skillsDir); skillErr != nil {
-		logger.Warn(ctx, "Failed to create agent skill store", tag.Error(skillErr))
-	} else {
-		agentSkillStore = skillStore
-	}
-
 	var agentSoulStore agent.SoulStore
 	soulsDir := filepath.Join(cfg.Paths.DAGsDir, "souls")
 	if _, err := fileagentsoul.SeedExampleSouls(ctx, soulsDir); err != nil {
@@ -382,7 +371,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -495,9 +484,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	if memoryStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentMemoryStore(memoryStore))
-	}
-	if agentSkillStore != nil {
-		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSkillStore(agentSkillStore))
 	}
 	if agentSoulStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSoulStore(agentSoulStore))
@@ -740,33 +726,9 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
-// autoEnableExampleSkills adds example skill IDs to the agent config's enabled list.
-func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore) {
-	cfg, err := configStore.Load(ctx)
-	if err != nil {
-		logger.Warn(ctx, "Failed to load agent config for auto-enabling skills", tag.Error(err))
-		return
-	}
-
-	existing := make(map[string]struct{}, len(cfg.EnabledSkills))
-	for _, id := range cfg.EnabledSkills {
-		existing[id] = struct{}{}
-	}
-
-	for _, id := range fileagentskill.ExampleSkillIDs() {
-		if _, ok := existing[id]; !ok {
-			cfg.EnabledSkills = append(cfg.EnabledSkills, id)
-		}
-	}
-
-	if err := configStore.Save(ctx, cfg); err != nil {
-		logger.Warn(ctx, "Failed to auto-enable example skills", tag.Error(err))
-	}
-}
-
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteContextResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteContextResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
@@ -781,7 +743,6 @@ func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore 
 	api := agent.NewAPI(agent.APIConfig{
 		ConfigStore:           store,
 		ModelStore:            modelStore,
-		SkillStore:            skillStore,
 		SoulStore:             soulStore,
 		WorkingDir:            paths.DAGsDir,
 		Logger:                slog.Default(),

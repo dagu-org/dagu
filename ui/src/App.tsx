@@ -35,8 +35,6 @@ import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
 import AgentSettingsPage from './pages/agent-settings';
-import AgentSkillsPage from './pages/agent-skills';
-import SkillEditorPage from './pages/agent-skills/SkillEditorPage';
 import AgentSoulsPage from './pages/agent-souls';
 import SoulEditorPage from './pages/agent-souls/SoulEditorPage';
 import APIKeysPage from './pages/api-keys';
@@ -412,30 +410,6 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                             element={
                                               <AdminElement>
                                                 <AgentMemoryPage />
-                                              </AdminElement>
-                                            }
-                                          />
-                                          <Route
-                                            path="/agent-skills"
-                                            element={
-                                              <AdminElement>
-                                                <AgentSkillsPage />
-                                              </AdminElement>
-                                            }
-                                          />
-                                          <Route
-                                            path="/agent-skills/new"
-                                            element={
-                                              <AdminElement>
-                                                <SkillEditorPage />
-                                              </AdminElement>
-                                            }
-                                          />
-                                          <Route
-                                            path="/agent-skills/:skillId"
-                                            element={
-                                              <AdminElement>
-                                                <SkillEditorPage />
                                               </AdminElement>
                                             }
                                           />

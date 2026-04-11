@@ -55,8 +55,6 @@ type SessionManager struct {
 	thinkingEffort        llm.ThinkingEffort
 	totalCost             float64
 	memoryStore           MemoryStore
-	skillStore            SkillStore
-	enabledSkills         []string
 	dagName               string
 	sessionStore          SessionStore
 	parentSessionID       string
@@ -102,8 +100,6 @@ type SessionManagerConfig struct {
 	OutputCostPer1M float64
 	ThinkingEffort  llm.ThinkingEffort
 	MemoryStore     MemoryStore
-	SkillStore      SkillStore
-	EnabledSkills   []string
 	DAGName         string
 	SessionStore    SessionStore
 	// ParentSessionID links this session to its parent (non-empty = sub-session).
@@ -195,8 +191,6 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		thinkingEffort:        cfg.ThinkingEffort,
 		totalCost:             totalCost,
 		memoryStore:           cfg.MemoryStore,
-		skillStore:            cfg.SkillStore,
-		enabledSkills:         cfg.EnabledSkills,
 		dagName:               cfg.DAGName,
 		sessionStore:          cfg.SessionStore,
 		parentSessionID:       cfg.ParentSessionID,
@@ -812,31 +806,21 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 // createLoop creates a new Loop instance with the current configuration.
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool, thinkingEffort llm.ThinkingEffort) *Loop {
 	memory := sm.loadMemory()
-	allowedSkills := ToSkillSet(sm.enabledSkills)
-	skillCount := len(sm.enabledSkills)
-	var skillSummaries []SkillSummary
-	if skillCount > 0 && skillCount <= SkillListThreshold {
-		skillSummaries = LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
-	}
 	return NewLoop(LoopConfig{
 		Provider: provider,
 		Model:    model,
 		History:  history,
 		Tools: CreateTools(ToolConfig{
 			DAGsDir:               sm.environment.DAGsDir,
-			SkillStore:            sm.skillStore,
-			AllowedSkills:         allowedSkills,
 			RemoteContextResolver: sm.remoteContextResolver,
 		}),
 		RecordMessage: sm.createRecordMessageFunc(),
 		Logger:        sm.logger,
 		SystemPrompt: GenerateSystemPrompt(SystemPromptParams{
-			Env:             sm.environment,
-			Memory:          memory,
-			Role:            sm.user.Role,
-			AvailableSkills: skillSummaries,
-			SkillCount:      skillCount,
-			Soul:            sm.soul,
+			Env:    sm.environment,
+			Memory: memory,
+			Role:   sm.user.Role,
+			Soul:   sm.soul,
 		}),
 		WorkingDir:       sm.workingDir,
 		SessionID:        sm.id,
@@ -851,8 +835,6 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		User:             sm.user,
 		SessionStore:     sm.sessionStore,
 		Registry:         sm.registry,
-		SkillStore:       sm.skillStore,
-		AllowedSkills:    allowedSkills,
 		WebSearch:        sm.webSearch,
 	})
 }

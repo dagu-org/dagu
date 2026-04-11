@@ -35,7 +35,7 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileagentconfig"
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
 	"github.com/dagucloud/dagu/internal/persis/fileagentoauth"
-	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
+
 	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filebaseconfig"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
@@ -743,13 +743,12 @@ type agentStoresResult struct {
 	ConfigStore     agent.ConfigStore
 	ModelStore      agent.ModelStore
 	MemoryStore     agent.MemoryStore
-	SkillStore      agent.SkillStore
 	SoulStore       agent.SoulStore
 	OAuthManager    *agentoauth.Manager
 	ContextResolver agent.RemoteContextResolver
 }
 
-// agentStores creates the agent config, model, memory, and skill stores from the config paths.
+// agentStores creates the agent config, model, memory, and soul stores from the config paths.
 // Errors are logged as warnings; nil stores are returned if creation fails.
 func (c *Context) agentStores() agentStoresResult {
 	var result agentStoresResult
@@ -777,14 +776,6 @@ func (c *Context) agentStores() agentStoresResult {
 		return result
 	}
 	result.MemoryStore = ms
-
-	skillsDir := filepath.Join(c.Config.Paths.DAGsDir, "skills")
-	ss, err := fileagentskill.New(skillsDir)
-	if err != nil {
-		logger.Warn(c, "Failed to create agent skill store", tag.Error(err))
-		return result
-	}
-	result.SkillStore = ss
 
 	soulsDir := filepath.Join(c.Config.Paths.DAGsDir, "souls")
 	soulStore, err := fileagentsoul.New(c, soulsDir)

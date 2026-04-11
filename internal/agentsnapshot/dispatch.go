@@ -14,7 +14,6 @@ import (
 	"github.com/dagucloud/dagu/internal/core/spec"
 	"github.com/dagucloud/dagu/internal/persis/fileagentconfig"
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
-	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
 	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filememory"
 )
@@ -52,11 +51,6 @@ func BuildFromPaths(
 		return nil, err
 	}
 
-	skillStore, err := fileagentskill.New(filepath.Join(paths.DAGsDir, "skills"))
-	if err != nil {
-		return nil, err
-	}
-
 	soulStore, err := fileagentsoul.New(ctx, filepath.Join(paths.DAGsDir, "souls"))
 	if err != nil {
 		return nil, err
@@ -70,7 +64,6 @@ func BuildFromPaths(
 	return agent.BuildSnapshotForDAG(ctx, dag, agent.SnapshotStores{
 		ConfigStore: configStore,
 		ModelStore:  modelStore,
-		SkillStore:  skillStore,
 		SoulStore:   soulStore,
 		MemoryStore: memoryStore,
 	}, agent.SnapshotBuildOptions{
@@ -93,7 +86,6 @@ func BuildFromContext(ctx context.Context, dag *core.DAG) ([]byte, error) {
 	return agent.BuildSnapshotForDAG(ctx, dag, agent.SnapshotStores{
 		ConfigStore: agent.GetConfigStore(ctx),
 		ModelStore:  agent.GetModelStore(ctx),
-		SkillStore:  agent.GetSkillStore(ctx),
 		SoulStore:   agent.GetSoulStore(ctx),
 		MemoryStore: agent.GetMemoryStore(ctx),
 	}, agent.SnapshotBuildOptions{
