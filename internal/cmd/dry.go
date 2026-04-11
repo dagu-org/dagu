@@ -90,7 +90,6 @@ func runDry(ctx *Context, args []string) error {
 			AgentConfigStore:           as.ConfigStore,
 			AgentModelStore:            as.ModelStore,
 			AgentMemoryStore:           as.MemoryStore,
-			AgentSkillStore:            as.SkillStore,
 			AgentSoulStore:             as.SoulStore,
 			AgentOAuthManager:          as.OAuthManager,
 			AgentRemoteContextResolver: as.ContextResolver,

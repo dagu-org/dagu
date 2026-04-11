@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
+	bundledskills "github.com/dagucloud/dagu/skills"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -378,7 +378,7 @@ func TestInstallSkill(t *testing.T) {
 	targetDir := t.TempDir()
 	targetSKILLMD := filepath.Join(targetDir, "dagu", "SKILL.md")
 
-	skillFS := fileagentskill.SkillFS()
+	skillFS := bundledskills.Assets
 	err := installSkill(targetSKILLMD, skillFS)
 	require.NoError(t, err)
 
@@ -393,7 +393,7 @@ func TestInstallSkillOverwrites(t *testing.T) {
 	targetSKILLMD := filepath.Join(targetDir, "dagu", "SKILL.md")
 
 	// Install once
-	skillFS := fileagentskill.SkillFS()
+	skillFS := bundledskills.Assets
 	require.NoError(t, installSkill(targetSKILLMD, skillFS))
 
 	// Install again — should overwrite without error
@@ -409,7 +409,7 @@ func TestInstallCopilotFresh(t *testing.T) {
 	targetDir := t.TempDir()
 	targetPath := filepath.Join(targetDir, copilotFileName)
 
-	skillFS := fileagentskill.SkillFS()
+	skillFS := bundledskills.Assets
 	err := installCopilot(targetPath, skillFS)
 	require.NoError(t, err)
 
@@ -432,7 +432,7 @@ func TestInstallCopilotReplace(t *testing.T) {
 		copilotBeginMark + "\nold content\n" + copilotEndMark + "\n\n# More stuff\n"
 	require.NoError(t, os.WriteFile(targetPath, []byte(existing), 0o600))
 
-	skillFS := fileagentskill.SkillFS()
+	skillFS := bundledskills.Assets
 	err := installCopilot(targetPath, skillFS)
 	require.NoError(t, err)
 
@@ -458,7 +458,7 @@ func TestInstallCopilotAppend(t *testing.T) {
 	existing := "# My Instructions\n\nSome existing content."
 	require.NoError(t, os.WriteFile(targetPath, []byte(existing), 0o600))
 
-	skillFS := fileagentskill.SkillFS()
+	skillFS := bundledskills.Assets
 	err := installCopilot(targetPath, skillFS)
 	require.NoError(t, err)
 
@@ -513,7 +513,7 @@ func TestInstallCopilotRejectsMalformedMarkers(t *testing.T) {
 			targetPath := filepath.Join(targetDir, copilotFileName)
 			require.NoError(t, os.WriteFile(targetPath, []byte(tt.existing), 0o600))
 
-			skillFS := fileagentskill.SkillFS()
+			skillFS := bundledskills.Assets
 			err := installCopilot(targetPath, skillFS)
 			require.Error(t, err)
 			assert.ErrorContains(t, err, "malformed DAGU markers")
@@ -565,7 +565,7 @@ func TestTildefy(t *testing.T) {
 func TestEmbeddedSkillFS(t *testing.T) {
 	t.Parallel()
 
-	skillFS := fileagentskill.SkillFS()
+	skillFS := bundledskills.Assets
 
 	_, err := skillFS.ReadFile("dagu/SKILL.md")
 	require.NoError(t, err)

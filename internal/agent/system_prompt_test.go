@@ -162,66 +162,6 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.NotContains(t, result, "<memory_management>")
 	})
 
-	t.Run("lists skills individually when under threshold", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-		skills := []SkillSummary{
-			{ID: "sql-optimizer", Name: "SQL Optimizer", Description: "Optimizes SQL queries"},
-			{ID: "docker-deploy", Name: "Docker Deployment", Description: "Container best practices"},
-		}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, AvailableSkills: skills, SkillCount: 2})
-
-		assert.Contains(t, result, "<available_skills>")
-		assert.Contains(t, result, "sql-optimizer")
-		assert.Contains(t, result, "docker-deploy")
-		assert.Contains(t, result, "Use `use_skill`")
-		assert.NotContains(t, result, "You have access to")
-	})
-
-	t.Run("shows count only when above threshold", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, SkillCount: 100})
-
-		assert.Contains(t, result, "<available_skills>")
-		assert.Contains(t, result, "You have access to 100 skills")
-		assert.Contains(t, result, "search_skills")
-		assert.NotContains(t, result, "Use `use_skill` with the skill ID")
-	})
-
-	t.Run("omits skills section when no skills", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer})
-
-		assert.NotContains(t, result, "<available_skills>")
-		assert.NotContains(t, result, "<skill_delegation>")
-	})
-
-	t.Run("includes skill delegation guidance when skills available", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-		skills := []SkillSummary{{ID: "test", Name: "Test Skill"}}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, AvailableSkills: skills, SkillCount: 1})
-
-		assert.Contains(t, result, "<skill_delegation>")
-		assert.Contains(t, result, "delegate")
-		assert.Contains(t, result, "use_skill")
-	})
-
-	t.Run("includes skill delegation guidance when only skill count", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, SkillCount: 50})
-
-		assert.Contains(t, result, "<skill_delegation>")
-	})
-
 	t.Run("includes soul content when provided", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}

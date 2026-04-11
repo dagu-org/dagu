@@ -79,10 +79,6 @@ type LoopConfig struct {
 	SessionStore SessionStore
 	// Registry manages sub-session lifecycle for delegate tools.
 	Registry SubSessionRegistry
-	// SkillStore provides skill loading for delegate skill pre-loading.
-	SkillStore SkillStore
-	// AllowedSkills restricts which skill IDs can be pre-loaded by delegates. Nil = all allowed.
-	AllowedSkills map[string]struct{}
 	// WebSearch configures provider-native web search for requests.
 	WebSearch *llm.WebSearchRequest
 	// OnTurnComplete is called after a queued message batch is successfully
@@ -117,8 +113,6 @@ type Loop struct {
 	user               UserIdentity
 	sessionStore       SessionStore
 	registry           SubSessionRegistry
-	skillStore         SkillStore
-	allowedSkills      map[string]struct{}
 	webSearch          *llm.WebSearchRequest
 	onTurnComplete     func()
 	activeTurn         bool
@@ -153,8 +147,6 @@ func NewLoop(config LoopConfig) *Loop {
 		user:             config.User,
 		sessionStore:     config.SessionStore,
 		registry:         config.Registry,
-		skillStore:       config.SkillStore,
-		allowedSkills:    config.AllowedSkills,
 		webSearch:        config.WebSearch,
 		onTurnComplete:   config.OnTurnComplete,
 	}
@@ -513,8 +505,6 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 			ParentID:      l.sessionID,
 			User:          user,
 			Registry:      l.registry,
-			SkillStore:    l.skillStore,
-			AllowedSkills: l.allowedSkills,
 		}
 	}
 

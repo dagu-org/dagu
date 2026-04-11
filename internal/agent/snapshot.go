@@ -36,10 +36,9 @@ var (
 // Snapshot carries execution-scoped agent settings for distributed workers.
 type Snapshot struct {
 	Version int             `json:"version"`
-	Config  *Config         `json:"config,omitempty"`
-	Models  []*ModelConfig  `json:"models,omitempty"`
-	Skills  []*Skill        `json:"skills,omitempty"`
-	Souls   []*Soul         `json:"souls,omitempty"`
+	Config *Config        `json:"config,omitempty"`
+	Models []*ModelConfig `json:"models,omitempty"`
+	Souls  []*Soul        `json:"souls,omitempty"`
 	Memory  *MemorySnapshot `json:"memory,omitempty"`
 }
 
@@ -53,7 +52,6 @@ type MemorySnapshot struct {
 type SnapshotStores struct {
 	ConfigStore ConfigStore
 	ModelStore  ModelStore
-	SkillStore  SkillStore
 	SoulStore   SoulStore
 	MemoryStore MemoryStore
 }
@@ -173,13 +171,6 @@ func BuildSnapshotForDAG(
 	if cfg.DefaultModelID != "" {
 		reqs.modelIDs[cfg.DefaultModelID] = struct{}{}
 	}
-	for _, id := range cfg.EnabledSkills {
-		id = strings.TrimSpace(id)
-		if id != "" {
-			reqs.skillIDs[id] = struct{}{}
-		}
-	}
-
 	snapshot := &Snapshot{
 		Config: cfg,
 	}
@@ -189,17 +180,6 @@ func BuildSnapshotForDAG(
 		return nil, err
 	}
 	snapshot.Models = models
-
-	if len(reqs.skillIDs) > 0 {
-		if stores.SkillStore == nil {
-			return nil, fmt.Errorf("agent skill store not available for distributed agent execution")
-		}
-		skills, err := snapshotSkills(ctx, stores.SkillStore, reqs.sortedSkillIDs())
-		if err != nil {
-			return nil, err
-		}
-		snapshot.Skills = skills
-	}
 
 	if len(reqs.soulIDs) > 0 {
 		if stores.SoulStore == nil {
@@ -267,21 +247,6 @@ func snapshotModels(ctx context.Context, store ModelStore, ids []string) ([]*Mod
 	return models, nil
 }
 
-func snapshotSkills(ctx context.Context, store SkillStore, ids []string) ([]*Skill, error) {
-	skills := make([]*Skill, 0, len(ids))
-	for _, id := range ids {
-		skill, err := store.GetByID(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("load skill %q for snapshot: %w", id, err)
-		}
-		skills = append(skills, skill)
-	}
-	sort.Slice(skills, func(i, j int) bool {
-		return skills[i].Name < skills[j].Name
-	})
-	return skills, nil
-}
-
 func snapshotSouls(ctx context.Context, store SoulStore, ids []string) ([]*Soul, error) {
 	souls := make([]*Soul, 0, len(ids))
 	for _, id := range ids {
@@ -323,7 +288,6 @@ type snapshotRequirements struct {
 	dagNames         map[string]struct{}
 	memoryDAGNames   map[string]struct{}
 	modelIDs         map[string]struct{}
-	skillIDs         map[string]struct{}
 	soulIDs          map[string]struct{}
 	hasAgentSteps    bool
 	usesDefaultModel bool
@@ -336,7 +300,6 @@ func newSnapshotRequirements() *snapshotRequirements {
 		dagNames:       make(map[string]struct{}),
 		memoryDAGNames: make(map[string]struct{}),
 		modelIDs:       make(map[string]struct{}),
-		skillIDs:       make(map[string]struct{}),
 		soulIDs:        make(map[string]struct{}),
 	}
 }
@@ -404,12 +367,6 @@ func (r *snapshotRequirements) collectStep(ctx context.Context, dag *core.DAG, s
 		} else {
 			r.modelIDs[step.Agent.Model] = struct{}{}
 		}
-		for _, id := range step.Agent.Skills {
-			id = strings.TrimSpace(id)
-			if id != "" {
-				r.skillIDs[id] = struct{}{}
-			}
-		}
 		if soulID := strings.TrimSpace(step.Agent.Soul); soulID != "" {
 			r.soulIDs[soulID] = struct{}{}
 		}
@@ -450,16 +407,8 @@ func (r *snapshotRequirements) sortedModelIDs() []string {
 	return sortedKeys(r.modelIDs)
 }
 
-func (r *snapshotRequirements) sortedSkillIDs() []string {
-	return sortedKeys(r.skillIDs)
-}
-
 func (r *snapshotRequirements) sortedSoulIDs() []string {
 	return sortedKeys(r.soulIDs)
-}
-
-func (r *snapshotRequirements) sortedDAGNames() []string {
-	return sortedKeys(r.dagNames)
 }
 
 func (r *snapshotRequirements) sortedMemoryDAGNames() []string {

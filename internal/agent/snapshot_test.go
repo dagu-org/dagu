@@ -19,26 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testSnapshotSkillStore struct {
-	skills map[string]*Skill
-}
-
-func (s *testSnapshotSkillStore) Create(context.Context, *Skill) error { return nil }
-func (s *testSnapshotSkillStore) GetByID(_ context.Context, id string) (*Skill, error) {
-	skill, ok := s.skills[id]
-	if !ok {
-		return nil, ErrSkillNotFound
-	}
-	return skill, nil
-}
-func (s *testSnapshotSkillStore) List(context.Context) ([]*Skill, error) { return nil, nil }
-func (s *testSnapshotSkillStore) Search(context.Context, SearchSkillsOptions) (*exec.PaginatedResult[SkillMetadata], error) {
-	result := exec.NewPaginatedResult([]SkillMetadata{}, 0, exec.DefaultPaginator())
-	return &result, nil
-}
-func (s *testSnapshotSkillStore) Update(context.Context, *Skill) error { return nil }
-func (s *testSnapshotSkillStore) Delete(context.Context, string) error { return nil }
-
 type testSnapshotSoulStore struct {
 	souls map[string]*Soul
 }
@@ -66,13 +46,9 @@ func TestMarshalSnapshotRoundTrip(t *testing.T) {
 		Config: &Config{
 			Enabled:        true,
 			DefaultModelID: "model-default",
-			EnabledSkills:  []string{"skill-global"},
 		},
 		Models: []*ModelConfig{
 			testModelConfig("model-default"),
-		},
-		Skills: []*Skill{
-			{ID: "skill-global", Name: "Global Skill", Knowledge: "knowledge"},
 		},
 		Souls: []*Soul{
 			{ID: "helper", Name: "Helper", Content: "be precise"},
@@ -96,8 +72,6 @@ func TestMarshalSnapshotRoundTrip(t *testing.T) {
 	assert.Equal(t, "model-default", decoded.Config.DefaultModelID)
 	require.Len(t, decoded.Models, 1)
 	assert.Equal(t, "model-default", decoded.Models[0].ID)
-	require.Len(t, decoded.Skills, 1)
-	assert.Equal(t, "skill-global", decoded.Skills[0].ID)
 	require.Len(t, decoded.Souls, 1)
 	assert.Equal(t, "helper", decoded.Souls[0].ID)
 	require.NotNil(t, decoded.Memory)
@@ -150,18 +124,11 @@ func TestBuildSnapshotForDAG_CapturesLocalSubDAGRequirements(t *testing.T) {
 	ctx := context.Background()
 	configStore := newMockConfigStore(true)
 	configStore.config.DefaultModelID = "default-model"
-	configStore.config.EnabledSkills = []string{"global-skill"}
 
 	modelStore := newMockModelStore().
 		addModel(testModelConfig("default-model")).
 		addModel(testModelConfig("child-model"))
 
-	skillStore := &testSnapshotSkillStore{
-		skills: map[string]*Skill{
-			"global-skill": {ID: "global-skill", Name: "Global Skill", Knowledge: "global"},
-			"step-skill":   {ID: "step-skill", Name: "Step Skill", Knowledge: "step"},
-		},
-	}
 	soulStore := &testSnapshotSoulStore{
 		souls: map[string]*Soul{
 			"helper": {ID: "helper", Name: "Helper", Content: "be precise"},
@@ -179,7 +146,6 @@ func TestBuildSnapshotForDAG_CapturesLocalSubDAGRequirements(t *testing.T) {
 				Name: "child-agent",
 				Agent: &core.AgentStepConfig{
 					Model:  "child-model",
-					Skills: []string{"step-skill"},
 					Soul:   "helper",
 					Memory: &core.AgentMemoryConfig{Enabled: true},
 				},
@@ -208,7 +174,6 @@ func TestBuildSnapshotForDAG_CapturesLocalSubDAGRequirements(t *testing.T) {
 	data, err := BuildSnapshotForDAG(ctx, parent, SnapshotStores{
 		ConfigStore: configStore,
 		ModelStore:  modelStore,
-		SkillStore:  skillStore,
 		SoulStore:   soulStore,
 		MemoryStore: memoryStore,
 	}, SnapshotBuildOptions{})
@@ -220,7 +185,6 @@ func TestBuildSnapshotForDAG_CapturesLocalSubDAGRequirements(t *testing.T) {
 	require.NotNil(t, decoded)
 
 	assert.Equal(t, []string{"child-model", "default-model"}, modelIDs(decoded.Models))
-	assert.Equal(t, []string{"global-skill", "step-skill"}, skillIDs(decoded.Skills))
 	assert.Equal(t, []string{"helper"}, soulIDs(decoded.Souls))
 	require.NotNil(t, decoded.Memory)
 	assert.Equal(t, "global memory", decoded.Memory.Global)
@@ -292,37 +256,6 @@ func TestBuildSnapshotForDAG_OnlySnapshotsMemoryForEnabledDAGs(t *testing.T) {
 	assert.Equal(t, map[string]string{
 		"parent": "parent memory",
 	}, decoded.Memory.PerDAG)
-}
-
-func TestBuildSnapshotForDAG_FailsWhenSkillMissing(t *testing.T) {
-	t.Parallel()
-
-	configStore := newMockConfigStore(true)
-	configStore.config.DefaultModelID = "default-model"
-	modelStore := newMockModelStore().addModel(testModelConfig("default-model"))
-	skillStore := &testSnapshotSkillStore{skills: map[string]*Skill{}}
-
-	dag := &core.DAG{
-		Name: "agent-dag",
-		Steps: []core.Step{
-			{
-				Name: "agent-step",
-				Agent: &core.AgentStepConfig{
-					Skills: []string{"missing-skill"},
-				},
-			},
-		},
-	}
-
-	data, err := BuildSnapshotForDAG(context.Background(), dag, SnapshotStores{
-		ConfigStore: configStore,
-		ModelStore:  modelStore,
-		SkillStore:  skillStore,
-	}, SnapshotBuildOptions{})
-	require.Nil(t, data)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), `load skill "missing-skill" for snapshot`)
-	assert.True(t, errors.Is(err, ErrSkillNotFound))
 }
 
 func TestBuildSnapshotForDAG_FailsWhenSoulMissing(t *testing.T) {
@@ -465,15 +398,6 @@ func modelIDs(models []*ModelConfig) []string {
 	out := make([]string, 0, len(models))
 	for _, model := range models {
 		out = append(out, model.ID)
-	}
-	sort.Strings(out)
-	return out
-}
-
-func skillIDs(skills []*Skill) []string {
-	out := make([]string, 0, len(skills))
-	for _, skill := range skills {
-		out = append(out, skill.ID)
 	}
 	sort.Strings(out)
 	return out

@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 import { DAGContext } from '../types';
 import { DAGPicker } from './DAGPicker';
 import { DocPicker, type DocRef, type DocPickerHandle } from './DocPicker';
-import { SkillPicker, type SkillRef, type SkillPickerHandle } from './SkillPicker';
 import { useDagPageContext } from '../hooks/useDagPageContext';
 import { useDocPageContext } from '../hooks/useDocPageContext';
 import { useAvailableModels } from '../hooks/useAvailableModels';
@@ -46,13 +45,6 @@ export function ChatInput({
   const currentPageDoc = useDocPageContext();
   // Track IME composition state manually for reliable Japanese/Chinese input handling
   const isComposingRef = useRef(false);
-
-  // Skill picker state
-  const [selectedSkills, setSelectedSkills] = useState<SkillRef[]>([]);
-  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
-  const [slashQuery, setSlashQuery] = useState('');
-  const [slashStart, setSlashStart] = useState(-1);
-  const skillPickerRef = useRef<SkillPickerHandle>(null);
 
   // Doc picker state
   const [selectedDocs, setSelectedDocs] = useState<DocRef[]>([]);
@@ -110,7 +102,7 @@ export function ChatInput({
       ? [currentPageDag, ...additionalDags]
       : additionalDags;
 
-    // Prepend doc and skill instructions if selected.
+    // Prepend doc instructions if selected.
     let finalMessage = trimmed;
     const additionalDocs = selectedDocs.filter(
       (doc) => doc.id !== currentPageDoc?.id
@@ -122,10 +114,6 @@ export function ChatInput({
       const docPrefix = allDocs.map((d) => `[Doc: ${d.id} | ${d.title}]`).join(' ');
       finalMessage = `${docPrefix}\n${finalMessage}`;
     }
-    if (selectedSkills.length > 0) {
-      const prefix = selectedSkills.map((s) => `[Skill: ${s.id}]`).join(' ');
-      finalMessage = `${prefix}\n${finalMessage}`;
-    }
 
     const soulValue = selectedSoul && selectedSoul !== '__default__' ? selectedSoul : undefined;
     onSend(
@@ -135,9 +123,8 @@ export function ChatInput({
       soulValue
     );
     setMessage('');
-    setSelectedSkills([]);
     setSelectedDocs([]);
-  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedSkills, selectedDocs, currentPageDoc, selectedSoul]);
+  }, [message, isPending, disabled, onSend, selectedDags, currentPageDag, selectedModel, selectedDocs, currentPageDoc, selectedSoul]);
 
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -152,35 +139,7 @@ export function ChatInput({
           setAtStart(pos - 1);
           setAtMenuOpen(true);
           setAtQuery('');
-          // Close skill menu if open (mutual exclusivity)
-          setSlashMenuOpen(false);
-          setSlashStart(-1);
           return;
-        }
-      }
-
-      // Detect '/' at start or after whitespace to open skill menu.
-      if (pos > 0 && val[pos - 1] === '/') {
-        const charBefore = pos > 1 ? val[pos - 2] : undefined;
-        if (charBefore === undefined || charBefore === ' ' || charBefore === '\n') {
-          setSlashStart(pos - 1);
-          setSlashMenuOpen(true);
-          setSlashQuery('');
-          // Close doc menu if open (mutual exclusivity)
-          setAtMenuOpen(false);
-          setAtStart(-1);
-          return;
-        }
-      }
-
-      // Update filter query while slash menu is open.
-      if (slashMenuOpen && slashStart >= 0) {
-        const query = val.substring(slashStart + 1, pos);
-        if (query.includes(' ')) {
-          setSlashMenuOpen(false);
-          setSlashStart(-1);
-        } else {
-          setSlashQuery(query);
         }
       }
 
@@ -196,32 +155,8 @@ export function ChatInput({
       }
 
     },
-    [slashMenuOpen, slashStart, atMenuOpen, atStart]
+    [atMenuOpen, atStart]
   );
-
-  const handleSkillSelect = useCallback(
-    (skill: SkillRef) => {
-      // Add to selected skills (no duplicates).
-      if (!selectedSkills.find((s) => s.id === skill.id)) {
-        setSelectedSkills((prev) => [...prev, skill]);
-      }
-      // Remove /text from textarea.
-      const before = message.substring(0, slashStart);
-      const after = message.substring(slashStart + 1 + slashQuery.length);
-      setMessage(before + after);
-      // Close dropdown.
-      setSlashMenuOpen(false);
-      setSlashStart(-1);
-      setSlashQuery('');
-      // Re-focus textarea.
-      textareaRef.current?.focus();
-    },
-    [selectedSkills, message, slashStart, slashQuery]
-  );
-
-  const handleSkillRemove = useCallback((id: string) => {
-    setSelectedSkills((prev) => prev.filter((s) => s.id !== id));
-  }, []);
 
   const handleDocSelect = useCallback(
     (doc: DocRef) => {
@@ -256,16 +191,6 @@ export function ChatInput({
         if (consumed) return;
       }
 
-      // Let skill picker handle keys when open.
-      if (slashMenuOpen && skillPickerRef.current) {
-        if (e.key === 'Backspace' && slashQuery === '') {
-          setSlashMenuOpen(false);
-          setSlashStart(-1);
-          return;
-        }
-        const consumed = skillPickerRef.current.handleKeyDown(e);
-        if (consumed) return;
-      }
 
       // Ignore Enter during IME composition (e.g., Japanese input conversion)
       // Check both isComposing and our manual ref for cross-browser compatibility
@@ -274,7 +199,7 @@ export function ChatInput({
         handleSend();
       }
     },
-    [handleSend, slashMenuOpen, slashQuery, atMenuOpen, atQuery]
+    [handleSend, atMenuOpen, atQuery]
   );
 
   const handleCompositionStart = useCallback(() => {
@@ -309,22 +234,6 @@ export function ChatInput({
         }}
         filterQuery={atQuery}
         currentPageDoc={currentPageDoc}
-        disabled={disabled || showPauseButton}
-      />
-
-      {/* Skill chips and dropdown */}
-      <SkillPicker
-        ref={skillPickerRef}
-        selectedSkills={selectedSkills}
-        onSelect={handleSkillSelect}
-        onRemove={handleSkillRemove}
-        isOpen={slashMenuOpen}
-        onClose={() => {
-          setSlashMenuOpen(false);
-          setSlashStart(-1);
-          setSlashQuery('');
-        }}
-        filterQuery={slashQuery}
         disabled={disabled || showPauseButton}
       />
 

@@ -16,7 +16,6 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
 	bundledskills "github.com/dagucloud/dagu/skills"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -198,7 +197,7 @@ func runAIInstall(cmd *cobra.Command, _ []string) error {
 
 	_, _ = fmt.Fprintf(out, "Found %s installation target(s)\n\n", bold(len(detected)))
 
-	skillFS := fileagentskill.SkillFS()
+	skillFS := bundledskills.Assets
 
 	var hadFailure bool
 

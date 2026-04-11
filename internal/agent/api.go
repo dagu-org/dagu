@@ -88,7 +88,6 @@ type API struct {
 	store                 SessionStore
 	configStore           ConfigStore
 	modelStore            ModelStore
-	skillStore            SkillStore
 	providers             *ProviderCache
 	workingDir            string
 	logger                *slog.Logger
@@ -106,7 +105,6 @@ type API struct {
 type APIConfig struct {
 	ConfigStore           ConfigStore
 	ModelStore            ModelStore
-	SkillStore            SkillStore
 	SoulStore             SoulStore
 	WorkingDir            string
 	Logger                *slog.Logger
@@ -136,7 +134,6 @@ type sessionRuntimeConfig struct {
 	dagName         string
 	title           string
 	safeMode        bool
-	enabledSkills   []string
 	soul            *Soul
 	webSearch       *llm.WebSearchRequest
 	thinkingEffort  llm.ThinkingEffort
@@ -154,7 +151,6 @@ func NewAPI(cfg APIConfig) *API {
 	return &API{
 		configStore:           cfg.ConfigStore,
 		modelStore:            cfg.ModelStore,
-		skillStore:            cfg.SkillStore,
 		soulStore:             cfg.SoulStore,
 		providers:             NewProviderCache(),
 		workingDir:            cfg.WorkingDir,
@@ -307,15 +303,6 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 		return nil, nil, err
 	}
 	return provider, model, nil
-}
-
-// loadEnabledSkills returns the list of enabled skill IDs from the agent config.
-func (a *API) loadEnabledSkills(ctx context.Context) []string {
-	cfg, err := a.configStore.Load(ctx)
-	if err != nil || cfg == nil {
-		return nil
-	}
-	return cfg.EnabledSkills
 }
 
 func (a *API) loadWebSearch(ctx context.Context) *llm.WebSearchRequest {
@@ -483,13 +470,6 @@ func (a *API) loadMemoryContent(ctx context.Context, dagName string) MemoryConte
 	}
 }
 
-func (a *API) loadSkillSummaries(ctx context.Context, enabledSkills []string) []SkillSummary {
-	if len(enabledSkills) == 0 || len(enabledSkills) > SkillListThreshold {
-		return nil
-	}
-	return LoadSkillSummaries(ctx, a.skillStore, enabledSkills)
-}
-
 func cloneWebSearchRequest(req *llm.WebSearchRequest) *llm.WebSearchRequest {
 	if req == nil {
 		return nil
@@ -528,14 +508,12 @@ func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMod
 	if err != nil {
 		return sessionRuntimeConfig{}, ErrAgentNotConfigured
 	}
-	enabledSkills := append([]string(nil), a.loadEnabledSkills(ctx)...)
 	return sessionRuntimeConfig{
 		modelID:         modelID,
 		resolvedModel:   modelCfg.Model,
 		modelCfg:        modelCfg,
 		dagName:         dagName,
 		safeMode:        safeMode,
-		enabledSkills:   enabledSkills,
 		soul:            a.loadSelectedSoul(ctx),
 		webSearch:       cloneWebSearchRequest(a.loadWebSearch(ctx)),
 		thinkingEffort:  modelThinkingEffort(modelCfg),
@@ -553,7 +531,6 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 	if err != nil {
 		return sessionRuntimeConfig{}, ErrAgentNotConfigured
 	}
-	enabledSkills := append([]string(nil), mgr.enabledSkills...)
 	return sessionRuntimeConfig{
 		modelID:         modelID,
 		resolvedModel:   modelCfg.Model,
@@ -561,7 +538,6 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 		dagName:         cmp.Or(overrideDAGName, mgr.dagName),
 		title:           mgr.title,
 		safeMode:        mgr.safeMode,
-		enabledSkills:   enabledSkills,
 		soul:            mgr.soul,
 		webSearch:       cloneWebSearchRequest(mgr.webSearch),
 		thinkingEffort:  modelThinkingEffort(modelCfg),
@@ -585,8 +561,6 @@ func (a *API) buildSessionManagerConfig(id string, user UserIdentity, cfg sessio
 		InputCostPer1M:        cfg.inputCostPer1M,
 		OutputCostPer1M:       cfg.outputCostPer1M,
 		MemoryStore:           a.memoryStore,
-		SkillStore:            a.skillStore,
-		EnabledSkills:         cfg.enabledSkills,
 		DAGName:               cfg.dagName,
 		SessionStore:          a.store,
 		Soul:                  cfg.soul,
@@ -616,14 +590,12 @@ func (a *API) ensureSessionLoop(mgr *SessionManager, provider llm.Provider, cfg 
 	return mgr.ensureLoop(provider, cfg.modelID, cfg.resolvedModel)
 }
 
-func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName string, enabledSkills []string, soul *Soul) string {
+func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName string, soul *Soul) string {
 	return GenerateSystemPrompt(SystemPromptParams{
-		Env:             a.environment,
-		Memory:          a.loadMemoryContent(ctx, dagName),
-		Role:            role,
-		AvailableSkills: a.loadSkillSummaries(ctx, enabledSkills),
-		SkillCount:      len(enabledSkills),
-		Soul:            soul,
+		Env:    a.environment,
+		Memory: a.loadMemoryContent(ctx, dagName),
+		Role:   role,
+		Soul:   soul,
 	})
 }
 
@@ -941,7 +913,6 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		title:           sess.Title,
 		dagName:         sess.DAGName,
 		safeMode:        true, // Default to safe mode for reactivated sessions
-		enabledSkills:   a.loadEnabledSkills(ctx),
 		soul:            a.loadSelectedSoul(ctx),
 		webSearch:       a.loadWebSearch(ctx),
 		thinkingEffort:  thinkingEffort,
@@ -1142,7 +1113,6 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		modelID:         model,
 		dagName:         dagName,
 		safeMode:        req.SafeMode,
-		enabledSkills:   a.loadEnabledSkills(ctx),
 		soul:            a.loadSoulWithOverride(ctx, req.SoulID),
 		webSearch:       a.loadWebSearch(ctx),
 		thinkingEffort:  modelThinkingEffort(modelCfg),
@@ -1223,7 +1193,7 @@ func (a *API) GenerateAssistantMessage(ctx context.Context, sessionID string, us
 		}
 	}
 
-	systemPrompt := a.buildSystemPrompt(ctx, user.Role, runtimeCfg.dagName, runtimeCfg.enabledSkills, runtimeCfg.soul)
+	systemPrompt := a.buildSystemPrompt(ctx, user.Role, runtimeCfg.dagName, runtimeCfg.soul)
 	resp, err := a.runOneShotPrompt(ctx, provider, runtimeCfg.resolvedModel, systemPrompt, prompt)
 	if err != nil {
 		return Message{}, err
