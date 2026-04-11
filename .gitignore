@@ -8,6 +8,7 @@ ui/src/assets/dag.schema.json
 
 # frontend test artifacts
 ui/test-results/
+ui/playwright-report/
 
 # NVM
 .nvmrc
@@ -50,4 +51,3 @@ prd.json
 
 # Compiled integration test binary
 intg.test
-

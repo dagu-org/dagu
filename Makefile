@@ -344,6 +344,15 @@ build-keepalive:
 # ui builds the frontend codes.
 ui: clean-ui build-ui cp-assets
 
+.PHONY: test-e2e
+test-e2e:
+	@printf '%b\n' "${COLOR_GREEN}Running browser E2E tests...${COLOR_RESET}"
+	@cd ui; NODE_OPTIONS="--max-old-space-size=8192" pnpm build
+	@rm -f ${FE_ASSETS_DIR}/*
+	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
+	@$(MAKE) bin
+	@cd ui; pnpm exec playwright test
+
 # build-ui builds the frontend codes.
 .PHONY: build-ui
 build-ui:
