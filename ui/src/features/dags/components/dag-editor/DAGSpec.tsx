@@ -30,6 +30,7 @@ import { FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
 import {
   buildAugmentedDAGSchema,
+  customStepTypeHintsEqual,
   extractLocalCustomStepTypeHints,
   mergeCustomStepTypeHints,
   toInheritedCustomStepTypeHints,
@@ -156,14 +157,27 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
   );
 
   useEffect(() => {
-    if (parsedLocalStepTypes.ok) {
-      setLastGoodLocalStepTypes(parsedLocalStepTypes.stepTypes);
+    if (!parsedLocalStepTypes.ok) {
+      return;
     }
+    setLastGoodLocalStepTypes((previous) =>
+      customStepTypeHintsEqual(previous, parsedLocalStepTypes.stepTypes)
+        ? previous
+        : parsedLocalStepTypes.stepTypes
+    );
   }, [parsedLocalStepTypes]);
 
-  const effectiveLocalStepTypes = parsedLocalStepTypes.ok
-    ? parsedLocalStepTypes.stepTypes
-    : lastGoodLocalStepTypes;
+  const effectiveLocalStepTypes = React.useMemo(() => {
+    if (!parsedLocalStepTypes.ok) {
+      return lastGoodLocalStepTypes;
+    }
+    return customStepTypeHintsEqual(
+      lastGoodLocalStepTypes,
+      parsedLocalStepTypes.stepTypes
+    )
+      ? lastGoodLocalStepTypes
+      : parsedLocalStepTypes.stepTypes;
+  }, [lastGoodLocalStepTypes, parsedLocalStepTypes]);
 
   const editorSchema = React.useMemo(() => {
     if (!baseSchema) {
@@ -179,8 +193,9 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
   }, [baseSchema, effectiveLocalStepTypes, inheritedCustomStepTypes]);
 
   const editorModelUri = React.useMemo(
-    () => `inmemory://dagu/dags/${encodeURIComponent(fileName)}.yaml`,
-    [fileName]
+    () =>
+      `inmemory://dagu/${encodeURIComponent(remoteNode)}/dags/${encodeURIComponent(fileName)}.yaml`,
+    [fileName, remoteNode]
   );
 
   // Sync unsaved changes context

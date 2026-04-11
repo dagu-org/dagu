@@ -469,7 +469,8 @@ func (a *API) buildDAGEditorHints(ctx context.Context, dag *core.DAG, fileName s
 			TargetType:  hint.TargetType,
 		}
 		if hint.Description != "" {
-			apiHint.Description = &hint.Description
+			desc := hint.Description
+			apiHint.Description = &desc
 		}
 		editorHints = append(editorHints, apiHint)
 	}

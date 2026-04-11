@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { describe, expect, it } from 'vitest';
 import {
   buildAugmentedDAGSchema,
@@ -225,6 +228,94 @@ steps:
     );
 
     expect(propertySchema).toMatchObject({ type: 'string' });
+  });
+
+  it('does not augment nested custom input schemas that only resemble steps', () => {
+    const schema = buildAugmentedDAGSchema(dereferencedBaseSchema, [
+      {
+        name: 'greet',
+        targetType: 'command',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            nested: {
+              type: 'object',
+              properties: {
+                type: {
+                  type: 'string',
+                },
+                config: {
+                  type: 'string',
+                },
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    const nestedTypeSchema = getSchemaAtPath(
+      schema,
+      ['steps', '0', 'config', 'nested', 'type'],
+      `
+steps:
+  - type: greet
+    config:
+      nested:
+        type: internal
+`
+    );
+    const nestedConfigSchema = getSchemaAtPath(
+      schema,
+      ['steps', '0', 'config', 'nested', 'config'],
+      `
+steps:
+  - type: greet
+    config:
+      nested:
+        config: value
+`
+    );
+
+    expect(nestedTypeSchema).toEqual({ type: 'string' });
+    expect(nestedConfigSchema).toEqual({ type: 'string' });
+  });
+
+  it('handles recursive internal refs without infinite recursion', () => {
+    const recursiveSchema = dereferenceSchema({
+      type: 'object',
+      properties: {
+        node: {
+          $ref: '#/definitions/node',
+        },
+      },
+      definitions: {
+        node: {
+          type: 'object',
+          properties: {
+            value: {
+              type: 'string',
+            },
+            next: {
+              $ref: '#/definitions/node',
+            },
+          },
+        },
+      },
+    });
+
+    const valueSchema = getSchemaAtPath(
+      recursiveSchema,
+      ['node', 'next', 'value']
+    );
+    const propertyInfo = toPropertyInfo(
+      recursiveSchema.properties?.node as JSONSchema,
+      'node',
+      ['node']
+    );
+
+    expect(valueSchema).toMatchObject({ type: 'string' });
+    expect(propertyInfo?.properties?.next).toBeDefined();
   });
 
   it('marks invalid YAML extraction as unsuccessful', () => {

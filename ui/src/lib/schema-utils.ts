@@ -51,6 +51,10 @@ export interface JSONSchema {
   [key: string]: unknown;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function unescapeJsonPointerSegment(segment: string): string {
   return segment.replace(/~1/g, '/').replace(/~0/g, '~');
 }
@@ -108,10 +112,22 @@ export function dereferenceSchema(schema: JSONSchema): JSONSchema {
       const ref = obj.$ref;
       let resolved = cache.get(ref);
       if (!resolved) {
-        resolved = processNode(resolveInternalRef(schema, ref)) as JSONSchema;
-        cache.set(ref, resolved);
+        const placeholder: JSONSchema = {};
+        cache.set(ref, placeholder);
+
+        const dereferenced = processNode(resolveInternalRef(schema, ref));
+        if (isRecord(dereferenced)) {
+          Object.assign(placeholder, dereferenced);
+          resolved = placeholder;
+        } else {
+          resolved = {};
+          cache.set(ref, resolved);
+        }
       }
       const { $ref: _ref, ...rest } = obj;
+      if (Object.keys(rest).length === 0) {
+        return resolved;
+      }
       return processNode({ ...resolved, ...rest });
     }
 
@@ -584,11 +600,30 @@ export function toPropertyInfo(
   schema: JSONSchema | null,
   name: string,
   path: string[],
-  parentRequired: string[] = []
+  parentRequired: string[] = [],
+  seen = new WeakSet<object>()
 ): SchemaPropertyInfo | null {
   if (!schema) {
     return null;
   }
+
+  if (seen.has(schema)) {
+    return {
+      name,
+      path,
+      type: resolveType(schema),
+      description: schema.description,
+      default: schema.default,
+      enum: collectEnumValues(schema),
+      required: parentRequired.includes(name),
+      deprecated: schema.deprecated,
+      examples: schema.examples,
+      title: schema.title,
+      format: schema.format,
+      pattern: schema.pattern,
+    };
+  }
+  seen.add(schema);
 
   const typeValue = resolveType(schema);
   const isRequired = parentRequired.includes(name);
@@ -617,7 +652,8 @@ export function toPropertyInfo(
         propSchema,
         key,
         [...path, key],
-        childRequired
+        childRequired,
+        seen
       );
       if (childInfo) {
         info.properties[key] = childInfo;
@@ -628,13 +664,16 @@ export function toPropertyInfo(
   // Add items info for arrays
   if (schema.items && !Array.isArray(schema.items)) {
     info.items =
-      toPropertyInfo(schema.items, 'items', [...path, '[]'], []) || undefined;
+      toPropertyInfo(schema.items, 'items', [...path, '[]'], [], seen) ||
+      undefined;
   }
 
   // Add oneOf info
   if (schema.oneOf) {
     info.oneOf = schema.oneOf
-      .map((variant, i) => toPropertyInfo(variant, `option${i + 1}`, path, []))
+      .map((variant, i) =>
+        toPropertyInfo(variant, `option${i + 1}`, path, [], seen)
+      )
       .filter((v): v is SchemaPropertyInfo => v !== null);
   }
 

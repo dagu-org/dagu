@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { components } from '../../../../api/v1/schema';
 import { parse as parseYaml } from 'yaml';
 import { dereferenceSchema, type JSONSchema } from '@/lib/schema-utils';
@@ -74,6 +77,15 @@ function appendUniqueAllOf(
   return result;
 }
 
+function customStepTypeHintKey(hint: EditorCustomStepTypeHint): string {
+  return JSON.stringify({
+    description: hint.description ?? '',
+    inputSchema: hint.inputSchema,
+    name: hint.name,
+    targetType: hint.targetType,
+  });
+}
+
 function isCustomTypeEnumBranch(
   schema: JSONSchema,
   customTypeNames: string[]
@@ -138,6 +150,23 @@ function isStepLikeSchema(schema: JSONSchema): boolean {
   );
 }
 
+function isStepSchemaCandidate(schema: JSONSchema): boolean {
+  if (!isStepLikeSchema(schema)) {
+    return false;
+  }
+
+  const typeSchema = schema.properties?.type;
+  if (!isRecord(typeSchema)) {
+    return false;
+  }
+
+  return (
+    typeSchema.$ref === '#/definitions/executorType' ||
+    Array.isArray(typeSchema.anyOf) ||
+    Array.isArray(typeSchema.oneOf)
+  );
+}
+
 function augmentStepSchema(
   stepSchema: JSONSchema,
   customStepRules: JSONSchema[],
@@ -156,10 +185,14 @@ function augmentStepSchema(
   }
 }
 
-function visitSchemas(node: unknown, visitor: (schema: JSONSchema) => void) {
+function visitSchemas(
+  node: unknown,
+  visitor: (schema: JSONSchema, path: string[]) => void,
+  path: string[] = []
+) {
   if (Array.isArray(node)) {
-    for (const item of node) {
-      visitSchemas(item, visitor);
+    for (const [index, item] of node.entries()) {
+      visitSchemas(item, visitor, [...path, String(index)]);
     }
     return;
   }
@@ -168,11 +201,43 @@ function visitSchemas(node: unknown, visitor: (schema: JSONSchema) => void) {
     return;
   }
 
-  visitor(node as JSONSchema);
+  visitor(node as JSONSchema, path);
 
-  for (const value of Object.values(node)) {
-    visitSchemas(value, visitor);
+  for (const [key, value] of Object.entries(node)) {
+    visitSchemas(value, visitor, [...path, key]);
   }
+}
+
+function collectStepSchemaPaths(schema: JSONSchema): string[][] {
+  const pathMap = new Map<string, string[]>();
+
+  visitSchemas(schema, (candidate, path) => {
+    if (candidate.$ref === '#/definitions/step' || isStepSchemaCandidate(candidate)) {
+      pathMap.set(path.join('/'), path);
+    }
+  });
+
+  return Array.from(pathMap.values());
+}
+
+function getNodeAtPath(root: unknown, path: string[]): JSONSchema | null {
+  let current = root;
+  for (const segment of path) {
+    if (Array.isArray(current)) {
+      const index = Number.parseInt(segment, 10);
+      if (Number.isNaN(index)) {
+        return null;
+      }
+      current = current[index];
+      continue;
+    }
+    if (!isRecord(current)) {
+      return null;
+    }
+    current = current[segment];
+  }
+
+  return isRecord(current) ? (current as JSONSchema) : null;
 }
 
 export function toInheritedCustomStepTypeHints(
@@ -274,6 +339,28 @@ export function mergeCustomStepTypeHints(
   );
 }
 
+export function customStepTypeHintsEqual(
+  left: EditorCustomStepTypeHint[],
+  right: EditorCustomStepTypeHint[]
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftHint = left[index];
+    const rightHint = right[index];
+    if (!leftHint || !rightHint) {
+      return false;
+    }
+    if (customStepTypeHintKey(leftHint) !== customStepTypeHintKey(rightHint)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function buildAugmentedDAGSchema(
   baseSchema: JSONSchema,
   stepTypes: EditorCustomStepTypeHint[]
@@ -284,10 +371,9 @@ export function buildAugmentedDAGSchema(
 
   const augmented = cloneJson(baseSchema);
   const definitions = augmented.definitions;
-  const stepSchema = definitions?.step;
-  const executorTypeSchema = definitions?.executorType;
+  const stepSchemaPaths = collectStepSchemaPaths(augmented);
 
-  if (!definitions || !stepSchema || !executorTypeSchema) {
+  if (!definitions) {
     return baseSchema;
   }
 
@@ -329,13 +415,6 @@ export function buildAugmentedDAGSchema(
     definitions: customDefinitions,
   };
 
-  stepSchema.allOf = appendUniqueAllOf(stepSchema.allOf, customStepRules);
-  augmentExecutorTypeSchema(
-    executorTypeSchema,
-    customTypeNames,
-    customTypeDescriptions
-  );
-
   const resolved = dereferenceSchema(augmented);
   const resolvedCustomStepRules =
     dereferenceSchema({
@@ -347,9 +426,10 @@ export function buildAugmentedDAGSchema(
       allOf: cloneJson(customStepRules),
     }).allOf ?? customStepRules;
 
-  visitSchemas(resolved, (schema) => {
-    if (!isStepLikeSchema(schema)) {
-      return;
+  for (const path of stepSchemaPaths) {
+    const schema = getNodeAtPath(resolved, path);
+    if (!schema || !isStepLikeSchema(schema)) {
+      continue;
     }
     augmentStepSchema(
       schema,
@@ -357,7 +437,7 @@ export function buildAugmentedDAGSchema(
       customTypeNames,
       customTypeDescriptions
     );
-  });
+  }
 
   return resolved;
 }

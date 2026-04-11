@@ -200,6 +200,67 @@ steps:
 	require.Equal(t, "string", message["type"])
 }
 
+func TestGetDAGDetails_EditorHintsKeepDistinctDescriptions(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	require.NoError(t, os.WriteFile(helper.Config.Paths.BaseConfig, []byte(`
+step_types:
+  greet:
+    type: command
+    description: First description
+    input_schema:
+      type: object
+      properties: {}
+    template:
+      exec:
+        command: echo
+  wave:
+    type: command
+    description: Second description
+    input_schema:
+      type: object
+      properties: {}
+    template:
+      exec:
+        command: echo
+`), 0o600))
+
+	dag := helper.DAG(t, `
+name: inherited-editor-hint-descriptions
+steps:
+  - command: echo hi
+`)
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.GetDAGDetails(context.Background(), openapi.GetDAGDetailsRequestObject{
+		FileName: dag.FileName(),
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.GetDAGDetails200JSONResponse)
+	require.True(t, ok)
+	require.NotNil(t, resp.EditorHints)
+	require.Len(t, resp.EditorHints.InheritedCustomStepTypes, 2)
+
+	require.NotNil(t, resp.EditorHints.InheritedCustomStepTypes[0].Description)
+	require.NotNil(t, resp.EditorHints.InheritedCustomStepTypes[1].Description)
+	require.Equal(t, "First description", *resp.EditorHints.InheritedCustomStepTypes[0].Description)
+	require.Equal(t, "Second description", *resp.EditorHints.InheritedCustomStepTypes[1].Description)
+}
+
 func TestGetDAGDetails_InvalidYAMLStillReturnsEditorHints(t *testing.T) {
 	t.Parallel()
 

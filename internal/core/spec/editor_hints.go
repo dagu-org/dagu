@@ -53,27 +53,39 @@ func InheritedCustomStepTypeEditorHints(baseConfig []byte) ([]CustomStepTypeEdit
 	hints := make([]CustomStepTypeEditorHint, 0, len(names))
 	for _, name := range names {
 		entry := registry.entries[name]
-		if entry == nil || entry.InputSchema == nil || entry.InputSchema.Schema() == nil {
+		hint, ok, err := editorHintForCustomStepType(entry)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
 			continue
 		}
-
-		schemaData, err := json.Marshal(entry.InputSchema.Schema())
-		if err != nil {
-			return nil, fmt.Errorf("marshal input schema for %q: %w", entry.Name, err)
-		}
-
-		var schemaMap map[string]any
-		if err := json.Unmarshal(schemaData, &schemaMap); err != nil {
-			return nil, fmt.Errorf("unmarshal input schema for %q: %w", entry.Name, err)
-		}
-
-		hints = append(hints, CustomStepTypeEditorHint{
-			Name:        entry.Name,
-			TargetType:  entry.Type,
-			Description: entry.Description,
-			InputSchema: schemaMap,
-		})
+		hints = append(hints, hint)
 	}
 
 	return hints, nil
+}
+
+func editorHintForCustomStepType(entry *customStepType) (CustomStepTypeEditorHint, bool, error) {
+	if entry == nil {
+		return CustomStepTypeEditorHint{}, false, nil
+	}
+
+	schemaMap := map[string]any{}
+	if entry.InputSchema != nil && entry.InputSchema.Schema() != nil {
+		schemaData, err := json.Marshal(entry.InputSchema.Schema())
+		if err != nil {
+			return CustomStepTypeEditorHint{}, false, fmt.Errorf("marshal input schema for %q: %w", entry.Name, err)
+		}
+		if err := json.Unmarshal(schemaData, &schemaMap); err != nil {
+			return CustomStepTypeEditorHint{}, false, fmt.Errorf("unmarshal input schema for %q: %w", entry.Name, err)
+		}
+	}
+
+	return CustomStepTypeEditorHint{
+		Name:        entry.Name,
+		TargetType:  entry.Type,
+		Description: entry.Description,
+		InputSchema: schemaMap,
+	}, true, nil
 }
