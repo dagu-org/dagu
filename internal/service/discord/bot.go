@@ -25,6 +25,9 @@ import (
 const maxDiscordMessageLen = 2000
 const defaultIncomingBatchDelay = 750 * time.Millisecond
 const defaultTypingRefreshInterval = 7 * time.Second
+const maxDiscordButtonsPerRow = 5
+const maxDiscordActionRows = 5
+const maxDiscordPromptOptions = maxDiscordButtonsPerRow * maxDiscordActionRows
 
 // AgentService is the subset of the agent API that the Discord bot requires.
 type AgentService = chatbridge.AgentService
@@ -56,10 +59,13 @@ type chatState struct {
 
 	channelID string
 
-	typingMu      sync.Mutex
-	typingCancel  context.CancelFunc
-	typingDone    chan struct{}
-	typingLoopGen uint64
+	promptMu              sync.Mutex
+	pendingPromptOptions  map[string]string
+	pendingPromptFreeText bool
+	typingMu              sync.Mutex
+	typingCancel          context.CancelFunc
+	typingDone            chan struct{}
+	typingLoopGen         uint64
 }
 
 // Bot is a Discord bot that forwards messages to the Dagu agent API.
@@ -263,11 +269,14 @@ func (b *Bot) handleInteractionCreate(ctx context.Context, i *discordgo.Interact
 	channelID := i.ChannelID
 	cs := b.getOrCreateChat(channelID)
 	sid, ownerUID := cs.ActiveSession()
-	cs.ClearPendingPrompt()
 
 	b.ackInteraction(i.Interaction)
 
 	if sid == "" {
+		return
+	}
+	if cs.PendingPromptID() != promptID {
+		b.sendText(channelID, "That prompt is no longer active.")
 		return
 	}
 
@@ -287,25 +296,19 @@ func (b *Bot) handleInteractionCreate(ctx context.Context, i *discordgo.Interact
 		return
 	}
 
+	cs.clearPendingPromptState()
 	b.updateInteractionMessage(channelID, i.Message, optionID)
 }
 
 func (b *Bot) updateInteractionMessage(channelID string, msg *discordgo.Message, optionID string) {
 	// Update the original message in-place to show the selection and remove
 	// the now-consumed buttons.
-	updatedContent := ""
-	if msg != nil {
-		updatedContent = msg.Content + "\n\nSelected: " + optionID
-	} else {
-		updatedContent = "Selected: " + optionID
-	}
-
 	emptyComponents := []discordgo.MessageComponent{}
 	if msg == nil {
 		return
 	}
 
-	edit := discordgo.NewMessageEdit(channelID, msg.ID).SetContent(updatedContent)
+	edit := discordgo.NewMessageEdit(channelID, msg.ID).SetContent("Selection received: " + optionID)
 	edit.Components = &emptyComponents
 	if _, err := b.client.ChannelMessageEditComplex(edit); err != nil {
 		b.logger.Warn("Failed to update interaction message", slog.String("error", err.Error()))
@@ -341,6 +344,7 @@ func (b *Bot) handleTextCommand(ctx context.Context, cs *chatState, channelID, c
 			b.sendText(channelID, "Failed to cancel session: "+err.Error())
 			return
 		}
+		b.resetChat(cs)
 		b.sendText(channelID, "Session cancelled.")
 	}
 }
@@ -442,22 +446,27 @@ func (b *Bot) sendAgentMessage(ctx context.Context, cs *chatState, channelID str
 // submitPromptResponse submits a text response to a pending agent prompt.
 func (b *Bot) submitPromptResponse(ctx context.Context, cs *chatState, channelID, promptID, text string) {
 	sid, ownerUserID := cs.ActiveSession()
-	cs.ClearPendingPrompt()
-
 	if sid == "" {
 		return
 	}
+	if cs.PendingPromptID() != promptID {
+		b.sendText(channelID, "That prompt is no longer active.")
+		return
+	}
 
-	resp := agent.UserPromptResponse{
-		PromptID:         promptID,
-		FreeTextResponse: text,
+	resp, ok := cs.promptResponse(promptID, text)
+	if !ok {
+		b.sendText(channelID, "Please use one of the prompt options.")
+		return
 	}
 
 	b.startTypingLoop(ctx, cs, channelID)
 	if err := b.agentAPI.SubmitUserResponse(ctx, sid, ownerUserID, resp); err != nil {
 		b.stopTypingLoop(cs)
 		b.sendText(channelID, "Failed to submit response: "+err.Error())
+		return
 	}
+	cs.clearPendingPromptState()
 }
 
 // ---------------------------------------------------------------------------
@@ -595,7 +604,7 @@ func (b *Bot) processStreamResponse(ctx context.Context, cs *chatState, channelI
 
 // sendPrompt sends a user prompt with interactive buttons.
 func (b *Bot) sendPrompt(cs *chatState, channelID string, prompt *agent.UserPrompt) {
-	cs.SetPendingPrompt(prompt.PromptID)
+	cs.setPendingPrompt(prompt)
 
 	text := prompt.Question
 	if prompt.Command != "" {
@@ -606,7 +615,12 @@ func (b *Bot) sendPrompt(cs *chatState, channelID string, prompt *agent.UserProm
 	}
 
 	if len(prompt.Options) == 0 {
-		b.sendText(channelID, text)
+		b.sendLongText(channelID, text)
+		return
+	}
+	if len(prompt.Options) > maxDiscordPromptOptions {
+		text += "\n\nReply with one of these option IDs:\n" + formatPromptOptions(prompt.Options)
+		b.sendLongText(channelID, text)
 		return
 	}
 
@@ -628,15 +642,12 @@ func (b *Bot) sendPrompt(cs *chatState, channelID string, prompt *agent.UserProm
 			Style:    discordgo.PrimaryButton,
 			CustomID: customID,
 		})
-		if len(current) == 5 {
+		if len(current) == maxDiscordButtonsPerRow {
 			rows = append(rows, discordgo.ActionsRow{Components: current})
 			current = nil
-			if len(rows) == 5 {
-				break
-			}
 		}
 	}
-	if len(current) > 0 && len(rows) < 5 {
+	if len(current) > 0 && len(rows) < maxDiscordActionRows {
 		rows = append(rows, discordgo.ActionsRow{Components: current})
 	}
 
@@ -811,6 +822,7 @@ func (b *Bot) resetChat(cs *chatState) {
 	if cancel := cs.Reset(); cancel != nil {
 		cancel()
 	}
+	cs.clearPendingPromptMetadata()
 	b.stopTypingLoop(cs)
 }
 
@@ -843,9 +855,77 @@ func notificationChatKey(channelID string) string {
 	return "notifications:" + channelID
 }
 
+func (cs *chatState) setPendingPrompt(prompt *agent.UserPrompt) {
+	cs.SetPendingPrompt(prompt.PromptID)
+
+	cs.promptMu.Lock()
+	defer cs.promptMu.Unlock()
+
+	cs.pendingPromptFreeText = prompt.AllowFreeText || len(prompt.Options) == 0
+	if len(prompt.Options) == 0 {
+		cs.pendingPromptOptions = nil
+		return
+	}
+
+	options := make(map[string]string, len(prompt.Options))
+	for _, opt := range prompt.Options {
+		if key := normalizePromptOptionInput(opt.ID); key != "" {
+			options[key] = opt.ID
+		}
+	}
+	cs.pendingPromptOptions = options
+}
+
+func (cs *chatState) clearPendingPromptState() {
+	cs.ClearPendingPrompt()
+	cs.clearPendingPromptMetadata()
+}
+
+func (cs *chatState) clearPendingPromptMetadata() {
+	cs.promptMu.Lock()
+	defer cs.promptMu.Unlock()
+	cs.pendingPromptOptions = nil
+	cs.pendingPromptFreeText = false
+}
+
+func (cs *chatState) promptResponse(promptID, text string) (agent.UserPromptResponse, bool) {
+	cs.promptMu.Lock()
+	defer cs.promptMu.Unlock()
+
+	resp := agent.UserPromptResponse{PromptID: promptID}
+	if optionID, ok := cs.pendingPromptOptions[normalizePromptOptionInput(text)]; ok {
+		resp.SelectedOptionIDs = []string{optionID}
+		return resp, true
+	}
+	if len(cs.pendingPromptOptions) > 0 && !cs.pendingPromptFreeText {
+		return agent.UserPromptResponse{}, false
+	}
+	resp.FreeTextResponse = text
+	return resp, true
+}
+
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
+
+func formatPromptOptions(options []agent.UserPromptOption) string {
+	var b strings.Builder
+	for _, opt := range options {
+		fmt.Fprintf(&b, "- %s", opt.ID)
+		if opt.Label != "" {
+			fmt.Fprintf(&b, ": %s", opt.Label)
+		}
+		if opt.Description != "" {
+			fmt.Fprintf(&b, " - %s", opt.Description)
+		}
+		b.WriteByte('\n')
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func normalizePromptOptionInput(text string) string {
+	return strings.ToLower(strings.TrimSpace(text))
+}
 
 // splitMessage splits text into chunks that fit within the Discord message limit.
 func splitMessage(text string, maxLen int) []string {

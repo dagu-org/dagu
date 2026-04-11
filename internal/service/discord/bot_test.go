@@ -24,8 +24,14 @@ import (
 type fakeDiscordClient struct {
 	mu                   sync.Mutex
 	sentMessages         []string
+	sentComplexMessages  []sentDiscordMessage
 	editedMessages       []editedDiscordMessage
 	interactionResponses []discordgo.InteractionResponseType
+}
+
+type sentDiscordMessage struct {
+	content       string
+	componentsLen int
 }
 
 type editedDiscordMessage struct {
@@ -44,12 +50,18 @@ func (c *fakeDiscordClient) ChannelMessageSend(_ string, content string, _ ...di
 
 func (c *fakeDiscordClient) ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, _ ...discordgo.RequestOption) (*discordgo.Message, error) {
 	content := ""
+	componentsLen := 0
 	if data != nil {
 		content = data.Content
+		componentsLen = len(data.Components)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.sentMessages = append(c.sentMessages, content)
+	c.sentComplexMessages = append(c.sentComplexMessages, sentDiscordMessage{
+		content:       content,
+		componentsLen: componentsLen,
+	})
 	return &discordgo.Message{ID: "sent", ChannelID: channelID, Content: content}, nil
 }
 
@@ -97,8 +109,10 @@ type fakeDiscordAgentService struct {
 	nextSequenceID   int64
 	createEmptyCalls int
 	appendSessionIDs []string
+	cancelCalls      int
 	submitResponses  []agent.UserPromptResponse
 	onSubmit         func()
+	submitErr        error
 }
 
 func (s *fakeDiscordAgentService) CreateSession(_ context.Context, _ agent.UserIdentity, _ agent.ChatRequest) (string, string, error) {
@@ -129,6 +143,9 @@ func (s *fakeDiscordAgentService) FlushQueuedChatMessage(_ context.Context, sess
 }
 
 func (s *fakeDiscordAgentService) CancelSession(context.Context, string, string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cancelCalls++
 	return nil
 }
 
@@ -138,6 +155,9 @@ func (s *fakeDiscordAgentService) SubmitUserResponse(_ context.Context, _ string
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.submitErr != nil {
+		return s.submitErr
+	}
 	s.submitResponses = append(s.submitResponses, resp)
 	return nil
 }
@@ -216,7 +236,7 @@ func TestHandleMessageCreate_AllowsPendingPromptReplyWithoutMention(t *testing.T
 
 	cs := bot.getOrCreateChat("C1")
 	bot.setActiveSession(cs, "session-1", "discord:C1")
-	cs.SetPendingPrompt("prompt-1")
+	cs.setPendingPrompt(&agent.UserPrompt{PromptID: "prompt-1", AllowFreeText: true})
 
 	bot.handleMessageCreate(context.Background(), &discordgo.MessageCreate{
 		Message: &discordgo.Message{
@@ -254,7 +274,12 @@ func TestHandleInteractionCreate_AcksBeforeSubmittingAndEditsMessage(t *testing.
 
 	cs := bot.getOrCreateChat("C1")
 	bot.setActiveSession(cs, "session-1", "discord:C1")
-	cs.SetPendingPrompt("prompt-1")
+	cs.setPendingPrompt(&agent.UserPrompt{
+		PromptID: "prompt-1",
+		Options: []agent.UserPromptOption{
+			{ID: "option-a", Label: "Option A"},
+		},
+	})
 
 	bot.handleInteractionCreate(context.Background(), &discordgo.InteractionCreate{
 		Interaction: &discordgo.Interaction{
@@ -276,8 +301,138 @@ func TestHandleInteractionCreate_AcksBeforeSubmittingAndEditsMessage(t *testing.
 	require.Len(t, client.editedMessages, 1)
 	assert.Equal(t, "C1", client.editedMessages[0].channelID)
 	assert.Equal(t, "message-1", client.editedMessages[0].messageID)
-	assert.Contains(t, client.editedMessages[0].content, "Selected: option-a")
+	assert.Equal(t, "Selection received: option-a", client.editedMessages[0].content)
 	assert.Equal(t, 0, client.editedMessages[0].componentsLen)
+	assert.Empty(t, cs.PendingPromptID())
+}
+
+func TestHandleInteractionCreate_RejectsStalePromptClick(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeDiscordClient{}
+	service := &fakeDiscordAgentService{}
+	bot := &Bot{
+		cfg:             Config{RespondToAll: false},
+		agentAPI:        service,
+		client:          client,
+		allowedChannels: map[string]struct{}{"C1": {}},
+		logger:          testDiscordLogger(),
+	}
+
+	cs := bot.getOrCreateChat("C1")
+	bot.setActiveSession(cs, "session-1", "discord:C1")
+	cs.setPendingPrompt(&agent.UserPrompt{
+		PromptID: "prompt-2",
+		Options: []agent.UserPromptOption{
+			{ID: "option-a", Label: "Option A"},
+		},
+	})
+
+	bot.handleInteractionCreate(context.Background(), &discordgo.InteractionCreate{
+		Interaction: &discordgo.Interaction{
+			ID:        "interaction-1",
+			Type:      discordgo.InteractionMessageComponent,
+			ChannelID: "C1",
+			Data: discordgo.MessageComponentInteractionData{
+				CustomID: "prompt:prompt-1:option-a",
+			},
+			Message: &discordgo.Message{
+				ID:      "message-1",
+				Content: "Choose an option",
+			},
+		},
+	})
+
+	require.Equal(t, []discordgo.InteractionResponseType{discordgo.InteractionResponseDeferredMessageUpdate}, client.interactionResponses)
+	assert.Empty(t, client.editedMessages)
+	assert.Equal(t, []string{"That prompt is no longer active."}, client.sentMessages)
+	service.mu.Lock()
+	assert.Empty(t, service.submitResponses)
+	service.mu.Unlock()
+	assert.Equal(t, "prompt-2", cs.PendingPromptID())
+}
+
+func TestSubmitPromptResponse_PreservesPendingPromptOnError(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeDiscordClient{}
+	service := &fakeDiscordAgentService{submitErr: assert.AnError}
+	bot := &Bot{
+		agentAPI: service,
+		client:   client,
+		logger:   testDiscordLogger(),
+	}
+
+	cs := bot.getOrCreateChat("C1")
+	bot.setActiveSession(cs, "session-1", "discord:C1")
+	cs.setPendingPrompt(&agent.UserPrompt{PromptID: "prompt-1", AllowFreeText: true})
+
+	bot.submitPromptResponse(context.Background(), cs, "C1", "prompt-1", "free-form answer")
+
+	assert.Equal(t, "prompt-1", cs.PendingPromptID())
+	assert.Equal(t, []string{"Failed to submit response: assert.AnError general error for testing"}, client.sentMessages)
+}
+
+func TestHandleTextCommand_CancelResetsChatState(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeDiscordAgentService{}
+	bot := &Bot{
+		agentAPI: service,
+		client:   &fakeDiscordClient{},
+		logger:   testDiscordLogger(),
+	}
+
+	cs := bot.getOrCreateChat("C1")
+	bot.setActiveSession(cs, "session-1", "discord:C1")
+	cs.setPendingPrompt(&agent.UserPrompt{PromptID: "prompt-1", AllowFreeText: true})
+
+	bot.handleTextCommand(context.Background(), cs, "C1", "cancel")
+
+	assert.Empty(t, cs.SessionID())
+	assert.Empty(t, cs.PendingPromptID())
+	service.mu.Lock()
+	assert.Equal(t, 1, service.cancelCalls)
+	service.mu.Unlock()
+}
+
+func TestSendPrompt_OverflowFallsBackToTextOptionIDs(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeDiscordClient{}
+	service := &fakeDiscordAgentService{}
+	bot := &Bot{
+		cfg:      Config{RespondToAll: true},
+		agentAPI: service,
+		client:   client,
+		logger:   testDiscordLogger(),
+	}
+
+	options := make([]agent.UserPromptOption, 0, maxDiscordPromptOptions+1)
+	for i := 1; i <= maxDiscordPromptOptions+1; i++ {
+		options = append(options, agent.UserPromptOption{
+			ID:    fmt.Sprintf("opt-%02d", i),
+			Label: fmt.Sprintf("Option %02d", i),
+		})
+	}
+
+	cs := bot.getOrCreateChat("C1")
+	bot.setActiveSession(cs, "session-1", "discord:C1")
+	bot.sendPrompt(cs, "C1", &agent.UserPrompt{
+		PromptID: "prompt-1",
+		Question: "Choose an option",
+		Options:  options,
+	})
+	bot.submitPromptResponse(context.Background(), cs, "C1", "prompt-1", "opt-26")
+
+	assert.Empty(t, client.sentComplexMessages)
+	require.NotEmpty(t, client.sentMessages)
+	assert.Contains(t, client.sentMessages[0], "Reply with one of these option IDs:")
+	assert.Contains(t, client.sentMessages[0], "opt-26")
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	require.Len(t, service.submitResponses, 1)
+	assert.Equal(t, []string{"opt-26"}, service.submitResponses[0].SelectedOptionIDs)
 }
 
 func TestDAGRunMonitor_UsesDedicatedNotificationState(t *testing.T) {
