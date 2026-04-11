@@ -143,6 +143,34 @@ export interface SchemaPropertyInfo {
   pattern?: string;
 }
 
+function collectEnumValues(schema: JSONSchema): unknown[] | undefined {
+  const values: unknown[] = [];
+  const seen = new Set<string>();
+
+  const addValues = (items?: unknown[]) => {
+    for (const item of items ?? []) {
+      const key = JSON.stringify(item);
+      if (seen.has(key)) {
+        continue;
+      }
+      values.push(item);
+      seen.add(key);
+    }
+  };
+
+  addValues(schema.enum);
+
+  for (const variant of schema.oneOf ?? []) {
+    addValues(collectEnumValues(variant));
+  }
+
+  for (const variant of schema.anyOf ?? []) {
+    addValues(collectEnumValues(variant));
+  }
+
+  return values.length > 0 ? values : undefined;
+}
+
 /**
  * Gets a value from a parsed YAML document at the specified path
  */
@@ -571,7 +599,7 @@ export function toPropertyInfo(
     type: typeValue,
     description: schema.description,
     default: schema.default,
-    enum: schema.enum,
+    enum: collectEnumValues(schema),
     required: isRequired,
     deprecated: schema.deprecated,
     examples: schema.examples,

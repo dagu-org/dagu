@@ -4,7 +4,12 @@ import {
   extractLocalCustomStepTypeHints,
   mergeCustomStepTypeHints,
 } from '../customStepSchema';
-import { getSchemaAtPath, type JSONSchema } from '@/lib/schema-utils';
+import {
+  dereferenceSchema,
+  getSchemaAtPath,
+  toPropertyInfo,
+  type JSONSchema,
+} from '@/lib/schema-utils';
 
 const baseSchema: JSONSchema = {
   type: 'object',
@@ -43,6 +48,8 @@ const baseSchema: JSONSchema = {
     },
   },
 };
+
+const dereferencedBaseSchema = dereferenceSchema(baseSchema);
 
 describe('customStepSchema', () => {
   it('extracts local custom step types from YAML', () => {
@@ -115,6 +122,68 @@ steps:
     );
 
     expect(propertySchema).toMatchObject({ type: 'integer' });
+  });
+
+  it('augments dereferenced step schemas with custom config inference', () => {
+    const schema = buildAugmentedDAGSchema(dereferencedBaseSchema, [
+      {
+        name: 'greet',
+        targetType: 'command',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            count: { type: 'integer' },
+          },
+        },
+      },
+    ]);
+
+    const propertySchema = getSchemaAtPath(
+      schema,
+      ['steps', '0', 'config', 'count'],
+      `
+steps:
+  - type: greet
+    config:
+      count: 1
+`
+    );
+
+    expect(propertySchema).toMatchObject({ type: 'integer' });
+  });
+
+  it('shows builtin and custom step names in type docs for dereferenced schemas', () => {
+    const schema = buildAugmentedDAGSchema(dereferencedBaseSchema, [
+      {
+        name: 'greet',
+        targetType: 'command',
+        description: 'Send a greeting',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+      },
+    ]);
+
+    const typeSchema = getSchemaAtPath(
+      schema,
+      ['steps', '0', 'type'],
+      `
+steps:
+  - type: greet
+`
+    );
+    const propertyInfo = toPropertyInfo(
+      typeSchema,
+      'type',
+      ['steps', '0', 'type']
+    );
+
+    expect(propertyInfo?.enum).toEqual(
+      expect.arrayContaining(['command', 'greet'])
+    );
   });
 
   it('resolves internal refs inside local custom input schemas', () => {

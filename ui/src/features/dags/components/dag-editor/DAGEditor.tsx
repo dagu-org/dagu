@@ -51,6 +51,14 @@ async function refreshRegisteredSchemas() {
   });
 }
 
+function getDocumentSchemaUri(modelUri: string): string {
+  const stableId = modelUri
+    .replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `inmemory://dagu-schema/${stableId || 'document'}.schema.json`;
+}
+
 /**
  * Cursor position information
  */
@@ -108,10 +116,16 @@ function DAGEditor({
   }, []);
 
   useEffect(() => {
+    const documentSchemaUri = getDocumentSchemaUri(effectiveModelUri);
     schemaRegistrations.set(effectiveModelUri, {
       fileMatch: effectiveModelUri,
-      uri: schema ? `${effectiveModelUri}#schema` : schemaUrl,
-      schema: schema ? (schema as MonacoJSONSchema) : undefined,
+      uri: schema ? documentSchemaUri : schemaUrl,
+      schema: schema
+        ? ({
+            ...schema,
+            $id: documentSchemaUri,
+          } as MonacoJSONSchema)
+        : undefined,
     });
     void refreshRegisteredSchemas();
 

@@ -55,6 +55,126 @@ function rewriteInternalRefs(value: unknown, basePointer: string): unknown {
   return rewritten;
 }
 
+function appendUniqueAllOf(
+  existing: JSONSchema[] | undefined,
+  additions: JSONSchema[]
+): JSONSchema[] {
+  const result = [...(existing ?? [])];
+  const seen = new Set(result.map((item) => JSON.stringify(item)));
+
+  for (const addition of additions) {
+    const key = JSON.stringify(addition);
+    if (seen.has(key)) {
+      continue;
+    }
+    result.push(cloneJson(addition));
+    seen.add(key);
+  }
+
+  return result;
+}
+
+function isCustomTypeEnumBranch(
+  schema: JSONSchema,
+  customTypeNames: string[]
+): boolean {
+  if (!Array.isArray(schema.enum)) {
+    return false;
+  }
+
+  if (schema.enum.length !== customTypeNames.length) {
+    return false;
+  }
+
+  return customTypeNames.every((name, index) => schema.enum?.[index] === name);
+}
+
+function buildCustomTypeEnumBranch(
+  customTypeNames: string[],
+  customTypeDescriptions: string[]
+): JSONSchema {
+  return {
+    type: 'string',
+    enum: customTypeNames,
+    enumDescriptions: customTypeDescriptions,
+    description:
+      'Custom step type declared in step_types or inherited from base config.',
+  };
+}
+
+function augmentExecutorTypeSchema(
+  schema: JSONSchema,
+  customTypeNames: string[],
+  customTypeDescriptions: string[]
+) {
+  if (!Array.isArray(schema.anyOf)) {
+    return;
+  }
+
+  const customTypeBranch = buildCustomTypeEnumBranch(
+    customTypeNames,
+    customTypeDescriptions
+  );
+  const anyOfWithoutCustomBranch = schema.anyOf.filter(
+    (entry) =>
+      !isRecord(entry) ||
+      !isCustomTypeEnumBranch(entry as JSONSchema, customTypeNames)
+  );
+
+  schema.anyOf = [
+    ...(anyOfWithoutCustomBranch.slice(0, 1) as JSONSchema[]),
+    customTypeBranch,
+    ...(anyOfWithoutCustomBranch.slice(1) as JSONSchema[]),
+  ];
+}
+
+function isStepLikeSchema(schema: JSONSchema): boolean {
+  const properties = schema.properties;
+  return (
+    schema.type === 'object' &&
+    !!properties &&
+    isRecord(properties.type) &&
+    isRecord(properties.config)
+  );
+}
+
+function augmentStepSchema(
+  stepSchema: JSONSchema,
+  customStepRules: JSONSchema[],
+  customTypeNames: string[],
+  customTypeDescriptions: string[]
+) {
+  stepSchema.allOf = appendUniqueAllOf(stepSchema.allOf, customStepRules);
+
+  const typeSchema = stepSchema.properties?.type;
+  if (isRecord(typeSchema)) {
+    augmentExecutorTypeSchema(
+      typeSchema as JSONSchema,
+      customTypeNames,
+      customTypeDescriptions
+    );
+  }
+}
+
+function visitSchemas(node: unknown, visitor: (schema: JSONSchema) => void) {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      visitSchemas(item, visitor);
+    }
+    return;
+  }
+
+  if (!isRecord(node)) {
+    return;
+  }
+
+  visitor(node as JSONSchema);
+
+  for (const value of Object.values(node)) {
+    visitSchemas(value, visitor);
+  }
+}
+
 export function toInheritedCustomStepTypeHints(
   editorHints?: components['schemas']['DAGEditorHints']
 ): EditorCustomStepTypeHint[] {
@@ -209,19 +329,35 @@ export function buildAugmentedDAGSchema(
     definitions: customDefinitions,
   };
 
-  stepSchema.allOf = [...(stepSchema.allOf ?? []), ...customStepRules];
+  stepSchema.allOf = appendUniqueAllOf(stepSchema.allOf, customStepRules);
+  augmentExecutorTypeSchema(
+    executorTypeSchema,
+    customTypeNames,
+    customTypeDescriptions
+  );
 
-  executorTypeSchema.anyOf = [
-    ...(executorTypeSchema.anyOf?.slice(0, 1) ?? []),
-    {
-      type: 'string',
-      enum: customTypeNames,
-      enumDescriptions: customTypeDescriptions,
-      description:
-        'Custom step type declared in step_types or inherited from base config.',
-    },
-    ...(executorTypeSchema.anyOf?.slice(1) ?? []),
-  ];
+  const resolved = dereferenceSchema(augmented);
+  const resolvedCustomStepRules =
+    dereferenceSchema({
+      definitions: {
+        [localCustomSchemaDefinitionsKey]: {
+          definitions: customDefinitions,
+        },
+      },
+      allOf: cloneJson(customStepRules),
+    }).allOf ?? customStepRules;
 
-  return dereferenceSchema(augmented);
+  visitSchemas(resolved, (schema) => {
+    if (!isStepLikeSchema(schema)) {
+      return;
+    }
+    augmentStepSchema(
+      schema,
+      resolvedCustomStepRules,
+      customTypeNames,
+      customTypeDescriptions
+    );
+  });
+
+  return resolved;
 }
