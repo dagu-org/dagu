@@ -83,6 +83,39 @@ func TestGetQueueFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing.T) {
 	assert.Equal(t, "fresh-run", queueResp.Running[0].DagRunId)
 }
 
+func TestGetQueueCountsQueuedItemsSeparatelyFromRunningItems(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
+	leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
+	queueStore := filequeue.New(filepath.Join(tmpDir, "queue"))
+	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
+
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "mixed-q", "running-run", "mixed-q", time.Now().Add(-time.Second))
+	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "mixed-q", "queued-run", core.Queued)
+
+	a := &API{
+		dagRunStore:         dagRunStore,
+		dagRunLeaseStore:    leaseStore,
+		queueStore:          queueStore,
+		procStore:           procStore,
+		config:              &config.Config{},
+		leaseStaleThreshold: 5 * time.Second,
+	}
+
+	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{
+		Name: "mixed-q",
+	})
+	require.NoError(t, err)
+
+	queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
+	require.True(t, ok)
+	assert.Equal(t, 1, queueResp.RunningCount)
+	assert.Equal(t, 1, queueResp.QueuedCount)
+}
+
 func TestListQueueItemsUsesCursorPaginationAndSkipsRunningEntries(t *testing.T) {
 	t.Parallel()
 
