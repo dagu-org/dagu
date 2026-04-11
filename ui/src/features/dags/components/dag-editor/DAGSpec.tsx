@@ -14,6 +14,7 @@ import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { Tab, Tabs } from '../../../../components/ui/tabs';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
+import { useSchema } from '../../../../contexts/SchemaContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import { useContentEditor } from '../../../../hooks/useContentEditor';
@@ -27,6 +28,13 @@ import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
 import { FlowchartType, Graph } from '../visualization';
 import DAGAttributes from './DAGAttributes';
+import {
+  buildAugmentedDAGSchema,
+  customStepTypeHintsEqual,
+  extractLocalCustomStepTypeHints,
+  mergeCustomStepTypeHints,
+  toInheritedCustomStepTypeHints,
+} from './customStepSchema';
 import DAGEditorWithDocs from './DAGEditorWithDocs';
 import ExternalChangeDialog from './ExternalChangeDialog';
 
@@ -38,17 +46,20 @@ type Props = {
   fileName: string;
   /** Local DAGs from parent (optional, avoids redundant fetch) */
   localDags?: components['schemas']['LocalDag'][];
+  /** Editor-only metadata used for dynamic schema synthesis */
+  editorHints?: components['schemas']['DAGEditorHints'];
 };
 
 /**
  * DAGSpec displays and allows editing of a DAG specification
  * including visualization, attributes, steps, and YAML definition
  */
-function DAGSpec({ fileName, localDags }: Props) {
+function DAGSpec({ fileName, localDags, editorHints }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const client = useClient();
   const config = useConfig();
+  const { schema: baseSchema } = useSchema();
   const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
   const { setHasUnsavedChanges } = useUnsavedChanges();
@@ -130,6 +141,62 @@ function DAGSpec({ fileName, localDags }: Props) {
     key: `${fileName}:${remoteNode}`,
     serverContent: serverSpec,
   });
+
+  const [lastGoodLocalStepTypes, setLastGoodLocalStepTypes] = React.useState(
+    () => extractLocalCustomStepTypeHints(serverSpec ?? '').stepTypes
+  );
+
+  const inheritedCustomStepTypes = React.useMemo(
+    () => toInheritedCustomStepTypeHints(editorHints),
+    [editorHints]
+  );
+
+  const parsedLocalStepTypes = React.useMemo(
+    () => extractLocalCustomStepTypeHints(currentValue ?? serverSpec ?? ''),
+    [currentValue, serverSpec]
+  );
+
+  useEffect(() => {
+    if (!parsedLocalStepTypes.ok) {
+      return;
+    }
+    setLastGoodLocalStepTypes((previous) =>
+      customStepTypeHintsEqual(previous, parsedLocalStepTypes.stepTypes)
+        ? previous
+        : parsedLocalStepTypes.stepTypes
+    );
+  }, [parsedLocalStepTypes]);
+
+  const effectiveLocalStepTypes = React.useMemo(() => {
+    if (!parsedLocalStepTypes.ok) {
+      return lastGoodLocalStepTypes;
+    }
+    return customStepTypeHintsEqual(
+      lastGoodLocalStepTypes,
+      parsedLocalStepTypes.stepTypes
+    )
+      ? lastGoodLocalStepTypes
+      : parsedLocalStepTypes.stepTypes;
+  }, [lastGoodLocalStepTypes, parsedLocalStepTypes]);
+
+  const editorSchema = React.useMemo(() => {
+    if (!baseSchema) {
+      return null;
+    }
+    return buildAugmentedDAGSchema(
+      baseSchema,
+      mergeCustomStepTypeHints(
+        inheritedCustomStepTypes,
+        effectiveLocalStepTypes
+      )
+    );
+  }, [baseSchema, effectiveLocalStepTypes, inheritedCustomStepTypes]);
+
+  const editorModelUri = React.useMemo(
+    () =>
+      `inmemory://dagu/${encodeURIComponent(remoteNode)}/dags/${encodeURIComponent(fileName)}.yaml`,
+    [fileName, remoteNode]
+  );
 
   // Sync unsaved changes context
   useEffect(() => {
@@ -420,6 +487,8 @@ function DAGSpec({ fileName, localDags }: Props) {
                       : undefined
                   }
                   className="min-h-[400px]"
+                  modelUri={editorModelUri}
+                  schema={editorSchema}
                   headerActions={
                     editable ? (
                       <>

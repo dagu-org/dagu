@@ -258,6 +258,7 @@ function DAGDetails() {
                   navigateToStatusTab={navigateToStatusTab}
                   skipHeader={true}
                   localDags={dagData?.localDags}
+                  editorHints={dagData?.editorHints}
                 />
               </>
             )}

@@ -978,6 +978,8 @@ paths:
                   spec:
                     type: string
                     description: "The DAG specification in YAML format"
+                  editorHints:
+                    $ref: "#/components/schemas/DAGEditorHints"
                 required:
                   - latestDAGRun
                   - suspended
@@ -7755,6 +7757,40 @@ components:
           $ref: "#/components/schemas/RunConfig"
       required:
         - name
+
+    DAGEditorHints:
+      type: object
+      description: "Editor-only metadata used to synthesize per-document schema hints"
+      properties:
+        inheritedCustomStepTypes:
+          type: array
+          description: "Custom step types inherited from base config and available to the current DAG"
+          items:
+            $ref: "#/components/schemas/InheritedCustomStepTypeHint"
+      required:
+        - inheritedCustomStepTypes
+
+    InheritedCustomStepTypeHint:
+      type: object
+      description: "Resolved editor hint for an inherited custom step type"
+      properties:
+        name:
+          type: string
+          description: "Custom step type name"
+        targetType:
+          type: string
+          description: "Builtin executor type that the custom step expands to"
+        description:
+          type: string
+          description: "Optional custom step description"
+        inputSchema:
+          type: object
+          additionalProperties: true
+          description: "Resolved JSON Schema object used to validate and document config input"
+      required:
+        - name
+        - targetType
+        - inputSchema
 
     ParamScalar:
       anyOf:

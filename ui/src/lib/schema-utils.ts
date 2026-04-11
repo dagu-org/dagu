@@ -15,14 +15,20 @@ export interface SchemaContext {
 }
 
 export interface JSONSchema {
+  $id?: string;
   $ref?: string;
   type?: string | string[];
   description?: string;
+  markdownDescription?: string;
   default?: unknown;
   enum?: unknown[];
+  enumDescriptions?: string[];
+  markdownEnumDescriptions?: string[];
   examples?: unknown[];
   deprecated?: boolean;
   properties?: Record<string, JSONSchema>;
+  patternProperties?: Record<string, JSONSchema>;
+  propertyNames?: JSONSchema;
   additionalProperties?: boolean | JSONSchema;
   items?: JSONSchema | JSONSchema[];
   oneOf?: JSONSchema[];
@@ -42,6 +48,97 @@ export interface JSONSchema {
   then?: JSONSchema;
   else?: JSONSchema;
   const?: unknown;
+  [key: string]: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function unescapeJsonPointerSegment(segment: string): string {
+  return segment.replace(/~1/g, '/').replace(/~0/g, '~');
+}
+
+function resolveInternalRef(root: unknown, ref: string): unknown {
+  if (ref === '#') {
+    return root;
+  }
+  if (!ref.startsWith('#/')) {
+    return {};
+  }
+
+  const segments = ref.slice(2).split('/').map(unescapeJsonPointerSegment);
+
+  let current: unknown = root;
+  for (const segment of segments) {
+    if (current === null || current === undefined) {
+      return {};
+    }
+    if (Array.isArray(current)) {
+      const index = Number.parseInt(segment, 10);
+      if (Number.isNaN(index)) {
+        return {};
+      }
+      current = current[index];
+      continue;
+    }
+    if (typeof current !== 'object') {
+      return {};
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return current ?? {};
+}
+
+/**
+ * Resolves internal $ref pointers in a JSON Schema.
+ * External refs are left untouched.
+ */
+export function dereferenceSchema(schema: JSONSchema): JSONSchema {
+  const cache = new Map<string, JSONSchema>();
+
+  function processNode(node: unknown): unknown {
+    if (!node || typeof node !== 'object') {
+      return node;
+    }
+
+    if (Array.isArray(node)) {
+      return node.map(processNode);
+    }
+
+    const obj = node as Record<string, unknown>;
+    if (typeof obj.$ref === 'string' && obj.$ref.startsWith('#')) {
+      const ref = obj.$ref;
+      let resolved = cache.get(ref);
+      if (!resolved) {
+        const placeholder: JSONSchema = {};
+        cache.set(ref, placeholder);
+
+        const dereferenced = processNode(resolveInternalRef(schema, ref));
+        if (isRecord(dereferenced)) {
+          Object.assign(placeholder, dereferenced);
+          resolved = placeholder;
+        } else {
+          resolved = {};
+          cache.set(ref, resolved);
+        }
+      }
+      const { $ref: _ref, ...rest } = obj;
+      if (Object.keys(rest).length === 0) {
+        return resolved;
+      }
+      return processNode({ ...resolved, ...rest });
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = processNode(value);
+    }
+    return result;
+  }
+
+  return processNode(schema) as JSONSchema;
 }
 
 export interface SchemaPropertyInfo {
@@ -60,6 +157,34 @@ export interface SchemaPropertyInfo {
   title?: string;
   format?: string;
   pattern?: string;
+}
+
+function collectEnumValues(schema: JSONSchema): unknown[] | undefined {
+  const values: unknown[] = [];
+  const seen = new Set<string>();
+
+  const addValues = (items?: unknown[]) => {
+    for (const item of items ?? []) {
+      const key = JSON.stringify(item);
+      if (seen.has(key)) {
+        continue;
+      }
+      values.push(item);
+      seen.add(key);
+    }
+  };
+
+  addValues(schema.enum);
+
+  for (const variant of schema.oneOf ?? []) {
+    addValues(collectEnumValues(variant));
+  }
+
+  for (const variant of schema.anyOf ?? []) {
+    addValues(collectEnumValues(variant));
+  }
+
+  return values.length > 0 ? values : undefined;
 }
 
 /**
@@ -94,7 +219,9 @@ function evaluateCondition(condition: JSONSchema, value: unknown): boolean {
   // Check properties conditions (e.g., { properties: { type: { const: "docker" } } })
   if (condition.properties && typeof value === 'object' && value !== null) {
     const obj = value as Record<string, unknown>;
-    for (const [propName, propCondition] of Object.entries(condition.properties)) {
+    for (const [propName, propCondition] of Object.entries(
+      condition.properties
+    )) {
       const propValue = obj[propName];
       if (!evaluateCondition(propCondition, propValue)) {
         return false;
@@ -115,7 +242,9 @@ function evaluateCondition(condition: JSONSchema, value: unknown): boolean {
 
   // Check type condition
   if (condition.type !== undefined) {
-    const types = Array.isArray(condition.type) ? condition.type : [condition.type];
+    const types = Array.isArray(condition.type)
+      ? condition.type
+      : [condition.type];
     const actualType = typeof value;
     if (value === null) {
       return types.includes('null');
@@ -182,9 +311,15 @@ export function getSchemaAtPath(
       // Check if current schema has allOf with if-then that overrides this property
       if (current.allOf) {
         const parentPath = path.slice(0, i + 1);
-        const parentValue = document ? getValueAtPath(document, parentPath.slice(0, -1)) : undefined;
+        const parentValue = document
+          ? getValueAtPath(document, parentPath.slice(0, -1))
+          : undefined;
 
-        const allOfOverride = findInAllOfWithContext(current.allOf, segment, parentValue);
+        const allOfOverride = findInAllOfWithContext(
+          current.allOf,
+          segment,
+          parentValue
+        );
         if (allOfOverride) {
           const overrideProp = allOfOverride.properties?.[segment];
           if (overrideProp) {
@@ -207,9 +342,15 @@ export function getSchemaAtPath(
       if (unionMatch.allOf && unionProp) {
         // Get the parent object value for context-aware condition evaluation
         const parentPath = path.slice(0, i);
-        const parentValue = document ? getValueAtPath(document, parentPath) : undefined;
+        const parentValue = document
+          ? getValueAtPath(document, parentPath)
+          : undefined;
 
-        const allOfOverride = findInAllOfWithContext(unionMatch.allOf, segment, parentValue);
+        const allOfOverride = findInAllOfWithContext(
+          unionMatch.allOf,
+          segment,
+          parentValue
+        );
         if (allOfOverride) {
           const overrideProp = allOfOverride.properties?.[segment];
           if (overrideProp) {
@@ -225,9 +366,15 @@ export function getSchemaAtPath(
     // Try allOf - merge all schemas and look for property
     if (current.allOf) {
       const parentPath = path.slice(0, i);
-      const parentValue = document ? getValueAtPath(document, parentPath) : undefined;
+      const parentValue = document
+        ? getValueAtPath(document, parentPath)
+        : undefined;
 
-      const allOfMatch = findInAllOfWithContext(current.allOf, segment, parentValue);
+      const allOfMatch = findInAllOfWithContext(
+        current.allOf,
+        segment,
+        parentValue
+      );
       if (allOfMatch) {
         const allOfProp = allOfMatch.properties?.[segment];
         current = allOfProp || allOfMatch;
@@ -236,7 +383,10 @@ export function getSchemaAtPath(
     }
 
     // Check additionalProperties
-    if (current.additionalProperties && typeof current.additionalProperties === 'object') {
+    if (
+      current.additionalProperties &&
+      typeof current.additionalProperties === 'object'
+    ) {
       current = current.additionalProperties;
       continue;
     }
@@ -303,7 +453,10 @@ function resolveArrayItems(schema: JSONSchema): JSONSchema | null {
 /**
  * Searches oneOf/anyOf schemas for a property
  */
-function findInUnionTypes(schema: JSONSchema, propertyName: string): JSONSchema | null {
+function findInUnionTypes(
+  schema: JSONSchema,
+  propertyName: string
+): JSONSchema | null {
   const unions = [...(schema.oneOf || []), ...(schema.anyOf || [])];
 
   for (const variant of unions) {
@@ -349,7 +502,11 @@ function findInAllOfWithContext(
             if (nested) return nested;
           }
           if (schema.then.allOf) {
-            const nested = findInAllOfWithContext(schema.then.allOf, propertyName, contextValue);
+            const nested = findInAllOfWithContext(
+              schema.then.allOf,
+              propertyName,
+              contextValue
+            );
             if (nested) return nested;
           }
         } else if (!conditionMatches && schema.else) {
@@ -362,7 +519,11 @@ function findInAllOfWithContext(
             if (nested) return nested;
           }
           if (schema.else.allOf) {
-            const nested = findInAllOfWithContext(schema.else.allOf, propertyName, contextValue);
+            const nested = findInAllOfWithContext(
+              schema.else.allOf,
+              propertyName,
+              contextValue
+            );
             if (nested) return nested;
           }
         }
@@ -377,7 +538,10 @@ function findInAllOfWithContext(
 /**
  * Searches allOf schemas for a property (fallback without context)
  */
-function findInAllOf(allOf: JSONSchema[], propertyName: string): JSONSchema | null {
+function findInAllOf(
+  allOf: JSONSchema[],
+  propertyName: string
+): JSONSchema | null {
   for (const schema of allOf) {
     if (schema.properties?.[propertyName]) {
       return schema;
@@ -436,11 +600,30 @@ export function toPropertyInfo(
   schema: JSONSchema | null,
   name: string,
   path: string[],
-  parentRequired: string[] = []
+  parentRequired: string[] = [],
+  seen = new WeakSet<object>()
 ): SchemaPropertyInfo | null {
   if (!schema) {
     return null;
   }
+
+  if (seen.has(schema)) {
+    return {
+      name,
+      path,
+      type: resolveType(schema),
+      description: schema.description,
+      default: schema.default,
+      enum: collectEnumValues(schema),
+      required: parentRequired.includes(name),
+      deprecated: schema.deprecated,
+      examples: schema.examples,
+      title: schema.title,
+      format: schema.format,
+      pattern: schema.pattern,
+    };
+  }
+  seen.add(schema);
 
   const typeValue = resolveType(schema);
   const isRequired = parentRequired.includes(name);
@@ -451,7 +634,7 @@ export function toPropertyInfo(
     type: typeValue,
     description: schema.description,
     default: schema.default,
-    enum: schema.enum,
+    enum: collectEnumValues(schema),
     required: isRequired,
     deprecated: schema.deprecated,
     examples: schema.examples,
@@ -465,7 +648,13 @@ export function toPropertyInfo(
     info.properties = {};
     const childRequired = schema.required || [];
     for (const [key, propSchema] of Object.entries(schema.properties)) {
-      const childInfo = toPropertyInfo(propSchema, key, [...path, key], childRequired);
+      const childInfo = toPropertyInfo(
+        propSchema,
+        key,
+        [...path, key],
+        childRequired,
+        seen
+      );
       if (childInfo) {
         info.properties[key] = childInfo;
       }
@@ -474,13 +663,17 @@ export function toPropertyInfo(
 
   // Add items info for arrays
   if (schema.items && !Array.isArray(schema.items)) {
-    info.items = toPropertyInfo(schema.items, 'items', [...path, '[]'], []) || undefined;
+    info.items =
+      toPropertyInfo(schema.items, 'items', [...path, '[]'], [], seen) ||
+      undefined;
   }
 
   // Add oneOf info
   if (schema.oneOf) {
     info.oneOf = schema.oneOf
-      .map((variant, i) => toPropertyInfo(variant, `option${i + 1}`, path, []))
+      .map((variant, i) =>
+        toPropertyInfo(variant, `option${i + 1}`, path, [], seen)
+      )
       .filter((v): v is SchemaPropertyInfo => v !== null);
   }
 
