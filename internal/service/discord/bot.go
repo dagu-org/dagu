@@ -130,7 +130,7 @@ func (b *Bot) Run(ctx context.Context) error {
 	b.session.AddHandler(func(_ *discordgo.Session, i *discordgo.InteractionCreate) {
 		b.handleInteractionCreate(ctx, i)
 	})
-	b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+	b.session.AddHandler(func(_ *discordgo.Session, r *discordgo.Ready) {
 		b.selfID = r.User.ID
 		b.logger.Info("Discord bot ready",
 			slog.String("username", r.User.Username),
