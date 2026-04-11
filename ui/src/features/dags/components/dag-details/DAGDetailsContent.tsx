@@ -38,6 +38,7 @@ type DAGDetailsContentProps = {
   navigateToStatusTab?: () => void;
   skipHeader?: boolean;
   localDags?: components['schemas']['LocalDag'][];
+  editorHints?: components['schemas']['DAGEditorHints'];
   /** Custom enqueue handler, threaded to DAGHeader → DAGActions */
   onEnqueue?: (
     params: string,
@@ -72,6 +73,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   navigateToStatusTab,
   skipHeader = false,
   localDags,
+  editorHints,
   onEnqueue,
   forceEnqueue = false,
   autoOpenStartModal = false,
@@ -354,6 +356,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               key={fileName}
               fileName={fileName}
               localDags={localDags}
+              editorHints={editorHints}
             />
           ) : null}
           {activeTab === 'history' ? (

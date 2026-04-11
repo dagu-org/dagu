@@ -6,29 +6,50 @@
 import { cn } from '@/lib/utils';
 import MonacoEditor, { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
-import { configureMonacoYaml } from 'monaco-yaml';
+import {
+  configureMonacoYaml,
+  type JSONSchema as MonacoJSONSchema,
+} from 'monaco-yaml';
 import { useEffect, useRef } from 'react';
+import type { JSONSchema } from '@/lib/schema-utils';
 
 // Get schema URL from config (getConfig() is available at module load time)
 declare function getConfig(): { basePath: string };
 const schemaUrl = `${getConfig().basePath}/assets/dag.schema.json`;
 
-// Configure schema at module level (before editor initialization)
-configureMonacoYaml(monaco, {
+type SchemaRegistration = {
+  fileMatch: string;
+  uri: string;
+  schema?: MonacoJSONSchema;
+};
+
+const schemaRegistrations = new Map<string, SchemaRegistration>();
+
+// Configure YAML language service once at module load time.
+const monacoYaml = configureMonacoYaml(monaco, {
   enableSchemaRequest: true,
   hover: true,
   completion: true,
   validate: true,
   format: true,
-  schemas: [
-    {
-      uri: schemaUrl,
-      fileMatch: ['*'], // Match all YAML files
-    },
-  ],
+  schemas: [],
 });
 
 loader.config({ monaco });
+
+async function refreshRegisteredSchemas() {
+  const registrations = Array.from(schemaRegistrations.values()).map(
+    ({ fileMatch, ...registration }) => ({
+      ...registration,
+      fileMatch: [fileMatch],
+    })
+  );
+
+  await monacoYaml.update({
+    ...monacoYaml.getOptions(),
+    schemas: registrations,
+  });
+}
 
 /**
  * Cursor position information
@@ -56,6 +77,10 @@ type Props = {
   className?: string;
   /** Callback when cursor position changes */
   onCursorPositionChange?: (position: CursorPosition) => void;
+  /** Stable model URI used for schema association */
+  modelUri?: string;
+  /** Optional document-specific schema */
+  schema?: JSONSchema | null;
 };
 
 /**
@@ -69,8 +94,11 @@ function DAGEditor({
   lineNumbers = true,
   className,
   onCursorPositionChange,
+  modelUri,
+  schema,
 }: Omit<Props, 'highlightLine'>) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const effectiveModelUri = modelUri ?? 'inmemory://dagu/editor/default.yaml';
 
   // Clean up editor on unmount
   useEffect(() => {
@@ -78,6 +106,20 @@ function DAGEditor({
       editorRef.current?.dispose();
     };
   }, []);
+
+  useEffect(() => {
+    schemaRegistrations.set(effectiveModelUri, {
+      fileMatch: effectiveModelUri,
+      uri: schema ? `${effectiveModelUri}#schema` : schemaUrl,
+      schema: schema ? (schema as MonacoJSONSchema) : undefined,
+    });
+    void refreshRegisteredSchemas();
+
+    return () => {
+      schemaRegistrations.delete(effectiveModelUri);
+      void refreshRegisteredSchemas();
+    };
+  }, [effectiveModelUri, schema]);
 
   // Update editor theme when dark mode changes
   useEffect(() => {
@@ -167,6 +209,7 @@ function DAGEditor({
       <MonacoEditor
         height="100%"
         language="yaml"
+        path={effectiveModelUri}
         theme={isDarkMode ? 'vs-dark' : 'vs'}
         value={value}
         onChange={readOnly ? undefined : onChange}

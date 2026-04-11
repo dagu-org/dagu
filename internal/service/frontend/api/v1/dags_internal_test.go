@@ -6,6 +6,7 @@ package api_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -132,6 +133,124 @@ func TestGetDAGDetails_InvalidYAML_Returns200WithErrors(t *testing.T) {
 	// File path should still be set
 	require.NotNil(t, resp.FilePath)
 	require.NotEmpty(t, *resp.FilePath)
+}
+
+func TestGetDAGDetails_EditorHintsIncludeInheritedCustomStepTypes(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	require.NoError(t, os.WriteFile(helper.Config.Paths.BaseConfig, []byte(`
+step_types:
+  greet:
+    type: command
+    description: Send a greeting
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: echo
+        args:
+          - {$input: message}
+`), 0o600))
+
+	dag := helper.DAG(t, `
+name: inherited-editor-hints
+steps:
+  - command: echo hi
+`)
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.GetDAGDetails(context.Background(), openapi.GetDAGDetailsRequestObject{
+		FileName: dag.FileName(),
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.GetDAGDetails200JSONResponse)
+	require.True(t, ok)
+	require.NotNil(t, resp.EditorHints)
+	require.Len(t, resp.EditorHints.InheritedCustomStepTypes, 1)
+
+	hint := resp.EditorHints.InheritedCustomStepTypes[0]
+	require.Equal(t, "greet", hint.Name)
+	require.Equal(t, "command", hint.TargetType)
+	require.NotNil(t, hint.Description)
+	require.Equal(t, "Send a greeting", *hint.Description)
+
+	properties, ok := hint.InputSchema["properties"].(map[string]any)
+	require.True(t, ok)
+	message, ok := properties["message"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "string", message["type"])
+}
+
+func TestGetDAGDetails_InvalidYAMLStillReturnsEditorHints(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	require.NoError(t, os.WriteFile(helper.Config.Paths.BaseConfig, []byte(`
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: echo
+        args:
+          - {$input: message}
+`), 0o600))
+
+	invalidYAML := `this is not valid yaml: [unterminated`
+	dagFile := helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "invalid-hints-dag", []byte(invalidYAML))
+	fileName := filepath.Base(dagFile)
+	fileName = fileName[:len(fileName)-len(".yaml")]
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.GetDAGDetails(context.Background(), openapi.GetDAGDetailsRequestObject{
+		FileName: fileName,
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.GetDAGDetails200JSONResponse)
+	require.True(t, ok)
+	require.NotEmpty(t, resp.Errors)
+	require.NotNil(t, resp.EditorHints)
+	require.Len(t, resp.EditorHints.InheritedCustomStepTypes, 1)
+	require.Equal(t, "greet", resp.EditorHints.InheritedCustomStepTypes[0].Name)
 }
 
 func TestGetDAGDetails_NonExistent_Returns404(t *testing.T) {

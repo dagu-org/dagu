@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils';
 import { X, BookOpen, RefreshCw } from 'lucide-react';
 import { useSchema } from '@/contexts/SchemaContext';
 import { useSchemaLookup } from '@/hooks/useSchemaLookup';
+import type { JSONSchema } from '@/lib/schema-utils';
 import type { YamlPathSegment } from '@/hooks/useYamlCursorPath';
 import { SchemaPathBreadcrumb } from './SchemaPathBreadcrumb';
 import { SchemaPropertyInfo } from './SchemaPropertyInfo';
@@ -15,6 +16,8 @@ interface SchemaDocSidebarProps {
   className?: string;
   /** YAML content for context-aware schema resolution */
   yamlContent?: string;
+  /** Optional document-specific schema override */
+  schema?: JSONSchema | null;
 }
 
 export function SchemaDocSidebar({
@@ -24,9 +27,23 @@ export function SchemaDocSidebar({
   segments,
   className,
   yamlContent,
+  schema: schemaOverride,
 }: SchemaDocSidebarProps) {
-  const { schema, loading: schemaLoading, error: schemaError, reload } = useSchema();
-  const { propertyInfo, siblingProperties, loading, error } = useSchemaLookup(path, yamlContent);
+  const {
+    schema: baseSchema,
+    loading: schemaLoading,
+    error: schemaError,
+    reload,
+  } = useSchema();
+  const activeSchema = schemaOverride ?? baseSchema;
+  const hasSchemaOverride = !!schemaOverride;
+  const { propertyInfo, siblingProperties, loading, error } = useSchemaLookup(
+    path,
+    yamlContent,
+    schemaOverride
+  );
+  const isLoading = hasSchemaOverride ? loading : loading || schemaLoading;
+  const currentError = hasSchemaOverride ? error : error || schemaError;
 
   if (!isOpen) {
     return null;
@@ -43,7 +60,9 @@ export function SchemaDocSidebar({
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
         <div className="flex items-center gap-1.5">
           <BookOpen className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-foreground">Schema Docs</span>
+          <span className="text-xs font-medium text-foreground">
+            Schema Docs
+          </span>
         </div>
         <button
           onClick={onClose}
@@ -57,7 +76,7 @@ export function SchemaDocSidebar({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 min-h-0">
         {/* Loading State */}
-        {(loading || schemaLoading) && (
+        {isLoading && (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <RefreshCw className="w-4 h-4 animate-spin mr-2" />
             <span className="text-xs">Loading schema...</span>
@@ -65,7 +84,7 @@ export function SchemaDocSidebar({
         )}
 
         {/* Error State */}
-        {(error || schemaError) && !loading && !schemaLoading && (
+        {currentError && !isLoading && (
           <div className="flex flex-col items-center justify-center h-full py-8 px-4">
             {/* Icon container */}
             <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
@@ -101,7 +120,7 @@ export function SchemaDocSidebar({
         )}
 
         {/* Content */}
-        {!loading && !schemaLoading && !error && !schemaError && (
+        {!isLoading && !currentError && (
           <>
             {/* Current Path */}
             <div className="mb-3">
@@ -111,7 +130,7 @@ export function SchemaDocSidebar({
             {/* Property Info */}
             {propertyInfo ? (
               <SchemaPropertyInfo propertyInfo={propertyInfo} />
-            ) : path.length === 0 && schema?.properties ? (
+            ) : path.length === 0 && activeSchema?.properties ? (
               // Root level - show all top-level properties
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
@@ -120,33 +139,36 @@ export function SchemaDocSidebar({
                 <div className="border border-border rounded p-1">
                   <NestedPropertiesTree
                     properties={Object.fromEntries(
-                      Object.entries(schema.properties).map(([key, value]) => [
-                        key,
-                        {
-                          name: key,
-                          path: [key],
-                          type: value.type || 'unknown',
-                          description: value.description,
-                          required: schema.required?.includes(key) || false,
-                          properties: value.properties
-                            ? Object.fromEntries(
-                                Object.entries(value.properties).map(
-                                  ([k, v]) => [
-                                    k,
-                                    {
-                                      name: k,
-                                      path: [key, k],
-                                      type: v.type || 'unknown',
-                                      description: v.description,
-                                      required:
-                                        value.required?.includes(k) || false,
-                                    },
-                                  ]
+                      Object.entries(activeSchema.properties).map(
+                        ([key, value]) => [
+                          key,
+                          {
+                            name: key,
+                            path: [key],
+                            type: value.type || 'unknown',
+                            description: value.description,
+                            required:
+                              activeSchema.required?.includes(key) || false,
+                            properties: value.properties
+                              ? Object.fromEntries(
+                                  Object.entries(value.properties).map(
+                                    ([k, v]) => [
+                                      k,
+                                      {
+                                        name: k,
+                                        path: [key, k],
+                                        type: v.type || 'unknown',
+                                        description: v.description,
+                                        required:
+                                          value.required?.includes(k) || false,
+                                      },
+                                    ]
+                                  )
                                 )
-                              )
-                            : undefined,
-                        },
-                      ])
+                              : undefined,
+                          },
+                        ]
+                      )
                     )}
                     maxDepth={1}
                   />
@@ -191,9 +213,19 @@ export function SchemaDocSidebar({
       {/* Footer */}
       <div className="px-3 py-1.5 border-t border-border bg-muted/20">
         <span className="text-xs text-muted-foreground">
-          Press <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">Ctrl</kbd>
-          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">Shift</kbd>
-          +<kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">D</kbd> to toggle
+          Press{' '}
+          <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">
+            Ctrl
+          </kbd>
+          +
+          <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">
+            Shift
+          </kbd>
+          +
+          <kbd className="px-1 py-0.5 bg-muted text-foreground rounded text-xs">
+            D
+          </kbd>{' '}
+          to toggle
         </span>
       </div>
     </div>
