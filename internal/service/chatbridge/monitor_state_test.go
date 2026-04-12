@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -447,6 +448,9 @@ func TestNotificationStateStore_LoadUnsupportedVersionQuarantinesState(t *testin
 
 func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory permissions do not reliably block notification state writes")
+	}
 
 	baseDir := t.TempDir()
 	store, err := fileeventstore.New(baseDir)
@@ -527,6 +531,9 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 
 func TestNotificationMonitor_NotifyCompletionSaveFailureDoesNotMutateLiveState(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory permissions do not reliably block notification state writes")
+	}
 
 	stateDir := t.TempDir()
 	stateFile := filepath.Join(stateDir, "state.json")
@@ -562,6 +569,9 @@ func TestNotificationMonitor_NotifyCompletionSaveFailureDoesNotMutateLiveState(t
 
 func TestNotificationMonitor_MarkBatchDeliveredSaveFailureDoesNotMutateLiveState(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory permissions do not reliably block notification state writes")
+	}
 
 	stateDir := t.TempDir()
 	stateFile := filepath.Join(stateDir, "state.json")
