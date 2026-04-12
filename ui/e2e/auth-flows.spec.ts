@@ -86,7 +86,10 @@ test.describe('auth flows', () => {
     await expect(dialog).toBeVisible();
     await dialog.getByLabel('DAG Name').fill(dagName);
     await dialog.getByRole('button', { name: 'Create' }).click();
-    await expect(page).toHaveURL(new RegExp(`/dags/${dagName}\\.yaml/spec`));
+    await expect(page).toHaveURL(new RegExp(`/dags/${dagName}/spec$`));
+    await expect(
+      page.getByRole('heading', { level: 1, name: dagName, exact: true })
+    ).toBeVisible();
 
     // Manager cannot access user management
     await page.goto('/users');
@@ -129,9 +132,15 @@ steps:
 
     // Operator should not see Rename/Delete on spec tab
     await page.goto(`/dags/${encodeURIComponent(fileName)}/spec`);
-    await expect(page.getByText(dagName)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Rename' })).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Delete' })).toBeHidden();
+    await expect(
+      page.getByRole('heading', { level: 1, name: dagName, exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Rename', exact: true })
+    ).toBeHidden();
+    await expect(
+      page.getByRole('button', { name: 'Delete', exact: true })
+    ).toBeHidden();
 
     // Operator can still execute via API
     const operatorToken = await loginViaAPI(request, operatorUser, operatorPass);
