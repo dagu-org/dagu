@@ -303,9 +303,7 @@ func TestDAGRunMonitor_FlushesUrgentSingleCreatesSessionWhenMissing(t *testing.T
 	require.True(t, ok)
 
 	require.Eventually(t, func() bool {
-		service.mu.Lock()
-		defer service.mu.Unlock()
-		return len(service.appendMessages) == 1
+		return api.sendCount() == 1
 	}, time.Second, 10*time.Millisecond)
 
 	cs := bot.getOrCreateChat(456)
