@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import {
   enqueueRunFromUI,
@@ -15,6 +18,10 @@ const DAG_FILE = 'e2e-distributed-queue.yaml';
 const DAG_NAME = 'e2e-distributed-queue';
 const STEP_NAME = 'hold-and-report';
 const EXPECTED_STEP_OUTPUT = 'e2e distributed worker ok';
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 test('exercises the web UI against the real distributed shared-nothing worker stack', async ({
   page,
@@ -38,7 +45,7 @@ test('exercises the web UI against the real distributed shared-nothing worker st
 
   await page.goto('/queues');
   const sharedQueueCard = page.getByRole('link', {
-    name: new RegExp(stack.queues.shared, 'i'),
+    name: new RegExp(escapeRegExp(stack.queues.shared), 'i'),
   });
   await expect(sharedQueueCard).toBeVisible();
   await expect(sharedQueueCard).toContainText('No activity');

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { expect, test } from '@playwright/test';
 import {
   clearSession,
@@ -70,13 +73,16 @@ steps:
   await expect(page).not.toHaveURL(/\/remote-nodes$/);
 
   const viewerToken = await loginViaAPI(request, viewerUsername, viewerPassword);
-  const startResponse = await request.post(`/api/v1/dags/${encodeURIComponent(fileName)}/start`, {
-    headers: {
-      Authorization: `Bearer ${viewerToken}`,
-      'Content-Type': 'application/json',
-    },
-    data: {},
-  });
+  const startResponse = await request.post(
+    `/api/v1/dags/${encodeURIComponent(fileName)}/start?remoteNode=local`,
+    {
+      headers: {
+        Authorization: `Bearer ${viewerToken}`,
+        'Content-Type': 'application/json',
+      },
+      data: {},
+    }
+  );
 
   expect(startResponse.status()).toBe(403);
 });

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { expect, test } from '@playwright/test';
 import {
   loadStack,
@@ -45,12 +48,17 @@ steps:
 
   await waitForDAGAvailable(request, token, `${localDagName}.yaml`);
   await expect
-    .poll(async () => {
-      const response = await request.get(
-        `${stack.remote.apiBaseURL}/dags/${encodeURIComponent(remoteFileName)}`
-      );
-      return response.ok();
-    })
+    .poll(
+      async () => {
+        const response = await request.get(
+          `${stack.remote.apiBaseURL}/dags/${encodeURIComponent(remoteFileName)}`
+        );
+        return response.ok();
+      },
+      {
+        timeout: 15_000,
+      }
+    )
     .toBeTruthy();
 
   const remoteNodeName = uniqueName('remote-node');

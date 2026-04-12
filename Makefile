@@ -359,8 +359,7 @@ test-e2e:
 	@cd ui; pnpm test:e2e:install
 	@printf '%b\n' "${COLOR_GREEN}Running browser E2E tests...${COLOR_RESET}"
 	@cd ui; NODE_OPTIONS="--max-old-space-size=8192" pnpm build
-	@rm -f ${FE_ASSETS_DIR}/*
-	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
+	@$(MAKE) cp-assets
 	@$(MAKE) bin-e2e
 	@cd ui; pnpm test:e2e
 

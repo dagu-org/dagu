@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 

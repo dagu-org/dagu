@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -96,6 +99,11 @@ type WorkersResponse = {
 
 type LogResponse = {
   content: string;
+};
+
+type ExecFileSyncError = Error & {
+  status?: number | null;
+  stderr?: string | Buffer;
 };
 
 const TOKEN_KEY = 'dagu_auth_token';
@@ -224,12 +232,18 @@ export async function startDAG(
   request: APIRequestContext,
   token: string,
   fileName: string,
-  body: Record<string, unknown> = {}
+  body: Record<string, unknown> = {},
+  remoteNode: string = 'local'
 ): Promise<string> {
-  const response = await request.post(`/api/v1/dags/${encodeURIComponent(fileName)}/start`, {
-    headers: authHeaders(token),
-    data: body,
-  });
+  const response = await request.post(
+    `/api/v1/dags/${encodeURIComponent(fileName)}/start?remoteNode=${encodeURIComponent(
+      remoteNode
+    )}`,
+    {
+      headers: authHeaders(token),
+      data: body,
+    }
+  );
 
   expect(response.ok()).toBeTruthy();
   const payload = (await response.json()) as { dagRunId?: string };
@@ -241,12 +255,18 @@ export async function enqueueDAG(
   request: APIRequestContext,
   token: string,
   fileName: string,
-  body: Record<string, unknown> = {}
+  body: Record<string, unknown> = {},
+  remoteNode: string = 'local'
 ): Promise<string> {
-  const response = await request.post(`/api/v1/dags/${encodeURIComponent(fileName)}/enqueue`, {
-    headers: authHeaders(token),
-    data: body,
-  });
+  const response = await request.post(
+    `/api/v1/dags/${encodeURIComponent(fileName)}/enqueue?remoteNode=${encodeURIComponent(
+      remoteNode
+    )}`,
+    {
+      headers: authHeaders(token),
+      data: body,
+    }
+  );
 
   expect(response.ok()).toBeTruthy();
   const payload = (await response.json()) as { dagRunId?: string };
@@ -486,10 +506,17 @@ export async function killProcess(
   pid: number | string,
   signal: 'TERM' | 'KILL' = 'KILL'
 ): Promise<void> {
-  execFileSync('kill', [`-${signal}`, `${pid}`], {
-    cwd: repoRoot,
-    stdio: 'pipe',
-  });
+  try {
+    execFileSync('kill', [`-${signal}`, `${pid}`], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+    });
+  } catch (error) {
+    if (isNoSuchProcessError(error)) {
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function getLatestLocalRunStatusRecord(
@@ -541,6 +568,18 @@ function authHeaders(token: string): Record<string, string> {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
+}
+
+function isNoSuchProcessError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const { status, stderr } = error as ExecFileSyncError;
+  const stderrText =
+    typeof stderr === 'string' ? stderr : Buffer.isBuffer(stderr) ? stderr.toString('utf8') : '';
+
+  return status === 1 && /no such process/i.test(stderrText);
 }
 
 function normalizeDAGRunDetails(run: RawDAGRunDetails): DAGRunDetails {
