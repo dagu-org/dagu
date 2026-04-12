@@ -42,6 +42,10 @@ func init() {
 		"PROGRAMFILES(X86)",
 		"PROGRAMDATA",
 
+		// SSH agent forwarding (Git over SSH, remote operations)
+		"SSH_AUTH_SOCK",
+		"SSH_AGENT_PID",
+
 		// Docker daemon connection (used by Docker SDK's client.FromEnv)
 		"DOCKER_HOST",        // Docker daemon address
 		"DOCKER_TLS_VERIFY",  // Enable TLS verification
