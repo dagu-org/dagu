@@ -102,11 +102,34 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name_suffix: " (core-rest)"
+          - name_suffix: " (core-entrypoints)"
             test_command: |
-              go list ./... \
-                | grep -vxE 'github.com/dagucloud/dagu/internal/(agent|intg($|/distr$|/queue$))' \
-                | xargs go test -v -race
+              ./scripts/test-package-shard.sh \
+                '^github.com/dagucloud/dagu/(api/v1|cmd|proto/coordinator/v1|proto/index/v1|skills)$|^github.com/dagucloud/dagu/internal/(agent/schema|agentoauth|agentsnapshot|auth($|/tokensecret$)|clicontext|cmd|license|output|proto/convert|remotenode|test($|util$)|tunnel|upgrade|workspace)$'
+          - name_suffix: " (core-cmn)"
+            test_command: |
+              ./scripts/test-package-shard.sh \
+                '^github.com/dagucloud/dagu/internal/cmn(/|$)'
+          - name_suffix: " (core-core-llm)"
+            test_command: |
+              ./scripts/test-package-shard.sh \
+                '^github.com/dagucloud/dagu/internal/(core(/|$)|gitsync$|llm(/|$))'
+          - name_suffix: " (core-persis)"
+            test_command: |
+              ./scripts/test-package-shard.sh \
+                '^github.com/dagucloud/dagu/internal/persis(/|$)'
+          - name_suffix: " (core-runtime-base)"
+            test_command: |
+              ./scripts/test-package-shard.sh \
+                '^github.com/dagucloud/dagu/internal/runtime($|/(agent|executor|remote|transform)$)'
+          - name_suffix: " (core-runtime-builtin)"
+            test_command: |
+              ./scripts/test-package-shard.sh \
+                '^github.com/dagucloud/dagu/internal/runtime/builtin(/|$)'
+          - name_suffix: " (core-service)"
+            test_command: |
+              ./scripts/test-package-shard.sh \
+                '^github.com/dagucloud/dagu/internal/service(/|$)'
           - name_suffix: " (agent-api)"
             test_command: |
               ./scripts/test-shard.sh ./internal/agent \
@@ -122,41 +145,91 @@ jobs:
               ./scripts/test-shard.sh ./internal/agent \
                 '' \
                 '^(Test(NewAPI|API_|FormatMessageWithContexts|FormatContextLine|SelectModel|GetUserIDFromContext|ShouldCompactMessages_|ShouldCancelStuckSession|RequestCommandApprovalWithTimeout|AskUserRun.*|FormatUserResponse|BashTool_.*|ResolveTimeout|BuildOutput|TruncateOutput|DelegateTool_.*|FilterOutTool|Truncate$|Hooks_.*|TruncateUTF8Bytes_.*|BuildChatInputSpillWrapper_.*|NewLoop|Loop_.*|StartHeartbeatPump|NavigateTool_.*|PatchTool_.*|CountLines|IsDAGFile|ValidateIfDAGFile|ResolveToolPolicy_.*|ValidateToolPolicy|EvaluateBashPolicy|SplitShellCommandSegments|HasUnsupportedShellConstructs|GetModelPresets.*|ProviderCache_.*|HashLLMConfig_.*|CreateLLMProvider_.*|ReadTool_.*|FormatFileContent|TruncateResult|AppendRejectionSummary|RemoteURL|NewRemoteAgentTool_.*|NewListContextsTool_.*))'
-          - name_suffix: " (intg-approval-history)"
+          - name_suffix: " (intg-approval)"
             test_command: |
               ./scripts/test-shard.sh ./internal/intg \
-                '^(TestWaitStepApproval|TestApprovalField|TestHistoryCommand_)' \
+                '^(Test(WaitStepApproval|ApprovalField))' \
                 ''
-          - name_suffix: " (intg-infra)"
+          - name_suffix: " (intg-history)"
             test_command: |
               ./scripts/test-shard.sh ./internal/intg \
-                '^(Test(DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|JQExecutor|MailConfigEnvExpansion|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|ShellExecution|SQLExecutor_.*|Server_.*|SSHExecutorIntegration|Router.*|TemplateExecutor|WebhookPayloadEnv|WorkingDirectoryResolution))' \
+                '^(TestHistoryCommand_)' \
+                ''
+          - name_suffix: " (intg-docker-storage)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(Test(DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration))' \
+                ''
+          - name_suffix: " (intg-router)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(Test(RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation))' \
+                ''
+          - name_suffix: " (intg-server-notify)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(Test(Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv))' \
+                ''
+          - name_suffix: " (intg-data-shell)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(Test(JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution))' \
+                ''
+          - name_suffix: " (intg-subdag-output)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(Test(CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*))' \
+                ''
+          - name_suffix: " (intg-parallel)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(Test(ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))' \
                 ''
           - name_suffix: " (intg-rest)"
             test_command: |
               ./scripts/test-shard.sh ./internal/intg \
                 '' \
-                '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|JQExecutor|MailConfigEnvExpansion|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|ShellExecution|SQLExecutor_.*|Server_.*|SSHExecutorIntegration|Router.*|TemplateExecutor|WebhookPayloadEnv|WorkingDirectoryResolution))'
-          - name_suffix: " (intg-distr-execution)"
+                '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))'
+          - name_suffix: " (intg-distr-baseconfig-status)"
             test_command: |
               ./scripts/test-shard.sh ./internal/intg/distr \
-                '^(Test(BaseConfig_|Coordinator_|Execution_(StatusPushing|LogStreaming|LargeOutput|StartCommand|TagsPropagation|SharedFSMode|WorkDir|QueueLifecycle|QueuedCatchupHappyPath)))' \
+                '^(Test(BaseConfig_.*|Coordinator_.*|Execution_(StatusPushing|LogStreaming|LargeOutput)))' \
+                ''
+          - name_suffix: " (intg-distr-direct-queue)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '^(TestExecution_(StartCommand|TagsPropagation|SharedFSMode|WorkDir|QueueLifecycle|QueuedCatchupHappyPath))' \
                 ''
           - name_suffix: " (intg-distr-retry-cancel)"
             test_command: |
               ./scripts/test-shard.sh ./internal/intg/distr \
-                '^(Test(Cancellation_|Retry_|OneOffScheduleRunsDistributed))' \
+                '^(Test(Cancellation_.*|Retry_.*|OneOffScheduleRunsDistributed))' \
                 ''
-          - name_suffix: " (intg-distr-dispatch)"
+          - name_suffix: " (intg-distr-parallel-params)"
             test_command: |
               ./scripts/test-shard.sh ./internal/intg/distr \
-                '^(Test(Execution_ProcHeartbeat_.*|Execution_QueuedDispatch_.*|Parallel_.*|Params_.*))' \
+                '^(Test(Parallel_.*|Params_.*))' \
+                ''
+          - name_suffix: " (intg-distr-proc-heartbeat)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '^(TestExecution_ProcHeartbeat_.*)' \
+                ''
+          - name_suffix: " (intg-distr-queued-dispatch)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '^(TestExecution_QueuedDispatch_(RecoversWhenWorkerRegistersLater|RecoversWhenMatchingWorkerRegistersLater))' \
+                ''
+          - name_suffix: " (intg-distr-queued-dispatch-heavy)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '^(TestExecution_QueuedDispatch_ConsumesOneThousandItems)' \
                 ''
           - name_suffix: " (intg-distr-rest)"
             test_command: |
               ./scripts/test-shard.sh ./internal/intg/distr \
-                '' \
-                '^(Test(BaseConfig_|Coordinator_|Execution_(StatusPushing|LogStreaming|LargeOutput|StartCommand|TagsPropagation|SharedFSMode|WorkDir|QueueLifecycle|QueuedCatchupHappyPath)|Cancellation_|Retry_|OneOffScheduleRunsDistributed|Execution_ProcHeartbeat_.*|Execution_QueuedDispatch_.*|Parallel_.*|Params_.*))'
+                '^(Test(CustomStepTypes_.*|SubDAG_.*|DistributedRun_.*))' \
+                ''
           - name_suffix: " (intg-queue)"
             test_command: go test -v -race ./internal/intg/queue
     steps:
@@ -176,4 +249,5 @@ jobs:
         shell: bash
         run: |
           chmod +x ./scripts/test-shard.sh
+          chmod +x ./scripts/test-package-shard.sh
           ${{ matrix.test_command }}
