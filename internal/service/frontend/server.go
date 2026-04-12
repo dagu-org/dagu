@@ -444,24 +444,15 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	if srv.licenseManager != nil {
 		srv.funcsConfig.LicenseChecker = srv.licenseManager.Checker()
 		srv.funcsConfig.LicenseManager = srv.licenseManager
-	}
-
-	// License feature gating
-	if srv.licenseManager != nil {
-		checker := srv.licenseManager.Checker()
-		if !checker.IsFeatureEnabled(license.FeatureAudit) {
-			srv.auditService = nil
-			srv.auditStore = nil
-		}
-		if !checker.IsFeatureEnabled(license.FeatureSSO) {
-			if srv.builtinOIDCCfg != nil {
-				logger.Error(ctx, "SSO (OIDC) requires a Dagu Pro license; OIDC login is disabled")
-				srv.builtinOIDCCfg = nil
-			}
+		if srv.builtinOIDCCfg != nil {
+			srv.builtinOIDCCfg.LicenseChecker = srv.licenseManager.Checker()
 		}
 	}
 
-	// Add audit service to API only if licensed (or no license manager)
+	if srv.licenseManager != nil && srv.builtinOIDCCfg != nil && !srv.licenseManager.Checker().IsFeatureEnabled(license.FeatureSSO) {
+		logger.Warn(ctx, "SSO (OIDC) is configured but currently unavailable because the active license does not enable it")
+	}
+
 	if srv.auditService != nil {
 		apiOpts = append(apiOpts, apiv1.WithAuditService(srv.auditService))
 	}
@@ -1084,7 +1075,11 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV1Base
 		shell = terminal.GetDefaultShell()
 	}
 	srv.terminalManager = terminal.NewManager(ctx, srv.config.Server.Terminal.MaxSessions)
-	termHandler := terminal.NewHandler(srv.authService, srv.auditService, srv.terminalManager, shell)
+	var auditChecker license.Checker
+	if srv.licenseManager != nil {
+		auditChecker = srv.licenseManager.Checker()
+	}
+	termHandler := terminal.NewHandler(srv.authService, srv.auditService, auditChecker, srv.terminalManager, shell)
 	wsPath := path.Join(apiV1BasePath, "terminal/ws")
 	r.Get(wsPath, termHandler.ServeHTTP)
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))

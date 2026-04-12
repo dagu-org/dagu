@@ -197,7 +197,15 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		"permissionsRunDags":   func() string { return boolStr(cfg.Permissions[config.PermissionRunDAGs]) },
 
 		// Feature toggle functions
-		"oidcEnabled":     func() string { return boolStr(cfg.OIDCEnabled) },
+		"oidcEnabled": func() string {
+			if !cfg.OIDCEnabled {
+				return "false"
+			}
+			if cfg.LicenseChecker != nil && !cfg.LicenseChecker.IsFeatureEnabled(license.FeatureSSO) {
+				return "false"
+			}
+			return "true"
+		},
 		"terminalEnabled": func() string { return boolStr(cfg.TerminalEnabled) },
 		"gitSyncEnabled":  func() string { return boolStr(cfg.GitSyncEnabled) },
 		"agentEnabled": func() string {
@@ -237,7 +245,7 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			if claims.ExpiresAt == nil {
 				return "true" // perpetual
 			}
-			if claims.ExpiresAt.After(time.Now()) || cfg.LicenseChecker.IsGracePeriod() {
+			if claims.ExpiresAt.After(time.Now()) {
 				return "true"
 			}
 			return "false"

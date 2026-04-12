@@ -87,9 +87,7 @@ func TestSSHExecutorIntegration(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dockerClient, err := client.New(client.FromEnv)
-	require.NoError(t, err, "failed to create docker client")
-	defer func() { _ = dockerClient.Close() }()
+	dockerClient := requireDockerClient(t)
 
 	// Start SSH server container
 	sshServer := startSSHServer(t, th, dockerClient)

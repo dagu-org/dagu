@@ -18,6 +18,7 @@ type LicenseClaims struct {
 	Features      []string `json:"features"`
 	ActivationID  string   `json:"activation_id"`
 	WarningCode   string   `json:"wc,omitempty"`
+	GraceDays     *int     `json:"grace_days,omitempty"`
 }
 
 // HasFeature returns true if the given feature is included in the license claims.

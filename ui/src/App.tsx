@@ -122,9 +122,9 @@ function LicensedRoute({
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
       <Shield size={48} className="text-muted-foreground" />
-      <h2 className="text-xl font-semibold">Pro License Required</h2>
+      <h2 className="text-xl font-semibold">License Required</h2>
       <p className="text-sm text-muted-foreground max-w-md">
-        This feature requires a Dagu Pro license. Visit the{' '}
+        This feature requires an active Dagu license or trial. Visit the{' '}
         <Link
           to="/license"
           className="text-primary underline underline-offset-2"

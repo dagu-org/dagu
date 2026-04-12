@@ -35,6 +35,9 @@ export function LicenseBanner() {
   // Community mode: no banner
   if (license.community) return null;
 
+  const licenseLabel = license.plan === 'trial' ? 'trial' : 'license';
+  const renewalLabel = license.plan === 'trial' ? 'upgrade' : 'renew';
+
   // Warning code banner: non-dismissible
   if (license.warningCode) {
     const message =
@@ -58,14 +61,14 @@ export function LicenseBanner() {
     return (
       <div role="alert" className="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-1.5 flex items-center text-sm">
         <span className="text-amber-800 dark:text-amber-200">
-          Your Dagu Pro license has expired. Features will be disabled on {graceEnd}. Please{' '}
+          Your Dagu {licenseLabel} has expired. Features will be disabled on {graceEnd}. Please{' '}
           <a
             href={LICENSE_CONSOLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"
           >
-            renew your license
+            {renewalLabel}
           </a>.
         </span>
       </div>
@@ -82,15 +85,15 @@ export function LicenseBanner() {
     return (
       <div role="alert" className="bg-orange-50 dark:bg-orange-950 border-b border-orange-200 dark:border-orange-800 px-4 py-1.5 flex items-center justify-between text-sm">
         <span className="text-orange-800 dark:text-orange-200">
-          Your Dagu Pro license {days === 0 ? 'expires today' : `expires in ${days} day${days !== 1 ? 's' : ''}`}! Please{' '}
+          Your Dagu {licenseLabel} {days === 0 ? 'expires today' : `expires in ${days} day${days !== 1 ? 's' : ''}`}! Please{' '}
           <a
             href={LICENSE_CONSOLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"
           >
-            renew now
-          </a>{' '}to keep Pro features.
+            {renewalLabel} now
+          </a>{' '}to keep licensed features.
         </span>
         <button
           onClick={() => {
@@ -111,14 +114,14 @@ export function LicenseBanner() {
     return (
       <div role="status" className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800 px-4 py-1.5 flex items-center justify-between text-sm">
         <span className="text-yellow-800 dark:text-yellow-200">
-          Your Dagu Pro license {days === 0 ? 'expires today' : `expires in ${days} day${days !== 1 ? 's' : ''}`}. Please{' '}
+          Your Dagu {licenseLabel} {days === 0 ? 'expires today' : `expires in ${days} day${days !== 1 ? 's' : ''}`}. Please{' '}
           <a
             href={LICENSE_CONSOLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:no-underline"
           >
-            renew to avoid disruption
+            {renewalLabel} to avoid disruption
           </a>.
         </span>
         <button

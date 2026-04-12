@@ -185,6 +185,23 @@ func TestState_IsFeatureEnabled(t *testing.T) {
 		// A feature not in the claims should still return false.
 		assert.False(t, s.IsFeatureEnabled("nonexistent-feature"))
 	})
+
+	t.Run("expired trial with zero grace disables features immediately", func(t *testing.T) {
+		t.Parallel()
+		var s State
+		zero := 0
+		claims := &LicenseClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Minute)),
+			},
+			Plan:      "trial",
+			Features:  []string{FeatureAudit},
+			GraceDays: &zero,
+		}
+		s.Update(claims, "tok")
+		assert.False(t, s.IsFeatureEnabled(FeatureAudit))
+		assert.False(t, s.IsGracePeriod())
+	})
 }
 
 func TestState_IsGracePeriod(t *testing.T) {

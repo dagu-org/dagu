@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/coder/websocket"
+	"github.com/dagucloud/dagu/internal/license"
 	"github.com/dagucloud/dagu/internal/service/audit"
 	authservice "github.com/dagucloud/dagu/internal/service/auth"
 	frontendauth "github.com/dagucloud/dagu/internal/service/frontend/auth"
@@ -16,19 +17,21 @@ import (
 
 // Handler handles WebSocket connections for the terminal.
 type Handler struct {
-	authService  *authservice.Service
-	auditService *audit.Service
-	manager      *Manager
-	shell        string
+	authService    *authservice.Service
+	auditService   *audit.Service
+	licenseChecker license.Checker
+	manager        *Manager
+	shell          string
 }
 
 // NewHandler creates a new terminal handler.
-func NewHandler(authSvc *authservice.Service, auditSvc *audit.Service, manager *Manager, shell string) *Handler {
+func NewHandler(authSvc *authservice.Service, auditSvc *audit.Service, licenseChecker license.Checker, manager *Manager, shell string) *Handler {
 	return &Handler{
-		authService:  authSvc,
-		auditService: auditSvc,
-		manager:      manager,
-		shell:        shell,
+		authService:    authSvc,
+		auditService:   auditSvc,
+		licenseChecker: licenseChecker,
+		manager:        manager,
+		shell:          shell,
 	}
 }
 
@@ -104,7 +107,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	runCtx, cancelRun := mergeSessionContext(ctx, managerCtx)
 	defer cancelRun()
-	_ = tc.Run(runCtx, h.auditService)
+	auditSvc := h.auditService
+	if h.licenseChecker != nil && !h.licenseChecker.IsFeatureEnabled(license.FeatureAudit) {
+		auditSvc = nil
+	}
+	_ = tc.Run(runCtx, auditSvc)
 }
 
 func mergeSessionContext(requestCtx, managerCtx context.Context) (context.Context, context.CancelFunc) {
