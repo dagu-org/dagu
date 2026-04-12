@@ -174,7 +174,7 @@ func counterThresholdExitScript(counterFile string, threshold, exitAtOrBelow, ex
 func retryOutputSequenceScript(counterFile string, outputs []string, successAttempt int) string {
 	if windowsShellTest() {
 		var body strings.Builder
-		body.WriteString(fmt.Sprintf("\n\t\t\t\t\t$counterFile = %s\n", test.PowerShellQuote(counterFile)))
+		fmt.Fprintf(&body, "\n\t\t\t\t\t$counterFile = %s\n", test.PowerShellQuote(counterFile))
 		body.WriteString("\t\t\t\t\t$attempt = 1\n")
 		body.WriteString("\t\t\t\t\tif (Test-Path $counterFile) {\n")
 		body.WriteString("\t\t\t\t\t\t$attempt = [int]((Get-Content -Raw -Path $counterFile).TrimEnd(\"`r\", \"`n\")) + 1\n")
@@ -187,7 +187,7 @@ func retryOutputSequenceScript(counterFile string, outputs []string, successAtte
 			if attempt == successAttempt {
 				exitCode = 0
 			}
-			body.WriteString(fmt.Sprintf("\t\t\t\t\t\t%d { Write-Output %s; exit %d }\n", attempt, test.PowerShellQuote(output), exitCode))
+			fmt.Fprintf(&body, "\t\t\t\t\t\t%d { Write-Output %s; exit %d }\n", attempt, test.PowerShellQuote(output), exitCode)
 		}
 		body.WriteString("\t\t\t\t\t\tdefault { exit 1 }\n")
 		body.WriteString("\t\t\t\t\t}\n")
@@ -195,7 +195,7 @@ func retryOutputSequenceScript(counterFile string, outputs []string, successAtte
 	}
 
 	var body strings.Builder
-	body.WriteString(fmt.Sprintf("\n\t\t\t\t\tCOUNTER_FILE=%q\n", shellTestPath(counterFile)))
+	fmt.Fprintf(&body, "\n\t\t\t\t\tCOUNTER_FILE=%q\n", shellTestPath(counterFile))
 	body.WriteString("\t\t\t\t\tif [ ! -f \"$COUNTER_FILE\" ]; then\n")
 	body.WriteString("\t\t\t\t\t\tATTEMPT=1\n")
 	body.WriteString("\t\t\t\t\telse\n")
