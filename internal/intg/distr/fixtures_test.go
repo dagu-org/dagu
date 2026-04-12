@@ -411,7 +411,7 @@ func (f *testFixture) enqueueDirect() error {
 		return err
 	}
 
-	dagCopy := f.dagWrapper.DAG.Clone()
+	dagCopy := f.dagWrapper.Clone()
 	dagCopy.Location = ""
 
 	att, err := f.coord.DAGRunStore.CreateAttempt(f.coord.Context, dagCopy, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
