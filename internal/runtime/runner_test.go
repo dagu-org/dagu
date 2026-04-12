@@ -209,7 +209,7 @@ func retryOutputSequenceScript(counterFile string, outputs []string, successAtte
 		if attempt == successAttempt {
 			exitCode = 0
 		}
-		body.WriteString(fmt.Sprintf("\t\t\t\t\t\t%d)\n\t\t\t\t\t\t\techo %q\n\t\t\t\t\t\t\texit %d\n\t\t\t\t\t\t\t;;\n", attempt, output, exitCode))
+		fmt.Fprintf(&body, "\t\t\t\t\t\t%d)\n\t\t\t\t\t\t\techo %q\n\t\t\t\t\t\t\texit %d\n\t\t\t\t\t\t\t;;\n", attempt, output, exitCode)
 	}
 	body.WriteString("\t\t\t\t\t\t*)\n\t\t\t\t\t\t\texit 1\n\t\t\t\t\t\t\t;;\n")
 	body.WriteString("\t\t\t\t\tesac\n")
