@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"slices"
 	"testing"
 	"time"
@@ -57,6 +58,17 @@ type procConfig struct {
 }
 
 type fixtureOption func(*fixtureConfig)
+
+func distrTestTimeout(timeout time.Duration) time.Duration {
+	switch {
+	case goruntime.GOOS == "windows" && raceEnabled():
+		return timeout * 3
+	case goruntime.GOOS == "windows" || raceEnabled():
+		return timeout * 2
+	default:
+		return timeout
+	}
+}
 
 func withWorkerMode(mode workerMode) fixtureOption {
 	return func(c *fixtureConfig) { c.workerMode = mode }
@@ -287,6 +299,7 @@ func (f *testFixture) startWorker(w *worker.Worker, workerID string) *worker.Wor
 
 func (f *testFixture) waitForWorkerRegistration(workerID string, timeout time.Duration) {
 	f.t.Helper()
+	timeout = distrTestTimeout(timeout)
 	require.Eventually(f.t, func() bool {
 		workers, err := f.coordinatorClient.GetWorkers(f.coord.Context)
 		if err != nil {
@@ -343,6 +356,7 @@ func (f *testFixture) startSchedulerWithOptions(
 	if startupTimeout <= 0 {
 		startupTimeout = 5 * time.Second
 	}
+	startupTimeout = distrTestTimeout(startupTimeout)
 
 	schedulerCtx, schedulerCancel := f.schedulerCtx, f.schedulerCancel
 	ownsSchedulerCtx := false
@@ -384,7 +398,7 @@ func (f *testFixture) startSchedulerWithOptions(
 				require.Eventually(f.t, func() bool {
 					startErr = f.pollSchedulerErr()
 					return startErr != nil
-				}, time.Second, 25*time.Millisecond, "scheduler startup did not stop after cancellation")
+				}, distrTestTimeout(time.Second), 25*time.Millisecond, "scheduler startup did not stop after cancellation")
 			}
 
 			if startErr != nil {
@@ -502,6 +516,7 @@ func (f *testFixture) retry(dagRunID string) error {
 func (f *testFixture) waitForQueued() {
 	f.t.Helper()
 	var schedulerErr error
+	timeout := distrTestTimeout(5 * time.Second)
 	require.Eventually(f.t, func() bool {
 		schedulerErr = f.pollSchedulerErr()
 		if schedulerErr != nil {
@@ -509,12 +524,13 @@ func (f *testFixture) waitForQueued() {
 		}
 		items, err := f.coord.QueueStore.ListByDAGName(f.coord.Context, f.dagWrapper.ProcGroup(), f.dagWrapper.Name)
 		return err == nil && len(items) == 1
-	}, 5*time.Second, 100*time.Millisecond, "DAG should be enqueued")
+	}, timeout, 100*time.Millisecond, "DAG should be enqueued")
 	require.NoError(f.t, schedulerErr)
 }
 
 func (f *testFixture) waitForStatus(expected core.Status, timeout time.Duration) exec.DAGRunStatus {
 	f.t.Helper()
+	timeout = distrTestTimeout(timeout)
 	var status exec.DAGRunStatus
 	var schedulerErr error
 	require.Eventually(f.t, func() bool {
@@ -535,6 +551,7 @@ func (f *testFixture) waitForStatus(expected core.Status, timeout time.Duration)
 
 func (f *testFixture) waitForStatusIn(expected []core.Status, timeout time.Duration) exec.DAGRunStatus {
 	f.t.Helper()
+	timeout = distrTestTimeout(timeout)
 	var status exec.DAGRunStatus
 	var schedulerErr error
 	require.Eventually(f.t, func() bool {

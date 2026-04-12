@@ -621,7 +621,7 @@ func TestNestedThreeLevelDAG(t *testing.T) {
 params:
   PARAM: VALUE
 steps:
-  - command: echo value is ${PARAM}
+  - command: echo "value is ${PARAM}"
     output: OUTPUT
 `))
 
@@ -630,7 +630,7 @@ steps:
   - call: nested_child
     params: "PARAM=123"
     output: SUB_OUTPUT
-  - command: echo ${SUB_OUTPUT.outputs.OUTPUT}
+  - command: echo "${SUB_OUTPUT.outputs.OUTPUT}"
     output: OUT1
 ---
 name: nested_child
@@ -640,7 +640,7 @@ steps:
   - call: nested_grand_child
     params: "PARAM=${PARAM}"
     output: GRAND_SUB_OUTPUT
-  - command: echo ${GRAND_SUB_OUTPUT.outputs.OUTPUT}
+  - command: echo "${GRAND_SUB_OUTPUT.outputs.OUTPUT}"
     output: OUTPUT
 `
 	dag := th.DAG(t, dagContent)

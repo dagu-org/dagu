@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/moby/moby/client"
 )
@@ -28,6 +29,17 @@ func canonicalTestPath(path string) string {
 		path = resolved
 	}
 	return filepath.Clean(path)
+}
+
+func intgTestTimeout(timeout time.Duration) time.Duration {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return timeout * 3
+	case runtime.GOOS == "windows" || raceEnabled():
+		return timeout * 2
+	default:
+		return timeout
+	}
 }
 
 func requireLinuxContainerRuntime(t *testing.T) {
