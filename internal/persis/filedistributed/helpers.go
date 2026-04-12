@@ -36,7 +36,7 @@ func writeJSONAtomic(path string, value any) error {
 }
 
 func readJSONFile(path string, value any) error {
-	data, err := os.ReadFile(path) //nolint:gosec // internal controlled file path
+	data, err := fileutil.ReadFileWithRetry(path)
 	if err != nil {
 		return err
 	}
@@ -64,6 +64,14 @@ func sortedFiles(dir string) ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+func removeFile(path string) error {
+	return fileutil.RemoveWithRetry(path)
+}
+
+func renameFile(oldPath, newPath string) error {
+	return fileutil.RenameWithRetry(oldPath, newPath)
 }
 
 func encodeKey(input string) string {

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -344,7 +345,7 @@ func (s *Store) saveQueueIndexLocked(ctx context.Context, name string, idx *queu
 	indexPath := s.queueIndexPath(name)
 	if idx.total() == 0 {
 		delete(s.indices, name)
-		if err := os.Remove(indexPath); err != nil && !os.IsNotExist(err) {
+		if err := fileutil.RemoveWithRetry(indexPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("failed to remove queue index %s: %w", indexPath, err)
 		}
 		return nil
@@ -375,7 +376,7 @@ func (s *Store) saveQueueIndexLocked(ctx context.Context, name string, idx *queu
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temporary queue index for %s: %w", name, err)
 	}
-	if err := os.Rename(tmpFile.Name(), indexPath); err != nil {
+	if err := fileutil.RenameWithRetry(tmpFile.Name(), indexPath); err != nil {
 		return fmt.Errorf("failed to install queue index for %s: %w", name, err)
 	}
 
@@ -395,7 +396,7 @@ func (s *Store) saveQueueIndexLocked(ctx context.Context, name string, idx *queu
 func (s *Store) invalidateQueueIndexLocked(ctx context.Context, name string) {
 	delete(s.indices, name)
 	indexPath := s.queueIndexPath(name)
-	if err := os.Remove(indexPath); err != nil && !os.IsNotExist(err) {
+	if err := fileutil.RemoveWithRetry(indexPath); err != nil && !os.IsNotExist(err) {
 		logger.Warn(ctx, "Failed to invalidate queue index",
 			tag.Queue(name),
 			tag.File(indexPath),

@@ -367,14 +367,13 @@ func (att *Attempt) compactLocked(ctx context.Context) (retErr error) {
 // safeRename safely replaces the target file with the source file,
 // handling platform-specific differences
 func safeRename(source, target string) error {
-	// On Windows, we need to remove the target file first
-	if _, err := os.Stat(target); err == nil {
-		if err := os.Remove(target); err != nil {
+	if err := fileutil.ReplaceFileWithRetry(source, target); err != nil {
+		if _, statErr := os.Stat(target); statErr == nil {
 			return fmt.Errorf("failed to remove target file: %w", err)
 		}
+		return err
 	}
-
-	return os.Rename(source, target)
+	return nil
 }
 
 // ReadStatus reads the latest status from the file, using cache if available.

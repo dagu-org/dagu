@@ -120,14 +120,14 @@ func (s *DispatchTaskStore) ClaimNext(_ context.Context, claim exec.DispatchTask
 		if err := ensureDir(filepath.Dir(claimPath)); err != nil {
 			return nil, err
 		}
-		if err := os.Rename(pendingPath, claimPath); err != nil {
+		if err := renameFile(pendingPath, claimPath); err != nil {
 			if os.IsNotExist(err) {
 				continue
 			}
 			return nil, fmt.Errorf("claim dispatch task %s: %w", pendingPath, err)
 		}
 		if err := os.Chtimes(claimPath, claimedAt, claimedAt); err != nil && !os.IsNotExist(err) {
-			_ = os.Rename(claimPath, pendingPath)
+			_ = renameFile(claimPath, pendingPath)
 			return nil, fmt.Errorf("stamp claim file %s: %w", claimPath, err)
 		}
 
@@ -138,12 +138,12 @@ func (s *DispatchTaskStore) ClaimNext(_ context.Context, claim exec.DispatchTask
 		record.Owner = claim.Owner
 		record.Task, err = applyTaskClaim(record.Task, claim.Owner, claimToken)
 		if err != nil {
-			_ = os.Rename(claimPath, pendingPath)
+			_ = renameFile(claimPath, pendingPath)
 			return nil, err
 		}
 
 		if err := writeJSONAtomic(claimPath, record); err != nil {
-			_ = os.Rename(claimPath, pendingPath)
+			_ = renameFile(claimPath, pendingPath)
 			return nil, err
 		}
 
@@ -183,7 +183,7 @@ func (s *DispatchTaskStore) GetClaim(_ context.Context, claimToken string) (*exe
 }
 
 func (s *DispatchTaskStore) DeleteClaim(_ context.Context, claimToken string) error {
-	err := os.Remove(s.claimPath(claimToken))
+	err := removeFile(s.claimPath(claimToken))
 	if err == nil || os.IsNotExist(err) {
 		return nil
 	}
@@ -288,7 +288,7 @@ func (s *DispatchTaskStore) recycleExpiredClaims() error {
 		if err := ensureDir(filepath.Dir(pendingPath)); err != nil {
 			return err
 		}
-		if err := os.Rename(claimPath, pendingPath); err != nil && !os.IsNotExist(err) {
+		if err := renameFile(claimPath, pendingPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("requeue expired claim %s: %w", claimPath, err)
 		}
 	}
@@ -323,7 +323,7 @@ func (s *DispatchTaskStore) recycleExpiredPending() error {
 			continue
 		}
 
-		if err := os.Remove(pendingPath); err != nil && !os.IsNotExist(err) {
+		if err := removeFile(pendingPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove expired pending dispatch task %s: %w", pendingPath, err)
 		}
 	}

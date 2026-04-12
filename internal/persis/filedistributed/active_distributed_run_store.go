@@ -70,7 +70,7 @@ func (s *ActiveDistributedRunStore) Delete(ctx context.Context, attemptKey strin
 		return nil
 	}
 	return s.withActiveRunLock(ctx, attemptKey, func() error {
-		err := os.Remove(s.activeRunPath(attemptKey))
+		err := removeFile(s.activeRunPath(attemptKey))
 		if err == nil || os.IsNotExist(err) {
 			return nil
 		}
