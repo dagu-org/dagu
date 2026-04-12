@@ -2158,6 +2158,66 @@ func TestBuildLogOutput(t *testing.T) {
 	}
 }
 
+func TestBuildArtifacts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		yaml     string
+		expected *core.ArtifactsConfig
+	}{
+		{
+			name:     "Default_Empty",
+			yaml:     "",
+			expected: nil,
+		},
+		{
+			name: "EnabledOnly",
+			yaml: `
+artifacts:
+  enabled: true
+`,
+			expected: &core.ArtifactsConfig{Enabled: true},
+		},
+		{
+			name: "DirOnly",
+			yaml: `
+artifacts:
+  dir: /var/lib/dagu/artifacts
+`,
+			expected: &core.ArtifactsConfig{Dir: "/var/lib/dagu/artifacts"},
+		},
+		{
+			name: "EnabledAndDir",
+			yaml: `
+artifacts:
+  enabled: true
+  dir: /var/lib/dagu/artifacts
+`,
+			expected: &core.ArtifactsConfig{
+				Enabled: true,
+				Dir:     "/var/lib/dagu/artifacts",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var d dag
+			if tt.yaml != "" {
+				err := yaml.Unmarshal([]byte(tt.yaml), &d)
+				require.NoError(t, err)
+			}
+
+			result, err := buildArtifacts(testBuildContext(), &d)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestBuildApprovalStepsValidation(t *testing.T) {
 	t.Parallel()
 
