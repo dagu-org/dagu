@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -376,10 +377,7 @@ func TestStore_ExternalFileDeletion(t *testing.T) {
 }
 
 func TestStore_WriteError(t *testing.T) {
-	// Skip if running as root since permission-based write failures cannot be reliably tested
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	t.Parallel()
 	ctx := context.Background()
@@ -503,7 +501,9 @@ func TestStore_FilePermissions(t *testing.T) {
 	// Directory permission
 	info, err := os.Stat(subDir)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0750), info.Mode().Perm())
+	if testutil.SupportsPOSIXPermissionBits() {
+		assert.Equal(t, os.FileMode(0750), info.Mode().Perm())
+	}
 
 	// File permission
 	wh := newWebhook(t, "perm-test")
@@ -511,7 +511,9 @@ func TestStore_FilePermissions(t *testing.T) {
 
 	info, err = os.Stat(filepath.Join(subDir, wh.ID+".json"))
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+	if testutil.SupportsPOSIXPermissionBits() {
+		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+	}
 }
 
 func TestStore_Concurrent(t *testing.T) {

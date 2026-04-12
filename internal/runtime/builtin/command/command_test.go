@@ -22,6 +22,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func assertExecutableName(t *testing.T, got string, want string) {
+	t.Helper()
+
+	gotBase := strings.TrimSuffix(strings.ToLower(filepath.Base(got)), ".exe")
+	wantBase := strings.TrimSuffix(strings.ToLower(filepath.Base(want)), ".exe")
+	assert.Equal(t, wantBase, gotBase)
+}
+
+func assertCommandArgs(t *testing.T, got []string, want []string) {
+	t.Helper()
+
+	require.Len(t, got, len(want))
+	assertExecutableName(t, got[0], want[0])
+	assert.Equal(t, want[1:], got[1:])
+}
+
 func TestDirectShell(t *testing.T) {
 	ctx := context.Background()
 
@@ -202,7 +218,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, cmd)
 
-			assert.Equal(t, tt.expected, cmd.Args)
+			assertCommandArgs(t, cmd.Args, tt.expected)
 		})
 	}
 }
@@ -416,7 +432,7 @@ func TestCommandConfig_NewCmd(t *testing.T) {
 			require.NotNil(t, cmd)
 
 			// Check the command path
-			assert.Contains(t, cmd.Path, tt.checkPath)
+			assertExecutableName(t, cmd.Path, tt.checkPath)
 
 			// Check working directory
 			if tt.config.Dir != "" {
@@ -1827,7 +1843,7 @@ func TestCreateDirectCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := createDirectCommand(ctx, tt.cmd, tt.args, tt.scriptFile)
-			assert.Equal(t, tt.expected, cmd.Args)
+			assertCommandArgs(t, cmd.Args, tt.expected)
 		})
 	}
 }

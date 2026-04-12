@@ -278,6 +278,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestDAGFromEntry(t *testing.T) {
+	baseDir := filepath.FromSlash("/dags")
 	entry := &indexv1.DAGIndexEntry{
 		FilePath:    "my-dag.yaml",
 		Name:        "my-dag",
@@ -289,9 +290,9 @@ func TestDAGFromEntry(t *testing.T) {
 		LoadError:   "",
 	}
 
-	dag := DAGFromEntry(entry, "/dags")
+	dag := DAGFromEntry(entry, baseDir)
 	assert.Equal(t, "my-dag", dag.Name)
-	assert.Equal(t, "/dags/my-dag.yaml", dag.Location)
+	assert.Equal(t, filepath.Join(baseDir, "my-dag.yaml"), dag.Location)
 	assert.Equal(t, "group1", dag.Group)
 	assert.Equal(t, "desc", dag.Description)
 	assert.Len(t, dag.Tags, 2)
@@ -302,13 +303,14 @@ func TestDAGFromEntry(t *testing.T) {
 }
 
 func TestDAGFromEntry_WithError(t *testing.T) {
+	baseDir := filepath.FromSlash("/dags")
 	entry := &indexv1.DAGIndexEntry{
 		FilePath:  "bad.yaml",
 		Name:      "bad",
 		LoadError: "parse failed",
 	}
 
-	dag := DAGFromEntry(entry, "/dags")
+	dag := DAGFromEntry(entry, baseDir)
 	assert.Equal(t, "bad", dag.Name)
 	require.Len(t, dag.BuildErrors, 1)
 	assert.Equal(t, "parse failed", dag.BuildErrors[0].Error())
@@ -425,19 +427,14 @@ func TestJoinErrors(t *testing.T) {
 func TestBuild_SpecLoadFailure(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create a YAML file that is unreadable (permission denied).
 	filePath := filepath.Join(dir, "noperm.yaml")
-	require.NoError(t, os.WriteFile(filePath, []byte("name: noperm\nsteps:\n  - name: s\n    command: echo ok\n"), 0600))
+	require.NoError(t, os.MkdirAll(filePath, 0750))
 	info, err := os.Stat(filePath)
 	require.NoError(t, err)
 
 	files := []YAMLFileMeta{
 		{Name: "noperm.yaml", Size: info.Size(), ModTime: info.ModTime().UnixNano()},
 	}
-
-	// Remove read permission so spec.Load fails with a file-open error.
-	require.NoError(t, os.Chmod(filePath, 0000))
-	t.Cleanup(func() { _ = os.Chmod(filePath, 0600) })
 
 	idx := Build(context.Background(), dir, files, nil)
 	require.Len(t, idx.Entries, 1)

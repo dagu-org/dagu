@@ -306,7 +306,7 @@ func TestFileResolver_CheckAccessibility(t *testing.T) {
 
 func TestFileResolver_CheckAccessibility_PermissionErrors(t *testing.T) {
 	// Skip on Windows - file permissions work differently
-	if os.Getenv("GOOS") == "windows" {
+	if runtime.GOOS == "windows" {
 		t.Skip("Skipping permission test on Windows")
 	}
 

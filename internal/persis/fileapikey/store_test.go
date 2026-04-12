@@ -13,6 +13,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -610,7 +611,9 @@ func TestStore_FileSystemEdgeCases(t *testing.T) {
 		// Check file permissions (0600 = -rw-------)
 		// Note: On some systems, umask might affect this
 		perm := info.Mode().Perm()
-		assert.Equal(t, os.FileMode(0600), perm, "API key file should have 0600 permissions")
+		if testutil.SupportsPOSIXPermissionBits() {
+			assert.Equal(t, os.FileMode(0600), perm, "API key file should have 0600 permissions")
+		}
 	})
 
 	t.Run("DirectoryPermissions", func(t *testing.T) {
@@ -626,7 +629,9 @@ func TestStore_FileSystemEdgeCases(t *testing.T) {
 
 		// Check directory permissions (0750 = drwxr-x---)
 		perm := info.Mode().Perm()
-		assert.Equal(t, os.FileMode(0750), perm, "API key directory should have 0750 permissions")
+		if testutil.SupportsPOSIXPermissionBits() {
+			assert.Equal(t, os.FileMode(0750), perm, "API key directory should have 0750 permissions")
+		}
 	})
 
 	t.Run("ExternalFileDeletion", func(t *testing.T) {
@@ -1052,8 +1057,10 @@ func TestStore_MultipleUpdateNameChanges(t *testing.T) {
 
 func TestStore_ErrorWrapping(t *testing.T) {
 	t.Run("CreateDirectoryError", func(t *testing.T) {
-		// Try to create store in an invalid path
-		_, err := New("/nonexistent/deeply/nested/path/that/cannot/exist")
+		blocker := filepath.Join(t.TempDir(), "blocked")
+		testutil.BlockPathWithFile(t, blocker)
+
+		_, err := New(filepath.Join(blocker, "nested"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "fileapikey:")
 	})
