@@ -36,7 +36,7 @@ func BlockPathWithFile(t *testing.T, path string) {
 	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("remove %s: %v", path, err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
 	}
 	if err := os.WriteFile(path, []byte("blocked"), 0o600); err != nil {
@@ -51,7 +51,7 @@ func BlockPathWithDirectory(t *testing.T, path string) {
 	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("remove %s: %v", path, err)
 	}
-	if err := os.MkdirAll(path, 0o755); err != nil {
+	if err := os.MkdirAll(path, 0o750); err != nil {
 		t.Fatalf("mkdir blocker directory %s: %v", path, err)
 	}
 }
