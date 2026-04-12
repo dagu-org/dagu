@@ -80,19 +80,16 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 	require.NotNil(t, gpuClaim)
 	assert.Equal(t, "run-a", gpuClaim.Task.DagRunId)
 
-	var reclaimed *exec.ClaimedDispatchTask
-	require.Eventually(t, func() bool {
-		var claimErr error
-		reclaimed, claimErr = store.ClaimNext(ctx, exec.DispatchTaskClaim{
-			WorkerID:     "worker-2",
-			PollerID:     "poller-2",
-			Labels:       map[string]string{"type": "cpu"},
-			Owner:        exec.CoordinatorEndpoint{ID: "coord-b"},
-			ClaimTimeout: claimTimeout,
-		})
-		require.NoError(t, claimErr)
-		return reclaimed != nil
-	}, 5*time.Second, 25*time.Millisecond)
+	ageClaimedDispatchTask(t, store, claimed.ClaimToken, 2*time.Second, 2*time.Second)
+
+	reclaimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
+		WorkerID:     "worker-2",
+		PollerID:     "poller-2",
+		Labels:       map[string]string{"type": "cpu"},
+		Owner:        exec.CoordinatorEndpoint{ID: "coord-b"},
+		ClaimTimeout: claimTimeout,
+	})
+	require.NoError(t, err)
 	require.NotNil(t, reclaimed)
 	assert.Equal(t, "run-b", reclaimed.Task.DagRunId)
 	assert.Equal(t, "coord-b", reclaimed.Task.OwnerCoordinatorId)

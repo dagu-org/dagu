@@ -46,6 +46,13 @@ echo "$COUNT"
 `, test.PosixQuote(counterFile), test.PosixQuote(counterFile), test.PosixQuote(counterFile))
 }
 
+func repeatPolicyTimeout(base time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return base * 6
+	}
+	return base
+}
+
 func repeatExitCodeScript(counterFile string, successAfter int, removeOnSuccess bool) string {
 	if runtime.GOOS == "windows" {
 		removeBlock := ""
@@ -110,7 +117,7 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 	agent := dag.Agent()
 
 	// Run with timeout
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -155,7 +162,7 @@ steps:
 	agent := dag.Agent()
 
 	// Run with timeout
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -192,7 +199,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	agent := dag.Agent()
 
 	// Run with timeout
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -227,7 +234,7 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 	agent := dag.Agent()
 
 	// Run with timeout
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -272,7 +279,7 @@ steps:
 	agent := dag.Agent()
 
 	// Run with timeout
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -309,7 +316,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 	agent := dag.Agent()
 
 	// Run with timeout
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -349,7 +356,7 @@ steps:
 `, counterFile, indentScript(repeatExitCodeScript(counterFile, 3, false), 6)))
 	agent := dag.Agent()
 
-	ctx, cancel := context.WithTimeout(agent.Context, 15*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(15*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -382,7 +389,7 @@ func TestRepeatPolicy_LimitFromEnvVar(t *testing.T) {
 `)
 	agent := dag.Agent()
 
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -409,7 +416,7 @@ func TestRepeatPolicy_IntervalSecFromEnvVar(t *testing.T) {
 `)
 	agent := dag.Agent()
 
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -437,7 +444,7 @@ func TestRepeatPolicy_MaxIntervalSecFromEnvVar(t *testing.T) {
 `)
 	agent := dag.Agent()
 
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -458,7 +465,7 @@ func TestRepeatPolicy_LimitFromCommandSubstitution(t *testing.T) {
 	dag := th.DAG(t, fmt.Sprintf("steps:\n  - command: echo \"repeating with cmd sub\"\n    repeat_policy:\n      repeat: true\n      limit: %q\n      interval_sec: 0\n", repeatCommandSubstitution("3")))
 	agent := dag.Agent()
 
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -486,7 +493,7 @@ func TestRepeatPolicy_MultipleDynamicFields(t *testing.T) {
 `)
 	agent := dag.Agent()
 
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)

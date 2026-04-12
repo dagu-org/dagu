@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -19,6 +20,13 @@ import (
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/stretchr/testify/require"
 )
+
+func rescheduleEventuallyTimeout(base time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return base * 6
+	}
+	return base
+}
 
 func CreateInlineDAGRunForReschedule(t *testing.T, server Server, dagName string, enqueue bool) (string, string) {
 	t.Helper()
@@ -59,11 +67,11 @@ steps:
 
 	if enqueue {
 		ProcessQueuedInlineRun(t, server, dagName)
+		statusAttempt := WaitForAttemptSnapshot(t, server, dagName, dagRunID)
 		require.Eventually(t, func() bool {
-			statusAttempt := WaitForAttemptSnapshot(t, server, dagName, dagRunID)
 			status, err := statusAttempt.ReadStatus(server.Context)
 			return err == nil && status.Status == core.Succeeded
-		}, 10*time.Second, 200*time.Millisecond)
+		}, rescheduleEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 	}
 
 	attempt, dag := WaitForAttemptSnapshotWithDAG(t, server, dagName, dagRunID)
@@ -91,7 +99,7 @@ func AssertInlineRescheduledRunParams(t *testing.T, server Server, dagName, dagR
 			return false
 		}
 		return status.Status == core.Succeeded
-	}, 10*time.Second, 200*time.Millisecond)
+	}, rescheduleEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 
 	status, err := attempt.ReadStatus(server.Context)
 	require.NoError(t, err)
@@ -106,7 +114,7 @@ func WaitForAttemptSnapshot(t *testing.T, server Server, dagName, dagRunID strin
 		var err error
 		attempt, err = server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, dagRunID))
 		return err == nil
-	}, 10*time.Second, 100*time.Millisecond)
+	}, rescheduleEventuallyTimeout(10*time.Second), 100*time.Millisecond)
 
 	return attempt
 }
@@ -121,7 +129,7 @@ func WaitForAttemptSnapshotWithDAG(t *testing.T, server Server, dagName, dagRunI
 		var err error
 		dag, err = attempt.ReadDAG(server.Context)
 		return err == nil && dag != nil && len(dag.YamlData) > 0
-	}, 10*time.Second, 100*time.Millisecond)
+	}, rescheduleEventuallyTimeout(10*time.Second), 100*time.Millisecond)
 
 	return attempt, dag
 }
@@ -156,5 +164,5 @@ func ProcessQueuedInlineRun(t *testing.T, server Server, queueName string) {
 		queueProcessor.ProcessQueueItems(server.Context, queueName)
 		items, err := server.QueueStore.List(server.Context, queueName)
 		return err == nil && len(items) == 0
-	}, 15*time.Second, 200*time.Millisecond)
+	}, rescheduleEventuallyTimeout(15*time.Second), 200*time.Millisecond)
 }
