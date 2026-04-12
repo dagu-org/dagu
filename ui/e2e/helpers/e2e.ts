@@ -228,6 +228,31 @@ export async function waitForDAGAvailable(
     .toBeTruthy();
 }
 
+export async function waitForSchedulerDAGRegistered(
+  dagName: string,
+  timeout: number = 15_000
+): Promise<void> {
+  const stack = await loadStack();
+  const schedulerStatePath = path.join(stack.stateDir, 'local/runtime/data/scheduler/state.json');
+
+  await expect
+    .poll(
+      async () => {
+        try {
+          const raw = await fs.readFile(schedulerStatePath, 'utf8');
+          const state = JSON.parse(raw) as { dags?: Record<string, unknown> };
+          return Boolean(state.dags?.[dagName]);
+        } catch {
+          return false;
+        }
+      },
+      {
+        timeout,
+      }
+    )
+    .toBeTruthy();
+}
+
 export async function startDAG(
   request: APIRequestContext,
   token: string,
@@ -502,10 +527,10 @@ export async function startService(serviceName: string): Promise<void> {
   });
 }
 
-export async function killProcess(
+export function killProcess(
   pid: number | string,
   signal: 'TERM' | 'KILL' = 'KILL'
-): Promise<void> {
+): void {
   try {
     execFileSync('kill', [`-${signal}`, `${pid}`], {
       cwd: repoRoot,

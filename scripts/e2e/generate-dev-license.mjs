@@ -10,6 +10,12 @@ if (!privKeyB64) {
 
 // Go ed25519.PrivateKey is seed (32 bytes) + public key (32 bytes).
 const rawKey = Buffer.from(privKeyB64, 'base64');
+if (rawKey.length !== 64) {
+  process.stderr.write(
+    `DAGU_LICENSE_PRIVKEY_B64 must decode to 64 bytes (got ${rawKey.length})\n`
+  );
+  process.exit(1);
+}
 const seed = rawKey.subarray(0, 32);
 const pub = rawKey.subarray(32);
 const privateKey = createPrivateKey({

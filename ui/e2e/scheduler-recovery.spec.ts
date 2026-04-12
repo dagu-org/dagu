@@ -8,6 +8,7 @@ import {
   loginViaAPI,
   startService,
   stopService,
+  waitForSchedulerDAGRegistered,
   uniqueName,
   waitForRunStatus,
   writeLocalDAG,
@@ -42,7 +43,7 @@ steps:
 `
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await waitForSchedulerDAGRegistered(dagName, 30_000);
 
     await stopService('scheduler');
 
