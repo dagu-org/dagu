@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,11 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildArtifactPreviewReturnsMetadataWithoutContentForLargeFiles(t *testing.T) {
+func TestBuildArtifactPreviewReturnsMetadataWithoutContentForLargeMarkdownFiles(t *testing.T) {
 	t.Parallel()
 
 	archiveDir := t.TempDir()
-	content := strings.Repeat("# heading\n", int(artifactPreviewMaxBytes/8)+1)
+	content := strings.Repeat("# heading\n", int(artifactTextPreviewMaxBytes/8)+1)
 	path := filepath.Join(archiveDir, "large.md")
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 
@@ -28,7 +29,39 @@ func TestBuildArtifactPreviewReturnsMetadataWithoutContentForLargeFiles(t *testi
 	assert.True(t, preview.TooLarge)
 	assert.False(t, preview.Truncated)
 	assert.Nil(t, preview.Content)
-	assert.Greater(t, preview.Size, artifactPreviewMaxBytes)
+	assert.Greater(t, preview.Size, artifactTextPreviewMaxBytes)
+}
+
+func TestBuildArtifactPreviewReturnsMetadataWithoutContentForLargeImages(t *testing.T) {
+	t.Parallel()
+
+	archiveDir := t.TempDir()
+	content := append([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, bytes.Repeat([]byte("a"), int(artifactImagePreviewMaxBytes))...)
+	path := filepath.Join(archiveDir, "large.png")
+	require.NoError(t, os.WriteFile(path, content, 0o600))
+
+	preview, err := buildArtifactPreview(archiveDir, "large.png")
+	require.NoError(t, err)
+	assert.Equal(t, openapiv1.ArtifactPreviewKindImage, preview.Kind)
+	assert.True(t, preview.TooLarge)
+	assert.Nil(t, preview.Content)
+	assert.Greater(t, preview.Size, artifactImagePreviewMaxBytes)
+}
+
+func TestBuildArtifactPreviewAllowsLargerTextWithinTextLimit(t *testing.T) {
+	t.Parallel()
+
+	archiveDir := t.TempDir()
+	content := strings.Repeat("line\n", 300000)
+	path := filepath.Join(archiveDir, "report.txt")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+	preview, err := buildArtifactPreview(archiveDir, "report.txt")
+	require.NoError(t, err)
+	assert.Equal(t, openapiv1.ArtifactPreviewKindText, preview.Kind)
+	assert.False(t, preview.TooLarge)
+	require.NotNil(t, preview.Content)
+	assert.NotEmpty(t, *preview.Content)
 }
 
 func TestResolveArtifactPathRejectsSymlinkEscape(t *testing.T) {

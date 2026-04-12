@@ -50,7 +50,8 @@ var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
 const dagRunReadTimeout = 10 * time.Second
 const statusClientClosedRequest = 499
-const artifactPreviewMaxBytes int64 = 512 * 1024
+const artifactTextPreviewMaxBytes int64 = 2 * 1024 * 1024
+const artifactImagePreviewMaxBytes int64 = 5 * 1024 * 1024
 
 var errArtifactUnavailable = errors.New("artifact directory not found")
 
@@ -3368,7 +3369,8 @@ func buildArtifactPreview(archiveDir, relPath string) (api.ArtifactPreviewRespon
 	}
 	mimeType := detectArtifactMimeType(absPath, sniffBytes)
 	kind := artifactPreviewKind(relPath, mimeType)
-	tooLarge := info.Size() > artifactPreviewMaxBytes
+	previewLimit := artifactPreviewLimit(kind)
+	tooLarge := previewLimit > 0 && info.Size() > previewLimit
 
 	resp := api.ArtifactPreviewResponse{
 		Name:      filepath.Base(absPath),
@@ -3379,19 +3381,19 @@ func buildArtifactPreview(archiveDir, relPath string) (api.ArtifactPreviewRespon
 		TooLarge:  tooLarge,
 		Truncated: false,
 	}
-	if tooLarge {
+	if tooLarge || previewLimit <= 0 {
 		return resp, nil
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return api.ArtifactPreviewResponse{}, err
 	}
 
-	previewBytes, err := io.ReadAll(io.LimitReader(file, artifactPreviewMaxBytes+1))
+	previewBytes, err := io.ReadAll(io.LimitReader(file, previewLimit+1))
 	if err != nil {
 		return api.ArtifactPreviewResponse{}, err
 	}
-	if int64(len(previewBytes)) > artifactPreviewMaxBytes {
-		previewBytes = previewBytes[:artifactPreviewMaxBytes]
+	if int64(len(previewBytes)) > previewLimit {
+		previewBytes = previewBytes[:previewLimit]
 		resp.Truncated = true
 	}
 	if kind == api.ArtifactPreviewKindMarkdown || kind == api.ArtifactPreviewKindText {
@@ -3456,6 +3458,18 @@ func artifactPreviewKind(path, mimeType string) api.ArtifactPreviewKind {
 		return api.ArtifactPreviewKindText
 	}
 	return api.ArtifactPreviewKindBinary
+}
+
+func artifactPreviewLimit(kind api.ArtifactPreviewKind) int64 {
+	switch kind {
+	case api.ArtifactPreviewKindMarkdown, api.ArtifactPreviewKindText:
+		return artifactTextPreviewMaxBytes
+	case api.ArtifactPreviewKindImage:
+		return artifactImagePreviewMaxBytes
+	case api.ArtifactPreviewKindBinary:
+		return 0
+	}
+	return 0
 }
 
 // GetDAGRunsListData returns DAG runs list for SSE.
