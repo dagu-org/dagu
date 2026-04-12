@@ -33,6 +33,10 @@ service CoordinatorService {
   // Uses client streaming for efficient log transmission.
   rpc StreamLogs (stream LogChunk) returns (StreamLogsResponse);
 
+  // StreamArtifacts is called by workers to upload DAG run artifacts to the coordinator.
+  // Uses client streaming for efficient file transmission.
+  rpc StreamArtifacts (stream ArtifactChunk) returns (StreamArtifactsResponse);
+
   // GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
   // Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
   rpc GetDAGRunStatus (GetDAGRunStatusRequest) returns (GetDAGRunStatusResponse);
@@ -253,6 +257,33 @@ enum LogStreamType {
 
 // Response message for log streaming.
 message StreamLogsResponse {
+  uint64 chunks_received = 1;
+  uint64 bytes_written = 2;
+  string error = 3;
+}
+
+// Artifact chunk sent from worker to coordinator.
+message ArtifactChunk {
+  string worker_id = 1;
+  string dag_run_id = 2;
+  string dag_name = 3;
+  string relative_path = 4;
+  bytes data = 5;
+  uint64 sequence = 6;
+  bool is_final = 7;
+
+  // Root DAG info for sub-DAGs
+  string root_dag_run_name = 8;
+  string root_dag_run_id = 9;
+
+  // Attempt ID for the DAG run
+  string attempt_id = 10;
+  // Owner coordinator used to validate owner-bound artifact writes.
+  string owner_coordinator_id = 11;
+}
+
+// Response message for artifact streaming.
+message StreamArtifactsResponse {
   uint64 chunks_received = 1;
   uint64 bytes_written = 2;
   string error = 3;

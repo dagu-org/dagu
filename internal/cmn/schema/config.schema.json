@@ -105,6 +105,10 @@
       "type": "string",
       "description": "Directory for log files."
     },
+    "artifact_dir": {
+      "type": "string",
+      "description": "Directory for DAG run artifact files."
+    },
     "data_dir": {
       "type": "string",
       "description": "Directory for application data."
@@ -429,6 +433,10 @@
         "log_dir": {
           "type": "string",
           "description": "Directory for log files."
+        },
+        "artifact_dir": {
+          "type": "string",
+          "description": "Directory for DAG run artifact files."
         },
         "data_dir": {
           "type": "string",

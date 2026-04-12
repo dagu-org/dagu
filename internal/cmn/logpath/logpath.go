@@ -26,14 +26,30 @@ type Config struct {
 // Generate expands the configured log directories, creates the DAG-run log
 // directory if needed, and returns the full log file path.
 func Generate(ctx context.Context, baseLogDir, dagLogDir, dagName, dagRunID string) (string, error) {
-	baseDir, err := eval.String(ctx, baseLogDir, eval.WithOSExpansion())
+	dir, err := GenerateDir(ctx, baseLogDir, dagLogDir, dagName, dagRunID)
 	if err != nil {
-		return "", fmt.Errorf("failed to expand log directory: %w", err)
+		return "", err
 	}
 
-	dagDir, err := eval.String(ctx, dagLogDir, eval.WithOSExpansion())
+	cfg := Config{
+		Name:     dagName,
+		DAGRunID: dagRunID,
+	}
+
+	return filepath.Join(dir, cfg.LogFile()), nil
+}
+
+// GenerateDir expands the configured directories, creates the DAG-run
+// directory if needed, and returns the per-run directory path.
+func GenerateDir(ctx context.Context, baseDir, dagDir, dagName, dagRunID string) (string, error) {
+	baseDir, err := eval.String(ctx, baseDir, eval.WithOSExpansion())
 	if err != nil {
-		return "", fmt.Errorf("failed to expand DAG log directory: %w", err)
+		return "", fmt.Errorf("failed to expand base directory: %w", err)
+	}
+
+	dagDir, err = eval.String(ctx, dagDir, eval.WithOSExpansion())
+	if err != nil {
+		return "", fmt.Errorf("failed to expand DAG directory: %w", err)
 	}
 
 	cfg := Config{
@@ -44,15 +60,15 @@ func Generate(ctx context.Context, baseLogDir, dagLogDir, dagName, dagRunID stri
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return "", fmt.Errorf("invalid log settings: %w", err)
+		return "", fmt.Errorf("invalid run directory settings: %w", err)
 	}
 
-	dir, err := cfg.LogDir()
+	dir, err := cfg.RunDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to setup log directory: %w", err)
+		return "", fmt.Errorf("failed to setup run directory: %w", err)
 	}
 
-	return filepath.Join(dir, cfg.LogFile()), nil
+	return dir, nil
 }
 
 // Validate checks that essential fields are provided.
@@ -61,13 +77,13 @@ func (cfg Config) Validate() error {
 		return fmt.Errorf("DAGName cannot be empty")
 	}
 	if cfg.BaseDir == "" && cfg.DAGLogDir == "" {
-		return fmt.Errorf("either LogDir or DAGLogDir must be specified")
+		return fmt.Errorf("either base directory or DAG-specific directory must be specified")
 	}
 	return nil
 }
 
-// LogDir creates and returns the log directory based on the log configuration.
-func (cfg Config) LogDir() (string, error) {
+// RunDir creates and returns the per-run directory based on the configuration.
+func (cfg Config) RunDir() (string, error) {
 	baseDir := cfg.BaseDir
 	if cfg.DAGLogDir != "" {
 		baseDir = cfg.DAGLogDir
@@ -85,6 +101,11 @@ func (cfg Config) LogDir() (string, error) {
 	}
 
 	return logDir, nil
+}
+
+// LogDir is kept for backward compatibility with log-specific call sites.
+func (cfg Config) LogDir() (string, error) {
+	return cfg.RunDir()
 }
 
 // LogFile constructs the scheduler log filename using the current timestamp and

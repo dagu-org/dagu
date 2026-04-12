@@ -145,6 +145,13 @@ func WithLogFilePath(logFilePath string) StatusOption {
 	}
 }
 
+// WithArchiveDir returns a StatusOption that sets the artifact/archive directory path.
+func WithArchiveDir(archiveDir string) StatusOption {
+	return func(s *exec.DAGRunStatus) {
+		s.ArchiveDir = archiveDir
+	}
+}
+
 // WithError returns a StatusOption that sets the top-level error message
 func WithError(err string) StatusOption {
 	return func(s *exec.DAGRunStatus) {
