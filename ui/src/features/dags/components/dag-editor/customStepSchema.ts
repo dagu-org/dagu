@@ -1,9 +1,9 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import type { components } from '../../../../api/v1/schema';
-import { parse as parseYaml } from 'yaml';
 import { dereferenceSchema, type JSONSchema } from '@/lib/schema-utils';
+import { parse as parseYaml } from 'yaml';
+import type { components } from '../../../../api/v1/schema';
 
 export interface EditorCustomStepTypeHint {
   name: string;
@@ -150,8 +150,28 @@ function isStepLikeSchema(schema: JSONSchema): boolean {
   );
 }
 
+function hasStepSpecificProperties(schema: JSONSchema): boolean {
+  const properties = schema.properties;
+  if (!properties) {
+    return false;
+  }
+
+  return (
+    'name' in properties ||
+    'command' in properties ||
+    'script' in properties ||
+    'depends' in properties ||
+    'working_dir' in properties ||
+    'parallel' in properties ||
+    'call' in properties
+  );
+}
+
 function isStepSchemaCandidate(schema: JSONSchema): boolean {
   if (!isStepLikeSchema(schema)) {
+    return false;
+  }
+  if (!hasStepSpecificProperties(schema)) {
     return false;
   }
 
@@ -174,14 +194,52 @@ function augmentStepSchema(
   customTypeDescriptions: string[]
 ) {
   stepSchema.allOf = appendUniqueAllOf(stepSchema.allOf, customStepRules);
+  suppressConditionalPropertySuggestions(stepSchema);
 
   const typeSchema = stepSchema.properties?.type;
   if (isRecord(typeSchema)) {
+    const clonedTypeSchema = cloneJson(typeSchema as JSONSchema);
+    stepSchema.properties = {
+      ...stepSchema.properties,
+      type: clonedTypeSchema,
+    };
     augmentExecutorTypeSchema(
-      typeSchema as JSONSchema,
+      clonedTypeSchema,
       customTypeNames,
       customTypeDescriptions
     );
+  }
+}
+
+function markPropertiesAsDoNotSuggest(schema: JSONSchema | undefined) {
+  if (!isRecord(schema?.properties)) {
+    return;
+  }
+
+  for (const [propertyName, propertySchema] of Object.entries(schema.properties)) {
+    if (!isRecord(propertySchema)) {
+      continue;
+    }
+
+    schema.properties[propertyName] = {
+      ...(propertySchema as JSONSchema),
+      doNotSuggest: true,
+    };
+  }
+}
+
+function suppressConditionalPropertySuggestions(stepSchema: JSONSchema) {
+  if (!Array.isArray(stepSchema.allOf)) {
+    return;
+  }
+
+  for (const rule of stepSchema.allOf) {
+    if (!isRecord(rule)) {
+      continue;
+    }
+
+    markPropertiesAsDoNotSuggest(rule.if as JSONSchema | undefined);
+    markPropertiesAsDoNotSuggest(rule.then as JSONSchema | undefined);
   }
 }
 
@@ -212,7 +270,10 @@ function collectStepSchemaPaths(schema: JSONSchema): string[][] {
   const pathMap = new Map<string, string[]>();
 
   visitSchemas(schema, (candidate, path) => {
-    if (candidate.$ref === '#/definitions/step' || isStepSchemaCandidate(candidate)) {
+    if (
+      candidate.$ref === '#/definitions/step' ||
+      isStepSchemaCandidate(candidate)
+    ) {
       pathMap.set(path.join('/'), path);
     }
   });
@@ -365,16 +426,23 @@ export function buildAugmentedDAGSchema(
   baseSchema: JSONSchema,
   stepTypes: EditorCustomStepTypeHint[]
 ): JSONSchema {
-  if (stepTypes.length === 0) {
-    return baseSchema;
-  }
-
   const augmented = cloneJson(baseSchema);
   const definitions = augmented.definitions;
-  const stepSchemaPaths = collectStepSchemaPaths(augmented);
+
+  if (stepTypes.length === 0) {
+    for (const path of collectStepSchemaPaths(augmented)) {
+      const schema = getNodeAtPath(augmented, path);
+      if (!schema || !isStepLikeSchema(schema)) {
+        continue;
+      }
+      suppressConditionalPropertySuggestions(schema);
+    }
+
+    return augmented;
+  }
 
   if (!definitions) {
-    return baseSchema;
+    return augmented;
   }
 
   const customDefinitions: Record<string, JSONSchema> = {};
@@ -426,7 +494,7 @@ export function buildAugmentedDAGSchema(
       allOf: cloneJson(customStepRules),
     }).allOf ?? customStepRules;
 
-  for (const path of stepSchemaPaths) {
+  for (const path of collectStepSchemaPaths(resolved)) {
     const schema = getNodeAtPath(resolved, path);
     if (!schema || !isStepLikeSchema(schema)) {
       continue;
