@@ -778,11 +778,11 @@ func TestAgent_SubDAGRunVisibleWhileRunning(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a child DAG that sleeps long enough for the parent to be observed mid-run
-	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", []byte(fmt.Sprintf(`
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", fmt.Appendf(nil, `
 steps:
   - name: slow-step
     command: %q
-`, test.PortableSleepCommand(3*time.Second))))
+`, test.PortableSleepCommand(3*time.Second)))
 
 	// The preceding step must run long enough for the one-shot 100ms status timer
 	// to fire (and exhaust itself) BEFORE run-child starts. This replicates the
