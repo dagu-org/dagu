@@ -42,7 +42,7 @@ func createVersionTestBinary(t testing.TB, dir, baseName, version string) string
 		scriptPath := filepath.Join(dir, baseName+".cmd")
 		require.NoError(t, os.WriteFile(
 			scriptPath,
-			[]byte(fmt.Sprintf("@echo off\r\necho dagu version %s\r\n", version)),
+			fmt.Appendf(nil, "@echo off\r\necho dagu version %s\r\n", version),
 			0755,
 		))
 		return scriptPath
@@ -51,7 +51,7 @@ func createVersionTestBinary(t testing.TB, dir, baseName, version string) string
 	scriptPath := filepath.Join(dir, baseName)
 	require.NoError(t, os.WriteFile(
 		scriptPath,
-		[]byte(fmt.Sprintf("#!/bin/sh\necho 'dagu version %s'\n", version)),
+		fmt.Appendf(nil, "#!/bin/sh\necho 'dagu version %s'\n", version),
 		0755,
 	))
 	return scriptPath
