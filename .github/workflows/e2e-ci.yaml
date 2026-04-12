@@ -84,6 +84,7 @@ jobs:
       - name: Run browser E2E tests
         env:
           CI: "true"
+          DAGU_LICENSE_PRIVKEY_B64: ${{ secrets.DAGU_LICENSE_PRIVKEY_B64 }}
         run: make test-e2e
 
       - name: Upload Playwright report

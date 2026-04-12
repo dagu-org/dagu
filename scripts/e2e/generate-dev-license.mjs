@@ -1,16 +1,21 @@
 #!/usr/bin/env node
 
-import { generateKeyPairSync, sign } from 'node:crypto';
+import { createPrivateKey, sign } from 'node:crypto';
+
+const privKeyB64 = process.env.DAGU_LICENSE_PRIVKEY_B64;
+if (!privKeyB64) {
+  process.stderr.write('DAGU_LICENSE_PRIVKEY_B64 not set; skipping license generation\n');
+  process.exit(0);
+}
+
+const privateKey = createPrivateKey({
+  key: Buffer.from(privKeyB64, 'base64'),
+  format: 'der',
+  type: 'pkcs8',
+});
 
 const nowSeconds = Math.floor(Date.now() / 1000);
 const expiresAtSeconds = nowSeconds + 24 * 60 * 60;
-
-const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-const publicJwk = publicKey.export({ format: 'jwk' });
-
-if (!publicJwk.x) {
-  throw new Error('failed to export Ed25519 public key');
-}
 
 const claims = {
   iss: 'dagu-e2e',
@@ -36,11 +41,6 @@ function base64UrlEncode(value) {
     .replace(/=+$/g, '');
 }
 
-function base64UrlToBase64(value) {
-  const padding = (4 - (value.length % 4)) % 4;
-  return value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(padding);
-}
-
 const encodedHeader = base64UrlEncode(JSON.stringify(header));
 const encodedClaims = base64UrlEncode(JSON.stringify(claims));
 const signingInput = `${encodedHeader}.${encodedClaims}`;
@@ -51,9 +51,4 @@ const encodedSignature = signature
   .replace(/\//g, '_')
   .replace(/=+$/g, '');
 
-process.stdout.write(
-  JSON.stringify({
-    publicKeyB64: Buffer.from(base64UrlToBase64(publicJwk.x), 'base64').toString('base64'),
-    token: `${signingInput}.${encodedSignature}`,
-  })
-);
+process.stdout.write(`${signingInput}.${encodedSignature}`);

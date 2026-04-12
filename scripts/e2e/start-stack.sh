@@ -51,39 +51,26 @@ fi
 
 mkdir -p "$STATE_DIR" "$PID_DIR" "$SERVICE_LOG_DIR"
 
-license_public_key_b64=""
 license_token=""
 
-load_license_env() {
-  if [[ ! -f "$LICENSE_FILE" ]]; then
-    return 1
-  fi
-
-  license_public_key_b64="$(node -e '
-    const fs = require("node:fs");
-    const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-    process.stdout.write(data.publicKeyB64);
-  ' "$LICENSE_FILE")"
-  license_token="$(node -e '
-    const fs = require("node:fs");
-    const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-    process.stdout.write(data.token);
-  ' "$LICENSE_FILE")"
-}
-
 ensure_license_env() {
-  if [[ -n "$license_public_key_b64" && -n "$license_token" ]]; then
+  if [[ -n "$license_token" ]]; then
     return 0
   fi
 
-  if load_license_env 2>/dev/null; then
-    return 0
+  if [[ -f "$LICENSE_FILE" ]]; then
+    license_token="$(cat "$LICENSE_FILE")"
+    if [[ -n "$license_token" ]]; then
+      return 0
+    fi
   fi
 
-  local license_json
-  license_json="$(node "$ROOT_DIR/scripts/e2e/generate-dev-license.mjs")"
-  printf '%s' "$license_json" >"$LICENSE_FILE"
-  load_license_env
+  license_token="$(node "$ROOT_DIR/scripts/e2e/generate-dev-license.mjs")"
+  if [[ -z "$license_token" ]]; then
+    echo "warning: no license generated (DAGU_LICENSE_PRIVKEY_B64 not set)" >&2
+    return 0
+  fi
+  printf '%s' "$license_token" >"$LICENSE_FILE"
 }
 
 pid_file_for() {
@@ -279,7 +266,6 @@ start_service() {
   (
     cd "$ROOT_DIR"
     export DAGU_LICENSE="$license_token"
-    export DAGU_LICENSE_PUBKEY_B64="$license_public_key_b64"
     nohup "$BIN_PATH" "$command_name" --config "$config_file" >>"$log_file" 2>&1 &
     printf '%s\n' "$!" >"$pid_file"
   )
