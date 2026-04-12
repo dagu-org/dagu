@@ -346,12 +346,16 @@ ui: clean-ui build-ui cp-assets
 
 .PHONY: test-e2e
 test-e2e:
+	@printf '%b\n' "${COLOR_GREEN}Installing frontend dependencies...${COLOR_RESET}"
+	@cd ui; pnpm install --frozen-lockfile
+	@printf '%b\n' "${COLOR_GREEN}Installing Playwright browser...${COLOR_RESET}"
+	@cd ui; pnpm test:e2e:install
 	@printf '%b\n' "${COLOR_GREEN}Running browser E2E tests...${COLOR_RESET}"
 	@cd ui; NODE_OPTIONS="--max-old-space-size=8192" pnpm build
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
 	@$(MAKE) bin
-	@cd ui; pnpm exec playwright test
+	@cd ui; pnpm test:e2e
 
 # build-ui builds the frontend codes.
 .PHONY: build-ui

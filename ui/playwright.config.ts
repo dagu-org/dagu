@@ -1,8 +1,31 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:32180';
+const defaultServerPort = '32180';
 const repoRoot = path.resolve(__dirname, '..');
+
+function resolveE2EEndpoint(): { baseURL: string; serverPort: string } {
+  const explicitBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+  if (!explicitBaseURL) {
+    const serverPort = process.env.DAGU_E2E_SERVER_PORT ?? defaultServerPort;
+    return {
+      baseURL: `http://127.0.0.1:${serverPort}`,
+      serverPort,
+    };
+  }
+
+  const url = new URL(explicitBaseURL);
+  const defaultPort = url.protocol === 'https:' ? '443' : '80';
+  const serverPort =
+    process.env.DAGU_E2E_SERVER_PORT ?? (url.port || defaultPort);
+
+  return {
+    baseURL: url.toString().replace(/\/$/, ''),
+    serverPort,
+  };
+}
+
+const { baseURL, serverPort } = resolveE2EEndpoint();
 
 export default defineConfig({
   testDir: './e2e',
@@ -43,7 +66,7 @@ export default defineConfig({
       DAGU_E2E_STATE_DIR:
         process.env.DAGU_E2E_STATE_DIR ??
         path.resolve(__dirname, 'test-results/e2e-stack'),
-      DAGU_E2E_SERVER_PORT: process.env.DAGU_E2E_SERVER_PORT ?? '32180',
+      DAGU_E2E_SERVER_PORT: serverPort,
       DAGU_E2E_COORDINATOR_PORT:
         process.env.DAGU_E2E_COORDINATOR_PORT ?? '32181',
       DAGU_E2E_WORKER_ID: process.env.DAGU_E2E_WORKER_ID ?? 'worker-1',
