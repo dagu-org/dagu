@@ -181,10 +181,13 @@ function DAGEditor({
       editor.addAction({
         id: 'dagu.triggerSuggest',
         label: 'Trigger Autocomplete',
+        precondition:
+          '!editorReadonly && editorHasCompletionItemProvider && !suggestWidgetVisible',
         keybindings: [
           monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space,
           monaco.KeyMod.WinCtrl | monaco.KeyCode.Space,
         ],
+        keybindingContext: 'textInputFocus',
         run: async (activeEditor) => {
           await activeEditor.getAction('editor.action.triggerSuggest')?.run();
         },
