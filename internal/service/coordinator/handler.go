@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -1460,39 +1461,42 @@ func (h *Handler) transformArtifactPaths(
 	}
 	if latestStatus != nil && latestStatus.ArchiveDir != "" {
 		incoming.ArchiveDir = latestStatus.ArchiveDir
-		return nil
-	}
-	if attempt == nil {
-		return fmt.Errorf("dag run attempt is required to resolve artifact path")
-	}
+	} else {
+		if attempt == nil {
+			return fmt.Errorf("dag run attempt is required to resolve artifact path")
+		}
 
-	dag, err := attempt.ReadDAG(ctx)
-	if err != nil {
-		return fmt.Errorf("read DAG for artifact path: %w", err)
-	}
-	if dag == nil {
-		return fmt.Errorf("read DAG for artifact path: DAG is nil")
-	}
+		dag, err := attempt.ReadDAG(ctx)
+		if err != nil {
+			return fmt.Errorf("read DAG for artifact path: %w", err)
+		}
+		if dag == nil {
+			return fmt.Errorf("read DAG for artifact path: DAG is nil")
+		}
 
-	baseDir := h.artifactDir
-	if dag.Artifacts != nil && dag.Artifacts.Dir != "" {
-		baseDir = dag.Artifacts.Dir
-	}
-	baseDir, err = eval.String(ctx, baseDir, eval.WithOSExpansion())
-	if err != nil {
-		return fmt.Errorf("expand artifact directory: %w", err)
-	}
+		baseDir := h.artifactDir
+		if dag.Artifacts != nil && dag.Artifacts.Dir != "" {
+			baseDir = dag.Artifacts.Dir
+		}
+		baseDir, err = eval.String(ctx, baseDir, eval.WithOSExpansion())
+		if err != nil {
+			return fmt.Errorf("expand artifact directory: %w", err)
+		}
 
-	archiveName := filepath.Base(filepath.Clean(incoming.ArchiveDir))
-	if archiveName == "." || archiveName == string(filepath.Separator) || archiveName == "" {
-		return fmt.Errorf("invalid artifact directory %q", incoming.ArchiveDir)
-	}
+		archiveName := filepath.Base(filepath.Clean(incoming.ArchiveDir))
+		if archiveName == "." || archiveName == string(filepath.Separator) || archiveName == "" {
+			return fmt.Errorf("invalid artifact directory %q", incoming.ArchiveDir)
+		}
 
-	incoming.ArchiveDir = filepath.Join(
-		baseDir,
-		fileutil.SafeName(dag.Name),
-		archiveName,
-	)
+		incoming.ArchiveDir = filepath.Join(
+			baseDir,
+			fileutil.SafeName(dag.Name),
+			archiveName,
+		)
+	}
+	if err := os.MkdirAll(incoming.ArchiveDir, 0o750); err != nil {
+		return fmt.Errorf("create artifact directory: %w", err)
+	}
 	return nil
 }
 

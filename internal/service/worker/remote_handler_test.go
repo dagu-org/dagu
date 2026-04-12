@@ -1801,3 +1801,178 @@ steps:
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")
 }
+
+func TestExecuteDAGRun_FailedExecutionStillUploadsArtifacts(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dagContent := `name: remote-handler-failure-artifacts
+artifacts:
+  enabled: true
+steps:
+  - name: fail-step
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+      exit 1
+`
+	dag := th.DAG(t, dagContent)
+
+	stream := newMockStreamArtifactsClient()
+	client := newMockRemoteCoordinatorClient()
+	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+		return stream, nil
+	}
+
+	handler := &remoteTaskHandler{
+		workerID:          "integration-test-worker",
+		coordinatorClient: client,
+		dagRunStore:       th.DAGRunStore,
+		dagStore:          th.DAGStore,
+		dagRunMgr:         th.DAGRunMgr,
+		serviceRegistry:   th.ServiceRegistry,
+		config:            th.Config,
+	}
+
+	dagRunID := "run-failure-artifacts-1"
+	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
+	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
+	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	artifactUploader := remote.NewArtifactUploader(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
+	require.Error(t, err)
+
+	var sawData bool
+	var sawFinal bool
+	for _, chunk := range stream.chunks {
+		if chunk.RelativePath != "out.txt" {
+			continue
+		}
+		if len(chunk.Data) > 0 {
+			sawData = true
+		}
+		if chunk.IsFinal {
+			sawFinal = true
+		}
+	}
+	assert.True(t, sawData, "failed runs should still upload artifact contents")
+	assert.True(t, sawFinal, "failed runs should still finalize artifact uploads")
+}
+
+func TestExecuteDAGRun_ArtifactUploadFailureMarksRunFailed(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dagContent := `name: remote-handler-upload-failure
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifact
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+`
+	dag := th.DAG(t, dagContent)
+
+	stream := newMockStreamArtifactsClient()
+	stream.response = &coordinatorv1.StreamArtifactsResponse{
+		Error: "coordinator write failed",
+	}
+
+	var reported []exec.DAGRunStatus
+	client := newMockRemoteCoordinatorClient()
+	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+		return stream, nil
+	}
+	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+		status, err := convert.ProtoToDAGRunStatus(req.Status)
+		require.NoError(t, err)
+		reported = append(reported, *status)
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	handler := &remoteTaskHandler{
+		workerID:          "integration-test-worker",
+		coordinatorClient: client,
+		dagRunStore:       th.DAGRunStore,
+		dagStore:          th.DAGStore,
+		dagRunMgr:         th.DAGRunMgr,
+		serviceRegistry:   th.ServiceRegistry,
+		config:            th.Config,
+	}
+
+	dagRunID := "run-upload-failure-1"
+	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
+	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
+	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	artifactUploader := remote.NewArtifactUploader(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "upload artifacts")
+	require.NotEmpty(t, reported)
+
+	final := reported[len(reported)-1]
+	assert.Equal(t, core.Failed, final.Status)
+	assert.Contains(t, final.Error, "failed to upload artifacts")
+}
+
+func TestExecuteDAGRun_FailedExecutionWithArtifactUploadFailurePreservesFailedStatus(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dagContent := `name: remote-handler-failure-upload-failure
+artifacts:
+  enabled: true
+steps:
+  - name: fail-step
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+      exit 1
+`
+	dag := th.DAG(t, dagContent)
+
+	stream := newMockStreamArtifactsClient()
+	stream.response = &coordinatorv1.StreamArtifactsResponse{
+		Error: "coordinator write failed",
+	}
+
+	var reported []exec.DAGRunStatus
+	client := newMockRemoteCoordinatorClient()
+	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+		return stream, nil
+	}
+	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+		status, err := convert.ProtoToDAGRunStatus(req.Status)
+		require.NoError(t, err)
+		reported = append(reported, *status)
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	handler := &remoteTaskHandler{
+		workerID:          "integration-test-worker",
+		coordinatorClient: client,
+		dagRunStore:       th.DAGRunStore,
+		dagStore:          th.DAGStore,
+		dagRunMgr:         th.DAGRunMgr,
+		serviceRegistry:   th.ServiceRegistry,
+		config:            th.Config,
+	}
+
+	dagRunID := "run-failure-upload-failure-1"
+	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
+	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
+	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	artifactUploader := remote.NewArtifactUploader(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "upload artifacts")
+	require.NotEmpty(t, reported)
+
+	final := reported[len(reported)-1]
+	assert.Equal(t, core.Failed, final.Status)
+	assert.Contains(t, final.Error, "failed to upload artifacts")
+}

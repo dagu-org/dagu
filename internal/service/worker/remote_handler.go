@@ -599,6 +599,7 @@ func (h *remoteTaskHandler) executeDAGRun(
 		AgentOAuthManager: agentStores.oauthManager,
 		ScheduleTime:      scheduleTime,
 		ArtifactDir:       env.artifactDir,
+		ArtifactFinalizer: artifactUploader,
 	}
 
 	if retry != nil {
@@ -624,20 +625,6 @@ func (h *remoteTaskHandler) executeDAGRun(
 			tag.RunID(dagRunID),
 			tag.Error(err))
 		return err
-	}
-	if artifactUploader != nil && env.artifactDir != "" {
-		status := agentInstance.Status(ctx)
-		artifactUploader.SetAttemptID(status.AttemptID)
-		if err := artifactUploader.UploadDir(ctx, env.artifactDir); err != nil {
-			status.Status = core.Failed
-			status.Error = fmt.Sprintf("failed to upload artifacts: %v", err)
-			if statusPusher != nil {
-				if pushErr := statusPusher.Push(ctx, status); pushErr != nil {
-					logger.Warn(ctx, "Failed to report artifact upload failure", tag.Error(pushErr))
-				}
-			}
-			return fmt.Errorf("upload artifacts: %w", err)
-		}
 	}
 
 	logger.Info(ctx, "DAG execution completed",

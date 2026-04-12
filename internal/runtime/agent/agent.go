@@ -105,6 +105,9 @@ type Agent struct {
 	// artifactDir is the per-run artifact directory when artifact storage is enabled.
 	artifactDir string
 
+	// artifactFinalizer persists artifacts before the final terminal status is written.
+	artifactFinalizer ArtifactFinalizer
+
 	// dag is the DAG to run.
 	dag *core.DAG
 
@@ -211,6 +214,11 @@ type StatusPusher interface {
 	Push(ctx context.Context, status exec.DAGRunStatus) error
 }
 
+// ArtifactFinalizer uploads or persists artifacts before the final terminal status is written.
+type ArtifactFinalizer interface {
+	Finalize(ctx context.Context, attemptID, dir string) error
+}
+
 // Options is the configuration for the Agent.
 type Options struct {
 	// Dry is a dry-run mode. It does not execute the actual command.
@@ -280,6 +288,8 @@ type Options struct {
 	ScheduleTime string
 	// ArtifactDir is the per-run artifact directory when artifact storage is enabled.
 	ArtifactDir string
+	// ArtifactFinalizer persists artifacts before the final terminal status is written.
+	ArtifactFinalizer ArtifactFinalizer
 }
 
 // New creates a new Agent.
@@ -302,6 +312,7 @@ func New(
 		logDir:                     logDir,
 		logFile:                    logFile,
 		artifactDir:                opts.ArtifactDir,
+		artifactFinalizer:          opts.ArtifactFinalizer,
 		dagRunMgr:                  drm,
 		dagStore:                   ds,
 		dagRunStore:                opts.DAGRunStore,
@@ -767,7 +778,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		defer close(progressDone)
 		for node := range progressCh {
 			status := a.Status(ctx)
-			a.writeStatus(ctx, attempt, status)
+			if !a.shouldDelayTerminalStatus(status.Status) {
+				a.writeStatus(ctx, attempt, status)
+			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
 				logger.Error(ctx, "Failed to report step", tag.Error(err))
 			}
@@ -835,6 +848,25 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status(ctx)
 
+	if a.artifactFinalizer != nil && a.artifactDir != "" {
+		if err := a.artifactFinalizer.Finalize(ctx, finishedStatus.AttemptID, a.artifactDir); err != nil {
+			uploadErr := fmt.Errorf("upload artifacts: %w", err)
+			if finishedStatus.Status.IsSuccess() {
+				finishedStatus.Status = core.Failed
+			}
+			if finishedStatus.Error != "" {
+				finishedStatus.Error = fmt.Sprintf("%s; failed to upload artifacts: %v", finishedStatus.Error, err)
+			} else {
+				finishedStatus.Error = fmt.Sprintf("failed to upload artifacts: %v", err)
+			}
+			if lastErr != nil {
+				lastErr = errors.Join(lastErr, uploadErr)
+			} else {
+				lastErr = uploadErr
+			}
+		}
+	}
+
 	// Send final progress update if enabled
 	if a.progressDisplay != nil {
 		// Update all nodes with their final status
@@ -881,6 +913,18 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Return the last error on the dag-run.
 	return lastErr
+}
+
+func (a *Agent) shouldDelayTerminalStatus(status core.Status) bool {
+	if a.artifactFinalizer == nil || a.artifactDir == "" {
+		return false
+	}
+	switch status {
+	case core.Failed, core.Aborted, core.Succeeded, core.PartiallySucceeded, core.Rejected:
+		return true
+	default:
+		return false
+	}
 }
 
 // nodeToModelNode converts a runner NodeData to an exec.Node.

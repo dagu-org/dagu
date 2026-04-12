@@ -164,6 +164,9 @@ func (h *artifactHandler) archiveDir(ctx context.Context, chunk *coordinatorv1.A
 	if runStatus == nil || runStatus.ArchiveDir == "" {
 		return "", fmt.Errorf("artifact directory is not available for dag run %s", chunk.DagRunId)
 	}
+	if chunk.AttemptId != "" && runStatus.AttemptID != "" && chunk.AttemptId != runStatus.AttemptID {
+		return "", fmt.Errorf("artifact chunk attempt %q does not match latest attempt %q for dag run %s", chunk.AttemptId, runStatus.AttemptID, chunk.DagRunId)
+	}
 
 	return runStatus.ArchiveDir, nil
 }

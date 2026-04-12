@@ -80,3 +80,38 @@ func TestArtifactHandlerHandleStreamCreatesEmptyFileOnFinalChunk(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, info.Size())
 }
+
+func TestArtifactHandlerHandleStreamRejectsMismatchedAttempt(t *testing.T) {
+	t.Parallel()
+
+	store := newMockDAGRunStore()
+	archiveDir := t.TempDir()
+	store.addAttempt(exec.DAGRunRef{Name: "test-dag", ID: "run-123"}, &exec.DAGRunStatus{
+		Name:       "test-dag",
+		DAGRunID:   "run-123",
+		AttemptID:  "attempt-2",
+		ArchiveDir: archiveDir,
+	})
+
+	handler := newArtifactHandler(store, "")
+	stream := &mockStreamArtifactsServer{
+		ctx: context.Background(),
+		chunks: []*coordinatorv1.ArtifactChunk{
+			{
+				DagName:      "test-dag",
+				DagRunId:     "run-123",
+				AttemptId:    "attempt-1",
+				RelativePath: "artifact.txt",
+				Data:         []byte("hello"),
+			},
+		},
+	}
+
+	err := handler.handleStream(stream)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match latest attempt")
+
+	_, statErr := os.Stat(filepath.Join(archiveDir, "artifact.txt"))
+	require.Error(t, statErr)
+	assert.True(t, os.IsNotExist(statErr))
+}

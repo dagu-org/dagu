@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -215,6 +216,7 @@ func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) erro
 
 // mockDAGRunAttempt is a test implementation of execution.DAGRunAttempt
 type mockDAGRunAttempt struct {
+	dag                    *core.DAG
 	status                 *exec.DAGRunStatus
 	opened                 bool
 	closed                 bool
@@ -273,7 +275,7 @@ func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, e
 	cloned := *m.status
 	return &cloned, nil
 }
-func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return nil, nil }
+func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return m.dag, nil }
 func (m *mockDAGRunAttempt) SetDAG(_ *core.DAG)                           {}
 func (m *mockDAGRunAttempt) Abort(_ context.Context) error                { return nil }
 func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error) {
@@ -320,6 +322,33 @@ func (m *mockDAGRunAttempt) GetStepMessages(stepName string) []exec.LLMMessage {
 		return nil
 	}
 	return m.stepMessages[stepName]
+}
+
+func TestTransformArtifactPathsCreatesDirectory(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	handler := &Handler{artifactDir: baseDir}
+	attempt := &mockDAGRunAttempt{
+		dag: &core.DAG{
+			Name: "test-dag",
+			Artifacts: &core.ArtifactsConfig{
+				Enabled: true,
+			},
+		},
+	}
+	incoming := &exec.DAGRunStatus{
+		DAGRunID:   "run-123",
+		ArchiveDir: "/tmp/worker/dag-run_20260412_000000Z_run-123",
+	}
+
+	err := handler.transformArtifactPaths(context.Background(), attempt, nil, incoming)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(baseDir, "test-dag", "dag-run_20260412_000000Z_run-123"), incoming.ArchiveDir)
+
+	info, statErr := os.Stat(incoming.ArchiveDir)
+	require.NoError(t, statErr)
+	assert.True(t, info.IsDir())
 }
 
 // Thread-safe getters for test assertions

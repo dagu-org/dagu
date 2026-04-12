@@ -61,6 +61,12 @@ func (u *ArtifactUploader) SetAttemptID(attemptID string) {
 	u.attemptID = attemptID
 }
 
+// Finalize uploads artifacts for the finalized attempt before the terminal status is written.
+func (u *ArtifactUploader) Finalize(ctx context.Context, attemptID, dir string) error {
+	u.SetAttemptID(attemptID)
+	return u.UploadDir(ctx, dir)
+}
+
 func (u *ArtifactUploader) getAttemptID() string {
 	u.mu.RLock()
 	defer u.mu.RUnlock()
