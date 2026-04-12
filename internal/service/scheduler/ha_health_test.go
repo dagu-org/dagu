@@ -78,6 +78,7 @@ func newHASchedulerFixture(t *testing.T) *haSchedulerFixture {
 			DataDir:            filepath.Join(tmpDir, "data"),
 			DAGsDir:            filepath.Join(tmpDir, "dags"),
 			DAGRunsDir:         filepath.Join(tmpDir, "data", "dag-runs"),
+			ArtifactDir:        filepath.Join(tmpDir, "data", "artifacts"),
 			QueueDir:           filepath.Join(tmpDir, "data", "queue"),
 			ProcDir:            filepath.Join(tmpDir, "data", "proc"),
 			ServiceRegistryDir: filepath.Join(tmpDir, "data", "service-registry"),

@@ -86,6 +86,7 @@ func (u *ArtifactUploader) UploadDir(ctx context.Context, dir string) error {
 		return nil
 	}
 
+	attemptID := u.getAttemptID()
 	seq := uint64(0)
 	var stream coordinatorv1.CoordinatorService_StreamArtifactsClient
 
@@ -114,59 +115,61 @@ func (u *ArtifactUploader) UploadDir(ctx context.Context, dir string) error {
 		}
 		relPath = filepath.ToSlash(relPath)
 
-		file, err := os.Open(filepath.Clean(path))
-		if err != nil {
-			return fmt.Errorf("open artifact %s: %w", path, err)
-		}
-		defer func() { _ = file.Close() }()
+		return func() error {
+			file, err := os.Open(filepath.Clean(path))
+			if err != nil {
+				return fmt.Errorf("open artifact %s: %w", path, err)
+			}
+			defer func() { _ = file.Close() }()
 
-		buf := make([]byte, maxChunkSize)
-		for {
-			n, readErr := file.Read(buf)
-			if n > 0 {
-				seq++
-				chunk := &coordinatorv1.ArtifactChunk{
-					WorkerId:           u.workerID,
-					DagRunId:           u.dagRunID,
-					DagName:            u.dagName,
-					RelativePath:       relPath,
-					Data:               append([]byte(nil), buf[:n]...),
-					Sequence:           seq,
-					RootDagRunName:     u.rootRef.Name,
-					RootDagRunId:       u.rootRef.ID,
-					AttemptId:          u.getAttemptID(),
-					OwnerCoordinatorId: u.owner.ID,
+			buf := make([]byte, maxChunkSize)
+			for {
+				n, readErr := file.Read(buf)
+				if n > 0 {
+					seq++
+					chunk := &coordinatorv1.ArtifactChunk{
+						WorkerId:           u.workerID,
+						DagRunId:           u.dagRunID,
+						DagName:            u.dagName,
+						RelativePath:       relPath,
+						Data:               append([]byte(nil), buf[:n]...),
+						Sequence:           seq,
+						RootDagRunName:     u.rootRef.Name,
+						RootDagRunId:       u.rootRef.ID,
+						AttemptId:          attemptID,
+						OwnerCoordinatorId: u.owner.ID,
+					}
+					if err := sendChunk(chunk); err != nil {
+						return fmt.Errorf("send artifact chunk: %w", err)
+					}
 				}
-				if err := sendChunk(chunk); err != nil {
-					return fmt.Errorf("send artifact chunk: %w", err)
+				if readErr == nil {
+					continue
 				}
+				if readErr != io.EOF {
+					return fmt.Errorf("read artifact %s: %w", path, readErr)
+				}
+				break
 			}
-			if readErr == nil {
-				continue
-			}
-			if readErr != io.EOF {
-				return fmt.Errorf("read artifact %s: %w", path, readErr)
-			}
-			break
-		}
 
-		seq++
-		if err := sendChunk(&coordinatorv1.ArtifactChunk{
-			WorkerId:           u.workerID,
-			DagRunId:           u.dagRunID,
-			DagName:            u.dagName,
-			RelativePath:       relPath,
-			IsFinal:            true,
-			Sequence:           seq,
-			RootDagRunName:     u.rootRef.Name,
-			RootDagRunId:       u.rootRef.ID,
-			AttemptId:          u.getAttemptID(),
-			OwnerCoordinatorId: u.owner.ID,
-		}); err != nil {
-			return fmt.Errorf("send artifact final marker: %w", err)
-		}
+			seq++
+			if err := sendChunk(&coordinatorv1.ArtifactChunk{
+				WorkerId:           u.workerID,
+				DagRunId:           u.dagRunID,
+				DagName:            u.dagName,
+				RelativePath:       relPath,
+				IsFinal:            true,
+				Sequence:           seq,
+				RootDagRunName:     u.rootRef.Name,
+				RootDagRunId:       u.rootRef.ID,
+				AttemptId:          attemptID,
+				OwnerCoordinatorId: u.owner.ID,
+			}); err != nil {
+				return fmt.Errorf("send artifact final marker: %w", err)
+			}
 
-		return nil
+			return nil
+		}()
 	})
 	if err != nil {
 		return err

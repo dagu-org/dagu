@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -66,40 +68,42 @@ func (h *artifactHandler) handleStream(stream coordinatorv1.CoordinatorService_S
 			return status.Error(codes.FailedPrecondition, "artifact chunk sent to non-owner coordinator")
 		}
 
-		if chunk.IsFinal {
-			if _, err := h.getOrCreateWriter(ctx, chunk); err != nil {
+		if len(chunk.Data) == 0 && !chunk.IsFinal {
+			continue
+		}
+
+		if len(chunk.Data) > 0 || chunk.IsFinal {
+			writer, err := h.getOrCreateWriter(ctx, chunk)
+			if err != nil {
 				return fmt.Errorf("failed to create artifact writer: %w", err)
 			}
+			activeKeys[key] = struct{}{}
+
+			if len(chunk.Data) > 0 {
+				n, err := writer.write(chunk.Data)
+				if err != nil {
+					return fmt.Errorf("failed to write artifact data: %w", err)
+				}
+				if n > 0 {
+					bytesWritten += uint64(n) // #nosec G115 -- n is non-negative from successful Write
+				}
+			}
+		}
+
+		if chunk.IsFinal {
 			h.closeWriterByKey(ctx, key)
 			delete(activeKeys, key)
-			continue
-		}
-		if len(chunk.Data) == 0 {
-			continue
-		}
-
-		writer, err := h.getOrCreateWriter(ctx, chunk)
-		if err != nil {
-			return fmt.Errorf("failed to create artifact writer: %w", err)
-		}
-		activeKeys[key] = struct{}{}
-
-		n, err := writer.write(chunk.Data)
-		if err != nil {
-			return fmt.Errorf("failed to write artifact data: %w", err)
-		}
-		if n > 0 {
-			bytesWritten += uint64(n) // #nosec G115 -- n is non-negative from successful Write
 		}
 	}
 }
 
 func (h *artifactHandler) streamKey(chunk *coordinatorv1.ArtifactChunk) string {
+	relPath := strings.TrimPrefix(path.Clean("/"+strings.ReplaceAll(chunk.RelativePath, "\\", "/")), "/")
 	return fmt.Sprintf("%s/%s/%s/%s",
 		chunk.DagName,
 		chunk.DagRunId,
 		chunk.AttemptId,
-		chunk.RelativePath,
+		relPath,
 	)
 }
 

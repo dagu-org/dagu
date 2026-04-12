@@ -6753,15 +6753,19 @@ components:
     ArtifactPath:
       name: path
       in: query
-      description: "Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'."
+      description: "Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\\' or contain '..'."
       required: true
       schema:
         allOf:
           - type: string
             minLength: 1
-            pattern: "^[^/].*$"
+            pattern: "^[^/\\\\].*$"
           - not:
-              pattern: "(^|/)\\.\\.(/|$)"
+              pattern: "\\\\"
+          - not:
+              pattern: "(^|[\\\\/])\\.\\.([\\\\/]|$)"
+          - not:
+              pattern: "^[A-Za-z]:"
 
     ArtifactRecursive:
       name: recursive
@@ -8111,9 +8115,6 @@ components:
         enabled:
           type: boolean
           description: "Whether artifact storage is enabled for this DAG"
-        dir:
-          type: string
-          description: "Optional DAG-specific artifact storage directory"
       required:
         - enabled
 

@@ -3,9 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useConfig } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
-import { getAuthToken } from '@/lib/authHeaders';
 import { cn } from '@/lib/utils';
 import {
   AlertCircle,
@@ -17,7 +15,7 @@ import {
   FolderOpen,
   RefreshCw,
 } from 'lucide-react';
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { components } from '../../../../api/v1/schema';
@@ -153,9 +151,11 @@ function TreeNode({
   );
 }
 
-export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props) {
+export default function ArtifactsTab({
+  dagRun,
+  artifactEnabled = false,
+}: Props) {
   const client = useClient();
-  const config = useConfig();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const isSubDAGRun =
@@ -173,6 +173,10 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set());
+  const treeRequestRef = useRef<{
+    id: number;
+    controller: AbortController | null;
+  }>({ id: 0, controller: null });
 
   const allNodes = useMemo(() => flattenNodes(tree), [tree]);
   const selectedNode = useMemo(
@@ -180,18 +184,22 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     [allNodes, selectedPath]
   );
 
-  const requestArtifactTree = async () => {
+  const requestArtifactTree = async (signal?: AbortSignal) => {
     if (isSubDAGRun) {
-      return client.GET('/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts', {
-        params: {
-          path: {
-            name: dagRun.rootDAGRunName!,
-            dagRunId: dagRun.rootDAGRunId!,
-            subDAGRunId: dagRun.dagRunId,
+      return client.GET(
+        '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts',
+        {
+          params: {
+            path: {
+              name: dagRun.rootDAGRunName!,
+              dagRunId: dagRun.rootDAGRunId!,
+              subDAGRunId: dagRun.dagRunId,
+            },
+            query: { remoteNode, recursive: true },
           },
-          query: { remoteNode, recursive: true },
-        },
-      });
+          signal,
+        }
+      );
     }
 
     return client.GET('/dag-runs/{name}/{dagRunId}/artifacts', {
@@ -202,6 +210,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
         },
         query: { remoteNode, recursive: true },
       },
+      signal,
     });
   };
 
@@ -233,44 +242,81 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     });
   };
 
-  const buildArtifactDownloadUrl = (path: string) => {
-    const endpoint = isSubDAGRun
-      ? `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.rootDAGRunName!)}/${encodeURIComponent(dagRun.rootDAGRunId!)}/sub-dag-runs/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`
-      : `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.name)}/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`;
-
-    const url = new URL(endpoint, window.location.origin);
-    url.searchParams.set('remoteNode', remoteNode);
-    url.searchParams.set('path', path);
-    return url;
-  };
-
   const fetchArtifactDownload = async (path: string, signal?: AbortSignal) => {
-    const token = getAuthToken();
-    const response = await fetch(buildArtifactDownloadUrl(path).toString(), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      signal,
-    });
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.statusText}`);
+    const request = isSubDAGRun
+      ? await client.GET(
+          '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/download',
+          {
+            params: {
+              path: {
+                name: dagRun.rootDAGRunName!,
+                dagRunId: dagRun.rootDAGRunId!,
+                subDAGRunId: dagRun.dagRunId,
+              },
+              query: { remoteNode, path },
+            },
+            parseAs: 'blob',
+            signal,
+          }
+        )
+      : await client.GET('/dag-runs/{name}/{dagRunId}/artifacts/download', {
+          params: {
+            path: {
+              name: dagRun.name,
+              dagRunId: dagRun.dagRunId,
+            },
+            query: { remoteNode, path },
+          },
+          parseAs: 'blob',
+          signal,
+        });
+
+    if (request.error) {
+      throw new Error(
+        request.error.message ||
+          request.response.statusText ||
+          'Download failed'
+      );
     }
-    return response;
+
+    return request;
   };
 
   const fetchTree = async () => {
+    const requestId = treeRequestRef.current.id + 1;
+    treeRequestRef.current.controller?.abort();
+
     if (!dagRun.artifactsAvailable) {
+      treeRequestRef.current = { id: requestId, controller: null };
       setTree([]);
-      setTreeError(null);
+      setOpenDirs(new Set());
+      setSelectedPath(null);
       setPreview(null);
+      setTreeError(null);
+      setTreeLoading(false);
       return;
     }
+
+    const controller = new AbortController();
+    treeRequestRef.current = { id: requestId, controller };
+
+    const isCurrentRequest = () =>
+      treeRequestRef.current.id === requestId &&
+      treeRequestRef.current.controller === controller &&
+      !controller.signal.aborted;
 
     setTreeLoading(true);
     setTreeError(null);
     try {
-      const request = await requestArtifactTree();
+      const request = await requestArtifactTree(controller.signal);
+
+      if (!isCurrentRequest()) {
+        return;
+      }
 
       if (request.error) {
         setTree([]);
+        setOpenDirs(new Set());
         setSelectedPath(null);
         setPreview(null);
         setTreeError(request.error.message || 'Failed to load artifacts');
@@ -289,27 +335,56 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
         return;
       }
 
-      if (selectedPath && nextNodes.some((node) => node.path === selectedPath)) {
+      if (
+        selectedPath &&
+        nextNodes.some((node) => node.path === selectedPath)
+      ) {
         setPreview(null);
         setPreviewVersion((current) => current + 1);
         return;
       }
 
+      setPreview(null);
       setSelectedPath(firstFile.path);
     } catch (error: unknown) {
+      if (controller.signal.aborted || !isCurrentRequest()) {
+        return;
+      }
+
       setTree([]);
+      setOpenDirs(new Set());
       setSelectedPath(null);
       setPreview(null);
-      setTreeError(error instanceof Error ? error.message : 'Failed to load artifacts');
+      setTreeError(
+        error instanceof Error ? error.message : 'Failed to load artifacts'
+      );
     } finally {
-      setTreeLoading(false);
+      if (
+        treeRequestRef.current.id === requestId &&
+        treeRequestRef.current.controller === controller
+      ) {
+        setTreeLoading(false);
+        treeRequestRef.current = { id: requestId, controller: null };
+      }
     }
   };
 
   useEffect(() => {
     void fetchTree();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dagRun.artifactsAvailable, dagRun.dagRunId, dagRun.rootDAGRunId, remoteNode]);
+
+    return () => {
+      treeRequestRef.current.controller?.abort();
+    };
+  }, [
+    client,
+    dagRun.artifactsAvailable,
+    dagRun.dagRunId,
+    dagRun.name,
+    dagRun.rootDAGRunId,
+    dagRun.rootDAGRunName,
+    isSubDAGRun,
+    remoteNode,
+  ]);
 
   useEffect(() => {
     if (!selectedPath || !dagRun.artifactsAvailable) {
@@ -332,7 +407,9 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
 
         if (request.error) {
           setPreview(null);
-          setPreviewError(request.error.message || 'Failed to load artifact preview');
+          setPreviewError(
+            request.error.message || 'Failed to load artifact preview'
+          );
           return;
         }
 
@@ -343,7 +420,9 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
         }
         setPreview(null);
         setPreviewError(
-          error instanceof Error ? error.message : 'Failed to load artifact preview'
+          error instanceof Error
+            ? error.message
+            : 'Failed to load artifact preview'
         );
       } finally {
         if (!cancelled) {
@@ -357,10 +436,26 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     return () => {
       cancelled = true;
     };
-  }, [client, dagRun.artifactsAvailable, dagRun.dagRunId, dagRun.name, dagRun.rootDAGRunId, dagRun.rootDAGRunName, isSubDAGRun, previewVersion, remoteNode, selectedPath]);
+  }, [
+    client,
+    dagRun.artifactsAvailable,
+    dagRun.dagRunId,
+    dagRun.name,
+    dagRun.rootDAGRunId,
+    dagRun.rootDAGRunName,
+    isSubDAGRun,
+    previewVersion,
+    remoteNode,
+    selectedPath,
+  ]);
 
   useEffect(() => {
-    if (!preview || preview.kind !== 'image' || preview.tooLarge || !selectedPath) {
+    if (
+      !preview ||
+      preview.kind !== 'image' ||
+      preview.tooLarge ||
+      !selectedPath
+    ) {
       setImageUrl(null);
       return;
     }
@@ -370,16 +465,15 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     const controller = new AbortController();
 
     const loadImage = async () => {
-      const response = await fetchArtifactDownload(selectedPath, controller.signal);
-      const bytes = await response.arrayBuffer();
+      const request = await fetchArtifactDownload(
+        selectedPath,
+        controller.signal
+      );
       if (cancelled) {
         return;
       }
 
-      const blob = new Blob([bytes], {
-        type: preview.mimeType || 'application/octet-stream',
-      });
-      objectUrl = URL.createObjectURL(blob);
+      objectUrl = URL.createObjectURL(request.data);
       setImageUrl(objectUrl);
     };
 
@@ -399,21 +493,33 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [config.apiURL, dagRun.dagRunId, dagRun.name, dagRun.rootDAGRunId, dagRun.rootDAGRunName, isSubDAGRun, preview, remoteNode, selectedPath]);
+  }, [
+    client,
+    dagRun.dagRunId,
+    dagRun.name,
+    dagRun.rootDAGRunId,
+    dagRun.rootDAGRunName,
+    isSubDAGRun,
+    preview,
+    remoteNode,
+    selectedPath,
+  ]);
 
   const handleDownload = async () => {
     if (!selectedPath) {
       return;
     }
 
-    const response = await fetchArtifactDownload(selectedPath);
-    const blob = await response.blob();
+    const request = await fetchArtifactDownload(selectedPath);
+    const blob = request.data;
     const link = document.createElement('a');
     const objectUrl = URL.createObjectURL(blob);
     const fileName =
-      response.headers
+      request.response.headers
         .get('Content-Disposition')
-        ?.match(/filename="(.+)"/)?.[1] || selectedNode?.name || 'artifact';
+        ?.match(/filename="(.+)"/)?.[1] ||
+      selectedNode?.name ||
+      'artifact';
 
     link.href = objectUrl;
     link.download = fileName;
@@ -448,7 +554,9 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
           <div>
             <p className="text-sm font-medium">Artifacts</p>
             <p className="text-xs text-muted-foreground">
-              {tree.length === 0 ? 'No files yet' : `${allNodes.filter((node) => node.type === 'file').length} files`}
+              {tree.length === 0
+                ? 'No files yet'
+                : `${allNodes.filter((node) => node.type === 'file').length} files`}
             </p>
           </div>
           <Button
@@ -459,7 +567,9 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
             }}
             title="Reload artifacts"
           >
-            <RefreshCw className={cn('h-4 w-4', treeLoading && 'animate-spin')} />
+            <RefreshCw
+              className={cn('h-4 w-4', treeLoading && 'animate-spin')}
+            />
           </Button>
         </div>
 
@@ -538,20 +648,24 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
               Select a file to preview it.
             </div>
           ) : previewLoading ? (
-            <div className="text-sm text-muted-foreground">Loading preview...</div>
+            <div className="text-sm text-muted-foreground">
+              Loading preview...
+            </div>
           ) : previewError ? (
             <div className="flex items-start gap-2 rounded-md bg-destructive/5 px-3 py-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{previewError}</span>
             </div>
           ) : !preview ? (
-            <div className="text-sm text-muted-foreground">Preview unavailable.</div>
+            <div className="text-sm text-muted-foreground">
+              Preview unavailable.
+            </div>
           ) : preview.tooLarge ? (
             <div className="rounded-md border border-dashed border-border bg-muted/20 p-6">
               <p className="text-sm font-medium">Preview unavailable</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                This artifact is too large to render inline. Download it to inspect the
-                contents.
+                This artifact is too large to render inline. Download it to
+                inspect the contents.
               </p>
               <dl className="mt-4 space-y-1 text-xs text-muted-foreground">
                 <div>
@@ -580,13 +694,16 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
                 className="max-h-[40rem] max-w-full rounded-md border border-border object-contain"
               />
             ) : (
-              <div className="text-sm text-muted-foreground">Loading image preview...</div>
+              <div className="text-sm text-muted-foreground">
+                Loading image preview...
+              </div>
             )
           ) : (
             <div className="rounded-md border border-dashed border-border bg-muted/20 p-6">
               <p className="text-sm font-medium">Binary artifact</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                This file can’t be rendered inline. Download it to inspect the contents.
+                This file can’t be rendered inline. Download it to inspect the
+                contents.
               </p>
               <dl className="mt-4 space-y-1 text-xs text-muted-foreground">
                 <div>

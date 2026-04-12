@@ -3323,8 +3323,6 @@ export interface components {
         DAGArtifactsConfig: {
             /** @description Whether artifact storage is enabled for this DAG */
             enabled: boolean;
-            /** @description Optional DAG-specific artifact storage directory */
-            dir?: string;
         };
         LocalDag: {
             /** @description Name of the local DAG */
@@ -4809,8 +4807,8 @@ export interface components {
         DAGName: components["schemas"]["DAGName"];
         /** @description name of the step */
         StepName: string;
-        /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
-        ArtifactPath: string & unknown;
+        /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\' or contain '..'. */
+        ArtifactPath: string & unknown & unknown & unknown;
         /** @description Whether to recursively expand nested artifact directories */
         ArtifactRecursive: boolean;
         /** @description name of the remote node */
@@ -7612,7 +7610,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;
@@ -7660,7 +7658,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;
@@ -8493,7 +8491,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;
@@ -8543,7 +8541,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;

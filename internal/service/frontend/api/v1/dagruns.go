@@ -3387,7 +3387,7 @@ func buildArtifactPreview(archiveDir, relPath string) (api.ArtifactPreviewRespon
 	if err != nil {
 		return api.ArtifactPreviewResponse{}, err
 	}
-	if info.IsDir() {
+	if !info.Mode().IsRegular() {
 		return api.ArtifactPreviewResponse{}, os.ErrNotExist
 	}
 
@@ -3445,19 +3445,17 @@ func openArtifactFile(archiveDir, relPath string) (*os.File, os.FileInfo, error)
 		return nil, nil, err
 	}
 
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, nil, os.ErrNotExist
+	}
+
 	file, err := os.Open(filepath.Clean(absPath))
 	if err != nil {
 		return nil, nil, err
-	}
-
-	info, err := file.Stat()
-	if err != nil {
-		_ = file.Close()
-		return nil, nil, err
-	}
-	if info.IsDir() {
-		_ = file.Close()
-		return nil, nil, os.ErrNotExist
 	}
 	return file, info, nil
 }

@@ -674,45 +674,9 @@ func (cli *clientImpl) ReportStatusTo(ctx context.Context, owner exec.HostInfo, 
 // StreamLogs returns a log streaming client for sending logs to the coordinator.
 // It performs health checks and tries multiple coordinators for failover.
 func (cli *clientImpl) StreamLogs(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
-	members, err := cli.getCoordinatorMembers(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Shuffle members to distribute load evenly
-	rand.Shuffle(len(members), func(i, j int) {
-		members[i], members[j] = members[j], members[i]
+	return openStreamWithFailover(cli, ctx, "log", func(ctx context.Context, client *client) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
+		return client.client.StreamLogs(ctx)
 	})
-
-	// Try each coordinator until one works
-	var lastErr error
-	for _, member := range members {
-		client, err := cli.getOrCreateClient(member)
-		if err != nil {
-			cli.recordFailure(err)
-			lastErr = err
-			continue
-		}
-
-		// Check if the coordinator is healthy before streaming
-		if err := cli.isHealthy(ctx, member); err != nil {
-			cli.recordFailure(err)
-			lastErr = err
-			continue
-		}
-
-		stream, err := client.client.StreamLogs(ctx)
-		if err != nil {
-			cli.recordFailure(err)
-			lastErr = err
-			continue
-		}
-
-		cli.recordSuccess(ctx)
-		return stream, nil
-	}
-
-	return nil, fmt.Errorf("failed to create log stream: %w", lastErr)
 }
 
 func (cli *clientImpl) StreamLogsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
@@ -734,9 +698,22 @@ func (cli *clientImpl) StreamLogsTo(ctx context.Context, owner exec.HostInfo) (c
 // StreamArtifacts returns an artifact streaming client for sending artifacts to the coordinator.
 // It performs health checks and tries multiple coordinators for failover.
 func (cli *clientImpl) StreamArtifacts(ctx context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	return openStreamWithFailover(cli, ctx, "artifact", func(ctx context.Context, client *client) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+		return client.client.StreamArtifacts(ctx)
+	})
+}
+
+func openStreamWithFailover[T any](
+	cli *clientImpl,
+	ctx context.Context,
+	streamType string,
+	open func(context.Context, *client) (T, error),
+) (T, error) {
+	var zero T
+
 	members, err := cli.getCoordinatorMembers(ctx)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	rand.Shuffle(len(members), func(i, j int) {
@@ -745,7 +722,7 @@ func (cli *clientImpl) StreamArtifacts(ctx context.Context) (coordinatorv1.Coord
 
 	var lastErr error
 	for _, member := range members {
-		client, err := cli.getOrCreateClient(member)
+		memberClient, err := cli.getOrCreateClient(member)
 		if err != nil {
 			cli.recordFailure(err)
 			lastErr = err
@@ -757,7 +734,7 @@ func (cli *clientImpl) StreamArtifacts(ctx context.Context) (coordinatorv1.Coord
 			continue
 		}
 
-		stream, err := client.client.StreamArtifacts(ctx)
+		stream, err := open(ctx, memberClient)
 		if err != nil {
 			cli.recordFailure(err)
 			lastErr = err
@@ -768,23 +745,10 @@ func (cli *clientImpl) StreamArtifacts(ctx context.Context) (coordinatorv1.Coord
 		return stream, nil
 	}
 
-	return nil, fmt.Errorf("failed to create artifact stream: %w", lastErr)
-}
-
-func (cli *clientImpl) StreamArtifactsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
-	var stream coordinatorv1.CoordinatorService_StreamArtifactsClient
-	err := cli.callMember(ctx, owner, func(ctx context.Context, client *client) error {
-		var callErr error
-		stream, callErr = client.client.StreamArtifacts(ctx)
-		if callErr != nil {
-			return fmt.Errorf("stream artifacts failed: %w", callErr)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no healthy coordinators available")
 	}
-	return stream, nil
+	return zero, fmt.Errorf("failed to create %s stream: %w", streamType, lastErr)
 }
 
 // GetDAGRunStatus retrieves the status of a DAG run from the coordinator
@@ -845,6 +809,22 @@ func (cli *clientImpl) RequestCancel(ctx context.Context, dagName, dagRunID stri
 		}
 		return nil
 	})
+}
+
+func (cli *clientImpl) StreamArtifactsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	var stream coordinatorv1.CoordinatorService_StreamArtifactsClient
+	err := cli.callMember(ctx, owner, func(ctx context.Context, client *client) error {
+		var callErr error
+		stream, callErr = client.client.StreamArtifacts(ctx)
+		if callErr != nil {
+			return fmt.Errorf("stream artifacts failed: %w", callErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return stream, nil
 }
 
 // getDialOptions returns the appropriate gRPC dial options based on TLS configuration

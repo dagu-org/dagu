@@ -85,6 +85,43 @@ func TestArtifactHandlerHandleStreamCreatesEmptyFileOnFinalChunk(t *testing.T) {
 	assert.Zero(t, info.Size())
 }
 
+func TestArtifactHandlerHandleStreamWritesFinalChunkPayload(t *testing.T) {
+	t.Parallel()
+
+	store := newMockDAGRunStore()
+	archiveDir := t.TempDir()
+	store.addAttempt(exec.DAGRunRef{Name: "test-dag", ID: "run-123"}, &exec.DAGRunStatus{
+		Name:       "test-dag",
+		DAGRunID:   "run-123",
+		AttemptID:  "attempt-1",
+		ArchiveDir: archiveDir,
+	})
+
+	handler := newArtifactHandler(store, "")
+	stream := &mockStreamArtifactsServer{
+		ctx: context.Background(),
+		chunks: []*coordinatorv1.ArtifactChunk{
+			{
+				DagName:      "test-dag",
+				DagRunId:     "run-123",
+				AttemptId:    "attempt-1",
+				RelativePath: "artifact.txt",
+				Data:         []byte("hello"),
+				IsFinal:      true,
+			},
+		},
+	}
+
+	err := handler.handleStream(stream)
+	require.NoError(t, err)
+	require.NotNil(t, stream.response)
+	assert.Equal(t, uint64(5), stream.response.BytesWritten)
+
+	content, readErr := os.ReadFile(filepath.Join(archiveDir, "artifact.txt"))
+	require.NoError(t, readErr)
+	assert.Equal(t, []byte("hello"), content)
+}
+
 func TestArtifactHandlerHandleStreamRejectsMismatchedAttempt(t *testing.T) {
 	t.Parallel()
 
@@ -184,4 +221,24 @@ func TestArtifactHandlerGetOrCreateWriterRevalidatesCachedAttempt(t *testing.T) 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "does not match latest attempt")
 	assert.Empty(t, handler.writers)
+}
+
+func TestArtifactHandlerStreamKeyNormalizesRelativePath(t *testing.T) {
+	t.Parallel()
+
+	handler := newArtifactHandler(nil, "")
+	normalized := &coordinatorv1.ArtifactChunk{
+		DagName:      "test-dag",
+		DagRunId:     "run-123",
+		AttemptId:    "attempt-1",
+		RelativePath: "reports/summary.txt",
+	}
+	duplicate := &coordinatorv1.ArtifactChunk{
+		DagName:      "test-dag",
+		DagRunId:     "run-123",
+		AttemptId:    "attempt-1",
+		RelativePath: "./reports\\summary.txt",
+	}
+
+	assert.Equal(t, handler.streamKey(normalized), handler.streamKey(duplicate))
 }

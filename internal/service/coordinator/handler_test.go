@@ -421,6 +421,30 @@ func TestTransformArtifactPathsRejectsEmptyExpandedBaseDir(t *testing.T) {
 	require.EqualError(t, err, "artifact directory is empty after expansion")
 }
 
+func TestTransformArtifactPathsUsesDAGSpecificDirWithoutGlobalArtifactDir(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	handler := &Handler{}
+	attempt := &mockDAGRunAttempt{
+		dag: &core.DAG{
+			Name: "test-dag",
+			Artifacts: &core.ArtifactsConfig{
+				Enabled: true,
+				Dir:     baseDir,
+			},
+		},
+	}
+	incoming := &exec.DAGRunStatus{
+		DAGRunID:   "run-123",
+		ArchiveDir: "/tmp/worker/dag-run_20260412_000000Z_run-123",
+	}
+
+	err := handler.transformArtifactPaths(context.Background(), attempt, nil, incoming)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(baseDir, "test-dag", "dag-run_20260412_000000Z_run-123"), incoming.ArchiveDir)
+}
+
 // Thread-safe getters for test assertions
 func (m *mockDAGRunAttempt) WasOpened() bool {
 	m.mu.Lock()

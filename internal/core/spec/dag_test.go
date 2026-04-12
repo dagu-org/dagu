@@ -2180,6 +2180,14 @@ artifacts:
 			expected: &core.ArtifactsConfig{Enabled: true},
 		},
 		{
+			name: "DisabledExplicit",
+			yaml: `
+artifacts:
+  enabled: false
+`,
+			expected: &core.ArtifactsConfig{Enabled: false},
+		},
+		{
 			name: "DirOnly",
 			yaml: `
 artifacts:

@@ -1457,7 +1457,7 @@ func (h *Handler) transformArtifactPaths(
 	latestStatus *exec.DAGRunStatus,
 	incoming *exec.DAGRunStatus,
 ) error {
-	if h.artifactDir == "" || incoming == nil {
+	if incoming == nil {
 		return nil
 	}
 	if latestStatus != nil && latestStatus.ArchiveDir != "" {
@@ -1481,6 +1481,10 @@ func (h *Handler) transformArtifactPaths(
 		baseDir := h.artifactDir
 		if dag.Artifacts != nil && dag.Artifacts.Dir != "" {
 			baseDir = dag.Artifacts.Dir
+		}
+		baseDir = strings.TrimSpace(baseDir)
+		if baseDir == "" {
+			return fmt.Errorf("artifact directory is not configured")
 		}
 		baseDir, err = eval.String(ctx, baseDir, eval.WithOSExpansion())
 		if err != nil {

@@ -102,8 +102,8 @@ func writeArtifactTestConfig(t *testing.T, home, dagRunsDir, artifactDir string)
 	configPath := filepath.Join(home, "config.yaml")
 	content := fmt.Sprintf(`
 paths:
-  dag_runs_dir: %s
-  artifact_dir: %s
+  dag_runs_dir: %q
+  artifact_dir: %q
 `, dagRunsDir, artifactDir)
 	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o600))
 	return configPath

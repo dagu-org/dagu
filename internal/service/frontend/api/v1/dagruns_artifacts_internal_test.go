@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	openapiv1 "github.com/dagucloud/dagu/api/v1"
@@ -121,4 +123,24 @@ func TestListArtifactTreeSortsCaseOnlyNameDifferencesDeterministically(t *testin
 
 	sortArtifactTreeNodes(items)
 	assert.Equal(t, []string{"Alpha.txt", "alpha.txt"}, []string{items[0].Name, items[1].Name})
+}
+
+func TestArtifactPreviewAndDownloadRejectNamedPipes(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("named pipes via mkfifo are not supported on Windows")
+	}
+
+	archiveDir := t.TempDir()
+	pipePath := filepath.Join(archiveDir, "artifact.pipe")
+	require.NoError(t, syscall.Mkfifo(pipePath, 0o600))
+
+	_, previewErr := buildArtifactPreview(archiveDir, "artifact.pipe")
+	require.ErrorIs(t, previewErr, os.ErrNotExist)
+
+	file, info, downloadErr := openArtifactFile(archiveDir, "artifact.pipe")
+	require.ErrorIs(t, downloadErr, os.ErrNotExist)
+	assert.Nil(t, file)
+	assert.Nil(t, info)
 }

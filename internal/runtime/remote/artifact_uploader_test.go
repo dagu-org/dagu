@@ -43,12 +43,10 @@ type mockStreamArtifactsClient struct {
 	mu         sync.Mutex
 	sentChunks []*coordinatorv1.ArtifactChunk
 	response   *coordinatorv1.StreamArtifactsResponse
+	sendHook   func(*coordinatorv1.ArtifactChunk)
 }
 
 func (m *mockStreamArtifactsClient) Send(chunk *coordinatorv1.ArtifactChunk) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	chunkCopy := &coordinatorv1.ArtifactChunk{
 		WorkerId:           chunk.WorkerId,
 		DagRunId:           chunk.DagRunId,
@@ -62,7 +60,15 @@ func (m *mockStreamArtifactsClient) Send(chunk *coordinatorv1.ArtifactChunk) err
 		AttemptId:          chunk.AttemptId,
 		OwnerCoordinatorId: chunk.OwnerCoordinatorId,
 	}
+
+	m.mu.Lock()
 	m.sentChunks = append(m.sentChunks, chunkCopy)
+	sendHook := m.sendHook
+	m.mu.Unlock()
+
+	if sendHook != nil {
+		sendHook(chunkCopy)
+	}
 	return nil
 }
 
@@ -123,4 +129,40 @@ func TestArtifactUploaderUploadDirIncludesEmptyFiles(t *testing.T) {
 	require.Len(t, nonEmptyChunks, 2)
 	assert.Equal(t, []byte("hello"), nonEmptyChunks[0].Data)
 	assert.True(t, nonEmptyChunks[1].IsFinal)
+}
+
+func TestArtifactUploaderUploadDirUsesSingleAttemptIDSnapshot(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "artifact.txt"), []byte("hello"), 0o600))
+
+	var uploader *ArtifactUploader
+	var once sync.Once
+
+	stream := &mockStreamArtifactsClient{
+		sendHook: func(chunk *coordinatorv1.ArtifactChunk) {
+			if chunk.RelativePath != "artifact.txt" || len(chunk.Data) == 0 {
+				return
+			}
+			once.Do(func() {
+				uploader.SetAttemptID("attempt-2")
+			})
+		},
+	}
+	client := &artifactUploaderMockClient{
+		streamArtifactsFunc: func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+			return stream, nil
+		},
+	}
+
+	uploader = NewArtifactUploader(client, "worker-1", "run-123", "test-dag", "attempt-1", exec.DAGRunRef{})
+	err := uploader.UploadDir(context.Background(), dir)
+	require.NoError(t, err)
+
+	chunks := stream.chunksForPath("artifact.txt")
+	require.Len(t, chunks, 2)
+	for _, chunk := range chunks {
+		assert.Equal(t, "attempt-1", chunk.AttemptId)
+	}
 }

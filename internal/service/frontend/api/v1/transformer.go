@@ -361,7 +361,6 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 	if dag.Artifacts != nil {
 		artifacts = &api.DAGArtifactsConfig{
 			Enabled: dag.Artifacts.Enabled,
-			Dir:     ptrOf(dag.Artifacts.Dir),
 		}
 	}
 
