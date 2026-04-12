@@ -4,9 +4,6 @@ import dayjs from '@/lib/dayjs';
 import { X } from 'lucide-react';
 import * as React from 'react';
 
-// Must match the backend grace period duration
-const GRACE_PERIOD_DAYS = 14;
-
 const warningMessages: Record<string, string> = {
   MACHINE_LIMIT_EXCEEDED:
     'This license is active on more machines than allowed. Deactivate extra machines or contact your administrator.',
@@ -55,8 +52,8 @@ export function LicenseBanner() {
 
   // Grace period: non-dismissible amber banner
   if (license.gracePeriod) {
-    const graceEnd = license.expiry
-      ? dayjs(license.expiry).add(GRACE_PERIOD_DAYS, 'day').format('YYYY-MM-DD')
+    const graceEnd = license.graceEndsAt
+      ? dayjs(license.graceEndsAt).format('YYYY-MM-DD')
       : 'soon';
     return (
       <div role="alert" className="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-1.5 flex items-center text-sm">

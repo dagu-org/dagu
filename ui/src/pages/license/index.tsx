@@ -50,6 +50,7 @@ export default function LicensePage() {
           features: data?.features || [],
           expiry: data?.expiry || '',
           gracePeriod: false,
+          graceEndsAt: '',
           community: false,
           source: 'file',
           warningCode: '',
@@ -83,6 +84,7 @@ export default function LicensePage() {
           features: [],
           expiry: '',
           gracePeriod: false,
+          graceEndsAt: '',
           community: true,
           source: '',
           warningCode: '',
@@ -156,7 +158,7 @@ export default function LicensePage() {
       </div>
 
       {/* Deactivate license */}
-      {license.valid && (
+      {!license.community && (
         <div className="card-obsidian p-4 space-y-3">
           <div className="text-sm font-medium">Deactivate License</div>
           {license.source === 'env' ? (

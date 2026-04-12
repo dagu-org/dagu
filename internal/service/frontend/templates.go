@@ -286,6 +286,12 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			}
 			return boolStr(cfg.LicenseChecker.IsGracePeriod())
 		},
+		"licenseGraceEndsAt": func() string {
+			if cfg.LicenseChecker == nil {
+				return ""
+			}
+			return graceEndsAt(cfg.LicenseChecker.Claims())
+		},
 		"licenseCommunity": func() string {
 			if cfg.LicenseChecker == nil {
 				return "true"
@@ -326,4 +332,20 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		"pathGitSyncDir":         func() string { return path.Join(cfg.Paths.DataDir, "gitsync") },
 		"pathAuditLogsDir":       func() string { return path.Join(cfg.Paths.AdminLogsDir, "audit") },
 	}
+}
+
+func graceEndsAt(claims *license.LicenseClaims) string {
+	if claims == nil || claims.ExpiresAt == nil {
+		return ""
+	}
+
+	graceDays := 14
+	if claims.GraceDays != nil {
+		graceDays = *claims.GraceDays
+		if graceDays < 0 {
+			graceDays = 0
+		}
+	}
+
+	return claims.ExpiresAt.Time.Add(time.Duration(graceDays) * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
 }

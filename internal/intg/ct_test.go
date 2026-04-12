@@ -500,8 +500,6 @@ steps:
 }
 
 func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
-	requireDockerDaemon(t)
-
 	th := test.Setup(t)
 	dockerClient := requireDockerClient(t)
 
@@ -1085,7 +1083,6 @@ steps:
 // TestContainerExecMode tests the new exec mode syntax for executing
 // commands in existing running containers.
 func TestContainerExecMode(t *testing.T) {
-	requireDockerDaemon(t)
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1284,7 +1281,6 @@ steps:
 
 // TestContainerExecNotRunning tests that exec mode fails when the container exists but is not running.
 func TestContainerExecNotRunning(t *testing.T) {
-	requireDockerDaemon(t)
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1397,7 +1393,6 @@ steps:
 
 // TestContainerExecVariableExpansion tests that environment variables are expanded in container names.
 func TestContainerExecVariableExpansion(t *testing.T) {
-	requireDockerDaemon(t)
 	t.Parallel()
 
 	th := test.Setup(t)

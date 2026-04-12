@@ -47,9 +47,25 @@ func cloneClaims(c *LicenseClaims) *LicenseClaims {
 		return nil
 	}
 	cp := *c
+	if c.ExpiresAt != nil {
+		expiresAt := *c.ExpiresAt
+		cp.ExpiresAt = &expiresAt
+	}
+	if c.NotBefore != nil {
+		notBefore := *c.NotBefore
+		cp.NotBefore = &notBefore
+	}
+	if c.IssuedAt != nil {
+		issuedAt := *c.IssuedAt
+		cp.IssuedAt = &issuedAt
+	}
 	if c.Features != nil {
 		cp.Features = make([]string, len(c.Features))
 		copy(cp.Features, c.Features)
+	}
+	if c.GraceDays != nil {
+		graceDays := *c.GraceDays
+		cp.GraceDays = &graceDays
 	}
 	return &cp
 }

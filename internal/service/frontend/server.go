@@ -369,9 +369,20 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		apiOpts = append(apiOpts, apiv1.WithWorkspaceStore(wsStore))
 	}
 
+	var licenseChecker license.Checker
+	auditEnabled := func() bool {
+		if auditSvc == nil {
+			return false
+		}
+		if licenseChecker == nil {
+			return true
+		}
+		return licenseChecker.IsFeatureEnabled(license.FeatureAudit)
+	}
+
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, auditEnabled, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -442,10 +453,11 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	// Populate license checker and manager in funcsConfig after opts
 	if srv.licenseManager != nil {
-		srv.funcsConfig.LicenseChecker = srv.licenseManager.Checker()
+		licenseChecker = srv.licenseManager.Checker()
+		srv.funcsConfig.LicenseChecker = licenseChecker
 		srv.funcsConfig.LicenseManager = srv.licenseManager
 		if srv.builtinOIDCCfg != nil {
-			srv.builtinOIDCCfg.LicenseChecker = srv.licenseManager.Checker()
+			srv.builtinOIDCCfg.LicenseChecker = licenseChecker
 		}
 	}
 
@@ -719,16 +731,16 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteContextResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, auditEnabled func() bool, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteContextResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
 	}
 
 	hooks := agent.NewHooks()
-	hooks.OnBeforeToolExec(newAgentPolicyHook(store, auditSvc))
+	hooks.OnBeforeToolExec(newAgentPolicyHook(store, auditSvc, auditEnabled))
 	if auditSvc != nil {
-		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc))
+		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc, auditEnabled))
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
@@ -775,9 +787,9 @@ func initEventService(cfg *config.Config) (*eventstore.Service, error) {
 }
 
 // newAgentAuditHook returns a hook that logs agent tool executions to the audit service.
-func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
+func newAgentAuditHook(auditSvc *audit.Service, auditEnabled func() bool) agent.AfterToolExecHookFunc {
 	return func(_ context.Context, info agent.ToolExecInfo, result agent.ToolOut) {
-		if info.Audit == nil {
+		if info.Audit == nil || !isAuditEnabled(auditSvc, auditEnabled) {
 			return // tool opted out of audit
 		}
 
@@ -797,6 +809,16 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 			WithIPAddress(info.User.IPAddress)
 		_ = auditSvc.Log(context.Background(), entry)
 	}
+}
+
+func isAuditEnabled(auditSvc *audit.Service, auditEnabled func() bool) bool {
+	if auditSvc == nil {
+		return false
+	}
+	if auditEnabled == nil {
+		return true
+	}
+	return auditEnabled()
 }
 
 // sanitizedRequestLogger wraps httplog's RequestLogger with URL sanitization

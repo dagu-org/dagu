@@ -7,6 +7,7 @@ const defaultLicense: LicenseStatus = {
   expiry: '',
   features: [],
   gracePeriod: false,
+  graceEndsAt: '',
   community: true,
   source: '',
   warningCode: '',

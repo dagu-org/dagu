@@ -14,28 +14,25 @@ import (
 func requireDockerDaemon(t *testing.T) {
 	t.Helper()
 
-	dockerClient, err := client.New(client.FromEnv)
-	if err != nil {
-		t.Skipf("Skipping Docker-backed integration test: failed to create docker client: %v", err)
-	}
+	dockerClient := newDockerClientOrSkip(t)
 	defer func() { _ = dockerClient.Close() }()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	if _, err := dockerClient.Info(ctx, client.InfoOptions{}); err != nil {
-		t.Skipf("Skipping Docker-backed integration test: docker daemon unavailable: %v", err)
-	}
 }
 
 func requireDockerClient(t *testing.T) *client.Client {
+	t.Helper()
+
+	dockerClient := newDockerClientOrSkip(t)
+	t.Cleanup(func() { _ = dockerClient.Close() })
+	return dockerClient
+}
+
+func newDockerClientOrSkip(t *testing.T) *client.Client {
 	t.Helper()
 
 	dockerClient, err := client.New(client.FromEnv)
 	if err != nil {
 		t.Skipf("Skipping Docker-backed integration test: failed to create docker client: %v", err)
 	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -43,7 +40,5 @@ func requireDockerClient(t *testing.T) *client.Client {
 		_ = dockerClient.Close()
 		t.Skipf("Skipping Docker-backed integration test: docker daemon unavailable: %v", err)
 	}
-
-	t.Cleanup(func() { _ = dockerClient.Close() })
 	return dockerClient
 }
