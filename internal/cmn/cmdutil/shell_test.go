@@ -5,6 +5,7 @@ package cmdutil
 
 import (
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -199,6 +200,9 @@ func TestShellQuote_ShellRoundTrip(t *testing.T) {
 
 	for _, input := range inputs {
 		t.Run(input, func(t *testing.T) {
+			if runtime.GOOS == "windows" && strings.Contains(input, "\v") {
+				t.Skip("Git Bash does not round-trip this control-character case reliably on Windows")
+			}
 			quoted := ShellQuote(input)
 			// Run sh -c 'printf %s <quoted>' and capture output
 			// We use printf because echo might interpret sequences or add newlines

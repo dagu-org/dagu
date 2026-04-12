@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -111,13 +112,13 @@ func TestResolvePath(t *testing.T) {
 			name:       "absolute path unchanged",
 			path:       "/abs/path/file.txt",
 			workingDir: "/work",
-			expected:   "/abs/path/file.txt",
+			expected:   filepath.Clean("/abs/path/file.txt"),
 		},
 		{
 			name:       "relative path joined with workingDir",
 			path:       "rel/path/file.txt",
 			workingDir: "/work",
-			expected:   "/work/rel/path/file.txt",
+			expected:   filepath.Join("/work", "rel/path/file.txt"),
 		},
 		{
 			name:       "relative path with empty workingDir unchanged",
@@ -129,7 +130,7 @@ func TestResolvePath(t *testing.T) {
 			name:       "simple filename joined",
 			path:       "file.txt",
 			workingDir: "/home/user",
-			expected:   "/home/user/file.txt",
+			expected:   filepath.Join("/home/user", "file.txt"),
 		},
 	}
 

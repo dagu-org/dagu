@@ -15,6 +15,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func setTestHomeDir(t *testing.T, homeDir string) {
+	t.Helper()
+
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	volume := filepath.VolumeName(homeDir)
+	if volume != "" {
+		t.Setenv("HOMEDRIVE", volume)
+		t.Setenv("HOMEPATH", strings.TrimPrefix(homeDir, volume))
+	}
+}
+
 func TestAIToolDetection(t *testing.T) {
 	t.Setenv("AGENTS_HOME", "")
 	t.Setenv("CODEX_HOME", "")
@@ -119,7 +132,7 @@ func TestRunAIInstallInstallsBothCodexDirectories(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setTestHomeDir(t, homeDir)
 
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".codex"), 0o750))
@@ -146,7 +159,7 @@ func TestRunAIInstallInstallsIntoCustomSkillsDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setTestHomeDir(t, homeDir)
 
 	customSkillsDir := filepath.Join(t.TempDir(), "skills")
 
@@ -168,7 +181,7 @@ func TestRunAIInstallCustomSkillsDirReplacesDetection(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setTestHomeDir(t, homeDir)
 
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
 	customSkillsDir := filepath.Join(t.TempDir(), "skills")
@@ -215,7 +228,7 @@ func TestRunAIInstallRequiresInputWithoutYes(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setTestHomeDir(t, homeDir)
 
 	require.NoError(t, os.MkdirAll(filepath.Join(homeDir, ".agents"), 0o750))
 
@@ -254,7 +267,7 @@ func TestRunAIInstallPreservesExistingSkillWhenOverwriteDeclined(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setTestHomeDir(t, homeDir)
 
 	target := filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o750))
@@ -301,7 +314,7 @@ func TestRunAIInstallOverwritesExistingSkillWhenConfirmed(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 
 	homeDir := t.TempDir()
-	t.Setenv("HOME", homeDir)
+	setTestHomeDir(t, homeDir)
 
 	target := filepath.Join(homeDir, ".agents", "skills", "dagu", "SKILL.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o750))

@@ -844,12 +844,12 @@ func TestSessionManager_RecordExternalMessage(t *testing.T) {
 func TestSessionManager_RecordExternalMessage_UpdatesLastActivity(t *testing.T) {
 	t.Parallel()
 
+	initialActivity := time.Now().Add(-time.Second)
 	sm := NewSessionManager(SessionManagerConfig{
-		ID:   "activity-test",
-		User: UserIdentity{UserID: "user-1"},
+		ID:           "activity-test",
+		User:         UserIdentity{UserID: "user-1"},
+		LastActivity: initialActivity,
 	})
-
-	initialActivity := sm.LastActivity()
 
 	_, err := sm.RecordExternalMessage(context.Background(), Message{
 		Type:    MessageTypeAssistant,
@@ -1051,8 +1051,11 @@ func TestSessionManager_RecordHeartbeat(t *testing.T) {
 	t.Run("updates lastActivity", func(t *testing.T) {
 		t.Parallel()
 
-		sm := NewSessionManager(SessionManagerConfig{ID: "hb-test"})
-		initialActivity := sm.LastActivity()
+		initialActivity := time.Now().Add(-time.Second)
+		sm := NewSessionManager(SessionManagerConfig{
+			ID:           "hb-test",
+			LastActivity: initialActivity,
+		})
 
 		sm.RecordHeartbeat()
 
