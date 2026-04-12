@@ -198,10 +198,6 @@ func (h *artifactHandler) archiveDir(ctx context.Context, chunk *coordinatorv1.A
 	return runStatus.ArchiveDir, nil
 }
 
-func (h *artifactHandler) closeWriter(ctx context.Context, chunk *coordinatorv1.ArtifactChunk) {
-	h.closeWriterByKey(ctx, h.streamKey(chunk))
-}
-
 func (h *artifactHandler) closeWriterByKey(ctx context.Context, key string) {
 	h.writersMu.Lock()
 	defer h.writersMu.Unlock()
