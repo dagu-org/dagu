@@ -68,6 +68,7 @@ type Options struct {
 	// Coordinator handler options for shared-nothing worker tests
 	WithStatusPersistence   bool          // Enable status persistence via DAGRunStore
 	WithLogPersistence      bool          // Enable log persistence to filesystem
+	WithArtifactPersistence bool          // Enable artifact persistence to filesystem
 	StaleHeartbeatThreshold time.Duration // Override for handler's stale heartbeat threshold
 	StaleLeaseThreshold     time.Duration // Override for handler's stale lease threshold
 }
@@ -119,6 +120,14 @@ func WithStatusPersistence() HelperOption {
 func WithLogPersistence() HelperOption {
 	return func(opts *Options) {
 		opts.WithLogPersistence = true
+	}
+}
+
+// WithArtifactPersistence enables artifact persistence to filesystem on the coordinator handler.
+// Use this for testing remote artifact uploads from workers.
+func WithArtifactPersistence() HelperOption {
+	return func(opts *Options) {
+		opts.WithArtifactPersistence = true
 	}
 }
 
@@ -335,6 +344,7 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	configData["paths"] = map[string]any{
 		"dags_dir":             cfg.Paths.DAGsDir,
 		"log_dir":              cfg.Paths.LogDir,
+		"artifact_dir":         cfg.Paths.ArtifactDir,
 		"data_dir":             cfg.Paths.DataDir,
 		"suspend_flags_dir":    cfg.Paths.SuspendFlagsDir,
 		"admin_logs_dir":       cfg.Paths.AdminLogsDir,

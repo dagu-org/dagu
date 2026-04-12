@@ -5,6 +5,7 @@ package distr_test
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -103,6 +104,66 @@ steps:
 
 		lineCount := strings.Count(content, "\n")
 		assert.GreaterOrEqual(t, lineCount, 2000, "should have at least 2000 lines")
+	})
+}
+
+func TestExecution_Artifacts(t *testing.T) {
+	t.Run("sharedNothingUploadsArtifactsToCoordinatorFilesystem", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: shared-nothing-artifact-test
+worker_selector:
+  test: "true"
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifacts
+    command: |
+      test -n "${DAG_RUN_ARTIFACTS_DIR}"
+      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
+      printf "artifact from shared-nothing worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`, withArtifactPersistence())
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+		require.DirExists(t, status.ArchiveDir)
+		assert.True(t, strings.HasPrefix(status.ArchiveDir, filepath.Join(f.artifactDir(), f.dagWrapper.Name)+string(os.PathSeparator)))
+		assertArtifactContains(t, status.ArchiveDir, "reports/summary.md", "artifact from shared-nothing worker")
+	})
+
+	t.Run("sharedFSWritesArtifactsToSharedFilesystem", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: sharedfs-artifact-test
+worker_selector:
+  test: "true"
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifacts
+    command: |
+      test -n "${DAG_RUN_ARTIFACTS_DIR}"
+      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
+      printf "artifact from shared filesystem worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`, withWorkerMode(sharedFSMode))
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+		require.DirExists(t, status.ArchiveDir)
+		assert.True(t, strings.HasPrefix(status.ArchiveDir, filepath.Join(f.artifactDir(), f.dagWrapper.Name)+string(os.PathSeparator)))
+		assertArtifactContains(t, status.ArchiveDir, "reports/summary.md", "artifact from shared filesystem worker")
 	})
 }
 
