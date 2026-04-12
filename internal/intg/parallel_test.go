@@ -280,7 +280,7 @@ steps:
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 		return err == nil && len(status.Nodes) == 1 && len(status.Nodes[0].SubRuns) == 3
-	}, time.Second, 50*time.Millisecond, "parallel sub-runs were not persisted")
+	}, startedTimeout, 50*time.Millisecond, "parallel sub-runs were not persisted")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)

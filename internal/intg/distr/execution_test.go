@@ -5,6 +5,7 @@ package distr_test
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -70,6 +71,15 @@ steps:
 
 func TestExecution_LargeOutput(t *testing.T) {
 	t.Run("largeOutputStreamedCorrectly", func(t *testing.T) {
+		command := `      for i in $(seq 1 2000); do
+        echo "Line $i: This is a test line to generate large output that exceeds the 64KB buffer size used in log streaming"
+      done`
+		if runtime.GOOS == "windows" {
+			command = `      1..2000 | ForEach-Object {
+        Write-Output ("Line {0}: This is a test line to generate large output that exceeds the 64KB buffer size used in log streaming" -f $_)
+      }`
+		}
+
 		f := newTestFixture(t, `
 name: large-output-test
 worker_selector:
@@ -77,9 +87,7 @@ worker_selector:
 steps:
   - name: big-output
     command: |
-      for i in $(seq 1 2000); do
-        echo "Line $i: This is a test line to generate large output that exceeds the 64KB buffer size used in log streaming"
-      done
+`+command+`
 `, withLogPersistence())
 		defer f.cleanup()
 
