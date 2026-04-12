@@ -19,6 +19,7 @@ const minioImage = "minio/minio:RELEASE.2024-10-02T17-50-41Z"
 // inside a container. This validates the container-based workflow pattern for object storage.
 func TestMinIOContainer_WithMCCommands(t *testing.T) {
 	t.Parallel()
+	requireLinuxContainerRuntime(t)
 
 	tempDir, err := os.MkdirTemp("", "dagu-s3-test-*")
 	require.NoError(t, err)

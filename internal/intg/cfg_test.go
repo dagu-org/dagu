@@ -768,6 +768,9 @@ func TestStepWorkingDir(t *testing.T) {
 
 	// Create temp directories for testing
 	tempDir := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(tempDir); err == nil {
+		tempDir = resolved
+	}
 	stepWorkDir := tempDir + "/step"
 
 	// Create directories
@@ -785,9 +788,9 @@ steps:
 
 	agent := dag.Agent()
 	agent.RunSuccess(t)
-	dag.AssertOutputs(t, map[string]any{
-		"STEP_DIR": stepWorkDir,
-	})
+	outputs := dag.ReadOutputs(t)
+	require.Contains(t, outputs, "stepDir")
+	require.Equal(t, canonicalTestPath(stepWorkDir), canonicalTestPath(outputs["stepDir"]))
 }
 
 // TestPreconditionNegate verifies that preconditions with negate:true work correctly.

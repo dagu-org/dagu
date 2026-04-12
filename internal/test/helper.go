@@ -175,6 +175,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
+	if runtime.GOOS == "windows" {
+		if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+			tmpDir = resolved
+		}
+	}
 	shellPath := testShellPath(t)
 
 	root := getProjectRoot(t)
@@ -885,6 +890,12 @@ func testShellPath(t *testing.T) string {
 	t.Helper()
 
 	if runtime.GOOS == "windows" {
+		if shPath, err := exec.LookPath("bash"); err == nil {
+			return shPath
+		}
+		if shPath, err := exec.LookPath("sh"); err == nil {
+			return shPath
+		}
 		if shPath, err := exec.LookPath("powershell"); err == nil {
 			return shPath
 		}

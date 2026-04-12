@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/core"
@@ -19,10 +20,12 @@ import (
 // back to the system temp directory. The file extension is chosen based on the shell.
 // Returns the created file path or an error if file creation, writing, syncing, or
 // permission setting fails.
-func setupScript(workDir, script string, shell []string) (string, error) {
-	// Determine file extension based on shell
+func setupScript(workDir, script, command string, shell []string) (string, error) {
+	// Determine file extension based on the actual execution path. Scripts that
+	// are passed to an explicit command or start with a shebang should preserve
+	// their original first line so the intended interpreter can handle them.
 	shellCmd := ""
-	if len(shell) > 0 {
+	if command == "" && !hasShebang(script) && len(shell) > 0 {
 		shellCmd = shell[0]
 	}
 	ext := cmdutil.GetScriptExtension(shellCmd)
@@ -62,15 +65,18 @@ func setupScript(workDir, script string, shell []string) (string, error) {
 	return file.Name(), nil
 }
 
+func hasShebang(script string) bool {
+	return strings.HasPrefix(script, "#!")
+}
+
 // scriptLineOffset returns the number of lines prepended by preprocessScript
 // for the given shell. This is needed to map error line numbers back to the
 // user's original script content.
-func scriptLineOffset(shell []string) int {
-	if len(shell) == 0 {
+func scriptLineOffset(scriptFile string) int {
+	if scriptFile == "" {
 		return 0
 	}
-	ext := cmdutil.GetScriptExtension(shell[0])
-	if ext == ".ps1" {
+	if cmdutil.GetScriptExtension(scriptFile) == ".ps1" {
 		return 2 // preprocessScript prepends 2 lines for PowerShell
 	}
 	return 0

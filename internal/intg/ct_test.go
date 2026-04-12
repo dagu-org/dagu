@@ -54,6 +54,8 @@ func inspectContainer(ctx context.Context, dockerClient *client.Client, containe
 }
 
 func TestDockerExecutor(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	tests := []dockerExecutorTest{
 		{
 			name: "BasicExecution",
@@ -111,6 +113,7 @@ type containerTest struct {
 
 func TestDAGLevelContainer(t *testing.T) {
 	t.Parallel()
+	requireLinuxContainerRuntime(t)
 
 	tests := []containerTest{
 		{
@@ -414,6 +417,8 @@ steps:
 }
 
 func TestContainerPullPolicy(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	th := test.Setup(t)
 
 	pullPolicyTestDAG := fmt.Sprintf(`
@@ -446,6 +451,8 @@ steps:
 }
 
 func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	th := test.Setup(t)
 
 	// Use nginx which stays up by default; most tags have no healthcheck,
@@ -469,6 +476,8 @@ steps:
 }
 
 func TestContainerStartup_Command_LongRunning(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -492,6 +501,8 @@ steps:
 }
 
 func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	th := test.Setup(t)
 	dockerClient, err := client.New(client.FromEnv)
 	require.NoError(t, err, "failed to create docker client")
@@ -521,6 +532,8 @@ steps:
 }
 
 func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	th := test.Setup(t)
 
 	dagConfig := fmt.Sprintf(`
@@ -656,6 +669,7 @@ func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Cli
 // using the executor syntax.
 func TestStepLevelContainer(t *testing.T) {
 	t.Parallel()
+	requireLinuxContainerRuntime(t)
 
 	tests := []containerTest{
 		{
@@ -1074,6 +1088,8 @@ steps:
 // TestContainerExecMode tests the new exec mode syntax for executing
 // commands in existing running containers.
 func TestContainerExecMode(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1254,6 +1270,8 @@ steps:
 
 // TestContainerExecNotFound tests that exec mode fails when the container doesn't exist.
 func TestContainerExecNotFound(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1273,6 +1291,8 @@ steps:
 
 // TestContainerExecNotRunning tests that exec mode fails when the container exists but is not running.
 func TestContainerExecNotRunning(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1322,6 +1342,8 @@ steps:
 // is passed to Docker and waitFor: healthy waits for the container to become
 // healthy (not just running). Uses a file creation delay to prove actual waiting.
 func TestContainerCustomHealthcheck(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1353,6 +1375,8 @@ steps:
 
 // TestContainerCustomHealthcheck_StepLevel tests custom healthcheck at step level.
 func TestContainerCustomHealthcheck_StepLevel(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1385,6 +1409,8 @@ steps:
 
 // TestContainerExecVariableExpansion tests that environment variables are expanded in container names.
 func TestContainerExecVariableExpansion(t *testing.T) {
+	requireLinuxContainerRuntime(t)
+
 	t.Parallel()
 
 	th := test.Setup(t)

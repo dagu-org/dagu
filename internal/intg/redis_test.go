@@ -21,6 +21,7 @@ type redisTest struct {
 
 func TestDAGLevelRedis(t *testing.T) {
 	t.Parallel()
+	requireLinuxContainerRuntime(t)
 
 	tests := []redisTest{
 		{

@@ -26,14 +26,15 @@ func TestBaseDAGSpecialEnvVarsInHandler(t *testing.T) {
 	tmpDir := t.TempDir()
 	baseConfigPath := filepath.Join(tmpDir, "base.yaml")
 	outputFile := filepath.Join(tmpDir, "handler_output.txt")
+	outputFileForShell := filepath.ToSlash(outputFile)
 
 	// Create base DAG with handler_on: failure that captures special env vars
 	baseConfig := `handler_on:
   failure:
     command: |
-      echo "DAG_NAME=${DAG_NAME}" >> ` + outputFile + `
-      echo "DAG_RUN_ID=${DAG_RUN_ID}" >> ` + outputFile + `
-      echo "DAG_RUN_LOG_FILE=${DAG_RUN_LOG_FILE}" >> ` + outputFile + `
+      echo "DAG_NAME=${DAG_NAME}" >> "` + outputFileForShell + `"
+      echo "DAG_RUN_ID=${DAG_RUN_ID}" >> "` + outputFileForShell + `"
+      echo "DAG_RUN_LOG_FILE=${DAG_RUN_LOG_FILE}" >> "` + outputFileForShell + `"
 `
 	require.NoError(t, os.WriteFile(baseConfigPath, []byte(baseConfig), 0600))
 
@@ -107,11 +108,12 @@ func TestSkipBaseHandlers_SubDAGDoesNotInheritHandlers(t *testing.T) {
 	tmpDir := t.TempDir()
 	baseConfigPath := filepath.Join(tmpDir, "base.yaml")
 	markerFile := filepath.Join(tmpDir, "marker.txt")
+	markerFileForShell := filepath.ToSlash(markerFile)
 
 	// Create base DAG with handler_on: failure that writes a marker file
 	baseConfig := `handler_on:
   failure:
-    command: echo "BASE_FAILURE_HANDLER_RAN" >> ` + markerFile + `
+    command: echo "BASE_FAILURE_HANDLER_RAN" >> "` + markerFileForShell + `"
 `
 	require.NoError(t, os.WriteFile(baseConfigPath, []byte(baseConfig), 0600))
 
@@ -142,11 +144,13 @@ func TestSkipBaseHandlers_ExplicitHandlersStillWork(t *testing.T) {
 	baseConfigPath := filepath.Join(tmpDir, "base.yaml")
 	baseMarkerFile := filepath.Join(tmpDir, "base_marker.txt")
 	dagMarkerFile := filepath.Join(tmpDir, "dag_marker.txt")
+	baseMarkerFileForShell := filepath.ToSlash(baseMarkerFile)
+	dagMarkerFileForShell := filepath.ToSlash(dagMarkerFile)
 
 	// Create base DAG with handler_on: failure
 	baseConfig := `handler_on:
   failure:
-    command: echo "BASE" >> ` + baseMarkerFile + `
+    command: echo "BASE" >> "` + baseMarkerFileForShell + `"
 `
 	require.NoError(t, os.WriteFile(baseConfigPath, []byte(baseConfig), 0600))
 
@@ -156,7 +160,7 @@ func TestSkipBaseHandlers_ExplicitHandlersStillWork(t *testing.T) {
 	// Create a DAG file with its own failure handler
 	dagContent := `handler_on:
   failure:
-    command: echo "DAG" >> ` + dagMarkerFile + `
+    command: echo "DAG" >> "` + dagMarkerFileForShell + `"
 
 steps:
   - name: failing-step

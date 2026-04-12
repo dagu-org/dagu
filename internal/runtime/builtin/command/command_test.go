@@ -1221,7 +1221,7 @@ func TestSetupScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			scriptFile, err := setupScript(tmpDir, tt.script, tt.shell)
+			scriptFile, err := setupScript(tmpDir, tt.script, "", tt.shell)
 			require.NoError(t, err)
 			defer func() { _ = os.Remove(scriptFile) }()
 
@@ -1835,7 +1835,7 @@ func TestCreateDirectCommand(t *testing.T) {
 // TestSetupScript_Errors tests error paths in setupScript
 func TestSetupScript_Errors(t *testing.T) {
 	t.Run("invalid directory", func(t *testing.T) {
-		_, err := setupScript("/nonexistent/dir/that/does/not/exist", "echo hello", []string{"/bin/sh"})
+		_, err := setupScript("/nonexistent/dir/that/does/not/exist", "echo hello", "", []string{"/bin/sh"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create script file")
 	})

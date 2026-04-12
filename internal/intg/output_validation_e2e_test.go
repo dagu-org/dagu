@@ -331,6 +331,7 @@ func TestParamValidation_ExternalSchema(t *testing.T) {
 
 	schemaDir := t.TempDir()
 	schemaPath := filepath.Join(schemaDir, "deploy-schema.json")
+	schemaPathForYAML := filepath.ToSlash(schemaPath)
 	require.NoError(t, os.WriteFile(schemaPath, []byte(`{
   "type": "object",
   "properties": {
@@ -344,7 +345,7 @@ func TestParamValidation_ExternalSchema(t *testing.T) {
 	dagFile := th.CreateDAGFile(t, "param-ext-schema.yaml", `
 name: param-ext-schema
 params:
-  schema: "`+schemaPath+`"
+  schema: "`+schemaPathForYAML+`"
   values:
     DEPLOY_ENV: dev
 steps:

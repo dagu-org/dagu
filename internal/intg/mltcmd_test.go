@@ -211,6 +211,7 @@ steps:
 
 func TestMultipleCommands_Docker(t *testing.T) {
 	t.Parallel()
+	requireLinuxContainerRuntime(t)
 
 	const testImage = "alpine:3"
 

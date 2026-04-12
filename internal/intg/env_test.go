@@ -4,6 +4,7 @@
 package intg_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmd"
@@ -110,8 +111,12 @@ steps:
 
 		th := test.Setup(t)
 		explicitDir := t.TempDir()
+		if resolved, err := filepath.EvalSymlinks(explicitDir); err == nil {
+			explicitDir = resolved
+		}
+		explicitDirForYAML := filepath.ToSlash(explicitDir)
 		dag := th.DAG(t, `
-working_dir: `+explicitDir+`
+working_dir: `+explicitDirForYAML+`
 steps:
   - name: check-pwd
     command: pwd
@@ -124,13 +129,13 @@ steps:
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
-
-		// PWD should be the explicit working_dir, not the work dir
-		// DAG_RUN_WORK_DIR should still be usable
 		dag.AssertOutputs(t, map[string]any{
-			"PWD_OUTPUT":     explicitDir,
 			"WORKDIR_OUTPUT": "from-workdir",
 		})
+
+		outputs := dag.ReadOutputs(t)
+		require.Contains(t, outputs, "pwdOutput")
+		require.Equal(t, canonicalTestPath(explicitDir), canonicalTestPath(outputs["pwdOutput"]))
 	})
 
 	t.Run("EnvReferencesParams", func(t *testing.T) {
