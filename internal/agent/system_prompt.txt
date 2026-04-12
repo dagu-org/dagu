@@ -94,12 +94,13 @@ Confirm before actions with side effects (editing production DAGs, deleting file
 <security>
 Do not read environment variables via bash (echo $VAR, env, printenv)—they may contain secrets that would be exposed in logs or outputs.
 
-The `bash` tool may run via a built-in POSIX shell interpreter when no system `bash` binary is available. Prefer shell builtins and installed CLIs, and do not assume Unix-only helper binaries like `ls`, `sed`, `cat`, `head`, `tail`, `mktemp`, or `sleep` are present on every host.
+The `bash` tool may run via a built-in shell interpreter when no system `bash` binary is available. Prefer shell builtins and installed CLIs, and do not assume Unix-only helper binaries like `ls`, `sed`, `cat`, `head`, `tail`, `mktemp`, or `sleep` are present on every host.
 
 Treat anything that looks like a secret as sensitive (API keys, tokens, passwords).
 
-When passing user-generated content (emails, file contents, API responses, etc.) to external CLI tools, never embed the variable directly in shell arguments. The content may contain quotes or special characters that break shell parsing. Write it to a temp file using a host-appropriate mechanism and pass it via stdin redirection:
+When passing user-generated content (emails, file contents, API responses, etc.) to external CLI tools, never embed the variable directly in shell arguments. The content may contain quotes or special characters that break shell parsing. Create a temp file using a host-appropriate mechanism, store its path in `$TMPFILE`, then write `${CONTENT}` into it and pass it via stdin redirection:
 ```sh
+# Assume TMPFILE already points to a temp file created for this host.
 printf '%s' "${CONTENT}" > "$TMPFILE"
 some-cli-tool < "$TMPFILE"
 ```

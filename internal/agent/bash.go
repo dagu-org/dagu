@@ -37,6 +37,12 @@ const (
 
 type bashPathFinder func() (string, bool)
 
+type cappedWriter struct {
+	limit     int
+	buf       bytes.Buffer
+	truncated bool
+}
+
 type commandRunResult struct {
 	stdout string
 	stderr string
@@ -136,14 +142,15 @@ func findBashPath() (string, bool) {
 }
 
 func executeWithBash(ctx context.Context, bashPath, command, workDir string) commandRunResult {
-	var stdout, stderr bytes.Buffer
+	stdout := newCappedWriter(maxOutputLength)
+	stderr := newCappedWriter(maxOutputLength)
 
 	cmd := exec.Command(bashPath, "-c", command) //nolint:gosec // command is intentionally interpreted by the configured shell tool
 	if workDir != "" {
 		cmd.Dir = workDir
 	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	cmdutil.SetupCommand(cmd)
 
 	if err := cmd.Start(); err != nil {
@@ -189,7 +196,8 @@ func executeWithBash(ctx context.Context, bashPath, command, workDir string) com
 }
 
 func executeWithInterpreter(ctx context.Context, command, workDir string) commandRunResult {
-	var stdout, stderr bytes.Buffer
+	stdout := newCappedWriter(maxOutputLength)
+	stderr := newCappedWriter(maxOutputLength)
 
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(bytes.NewBufferString(command), "")
 	if err != nil {
@@ -200,7 +208,7 @@ func executeWithInterpreter(ctx context.Context, command, workDir string) comman
 
 	opts := []interp.RunnerOption{
 		interp.Env(nil),
-		interp.StdIO(nil, &stdout, &stderr),
+		interp.StdIO(nil, stdout, stderr),
 	}
 	if workDir != "" {
 		opts = append(opts, interp.Dir(workDir))
@@ -219,6 +227,52 @@ func executeWithInterpreter(ctx context.Context, command, workDir string) comman
 		stderr: stderr.String(),
 		err:    err,
 	}
+}
+
+func newCappedWriter(limit int) *cappedWriter {
+	return &cappedWriter{limit: limit}
+}
+
+func (w *cappedWriter) Write(p []byte) (int, error) {
+	if w.limit <= 0 {
+		if len(p) > 0 {
+			w.truncated = true
+		}
+		return len(p), nil
+	}
+	if w.truncated {
+		return len(p), nil
+	}
+
+	remaining := w.limit - w.buf.Len()
+	if remaining <= 0 {
+		w.truncated = true
+		return len(p), nil
+	}
+	if len(p) > remaining {
+		_, _ = w.buf.Write(p[:remaining])
+		w.truncated = true
+		return len(p), nil
+	}
+
+	_, _ = w.buf.Write(p)
+	return len(p), nil
+}
+
+func (w *cappedWriter) String() string {
+	if !w.truncated {
+		return w.buf.String()
+	}
+	if w.limit <= len(outputTruncationMarker) {
+		return outputTruncationMarker[:w.limit]
+	}
+
+	s := w.buf.String()
+	keep := w.limit - len(outputTruncationMarker)
+	if keep > len(s) {
+		keep = len(s)
+	}
+	return s[:keep] + outputTruncationMarker
 }
 
 func buildCommandError(err error, output string, timeout time.Duration, parentCtx context.Context) ToolOut {
@@ -264,7 +318,9 @@ func buildOutput(stdout, stderr string) string {
 
 func truncateOutput(s string) string {
 	if len(s) > maxOutputLength {
-		return s[:maxOutputLength] + "\n... [output truncated]"
+		return s[:maxOutputLength] + outputTruncationMarker
 	}
 	return s
 }
+
+const outputTruncationMarker = "\n... [output truncated]"

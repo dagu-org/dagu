@@ -6,8 +6,10 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +21,21 @@ import (
 
 func backgroundCtx() ToolContext {
 	return ToolContext{Context: context.Background()}
+}
+
+func createPathHelper(tb testing.TB, dir string) string {
+	tb.Helper()
+
+	name := "path-helper"
+	path := filepath.Join(dir, name)
+	content := "#!/bin/sh\nprintf 'path-helper-marker\\n'\n"
+	if runtime.GOOS == "windows" {
+		path += ".cmd"
+		content = "@echo off\r\necho path-helper-marker\r\n"
+	}
+
+	require.NoError(tb, os.WriteFile(path, []byte(content), 0o700))
+	return name
 }
 
 func noBashPath() (string, bool) {
@@ -300,6 +317,19 @@ func TestExecuteCommand_InterpreterFallback(t *testing.T) {
 		assert.Contains(t, result.Content, "yes")
 	})
 
+	t.Run("runs PATH-installed executables", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		helper := createPathHelper(t, dir)
+		command := fmt.Sprintf("PATH=%q; %s", dir+string(os.PathListSeparator)+"$PATH", helper)
+
+		result := runCommandWithFinder(t, context.Background(), "", command, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "path-helper-marker")
+	})
+
 	t.Run("reports parse errors", func(t *testing.T) {
 		t.Parallel()
 
@@ -521,5 +551,31 @@ func TestTruncateOutput(t *testing.T) {
 		result := truncateOutput(exactString)
 
 		assert.Equal(t, exactString, result)
+	})
+}
+
+func TestCappedWriter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("preserves short output", func(t *testing.T) {
+		t.Parallel()
+
+		writer := newCappedWriter(16)
+		n, err := writer.Write([]byte("short"))
+
+		require.NoError(t, err)
+		assert.Equal(t, 5, n)
+		assert.Equal(t, "short", writer.String())
+	})
+
+	t.Run("caps long output and appends marker", func(t *testing.T) {
+		t.Parallel()
+
+		writer := newCappedWriter(len(outputTruncationMarker) + 5)
+		n, err := writer.Write([]byte(strings.Repeat("x", len(outputTruncationMarker)+10)))
+
+		require.NoError(t, err)
+		assert.Equal(t, len(outputTruncationMarker)+10, n)
+		assert.Equal(t, strings.Repeat("x", 5)+outputTruncationMarker, writer.String())
 	})
 }
