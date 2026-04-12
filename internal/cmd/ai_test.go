@@ -578,7 +578,7 @@ func TestTildefy(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		homeDir = `C:\Users\user`
 		expectedHome = `~\.claude\skills\dagu\SKILL.md`
-		otherPath = `C:\other\path`
+		otherPath = `C:\sample\path`
 	}
 
 	assert.Equal(t, expectedHome, tildefy(filepath.Join(homeDir, ".claude", "skills", "dagu", "SKILL.md"), homeDir))
