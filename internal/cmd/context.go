@@ -943,8 +943,22 @@ func (c *Context) RecordEarlyFailure(dag *core.DAG, dagRunID string, err error) 
 
 	// 3. Construct the "Failed" status
 	statusBuilder := transform.NewStatusBuilder(dag)
-	logPath, _ := c.GenLogFileName(dag, dagRunID)
-	artifactDir, _ := c.GenArtifactDir(dag, dagRunID)
+	logPath, logPathErr := c.GenLogFileName(dag, dagRunID)
+	if logPathErr != nil {
+		logger.Warn(c, "Failed to generate log file path for early failure status",
+			tag.Error(logPathErr),
+			tag.DAG(dag.Name),
+			tag.RunID(dagRunID),
+		)
+	}
+	artifactDir, artifactDirErr := c.GenArtifactDir(dag, dagRunID)
+	if artifactDirErr != nil {
+		logger.Warn(c, "Failed to generate artifact directory for early failure status",
+			tag.Error(artifactDirErr),
+			tag.DAG(dag.Name),
+			tag.RunID(dagRunID),
+		)
+	}
 	status := statusBuilder.Create(dagRunID, core.Failed, 0, time.Now(),
 		transform.WithLogFilePath(logPath),
 		transform.WithArchiveDir(artifactDir),

@@ -39,6 +39,13 @@ func (h *artifactHandler) handleStream(stream coordinatorv1.CoordinatorService_S
 	ctx := stream.Context()
 	var chunksReceived uint64
 	var bytesWritten uint64
+	activeKeys := make(map[string]struct{})
+
+	defer func() {
+		for key := range activeKeys {
+			h.closeWriterByKey(ctx, key)
+		}
+	}()
 
 	for {
 		chunk, err := stream.Recv()
@@ -53,6 +60,7 @@ func (h *artifactHandler) handleStream(stream coordinatorv1.CoordinatorService_S
 		}
 
 		chunksReceived++
+		key := h.streamKey(chunk)
 
 		if h.ownerID != "" && chunk.OwnerCoordinatorId != h.ownerID {
 			return status.Error(codes.FailedPrecondition, "artifact chunk sent to non-owner coordinator")
@@ -62,7 +70,8 @@ func (h *artifactHandler) handleStream(stream coordinatorv1.CoordinatorService_S
 			if _, err := h.getOrCreateWriter(ctx, chunk); err != nil {
 				return fmt.Errorf("failed to create artifact writer: %w", err)
 			}
-			h.closeWriter(ctx, chunk)
+			h.closeWriterByKey(ctx, key)
+			delete(activeKeys, key)
 			continue
 		}
 		if len(chunk.Data) == 0 {
@@ -73,6 +82,7 @@ func (h *artifactHandler) handleStream(stream coordinatorv1.CoordinatorService_S
 		if err != nil {
 			return fmt.Errorf("failed to create artifact writer: %w", err)
 		}
+		activeKeys[key] = struct{}{}
 
 		n, err := writer.write(chunk.Data)
 		if err != nil {
@@ -97,11 +107,15 @@ func (h *artifactHandler) getOrCreateWriter(ctx context.Context, chunk *coordina
 	key := h.streamKey(chunk)
 
 	h.writersMu.Lock()
-	defer h.writersMu.Unlock()
-
 	if w, ok := h.writers[key]; ok {
+		h.writersMu.Unlock()
+		if _, err := h.archiveDir(ctx, chunk); err != nil {
+			h.closeWriterByKey(ctx, key)
+			return nil, err
+		}
 		return w, nil
 	}
+	h.writersMu.Unlock()
 
 	filePath, err := h.artifactFilePath(ctx, chunk)
 	if err != nil {
@@ -120,6 +134,19 @@ func (h *artifactHandler) getOrCreateWriter(ctx context.Context, chunk *coordina
 		file:   file,
 		writer: bufio.NewWriterSize(file, 64*1024),
 		path:   filePath,
+	}
+
+	h.writersMu.Lock()
+	defer h.writersMu.Unlock()
+
+	if existing, ok := h.writers[key]; ok {
+		w.close(ctx)
+		if _, err := h.archiveDir(ctx, chunk); err != nil {
+			delete(h.writers, key)
+			existing.close(ctx)
+			return nil, err
+		}
+		return existing, nil
 	}
 	h.writers[key] = w
 	return w, nil
@@ -172,8 +199,10 @@ func (h *artifactHandler) archiveDir(ctx context.Context, chunk *coordinatorv1.A
 }
 
 func (h *artifactHandler) closeWriter(ctx context.Context, chunk *coordinatorv1.ArtifactChunk) {
-	key := h.streamKey(chunk)
+	h.closeWriterByKey(ctx, h.streamKey(chunk))
+}
 
+func (h *artifactHandler) closeWriterByKey(ctx context.Context, key string) {
 	h.writersMu.Lock()
 	defer h.writersMu.Unlock()
 

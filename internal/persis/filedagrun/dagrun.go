@@ -80,15 +80,20 @@ type DAGRunSummary struct {
 
 // DAGRun represents a dag-run with its associated timestamp and run ID.
 type DAGRun struct {
-	baseDir   string         // Base directory path for this run
-	timestamp time.Time      // Timestamp when the run was created
-	dagRunID  string         // Unique identifier for the dag-run
-	summary   *DAGRunSummary // Optional pre-loaded summary from index
+	baseDir     string         // Base directory path for this run
+	artifactDir string         // Trusted root for artifact cleanup
+	timestamp   time.Time      // Timestamp when the run was created
+	dagRunID    string         // Unique identifier for the dag-run
+	summary     *DAGRunSummary // Optional pre-loaded summary from index
 }
 
 // NewDAGRun creates a new Run instance from a directory path.
 // It parses the directory name to extract the timestamp and dag-run ID.
 func NewDAGRun(dir string) (*DAGRun, error) {
+	return newDAGRun(dir, "")
+}
+
+func newDAGRun(dir, artifactDir string) (*DAGRun, error) {
 	// Determine if the run is a sub dag-run or a regular dag-run.
 	parentDir := filepath.Dir(dir)
 	if filepath.Base(parentDir) == SubDAGRunsDir {
@@ -97,8 +102,9 @@ func NewDAGRun(dir string) (*DAGRun, error) {
 			return nil, ErrInvalidDAGRunsDir
 		}
 		return &DAGRun{
-			baseDir:  dir,
-			dagRunID: matches[1],
+			baseDir:     dir,
+			artifactDir: artifactDir,
+			dagRunID:    matches[1],
 		}, nil
 	}
 
@@ -111,9 +117,10 @@ func NewDAGRun(dir string) (*DAGRun, error) {
 		return nil, err
 	}
 	return &DAGRun{
-		baseDir:   dir,
-		timestamp: ts,
-		dagRunID:  matches[2],
+		baseDir:     dir,
+		artifactDir: artifactDir,
+		timestamp:   ts,
+		dagRunID:    matches[2],
 	}, nil
 }
 
@@ -147,7 +154,7 @@ func (dr DAGRun) CreateSubDAGRun(_ context.Context, dagRunID string) (*DAGRun, e
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create sub dag-run directory: %w", err)
 	}
-	return NewDAGRun(dir)
+	return newDAGRun(dir, dr.artifactDir)
 }
 
 // FindSubDAGRun searches for a sub dag-run by its run ID.
@@ -164,7 +171,7 @@ func (dr DAGRun) FindSubDAGRun(_ context.Context, dagRunID string) (*DAGRun, err
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i] > matches[j]
 	})
-	return NewDAGRun(matches[0])
+	return newDAGRun(matches[0], dr.artifactDir)
 }
 
 func (dr DAGRun) ListSubDAGRuns(ctx context.Context) ([]*DAGRun, error) {
@@ -188,7 +195,7 @@ func (dr DAGRun) ListSubDAGRuns(ctx context.Context) ([]*DAGRun, error) {
 			continue
 		}
 
-		subDAGRun, err := NewDAGRun(filepath.Join(subDir, entry.Name()))
+		subDAGRun, err := newDAGRun(filepath.Join(subDir, entry.Name()), dr.artifactDir)
 		if err != nil {
 			logger.Error(ctx, "Failed to read sub dag-run data",
 				tag.Error(err),
@@ -306,14 +313,22 @@ func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 		parentDirs[filepath.Dir(file)] = struct{}{}
 	}
 	for dir := range uniqueArtifactDirs {
-		if err := os.RemoveAll(dir); err != nil {
+		validDir, ok := dr.validatedArtifactDir(dir)
+		if !ok {
+			logger.Warn(ctx, "Skipping artifact directory outside trusted artifact root",
+				tag.Dir(dir),
+				tag.RunID(dr.dagRunID),
+			)
+			continue
+		}
+		if err := os.RemoveAll(validDir); err != nil {
 			logger.Error(ctx, "Failed to remove artifact directory",
 				tag.Error(err),
 				tag.RunID(dr.dagRunID),
-				tag.Dir(dir))
+				tag.Dir(validDir))
 			continue
 		}
-		parentDirs[filepath.Dir(dir)] = struct{}{}
+		parentDirs[filepath.Dir(validDir)] = struct{}{}
 	}
 
 	// Remove parent dirs if they are empty.
@@ -433,10 +448,39 @@ func (dr DAGRun) listArtifactDirs(ctx context.Context) ([]string, error) {
 				tag.AttemptID(attempt.ID()))
 			continue
 		}
-		artifactDirs = append(artifactDirs, status.ArchiveDir)
+		if validDir, ok := dr.validatedArtifactDir(status.ArchiveDir); ok {
+			artifactDirs = append(artifactDirs, validDir)
+		} else if status.ArchiveDir != "" {
+			logger.Warn(ctx, "Skipping persisted artifact directory outside trusted artifact root",
+				tag.Dir(status.ArchiveDir),
+				tag.RunID(dr.dagRunID),
+				tag.AttemptID(attempt.ID()),
+			)
+		}
 	}
 
 	return artifactDirs, nil
+}
+
+func (dr DAGRun) validatedArtifactDir(dir string) (string, bool) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" || dr.artifactDir == "" {
+		return "", false
+	}
+
+	cleanDir, err := filepath.Abs(filepath.Clean(dir))
+	if err != nil {
+		return "", false
+	}
+	cleanRoot, err := filepath.Abs(filepath.Clean(dr.artifactDir))
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(cleanRoot, cleanDir)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return cleanDir, true
 }
 
 // Regular expressions for parsing directory names

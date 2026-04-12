@@ -22,10 +22,14 @@ type mockStreamArtifactsServer struct {
 	idx      int
 	response *coordinatorv1.StreamArtifactsResponse
 	ctx      context.Context
+	recvErr  error
 }
 
 func (m *mockStreamArtifactsServer) Recv() (*coordinatorv1.ArtifactChunk, error) {
 	if m.idx >= len(m.chunks) {
+		if m.recvErr != nil {
+			return nil, m.recvErr
+		}
 		return nil, io.EOF
 	}
 	chunk := m.chunks[m.idx]
@@ -114,4 +118,70 @@ func TestArtifactHandlerHandleStreamRejectsMismatchedAttempt(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(archiveDir, "artifact.txt"))
 	require.Error(t, statErr)
 	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestArtifactHandlerHandleStreamClosesWritersOnRecvError(t *testing.T) {
+	t.Parallel()
+
+	store := newMockDAGRunStore()
+	archiveDir := t.TempDir()
+	store.addAttempt(exec.DAGRunRef{Name: "test-dag", ID: "run-123"}, &exec.DAGRunStatus{
+		Name:       "test-dag",
+		DAGRunID:   "run-123",
+		AttemptID:  "attempt-1",
+		ArchiveDir: archiveDir,
+	})
+
+	handler := newArtifactHandler(store, "")
+	stream := &mockStreamArtifactsServer{
+		ctx:     context.Background(),
+		recvErr: io.ErrUnexpectedEOF,
+		chunks: []*coordinatorv1.ArtifactChunk{
+			{
+				DagName:      "test-dag",
+				DagRunId:     "run-123",
+				AttemptId:    "attempt-1",
+				RelativePath: "artifact.txt",
+				Data:         []byte("hello"),
+			},
+		},
+	}
+
+	err := handler.handleStream(stream)
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	assert.Empty(t, handler.writers)
+}
+
+func TestArtifactHandlerGetOrCreateWriterRevalidatesCachedAttempt(t *testing.T) {
+	t.Parallel()
+
+	store := newMockDAGRunStore()
+	archiveDir := t.TempDir()
+	attempt := store.addAttempt(exec.DAGRunRef{Name: "test-dag", ID: "run-123"}, &exec.DAGRunStatus{
+		Name:       "test-dag",
+		DAGRunID:   "run-123",
+		AttemptID:  "attempt-1",
+		ArchiveDir: archiveDir,
+	})
+
+	handler := newArtifactHandler(store, "")
+	chunk := &coordinatorv1.ArtifactChunk{
+		DagName:      "test-dag",
+		DagRunId:     "run-123",
+		AttemptId:    "attempt-1",
+		RelativePath: "artifact.txt",
+	}
+
+	_, err := handler.getOrCreateWriter(context.Background(), chunk)
+	require.NoError(t, err)
+	require.Len(t, handler.writers, 1)
+
+	attempt.mu.Lock()
+	attempt.status.AttemptID = "attempt-2"
+	attempt.mu.Unlock()
+
+	_, err = handler.getOrCreateWriter(context.Background(), chunk)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match latest attempt")
+	assert.Empty(t, handler.writers)
 }

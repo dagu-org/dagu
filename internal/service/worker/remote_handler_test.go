@@ -1881,6 +1881,7 @@ steps:
 	}
 
 	var reported []exec.DAGRunStatus
+	var reportedMu sync.Mutex
 	client := newMockRemoteCoordinatorClient()
 	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
 		return stream, nil
@@ -1888,7 +1889,9 @@ steps:
 	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 		status, err := convert.ProtoToDAGRunStatus(req.Status)
 		require.NoError(t, err)
+		reportedMu.Lock()
 		reported = append(reported, *status)
+		reportedMu.Unlock()
 		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 	}
 
@@ -1911,9 +1914,11 @@ steps:
 	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "upload artifacts")
+	reportedMu.Lock()
 	require.NotEmpty(t, reported)
 
 	final := reported[len(reported)-1]
+	reportedMu.Unlock()
 	assert.Equal(t, core.Failed, final.Status)
 	assert.Contains(t, final.Error, "failed to upload artifacts")
 }
@@ -1940,6 +1945,7 @@ steps:
 	}
 
 	var reported []exec.DAGRunStatus
+	var reportedMu sync.Mutex
 	client := newMockRemoteCoordinatorClient()
 	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
 		return stream, nil
@@ -1947,7 +1953,9 @@ steps:
 	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 		status, err := convert.ProtoToDAGRunStatus(req.Status)
 		require.NoError(t, err)
+		reportedMu.Lock()
 		reported = append(reported, *status)
+		reportedMu.Unlock()
 		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 	}
 
@@ -1970,9 +1978,11 @@ steps:
 	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "upload artifacts")
+	reportedMu.Lock()
 	require.NotEmpty(t, reported)
 
 	final := reported[len(reported)-1]
+	reportedMu.Unlock()
 	assert.Equal(t, core.Failed, final.Status)
 	assert.Contains(t, final.Error, "failed to upload artifacts")
 }

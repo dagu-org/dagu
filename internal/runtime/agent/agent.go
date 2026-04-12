@@ -799,10 +799,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	// If the DAG is already finished, skip it.
 	go execWithRecovery(ctx, func() {
 		time.Sleep(waitForRunning)
-		if a.finished.Load() {
+		status := a.Status(ctx)
+		if a.finished.Load() || a.shouldDelayTerminalStatus(status.Status) {
 			return
 		}
-		a.writeStatus(ctx, attempt, a.Status(ctx))
+		a.writeStatus(ctx, attempt, status)
 	})
 
 	// Start the dag-run.
@@ -849,7 +850,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	finishedStatus := a.Status(ctx)
 
 	if a.artifactFinalizer != nil && a.artifactDir != "" {
-		if err := a.artifactFinalizer.Finalize(ctx, finishedStatus.AttemptID, a.artifactDir); err != nil {
+		finalizeCtx, cancelFinalize := context.WithTimeout(context.WithoutCancel(ctx), artifactFinalizeTimeout)
+		defer cancelFinalize()
+		if err := a.artifactFinalizer.Finalize(finalizeCtx, finishedStatus.AttemptID, a.artifactDir); err != nil {
 			uploadErr := fmt.Errorf("upload artifacts: %w", err)
 			if finishedStatus.Status.IsSuccess() {
 				finishedStatus.Status = core.Failed
@@ -1271,6 +1274,7 @@ func (a *Agent) Signal(ctx context.Context, sig os.Signal) {
 
 // wait before read the running status
 const waitForRunning = time.Millisecond * 100
+const artifactFinalizeTimeout = 30 * time.Second
 
 // Simple regular expressions for request routing
 var (

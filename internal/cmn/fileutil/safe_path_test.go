@@ -36,7 +36,9 @@ func TestResolveExistingPathWithinBaseRejectsSymlinkEscape(t *testing.T) {
 	require.NoError(t, os.WriteFile(outsidePath, []byte("secret"), 0o600))
 
 	linkPath := filepath.Join(baseDir, "link.txt")
-	require.NoError(t, os.Symlink(outsidePath, linkPath))
+	if err := os.Symlink(outsidePath, linkPath); err != nil {
+		t.Skipf("skipping symlink test: %v", err)
+	}
 
 	_, err := ResolveExistingPathWithinBase(baseDir, "link.txt")
 	require.Error(t, err)
@@ -51,7 +53,9 @@ func TestResolveExistingPathWithinBaseAllowsSafeSymlink(t *testing.T) {
 	require.NoError(t, os.WriteFile(targetPath, []byte("ok"), 0o600))
 
 	linkPath := filepath.Join(baseDir, "link.txt")
-	require.NoError(t, os.Symlink(targetPath, linkPath))
+	if err := os.Symlink(targetPath, linkPath); err != nil {
+		t.Skipf("skipping symlink test: %v", err)
+	}
 
 	resolved, err := ResolveExistingPathWithinBase(baseDir, "link.txt")
 	require.NoError(t, err)
@@ -68,4 +72,12 @@ func TestResolveExistingPathWithinBasePropagatesMissingFile(t *testing.T) {
 	_, err := ResolveExistingPathWithinBase(baseDir, "missing.txt")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, os.ErrNotExist))
+}
+
+func TestResolvePathWithinBaseAllowsRootBase(t *testing.T) {
+	t.Parallel()
+
+	resolved, err := ResolvePathWithinBase(string(filepath.Separator), filepath.Join("tmp", "artifact.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(string(filepath.Separator), "tmp", "artifact.txt"), resolved)
 }

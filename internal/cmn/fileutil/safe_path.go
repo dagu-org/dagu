@@ -75,7 +75,13 @@ func ResolveExistingPathWithinBase(baseDir, relPath string) (string, error) {
 }
 
 func pathWithinBase(path, base string) bool {
-	return path == base || strings.HasPrefix(path, base+string(filepath.Separator))
+	cleanPath := filepath.Clean(path)
+	cleanBase := filepath.Clean(base)
+	rel, err := filepath.Rel(cleanBase, cleanPath)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
 // IsSymlinkDirEntry reports whether the entry itself is a symbolic link.

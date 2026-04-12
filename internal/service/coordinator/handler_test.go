@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/persis/filedagrun"
@@ -349,6 +350,75 @@ func TestTransformArtifactPathsCreatesDirectory(t *testing.T) {
 	info, statErr := os.Stat(incoming.ArchiveDir)
 	require.NoError(t, statErr)
 	assert.True(t, info.IsDir())
+}
+
+func TestTransformArtifactPathsSanitizesDAGName(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	handler := &Handler{artifactDir: baseDir}
+	attempt := &mockDAGRunAttempt{
+		dag: &core.DAG{
+			Name: "../weird/..-dag--name",
+			Artifacts: &core.ArtifactsConfig{
+				Enabled: true,
+			},
+		},
+	}
+	incoming := &exec.DAGRunStatus{
+		DAGRunID:   "run-123",
+		ArchiveDir: "/tmp/worker/dag-run_20260412_000000Z_run-123",
+	}
+
+	err := handler.transformArtifactPaths(context.Background(), attempt, nil, incoming)
+	require.NoError(t, err)
+
+	expected := filepath.Join(baseDir, fileutil.SafeName(attempt.dag.Name), "dag-run_20260412_000000Z_run-123")
+	assert.Equal(t, expected, incoming.ArchiveDir)
+
+	info, statErr := os.Stat(incoming.ArchiveDir)
+	require.NoError(t, statErr)
+	assert.True(t, info.IsDir())
+}
+
+func TestTransformArtifactPathsPreservesLatestArchiveDir(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	existingArchiveDir := filepath.Join(baseDir, "test-dag", "dag-run_20260412_000000Z_run-123")
+	handler := &Handler{artifactDir: baseDir}
+	incoming := &exec.DAGRunStatus{DAGRunID: "run-123"}
+	latestStatus := &exec.DAGRunStatus{ArchiveDir: existingArchiveDir}
+
+	err := handler.transformArtifactPaths(context.Background(), nil, latestStatus, incoming)
+	require.NoError(t, err)
+	assert.Equal(t, existingArchiveDir, incoming.ArchiveDir)
+
+	info, statErr := os.Stat(existingArchiveDir)
+	require.NoError(t, statErr)
+	assert.True(t, info.IsDir())
+}
+
+func TestTransformArtifactPathsRejectsEmptyExpandedBaseDir(t *testing.T) {
+	t.Setenv("EMPTY_ARTIFACT_DIR", "")
+
+	handler := &Handler{artifactDir: t.TempDir()}
+	attempt := &mockDAGRunAttempt{
+		dag: &core.DAG{
+			Name: "test-dag",
+			Artifacts: &core.ArtifactsConfig{
+				Enabled: true,
+				Dir:     "${EMPTY_ARTIFACT_DIR}",
+			},
+		},
+	}
+	incoming := &exec.DAGRunStatus{
+		DAGRunID:   "run-123",
+		ArchiveDir: "/tmp/worker/dag-run_20260412_000000Z_run-123",
+	}
+
+	err := handler.transformArtifactPaths(context.Background(), attempt, nil, incoming)
+	require.EqualError(t, err, "artifact directory is empty after expansion")
 }
 
 // Thread-safe getters for test assertions

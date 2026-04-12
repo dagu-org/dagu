@@ -72,10 +72,7 @@ func EnqueueCatchupRun(
 	}
 	artifactDir := ""
 	if dagCopy.ArtifactsEnabled() {
-		dagArtifactDir := ""
-		if dagCopy.Artifacts != nil {
-			dagArtifactDir = dagCopy.Artifacts.Dir
-		}
+		dagArtifactDir := dagCopy.Artifacts.Dir
 		artifactDir, err = logpath.GenerateDir(ctx, baseArtifactDir, dagArtifactDir, dagCopy.Name, runID)
 		if err != nil {
 			return fmt.Errorf("failed to generate catchup artifact directory: %w", err)

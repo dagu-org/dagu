@@ -90,8 +90,35 @@ func TestListArtifactTreeSkipsSymlinks(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(archiveDir, "inside.txt"), []byte("inside"), 0o600))
 	require.NoError(t, os.Symlink(outsidePath, filepath.Join(archiveDir, "link.txt")))
 
-	items, err := listArtifactTree(archiveDir)
+	items, err := listArtifactTree(archiveDir, true)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	assert.Equal(t, "inside.txt", items[0].Name)
+}
+
+func TestListArtifactTreeShallowLeavesDirectoryChildrenCollapsed(t *testing.T) {
+	t.Parallel()
+
+	archiveDir := t.TempDir()
+	nestedDir := filepath.Join(archiveDir, "reports")
+	require.NoError(t, os.MkdirAll(nestedDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(nestedDir, "summary.txt"), []byte("ok"), 0o600))
+
+	items, err := listArtifactTree(archiveDir, false)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, openapiv1.ArtifactNodeTypeDirectory, items[0].Type)
+	assert.Nil(t, items[0].Children)
+}
+
+func TestListArtifactTreeSortsCaseOnlyNameDifferencesDeterministically(t *testing.T) {
+	t.Parallel()
+
+	items := []openapiv1.ArtifactTreeNode{
+		{Name: "alpha.txt", Type: openapiv1.ArtifactNodeTypeFile},
+		{Name: "Alpha.txt", Type: openapiv1.ArtifactNodeTypeFile},
+	}
+
+	sortArtifactTreeNodes(items)
+	assert.Equal(t, []string{"Alpha.txt", "alpha.txt"}, []string{items[0].Name, items[1].Name})
 }

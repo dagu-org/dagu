@@ -165,6 +165,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
   const [treeError, setTreeError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [preview, setPreview] = useState<ArtifactPreviewResponse | null>(null);
+  const [previewVersion, setPreviewVersion] = useState(0);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -185,7 +186,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
             dagRunId: dagRun.rootDAGRunId!,
             subDAGRunId: dagRun.dagRunId,
           },
-          query: { remoteNode },
+          query: { remoteNode, recursive: true },
         },
       });
     }
@@ -196,7 +197,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
           name: dagRun.name,
           dagRunId: dagRun.dagRunId,
         },
-        query: { remoteNode },
+        query: { remoteNode, recursive: true },
       },
     });
   };
@@ -253,52 +254,62 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
   };
 
   const fetchTree = async () => {
-    if (!dagRun.archiveDir) {
+    if (!dagRun.artifactsAvailable) {
       setTree([]);
       setTreeError(null);
+      setPreview(null);
       return;
     }
 
     setTreeLoading(true);
     setTreeError(null);
+    try {
+      const request = await requestArtifactTree();
 
-    const request = await requestArtifactTree();
+      if (request.error) {
+        setTree([]);
+        setSelectedPath(null);
+        setPreview(null);
+        setTreeError(request.error.message || 'Failed to load artifacts');
+        return;
+      }
 
-    if (request.error) {
+      const items = request.data?.items ?? [];
+      const nextNodes = flattenNodes(items);
+      setTree(items);
+      setOpenDirs(new Set(collectDirectoryPaths(items)));
+
+      const firstFile = findFirstFile(items);
+      if (!firstFile) {
+        setSelectedPath(null);
+        setPreview(null);
+        return;
+      }
+
+      if (selectedPath && nextNodes.some((node) => node.path === selectedPath)) {
+        setPreview(null);
+        setPreviewVersion((current) => current + 1);
+        return;
+      }
+
+      setSelectedPath(firstFile.path);
+    } catch (error: unknown) {
       setTree([]);
-      setTreeError(request.error.message || 'Failed to load artifacts');
-      setTreeLoading(false);
-      return;
-    }
-
-    const items = request.data?.items ?? [];
-    const nextNodes = flattenNodes(items);
-    setTree(items);
-    setOpenDirs(new Set(collectDirectoryPaths(items)));
-    setTreeLoading(false);
-
-    const firstFile = findFirstFile(items);
-    if (!firstFile) {
       setSelectedPath(null);
       setPreview(null);
-      return;
+      setTreeError(error instanceof Error ? error.message : 'Failed to load artifacts');
+    } finally {
+      setTreeLoading(false);
     }
-
-    setSelectedPath((current) => {
-      if (current && nextNodes.some((node) => node.path === current)) {
-        return current;
-      }
-      return firstFile.path;
-    });
   };
 
   useEffect(() => {
     void fetchTree();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dagRun.archiveDir, dagRun.dagRunId, dagRun.rootDAGRunId, remoteNode]);
+  }, [dagRun.artifactsAvailable, dagRun.dagRunId, dagRun.rootDAGRunId, remoteNode]);
 
   useEffect(() => {
-    if (!selectedPath || !dagRun.archiveDir) {
+    if (!selectedPath || !dagRun.artifactsAvailable) {
       setPreview(null);
       setPreviewError(null);
       return;
@@ -309,19 +320,33 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     setPreviewError(null);
 
     const loadPreview = async () => {
-      const request = await requestArtifactPreview(selectedPath);
+      try {
+        const request = await requestArtifactPreview(selectedPath);
 
-      if (cancelled) {
-        return;
-      }
+        if (cancelled) {
+          return;
+        }
 
-      if (request.error) {
-        setPreview(null);
-        setPreviewError(request.error.message || 'Failed to load artifact preview');
-      } else {
+        if (request.error) {
+          setPreview(null);
+          setPreviewError(request.error.message || 'Failed to load artifact preview');
+          return;
+        }
+
         setPreview(request.data ?? null);
+      } catch (error: unknown) {
+        if (cancelled) {
+          return;
+        }
+        setPreview(null);
+        setPreviewError(
+          error instanceof Error ? error.message : 'Failed to load artifact preview'
+        );
+      } finally {
+        if (!cancelled) {
+          setPreviewLoading(false);
+        }
       }
-      setPreviewLoading(false);
     };
 
     void loadPreview();
@@ -329,7 +354,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     return () => {
       cancelled = true;
     };
-  }, [client, dagRun.archiveDir, dagRun.dagRunId, dagRun.name, dagRun.rootDAGRunId, dagRun.rootDAGRunName, isSubDAGRun, remoteNode, selectedPath]);
+  }, [client, dagRun.artifactsAvailable, dagRun.dagRunId, dagRun.name, dagRun.rootDAGRunId, dagRun.rootDAGRunName, isSubDAGRun, previewVersion, remoteNode, selectedPath]);
 
   useEffect(() => {
     if (!preview || preview.kind !== 'image' || preview.tooLarge || !selectedPath) {
@@ -393,7 +418,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     URL.revokeObjectURL(objectUrl);
   };
 
-  if (!artifactEnabled && !dagRun.archiveDir) {
+  if (!artifactEnabled && !dagRun.artifactsAvailable) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
         Artifact storage is not enabled for this DAG run.
@@ -401,7 +426,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     );
   }
 
-  if (!dagRun.archiveDir) {
+  if (!dagRun.artifactsAvailable) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
         Artifacts will appear here after a run writes files into

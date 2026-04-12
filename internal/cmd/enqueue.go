@@ -97,15 +97,15 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType cor
 	if err != nil {
 		return fmt.Errorf("failed to generate log file name: %w", err)
 	}
-	artifactDir, err := ctx.GenArtifactDir(dag, dagRunID)
-	if err != nil {
-		return fmt.Errorf("failed to generate artifact directory: %w", err)
-	}
 
 	dagRun := exec.NewDAGRunRef(dag.Name, dagRunID)
 
 	if _, err = ctx.DAGRunStore.FindAttempt(ctx, dagRun); err == nil {
 		return fmt.Errorf("DAG %q with ID %q already exists", dag.Name, dagRunID)
+	}
+	artifactDir, err := ctx.GenArtifactDir(dag, dagRunID)
+	if err != nil {
+		return fmt.Errorf("failed to generate artifact directory: %w", err)
 	}
 
 	att, err := ctx.DAGRunStore.CreateAttempt(ctx.Context, dag, time.Now(), dagRunID, exec.NewDAGRunAttemptOptions{})

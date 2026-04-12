@@ -406,7 +406,7 @@ func TestDataRootRemoveOld(t *testing.T) {
 		oldTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		dagRun := root.CreateTestDAGRun(t, "artifact-run", exec.NewUTC(oldTime))
 
-		artifactDir := filepath.Join(t.TempDir(), "artifact-run")
+		artifactDir := filepath.Join(root.artifactDir, "artifact-run")
 		require.NoError(t, os.MkdirAll(artifactDir, 0o750))
 		require.NoError(t, os.WriteFile(filepath.Join(artifactDir, "report.md"), []byte("artifact"), 0o600))
 
@@ -610,7 +610,7 @@ func setupTestDataRoot(t *testing.T) *DataRootTest {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	root := NewDataRoot(tmpDir, "test-dag")
+	root := NewDataRootWithArtifactDir(tmpDir, "test-dag", filepath.Join(tmpDir, "artifacts"))
 	return &DataRootTest{DataRoot: root, TB: t, Context: context.Background()}
 }
 

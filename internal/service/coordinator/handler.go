@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -1456,12 +1457,15 @@ func (h *Handler) transformArtifactPaths(
 	latestStatus *exec.DAGRunStatus,
 	incoming *exec.DAGRunStatus,
 ) error {
-	if h.artifactDir == "" || incoming == nil || incoming.ArchiveDir == "" {
+	if h.artifactDir == "" || incoming == nil {
 		return nil
 	}
 	if latestStatus != nil && latestStatus.ArchiveDir != "" {
 		incoming.ArchiveDir = latestStatus.ArchiveDir
 	} else {
+		if incoming.ArchiveDir == "" {
+			return nil
+		}
 		if attempt == nil {
 			return fmt.Errorf("dag run attempt is required to resolve artifact path")
 		}
@@ -1482,6 +1486,10 @@ func (h *Handler) transformArtifactPaths(
 		if err != nil {
 			return fmt.Errorf("expand artifact directory: %w", err)
 		}
+		baseDir = strings.TrimSpace(baseDir)
+		if baseDir == "" {
+			return fmt.Errorf("artifact directory is empty after expansion")
+		}
 
 		archiveName := filepath.Base(filepath.Clean(incoming.ArchiveDir))
 		if archiveName == "." || archiveName == string(filepath.Separator) || archiveName == "" {
@@ -1493,6 +1501,9 @@ func (h *Handler) transformArtifactPaths(
 			fileutil.SafeName(dag.Name),
 			archiveName,
 		)
+	}
+	if incoming.ArchiveDir == "" {
+		return nil
 	}
 	if err := os.MkdirAll(incoming.ArchiveDir, 0o750); err != nil {
 		return fmt.Errorf("create artifact directory: %w", err)

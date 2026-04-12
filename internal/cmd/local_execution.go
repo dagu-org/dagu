@@ -106,8 +106,22 @@ func recordPreparedAttemptFailure(
 		root = exec.NewDAGRunRef(dag.Name, dagRunID)
 	}
 
-	logPath, _ := ctx.GenLogFileName(dag, dagRunID)
-	artifactDir, _ := ctx.GenArtifactDir(dag, dagRunID)
+	logPath, logPathErr := ctx.GenLogFileName(dag, dagRunID)
+	if logPathErr != nil {
+		logger.Warn(ctx, "Failed to generate log file path for prepared local execution failure",
+			tag.Error(logPathErr),
+			tag.DAG(dag.Name),
+			tag.RunID(dagRunID),
+		)
+	}
+	artifactDir, artifactDirErr := ctx.GenArtifactDir(dag, dagRunID)
+	if artifactDirErr != nil {
+		logger.Warn(ctx, "Failed to generate artifact directory for prepared local execution failure",
+			tag.Error(artifactDirErr),
+			tag.DAG(dag.Name),
+			tag.RunID(dagRunID),
+		)
+	}
 	opts := []transform.StatusOption{
 		transform.WithAttemptID(attempt.ID()),
 		transform.WithHierarchyRefs(root, parent),

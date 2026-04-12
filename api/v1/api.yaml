@@ -2009,6 +2009,7 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/ArtifactRecursive"
       responses:
         "200":
           description: "A successful response"
@@ -2257,6 +2258,7 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/ArtifactRecursive"
       responses:
         "200":
           description: "Artifact tree retrieved successfully"
@@ -2905,6 +2907,7 @@ paths:
           schema:
             type: "string"
           description: "ID of the sub DAG-run to retrieve artifacts for"
+        - $ref: "#/components/parameters/ArtifactRecursive"
       responses:
         "200":
           description: "Artifact tree retrieved successfully"
@@ -6751,11 +6754,24 @@ components:
     ArtifactPath:
       name: path
       in: query
-      description: "Relative artifact file path within the DAG-run artifact directory"
+      description: "Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'."
       required: true
       schema:
-        type: string
-        minLength: 1
+        allOf:
+          - type: string
+            minLength: 1
+            pattern: "^[^/].*$"
+          - not:
+              pattern: "(^|/)\\.\\.(/|$)"
+
+    ArtifactRecursive:
+      name: recursive
+      in: query
+      description: "Whether to recursively expand nested artifact directories"
+      required: false
+      schema:
+        type: boolean
+        default: false
 
     RemoteNode:
       name: remoteNode
@@ -8210,9 +8226,9 @@ components:
             log:
               type: string
               description: "Path to the log file"
-            archiveDir:
-              type: string
-              description: "Path to the artifact directory for this DAG-run"
+            artifactsAvailable:
+              type: boolean
+              description: "Whether artifact endpoints are available for this DAG-run"
             nodes:
               type: array
               description: "Status of individual steps within the DAG-run"
@@ -8241,6 +8257,7 @@ components:
             - rootDAGRunName
             - rootDAGRunId
             - log
+            - artifactsAvailable
             - nodes
 
     ArtifactNodeType:

@@ -144,7 +144,7 @@ func TestJSONDB(t *testing.T) {
 		th := setupTestStore(t)
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		artifactRoot := t.TempDir()
+		artifactRoot := filepath.Join(th.TmpDir, "artifacts")
 		parentArtifactDir := filepath.Join(artifactRoot, "parent-artifacts")
 		subArtifactDir := filepath.Join(artifactRoot, "sub-artifacts")
 		require.NoError(t, os.MkdirAll(parentArtifactDir, 0o750))
@@ -188,6 +188,36 @@ func TestJSONDB(t *testing.T) {
 		assert.NoDirExists(t, parentArtifactDir)
 		assert.NoDirExists(t, subArtifactDir)
 
+		_, err = th.Store.FindAttempt(th.Context, rootRef)
+		assert.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
+	})
+	t.Run("RemoveDAGRunSkipsArtifactDirsOutsideTrustedRoot", func(t *testing.T) {
+		th := setupTestStore(t)
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		outsideArtifactDir := filepath.Join(t.TempDir(), "outside-artifacts")
+		require.NoError(t, os.MkdirAll(outsideArtifactDir, 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(outsideArtifactDir, "summary.md"), []byte("outside"), 0o600))
+
+		dag := th.DAG("test_DAG")
+		attempt, err := th.Store.CreateAttempt(th.Context, dag.DAG, ts, "outside-id", exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(th.Context))
+
+		status := exec.InitialStatus(dag.DAG)
+		status.DAGRunID = "outside-id"
+		status.Status = core.Succeeded
+		status.ArchiveDir = outsideArtifactDir
+		require.NoError(t, attempt.Write(th.Context, status))
+		require.NoError(t, attempt.Close(th.Context))
+
+		rootRef := exec.NewDAGRunRef("test_DAG", "outside-id")
+		require.DirExists(t, outsideArtifactDir)
+
+		err = th.Store.RemoveDAGRun(th.Context, rootRef)
+		require.NoError(t, err)
+
+		require.DirExists(t, outsideArtifactDir)
 		_, err = th.Store.FindAttempt(th.Context, rootRef)
 		assert.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
 	})

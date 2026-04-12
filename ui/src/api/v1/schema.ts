@@ -3376,8 +3376,8 @@ export interface components {
             parentDAGRunId?: components["schemas"]["DAGRunId"] & unknown;
             /** @description Path to the log file */
             log: string;
-            /** @description Path to the artifact directory for this DAG-run */
-            archiveDir?: string;
+            /** @description Whether artifact endpoints are available for this DAG-run */
+            artifactsAvailable: boolean;
             /** @description Status of individual steps within the DAG-run */
             nodes: components["schemas"]["Node"][];
             onExit?: components["schemas"]["Node"];
@@ -4809,8 +4809,10 @@ export interface components {
         DAGName: components["schemas"]["DAGName"];
         /** @description name of the step */
         StepName: string;
-        /** @description Relative artifact file path within the DAG-run artifact directory */
-        ArtifactPath: string;
+        /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
+        ArtifactPath: string & unknown;
+        /** @description Whether to recursively expand nested artifact directories */
+        ArtifactRecursive: boolean;
         /** @description name of the remote node */
         RemoteNode: string;
         /** @description Filter entries after this time (ISO 8601 format) */
@@ -7239,6 +7241,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Whether to recursively expand nested artifact directories */
+                recursive?: components["parameters"]["ArtifactRecursive"];
             };
             header?: never;
             path: {
@@ -7562,6 +7566,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Whether to recursively expand nested artifact directories */
+                recursive?: components["parameters"]["ArtifactRecursive"];
             };
             header?: never;
             path: {
@@ -7608,7 +7614,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;
@@ -7656,7 +7662,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;
@@ -8439,6 +8445,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Whether to recursively expand nested artifact directories */
+                recursive?: components["parameters"]["ArtifactRecursive"];
             };
             header?: never;
             path: {
@@ -8487,7 +8495,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;
@@ -8537,7 +8545,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Relative artifact file path within the DAG-run artifact directory */
+                /** @description Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or contain '..'. */
                 path: components["parameters"]["ArtifactPath"];
             };
             header?: never;

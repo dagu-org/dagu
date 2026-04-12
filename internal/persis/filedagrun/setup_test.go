@@ -28,7 +28,7 @@ func setupTestStore(t *testing.T) StoreTest {
 
 	th := StoreTest{
 		Context: context.Background(),
-		Store:   New(tmpDir),
+		Store:   New(tmpDir, WithArtifactDir(filepath.Join(tmpDir, "artifacts"))),
 		TmpDir:  tmpDir,
 	}
 

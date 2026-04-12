@@ -318,7 +318,7 @@ function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
     (node) => node.status === NodeStatus.Waiting
   ).length || 0;
   const hasWaitingSteps = waitingStepCount > 0;
-  const hasArtifacts = artifactEnabled || !!dagRun.archiveDir;
+  const hasArtifacts = artifactEnabled || !!dagRun.artifactsAvailable;
 
   // Reset to status tab if selected tab is not available
   useEffect(() => {
