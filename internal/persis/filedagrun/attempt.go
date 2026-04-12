@@ -247,6 +247,11 @@ func (att *Attempt) Close(ctx context.Context) error {
 	w := att.writer
 	att.writer = nil
 
+	// Close the writer before compaction so Windows can replace the file.
+	if closeErr := w.Close(ctx); closeErr != nil {
+		return fmt.Errorf("failed to close writer: %w", closeErr)
+	}
+
 	// Attempt to compact the file
 	if compactErr := att.compactLocked(ctx); compactErr != nil {
 		logger.Warn(ctx, "Failed to compact file during close",
@@ -257,11 +262,6 @@ func (att *Attempt) Close(ctx context.Context) error {
 	// Invalidate the cache
 	if att.cache != nil {
 		att.cache.Invalidate(att.file)
-	}
-
-	// Close the writer
-	if closeErr := w.Close(ctx); closeErr != nil {
-		return fmt.Errorf("failed to close writer: %w", closeErr)
 	}
 
 	return nil
@@ -281,7 +281,28 @@ func (att *Attempt) Compact(ctx context.Context) error {
 }
 
 // compactLocked performs actual compaction with the lock already held
-func (att *Attempt) compactLocked(ctx context.Context) error {
+func (att *Attempt) compactLocked(ctx context.Context) (retErr error) {
+	reopenWriter := att.writer
+	if reopenWriter != nil {
+		att.writer = nil
+		if err := reopenWriter.close(); err != nil {
+			att.writer = reopenWriter
+			return fmt.Errorf("failed to close writer before compaction: %w", err)
+		}
+		defer func() {
+			if err := reopenWriter.Open(); err != nil {
+				reopenErr := fmt.Errorf("failed to reopen writer after compaction: %w", err)
+				if retErr != nil {
+					retErr = errors.Join(retErr, reopenErr)
+					return
+				}
+				retErr = reopenErr
+				return
+			}
+			att.writer = reopenWriter
+		}()
+	}
+
 	status, err := att.parseLocked(ctx)
 	if err == io.EOF {
 		return nil // Empty file, nothing to compact

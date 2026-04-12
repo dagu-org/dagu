@@ -188,6 +188,33 @@ func TestAttempt_Compact(t *testing.T) {
 	assert.Equal(t, core.Succeeded, dagRunStatus.Status)
 }
 
+func TestAttempt_CompactReopensWriter(t *testing.T) {
+	dir := createTempDir(t)
+	file := filepath.Join(dir, "status.dat")
+
+	att, err := NewAttempt(file, nil)
+	require.NoError(t, err)
+	require.NoError(t, att.Open(context.Background()))
+
+	first := createTestStatus(core.Running)
+	require.NoError(t, att.Write(context.Background(), first))
+	require.NotNil(t, att.writer)
+	assert.True(t, att.writer.IsOpen())
+
+	require.NoError(t, att.Compact(context.Background()))
+	require.NotNil(t, att.writer)
+	assert.True(t, att.writer.IsOpen())
+
+	final := createTestStatus(core.Succeeded)
+	require.NoError(t, att.Write(context.Background(), final))
+
+	status, err := att.ReadStatus(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, core.Succeeded, status.Status)
+
+	require.NoError(t, att.Close(context.Background()))
+}
+
 func TestAttempt_Close(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
