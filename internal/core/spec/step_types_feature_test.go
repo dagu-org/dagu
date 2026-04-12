@@ -493,7 +493,7 @@ func TestCustomStepTypes_CallSiteOverridesTemplateAndComposesAdditiveFields(t *t
 		callSiteSignal = "SIGINT"
 	}
 
-	dag, err := LoadYAML(context.Background(), []byte(fmt.Sprintf(`
+	dag, err := LoadYAML(context.Background(), fmt.Appendf(nil, `
 name: custom-step-callsite-overrides-template
 defaults:
   continue_on: failed
@@ -560,7 +560,7 @@ steps:
       - CALL_ONLY: call-only
     preconditions:
       - condition: "test -x /call"
-`, callSiteSignal)))
+`, callSiteSignal))
 	require.NoError(t, err)
 	require.Len(t, dag.Steps, 1)
 
