@@ -411,10 +411,10 @@ func (f *testFixture) enqueueDirect() error {
 		return err
 	}
 
-	dagCopy := *f.dagWrapper.DAG
+	dagCopy := f.dagWrapper.DAG.Clone()
 	dagCopy.Location = ""
 
-	att, err := f.coord.DAGRunStore.CreateAttempt(f.coord.Context, &dagCopy, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	att, err := f.coord.DAGRunStore.CreateAttempt(f.coord.Context, dagCopy, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
 	if err != nil {
 		return err
 	}
@@ -424,7 +424,7 @@ func (f *testFixture) enqueueDirect() error {
 		return err
 	}
 
-	status := transform.NewStatusBuilder(&dagCopy).Create(
+	status := transform.NewStatusBuilder(dagCopy).Create(
 		runID,
 		core.Queued,
 		0,
