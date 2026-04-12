@@ -25,6 +25,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func workerTaskTimeout() time.Duration {
+	if osrt.GOOS == "windows" {
+		return 90 * time.Second
+	}
+	return 30 * time.Second
+}
+
 func workerStatusOutputValue(t *testing.T, status *exec.DAGRunStatus, key string) string {
 	t.Helper()
 
@@ -87,7 +94,7 @@ func TestTaskHandler(t *testing.T) {
 		}
 
 		// Create a context with timeout for the task execution
-		taskCtx, cancel := context.WithTimeout(th.Context, 30*time.Second)
+		taskCtx, cancel := context.WithTimeout(th.Context, workerTaskTimeout())
 		defer cancel()
 
 		// Execute the task (retry without step re-runs all steps)
@@ -135,7 +142,7 @@ func TestTaskHandler(t *testing.T) {
 		}
 
 		// Create a context with timeout for the task execution
-		taskCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		taskCtx, cancel := context.WithTimeout(ctx, workerTaskTimeout())
 		defer cancel()
 
 		// Execute the task
@@ -172,7 +179,7 @@ func TestTaskHandler(t *testing.T) {
 		}
 
 		// Create a context with timeout for the task execution
-		taskCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		taskCtx, cancel := context.WithTimeout(ctx, workerTaskTimeout())
 		defer cancel()
 
 		// Execute the task

@@ -786,7 +786,7 @@ func TestStepWorkingDir(t *testing.T) {
 	dag := th.DAG(t, `
 steps:
   - working_dir: `+stepWorkDir+`
-    command: pwd
+    command: `+test.PortablePwdCommand()+`
     output: STEP_DIR
 `)
 

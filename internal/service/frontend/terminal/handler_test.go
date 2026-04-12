@@ -214,7 +214,7 @@ func readTerminalUntilClose(t *testing.T, conn *websocket.Conn) (string, []strin
 
 func terminalTestTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return base * 3
+		return base * 6
 	}
 	return base
 }

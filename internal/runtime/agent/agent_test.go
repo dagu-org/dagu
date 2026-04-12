@@ -47,9 +47,9 @@ func TestAgent_Run(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `steps:
-  - "sleep 1"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableSleepCommand(time.Second)))
 		dagAgent := dag.Agent()
 
 		dag.AssertLatestStatus(t, core.NotStarted)
@@ -75,9 +75,9 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `steps:
-  - "sleep 1"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableSleepCommand(time.Second)))
 		dagAgent := dag.Agent()
 
 		// Create a history file by running a DAG
@@ -199,11 +199,11 @@ steps:
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
-		timeoutDAG := th.DAG(t, `timeout_sec: 2
+		timeoutDAG := th.DAG(t, fmt.Sprintf(`timeout_sec: 2
 steps:
-  - "sleep 1"
-  - "sleep 2"
-`)
+  - %q
+  - %q
+`, test.PortableSleepCommand(time.Second), test.PortableSleepCommand(2*time.Second)))
 		dagAgent := timeoutDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -212,9 +212,9 @@ steps:
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `steps:
-  - "sleep 3"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableSleepCommand(3*time.Second)))
 		dagAgent := dag.Agent()
 		done := make(chan struct{})
 
@@ -269,7 +269,7 @@ func TestAgent_WorkingDirExpansion(t *testing.T) {
 		dag := th.DAG(t, `working_dir: $TEST_WORK_DIR
 steps:
   - name: check-pwd
-    command: pwd
+    command: `+test.PortablePwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -294,7 +294,7 @@ steps:
 working_dir: $CUSTOM_DIR
 steps:
   - name: check-pwd
-    command: pwd
+    command: `+test.PortablePwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -311,7 +311,7 @@ steps:
 		dag := th.DAG(t, `working_dir: ~
 steps:
   - name: check-pwd
-    command: pwd
+    command: `+test.PortablePwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -532,9 +532,9 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, `steps:
-  - "sleep 10"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableSleepCommand(10*time.Second)))
 		dagAgent := dag.Agent()
 		ctx := th.Context
 		go func() {
@@ -566,9 +566,9 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, `steps:
-  - "sleep 10"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableSleepCommand(10*time.Second)))
 		dagAgent := dag.Agent()
 
 		go func() {
@@ -596,9 +596,9 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.DAG(t, `steps:
-  - "sleep 10"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableSleepCommand(10*time.Second)))
 		dagAgent := dag.Agent()
 
 		done := make(chan struct{})
@@ -778,25 +778,25 @@ func TestAgent_SubDAGRunVisibleWhileRunning(t *testing.T) {
 	th := test.Setup(t)
 
 	// Create a child DAG that sleeps long enough for the parent to be observed mid-run
-	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", []byte(`
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", []byte(fmt.Sprintf(`
 steps:
   - name: slow-step
-    command: "sleep 3"
-`))
+    command: %q
+`, test.PortableSleepCommand(3*time.Second))))
 
 	// The preceding step must run long enough for the one-shot 100ms status timer
 	// to fire (and exhaust itself) BEFORE run-child starts. This replicates the
 	// production scenario where the bug manifests.
-	parent := th.DAG(t, `
+	parent := th.DAG(t, fmt.Sprintf(`
 type: graph
 steps:
   - name: pre-step
-    command: "sleep 0.3"
+    command: %q
   - name: run-child
     call: child-slow
     depends:
       - pre-step
-`)
+`, test.PortableSleepCommand(300*time.Millisecond)))
 
 	a := parent.Agent()
 	runErr := make(chan error, 1)

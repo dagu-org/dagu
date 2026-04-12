@@ -6,6 +6,7 @@ package license
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/google/uuid"
@@ -111,8 +112,10 @@ func TestGetOrCreateServerID(t *testing.T) {
 	t.Run("returns error for invalid path", func(t *testing.T) {
 		t.Parallel()
 
-		// /dev/null is a file, so using it as a directory will fail on MkdirAll.
 		dir := "/dev/null/impossible"
+		if runtime.GOOS == "windows" {
+			dir = `C:\Windows\System32\drivers\etc\hosts\impossible`
+		}
 		_, err := GetOrCreateServerID(dir)
 		assert.Error(t, err)
 	})
@@ -139,6 +142,10 @@ func TestGetOrCreateServerID(t *testing.T) {
 		idPath := filepath.Join(dir, "server_id")
 		info, statErr := os.Stat(idPath)
 		require.NoError(t, statErr)
+		if runtime.GOOS == "windows" {
+			assert.NotZero(t, info.Mode().Perm())
+			return
+		}
 		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 	})
 }

@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +17,83 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func repeatCounterScript(counterFile string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(`
+$counterFile = %s
+$count = 0
+if (Test-Path $counterFile) {
+  $count = [int](Get-Content -Raw -Path $counterFile).Trim()
+}
+$count++
+Set-Content -Path $counterFile -Value $count -NoNewline
+Write-Output ("Count: {0}" -f $count)
+Write-Output $count
+`, test.PowerShellQuote(counterFile))
+	}
+
+	counterFile = test.PortableShellPath(counterFile)
+	return fmt.Sprintf(`
+COUNT=0
+if [ -f %s ]; then
+  COUNT=$(cat %s)
+fi
+COUNT=$((COUNT + 1))
+printf '%%s' "$COUNT" > %s
+echo "Count: $COUNT"
+echo "$COUNT"
+`, test.PosixQuote(counterFile), test.PosixQuote(counterFile), test.PosixQuote(counterFile))
+}
+
+func repeatExitCodeScript(counterFile string, successAfter int, removeOnSuccess bool) string {
+	if runtime.GOOS == "windows" {
+		removeBlock := ""
+		if removeOnSuccess {
+			removeBlock = "Remove-Item -Path $counterFile -Force -ErrorAction SilentlyContinue\n"
+		}
+		return fmt.Sprintf(`
+$counterFile = %s
+$count = 0
+if (Test-Path $counterFile) {
+  $count = [int](Get-Content -Raw -Path $counterFile).Trim()
+}
+$count++
+Set-Content -Path $counterFile -Value $count -NoNewline
+Write-Output ("Count: {0}" -f $count)
+if ($count -lt %d) {
+  exit 1
+}
+%sexit 0
+`, test.PowerShellQuote(counterFile), successAfter, removeBlock)
+	}
+
+	counterFile = test.PortableShellPath(counterFile)
+	removeBlock := ""
+	if removeOnSuccess {
+		removeBlock = fmt.Sprintf("rm -f %s\n", test.PosixQuote(counterFile))
+	}
+	return fmt.Sprintf(`
+if [ ! -f %s ]; then
+  printf '%%s' "1" > %s
+  echo "Count: 1"
+  exit 1
+fi
+
+count=$(cat %s)
+count=$((count + 1))
+printf '%%s' "$count" > %s
+echo "Count: $count"
+if [ "$count" -lt %d ]; then
+  exit 1
+fi
+%sexit 0
+`, test.PosixQuote(counterFile), test.PosixQuote(counterFile), test.PosixQuote(counterFile), test.PosixQuote(counterFile), successAfter, removeBlock)
+}
+
+func repeatCommandSubstitution(value string) string {
+	return "`" + test.PortableOutputCommand(value) + "`"
+}
 
 func TestRepeatPolicy_WithLimit(t *testing.T) {
 	t.Parallel()
@@ -58,29 +137,21 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
-	counterFileForShell := filepath.ToSlash(counterFile)
 
 	// Load DAG with repeat limit and condition
 	dag := th.DAG(t, fmt.Sprintf(`env:
   - COUNTER_FILE: %q
 steps:
   - script: |
-      COUNT=0
-      if [ -f "$COUNTER_FILE" ]; then
-        COUNT=$(cat "$COUNTER_FILE")
-      fi
-      COUNT=$((COUNT + 1))
-      echo "$COUNT" > "$COUNTER_FILE"
-      echo "Count: $COUNT"
-      echo "$COUNT"
+%s
     output: FINAL_COUNT
     repeat_policy:
       repeat: until
       limit: 5
       interval_sec: 0
-      condition: "`+"`"+`[ -f %s ] && cat %s || echo 0`+"`"+`"
+      condition: %q
       expected: "10"
-`, counterFileForShell, counterFileForShell, counterFileForShell))
+`, counterFile, indentScript(repeatCounterScript(counterFile), 6), repeatCommandSubstitution(test.PortableReadFileOrFallbackCommand(counterFile, "0"))))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -183,25 +254,12 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
-	counterFileForShell := filepath.ToSlash(counterFile)
 
 	dag := th.DAG(t, fmt.Sprintf(`env:
   - COUNTER_FILE: %q
 steps:
   - script: |
-      COUNT=0
-      if [ -f "$COUNTER_FILE" ]; then
-        COUNT=$(cat "$COUNTER_FILE")
-      fi
-      COUNT=$((COUNT + 1))
-      echo "$COUNT" > "$COUNTER_FILE"
-      echo "Count: $COUNT"
-      if [ "$COUNT" -le 2 ]; then
-        exit 1
-      else
-        rm -f "$COUNTER_FILE"
-        exit 0
-      fi
+%s
     repeat_policy:
       # Using backward compatibility mode: exitCode only infers "while" mode
       # but we can test "until" behavior with explicit condition that inverts logic
@@ -210,7 +268,7 @@ steps:
       interval_sec: 0
     continue_on:
       exit_code: [1]
-`, counterFileForShell))
+`, counterFile, indentScript(repeatExitCodeScript(counterFile, 3, true), 6)))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -278,31 +336,17 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
-	counterFileForShell := filepath.ToSlash(counterFile)
 
 	dag := th.DAG(t, fmt.Sprintf(`env:
   - COUNTER_FILE: %q
 steps:
   - command: |
-      #!/bin/bash
-      if [ ! -f "$COUNTER_FILE" ]; then
-          echo 1 > "$COUNTER_FILE"
-          exit 1
-      fi
-
-      count=$(cat "$COUNTER_FILE")
-      if [ "$count" -lt 3 ]; then
-          echo $((count + 1)) > "$COUNTER_FILE"
-          exit 1
-      else
-          echo $((count + 1)) > "$COUNTER_FILE"
-          exit 0
-      fi
+%s
     repeat_policy:
       exit_code: [1]
       limit: 5
       interval_sec: 0
-`, counterFileForShell))
+`, counterFile, indentScript(repeatExitCodeScript(counterFile, 3, false), 6)))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, 15*time.Second)
@@ -411,7 +455,7 @@ func TestRepeatPolicy_LimitFromCommandSubstitution(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 
-	dag := th.DAG(t, "steps:\n  - command: echo \"repeating with cmd sub\"\n    repeat_policy:\n      repeat: true\n      limit: \"`echo 3`\"\n      interval_sec: 0\n")
+	dag := th.DAG(t, fmt.Sprintf("steps:\n  - command: echo \"repeating with cmd sub\"\n    repeat_policy:\n      repeat: true\n      limit: %q\n      interval_sec: 0\n", repeatCommandSubstitution("3")))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
@@ -454,4 +498,11 @@ func TestRepeatPolicy_MultipleDynamicFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, dagRunStatus.Nodes, 1)
 	assert.Equal(t, 4, dagRunStatus.Nodes[0].DoneCount)
+}
+
+func indentScript(script string, spaces int) string {
+	script = strings.TrimPrefix(script, "\n")
+	lines := strings.Split(strings.TrimRight(script, "\n"), "\n")
+	prefix := strings.Repeat(" ", spaces)
+	return prefix + strings.Join(lines, "\n"+prefix)
 }

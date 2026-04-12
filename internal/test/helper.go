@@ -246,7 +246,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	configFile := filepath.Join(tmpDir, "config.yaml")
 	cfg.Paths.ConfigFileUsed = configFile
-	cfg.Core.BaseEnv = config.NewBaseEnv(buildHelperChildEnv(cfg.Core.BaseEnv.AsSlice(), tmpDir, configFile, executablePath, shellPath))
+	cfg.Core.BaseEnv = config.NewBaseEnv(buildHelperChildEnv(cfg.Core.BaseEnv.AsSlice(), tmpDir, configFile, executablePath, cfg.Core.DefaultShell))
 	writeHelperConfigFile(t, cfg, configFile)
 
 	ctx = config.WithConfig(ctx, cfg)
@@ -896,13 +896,16 @@ func testShellPath(t *testing.T) string {
 	t.Helper()
 
 	if runtime.GOOS == "windows" {
+		if shPath, err := exec.LookPath("powershell"); err == nil {
+			return shPath
+		}
+		if shPath, err := exec.LookPath("pwsh"); err == nil {
+			return shPath
+		}
 		if bashPath, ok := cmdutil.FindExecutable("bash"); ok {
 			return bashPath
 		}
 		if shPath, ok := cmdutil.FindExecutable("sh"); ok {
-			return shPath
-		}
-		if shPath, err := exec.LookPath("powershell"); err == nil {
 			return shPath
 		}
 		if shPath, err := exec.LookPath("cmd"); err == nil {

@@ -5,6 +5,7 @@ package test
 
 import (
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -32,6 +33,27 @@ func PortableSuccessCommand() string {
 
 func PortableFailureCommand() string {
 	return "exit 1"
+}
+
+func PortableOutputCommand(value string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("Write-Output %s", PowerShellQuote(value))
+	}
+	return fmt.Sprintf("printf '%%s\\n' %s", PosixQuote(value))
+}
+
+func PortablePwdCommand() string {
+	if runtime.GOOS == "windows" {
+		return "(Get-Location).Path"
+	}
+	return "pwd"
+}
+
+func PortableShellPath(path string) string {
+	if runtime.GOOS == "windows" {
+		return filepath.ToSlash(path)
+	}
+	return path
 }
 
 func PortableSleepCommand(d time.Duration) string {

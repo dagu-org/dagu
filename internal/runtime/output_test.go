@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	osrt "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,10 +21,16 @@ import (
 )
 
 func repeatedXOutputScript(size int) string {
+	if osrt.GOOS == "windows" {
+		return fmt.Sprintf("$value = 'x' * %d; [Console]::Write($value)", size)
+	}
 	return fmt.Sprintf("head -c %d /dev/zero | tr '\\000' 'x'", size)
 }
 
 func concurrentRepeatedXOutputScript(processes, bytesPerProcess int) string {
+	if osrt.GOOS == "windows" {
+		return fmt.Sprintf("1..%d | ForEach-Object { [Console]::Write((\"Process {0}: \" -f $_)); [Console]::Write('x' * %d); [Console]::Write([Environment]::NewLine) }", processes, bytesPerProcess)
+	}
 	return fmt.Sprintf(`
 		for i in $(seq 1 %d); do
 			(
@@ -34,6 +41,19 @@ func concurrentRepeatedXOutputScript(processes, bytesPerProcess int) string {
 		done
 		wait
 	`, processes, bytesPerProcess)
+}
+
+func outputCommandEntry(script string) core.CommandEntry {
+	if osrt.GOOS == "windows" {
+		return core.CommandEntry{
+			Command: "powershell",
+			Args:    []string{"-Command", script},
+		}
+	}
+	return core.CommandEntry{
+		Command: "sh",
+		Args:    []string{"-c", script},
+	}
 }
 
 func TestNode_LargeOutput(t *testing.T) {
@@ -78,12 +98,9 @@ func TestNode_LargeOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			step := core.Step{
-				Name:   "test",
-				Output: "RESULT",
-				Commands: []core.CommandEntry{{
-					Command: "sh",
-					Args:    []string{"-c", tt.script},
-				}},
+				Name:     "test",
+				Output:   "RESULT",
+				Commands: []core.CommandEntry{outputCommandEntry(tt.script)},
 			}
 
 			node := NewNode(step, NodeState{})
@@ -145,12 +162,9 @@ func TestNode_LargeOutput(t *testing.T) {
 func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	// Test specifically for the pipe deadlock issue
 	step := core.Step{
-		Name:   "deadlock-test",
-		Output: "RESULT",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args:    []string{"-c", repeatedXOutputScript(64*1024 + 1)},
-		}},
+		Name:     "deadlock-test",
+		Output:   "RESULT",
+		Commands: []core.CommandEntry{outputCommandEntry(repeatedXOutputScript(64*1024 + 1))},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -193,12 +207,9 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 func TestNode_OutputExceedsLimit(t *testing.T) {
 	// Test that output exceeding the limit returns an error
 	step := core.Step{
-		Name:   "exceed-limit-test",
-		Output: "RESULT",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args:    []string{"-c", repeatedXOutputScript(2 * 1024 * 1024)},
-		}},
+		Name:     "exceed-limit-test",
+		Output:   "RESULT",
+		Commands: []core.CommandEntry{outputCommandEntry(repeatedXOutputScript(2 * 1024 * 1024))},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -225,12 +236,9 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 func TestNode_CustomOutputLimit(t *testing.T) {
 	// Test with custom output limit
 	step := core.Step{
-		Name:   "custom-limit-test",
-		Output: "RESULT",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args:    []string{"-c", repeatedXOutputScript(100 * 1024)},
-		}},
+		Name:     "custom-limit-test",
+		Output:   "RESULT",
+		Commands: []core.CommandEntry{outputCommandEntry(repeatedXOutputScript(100 * 1024))},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -260,12 +268,9 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	// Test that output capture doesn't interfere with concurrent writes
 	step := core.Step{
-		Name: "concurrent-test",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args:    []string{"-c", concurrentRepeatedXOutputScript(10, 10000)},
-		}},
-		Output: "RESULT",
+		Name:     "concurrent-test",
+		Commands: []core.CommandEntry{outputCommandEntry(concurrentRepeatedXOutputScript(10, 10000))},
+		Output:   "RESULT",
 	}
 
 	node := NewNode(step, NodeState{})
