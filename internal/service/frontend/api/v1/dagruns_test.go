@@ -38,6 +38,30 @@ func directWhoamiCommandPath(t *testing.T) string {
 	return path
 }
 
+func waitForDAGRunStatus(
+	t *testing.T,
+	server test.Server,
+	dagName string,
+	dagRunID string,
+	timeout time.Duration,
+	predicate func(*exec.DAGRunStatus) bool,
+) *exec.DAGRunStatus {
+	t.Helper()
+
+	dag := &core.DAG{Name: dagName}
+	var status *exec.DAGRunStatus
+	require.Eventually(t, func() bool {
+		current, err := server.DAGRunMgr.GetCurrentStatus(server.Context, dag, dagRunID)
+		if err != nil || current == nil {
+			return false
+		}
+		status = current
+		return predicate(current)
+	}, dagRunEventuallyTimeout(timeout), 200*time.Millisecond)
+
+	return status
+}
+
 func TestGetDAGRunSpec(t *testing.T) {
 	server := test.SetupServer(t)
 
@@ -59,18 +83,9 @@ func TestGetDAGRunSpec(t *testing.T) {
 	startResp.Unmarshal(t, &startBody)
 	require.NotEmpty(t, startBody.DagRunId)
 
-	// Wait for the DAG run to complete
-	require.Eventually(t, func() bool {
-		url := fmt.Sprintf("/api/v1/dags/spec_test_dag/dag-runs/%s", startBody.DagRunId)
-		statusResp := server.Client().Get(url).Send(t)
-		if statusResp.Response.StatusCode() != http.StatusOK {
-			return false
-		}
-
-		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
-		statusResp.Unmarshal(t, &dagRunStatus)
-		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
-	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+	waitForDAGRunStatus(t, server, "spec_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Succeeded
+	})
 
 	// Fetch the DAG spec for the DAG run
 	specResp := server.Client().Get(
@@ -288,29 +303,25 @@ steps:
 	startResp.Unmarshal(t, &startBody)
 	require.NotEmpty(t, startBody.DagRunId)
 
-	var detailsBody api.GetDAGDAGRunDetails200JSONResponse
-	require.Eventually(t, func() bool {
-		detailsResp := server.Client().Get(
-			fmt.Sprintf("/api/v1/dags/parent_dag_for_subdag_spec/dag-runs/%s", startBody.DagRunId),
-		).Send(t)
-		if detailsResp.Response.StatusCode() != http.StatusOK {
-			return false
-		}
-		detailsResp.Unmarshal(t, &detailsBody)
-		if detailsBody.DagRun.Status != api.Status(core.Succeeded) || len(detailsBody.DagRun.Nodes) != 1 {
-			return false
-		}
-		callNode := detailsBody.DagRun.Nodes[0]
-		return callNode.SubRuns != nil && len(*callNode.SubRuns) == 1
-	}, dagRunEventuallyTimeout(15*time.Second), 200*time.Millisecond)
-	require.Len(t, detailsBody.DagRun.Nodes, 1, "Expected 1 node (the call_child step)")
+	status := waitForDAGRunStatus(
+		t,
+		server,
+		"parent_dag_for_subdag_spec",
+		startBody.DagRunId,
+		15*time.Second,
+		func(status *exec.DAGRunStatus) bool {
+			return status.Status == core.Succeeded &&
+				len(status.Nodes) == 1 &&
+				len(status.Nodes[0].SubRuns) == 1
+		},
+	)
+	require.Len(t, status.Nodes, 1, "Expected 1 node (the call_child step)")
 
 	// Extract the sub-DAG run ID from the call step
-	callNode := detailsBody.DagRun.Nodes[0]
+	callNode := status.Nodes[0]
 	require.Equal(t, "call_child", callNode.Step.Name)
-	require.NotNil(t, callNode.SubRuns, "Expected SubRuns to be present")
-	require.Len(t, *callNode.SubRuns, 1, "Expected exactly one sub-DAG run")
-	subDAGRunID := (*callNode.SubRuns)[0].DagRunId
+	require.Len(t, callNode.SubRuns, 1, "Expected exactly one sub-DAG run")
+	subDAGRunID := callNode.SubRuns[0].DAGRunID
 
 	// Test 1: Fetch the sub-DAG spec successfully
 	subSpecResp := server.Client().Get(

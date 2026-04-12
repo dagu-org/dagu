@@ -21,7 +21,7 @@ import (
 )
 
 func TestParallelExecution_ItemSources(t *testing.T) {
-	const childEcho = `---
+	childEcho := `---
 name: child-echo
 params:
   - ITEM: "default"
@@ -29,8 +29,19 @@ steps:
   - command: echo "Processing $1"
     output: PROCESSED_ITEM
 `
+	if runtime.GOOS == "windows" {
+		childEcho = `---
+name: child-echo
+params:
+  - ITEM: "default"
+steps:
+  - command: |
+      Write-Output ("Processing {0}" -f "${ITEM}")
+    output: PROCESSED_ITEM
+`
+	}
 
-	const childProcess = `---
+	childProcess := `---
 name: child-process
 params:
   - REGION: "us-east-1"
@@ -39,6 +50,44 @@ steps:
   - command: echo "Deploying version $VERSION to region $REGION"
     output: DEPLOYMENT_RESULT
 `
+	if runtime.GOOS == "windows" {
+		childProcess = `---
+name: child-process
+params:
+  - REGION: "us-east-1"
+  - VERSION: "1.0.0"
+steps:
+  - command: |
+      Write-Output ("Deploying version {0} to region {1}" -f "${VERSION}", "${REGION}")
+    output: DEPLOYMENT_RESULT
+`
+	}
+
+	childWithOutput := `---
+name: child-with-output
+params:
+  - TASK: "default"
+steps:
+  - command: |
+      echo "Processing task: $1"
+      echo "TASK_RESULT_$1"
+    output: TASK_OUTPUT
+  - echo "Task $1 completed with output ${TASK_OUTPUT}"
+`
+	if runtime.GOOS == "windows" {
+		childWithOutput = `---
+name: child-with-output
+params:
+  - TASK: "default"
+steps:
+  - command: |
+      Write-Output ("Processing task: {0}" -f "${TASK}")
+      Write-Output ("TASK_RESULT_{0}" -f "${TASK}")
+    output: TASK_OUTPUT
+  - command: |
+      Write-Output ("Task {0} completed with output {1}" -f "${TASK}", "${TASK_OUTPUT}")
+`
+	}
 
 	cases := []struct {
 		name              string
@@ -121,17 +170,7 @@ steps:
   - name: aggregate-results
     command: echo "Completed parallel tasks"
     output: FINAL_RESULT
-` + `---
-name: child-with-output
-params:
-  - TASK: "default"
-steps:
-  - command: |
-      echo "Processing task: $1"
-      echo "TASK_RESULT_$1"
-    output: TASK_OUTPUT
-  - echo "Task $1 completed with output ${TASK_OUTPUT}"
-`,
+` + childWithOutput,
 			expectedNodes:     2,
 			parallelNodeIndex: 0,
 			expectedChildren:  3,

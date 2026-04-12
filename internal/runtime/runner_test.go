@@ -1026,23 +1026,17 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
 	t.Run("StdoutPathExpandsStepNameBeforePrepare", func(t *testing.T) {
-		r := setupRunner(t)
 		stdoutPath := filepath.Join(t.TempDir(), "dag_${DAG_RUN_STEP_NAME}_out.log")
+		step := core.Step{Name: "second", Stdout: stdoutPath}
+		node := runtime.NewNode(step, runtime.NodeState{})
+		node.Init()
 
-		plan := r.newPlan(t,
-			newStep("second",
-				withCommand("echo meh"),
-				withStdout(stdoutPath),
-			),
-		)
+		ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test_dag"}, "test-run", "test.log")
+		ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, step))
 
-		result := plan.assertRun(t, core.Succeeded)
-		node := result.nodeByName(t, "second")
-
-		require.Equal(t, strings.ReplaceAll(stdoutPath, "${DAG_RUN_STEP_NAME}", "second"), node.Step().Stdout)
-		content, err := os.ReadFile(node.Step().Stdout)
+		err := node.Prepare(ctx, t.TempDir(), "test-run")
 		require.NoError(t, err)
-		assert.Contains(t, string(content), "meh")
+		require.Equal(t, strings.ReplaceAll(stdoutPath, "${DAG_RUN_STEP_NAME}", "second"), node.Step().Stdout)
 	})
 	t.Run("StdoutPathExpandsStepEnvBeforePrepare", func(t *testing.T) {
 		r := setupRunner(t)

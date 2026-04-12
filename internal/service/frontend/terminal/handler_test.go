@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -92,9 +94,7 @@ func setupTerminalServer(t *testing.T, maxSessions int) (test.Server, string) {
 
 	shellPath := ""
 	if runtime.GOOS == "windows" {
-		var err error
-		shellPath, err = exec.LookPath("cmd")
-		require.NoError(t, err)
+		shellPath = windowsTerminalShell(t)
 		t.Setenv("SHELL", shellPath)
 	}
 
@@ -123,6 +123,18 @@ func setupTerminalServer(t *testing.T, maxSessions int) (test.Server, string) {
 	resp.Unmarshal(t, &result)
 	require.NotEmpty(t, result.Token)
 	return server, result.Token
+}
+
+func windowsTerminalShell(t *testing.T) string {
+	t.Helper()
+
+	cmdPath, err := exec.LookPath("cmd")
+	require.NoError(t, err)
+
+	wrapperPath := filepath.Join(t.TempDir(), "terminal-shell.cmd")
+	wrapper := fmt.Sprintf("@echo off\r\n\"%s\" /Q /K\r\n", cmdPath)
+	require.NoError(t, os.WriteFile(wrapperPath, []byte(wrapper), 0600))
+	return wrapperPath
 }
 
 func mustDialTerminal(t *testing.T, server test.Server, token string) *websocket.Conn {
