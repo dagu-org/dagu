@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -33,9 +34,22 @@ func TestAgent_Run(t *testing.T) {
 
 		dag.AssertLatestStatus(t, core.NotStarted)
 
+		runDone := make(chan error, 1)
 		go func() {
-			dagAgent.RunSuccess(t)
+			runDone <- dagAgent.Run(th.Context)
 		}()
+
+		runTimeout := 10 * time.Second
+		if runtime.GOOS == "windows" {
+			runTimeout = 60 * time.Second
+		}
+
+		select {
+		case err := <-runDone:
+			require.NoError(t, err)
+		case <-time.After(runTimeout):
+			t.Fatalf("timed out waiting for DAG run to finish after %s", runTimeout)
+		}
 
 		dag.AssertLatestStatus(t, core.Succeeded)
 	})
@@ -248,6 +262,11 @@ steps:
 	t.Run("WorkingDirWithDAGEnvVar", func(t *testing.T) {
 		th := test.Setup(t)
 		tempDir := t.TempDir()
+		origWD, err := os.Getwd()
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = os.Chdir(origWD)
+		})
 
 		// Create DAG with WorkingDir using DAG-defined env var
 		dag := th.DAG(t, `env:
@@ -786,8 +805,15 @@ steps:
 			}
 		}
 		return false
-	}, 10*time.Second, 100*time.Millisecond,
+	}, subDAGVisibleTimeout(), 100*time.Millisecond,
 		"SubRuns must be present in stored status while subDAG step is running")
 
 	require.NoError(t, <-runErr)
+}
+
+func subDAGVisibleTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 45 * time.Second
+	}
+	return 10 * time.Second
 }

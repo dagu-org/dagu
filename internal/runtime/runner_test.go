@@ -25,6 +25,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func shellTestPath(path string) string {
+	return filepath.ToSlash(path)
+}
+
+func trimmedCounterReadCommand(counterFile string) string {
+	return fmt.Sprintf("tr -d '\\r\\n' < \"%s\"", shellTestPath(counterFile))
+}
+
+func repeatCounterValueCondition(counterFile string) string {
+	return fmt.Sprintf("`%s`", trimmedCounterReadCommand(counterFile))
+}
+
+func repeatCounterEqualsCommand(counterFile, expected string) string {
+	return fmt.Sprintf("test \"$(%s)\" = \"%s\"", trimmedCounterReadCommand(counterFile), expected)
+}
+
+func repeatCounterSetupScript(counterFile string) string {
+	return fmt.Sprintf(`
+					COUNTER_FILE="%s"
+					if [ -f "$COUNTER_FILE" ]; then
+						COUNT=$(%s)
+					else
+						COUNT=0
+					fi
+				`, shellTestPath(counterFile), trimmedCounterReadCommand(counterFile))
+}
+
+func repeatCounterScript(counterFile string, emitCount bool) string {
+	emitLine := ""
+	if emitCount {
+		emitLine = "\n\t\t\t\t\tprintf '%s\\n' \"$COUNT\""
+	}
+	return fmt.Sprintf(`
+					%s
+					COUNT=$((COUNT + 1))
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"%s
+				`, repeatCounterSetupScript(counterFile), emitLine)
+}
+
 func TestRunner(t *testing.T) {
 	testScript := test.TestdataPath(t, filepath.Join("runtime", "runner", "testfile.sh"))
 
@@ -901,20 +940,11 @@ func TestRunner(t *testing.T) {
 		defer func() { _ = os.Remove(counterFile) }()
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					echo "$COUNT"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, true)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
+						Condition: repeatCounterValueCondition(counterFile),
 						Expected:  "2",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -934,19 +964,11 @@ func TestRunner(t *testing.T) {
 		defer func() { _ = os.Remove(counterFile) }()
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test \"$(cat %s)\" = \"1\"", counterFile),
+						Condition: repeatCounterEqualsCommand(counterFile, "1"),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -999,19 +1021,11 @@ func TestRunner(t *testing.T) {
 		})
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
+						Condition: repeatCounterValueCondition(counterFile),
 						Expected:  "2",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -1035,16 +1049,7 @@ func TestRunner(t *testing.T) {
 		})
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					echo "$COUNT"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, true)),
 				withOutput("OUT"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
@@ -1076,22 +1081,22 @@ func TestRunner(t *testing.T) {
 				withScript(fmt.Sprintf(`
 					COUNTER_FILE="%s"
 					if [ ! -f "$COUNTER_FILE" ]; then
-						echo "1" > "$COUNTER_FILE"
+						printf '%%s' "1" > "$COUNTER_FILE"
 						echo "output_attempt_1"
 						exit 1
 					else
-						COUNT=$(cat "$COUNTER_FILE")
+						COUNT=$(tr -d '\r\n' < "$COUNTER_FILE")
 						if [ "$COUNT" -eq "1" ]; then
-							echo "2" > "$COUNTER_FILE"
+							printf '%%s' "2" > "$COUNTER_FILE"
 							echo "output_attempt_2"
 							exit 1
 						elif [ "$COUNT" -eq "2" ]; then
-							echo "3" > "$COUNTER_FILE"
+							printf '%%s' "3" > "$COUNTER_FILE"
 							echo "output_attempt_3_success"
 							exit 0
 						fi
 					fi
-				`, counterFile)),
+				`, shellTestPath(counterFile))),
 				withOutput("RESULT"),
 				withRetryPolicy(3, time.Millisecond*20),
 			),
@@ -1147,22 +1152,22 @@ func TestRunner(t *testing.T) {
 				withScript(fmt.Sprintf(`
 					COUNTER_FILE="%s"
 					if [ ! -f "$COUNTER_FILE" ]; then
-						echo "1" > "$COUNTER_FILE"
+						printf '%%s' "1" > "$COUNTER_FILE"
 						echo "output_attempt_1"
 						exit 1
 					else
-						COUNT=$(cat "$COUNTER_FILE")
+						COUNT=$(tr -d '\r\n' < "$COUNTER_FILE")
 						if [ "$COUNT" -eq "1" ]; then
-							echo "2" > "$COUNTER_FILE"
+							printf '%%s' "2" > "$COUNTER_FILE"
 							echo "output_attempt_2"
 							exit 1
 						elif [ "$COUNT" -eq "2" ]; then
-							echo "3" > "$COUNTER_FILE"
+							printf '%%s' "3" > "$COUNTER_FILE"
 							echo "output_attempt_3"
 							exit 1
 						fi
 					fi
-				`, counterFile)),
+				`, shellTestPath(counterFile))),
 				withOutput("RESULT"),
 				withRetryPolicy(2, time.Millisecond*20),
 			),
@@ -1802,19 +1807,14 @@ func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 	plan := r.newPlan(t,
 		newStep("1",
 			withScript(fmt.Sprintf(`
-				COUNT=0
-				if [ -f "%s" ]; then
-					COUNT=$(cat "%s")
-				fi
-				COUNT=$((COUNT + 1))
-				echo "$COUNT" > "%s"
-				echo "PENDING"
-			`, counterFile, counterFile, counterFile)),
+					%s
+					echo "PENDING"
+				`, repeatCounterScript(counterFile, false))),
 			func(step *core.Step) {
 				step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 				step.RepeatPolicy.Limit = 5
 				step.RepeatPolicy.Condition = &core.Condition{
-					Condition: "`cat " + counterFile + "`",
+					Condition: repeatCounterValueCondition(counterFile),
 					Expected:  "10", // Would repeat forever but limit stops at 5
 				}
 			},
@@ -1831,7 +1831,7 @@ func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 	// Verify counter file shows 5
 	content, err := os.ReadFile(counterFile)
 	assert.NoError(t, err)
-	assert.Equal(t, "5\n", string(content))
+	assert.Equal(t, "5", string(content))
 }
 
 func TestRunner_ComplexRetryScenarios(t *testing.T) {
@@ -1869,16 +1869,16 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 			newStep("1",
 				withScript(fmt.Sprintf(`
 					if [ ! -f "%s" ]; then
-						echo "1" > "%s"
+						printf '%%s' "1" > "%s"
 						exit 42  # Should retry
 					else
-						COUNT=$(cat "%s")
+						COUNT=$(tr -d '\r\n' < "%s")
 						if [ "$COUNT" -eq "1" ]; then
-							echo "2" > "%s"
+							printf '%%s' "2" > "%s"
 							exit 100  # Should not retry
 						fi
 					fi
-				`, counterFile, counterFile, counterFile, counterFile)),
+				`, shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile))),
 				withRetryPolicy(3, 20*time.Millisecond),
 				func(step *core.Step) {
 					step.RetryPolicy.ExitCodes = []int{42} // Only retry on exit code 42
@@ -1929,18 +1929,15 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
-					COUNT=0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					fi
+					%s
 					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"
 					if [ "$COUNT" -le 2 ]; then
 						exit 0
 					else
 						exit 1
 					fi
-				`, counterFile, counterFile, counterFile)),
+				`, repeatCounterSetupScript(counterFile))),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile // Boolean true mode
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -1967,18 +1964,15 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
-					COUNT=0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					fi
+					%s
 					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"
 					if [ "$COUNT" -le 2 ]; then
 						exit 1
 					else
 						exit 0
 					fi
-				`, counterFile, counterFile, counterFile)),
+				`, repeatCounterSetupScript(counterFile))),
 				withContinueOn(core.ContinueOn{
 					ExitCode:    []int{1},
 					Failure:     true,
@@ -2017,11 +2011,11 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("cat "+counterFile+" || echo notfound"),
+				withCommand("cat "+shellTestPath(counterFile)+" || echo notfound"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test ! -f %s", counterFile),
+						Condition: fmt.Sprintf("test ! -f \"%s\"", shellTestPath(counterFile)),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2059,7 +2053,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
+						Condition: repeatCounterValueCondition(counterFile),
 						Expected:  "continue",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -2098,11 +2092,11 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("cat "+counterFile+" || echo notfound"),
+				withCommand("cat "+shellTestPath(counterFile)+" || echo notfound"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test -f %s", counterFile),
+						Condition: fmt.Sprintf("test -f \"%s\"", shellTestPath(counterFile)),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2140,7 +2134,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
+						Condition: repeatCounterValueCondition(counterFile),
 						Expected:  "ready",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -2172,18 +2166,15 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(fmt.Sprintf(`
-					COUNT=0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					fi
+					%s
 					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"
 					if [ "$COUNT" -le 2 ]; then
 						exit 1
 					else
 						exit 42
 					fi
-				`, counterFile, counterFile, counterFile)),
+				`, repeatCounterSetupScript(counterFile))),
 				withContinueOn(core.ContinueOn{
 					ExitCode:    []int{1},
 					Failure:     true,
@@ -2245,17 +2236,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					# Read counter from file or start at 0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					echo "$COUNT"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, true)),
 				withOutput("COUNTER"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil

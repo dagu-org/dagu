@@ -6,6 +6,7 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -18,6 +19,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func repeatedXOutputScript(size int) string {
+	return fmt.Sprintf("head -c %d /dev/zero | tr '\\000' 'x'", size)
+}
+
+func concurrentRepeatedXOutputScript(processes, bytesPerProcess int) string {
+	return fmt.Sprintf(`
+		for i in $(seq 1 %d); do
+			(
+				printf 'Process %%s: ' "$i"
+				head -c %d /dev/zero | tr '\000' 'x'
+				printf '\n'
+			) &
+		done
+		wait
+	`, processes, bytesPerProcess)
+}
+
 func TestNode_LargeOutput(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -28,31 +46,31 @@ func TestNode_LargeOutput(t *testing.T) {
 		{
 			name:       "SmallOutput",
 			outputSize: 1024, // 1KB
-			script:     `python3 -c "print('x' * 1024)"`,
+			script:     repeatedXOutputScript(1024),
 			expectHang: false,
 		},
 		{
 			name:       "MediumOutput",
 			outputSize: 32 * 1024, // 32KB
-			script:     `python3 -c "print('x' * (32 * 1024))"`,
+			script:     repeatedXOutputScript(32 * 1024),
 			expectHang: false,
 		},
 		{
 			name:       "LargeOutputJustBelow64KB",
 			outputSize: 63 * 1024, // 63KB
-			script:     `python3 -c "print('x' * (63 * 1024))"`,
+			script:     repeatedXOutputScript(63 * 1024),
 			expectHang: false,
 		},
 		{
 			name:       "LargeOutputAt64KB",
 			outputSize: 64 * 1024, // 64KB
-			script:     `python3 -c "print('x' * (64 * 1024))"`,
+			script:     repeatedXOutputScript(64 * 1024),
 			expectHang: false, // Fixed - no longer hangs
 		},
 		{
 			name:       "LargeOutputAbove64KB",
 			outputSize: 128 * 1024, // 128KB
-			script:     `python3 -c "print('x' * (128 * 1024))"`,
+			script:     repeatedXOutputScript(128 * 1024),
 			expectHang: false, // Fixed - no longer hangs
 		},
 	}
@@ -131,10 +149,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 		Output: "RESULT",
 		Commands: []core.CommandEntry{{
 			Command: "sh",
-			Args: []string{"-c", `
-			# Generate exactly 64KB + 1 byte to trigger pipe buffer deadlock
-			python3 -c "import sys; sys.stdout.write('x' * (64 * 1024 + 1)); sys.stdout.flush()"
-		`},
+			Args:    []string{"-c", repeatedXOutputScript(64*1024 + 1)},
 		}},
 	}
 
@@ -182,10 +197,7 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 		Output: "RESULT",
 		Commands: []core.CommandEntry{{
 			Command: "sh",
-			Args: []string{"-c", `
-			# Generate 2MB of output (exceeds default 1MB limit)
-			python3 -c "print('x' * (2 * 1024 * 1024))"
-		`},
+			Args:    []string{"-c", repeatedXOutputScript(2 * 1024 * 1024)},
 		}},
 	}
 
@@ -217,10 +229,7 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 		Output: "RESULT",
 		Commands: []core.CommandEntry{{
 			Command: "sh",
-			Args: []string{"-c", `
-			# Generate 100KB of output
-			python3 -c "print('x' * (100 * 1024))"
-		`},
+			Args:    []string{"-c", repeatedXOutputScript(100 * 1024)},
 		}},
 	}
 
@@ -254,13 +263,7 @@ func TestNode_ConcurrentOutputCapture(t *testing.T) {
 		Name: "concurrent-test",
 		Commands: []core.CommandEntry{{
 			Command: "sh",
-			Args: []string{"-c", `
-			# Generate output from multiple processes concurrently
-			for i in $(seq 1 10); do
-				(python3 -c "print('Process ' + str($i) + ': ' + 'x' * 10000)") &
-			done
-			wait
-		`},
+			Args:    []string{"-c", concurrentRepeatedXOutputScript(10, 10000)},
 		}},
 		Output: "RESULT",
 	}
