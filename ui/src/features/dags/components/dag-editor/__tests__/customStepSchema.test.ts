@@ -113,6 +113,72 @@ const baseSchemaWithExecutorObject: JSONSchema = {
 
 const dereferencedBaseSchema = dereferenceSchema(baseSchema);
 
+const baseSchemaWithConditionalRules = dereferenceSchema({
+  type: 'object',
+  properties: {
+    steps: {
+      type: 'array',
+      items: {
+        $ref: '#/definitions/step',
+      },
+    },
+  },
+  definitions: {
+    executorType: {
+      anyOf: [
+        {
+          type: 'string',
+          enum: ['command', 'http'],
+        },
+        {
+          type: 'string',
+          pattern: '^[A-Za-z][A-Za-z0-9_-]*$',
+        },
+      ],
+    },
+    httpConfig: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+        },
+      },
+    },
+    step: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+        },
+        type: {
+          $ref: '#/definitions/executorType',
+        },
+        config: {
+          type: 'object',
+        },
+      },
+      allOf: [
+        {
+          if: {
+            properties: {
+              type: {
+                const: 'http',
+              },
+            },
+          },
+          then: {
+            properties: {
+              config: {
+                $ref: '#/definitions/httpConfig',
+              },
+            },
+          },
+        },
+      ],
+    },
+  },
+});
+
 describe('customStepSchema', () => {
   it('extracts local custom step types from YAML', () => {
     const result = extractLocalCustomStepTypeHints(`
@@ -372,6 +438,48 @@ steps:
 
     expect(nestedTypeSchema).toEqual({ type: 'string' });
     expect(nestedConfigSchema).toEqual({ type: 'string' });
+  });
+
+  it('marks conditional step properties as non-suggestable to avoid duplicate completions', () => {
+    const schema = buildAugmentedDAGSchema(baseSchemaWithConditionalRules, [
+      {
+        name: 'greet',
+        targetType: 'command',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+      },
+    ]);
+
+    const stepSchema = getSchemaAtPath(schema, ['steps', '0']) as JSONSchema;
+    expect(Array.isArray(stepSchema.allOf)).toBe(true);
+
+    const httpRule = stepSchema.allOf?.find(
+      (rule) =>
+        (rule.if as JSONSchema | undefined)?.properties?.type?.const === 'http'
+    ) as JSONSchema | undefined;
+    const greetRule = stepSchema.allOf?.find(
+      (rule) =>
+        (rule.if as JSONSchema | undefined)?.properties?.type?.const === 'greet'
+    ) as JSONSchema | undefined;
+
+    expect(httpRule?.if?.properties?.type).toMatchObject({
+      const: 'http',
+      doNotSuggest: true,
+    });
+    expect(httpRule?.then?.properties?.config).toMatchObject({
+      doNotSuggest: true,
+    });
+    expect(greetRule?.if?.properties?.type).toMatchObject({
+      const: 'greet',
+      doNotSuggest: true,
+    });
+    expect(greetRule?.then?.properties?.config).toMatchObject({
+      doNotSuggest: true,
+    });
   });
 
   it('handles recursive internal refs without infinite recursion', () => {
