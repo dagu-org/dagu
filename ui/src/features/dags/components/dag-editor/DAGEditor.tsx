@@ -177,6 +177,20 @@ function DAGEditor({
   const editorDidMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
 
+    if (!readOnly) {
+      editor.addAction({
+        id: 'dagu.triggerSuggest',
+        label: 'Trigger Autocomplete',
+        keybindings: [
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space,
+          monaco.KeyMod.WinCtrl | monaco.KeyCode.Space,
+        ],
+        run: async (activeEditor) => {
+          await activeEditor.getAction('editor.action.triggerSuggest')?.run();
+        },
+      });
+    }
+
     // Format document after a short delay
     setTimeout(() => {
       editor.getAction('editor.action.formatDocument')?.run();
@@ -236,6 +250,7 @@ function DAGEditor({
           quickSuggestions: readOnly
             ? false
             : { other: true, comments: false, strings: true },
+          suggestOnTriggerCharacters: !readOnly,
           formatOnType: !readOnly,
           formatOnPaste: !readOnly,
           renderValidationDecorations: readOnly ? 'off' : 'on',
