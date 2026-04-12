@@ -65,7 +65,10 @@ func SetupScheduler(t *testing.T, opts ...HelperOption) *Scheduler {
 		filedag.WithBaseConfig(helper.Config.Paths.BaseConfig),
 		filedag.WithSkipExamples(true),
 	)
-	drs := filedagrun.New(helper.Config.Paths.DAGRunsDir)
+	drs := filedagrun.New(
+		helper.Config.Paths.DAGRunsDir,
+		filedagrun.WithArtifactDir(helper.Config.Paths.ArtifactDir),
+	)
 	ps := newProcStore(helper.Config)
 	qs := filequeue.New(helper.Config.Paths.QueueDir)
 

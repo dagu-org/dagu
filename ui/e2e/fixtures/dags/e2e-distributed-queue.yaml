@@ -1,0 +1,9 @@
+name: e2e-distributed-queue
+queue: e2e-shared
+worker_selector:
+  role: e2e
+steps:
+  - name: hold-and-report
+    command: |
+      sleep 6
+      echo "e2e distributed worker ok"

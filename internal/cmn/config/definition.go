@@ -38,6 +38,7 @@ type Definition struct {
 	DAGsDir         string `mapstructure:"dags_dir"`
 	Executable      string `mapstructure:"executable"`
 	LogDir          string `mapstructure:"log_dir"`
+	ArtifactDir     string `mapstructure:"artifact_dir"`
 	DataDir         string `mapstructure:"data_dir"`
 	SuspendFlagsDir string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir    string `mapstructure:"admin_logs_dir"`
@@ -183,6 +184,7 @@ type PathsDef struct {
 	DocsDir            string `mapstructure:"docs_dir"`
 	Executable         string `mapstructure:"executable"`
 	LogDir             string `mapstructure:"log_dir"`
+	ArtifactDir        string `mapstructure:"artifact_dir"`
 	DataDir            string `mapstructure:"data_dir"`
 	SuspendFlagsDir    string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir       string `mapstructure:"admin_logs_dir"`

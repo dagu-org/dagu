@@ -30,6 +30,7 @@ const (
 	CoordinatorService_RunHeartbeat_FullMethodName    = "/coordinator.v1.CoordinatorService/RunHeartbeat"
 	CoordinatorService_ReportStatus_FullMethodName    = "/coordinator.v1.CoordinatorService/ReportStatus"
 	CoordinatorService_StreamLogs_FullMethodName      = "/coordinator.v1.CoordinatorService/StreamLogs"
+	CoordinatorService_StreamArtifacts_FullMethodName = "/coordinator.v1.CoordinatorService/StreamArtifacts"
 	CoordinatorService_GetDAGRunStatus_FullMethodName = "/coordinator.v1.CoordinatorService/GetDAGRunStatus"
 	CoordinatorService_RequestCancel_FullMethodName   = "/coordinator.v1.CoordinatorService/RequestCancel"
 )
@@ -59,6 +60,9 @@ type CoordinatorServiceClient interface {
 	// StreamLogs is called by workers to stream step logs to the coordinator.
 	// Uses client streaming for efficient log transmission.
 	StreamLogs(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[LogChunk, StreamLogsResponse], error)
+	// StreamArtifacts is called by workers to upload DAG run artifacts to the coordinator.
+	// Uses client streaming for efficient file transmission.
+	StreamArtifacts(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ArtifactChunk, StreamArtifactsResponse], error)
 	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
 	// Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
 	GetDAGRunStatus(ctx context.Context, in *GetDAGRunStatusRequest, opts ...grpc.CallOption) (*GetDAGRunStatusResponse, error)
@@ -159,6 +163,19 @@ func (c *coordinatorServiceClient) StreamLogs(ctx context.Context, opts ...grpc.
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CoordinatorService_StreamLogsClient = grpc.ClientStreamingClient[LogChunk, StreamLogsResponse]
 
+func (c *coordinatorServiceClient) StreamArtifacts(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ArtifactChunk, StreamArtifactsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &CoordinatorService_ServiceDesc.Streams[1], CoordinatorService_StreamArtifacts_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ArtifactChunk, StreamArtifactsResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CoordinatorService_StreamArtifactsClient = grpc.ClientStreamingClient[ArtifactChunk, StreamArtifactsResponse]
+
 func (c *coordinatorServiceClient) GetDAGRunStatus(ctx context.Context, in *GetDAGRunStatusRequest, opts ...grpc.CallOption) (*GetDAGRunStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetDAGRunStatusResponse)
@@ -204,6 +221,9 @@ type CoordinatorServiceServer interface {
 	// StreamLogs is called by workers to stream step logs to the coordinator.
 	// Uses client streaming for efficient log transmission.
 	StreamLogs(grpc.ClientStreamingServer[LogChunk, StreamLogsResponse]) error
+	// StreamArtifacts is called by workers to upload DAG run artifacts to the coordinator.
+	// Uses client streaming for efficient file transmission.
+	StreamArtifacts(grpc.ClientStreamingServer[ArtifactChunk, StreamArtifactsResponse]) error
 	// GetDAGRunStatus retrieves the status of a DAG run from the coordinator.
 	// Used by parent DAGs to poll status of remote sub-DAGs in shared-nothing mode.
 	GetDAGRunStatus(context.Context, *GetDAGRunStatusRequest) (*GetDAGRunStatusResponse, error)
@@ -244,6 +264,9 @@ func (UnimplementedCoordinatorServiceServer) ReportStatus(context.Context, *Repo
 }
 func (UnimplementedCoordinatorServiceServer) StreamLogs(grpc.ClientStreamingServer[LogChunk, StreamLogsResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method StreamLogs not implemented")
+}
+func (UnimplementedCoordinatorServiceServer) StreamArtifacts(grpc.ClientStreamingServer[ArtifactChunk, StreamArtifactsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamArtifacts not implemented")
 }
 func (UnimplementedCoordinatorServiceServer) GetDAGRunStatus(context.Context, *GetDAGRunStatusRequest) (*GetDAGRunStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDAGRunStatus not implemented")
@@ -405,6 +428,13 @@ func _CoordinatorService_StreamLogs_Handler(srv interface{}, stream grpc.ServerS
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type CoordinatorService_StreamLogsServer = grpc.ClientStreamingServer[LogChunk, StreamLogsResponse]
 
+func _CoordinatorService_StreamArtifacts_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(CoordinatorServiceServer).StreamArtifacts(&grpc.GenericServerStream[ArtifactChunk, StreamArtifactsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type CoordinatorService_StreamArtifactsServer = grpc.ClientStreamingServer[ArtifactChunk, StreamArtifactsResponse]
+
 func _CoordinatorService_GetDAGRunStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetDAGRunStatusRequest)
 	if err := dec(in); err != nil {
@@ -489,6 +519,11 @@ var CoordinatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "StreamLogs",
 			Handler:       _CoordinatorService_StreamLogs_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "StreamArtifacts",
+			Handler:       _CoordinatorService_StreamArtifacts_Handler,
 			ClientStreams: true,
 		},
 	},

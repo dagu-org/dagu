@@ -59,6 +59,8 @@ type dag struct {
 	OverlapPolicy string `yaml:"overlap_policy,omitempty"`
 	// LogDir is the directory where the logs are stored.
 	LogDir string `yaml:"log_dir,omitempty"`
+	// Artifacts config controls optional DAG run artifact storage.
+	Artifacts *artifactsConfig `yaml:"artifacts,omitempty"`
 	// LogOutput specifies how stdout and stderr are handled in log files.
 	// Can be "separate" (default) for separate .out and .err files,
 	// or "merged" for a single combined .log file.
@@ -160,6 +162,11 @@ type dagRetryPolicy struct {
 	IntervalSec    any `yaml:"interval_sec,omitempty"`
 	Backoff        any `yaml:"backoff,omitempty"`
 	MaxIntervalSec any `yaml:"max_interval_sec,omitempty"`
+}
+
+type artifactsConfig struct {
+	Enabled *bool  `yaml:"enabled,omitempty"`
+	Dir     string `yaml:"dir,omitempty"`
 }
 
 // handlerOn defines the steps to be executed on different events.
@@ -476,6 +483,7 @@ var metadataTransformers = []transform{
 // fullTransformers are only run when building the full DAG (not metadata-only)
 var fullTransformers = []transform{
 	{"log_dir", newTransformer("LogDir", buildLogDir)},
+	{"artifacts", newTransformer("Artifacts", buildArtifacts)},
 	{"log_output", newTransformer("LogOutput", buildLogOutput)},
 	{"mail_on", newTransformer("MailOn", buildMailOn)},
 	{"run_config", newTransformer("RunConfig", buildRunConfig)},
@@ -804,6 +812,23 @@ func buildOverlapPolicy(_ BuildContext, d *dag) (core.OverlapPolicy, error) {
 
 func buildLogDir(_ BuildContext, d *dag) (string, error) {
 	return d.LogDir, nil
+}
+
+func buildArtifacts(_ BuildContext, d *dag) (*core.ArtifactsConfig, error) {
+	if d.Artifacts == nil {
+		return nil, nil
+	}
+
+	cfg := &core.ArtifactsConfig{
+		Dir: d.Artifacts.Dir,
+	}
+	if d.Artifacts.Enabled != nil {
+		cfg.Enabled = *d.Artifacts.Enabled
+	}
+	if d.Artifacts.Enabled == nil && cfg.Dir == "" {
+		return nil, nil
+	}
+	return cfg, nil
 }
 
 func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {

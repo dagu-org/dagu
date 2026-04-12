@@ -145,6 +145,11 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 
 	logger.Info(ctx, "Dag-run restart initiated", tag.File(logFile.Name()))
 
+	artifactDir, err := ctx.GenArtifactDir(dag, dagRunID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize artifact directory: %w", err)
+	}
+
 	dr, err := ctx.dagStore(dagStoreConfig{
 		SearchPaths: []string{filepath.Dir(dag.Location)},
 	})
@@ -176,6 +181,7 @@ func executeDAGWithRunID(ctx *Context, cli runtime.Manager, dag *core.DAG, dagRu
 			AgentOAuthManager:          as.OAuthManager,
 			AgentRemoteContextResolver: as.ContextResolver,
 			ScheduleTime:               scheduleTime,
+			ArtifactDir:                artifactDir,
 		})
 
 	listenSignals(ctx, agentInstance)

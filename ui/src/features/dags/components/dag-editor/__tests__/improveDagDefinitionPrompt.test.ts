@@ -30,6 +30,7 @@ describe('improveDagDefinitionPrompt', () => {
         rootDAGRunName: 'example',
         rootDAGRunId: 'run-1234567890',
         log: '/tmp/example.log',
+        artifactsAvailable: false,
         autoRetryCount: 0,
         nodes: [
           {
@@ -91,6 +92,7 @@ describe('improveDagDefinitionPrompt', () => {
       rootDAGRunName: 'example',
       rootDAGRunId: 'run-2',
       log: '/tmp/example.log',
+      artifactsAvailable: false,
       autoRetryCount: 0,
       params: JSON.stringify({
         username: 'alice',

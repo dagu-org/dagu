@@ -102,6 +102,12 @@ type Agent struct {
 	// logFile is the file to write the runner log.
 	logFile string
 
+	// artifactDir is the per-run artifact directory when artifact storage is enabled.
+	artifactDir string
+
+	// artifactFinalizer persists artifacts before the final terminal status is written.
+	artifactFinalizer ArtifactFinalizer
+
 	// dag is the DAG to run.
 	dag *core.DAG
 
@@ -208,6 +214,11 @@ type StatusPusher interface {
 	Push(ctx context.Context, status exec.DAGRunStatus) error
 }
 
+// ArtifactFinalizer uploads or persists artifacts before the final terminal status is written.
+type ArtifactFinalizer interface {
+	Finalize(ctx context.Context, attemptID, dir string) error
+}
+
 // Options is the configuration for the Agent.
 type Options struct {
 	// Dry is a dry-run mode. It does not execute the actual command.
@@ -275,6 +286,10 @@ type Options struct {
 	// ScheduleTime is the RFC 3339 timestamp of when this run was scheduled.
 	// Set by the scheduler for cron-triggered runs; empty for manual runs.
 	ScheduleTime string
+	// ArtifactDir is the per-run artifact directory when artifact storage is enabled.
+	ArtifactDir string
+	// ArtifactFinalizer persists artifacts before the final terminal status is written.
+	ArtifactFinalizer ArtifactFinalizer
 }
 
 // New creates a new Agent.
@@ -296,6 +311,8 @@ func New(
 		retryTarget:                opts.RetryTarget,
 		logDir:                     logDir,
 		logFile:                    logFile,
+		artifactDir:                opts.ArtifactDir,
+		artifactFinalizer:          opts.ArtifactFinalizer,
 		dagRunMgr:                  drm,
 		dagStore:                   ds,
 		dagRunStore:                opts.DAGRunStore,
@@ -464,6 +481,11 @@ func (a *Agent) Run(ctx context.Context) error {
 			}()
 		}
 	}
+	if a.artifactDir != "" {
+		if err := os.MkdirAll(a.artifactDir, 0o750); err != nil {
+			return fmt.Errorf("failed to create artifact directory: %w", err)
+		}
+	}
 
 	// Initialize the runner
 	a.runner = a.newRunner(attempt)
@@ -493,6 +515,9 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	if a.workDir != "" {
 		contextOpts = append(contextOpts, runtime.WithWorkDir(a.workDir))
+	}
+	if a.artifactDir != "" {
+		contextOpts = append(contextOpts, runtime.WithArtifactDir(a.artifactDir))
 	}
 	if a.logWriterFactory != nil {
 		contextOpts = append(contextOpts, runtime.WithLogWriterFactory(a.logWriterFactory))
@@ -758,7 +783,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		defer close(progressDone)
 		for node := range progressCh {
 			status := a.Status(ctx)
-			a.writeStatus(ctx, attempt, status)
+			if !a.shouldDelayTerminalStatus(status.Status) {
+				a.writeStatus(ctx, attempt, status)
+			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
 				logger.Error(ctx, "Failed to report step", tag.Error(err))
 			}
@@ -788,10 +815,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		case <-timer.C:
 		}
 
-		if a.finished.Load() {
+		status := a.Status(ctx)
+		if a.finished.Load() || a.shouldDelayTerminalStatus(status.Status) {
 			return
 		}
-		a.writeStatus(ctx, attempt, a.Status(ctx))
+		a.writeStatus(ctx, attempt, status)
 	})
 
 	// Start the dag-run.
@@ -836,6 +864,44 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the finished status to the runstore database.
 	finishedStatus := a.Status(ctx)
+
+	if a.artifactFinalizer != nil && a.artifactDir != "" {
+		artifactFinalizeStartedAt := time.Now()
+		logger.Info(ctx, "Finalizing DAG run artifacts before writing terminal status",
+			slog.String("attempt-id", finishedStatus.AttemptID),
+			slog.String("artifact-dir", a.artifactDir),
+		)
+		finalizeCtx, cancelFinalize := context.WithTimeout(context.WithoutCancel(ctx), artifactFinalizeTimeout)
+		defer cancelFinalize()
+		if err := a.artifactFinalizer.Finalize(finalizeCtx, finishedStatus.AttemptID, a.artifactDir); err != nil {
+			logger.Error(ctx, "Failed to finalize DAG run artifacts before writing terminal status",
+				tag.Error(err),
+				slog.String("attempt-id", finishedStatus.AttemptID),
+				slog.String("artifact-dir", a.artifactDir),
+				slog.Duration("elapsed", time.Since(artifactFinalizeStartedAt)),
+			)
+			uploadErr := fmt.Errorf("upload artifacts: %w", err)
+			if finishedStatus.Status.IsSuccess() {
+				finishedStatus.Status = core.Failed
+			}
+			if finishedStatus.Error != "" {
+				finishedStatus.Error = fmt.Sprintf("%s; failed to upload artifacts: %v", finishedStatus.Error, err)
+			} else {
+				finishedStatus.Error = fmt.Sprintf("failed to upload artifacts: %v", err)
+			}
+			if lastErr != nil {
+				lastErr = errors.Join(lastErr, uploadErr)
+			} else {
+				lastErr = uploadErr
+			}
+		} else {
+			logger.Info(ctx, "Finished DAG run artifact finalization; terminal status can be written",
+				slog.String("attempt-id", finishedStatus.AttemptID),
+				slog.String("artifact-dir", a.artifactDir),
+				slog.Duration("elapsed", time.Since(artifactFinalizeStartedAt)),
+			)
+		}
+	}
 
 	// Send final progress update if enabled
 	if a.progressDisplay != nil {
@@ -883,6 +949,18 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Return the last error on the dag-run.
 	return lastErr
+}
+
+func (a *Agent) shouldDelayTerminalStatus(status core.Status) bool {
+	if a.artifactFinalizer == nil || a.artifactDir == "" {
+		return false
+	}
+	switch status {
+	case core.Failed, core.Aborted, core.Succeeded, core.PartiallySucceeded, core.Rejected:
+		return true
+	default:
+		return false
+	}
 }
 
 // nodeToModelNode converts a runner NodeData to an exec.Node.
@@ -1083,6 +1161,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		statusOpts := []transform.StatusOption{
 			transform.WithAttemptID(a.dagRunAttemptID),
 			transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+			transform.WithArchiveDir(a.artifactDir),
 			transform.WithTriggerType(a.triggerType),
 			transform.WithAutoRetryCount(a.currentAutoRetryCount()),
 		}
@@ -1113,6 +1192,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithFinishedAt(a.plan.FinishAt()),
 		transform.WithNodes(a.plan.NodeData()),
 		transform.WithLogFilePath(a.logFile),
+		transform.WithArchiveDir(a.artifactDir),
 		transform.WithOnInitNode(a.runner.HandlerNode(core.HandlerOnInit)),
 		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
 		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
@@ -1227,6 +1307,7 @@ func (a *Agent) Signal(ctx context.Context, sig os.Signal) {
 
 // wait before read the running status
 const waitForRunning = time.Millisecond * 100
+const artifactFinalizeTimeout = 30 * time.Second
 
 // Simple regular expressions for request routing
 var (
@@ -1526,11 +1607,15 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
+	contextOpts := []runtime.ContextOption{
 		runtime.WithDatabase(db),
 		runtime.WithRootDAGRun(a.rootDAGRun),
 		runtime.WithParams(a.dag.Params),
-	)
+	}
+	if a.artifactDir != "" {
+		contextOpts = append(contextOpts, runtime.WithArtifactDir(a.artifactDir))
+	}
+	dagCtx := runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile, contextOpts...)
 	lastErr := a.runner.Run(dagCtx, a.plan, progressCh)
 	a.lastErr = lastErr
 

@@ -49,6 +49,8 @@ var (
 	WithDefaultExecMode = exec.WithDefaultExecMode
 	// WithWorkDir sets the per-DAG-run working directory path.
 	WithWorkDir = exec.WithWorkDir
+	// WithArtifactDir sets the per-DAG-run artifact directory path.
+	WithArtifactDir = exec.WithArtifactDir
 )
 
 // LogWriterFactory is re-exported from execution package

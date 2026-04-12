@@ -29,6 +29,7 @@ var _ exec.DAGRunStore = (*Store)(nil)
 // Store manages DAG run status files on the local filesystem.
 type Store struct {
 	baseDir           string                              // Base directory for all status files
+	artifactDir       string                              // Trusted root for artifact cleanup
 	latestStatusToday bool                                // Whether to only return today's status
 	cache             *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for read operations
 	maxWorkers        int                                 // Maximum number of parallel workers
@@ -41,6 +42,7 @@ type DAGRunStoreOption func(*DAGRunStoreOptions)
 // DAGRunStoreOptions holds configuration options for Store.
 type DAGRunStoreOptions struct {
 	FileCache         *fileutil.Cache[*exec.DAGRunStatus] // Optional cache for status files
+	ArtifactDir       string                              // Trusted root for artifact cleanup
 	LatestStatusToday bool                                // Whether to only return today's status
 	MaxWorkers        int                                 // Maximum number of parallel workers
 	Location          *time.Location                      // Timezone location for date calculations
@@ -50,6 +52,13 @@ type DAGRunStoreOptions struct {
 func WithHistoryFileCache(cache *fileutil.Cache[*exec.DAGRunStatus]) DAGRunStoreOption {
 	return func(o *DAGRunStoreOptions) {
 		o.FileCache = cache
+	}
+}
+
+// WithArtifactDir sets the trusted root for artifact cleanup operations.
+func WithArtifactDir(dir string) DAGRunStoreOption {
+	return func(o *DAGRunStoreOptions) {
+		o.ArtifactDir = dir
 	}
 }
 
@@ -73,6 +82,7 @@ func New(baseDir string, opts ...DAGRunStoreOption) exec.DAGRunStore {
 		LatestStatusToday: true,
 		MaxWorkers:        runtime.NumCPU(),
 		Location:          time.Local, // Default to local timezone
+		ArtifactDir:       filepath.Join(filepath.Dir(filepath.Clean(baseDir)), "artifacts"),
 	}
 
 	for _, opt := range opts {
@@ -81,6 +91,7 @@ func New(baseDir string, opts ...DAGRunStoreOption) exec.DAGRunStore {
 
 	return &Store{
 		baseDir:           baseDir,
+		artifactDir:       options.ArtifactDir,
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
 		maxWorkers:        options.MaxWorkers,
@@ -513,7 +524,7 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 		opt(&options)
 	}
 
-	root := NewDataRoot(store.baseDir, dagName)
+	root := NewDataRootWithArtifactDir(store.baseDir, dagName, store.artifactDir)
 	return root.RemoveOld(ctx, retentionDays, options.DryRun)
 }
 
@@ -523,7 +534,7 @@ func (store *Store) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef) err
 		return ErrDAGRunIDEmpty
 	}
 
-	root := NewDataRoot(store.baseDir, dagRun.Name)
+	root := NewDataRootWithArtifactDir(store.baseDir, dagRun.Name, store.artifactDir)
 	run, err := root.FindByDAGRunID(ctx, dagRun.ID)
 	if err != nil {
 		return fmt.Errorf("failed to find dag-run %s: %w", dagRun.ID, err)

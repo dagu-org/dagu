@@ -244,31 +244,32 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 	}
 
 	return api.DAGRunDetails{
-		RootDAGRunName:   s.Root.Name,
-		RootDAGRunId:     s.Root.ID,
-		ParentDAGRunName: ptrOf(s.Parent.Name),
-		ParentDAGRunId:   ptrOf(s.Parent.ID),
-		Log:              s.Log,
-		Name:             s.Name,
-		Params:           ptrOf(s.Params),
-		DagRunId:         s.DAGRunID,
-		QueuedAt:         ptrOf(s.QueuedAt),
-		AutoRetryCount:   s.AutoRetryCount,
-		AutoRetryLimit:   autoRetryLimit,
-		ScheduleTime:     ptrOf(s.ScheduleTime),
-		StartedAt:        s.StartedAt,
-		FinishedAt:       s.FinishedAt,
-		Status:           api.Status(s.Status),
-		StatusLabel:      api.StatusLabel(s.Status.String()),
-		WorkerId:         ptrOf(s.WorkerID),
-		TriggerType:      toTriggerType(s.TriggerType),
-		Preconditions:    ptrOf(preconditions),
-		Nodes:            nodes,
-		OnSuccess:        ptrOf(toNode(s.OnSuccess)),
-		OnFailure:        ptrOf(toNode(s.OnFailure)),
-		OnAbort:          ptrOf(toNode(s.OnAbort)),
-		OnExit:           ptrOf(toNode(s.OnExit)),
-		Tags:             &s.Tags,
+		RootDAGRunName:     s.Root.Name,
+		RootDAGRunId:       s.Root.ID,
+		ParentDAGRunName:   ptrOf(s.Parent.Name),
+		ParentDAGRunId:     ptrOf(s.Parent.ID),
+		ArtifactsAvailable: s.ArchiveDir != "",
+		Log:                s.Log,
+		Name:               s.Name,
+		Params:             ptrOf(s.Params),
+		DagRunId:           s.DAGRunID,
+		QueuedAt:           ptrOf(s.QueuedAt),
+		AutoRetryCount:     s.AutoRetryCount,
+		AutoRetryLimit:     autoRetryLimit,
+		ScheduleTime:       ptrOf(s.ScheduleTime),
+		StartedAt:          s.StartedAt,
+		FinishedAt:         s.FinishedAt,
+		Status:             api.Status(s.Status),
+		StatusLabel:        api.StatusLabel(s.Status.String()),
+		WorkerId:           ptrOf(s.WorkerID),
+		TriggerType:        toTriggerType(s.TriggerType),
+		Preconditions:      ptrOf(preconditions),
+		Nodes:              nodes,
+		OnSuccess:          ptrOf(toNode(s.OnSuccess)),
+		OnFailure:          ptrOf(toNode(s.OnFailure)),
+		OnAbort:            ptrOf(toNode(s.OnAbort)),
+		OnExit:             ptrOf(toNode(s.OnExit)),
+		Tags:               &s.Tags,
 	}
 }
 
@@ -356,7 +357,15 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		paramDefs = ptrOf(defs)
 	}
 
+	var artifacts *api.DAGArtifactsConfig
+	if dag.Artifacts != nil {
+		artifacts = &api.DAGArtifactsConfig{
+			Enabled: dag.Artifacts.Enabled,
+		}
+	}
+
 	return &api.DAGDetails{
+		Artifacts:         artifacts,
 		Name:              dag.Name,
 		Description:       ptrOf(dag.Description),
 		DefaultParams:     ptrOf(dag.DefaultParams),

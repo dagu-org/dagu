@@ -108,6 +108,7 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_EXECUTABLE":           filepath.Join(testPaths, "bin", "dagu"),
 		"DAGU_LOG_DIR":              filepath.Join(testPaths, "logs"),
 		"DAGU_DATA_DIR":             filepath.Join(testPaths, "data"),
+		"DAGU_ARTIFACT_DIR":         filepath.Join(testPaths, "artifacts"),
 		"DAGU_SUSPEND_FLAGS_DIR":    filepath.Join(testPaths, "suspend"),
 		"DAGU_ADMIN_LOG_DIR":        filepath.Join(testPaths, "admin"),
 		"DAGU_BASE_CONFIG":          filepath.Join(testPaths, "base.yaml"),
@@ -238,6 +239,7 @@ func TestLoad_Env(t *testing.T) {
 			Executable:         filepath.Join(testPaths, "bin", "dagu"),
 			LogDir:             filepath.Join(testPaths, "logs"),
 			DataDir:            filepath.Join(testPaths, "data"),
+			ArtifactDir:        filepath.Join(testPaths, "artifacts"),
 			SuspendFlagsDir:    filepath.Join(testPaths, "suspend"),
 			AdminLogsDir:       filepath.Join(testPaths, "admin"),
 			EventStoreDir:      cfg.Paths.EventStoreDir,
@@ -380,6 +382,7 @@ func TestLoad_WithAppHomeDir(t *testing.T) {
 	assert.Equal(t, filepath.Join(tempDir, "dags"), cfg.Paths.DAGsDir)
 	assert.Equal(t, filepath.Join(tempDir, "data"), cfg.Paths.DataDir)
 	assert.Equal(t, filepath.Join(tempDir, "logs"), cfg.Paths.LogDir)
+	assert.Equal(t, filepath.Join(tempDir, "data", "artifacts"), cfg.Paths.ArtifactDir)
 
 	baseEnv := cfg.Core.BaseEnv.AsSlice()
 	require.Contains(t, baseEnv, fmt.Sprintf("DAGU_HOME=%s", tempDir))
@@ -685,6 +688,7 @@ scheduler:
 			DocsDir:            "/var/dagu/dags/docs",
 			LogDir:             "/var/dagu/logs",
 			DataDir:            "/var/dagu/data",
+			ArtifactDir:        cfg.Paths.ArtifactDir,
 			SuspendFlagsDir:    "/var/dagu/suspend",
 			AdminLogsDir:       "/var/dagu/adminlogs",
 			EventStoreDir:      cfg.Paths.EventStoreDir,
@@ -839,6 +843,23 @@ func TestLoad_EdgeCases_ContextsDirFromEnv(t *testing.T) {
 	})
 
 	assert.Equal(t, "/tmp/custom-contexts", cfg.Paths.ContextsDir)
+}
+
+func TestLoad_ArtifactDirFromConfig(t *testing.T) {
+	cfg := loadFromYAML(t, `
+paths:
+  artifact_dir: "/custom/artifacts"
+`)
+
+	assert.Equal(t, "/custom/artifacts", cfg.Paths.ArtifactDir)
+}
+
+func TestLoad_ArtifactDirFromEnv(t *testing.T) {
+	cfg := loadWithEnv(t, "# empty", map[string]string{
+		"DAGU_ARTIFACT_DIR": "/env/artifacts",
+	})
+
+	assert.Equal(t, "/env/artifacts", cfg.Paths.ArtifactDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {
