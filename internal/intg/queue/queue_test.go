@@ -233,6 +233,7 @@ steps:
 func TestSchedulerRetryScanner(t *testing.T) {
 	t.Run("EligibleFailedRunRetries", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
+		markerPathForShell := filepath.ToSlash(markerPath)
 		f := newFixture(t, fmt.Sprintf(`
 type: graph
 name: retry-dag
@@ -248,7 +249,7 @@ handler_on:
 steps:
   - id: retry_step
     command: echo retried
-`, markerPath), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+`, markerPathForShell), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
 
 		failedAt := time.Now().UTC().Add(-30 * time.Second)
 		runID := f.FailedRunWithMetadata(runStatusOptions{
@@ -281,6 +282,7 @@ steps:
 
 	t.Run("MissingFinishedAtStillRetriesViaCreatedAt", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
+		markerPathForShell := filepath.ToSlash(markerPath)
 		f := newFixture(t, fmt.Sprintf(`
 type: graph
 name: retry-dag
@@ -296,7 +298,7 @@ handler_on:
 steps:
   - id: retry_step
     command: echo retried
-`, markerPath), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+`, markerPathForShell), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
 
 		failedAt := time.Now().UTC().Add(-30 * time.Second)
 		runID := f.FailedRunWithMetadata(runStatusOptions{
@@ -325,6 +327,7 @@ steps:
 
 	t.Run("NewerScheduledRunDoesNotSuppressRetry", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
+		markerPathForShell := filepath.ToSlash(markerPath)
 		f := newFixture(t, fmt.Sprintf(`
 type: graph
 name: retry-dag
@@ -340,7 +343,7 @@ handler_on:
 steps:
   - id: retry_step
     command: echo retried
-`, markerPath), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1), WithRetryWindow(48*time.Hour))
+`, markerPathForShell), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1), WithRetryWindow(48*time.Hour))
 
 		now := time.Now().UTC()
 		midnight := retryScanReferenceMidnight(now)
