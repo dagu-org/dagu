@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -27,6 +28,14 @@ func dagRunEventuallyTimeout(base time.Duration) time.Duration {
 		return base * 6
 	}
 	return base
+}
+
+func directWhoamiCommandPath(t *testing.T) string {
+	t.Helper()
+
+	path, err := osexec.LookPath("whoami")
+	require.NoError(t, err)
+	return path
 }
 
 func TestGetDAGRunSpec(t *testing.T) {
@@ -247,9 +256,10 @@ func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
 
 func TestGetSubDAGRunSpec(t *testing.T) {
 	server := test.SetupServer(t)
+	whoamiPath := directWhoamiCommandPath(t)
 
 	// Create a parent DAG with an inline sub-DAG definition
-	dagSpec := `steps:
+	dagSpec := fmt.Sprintf(`steps:
   - name: call_child
     call: child_dag
     params: "MSG=hello"
@@ -261,7 +271,8 @@ params:
   - MSG
 steps:
   - name: echo_message
-    command: "echo ${MSG}_from_child"`
+    shell: direct
+    command: [%q]`, whoamiPath)
 
 	// Create the parent DAG
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
@@ -277,26 +288,21 @@ steps:
 	startResp.Unmarshal(t, &startBody)
 	require.NotEmpty(t, startBody.DagRunId)
 
-	// Wait for the parent DAG to complete
+	var detailsBody api.GetDAGDAGRunDetails200JSONResponse
 	require.Eventually(t, func() bool {
-		url := fmt.Sprintf("/api/v1/dags/parent_dag_for_subdag_spec/dag-runs/%s", startBody.DagRunId)
-		statusResp := server.Client().Get(url).Send(t)
-		if statusResp.Response.StatusCode() != http.StatusOK {
+		detailsResp := server.Client().Get(
+			fmt.Sprintf("/api/v1/dags/parent_dag_for_subdag_spec/dag-runs/%s", startBody.DagRunId),
+		).Send(t)
+		if detailsResp.Response.StatusCode() != http.StatusOK {
 			return false
 		}
-
-		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
-		statusResp.Unmarshal(t, &dagRunStatus)
-		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
-	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
-
-	// Get the parent DAG run details to extract sub-DAG run ID
-	detailsResp := server.Client().Get(
-		fmt.Sprintf("/api/v1/dags/parent_dag_for_subdag_spec/dag-runs/%s", startBody.DagRunId),
-	).ExpectStatus(http.StatusOK).Send(t)
-
-	var detailsBody api.GetDAGDAGRunDetails200JSONResponse
-	detailsResp.Unmarshal(t, &detailsBody)
+		detailsResp.Unmarshal(t, &detailsBody)
+		if detailsBody.DagRun.Status != api.Status(core.Succeeded) || len(detailsBody.DagRun.Nodes) != 1 {
+			return false
+		}
+		callNode := detailsBody.DagRun.Nodes[0]
+		return callNode.SubRuns != nil && len(*callNode.SubRuns) == 1
+	}, dagRunEventuallyTimeout(15*time.Second), 200*time.Millisecond)
 	require.Len(t, detailsBody.DagRun.Nodes, 1, "Expected 1 node (the call_child step)")
 
 	// Extract the sub-DAG run ID from the call step
@@ -317,7 +323,7 @@ steps:
 	require.NotEmpty(t, subSpecBody.Spec, "Sub-DAG spec should not be empty")
 	require.Contains(t, subSpecBody.Spec, "child_dag", "Spec should contain child_dag name")
 	require.Contains(t, subSpecBody.Spec, "echo_message", "Spec should contain echo_message step")
-	require.Contains(t, subSpecBody.Spec, "echo ${MSG}_from_child", "Spec should contain the command")
+	require.Contains(t, subSpecBody.Spec, filepath.Base(whoamiPath), "Spec should contain the command")
 
 	// Test 2: 404 for non-existent sub-DAG run ID
 	_ = server.Client().Get(

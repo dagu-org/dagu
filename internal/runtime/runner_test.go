@@ -563,6 +563,9 @@ func TestRunner(t *testing.T) {
 		file := filepath.Join(
 			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewV7()).String()),
 		)
+		t.Cleanup(func() {
+			_ = os.Remove(file)
+		})
 
 		r := setupRunner(t)
 
@@ -573,14 +576,19 @@ func TestRunner(t *testing.T) {
 			),
 		)
 
+		waitTimeout := 5 * time.Second
+		if windowsShellTest() {
+			waitTimeout = 30 * time.Second
+		}
+		fileReady := make(chan error, 1)
 		go func() {
 			// Wait until at least one retry has happened before creating the file
 			// so that the first attempt and first retry both fail.
-			deadline := time.After(5 * time.Second)
+			deadline := time.After(waitTimeout)
 			for {
 				select {
 				case <-deadline:
-					t.Error("timed out waiting for retry count to increment")
+					fileReady <- fmt.Errorf("timed out waiting for retry count to increment")
 					return
 				default:
 				}
@@ -593,17 +601,19 @@ func TestRunner(t *testing.T) {
 
 			// Create file during the retry interval
 			f, err := os.Create(file)
-			require.NoError(t, err)
-			defer func() {
-				_ = f.Close()
-			}()
-
-			t.Cleanup(func() {
-				_ = os.Remove(file)
-			})
+			if err != nil {
+				fileReady <- err
+				return
+			}
+			if err := f.Close(); err != nil {
+				fileReady <- err
+				return
+			}
+			fileReady <- nil
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
+		require.NoError(t, <-fileReady)
 
 		// Check if the retry is successful
 		state := result.nodeByName(t, "1").State()

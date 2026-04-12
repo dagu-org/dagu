@@ -109,7 +109,7 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 func queueTestTimeout(timeout time.Duration) time.Duration {
 	switch {
 	case runtime.GOOS == "windows" && raceEnabled():
-		return timeout * 3
+		return timeout * 4
 	case runtime.GOOS == "windows" || raceEnabled():
 		return timeout * 2
 	default:

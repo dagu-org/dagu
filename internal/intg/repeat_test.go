@@ -107,13 +107,13 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat limit
-	dag := th.DAG(t, `steps:
-  - command: echo "Executing step"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: 3
       interval_sec: 0
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -189,13 +189,13 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG that repeats with a limit
-	dag := th.DAG(t, `steps:
-  - command: echo "Checking for flag file"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: 3
       interval_sec: 0
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -224,13 +224,13 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
-	dag := th.DAG(t, `steps:
-  - command: echo "Unconditional while loop using boolean mode"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: 3
       interval_sec: 0
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -306,13 +306,13 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat: true (should work as "while" mode)
-	dag := th.DAG(t, `steps:
-  - command: echo "Boolean true compatibility test"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: 4
       interval_sec: 0
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -380,13 +380,13 @@ func TestRepeatPolicy_LimitFromEnvVar(t *testing.T) {
 	t.Setenv("REPEAT_LIMIT", "3")
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `steps:
-  - command: echo "repeating"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: $REPEAT_LIMIT
       interval_sec: 0
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
@@ -407,13 +407,13 @@ func TestRepeatPolicy_IntervalSecFromEnvVar(t *testing.T) {
 	t.Setenv("INTERVAL_SEC", "0")
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `steps:
-  - command: echo "repeating with env interval"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: 3
       interval_sec: $INTERVAL_SEC
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
@@ -434,14 +434,14 @@ func TestRepeatPolicy_MaxIntervalSecFromEnvVar(t *testing.T) {
 	t.Setenv("MAX_INTERVAL", "10")
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `steps:
-  - command: echo "repeating with env max interval"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: 2
       interval_sec: 0
       max_interval_sec: $MAX_INTERVAL
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
@@ -462,7 +462,7 @@ func TestRepeatPolicy_LimitFromCommandSubstitution(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 
-	dag := th.DAG(t, fmt.Sprintf("steps:\n  - command: echo \"repeating with cmd sub\"\n    repeat_policy:\n      repeat: true\n      limit: %q\n      interval_sec: 0\n", repeatCommandSubstitution("3")))
+	dag := th.DAG(t, fmt.Sprintf("steps:\n  - %s\n    repeat_policy:\n      repeat: true\n      limit: %q\n      interval_sec: 0\n", portableDirectSuccessStepYAML(t), repeatCommandSubstitution("3")))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
@@ -484,13 +484,13 @@ func TestRepeatPolicy_MultipleDynamicFields(t *testing.T) {
 	t.Setenv("DYN_INTERVAL", "0")
 	th := test.Setup(t)
 
-	dag := th.DAG(t, `steps:
-  - command: echo "multiple dynamic fields"
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: true
       limit: $DYN_LIMIT
       interval_sec: $DYN_INTERVAL
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))

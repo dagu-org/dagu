@@ -333,7 +333,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, 30*time.Second)
 		dagRunID := status.DAGRunID
 		f.cleanup()
 
@@ -347,7 +347,7 @@ steps:
 				return false
 			}
 			return status.Status == core.Succeeded && status.DAGRunID == dagRunID
-		}, 25*time.Second, 200*time.Millisecond, "Retry should complete successfully")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Retry should complete successfully")
 
 		finalStatus, err := f.latestStatus()
 		require.NoError(t, err)
@@ -373,7 +373,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, 30*time.Second)
 		dagRunID := status.DAGRunID
 		f.cleanup()
 
@@ -387,7 +387,7 @@ steps:
 				return false
 			}
 			return status.Status == core.Succeeded && status.DAGRunID == dagRunID
-		}, 25*time.Second, 200*time.Millisecond, "Retry should complete successfully")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Retry should complete successfully")
 
 		finalStatus, err := f.latestStatus()
 		require.NoError(t, err)

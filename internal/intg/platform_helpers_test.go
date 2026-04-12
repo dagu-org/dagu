@@ -34,7 +34,7 @@ func canonicalTestPath(path string) string {
 func intgTestTimeout(timeout time.Duration) time.Duration {
 	switch {
 	case runtime.GOOS == "windows" && raceEnabled():
-		return timeout * 3
+		return timeout * 4
 	case runtime.GOOS == "windows" || raceEnabled():
 		return timeout * 2
 	default:

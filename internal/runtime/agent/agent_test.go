@@ -776,13 +776,18 @@ func TestAgent_SubDAGRunVisibleWhileRunning(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
+	releaseFile := filepath.Join(t.TempDir(), "release-child")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("done"), 0600)
+	})
 
-	// Create a child DAG that sleeps long enough for the parent to be observed mid-run
+	// Hold the child open until the test explicitly releases it so Windows can
+	// observe persisted SubRuns without racing the child completion.
 	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", fmt.Appendf(nil, `
 steps:
   - name: slow-step
     command: %q
-`, test.PortableSleepCommand(3*time.Second)))
+`, test.PortableWaitForFileScript(releaseFile, 100*time.Millisecond)))
 
 	// The preceding step must run long enough for the one-shot 100ms status timer
 	// to fire (and exhaust itself) BEFORE run-child starts. This replicates the
@@ -796,7 +801,7 @@ steps:
     call: child-slow
     depends:
       - pre-step
-`, test.PortableSleepCommand(300*time.Millisecond)))
+`, test.PortableSleepCommand(time.Second)))
 
 	a := parent.Agent()
 	runErr := make(chan error, 1)
@@ -824,12 +829,13 @@ steps:
 	}, subDAGVisibleTimeout(), 100*time.Millisecond,
 		"SubRuns must be present in stored status while subDAG step is running")
 
+	require.NoError(t, os.WriteFile(releaseFile, []byte("done"), 0600))
 	require.NoError(t, <-runErr)
 }
 
 func subDAGVisibleTimeout() time.Duration {
 	if runtime.GOOS == "windows" {
-		return 45 * time.Second
+		return 90 * time.Second
 	}
 	return 10 * time.Second
 }

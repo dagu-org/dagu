@@ -112,8 +112,9 @@ func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvent
 		return len(delivered) == 1 && delivered[0] == "run-new"
 	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 
-	assert.False(t, monitor.IsDelivered("dest-1", oldStatus))
-	assert.True(t, monitor.IsDelivered("dest-1", newStatus))
+	require.Eventually(t, func() bool {
+		return !monitor.IsDelivered("dest-1", oldStatus) && monitor.IsDelivered("dest-1", newStatus)
+	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 }
 
 func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {

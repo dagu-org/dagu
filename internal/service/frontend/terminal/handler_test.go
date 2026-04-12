@@ -90,13 +90,18 @@ func TestTerminal_ServerShutdownDoesNotEmitTimeoutError(t *testing.T) {
 func setupTerminalServer(t *testing.T, maxSessions int) (test.Server, string) {
 	t.Helper()
 
+	shellPath := ""
 	if runtime.GOOS == "windows" {
-		if shellPath, err := exec.LookPath("powershell"); err == nil {
-			t.Setenv("SHELL", shellPath)
-		}
+		var err error
+		shellPath, err = exec.LookPath("cmd")
+		require.NoError(t, err)
+		t.Setenv("SHELL", shellPath)
 	}
 
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		if shellPath != "" {
+			cfg.Core.DefaultShell = shellPath
+		}
 		cfg.Server.Auth.Mode = config.AuthModeBuiltin
 		cfg.Server.Auth.Builtin.Token.Secret = "test-jwt-secret-key-terminal"
 		cfg.Server.Auth.Builtin.Token.TTL = time.Hour

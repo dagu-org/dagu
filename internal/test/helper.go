@@ -49,10 +49,17 @@ var builtExecutableOnce sync.Once
 var builtExecutablePath string
 var builtExecutableErr error
 
-const (
-	latestStatusAssertTimeout  = 30 * time.Second
+var (
+	latestStatusAssertTimeout  = helperLatestStatusAssertTimeout()
 	latestStatusAssertInterval = 1 * time.Second
 )
+
+func helperLatestStatusAssertTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 2 * time.Minute
+	}
+	return 30 * time.Second
+}
 
 // HelperOption defines functional options for Helper
 type HelperOption func(*Options)

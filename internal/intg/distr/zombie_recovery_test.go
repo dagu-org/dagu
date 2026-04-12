@@ -20,6 +20,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/service/worker"
+	"github.com/dagucloud/dagu/internal/test"
 	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,15 +94,15 @@ func TestDistributedRun_DelayedAfterAck_DoesNotExecuteAfterStaleCleanup(t *testi
 // long-running quiet step remains RUNNING past the lease threshold because
 // coordinator-owned heartbeat refreshes keep the lease fresh.
 func TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive(t *testing.T) {
-	f := newTestFixture(t, `
+	f := newTestFixture(t, fmt.Sprintf(`
 type: graph
 name: quiet-heartbeat-test
 worker_selector:
   test: "true"
 steps:
   - name: long-step
-    command: sleep 8
-`,
+    command: %s
+`, test.ShellQuote(test.PortableSleepCommand(8*time.Second))),
 		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
@@ -128,7 +129,11 @@ steps:
 	require.Equal(t, core.Running, status.Status)
 	lease := waitForLease(t, f, status.AttemptKey, 5*time.Second)
 	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
-	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), 2*time.Second)
+	freshWindow := 2 * time.Second
+	if runtime.GOOS == "windows" {
+		freshWindow = 5 * time.Second
+	}
+	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), freshWindow)
 
 	finalStatus := f.waitForStatus(core.Succeeded, 15*time.Second)
 	assert.Equal(t, core.Succeeded, finalStatus.Status)
@@ -146,7 +151,7 @@ func TestDistributedRun_QueueConcurrency_ActiveRunCounted(t *testing.T) {
 		completionTimeout = 45 * time.Second
 	}
 
-	f := newTestFixture(t, `
+	f := newTestFixture(t, fmt.Sprintf(`
 type: graph
 name: queue-concurrency-test
 queue: concurrency-q
@@ -154,8 +159,8 @@ worker_selector:
   test: "true"
 steps:
   - name: long-step
-    command: sleep 8
-`,
+    command: %s
+`, test.ShellQuote(test.PortableSleepCommand(8*time.Second))),
 		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
@@ -193,7 +198,7 @@ steps:
 		}
 
 		return running == 1 && queued == 1
-	}, 15*time.Second, 100*time.Millisecond, "one run should start and one should remain queued")
+	}, distrTestTimeout(15*time.Second), 100*time.Millisecond, "one run should start and one should remain queued")
 
 	// Verify the state is stable: concurrency limit keeps one running and one queued.
 	require.Never(t, func() bool {
@@ -237,7 +242,7 @@ steps:
 			}
 		}
 		return succeeded == 2
-	}, completionTimeout, 200*time.Millisecond, "both queued runs should eventually complete")
+	}, distrTestTimeout(completionTimeout), 200*time.Millisecond, "both queued runs should eventually complete")
 }
 
 // TestDistributedRun_StatusAndQueueConsistency verifies that after a

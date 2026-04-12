@@ -34,7 +34,7 @@ func TestSetupDoesNotMutatePerTestProcessEnv(t *testing.T) {
 	assert.Equal(t, helperExpectedProcessValue("/original/dagu-home"), os.Getenv("DAGU_HOME"))
 	assert.Equal(t, helperExpectedProcessValue("/original/config.yaml"), os.Getenv("DAGU_CONFIG"))
 	assert.Equal(t, helperExpectedProcessValue("/original/dagu"), os.Getenv("DAGU_EXECUTABLE"))
-	assert.Equal(t, helperExpectedProcessValue("/original/shell"), os.Getenv("SHELL"))
+	assert.Equal(t, "/original/shell", os.Getenv("SHELL"))
 
 	assert.Contains(t, helper.ChildEnv, "DAGU_HOME="+helper.tmpDir)
 	assert.Contains(t, helper.ChildEnv, "DAGU_CONFIG="+helper.Config.Paths.ConfigFileUsed)

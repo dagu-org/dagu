@@ -395,6 +395,28 @@ steps:
 
 func TestParallelExecution_AbortSuppressesPendingRetry(t *testing.T) {
 	counterFile := filepath.Join(t.TempDir(), "parallel-retry-counter.txt")
+	childScript := fmt.Sprintf(`
+      COUNTER_FILE=%q
+      count=0
+      if [ -f "$COUNTER_FILE" ]; then
+        count=$(cat "$COUNTER_FILE")
+      fi
+      count=$((count + 1))
+      echo "$count" > "$COUNTER_FILE"
+      exit 1
+`, counterFile)
+	if runtime.GOOS == "windows" {
+		childScript = fmt.Sprintf(`
+      $counterFile = %q
+      $count = 0
+      if (Test-Path $counterFile) {
+        $count = [int](Get-Content -Raw -Path $counterFile).Trim()
+      }
+      $count++
+      Set-Content -Path $counterFile -Value $count -NoNewline
+      exit 1
+`, counterFile)
+	}
 
 	th := test.Setup(t, test.WithBuiltExecutable())
 	dag := th.DAG(t, fmt.Sprintf(`type: graph
@@ -412,18 +434,11 @@ params:
 steps:
   - name: flaky
     command: |
-      COUNTER_FILE=%q
-      count=0
-      if [ -f "$COUNTER_FILE" ]; then
-        count=$(cat "$COUNTER_FILE")
-      fi
-      count=$((count + 1))
-      echo "$count" > "$COUNTER_FILE"
-      exit 1
+%s
     retry_policy:
       limit: 1
       interval_sec: 2
-`, counterFile))
+`, strings.TrimPrefix(childScript, "\n")))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -434,7 +449,7 @@ steps:
 	require.Eventually(t, func() bool {
 		data, err := os.ReadFile(counterFile)
 		return err == nil && strings.TrimSpace(string(data)) == "1"
-	}, 10*time.Second, 50*time.Millisecond, "expected first attempt to increment counter")
+	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected first attempt to increment counter")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
@@ -442,7 +457,7 @@ steps:
 			return false
 		}
 		return status.Status == core.Running
-	}, 5*time.Second, 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
+	}, intgTestTimeout(5*time.Second), 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
 
 	agent.Abort()
 
@@ -552,26 +567,40 @@ steps:
 }
 
 func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
-	const dagContent = `steps:
+	childScript := `
+      INPUT="${INPUT}"
+      echo "Output for ${INPUT}"
+      if [ "${INPUT}" = "fail" ]; then
+        exit 1
+      fi
+`
+	if runtime.GOOS == "windows" {
+		childScript = `
+      Write-Output ("Output for {0}" -f "${INPUT}")
+      if ("${INPUT}" -eq "fail") {
+        exit 1
+      }
+`
+	}
+
+	dagContent := fmt.Sprintf(`steps:
   - call: child-output-fail
     parallel:
       items:
-        - "success"
-        - "fail"
+        - INPUT: "success"
+        - INPUT: "fail"
     output: RESULTS
     continue_on:
       failure: true
 ---
 name: child-output-fail
+params:
+  - INPUT: "default"
 steps:
   - command: |
-      INPUT="$1"
-      echo "Output for ${INPUT}"
-      if [ "${INPUT}" = "fail" ]; then
-        exit 1
-      fi
+%s
     output: RESULT
-`
+`, strings.TrimPrefix(childScript, "\n"))
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -603,8 +632,32 @@ steps:
 }
 
 func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
-	const counterFile = "/tmp/test_retry_counter.txt"
+	counterFile := filepath.Join(t.TempDir(), "test_retry_counter.txt")
 	t.Cleanup(func() { _ = os.Remove(counterFile) })
+
+	childScript := fmt.Sprintf(`
+      COUNTER_FILE=%q
+      if [ ! -f "$COUNTER_FILE" ]; then
+        echo "1" > "$COUNTER_FILE"
+        echo "First attempt"
+        exit 1
+      else
+        echo "Retry success"
+        exit 0
+      fi
+`, counterFile)
+	if runtime.GOOS == "windows" {
+		childScript = fmt.Sprintf(`
+      $counterFile = %q
+      if (-not (Test-Path $counterFile)) {
+        Set-Content -Path $counterFile -Value "1" -NoNewline
+        Write-Output "First attempt"
+        exit 1
+      }
+      Write-Output "Retry success"
+      exit 0
+`, counterFile)
+	}
 
 	th := test.Setup(t)
 	dag := th.DAG(t, fmt.Sprintf(`steps:
@@ -617,20 +670,12 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 name: child-retry-simple
 steps:
   - command: |
-      COUNTER_FILE="%s"
-      if [ ! -f "$COUNTER_FILE" ]; then
-        echo "1" > "$COUNTER_FILE"
-        echo "First attempt"
-        exit 1
-      else
-        echo "Retry success"
-        exit 0
-      fi
+%s
     output: OUTPUT
     retry_policy:
       limit: 1
       interval_sec: 0
-`, counterFile))
+`, strings.TrimPrefix(childScript, "\n")))
 
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
