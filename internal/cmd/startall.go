@@ -19,6 +19,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/service/coordinator"
+	"github.com/dagucloud/dagu/internal/service/discord"
 	"github.com/dagucloud/dagu/internal/service/eventstore"
 	"github.com/dagucloud/dagu/internal/service/frontend"
 	"github.com/dagucloud/dagu/internal/service/resource"
@@ -164,6 +165,7 @@ func runStartAll(ctx *Context, _ []string) error {
 	// Initialize bot if selected as provider
 	var tgBot *telegram.Bot
 	var slackBot *daguslack.Bot
+	var discordBot *discord.Bot
 	if agentAPI != nil {
 		switch ctx.Config.Bots.Provider {
 		case config.BotProviderTelegram:
@@ -206,6 +208,26 @@ func runStartAll(ctx *Context, _ []string) error {
 				logger.Info(serviceCtx, "Slack bot initialized")
 			}
 
+		case config.BotProviderDiscord:
+			discordBot, err = discord.New(
+				discord.Config{
+					Token:                 ctx.Config.Bots.Discord.Token,
+					AllowedChannelIDs:     ctx.Config.Bots.Discord.AllowedChannelIDs,
+					InterestedEventTypes:  ctx.Config.Bots.Discord.InterestedEventTypes,
+					RespondToAll:          ctx.Config.Bots.Discord.RespondToAll,
+					SafeMode:              ctx.Config.Bots.SafeMode,
+					EventService:          ctx.EventService,
+					NotificationStateFile: filepath.Join(ctx.Config.Paths.DataDir, "bots", "discord", "notifications.json"),
+				},
+				agentAPI,
+				slog.Default(),
+			)
+			if err != nil {
+				logger.Warn(serviceCtx, "Failed to initialize Discord bot", tag.Error(err))
+			} else {
+				logger.Info(serviceCtx, "Discord bot initialized")
+			}
+
 		case config.BotProviderNone:
 			// No bot configured
 		}
@@ -226,6 +248,9 @@ func runStartAll(ctx *Context, _ []string) error {
 		serviceCount++
 	}
 	if slackBot != nil {
+		serviceCount++
+	}
+	if discordBot != nil {
 		serviceCount++
 	}
 	errCh := make(chan error, serviceCount)
@@ -272,6 +297,18 @@ func runStartAll(ctx *Context, _ []string) error {
 			if err := slackBot.Run(signalCtx); err != nil {
 				select {
 				case errCh <- fmt.Errorf("slack bot failed: %w", err):
+				default:
+				}
+			}
+		})
+	}
+
+	// Start Discord bot
+	if discordBot != nil {
+		wg.Go(func() {
+			if err := discordBot.Run(signalCtx); err != nil {
+				select {
+				case errCh <- fmt.Errorf("discord bot failed: %w", err):
 				default:
 				}
 			}

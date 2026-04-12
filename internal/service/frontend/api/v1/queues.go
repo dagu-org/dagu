@@ -267,7 +267,7 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 		}
 		if count > 0 {
 			queue := getOrCreateQueue(queueMap, onlyQueue, a.config)
-			queue.queuedCount = max(count-len(queue.running), 0)
+			queue.queuedCount = count
 		}
 	} else {
 		queueNames, err := a.queueStore.QueueList(ctx)
@@ -287,7 +287,7 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 				continue
 			}
 			queue := getOrCreateQueue(queueMap, queueName, a.config)
-			queue.queuedCount = max(count-len(queue.running), 0)
+			queue.queuedCount = count
 		}
 	}
 

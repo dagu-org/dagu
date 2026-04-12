@@ -5,7 +5,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -67,37 +66,6 @@ func TestNewSnapshotStores_HydratesReadOnlyStores(t *testing.T) {
 	readOnlyStore, ok := stores.MemoryStore.(SnapshotReadOnlyMemoryStore)
 	require.True(t, ok)
 	assert.True(t, readOnlyStore.MemoryReadOnly())
-}
-
-func TestSnapshotSkillStore_SearchAndReadOnly(t *testing.T) {
-	t.Parallel()
-
-	store := NewSnapshotSkillStore([]*Skill{
-		{ID: "alpha", Name: "Alpha", Description: "Docker deploy", Tags: []string{"ops", "docker"}, Knowledge: "a"},
-		{ID: "beta", Name: "Beta", Description: "SQL tuning", Tags: []string{"data"}, Knowledge: "b"},
-		{ID: "gamma", Name: "Gamma", Description: "Docker build", Tags: []string{"ops"}, Knowledge: "c"},
-	})
-	require.NotNil(t, store)
-
-	result, err := store.Search(context.Background(), SearchSkillsOptions{
-		Query:      "docker",
-		Tags:       []string{"ops"},
-		AllowedIDs: map[string]struct{}{"alpha": {}, "gamma": {}},
-		Paginator:  exec.NewPaginator(2, 1),
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, 2, result.TotalCount)
-	require.Len(t, result.Items, 1)
-	assert.Equal(t, "gamma", result.Items[0].ID)
-
-	skill, err := store.GetByID(context.Background(), "alpha")
-	require.NoError(t, err)
-	assert.Equal(t, "Alpha", skill.Name)
-	_, err = store.GetByID(context.Background(), "missing")
-	assert.True(t, errors.Is(err, ErrSkillNotFound))
-	assert.ErrorIs(t, store.Create(context.Background(), &Skill{ID: "new"}), ErrSnapshotStoreReadOnly)
-	assert.ErrorIs(t, store.Update(context.Background(), &Skill{ID: "alpha"}), ErrSnapshotStoreReadOnly)
 }
 
 func TestSnapshotSoulStore_SearchAndReadOnly(t *testing.T) {

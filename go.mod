@@ -6,6 +6,7 @@ require (
 	dario.cat/mergo v1.0.2
 	github.com/adrg/xdg v0.5.3
 	github.com/bmatcuk/doublestar/v4 v4.8.1
+	github.com/bwmarrin/discordgo v0.29.0
 	github.com/coder/websocket v1.8.14
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.4

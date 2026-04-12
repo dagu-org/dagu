@@ -657,9 +657,6 @@ func TestAgentStoresFromSnapshot_HydratesSnapshotStores(t *testing.T) {
 				APIKey:   "test-key",
 			},
 		},
-		Skills: []*agent.Skill{
-			{ID: "skill-one", Name: "Skill One", Knowledge: "knowledge"},
-		},
 		Souls: []*agent.Soul{
 			{ID: "helper", Name: "Helper", Content: "be precise"},
 		},
@@ -674,7 +671,6 @@ func TestAgentStoresFromSnapshot_HydratesSnapshotStores(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, stores.configStore)
 	require.NotNil(t, stores.modelStore)
-	require.NotNil(t, stores.skillStore)
 	require.NotNil(t, stores.soulStore)
 	require.NotNil(t, stores.memoryStore)
 	assert.Nil(t, stores.oauthManager)
@@ -685,9 +681,6 @@ func TestAgentStoresFromSnapshot_HydratesSnapshotStores(t *testing.T) {
 	model, err := stores.modelStore.GetByID(context.Background(), "model-default")
 	require.NoError(t, err)
 	assert.Equal(t, "gpt-5.4", model.Model)
-	skill, err := stores.skillStore.GetByID(context.Background(), "skill-one")
-	require.NoError(t, err)
-	assert.Equal(t, "Skill One", skill.Name)
 	soul, err := stores.soulStore.GetByID(context.Background(), "helper")
 	require.NoError(t, err)
 	assert.Equal(t, "Helper", soul.Name)

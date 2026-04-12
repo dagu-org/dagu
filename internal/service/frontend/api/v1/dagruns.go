@@ -2204,8 +2204,12 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 		}
 		terminateMode = "failed_auto_retry_cancel"
 	} else {
-		// Check if it's a distributed DAG (has WorkerID)
-		if savedStatus.WorkerID != "" {
+		dag, err := attempt.ReadDAG(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error reading DAG: %w", err)
+		}
+
+		if core.ShouldDispatchToCoordinator(dag, a.coordinatorCli != nil, a.defaultExecMode) {
 			// For distributed DAGs, use saved status for running check
 			if savedStatus.Status != core.Running {
 				return nil, &Error{
@@ -2227,10 +2231,6 @@ func (a *API) TerminateDAGRun(ctx context.Context, request api.TerminateDAGRunRe
 			}
 		} else {
 			// For local DAGs, use existing logic with GetCurrentStatus and socket
-			dag, err := attempt.ReadDAG(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("error reading DAG: %w", err)
-			}
 			dagStatus, err := a.dagRunMgr.GetCurrentStatus(ctx, dag, request.DagRunId)
 			if err != nil {
 				return nil, &Error{

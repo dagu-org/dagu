@@ -20,7 +20,6 @@ type Config struct {
 	Enabled        bool             `json:"enabled"`
 	DefaultModelID string           `json:"defaultModelId,omitempty"`
 	ToolPolicy     ToolPolicyConfig `json:"toolPolicy"`
-	EnabledSkills  []string         `json:"enabledSkills,omitempty"`
 	SelectedSoulID string           `json:"selectedSoulId,omitempty"`
 	WebSearch      *WebSearchConfig `json:"webSearch,omitempty"`
 }

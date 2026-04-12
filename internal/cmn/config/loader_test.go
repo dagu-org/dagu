@@ -329,6 +329,11 @@ func TestLoad_Env(t *testing.T) {
 			},
 			Slack: SlackBotConfig{
 				InterestedEventTypes: DefaultBotInterestedEventTypes,
+				RespondToAll:         true,
+			},
+			Discord: DiscordBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+				RespondToAll:         true,
 			},
 		},
 		DefaultExecMode: ExecutionModeLocal,
@@ -759,6 +764,11 @@ scheduler:
 			},
 			Slack: SlackBotConfig{
 				InterestedEventTypes: DefaultBotInterestedEventTypes,
+				RespondToAll:         true,
+			},
+			Discord: DiscordBotConfig{
+				InterestedEventTypes: DefaultBotInterestedEventTypes,
+				RespondToAll:         true,
 			},
 		},
 		DefaultExecMode: ExecutionModeLocal,
@@ -1218,6 +1228,35 @@ bots:
 
 		assert.Empty(t, cfg.Bots.Slack.InterestedEventTypes)
 	})
+
+	t.Run("discord env overrides config", func(t *testing.T) {
+		cfg := loadWithEnv(t, `
+bots:
+  discord:
+    interested_event_types:
+      - dag.run.failed
+      - dag.run.succeeded
+`, map[string]string{
+			"DAGU_BOTS_DISCORD_INTERESTED_EVENT_TYPES": "dag.run.running,dag.run.queued",
+		})
+
+		assert.Equal(t, []string{"dag.run.running", "dag.run.queued"}, cfg.Bots.Discord.InterestedEventTypes)
+	})
+}
+
+func TestLoad_DiscordBotEnvOnlyConfig(t *testing.T) {
+	cfg := loadWithEnv(t, "# empty", map[string]string{
+		"DAGU_BOTS_PROVIDER":                    "discord",
+		"DAGU_BOTS_DISCORD_TOKEN":               "discord-token",
+		"DAGU_BOTS_DISCORD_ALLOWED_CHANNEL_IDS": "chan-1,chan-2",
+		"DAGU_BOTS_DISCORD_RESPOND_TO_ALL":      "false",
+	})
+
+	assert.Equal(t, BotProviderDiscord, cfg.Bots.Provider)
+	assert.Equal(t, "discord-token", cfg.Bots.Discord.Token)
+	assert.Equal(t, []string{"chan-1", "chan-2"}, cfg.Bots.Discord.AllowedChannelIDs)
+	assert.False(t, cfg.Bots.Discord.RespondToAll)
+	assert.Equal(t, DefaultBotInterestedEventTypes, cfg.Bots.Discord.InterestedEventTypes)
 }
 
 func TestLoad_Monitoring(t *testing.T) {
