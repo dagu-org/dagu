@@ -18,6 +18,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/persis/filewatermark"
 	"github.com/dagucloud/dagu/internal/runtime"
+	"github.com/dagucloud/dagu/internal/runtime/transform"
 	"github.com/dagucloud/dagu/internal/service/coordinator"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/dagucloud/dagu/internal/service/worker"
@@ -400,6 +401,57 @@ func (f *testFixture) enqueue() error {
 	subCmdBuilder := runtime.NewSubCmdBuilder(f.coord.Config)
 	enqueueSpec := subCmdBuilder.Enqueue(f.dagWrapper.DAG, runtime.EnqueueOptions{Quiet: true})
 	return runtime.Run(f.coord.Context, enqueueSpec)
+}
+
+func (f *testFixture) enqueueDirect() error {
+	f.t.Helper()
+
+	runID, err := f.coord.DAGRunMgr.GenDAGRunID(f.coord.Context)
+	if err != nil {
+		return err
+	}
+
+	dagCopy := *f.dagWrapper.DAG
+	dagCopy.Location = ""
+
+	att, err := f.coord.DAGRunStore.CreateAttempt(f.coord.Context, &dagCopy, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
+	if err != nil {
+		return err
+	}
+
+	logFile := filepath.Join(f.coord.Config.Paths.LogDir, dagCopy.Name, runID+".log")
+	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
+		return err
+	}
+
+	status := transform.NewStatusBuilder(&dagCopy).Create(
+		runID,
+		core.Queued,
+		0,
+		time.Time{},
+		transform.WithLogFilePath(logFile),
+		transform.WithAttemptID(att.ID()),
+		transform.WithHierarchyRefs(exec.NewDAGRunRef(dagCopy.Name, runID), exec.DAGRunRef{}),
+		transform.WithTriggerType(core.TriggerTypeManual),
+	)
+
+	if err := att.Open(f.coord.Context); err != nil {
+		return err
+	}
+	if err := att.Write(f.coord.Context, status); err != nil {
+		_ = att.Close(f.coord.Context)
+		return err
+	}
+	if err := att.Close(f.coord.Context); err != nil {
+		return err
+	}
+
+	return f.coord.QueueStore.Enqueue(
+		f.coord.Context,
+		dagCopy.ProcGroup(),
+		exec.QueuePriorityLow,
+		exec.NewDAGRunRef(dagCopy.Name, runID),
+	)
 }
 
 func (f *testFixture) enqueueCatchup(scheduleTime time.Time) (string, error) {

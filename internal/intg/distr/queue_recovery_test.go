@@ -43,7 +43,7 @@ steps:
 	defer f.cleanup()
 
 	for range totalRuns {
-		require.NoError(t, f.enqueue())
+		require.NoError(t, f.enqueueDirect())
 	}
 
 	requireQueuedItemCountEventually(t, f, totalRuns, 60*time.Second)
