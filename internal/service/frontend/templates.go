@@ -341,10 +341,7 @@ func graceEndsAt(claims *license.LicenseClaims) string {
 
 	graceDays := 14
 	if claims.GraceDays != nil {
-		graceDays = *claims.GraceDays
-		if graceDays < 0 {
-			graceDays = 0
-		}
+		graceDays = max(*claims.GraceDays, 0)
 	}
 
 	return claims.ExpiresAt.Time.Add(time.Duration(graceDays) * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
