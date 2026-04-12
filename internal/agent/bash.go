@@ -268,10 +268,7 @@ func (w *cappedWriter) String() string {
 	}
 
 	s := w.buf.String()
-	keep := w.limit - len(outputTruncationMarker)
-	if keep > len(s) {
-		keep = len(s)
-	}
+	keep := min(w.limit-len(outputTruncationMarker), len(s))
 	return s[:keep] + outputTruncationMarker
 }
 
