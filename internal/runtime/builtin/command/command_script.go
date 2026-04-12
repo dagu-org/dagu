@@ -104,7 +104,9 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 	if scriptFile != "" {
 		clonedArgs = append(clonedArgs, scriptFile)
 	}
-	return exec.CommandContext(ctx, cmd, clonedArgs...) // nolint: gosec
+	command := exec.CommandContext(ctx, cmdutil.ResolveExecutable(cmd), clonedArgs...) // nolint: gosec
+	cmdutil.SetupCommand(command)
+	return command
 }
 
 // validateCommandStep checks that a Step has a valid command configuration.

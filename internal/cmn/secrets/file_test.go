@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/core"
@@ -200,7 +201,7 @@ func TestFileResolver_Resolve(t *testing.T) {
 
 func TestFileResolver_Resolve_PermissionErrors(t *testing.T) {
 	// Skip on Windows - file permissions work differently
-	if os.Getenv("GOOS") == "windows" {
+	if runtime.GOOS == "windows" {
 		t.Skip("Skipping permission test on Windows")
 	}
 

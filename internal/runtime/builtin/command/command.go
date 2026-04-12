@@ -242,7 +242,8 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		}
 		if shebang != "" {
 			// Use the shebang interpreter to run the script
-			cmd = exec.CommandContext(cfg.Ctx, shebang, append(shebangArgs, scriptFile)...) // nolint: gosec
+			cmd = exec.CommandContext(cfg.Ctx, cmdutil.ResolveExecutable(shebang), append(shebangArgs, scriptFile)...) // nolint: gosec
+			cmdutil.SetupCommand(cmd)
 			break
 		}
 		// Use shell command builder to properly execute the script file

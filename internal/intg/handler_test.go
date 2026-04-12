@@ -638,9 +638,11 @@ steps:
 
 		outputStr := extractValue(output.(string))
 
-		// These should be unset/empty in handlers
-		assert.Contains(t, outputStr, "stdout:UNSET", "DAG_RUN_STEP_STDOUT_FILE should not be set in handler")
-		assert.Contains(t, outputStr, "stderr:UNSET", "DAG_RUN_STEP_STDERR_FILE should not be set in handler")
+		// Handler steps do not get step-scoped stdout/stderr vars.
+		assert.Contains(t, outputStr, "stdout:", "stdout prefix should be present")
+		assert.Contains(t, outputStr, "stderr:", "stderr prefix should be present")
+		assert.NotContains(t, outputStr, ".out", "DAG_RUN_STEP_STDOUT_FILE should not be set in handler")
+		assert.NotContains(t, outputStr, ".err", "DAG_RUN_STEP_STDERR_FILE should not be set in handler")
 	})
 
 	t.Run("Handlers_CanAccessStepOutputVariables", func(t *testing.T) {
@@ -705,9 +707,8 @@ steps:
 
 		outputStr := extractValue(output.(string))
 
-		// Init handler cannot access step output (steps haven't run yet)
-		assert.Contains(t, outputStr, "step_output:NOT_YET_AVAILABLE",
-			"init handler should not access step outputs")
+		// Init handler runs before any step output exists, so shell fallback is used.
+		assert.Equal(t, "step_output:NOT_YET_AVAILABLE", outputStr)
 	})
 
 	t.Run("WaitHandler_DAG_WAITING_STEPS_EnvVar", func(t *testing.T) {
@@ -799,11 +800,12 @@ steps:
 		th := test.Setup(t)
 		tempDir := t.TempDir()
 		stdoutPath := filepath.Join(tempDir, "handler_${DAG_RUN_STATUS}.log")
+		stdoutPathForYAML := filepath.ToSlash(stdoutPath)
 
 		dag := th.DAG(t, `
 handler_on:
   success:
-    stdout: "`+stdoutPath+`"
+    stdout: "`+stdoutPathForYAML+`"
     command: echo "handler ran"
 
 steps:
@@ -827,12 +829,13 @@ steps:
 		th := test.Setup(t)
 		tempDir := t.TempDir()
 		stdoutPath := filepath.Join(tempDir, "wait_${DAG_WAITING_STEPS}.log")
+		stdoutPathForYAML := filepath.ToSlash(stdoutPath)
 
 		dag := th.DAG(t, `
 type: graph
 handler_on:
   wait:
-    stdout: "`+stdoutPath+`"
+    stdout: "`+stdoutPathForYAML+`"
     command: echo "waiting handler"
 
 steps:

@@ -616,7 +616,8 @@ steps:
 		th := test.SetupCommand(t)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		counterFile := filepath.Join("/tmp", "retry_counter_"+dagRunID)
+		counterFile := filepath.Join(t.TempDir(), "retry_counter_"+dagRunID)
+		counterFileForShell := filepath.ToSlash(counterFile)
 		defer func() { _ = os.Remove(counterFile) }()
 
 		th.CreateDAGFile(t, "parent_retry.yaml", `
@@ -630,7 +631,7 @@ steps:
 steps:
   - name: retry_step
     command: |
-      COUNTER_FILE="`+counterFile+`"
+      COUNTER_FILE="`+counterFileForShell+`"
       if [ ! -f "$COUNTER_FILE" ]; then
         echo "1" > "$COUNTER_FILE"
         echo "output_attempt_1"
@@ -689,14 +690,15 @@ func TestRetryPolicy(t *testing.T) {
 		th := test.SetupCommand(t)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		counterFile := filepath.Join("/tmp", "retry_counter_basic_"+dagRunID)
+		counterFile := filepath.Join(t.TempDir(), "retry_counter_basic_"+dagRunID)
+		counterFileForShell := filepath.ToSlash(counterFile)
 		defer func() { _ = os.Remove(counterFile) }()
 
 		th.CreateDAGFile(t, "basic_retry.yaml", `
 steps:
   - name: retry_step
     command: |
-      COUNTER_FILE="`+counterFile+`"
+      COUNTER_FILE="`+counterFileForShell+`"
       if [ ! -f "$COUNTER_FILE" ]; then
         echo "1" > "$COUNTER_FILE"
         echo "output_attempt_1"

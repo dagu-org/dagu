@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -721,7 +722,11 @@ steps:
 		require.NoError(t, err)
 
 		// Child should inherit base's working_dir
-		assert.Equal(t, "/shared/workspace", dag.WorkingDir)
+		expected := "/shared/workspace"
+		if runtime.GOOS == "windows" {
+			expected = filepath.Join(filepath.Dir(baseDAG), filepath.FromSlash("/shared/workspace"))
+		}
+		assert.Equal(t, expected, dag.WorkingDir)
 	})
 
 	t.Run("OverrideBaseWorkingDir", func(t *testing.T) {
@@ -742,7 +747,11 @@ steps:
 		require.NoError(t, err)
 
 		// Child's explicit working_dir should override base
-		assert.Equal(t, "/my/custom/dir", dag.WorkingDir)
+		expected := "/my/custom/dir"
+		if runtime.GOOS == "windows" {
+			expected = filepath.Join(filepath.Dir(childDAG), filepath.FromSlash("/my/custom/dir"))
+		}
+		assert.Equal(t, expected, dag.WorkingDir)
 	})
 }
 

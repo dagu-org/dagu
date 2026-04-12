@@ -1944,7 +1944,7 @@ tunnel:
 		assert.Equal(t, "yaml-dagu", cfg.Tunnel.Tailscale.Hostname)
 		assert.False(t, cfg.Tunnel.Tailscale.Funnel)
 		assert.True(t, cfg.Tunnel.Tailscale.HTTPS)
-		assert.Equal(t, resolvedTestPath(t, "/var/dagu/tailscale"), cfg.Tunnel.Tailscale.StateDir)
+		assert.Equal(t, "/var/dagu/tailscale", cfg.Tunnel.Tailscale.StateDir)
 		assert.True(t, cfg.Tunnel.AllowTerminal)
 		assert.Equal(t, []string{"192.168.1.0/24", "10.0.0.0/8"}, cfg.Tunnel.AllowedIPs)
 		assert.True(t, cfg.Tunnel.RateLimiting.Enabled)

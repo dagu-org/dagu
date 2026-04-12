@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
@@ -652,16 +653,17 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 		}
 
 		if actual, ok := actualOutputs[key]; ok {
+			actual = normalizeTestOutput(actual)
 			switch expected := expected.(type) {
 			case string:
-				assert.Equal(t, fmt.Sprintf("%s=%s", key, expected), actual)
+				assert.Equal(t, normalizeTestOutput(fmt.Sprintf("%s=%s", key, expected)), actual)
 
 			case Contains:
-				assert.Contains(t, actual, string(expected), "expected output %q to include %q", key, expected)
+				assert.Contains(t, actual, normalizeTestOutput(string(expected)), "expected output %q to include %q", key, expected)
 
 			case []Contains:
 				for _, c := range expected {
-					assert.Contains(t, actual, string(c), "expected output %q to include %q", key, c)
+					assert.Contains(t, actual, normalizeTestOutput(string(c)), "expected output %q to include %q", key, c)
 				}
 
 			case NotEmpty:
@@ -677,6 +679,10 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 			t.Errorf("expected output %q not found", key)
 		}
 	}
+}
+
+func normalizeTestOutput(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
 // ReadOutputs reads the collected outputs from the outputs.json file.
@@ -890,10 +896,10 @@ func testShellPath(t *testing.T) string {
 	t.Helper()
 
 	if runtime.GOOS == "windows" {
-		if shPath, err := exec.LookPath("bash"); err == nil {
-			return shPath
+		if bashPath, ok := cmdutil.FindExecutable("bash"); ok {
+			return bashPath
 		}
-		if shPath, err := exec.LookPath("sh"); err == nil {
+		if shPath, ok := cmdutil.FindExecutable("sh"); ok {
 			return shPath
 		}
 		if shPath, err := exec.LookPath("powershell"); err == nil {

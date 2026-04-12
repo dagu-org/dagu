@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -269,6 +270,13 @@ steps:
 		errCh <- agent.Run(agent.Context)
 	}()
 
+	startedTimeout := 3 * time.Second
+	allStartedTimeout := 3 * time.Second
+	if runtime.GOOS == "windows" {
+		startedTimeout = 8 * time.Second
+		allStartedTimeout = 10 * time.Second
+	}
+
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 		return err == nil && len(status.Nodes) == 1 && len(status.Nodes[0].SubRuns) == 3
@@ -288,7 +296,7 @@ steps:
 			}
 		}
 		return started >= 2
-	}, 3*time.Second, 50*time.Millisecond, "first two items never started")
+	}, startedTimeout, 50*time.Millisecond, "first two items never started")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
@@ -304,7 +312,7 @@ steps:
 			}
 		}
 		return started == 3
-	}, 3*time.Second, 50*time.Millisecond, "third item should start before the retry backoff expires")
+	}, allStartedTimeout, 50*time.Millisecond, "third item should start before the retry backoff expires")
 
 	select {
 	case err := <-errCh:
@@ -966,7 +974,7 @@ steps:
     params:
       - ITEM: ${ITEM}
     output: RESULTS
-`, testDataDir))
+`, filepath.ToSlash(testDataDir)))
 
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)

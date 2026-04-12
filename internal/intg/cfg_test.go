@@ -4,6 +4,7 @@
 package intg_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -266,9 +267,10 @@ steps:
 	t.Run("EnvVar", func(t *testing.T) {
 		t.Parallel()
 
-		dag := th.DAG(t, `env:
-  - DATA_DIR: /tmp/dagu_test_integration
-  - PROCESS_DATE: "`+"`"+`date '+%Y%m%d_%H%M%S'`+"`"+`"
+		dataPrefix := filepath.ToSlash(filepath.Join(t.TempDir(), "dagu_test_integration"))
+		dag := th.DAG(t, fmt.Sprintf(`env:
+  - DATA_DIR: %q
+  - PROCESS_DATE: "`+"`"+`date '+%%Y%%m%%d_%%H%%M%%S'`+"`"+`"
 
 steps:
   - command: echo foo
@@ -279,7 +281,7 @@ steps:
       - condition: "${DATA_DIR}_${PROCESS_DATE}"
         expected: "re:[0-9]{8}_[0-9]{6}"
   - command: rm ${DATA_DIR}_${PROCESS_DATE}
-`)
+`, dataPrefix))
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 		dag.AssertOutputs(t, map[string]any{
@@ -345,6 +347,8 @@ steps:
 		tempDir := t.TempDir()
 		stdoutPath := filepath.Join(tempDir, "dag_${DAG_RUN_STEP_NAME}.out")
 		stderrPath := filepath.Join(tempDir, "dag_${LOG_SUFFIX}.err")
+		stdoutPathForYAML := filepath.ToSlash(stdoutPath)
+		stderrPathForYAML := filepath.ToSlash(stderrPath)
 
 		dag := th.DAG(t, `steps:
   - name: first
@@ -354,8 +358,8 @@ steps:
   - name: second
     env:
       - LOG_SUFFIX=custom-error
-    stdout: "`+stdoutPath+`"
-    stderr: "`+stderrPath+`"
+    stdout: "`+stdoutPathForYAML+`"
+    stderr: "`+stderrPathForYAML+`"
     command: |
       echo "meh"
       echo "oops" >&2
@@ -489,10 +493,9 @@ steps:
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
-		dag.AssertOutputs(t, map[string]any{
-			"OUT1": os.ExpandEnv("$HOME"),
-			"OUT2": os.ExpandEnv("$HOME"),
-		})
+		outputs := dag.ReadOutputs(t)
+		require.Equal(t, canonicalTestPath(os.ExpandEnv("$HOME")), canonicalTestPath(outputs["out1"]))
+		require.Equal(t, canonicalTestPath(os.ExpandEnv("$HOME")), canonicalTestPath(outputs["out2"]))
 	})
 
 	t.Run("Issue810", func(t *testing.T) {
@@ -564,11 +567,12 @@ steps:
 		// Issue #1203: Scripts with trailing \r cause file path errors
 		// Example: "can't open file '/path/to/file.py\r': [Errno 2] No such file or directory"
 		tmpFile := th.TempFile(t, "script-trimming-issue", nil)
+		tmpFileForShell := filepath.ToSlash(tmpFile)
 
 		// Create a DAG with script containing \r - this should fail
 		dag := th.DAG(t, "steps:\n"+
 			"  - command: bash\n"+
-			"    script: \"test -f "+tmpFile+"\\r\"\n")
+			"    script: \"test -f "+tmpFileForShell+"\\r\"\n")
 
 		agent := dag.Agent()
 

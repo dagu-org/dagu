@@ -18,6 +18,12 @@ func canonicalTestPath(path string) string {
 	if path == "" {
 		return ""
 	}
+	if runtime.GOOS == "windows" && len(path) >= 3 && path[0] == '/' && path[2] == '/' {
+		drive := path[1]
+		if ('a' <= drive && drive <= 'z') || ('A' <= drive && drive <= 'Z') {
+			path = strings.ToUpper(string(drive)) + ":" + filepath.FromSlash(path[2:])
+		}
+	}
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		path = resolved
 	}
@@ -31,7 +37,7 @@ func requireLinuxContainerRuntime(t *testing.T) {
 		return
 	}
 
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	dockerClient, err := client.New(client.FromEnv)
 	if err != nil {
 		t.Skipf("Docker integration tests require a Linux container runtime: %v", err)
 	}

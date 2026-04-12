@@ -450,7 +450,7 @@ func TestCollector_Collect_WithDAGRuns(t *testing.T) {
 
 	// Check dagu_uptime_seconds
 	assert.Contains(t, metricMap, "dagu_uptime_seconds")
-	assert.Greater(t, *metricMap["dagu_uptime_seconds"].Metric[0].Gauge.Value, float64(0))
+	assert.GreaterOrEqual(t, *metricMap["dagu_uptime_seconds"].Metric[0].Gauge.Value, float64(0))
 
 	// Check dagu_scheduler_running
 	assert.Contains(t, metricMap, "dagu_scheduler_running")

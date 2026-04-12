@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -571,8 +572,17 @@ func TestStripFrontmatter(t *testing.T) {
 func TestTildefy(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "~/.claude/skills/dagu/SKILL.md", tildefy("/home/user/.claude/skills/dagu/SKILL.md", "/home/user"))
-	assert.Equal(t, "/other/path", tildefy("/other/path", "/home/user"))
+	homeDir := "/home/user"
+	expectedHome := "~/.claude/skills/dagu/SKILL.md"
+	otherPath := "/other/path"
+	if runtime.GOOS == "windows" {
+		homeDir = `C:\Users\user`
+		expectedHome = `~\.claude\skills\dagu\SKILL.md`
+		otherPath = `C:\other\path`
+	}
+
+	assert.Equal(t, expectedHome, tildefy(filepath.Join(homeDir, ".claude", "skills", "dagu", "SKILL.md"), homeDir))
+	assert.Equal(t, otherPath, tildefy(otherPath, homeDir))
 }
 
 func TestEmbeddedSkillFS(t *testing.T) {

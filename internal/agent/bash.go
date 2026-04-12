@@ -7,9 +7,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/llm"
 )
 
@@ -91,28 +93,52 @@ func executeCommand(toolCtx ToolContext, args BashToolInput) ToolOut {
 	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", args.Command)
+	bashPath, ok := cmdutil.FindExecutable("bash")
+	if !ok {
+		return toolError("bash is not available")
+	}
+
+	cmd := exec.Command(bashPath, "-c", args.Command)
 	if toolCtx.WorkingDir != "" {
 		cmd.Dir = toolCtx.WorkingDir
 	}
+	cmdutil.SetupCommand(cmd)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
-	output := buildOutput(stdout.String(), stderr.String())
+	if err := cmd.Start(); err != nil {
+		return toolError("Command failed: %v", err)
+	}
 
-	if err != nil {
+	waitDone := make(chan error, 1)
+	go func() {
+		waitDone <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-waitDone:
+		output := buildOutput(stdout.String(), stderr.String())
+		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				return toolError("Command timed out after %v\n%s", timeout, output)
+			}
+			return toolError("Command failed: %v\n%s", err, output)
+		}
+		if output == "" {
+			return ToolOut{Content: "(no output)"}
+		}
+		return ToolOut{Content: output}
+	case <-ctx.Done():
+		_ = cmdutil.KillProcessGroup(cmd, os.Kill)
+		<-waitDone
+		output := buildOutput(stdout.String(), stderr.String())
 		if ctx.Err() == context.DeadlineExceeded {
 			return toolError("Command timed out after %v\n%s", timeout, output)
 		}
-		return toolError("Command failed: %v\n%s", err, output)
+		return toolError("Command canceled\n%s", output)
 	}
-	if output == "" {
-		return ToolOut{Content: "(no output)"}
-	}
-	return ToolOut{Content: output}
 }
 
 func resolveTimeout(seconds int) time.Duration {

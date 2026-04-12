@@ -6,6 +6,7 @@ package spec
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -1344,6 +1345,11 @@ func TestBuildRegistryAuths_NoEval(t *testing.T) {
 func TestBuildWorkingDir(t *testing.T) {
 	t.Parallel()
 
+	explicitAbsolutePath := "/custom/path"
+	if runtime.GOOS == "windows" {
+		explicitAbsolutePath = filepath.Join(filepath.Dir(testBuildContext().file), filepath.FromSlash("/custom/path"))
+	}
+
 	tests := []struct {
 		name     string
 		dag      *dag
@@ -1354,7 +1360,7 @@ func TestBuildWorkingDir(t *testing.T) {
 			name:     "ExplicitAbsolutePath",
 			dag:      &dag{WorkingDir: "/custom/path"},
 			ctx:      testBuildContext(),
-			expected: "/custom/path",
+			expected: explicitAbsolutePath,
 		},
 		{
 			name:     "EmptyWhenNoExplicitValue",

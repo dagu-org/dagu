@@ -127,7 +127,7 @@ func TestDagIDToRepoPath_MemoryFiles(t *testing.T) {
 
 	// Memory file
 	assert.Equal(t,
-		filepath.Join("subdir", "memory", "MEMORY.md"),
+		"subdir/memory/MEMORY.md",
 		s.dagIDToRepoPath("memory/MEMORY"),
 	)
 }
@@ -152,13 +152,13 @@ func TestScanMemoryFiles(t *testing.T) {
 	s.scanMemoryFiles(state)
 
 	// Should find global memory
-	globalID := filepath.Join("memory", "MEMORY")
+	globalID := "memory/MEMORY"
 	assert.Contains(t, state.DAGs, globalID)
 	assert.Equal(t, StatusUntracked, state.DAGs[globalID].Status)
 	assert.Equal(t, DAGKindMemory, state.DAGs[globalID].Kind)
 
 	// Should find per-DAG memory
-	dagID := filepath.Join("memory", "dags", "my-dag", "MEMORY")
+	dagID := "memory/dags/my-dag/MEMORY"
 	assert.Contains(t, state.DAGs, dagID)
 	assert.Equal(t, StatusUntracked, state.DAGs[dagID].Status)
 	assert.Equal(t, DAGKindMemory, state.DAGs[dagID].Kind)

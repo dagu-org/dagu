@@ -152,5 +152,9 @@ func ProcessQueuedInlineRun(t *testing.T, server Server, queueName string) {
 			},
 		},
 	)
-	queueProcessor.ProcessQueueItems(server.Context, queueName)
+	require.Eventually(t, func() bool {
+		queueProcessor.ProcessQueueItems(server.Context, queueName)
+		items, err := server.QueueStore.List(server.Context, queueName)
+		return err == nil && len(items) == 0
+	}, 15*time.Second, 200*time.Millisecond)
 }

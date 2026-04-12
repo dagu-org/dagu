@@ -5,6 +5,8 @@ package spec
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -486,7 +488,12 @@ steps:
 func TestCustomStepTypes_CallSiteOverridesTemplateAndComposesAdditiveFields(t *testing.T) {
 	t.Parallel()
 
-	dag, err := LoadYAML(context.Background(), []byte(`
+	callSiteSignal := "SIGQUIT"
+	if runtime.GOOS == "windows" {
+		callSiteSignal = "SIGINT"
+	}
+
+	dag, err := LoadYAML(context.Background(), []byte(fmt.Sprintf(`
 name: custom-step-callsite-overrides-template
 defaults:
   continue_on: failed
@@ -547,13 +554,13 @@ steps:
       interval_sec: 11
     timeout_sec: 0
     mail_on_error: false
-    signal_on_stop: SIGQUIT
+    signal_on_stop: %s
     env:
       - LAYERED: call
       - CALL_ONLY: call-only
     preconditions:
       - condition: "test -x /call"
-`))
+`, callSiteSignal)))
 	require.NoError(t, err)
 	require.Len(t, dag.Steps, 1)
 
@@ -569,7 +576,7 @@ steps:
 	assert.Equal(t, 11*time.Second, step.RepeatPolicy.Interval)
 	assert.Zero(t, step.Timeout)
 	assert.False(t, step.MailOnError)
-	assert.Equal(t, "SIGQUIT", step.SignalOnStop)
+	assert.Equal(t, callSiteSignal, step.SignalOnStop)
 	assert.Equal(t, []string{
 		"LAYERED=default",
 		"DEFAULT_ONLY=default-only",

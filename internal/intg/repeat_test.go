@@ -58,10 +58,11 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
+	counterFileForShell := filepath.ToSlash(counterFile)
 
 	// Load DAG with repeat limit and condition
 	dag := th.DAG(t, fmt.Sprintf(`env:
-  - COUNTER_FILE: %s
+  - COUNTER_FILE: %q
 steps:
   - script: |
       COUNT=0
@@ -79,7 +80,7 @@ steps:
       interval_sec: 0
       condition: "`+"`"+`[ -f %s ] && cat %s || echo 0`+"`"+`"
       expected: "10"
-`, counterFile, counterFile, counterFile))
+`, counterFileForShell, counterFileForShell, counterFileForShell))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -182,9 +183,10 @@ func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
+	counterFileForShell := filepath.ToSlash(counterFile)
 
 	dag := th.DAG(t, fmt.Sprintf(`env:
-  - COUNTER_FILE: %s
+  - COUNTER_FILE: %q
 steps:
   - script: |
       COUNT=0
@@ -208,7 +210,7 @@ steps:
       interval_sec: 0
     continue_on:
       exit_code: [1]
-`, counterFile))
+`, counterFileForShell))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -276,9 +278,10 @@ func TestRepeatPolicy_OnExitCode(t *testing.T) {
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
+	counterFileForShell := filepath.ToSlash(counterFile)
 
 	dag := th.DAG(t, fmt.Sprintf(`env:
-  - COUNTER_FILE: %s
+  - COUNTER_FILE: %q
 steps:
   - command: |
       #!/bin/bash
@@ -299,7 +302,7 @@ steps:
       exit_code: [1]
       limit: 5
       interval_sec: 0
-`, counterFile))
+`, counterFileForShell))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, 15*time.Second)
