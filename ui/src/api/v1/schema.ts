@@ -3434,6 +3434,8 @@ export interface components {
              * @description Artifact file size in bytes
              */
             size: number;
+            /** @description Whether the artifact exceeds the inline preview size limit */
+            tooLarge: boolean;
             /** @description Whether inline text content was truncated for preview */
             truncated: boolean;
             /** @description Inline preview content for markdown or text artifacts */

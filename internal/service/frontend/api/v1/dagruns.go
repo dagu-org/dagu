@@ -864,36 +864,15 @@ func (a *API) DownloadDAGRunArtifact(ctx context.Context, request api.DownloadDA
 		}, nil
 	}
 
-	absPath, err := resolveArtifactPath(status.ArchiveDir, string(request.Params.Path))
+	file, info, err := openArtifactFile(status.ArchiveDir, string(request.Params.Path))
 	if err != nil {
-		return api.DownloadDAGRunArtifact404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("artifact file not found for dag-run %s", request.DagRunId),
-		}, nil
-	}
-
-	file, err := os.Open(filepath.Clean(absPath))
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
 			return api.DownloadDAGRunArtifact404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
 				Message: fmt.Sprintf("artifact file not found for dag-run %s", request.DagRunId),
 			}, nil
 		}
 		return nil, fmt.Errorf("open dag-run artifact: %w", err)
-	}
-
-	info, err := file.Stat()
-	if err != nil {
-		_ = file.Close()
-		return nil, fmt.Errorf("stat dag-run artifact: %w", err)
-	}
-	if info.IsDir() {
-		_ = file.Close()
-		return api.DownloadDAGRunArtifact404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("artifact file not found for dag-run %s", request.DagRunId),
-		}, nil
 	}
 
 	return api.DownloadDAGRunArtifact200ApplicationoctetStreamResponse{
@@ -1898,36 +1877,15 @@ func (a *API) DownloadSubDAGRunArtifact(ctx context.Context, request api.Downloa
 		}, nil
 	}
 
-	absPath, err := resolveArtifactPath(status.ArchiveDir, string(request.Params.Path))
+	file, info, err := openArtifactFile(status.ArchiveDir, string(request.Params.Path))
 	if err != nil {
-		return &api.DownloadSubDAGRunArtifact404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("artifact file not found for sub dag-run %s", request.SubDAGRunId),
-		}, nil
-	}
-
-	file, err := os.Open(filepath.Clean(absPath))
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
 			return &api.DownloadSubDAGRunArtifact404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
 				Message: fmt.Sprintf("artifact file not found for sub dag-run %s", request.SubDAGRunId),
 			}, nil
 		}
 		return nil, fmt.Errorf("open sub dag-run artifact: %w", err)
-	}
-
-	info, err := file.Stat()
-	if err != nil {
-		_ = file.Close()
-		return nil, fmt.Errorf("stat sub dag-run artifact: %w", err)
-	}
-	if info.IsDir() {
-		_ = file.Close()
-		return &api.DownloadSubDAGRunArtifact404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("artifact file not found for sub dag-run %s", request.SubDAGRunId),
-		}, nil
 	}
 
 	return &api.DownloadSubDAGRunArtifact200ApplicationoctetStreamResponse{
@@ -3312,6 +3270,9 @@ func listArtifactTreeNodes(rootDir, currentDir string) ([]api.ArtifactTreeNode, 
 
 	nodes := make([]api.ArtifactTreeNode, 0, len(entries))
 	for _, entry := range entries {
+		if fileutil.IsSymlinkDirEntry(entry) {
+			continue
+		}
 		node, err := buildArtifactTreeNode(rootDir, currentDir, entry)
 		if err != nil {
 			return nil, err
@@ -3372,25 +3333,11 @@ func resolveArtifactPath(archiveDir, relPath string) (string, error) {
 	if archiveDir == "" {
 		return "", errArtifactUnavailable
 	}
-
-	cleanRel := filepath.Clean(filepath.FromSlash(relPath))
-	if cleanRel == "." || cleanRel == "" || cleanRel == ".." || strings.HasPrefix(cleanRel, ".."+string(filepath.Separator)) {
+	resolved, err := fileutil.ResolveExistingPathWithinBase(archiveDir, relPath)
+	if errors.Is(err, fileutil.ErrPathEscapesBase) {
 		return "", os.ErrNotExist
 	}
-
-	archiveRoot, err := filepath.Abs(archiveDir)
-	if err != nil {
-		return "", err
-	}
-	resolved := filepath.Join(archiveRoot, cleanRel)
-	resolvedAbs, err := filepath.Abs(resolved)
-	if err != nil {
-		return "", err
-	}
-	if resolvedAbs != archiveRoot && !strings.HasPrefix(resolvedAbs, archiveRoot+string(filepath.Separator)) {
-		return "", os.ErrNotExist
-	}
-	return resolvedAbs, nil
+	return resolved, err
 }
 
 func buildArtifactPreview(archiveDir, relPath string) (api.ArtifactPreviewResponse, error) {
@@ -3415,18 +3362,13 @@ func buildArtifactPreview(archiveDir, relPath string) (api.ArtifactPreviewRespon
 		_ = file.Close()
 	}()
 
-	previewBytes, err := io.ReadAll(io.LimitReader(file, artifactPreviewMaxBytes+1))
+	sniffBytes, err := io.ReadAll(io.LimitReader(file, 512))
 	if err != nil {
 		return api.ArtifactPreviewResponse{}, err
 	}
-
-	truncated := int64(len(previewBytes)) > artifactPreviewMaxBytes
-	if truncated {
-		previewBytes = previewBytes[:artifactPreviewMaxBytes]
-	}
-
-	mimeType := detectArtifactMimeType(absPath, previewBytes)
+	mimeType := detectArtifactMimeType(absPath, sniffBytes)
 	kind := artifactPreviewKind(relPath, mimeType)
+	tooLarge := info.Size() > artifactPreviewMaxBytes
 
 	resp := api.ArtifactPreviewResponse{
 		Name:      filepath.Base(absPath),
@@ -3434,13 +3376,52 @@ func buildArtifactPreview(archiveDir, relPath string) (api.ArtifactPreviewRespon
 		Kind:      kind,
 		MimeType:  mimeType,
 		Size:      info.Size(),
-		Truncated: truncated,
+		TooLarge:  tooLarge,
+		Truncated: false,
+	}
+	if tooLarge {
+		return resp, nil
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+
+	previewBytes, err := io.ReadAll(io.LimitReader(file, artifactPreviewMaxBytes+1))
+	if err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+	if int64(len(previewBytes)) > artifactPreviewMaxBytes {
+		previewBytes = previewBytes[:artifactPreviewMaxBytes]
+		resp.Truncated = true
 	}
 	if kind == api.ArtifactPreviewKindMarkdown || kind == api.ArtifactPreviewKindText {
 		content := string(previewBytes)
 		resp.Content = &content
 	}
 	return resp, nil
+}
+
+func openArtifactFile(archiveDir, relPath string) (*os.File, os.FileInfo, error) {
+	absPath, err := resolveArtifactPath(archiveDir, relPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	file, err := os.Open(filepath.Clean(absPath))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, nil, err
+	}
+	if info.IsDir() {
+		_ = file.Close()
+		return nil, nil, os.ErrNotExist
+	}
+	return file, info, nil
 }
 
 func detectArtifactMimeType(path string, previewBytes []byte) string {

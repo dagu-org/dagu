@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -60,6 +59,9 @@ func (h *artifactHandler) handleStream(stream coordinatorv1.CoordinatorService_S
 		}
 
 		if chunk.IsFinal {
+			if _, err := h.getOrCreateWriter(ctx, chunk); err != nil {
+				return fmt.Errorf("failed to create artifact writer: %w", err)
+			}
 			h.closeWriter(ctx, chunk)
 			continue
 		}
@@ -128,16 +130,11 @@ func (h *artifactHandler) artifactFilePath(ctx context.Context, chunk *coordinat
 	if err != nil {
 		return "", err
 	}
-
-	relPath := filepath.Clean(filepath.FromSlash(chunk.RelativePath))
-	if relPath == "." || relPath == "" {
-		return "", fmt.Errorf("artifact relative path is empty")
+	filePath, err := fileutil.ResolvePathWithinBase(archiveDir, chunk.RelativePath)
+	if err != nil {
+		return "", fmt.Errorf("resolve artifact path %q: %w", chunk.RelativePath, err)
 	}
-	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("artifact relative path escapes archive root: %q", chunk.RelativePath)
-	}
-
-	return filepath.Join(archiveDir, relPath), nil
+	return filePath, nil
 }
 
 func (h *artifactHandler) archiveDir(ctx context.Context, chunk *coordinatorv1.ArtifactChunk) (string, error) {

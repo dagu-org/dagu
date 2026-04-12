@@ -8315,6 +8315,9 @@ components:
           type: integer
           format: int64
           description: "Artifact file size in bytes"
+        tooLarge:
+          type: boolean
+          description: "Whether the artifact exceeds the inline preview size limit"
         truncated:
           type: boolean
           description: "Whether inline text content was truncated for preview"
@@ -8327,6 +8330,7 @@ components:
         - kind
         - mimeType
         - size
+        - tooLarge
         - truncated
 
     DAGRunOutputs:

@@ -176,6 +176,82 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     [allNodes, selectedPath]
   );
 
+  const requestArtifactTree = async () => {
+    if (isSubDAGRun) {
+      return client.GET('/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts', {
+        params: {
+          path: {
+            name: dagRun.rootDAGRunName!,
+            dagRunId: dagRun.rootDAGRunId!,
+            subDAGRunId: dagRun.dagRunId,
+          },
+          query: { remoteNode },
+        },
+      });
+    }
+
+    return client.GET('/dag-runs/{name}/{dagRunId}/artifacts', {
+      params: {
+        path: {
+          name: dagRun.name,
+          dagRunId: dagRun.dagRunId,
+        },
+        query: { remoteNode },
+      },
+    });
+  };
+
+  const requestArtifactPreview = async (path: string) => {
+    if (isSubDAGRun) {
+      return client.GET(
+        '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/preview',
+        {
+          params: {
+            path: {
+              name: dagRun.rootDAGRunName!,
+              dagRunId: dagRun.rootDAGRunId!,
+              subDAGRunId: dagRun.dagRunId,
+            },
+            query: { remoteNode, path },
+          },
+        }
+      );
+    }
+
+    return client.GET('/dag-runs/{name}/{dagRunId}/artifacts/preview', {
+      params: {
+        path: {
+          name: dagRun.name,
+          dagRunId: dagRun.dagRunId,
+        },
+        query: { remoteNode, path },
+      },
+    });
+  };
+
+  const buildArtifactDownloadUrl = (path: string) => {
+    const endpoint = isSubDAGRun
+      ? `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.rootDAGRunName!)}/${encodeURIComponent(dagRun.rootDAGRunId!)}/sub-dag-runs/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`
+      : `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.name)}/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`;
+
+    const url = new URL(endpoint, window.location.origin);
+    url.searchParams.set('remoteNode', remoteNode);
+    url.searchParams.set('path', path);
+    return url;
+  };
+
+  const fetchArtifactDownload = async (path: string, signal?: AbortSignal) => {
+    const token = getAuthToken();
+    const response = await fetch(buildArtifactDownloadUrl(path).toString(), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.statusText}`);
+    }
+    return response;
+  };
+
   const fetchTree = async () => {
     if (!dagRun.archiveDir) {
       setTree([]);
@@ -186,29 +262,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     setTreeLoading(true);
     setTreeError(null);
 
-    const request = isSubDAGRun
-      ? await client.GET(
-          '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts',
-          {
-            params: {
-              path: {
-                name: dagRun.rootDAGRunName!,
-                dagRunId: dagRun.rootDAGRunId!,
-                subDAGRunId: dagRun.dagRunId,
-              },
-              query: { remoteNode },
-            },
-          }
-        )
-      : await client.GET('/dag-runs/{name}/{dagRunId}/artifacts', {
-          params: {
-            path: {
-              name: dagRun.name,
-              dagRunId: dagRun.dagRunId,
-            },
-            query: { remoteNode },
-          },
-        });
+    const request = await requestArtifactTree();
 
     if (request.error) {
       setTree([]);
@@ -255,29 +309,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     setPreviewError(null);
 
     const loadPreview = async () => {
-      const request = isSubDAGRun
-        ? await client.GET(
-            '/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/preview',
-            {
-              params: {
-                path: {
-                  name: dagRun.rootDAGRunName!,
-                  dagRunId: dagRun.rootDAGRunId!,
-                  subDAGRunId: dagRun.dagRunId,
-                },
-                query: { remoteNode, path: selectedPath },
-              },
-            }
-          )
-        : await client.GET('/dag-runs/{name}/{dagRunId}/artifacts/preview', {
-            params: {
-              path: {
-                name: dagRun.name,
-                dagRunId: dagRun.dagRunId,
-              },
-              query: { remoteNode, path: selectedPath },
-            },
-          });
+      const request = await requestArtifactPreview(selectedPath);
 
       if (cancelled) {
         return;
@@ -300,7 +332,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
   }, [client, dagRun.archiveDir, dagRun.dagRunId, dagRun.name, dagRun.rootDAGRunId, dagRun.rootDAGRunName, isSubDAGRun, remoteNode, selectedPath]);
 
   useEffect(() => {
-    if (!preview || preview.kind !== 'image' || !selectedPath) {
+    if (!preview || preview.kind !== 'image' || preview.tooLarge || !selectedPath) {
       setImageUrl(null);
       return;
     }
@@ -310,23 +342,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
     const controller = new AbortController();
 
     const loadImage = async () => {
-      const token = getAuthToken();
-      const endpoint = isSubDAGRun
-        ? `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.rootDAGRunName!)}/${encodeURIComponent(dagRun.rootDAGRunId!)}/sub-dag-runs/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`
-        : `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.name)}/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`;
-
-      const url = new URL(endpoint, window.location.origin);
-      url.searchParams.set('remoteNode', remoteNode);
-      url.searchParams.set('path', selectedPath);
-
-      const response = await fetch(url.toString(), {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to load image preview: ${response.statusText}`);
-      }
-
+      const response = await fetchArtifactDownload(selectedPath, controller.signal);
       const bytes = await response.arrayBuffer();
       if (cancelled) {
         return;
@@ -362,22 +378,7 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
       return;
     }
 
-    const token = getAuthToken();
-    const endpoint = isSubDAGRun
-      ? `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.rootDAGRunName!)}/${encodeURIComponent(dagRun.rootDAGRunId!)}/sub-dag-runs/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`
-      : `${config.apiURL}/dag-runs/${encodeURIComponent(dagRun.name)}/${encodeURIComponent(dagRun.dagRunId)}/artifacts/download`;
-
-    const url = new URL(endpoint, window.location.origin);
-    url.searchParams.set('remoteNode', remoteNode);
-    url.searchParams.set('path', selectedPath);
-
-    const response = await fetch(url.toString(), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.statusText}`);
-    }
-
+    const response = await fetchArtifactDownload(selectedPath);
     const blob = await response.blob();
     const link = document.createElement('a');
     const objectUrl = URL.createObjectURL(blob);
@@ -517,6 +518,26 @@ export default function ArtifactsTab({ dagRun, artifactEnabled = false }: Props)
             </div>
           ) : !preview ? (
             <div className="text-sm text-muted-foreground">Preview unavailable.</div>
+          ) : preview.tooLarge ? (
+            <div className="rounded-md border border-dashed border-border bg-muted/20 p-6">
+              <p className="text-sm font-medium">Preview unavailable</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                This artifact is too large to render inline. Download it to inspect the
+                contents.
+              </p>
+              <dl className="mt-4 space-y-1 text-xs text-muted-foreground">
+                <div>
+                  <dt className="inline font-medium text-foreground">MIME:</dt>{' '}
+                  <dd className="inline">{preview.mimeType}</dd>
+                </div>
+                <div>
+                  <dt className="inline font-medium text-foreground">Size:</dt>{' '}
+                  <dd className="inline">
+                    {Intl.NumberFormat().format(preview.size)} bytes
+                  </dd>
+                </div>
+              </dl>
+            </div>
           ) : preview.kind === 'markdown' ? (
             <ArtifactMarkdown content={preview.content || ''} />
           ) : preview.kind === 'text' ? (
