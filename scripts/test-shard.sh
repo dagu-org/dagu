@@ -15,14 +15,36 @@ if [[ -z "$include_pattern" && -z "$exclude_pattern" ]]; then
   exec go test -v -race "$package"
 fi
 
+if command -v rg >/dev/null 2>&1; then
+  match_filter() {
+    rg "$1" || true
+  }
+  exclude_filter() {
+    rg -v "$1" || true
+  }
+  list_filter() {
+    rg '^Test' || true
+  }
+else
+  match_filter() {
+    grep -E "$1" || true
+  }
+  exclude_filter() {
+    grep -Ev "$1" || true
+  }
+  list_filter() {
+    grep -E '^Test' || true
+  }
+fi
+
 tests=()
 while IFS= read -r test_name; do
   tests+=("$test_name")
 done < <(
   go test -list '^Test' "$package" \
-    | rg '^Test' \
-    | { if [[ -n "$include_pattern" ]]; then rg "$include_pattern"; else cat; fi; } \
-    | { if [[ -n "$exclude_pattern" ]]; then rg -v "$exclude_pattern"; else cat; fi; }
+    | list_filter \
+    | { if [[ -n "$include_pattern" ]]; then match_filter "$include_pattern"; else cat; fi; } \
+    | { if [[ -n "$exclude_pattern" ]]; then exclude_filter "$exclude_pattern"; else cat; fi; }
 )
 
 if [[ ${#tests[@]} -eq 0 ]]; then
