@@ -795,6 +795,30 @@ func TestManager_doHeartbeat(t *testing.T) {
 		assert.Equal(t, "pro", m.Checker().Plan())
 	})
 
+	t.Run("400 Bad Request keeps expired token state for local enforcement", func(t *testing.T) {
+		t.Parallel()
+
+		pub, priv := testKeyPair(t)
+		claims := expiredInGraceClaims()
+		token := signToken(t, priv, claims)
+
+		srv := newMockCloudServer(t, mockCloudServerConfig{
+			heartbeatHandler: errorHandlerFn(http.StatusBadRequest, "license has expired"),
+		})
+
+		m := NewManager(ManagerConfig{
+			LicenseDir: t.TempDir(),
+			CloudURL:   srv.URL,
+		}, pub, nil, slog.Default())
+		m.state.Update(claims, token)
+
+		m.doHeartbeat(context.Background(), makeAD("server-001"))
+
+		assert.False(t, m.Checker().IsCommunity())
+		assert.Equal(t, "pro", m.Checker().Plan())
+		assert.True(t, m.Checker().IsGracePeriod())
+	})
+
 	t.Run("invalid refreshed token leaves state unchanged", func(t *testing.T) {
 		t.Parallel()
 

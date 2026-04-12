@@ -42,6 +42,28 @@ func TestLicenseClaims_WarningCode(t *testing.T) {
 	})
 }
 
+func TestLicenseClaims_GraceDays(t *testing.T) {
+	t.Parallel()
+
+	t.Run("round-trips zero grace days through JSON", func(t *testing.T) {
+		t.Parallel()
+		zero := 0
+		original := &LicenseClaims{
+			Plan:      "trial",
+			Features:  []string{FeatureAudit},
+			GraceDays: &zero,
+		}
+		data, err := json.Marshal(original)
+		require.NoError(t, err)
+		assert.Contains(t, string(data), `"grace_days":0`)
+
+		var decoded LicenseClaims
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		require.NotNil(t, decoded.GraceDays)
+		assert.Equal(t, 0, *decoded.GraceDays)
+	})
+}
+
 func TestLicenseClaims_HasFeature(t *testing.T) {
 	t.Parallel()
 

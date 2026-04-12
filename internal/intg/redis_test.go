@@ -20,6 +20,7 @@ type redisTest struct {
 }
 
 func TestDAGLevelRedis(t *testing.T) {
+	requireDockerDaemon(t)
 	t.Parallel()
 
 	tests := []redisTest{

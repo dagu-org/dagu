@@ -197,7 +197,15 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		"permissionsRunDags":   func() string { return boolStr(cfg.Permissions[config.PermissionRunDAGs]) },
 
 		// Feature toggle functions
-		"oidcEnabled":     func() string { return boolStr(cfg.OIDCEnabled) },
+		"oidcEnabled": func() string {
+			if !cfg.OIDCEnabled {
+				return "false"
+			}
+			if cfg.LicenseChecker != nil && !cfg.LicenseChecker.IsFeatureEnabled(license.FeatureSSO) {
+				return "false"
+			}
+			return "true"
+		},
 		"terminalEnabled": func() string { return boolStr(cfg.TerminalEnabled) },
 		"gitSyncEnabled":  func() string { return boolStr(cfg.GitSyncEnabled) },
 		"agentEnabled": func() string {
@@ -237,7 +245,7 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 			if claims.ExpiresAt == nil {
 				return "true" // perpetual
 			}
-			if claims.ExpiresAt.After(time.Now()) || cfg.LicenseChecker.IsGracePeriod() {
+			if claims.ExpiresAt.After(time.Now()) {
 				return "true"
 			}
 			return "false"
@@ -277,6 +285,12 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 				return "false"
 			}
 			return boolStr(cfg.LicenseChecker.IsGracePeriod())
+		},
+		"licenseGraceEndsAt": func() string {
+			if cfg.LicenseChecker == nil {
+				return ""
+			}
+			return graceEndsAt(cfg.LicenseChecker.Claims())
 		},
 		"licenseCommunity": func() string {
 			if cfg.LicenseChecker == nil {
@@ -318,4 +332,17 @@ func defaultFunctions(cfg *funcsConfig) template.FuncMap {
 		"pathGitSyncDir":         func() string { return path.Join(cfg.Paths.DataDir, "gitsync") },
 		"pathAuditLogsDir":       func() string { return path.Join(cfg.Paths.AdminLogsDir, "audit") },
 	}
+}
+
+func graceEndsAt(claims *license.LicenseClaims) string {
+	if claims == nil || claims.ExpiresAt == nil {
+		return ""
+	}
+
+	graceDays := 14
+	if claims.GraceDays != nil {
+		graceDays = max(*claims.GraceDays, 0)
+	}
+
+	return claims.ExpiresAt.Time.Add(time.Duration(graceDays) * 24 * time.Hour).Format("2006-01-02T15:04:05Z")
 }

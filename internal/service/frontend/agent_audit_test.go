@@ -19,7 +19,7 @@ func TestNewAgentAuditHook(t *testing.T) {
 
 	store := &mockAuditStore{}
 	svc := audit.New(store)
-	hook := newAgentAuditHook(svc)
+	hook := newAgentAuditHook(svc, nil)
 
 	info := agent.ToolExecInfo{
 		ToolName:  "bash",
@@ -60,7 +60,7 @@ func TestNewAgentAuditHook_FailedAction(t *testing.T) {
 
 	store := &mockAuditStore{}
 	svc := audit.New(store)
-	hook := newAgentAuditHook(svc)
+	hook := newAgentAuditHook(svc, nil)
 
 	info := agent.ToolExecInfo{
 		ToolName:  "bash",
@@ -90,7 +90,7 @@ func TestNewAgentAuditHook_SkipsNonAudited(t *testing.T) {
 
 	store := &mockAuditStore{}
 	svc := audit.New(store)
-	hook := newAgentAuditHook(svc)
+	hook := newAgentAuditHook(svc, nil)
 
 	info := agent.ToolExecInfo{
 		ToolName: "think",
@@ -108,7 +108,7 @@ func TestNewAgentAuditHook_NilDetailExtractor(t *testing.T) {
 
 	store := &mockAuditStore{}
 	svc := audit.New(store)
-	hook := newAgentAuditHook(svc)
+	hook := newAgentAuditHook(svc, nil)
 
 	info := agent.ToolExecInfo{
 		ToolName:  "custom_tool",
@@ -135,6 +135,32 @@ func TestNewAgentAuditHook_NilDetailExtractor(t *testing.T) {
 	assert.Equal(t, "sess-789", details["session_id"])
 	// Only session_id should be present (no extracted details)
 	assert.Len(t, details, 1)
+}
+
+func TestNewAgentAuditHook_SkipsWhenAuditFeatureDisabled(t *testing.T) {
+	t.Parallel()
+
+	store := &mockAuditStore{}
+	svc := audit.New(store)
+	hook := newAgentAuditHook(svc, func() bool { return false })
+
+	info := agent.ToolExecInfo{
+		ToolName:  "bash",
+		Input:     json.RawMessage(`{"command":"echo hello"}`),
+		SessionID: "sess-disabled",
+		User: agent.UserIdentity{
+			UserID:   "user-4",
+			Username: "dave",
+		},
+		Audit: &agent.AuditInfo{
+			Action:          "bash_exec",
+			DetailExtractor: agent.ExtractFields("command"),
+		},
+	}
+
+	hook(context.Background(), info, agent.ToolOut{Content: "hello\n"})
+
+	assert.Empty(t, store.entries)
 }
 
 // mockAuditStore is a simple in-memory audit store for testing.
