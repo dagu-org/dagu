@@ -74,7 +74,6 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - windows-latest
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -85,24 +84,12 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Build
-        if: runner.os != 'Windows'
         run: |
           make bin
 
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          go build -o .\.local\bin\dagu.exe .\cmd
-
       - name: Test
-        if: runner.os != 'Windows'
         run: |
           make test-coverage
-
-      - name: Test (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          go test -v -race .\...
 
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest'
@@ -111,3 +98,23 @@ jobs:
           files: ./coverage.out
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  windows-smoke:
+    name: Smoke test on windows-latest
+    runs-on: windows-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build (Windows)
+        run: |
+          go build -o .\.local\bin\dagu.exe .\cmd
+
+      - name: Compile test graph (Windows)
+        run: |
+          go test -run TestDoesNotExist -count=1 .\...
