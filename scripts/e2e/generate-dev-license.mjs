@@ -8,10 +8,11 @@ if (!privKeyB64) {
   process.exit(0);
 }
 
+// Go ed25519.PrivateKey is seed (32 bytes) + public key (32 bytes).
+const seed = Buffer.from(privKeyB64, 'base64').subarray(0, 32);
 const privateKey = createPrivateKey({
-  key: Buffer.from(privKeyB64, 'base64'),
-  format: 'der',
-  type: 'pkcs8',
+  key: { kty: 'OKP', crv: 'Ed25519', d: seed.toString('base64url') },
+  format: 'jwk',
 });
 
 const nowSeconds = Math.floor(Date.now() / 1000);
