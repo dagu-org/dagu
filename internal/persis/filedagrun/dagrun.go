@@ -253,6 +253,12 @@ func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 			tag.Error(err),
 			tag.RunID(dr.dagRunID))
 	}
+	artifactDirs, err := dr.listArtifactDirs(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to list artifact directories to remove",
+			tag.Error(err),
+			tag.RunID(dr.dagRunID))
+	}
 
 	children, err := dr.ListSubDAGRuns(ctx)
 	if err != nil {
@@ -268,12 +274,29 @@ func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 				tag.RunID(child.dagRunID))
 		}
 		deleteFiles = append(deleteFiles, subLogFiles...)
+		subArtifactDirs, err := child.listArtifactDirs(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to list artifact directories for sub dag-run",
+				tag.Error(err),
+				tag.RunID(child.dagRunID))
+		}
+		artifactDirs = append(artifactDirs, subArtifactDirs...)
 	}
 
 	parentDirs := make(map[string]struct{})
+	uniqueArtifactDirs := make(map[string]struct{})
+	for _, dir := range artifactDirs {
+		if dir == "" {
+			continue
+		}
+		uniqueArtifactDirs[dir] = struct{}{}
+	}
 
 	// Remove all log files.
 	for _, file := range deleteFiles {
+		if file == "" {
+			continue
+		}
 		if err := os.Remove(file); err != nil {
 			logger.Error(ctx, "Failed to remove log file",
 				tag.Error(err),
@@ -281,6 +304,16 @@ func (dr DAGRun) removeLogFiles(ctx context.Context) error {
 				tag.File(file))
 		}
 		parentDirs[filepath.Dir(file)] = struct{}{}
+	}
+	for dir := range uniqueArtifactDirs {
+		if err := os.RemoveAll(dir); err != nil {
+			logger.Error(ctx, "Failed to remove artifact directory",
+				tag.Error(err),
+				tag.RunID(dr.dagRunID),
+				tag.Dir(dir))
+			continue
+		}
+		parentDirs[filepath.Dir(dir)] = struct{}{}
 	}
 
 	// Remove parent dirs if they are empty.
@@ -371,6 +404,39 @@ func (dr DAGRun) listLogFiles(ctx context.Context) ([]string, error) {
 	}
 
 	return logFiles, nil
+}
+
+func (dr DAGRun) listArtifactDirs(ctx context.Context) ([]string, error) {
+	attDirs, err := dr.listAttemptDirs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list attempt directories: %w", err)
+	}
+
+	var artifactDirs []string
+	for _, attDir := range attDirs {
+		attempt, err := NewAttempt(filepath.Join(dr.baseDir, attDir, JSONLStatusFile), nil)
+		if err != nil {
+			logger.Error(ctx, "Failed to read attempt data",
+				tag.Error(err),
+				tag.RunID(dr.dagRunID),
+				tag.Dir(attDir))
+			continue
+		}
+		if !attempt.Exists() {
+			continue
+		}
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			logger.Error(ctx, "Failed to read status for attempt",
+				tag.Error(err),
+				tag.RunID(dr.dagRunID),
+				tag.AttemptID(attempt.ID()))
+			continue
+		}
+		artifactDirs = append(artifactDirs, status.ArchiveDir)
+	}
+
+	return artifactDirs, nil
 }
 
 // Regular expressions for parsing directory names

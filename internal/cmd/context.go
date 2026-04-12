@@ -825,6 +825,20 @@ func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error)
 	return logpath.Generate(c, c.Config.Paths.LogDir, dag.LogDir, dag.Name, dagRunID)
 }
 
+// GenArtifactDir generates an artifact directory path for the DAG run when artifacts are enabled.
+func (c *Context) GenArtifactDir(dag *core.DAG, dagRunID string) (string, error) {
+	if dag == nil || !dag.ArtifactsEnabled() {
+		return "", nil
+	}
+
+	dagArtifactDir := ""
+	if dag.Artifacts != nil {
+		dagArtifactDir = dag.Artifacts.Dir
+	}
+
+	return logpath.GenerateDir(c, c.Config.Paths.ArtifactDir, dagArtifactDir, dag.Name, dagRunID)
+}
+
 // NewCommand creates a new command instance with the given cobra command and run function.
 func NewCommand(cmd *cobra.Command, flags []commandLineFlag, runFunc func(cmd *Context, args []string) error) *cobra.Command {
 	initFlags(cmd, flags...)
@@ -930,8 +944,10 @@ func (c *Context) RecordEarlyFailure(dag *core.DAG, dagRunID string, err error) 
 	// 3. Construct the "Failed" status
 	statusBuilder := transform.NewStatusBuilder(dag)
 	logPath, _ := c.GenLogFileName(dag, dagRunID)
+	artifactDir, _ := c.GenArtifactDir(dag, dagRunID)
 	status := statusBuilder.Create(dagRunID, core.Failed, 0, time.Now(),
 		transform.WithLogFilePath(logPath),
+		transform.WithArchiveDir(artifactDir),
 		transform.WithFinishedAt(time.Now()),
 		transform.WithError(err.Error()),
 	)

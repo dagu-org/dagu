@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -86,6 +87,7 @@ type Handler struct {
 	// Optional: for shared-nothing worker architecture
 	dagRunStore               exec.DAGRunStore               // For status persistence
 	logDir                    string                         // For log storage
+	artifactDir               string                         // For artifact storage
 	dispatchTaskStore         exec.DispatchTaskStore         // Shared distributed dispatch queue
 	workerHeartbeatStore      exec.WorkerHeartbeatStore      // Shared worker presence
 	dagRunLeaseStore          exec.DAGRunLeaseStore          // Shared distributed run leases
@@ -124,6 +126,10 @@ type HandlerConfig struct {
 	// LogDir is the directory for log storage in shared-nothing mode.
 	// Required for shared-nothing worker architecture.
 	LogDir string
+
+	// ArtifactDir is the directory for artifact storage in shared-nothing mode.
+	// Required for shared-nothing worker architecture.
+	ArtifactDir string
 
 	// Owner identifies this coordinator instance for shared task ownership.
 	Owner exec.CoordinatorEndpoint
@@ -177,6 +183,7 @@ func NewHandler(cfg HandlerConfig) *Handler {
 		owner:                     cfg.Owner,
 		dagRunStore:               cfg.DAGRunStore,
 		logDir:                    cfg.LogDir,
+		artifactDir:               cfg.ArtifactDir,
 		dispatchTaskStore:         cfg.DispatchTaskStore,
 		workerHeartbeatStore:      cfg.WorkerHeartbeatStore,
 		dagRunLeaseStore:          cfg.DAGRunLeaseStore,
@@ -1252,6 +1259,9 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 			Error:    rejectReason,
 		}, nil
 	}
+	if err := h.transformArtifactPaths(ctx, latestAttempt, latestStatus, dagRunStatus); err != nil {
+		return nil, status.Error(codes.Internal, "failed to resolve artifact path: "+err.Error())
+	}
 
 	attempt, err := h.replaceOpenAttempt(ctx, dagRunStatus.DAGRunID, latestAttempt, latestStatus.AttemptID)
 	if err != nil {
@@ -1436,6 +1446,54 @@ func (h *Handler) transformLogPaths(status *exec.DAGRunStatus) {
 		fileutil.SafeName(attemptID),
 		"scheduler.log",
 	)
+}
+
+// transformArtifactPaths rewrites worker-local artifact directories to coordinator paths.
+func (h *Handler) transformArtifactPaths(
+	ctx context.Context,
+	attempt exec.DAGRunAttempt,
+	latestStatus *exec.DAGRunStatus,
+	incoming *exec.DAGRunStatus,
+) error {
+	if h.artifactDir == "" || incoming == nil || incoming.ArchiveDir == "" {
+		return nil
+	}
+	if latestStatus != nil && latestStatus.ArchiveDir != "" {
+		incoming.ArchiveDir = latestStatus.ArchiveDir
+		return nil
+	}
+	if attempt == nil {
+		return fmt.Errorf("dag run attempt is required to resolve artifact path")
+	}
+
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil {
+		return fmt.Errorf("read DAG for artifact path: %w", err)
+	}
+	if dag == nil {
+		return fmt.Errorf("read DAG for artifact path: DAG is nil")
+	}
+
+	baseDir := h.artifactDir
+	if dag.Artifacts != nil && dag.Artifacts.Dir != "" {
+		baseDir = dag.Artifacts.Dir
+	}
+	baseDir, err = eval.String(ctx, baseDir, eval.WithOSExpansion())
+	if err != nil {
+		return fmt.Errorf("expand artifact directory: %w", err)
+	}
+
+	archiveName := filepath.Base(filepath.Clean(incoming.ArchiveDir))
+	if archiveName == "." || archiveName == string(filepath.Separator) || archiveName == "" {
+		return fmt.Errorf("invalid artifact directory %q", incoming.ArchiveDir)
+	}
+
+	incoming.ArchiveDir = filepath.Join(
+		baseDir,
+		fileutil.SafeName(dag.Name),
+		archiveName,
+	)
+	return nil
 }
 
 // persistChatMessages writes chat messages from status to the attempt.
@@ -1727,6 +1785,20 @@ func (h *Handler) StreamLogs(stream coordinatorv1.CoordinatorService_StreamLogsS
 	logHandler := newLogHandler(h.logDir, h.owner.ID)
 	defer logHandler.Close(stream.Context()) // Ensure file handles are closed on stream end or error
 	return logHandler.handleStream(stream)
+}
+
+// StreamArtifacts receives artifact streams from workers and writes them to local filesystem.
+func (h *Handler) StreamArtifacts(stream coordinatorv1.CoordinatorService_StreamArtifactsServer) error {
+	if h.artifactDir == "" {
+		return status.Error(codes.FailedPrecondition, "artifact streaming not configured: artifactDir is empty")
+	}
+	if h.dagRunStore == nil {
+		return status.Error(codes.FailedPrecondition, "artifact streaming not configured: dagRunStore is empty")
+	}
+
+	artifactHandler := newArtifactHandler(h.dagRunStore, h.owner.ID)
+	defer artifactHandler.Close(stream.Context())
+	return artifactHandler.handleStream(stream)
 }
 
 // GetDAGRunStatus retrieves the status of a DAG run.

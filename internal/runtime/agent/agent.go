@@ -102,6 +102,9 @@ type Agent struct {
 	// logFile is the file to write the runner log.
 	logFile string
 
+	// artifactDir is the per-run artifact directory when artifact storage is enabled.
+	artifactDir string
+
 	// dag is the DAG to run.
 	dag *core.DAG
 
@@ -275,6 +278,8 @@ type Options struct {
 	// ScheduleTime is the RFC 3339 timestamp of when this run was scheduled.
 	// Set by the scheduler for cron-triggered runs; empty for manual runs.
 	ScheduleTime string
+	// ArtifactDir is the per-run artifact directory when artifact storage is enabled.
+	ArtifactDir string
 }
 
 // New creates a new Agent.
@@ -296,6 +301,7 @@ func New(
 		retryTarget:                opts.RetryTarget,
 		logDir:                     logDir,
 		logFile:                    logFile,
+		artifactDir:                opts.ArtifactDir,
 		dagRunMgr:                  drm,
 		dagStore:                   ds,
 		dagRunStore:                opts.DAGRunStore,
@@ -459,6 +465,11 @@ func (a *Agent) Run(ctx context.Context) error {
 			}()
 		}
 	}
+	if a.artifactDir != "" {
+		if err := os.MkdirAll(a.artifactDir, 0o750); err != nil {
+			return fmt.Errorf("failed to create artifact directory: %w", err)
+		}
+	}
 
 	// Initialize the runner
 	a.runner = a.newRunner(attempt)
@@ -488,6 +499,9 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	if a.workDir != "" {
 		contextOpts = append(contextOpts, runtime.WithWorkDir(a.workDir))
+	}
+	if a.artifactDir != "" {
+		contextOpts = append(contextOpts, runtime.WithArtifactDir(a.artifactDir))
 	}
 	if a.logWriterFactory != nil {
 		contextOpts = append(contextOpts, runtime.WithLogWriterFactory(a.logWriterFactory))
@@ -1067,6 +1081,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		statusOpts := []transform.StatusOption{
 			transform.WithAttemptID(a.dagRunAttemptID),
 			transform.WithHierarchyRefs(a.rootDAGRun, a.parentDAGRun),
+			transform.WithArchiveDir(a.artifactDir),
 			transform.WithTriggerType(a.triggerType),
 			transform.WithAutoRetryCount(a.currentAutoRetryCount()),
 		}
@@ -1097,6 +1112,7 @@ func (a *Agent) Status(ctx context.Context) exec.DAGRunStatus {
 		transform.WithFinishedAt(a.plan.FinishAt()),
 		transform.WithNodes(a.plan.NodeData()),
 		transform.WithLogFilePath(a.logFile),
+		transform.WithArchiveDir(a.artifactDir),
 		transform.WithOnInitNode(a.runner.HandlerNode(core.HandlerOnInit)),
 		transform.WithOnExitNode(a.runner.HandlerNode(core.HandlerOnExit)),
 		transform.WithOnSuccessNode(a.runner.HandlerNode(core.HandlerOnSuccess)),
@@ -1510,11 +1526,15 @@ func (a *Agent) dryRun(ctx context.Context) error {
 	}()
 
 	db := newDBClient(a.dagRunStore, a.dagStore)
-	dagCtx := runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile,
+	contextOpts := []runtime.ContextOption{
 		runtime.WithDatabase(db),
 		runtime.WithRootDAGRun(a.rootDAGRun),
 		runtime.WithParams(a.dag.Params),
-	)
+	}
+	if a.artifactDir != "" {
+		contextOpts = append(contextOpts, runtime.WithArtifactDir(a.artifactDir))
+	}
+	dagCtx := runtime.NewContext(ctx, a.dag, a.dagRunID, a.logFile, contextOpts...)
 	lastErr := a.runner.Run(dagCtx, a.plan, progressCh)
 	a.lastErr = lastErr
 

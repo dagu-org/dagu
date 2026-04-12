@@ -107,10 +107,12 @@ func recordPreparedAttemptFailure(
 	}
 
 	logPath, _ := ctx.GenLogFileName(dag, dagRunID)
+	artifactDir, _ := ctx.GenArtifactDir(dag, dagRunID)
 	opts := []transform.StatusOption{
 		transform.WithAttemptID(attempt.ID()),
 		transform.WithHierarchyRefs(root, parent),
 		transform.WithLogFilePath(logPath),
+		transform.WithArchiveDir(artifactDir),
 		transform.WithFinishedAt(time.Now()),
 		transform.WithError(runErr.Error()),
 		transform.WithWorkerID("local"),

@@ -2246,6 +2246,107 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/artifacts:
+    get:
+      summary: "List artifacts for a DAG-run"
+      description: "Returns the artifact file tree for a DAG-run"
+      operationId: "getDAGRunArtifacts"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      responses:
+        "200":
+          description: "Artifact tree retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactTreeResponse"
+        "404":
+          description: "Artifact directory not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/artifacts/preview:
+    get:
+      summary: "Preview an artifact for a DAG-run"
+      description: "Returns preview metadata and text content for a single artifact file"
+      operationId: "getDAGRunArtifactPreview"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact preview retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactPreviewResponse"
+        "404":
+          description: "Artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/artifacts/download:
+    get:
+      summary: "Download an artifact for a DAG-run"
+      description: "Downloads a single artifact file from a DAG-run"
+      operationId: "downloadDAGRunArtifact"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: "Artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/outputs:
     get:
       summary: "Retrieve collected outputs from a DAG-run"
@@ -2776,6 +2877,125 @@ paths:
                 type: "string"
         "404":
           description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts:
+    get:
+      summary: "List artifacts for a sub DAG-run"
+      description: "Returns the artifact file tree for a specific sub DAG-run"
+      operationId: "getSubDAGRunArtifacts"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to retrieve artifacts for"
+      responses:
+        "200":
+          description: "Artifact tree retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactTreeResponse"
+        "404":
+          description: "Artifact directory not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/preview:
+    get:
+      summary: "Preview an artifact for a sub DAG-run"
+      description: "Returns preview metadata and text content for a single sub DAG-run artifact file"
+      operationId: "getSubDAGRunArtifactPreview"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to preview an artifact for"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact preview retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactPreviewResponse"
+        "404":
+          description: "Artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/download:
+    get:
+      summary: "Download an artifact for a sub DAG-run"
+      description: "Downloads a single artifact file from a sub DAG-run"
+      operationId: "downloadSubDAGRunArtifact"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to download an artifact for"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: "Artifact file not found"
           content:
             application/json:
               schema:
@@ -6528,6 +6748,15 @@ components:
       schema:
         type: string
 
+    ArtifactPath:
+      name: path
+      in: query
+      description: "Relative artifact file path within the DAG-run artifact directory"
+      required: true
+      schema:
+        type: string
+        minLength: 1
+
     RemoteNode:
       name: remoteNode
       in: query
@@ -7706,6 +7935,8 @@ components:
         logDir:
           type: string
           description: "Directory path for storing log files"
+        artifacts:
+          $ref: "#/components/schemas/DAGArtifactsConfig"
         handlerOn:
           $ref: "#/components/schemas/HandlerOn"
         steps:
@@ -7858,6 +8089,19 @@ components:
         - disableParamEdit
         - disableRunIdEdit
 
+    DAGArtifactsConfig:
+      type: object
+      description: "Configuration for DAG run artifact storage"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether artifact storage is enabled for this DAG"
+        dir:
+          type: string
+          description: "Optional DAG-specific artifact storage directory"
+      required:
+        - enabled
+
     LocalDag:
       type: object
       properties:
@@ -7966,6 +8210,9 @@ components:
             log:
               type: string
               description: "Path to the log file"
+            archiveDir:
+              type: string
+              description: "Path to the artifact directory for this DAG-run"
             nodes:
               type: array
               description: "Status of individual steps within the DAG-run"
@@ -7995,6 +8242,92 @@ components:
             - rootDAGRunId
             - log
             - nodes
+
+    ArtifactNodeType:
+      type: string
+      description: "Artifact tree node type"
+      enum:
+        - "directory"
+        - "file"
+
+    ArtifactTreeNode:
+      type: object
+      description: "A single file or directory in a DAG-run artifact tree"
+      properties:
+        name:
+          type: string
+          description: "Display name of the artifact entry"
+        path:
+          type: string
+          description: "Relative path of the artifact entry within the artifact directory"
+        type:
+          $ref: "#/components/schemas/ArtifactNodeType"
+        size:
+          type: integer
+          format: int64
+          description: "Size of the artifact file in bytes"
+        children:
+          type: array
+          description: "Nested artifact entries when this node is a directory"
+          items:
+            $ref: "#/components/schemas/ArtifactTreeNode"
+      required:
+        - name
+        - path
+        - type
+
+    ArtifactTreeResponse:
+      type: object
+      description: "Artifact tree for a DAG-run"
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactTreeNode"
+      required:
+        - items
+
+    ArtifactPreviewKind:
+      type: string
+      description: "Preview mode for an artifact file"
+      enum:
+        - "markdown"
+        - "text"
+        - "image"
+        - "binary"
+
+    ArtifactPreviewResponse:
+      type: object
+      description: "Preview metadata and optional inline content for a DAG-run artifact file"
+      properties:
+        name:
+          type: string
+          description: "Artifact file name"
+        path:
+          type: string
+          description: "Relative artifact file path"
+        kind:
+          $ref: "#/components/schemas/ArtifactPreviewKind"
+        mimeType:
+          type: string
+          description: "Detected MIME type for the artifact file"
+        size:
+          type: integer
+          format: int64
+          description: "Artifact file size in bytes"
+        truncated:
+          type: boolean
+          description: "Whether inline text content was truncated for preview"
+        content:
+          type: string
+          description: "Inline preview content for markdown or text artifacts"
+      required:
+        - name
+        - path
+        - kind
+        - mimeType
+        - size
+        - truncated
 
     DAGRunOutputs:
       type: object

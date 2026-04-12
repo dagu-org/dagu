@@ -97,6 +97,10 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType cor
 	if err != nil {
 		return fmt.Errorf("failed to generate log file name: %w", err)
 	}
+	artifactDir, err := ctx.GenArtifactDir(dag, dagRunID)
+	if err != nil {
+		return fmt.Errorf("failed to generate artifact directory: %w", err)
+	}
 
 	dagRun := exec.NewDAGRunRef(dag.Name, dagRunID)
 
@@ -111,6 +115,7 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType cor
 
 	opts := []transform.StatusOption{
 		transform.WithLogFilePath(logFile),
+		transform.WithArchiveDir(artifactDir),
 		transform.WithAttemptID(att.ID()),
 		transform.WithPreconditions(dag.Preconditions),
 		transform.WithQueuedAt(stringutil.FormatTime(time.Now())),

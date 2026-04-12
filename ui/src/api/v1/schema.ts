@@ -861,6 +861,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List artifacts for a DAG-run
+         * @description Returns the artifact file tree for a DAG-run
+         */
+        get: operations["getDAGRunArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/artifacts/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview an artifact for a DAG-run
+         * @description Returns preview metadata and text content for a single artifact file
+         */
+        get: operations["getDAGRunArtifactPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/artifacts/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an artifact for a DAG-run
+         * @description Downloads a single artifact file from a DAG-run
+         */
+        get: operations["downloadDAGRunArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/outputs": {
         parameters: {
             query?: never;
@@ -1133,6 +1193,66 @@ export interface paths {
          * @description Downloads the entire log file for an individual sub DAG-run
          */
         get: operations["downloadSubDAGRunLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List artifacts for a sub DAG-run
+         * @description Returns the artifact file tree for a specific sub DAG-run
+         */
+        get: operations["getSubDAGRunArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview an artifact for a sub DAG-run
+         * @description Returns preview metadata and text content for a single sub DAG-run artifact file
+         */
+        get: operations["getSubDAGRunArtifactPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an artifact for a sub DAG-run
+         * @description Downloads a single artifact file from a sub DAG-run
+         */
+        get: operations["downloadSubDAGRunArtifact"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2059,78 +2179,6 @@ export interface paths {
          * @description Sets the default model for the AI agent. Requires admin role.
          */
         put: operations["setDefaultAgentModel"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/settings/agent/skills": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List agent skills
-         * @description Returns all configured agent skills with enabled status. Requires admin role.
-         */
-        get: operations["listAgentSkills"];
-        put?: never;
-        /**
-         * Create agent skill
-         * @description Creates a new agent skill. Requires admin role.
-         */
-        post: operations["createAgentSkill"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/settings/agent/skills/{skillId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get agent skill
-         * @description Returns a single agent skill by ID. Requires admin role.
-         */
-        get: operations["getAgentSkill"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete agent skill
-         * @description Deletes an agent skill. Requires admin role.
-         */
-        delete: operations["deleteAgentSkill"];
-        options?: never;
-        head?: never;
-        /**
-         * Update agent skill
-         * @description Updates an existing agent skill. Requires admin role.
-         */
-        patch: operations["updateAgentSkill"];
-        trace?: never;
-    };
-    "/settings/agent/enabled-skills": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set enabled agent skills
-         * @description Sets the list of enabled skill IDs for the AI agent. Requires admin role.
-         */
-        put: operations["setEnabledSkills"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3187,6 +3235,7 @@ export interface components {
             env?: string[];
             /** @description Directory path for storing log files */
             logDir?: string;
+            artifacts?: components["schemas"]["DAGArtifactsConfig"];
             handlerOn?: components["schemas"]["HandlerOn"];
             /** @description List of steps to execute in DAG-runs created from this DAG */
             steps?: components["schemas"]["Step"][];
@@ -3270,6 +3319,13 @@ export interface components {
              */
             disableRunIdEdit: boolean;
         };
+        /** @description Configuration for DAG run artifact storage */
+        DAGArtifactsConfig: {
+            /** @description Whether artifact storage is enabled for this DAG */
+            enabled: boolean;
+            /** @description Optional DAG-specific artifact storage directory */
+            dir?: string;
+        };
         LocalDag: {
             /** @description Name of the local DAG */
             name: string;
@@ -3320,6 +3376,8 @@ export interface components {
             parentDAGRunId?: components["schemas"]["DAGRunId"] & unknown;
             /** @description Path to the log file */
             log: string;
+            /** @description Path to the artifact directory for this DAG-run */
+            archiveDir?: string;
             /** @description Status of individual steps within the DAG-run */
             nodes: components["schemas"]["Node"][];
             onExit?: components["schemas"]["Node"];
@@ -3332,6 +3390,54 @@ export interface components {
             specFromFile?: boolean;
             /** @description File name of the source DAG definition, derived from the DAG-run's source file path. Only set when the source file still exists on disk. Can be used to navigate to the DAG definition page. */
             sourceFileName?: components["schemas"]["DAGFileName"];
+        };
+        /**
+         * @description Artifact tree node type
+         * @enum {string}
+         */
+        ArtifactNodeType: ArtifactNodeType;
+        /** @description A single file or directory in a DAG-run artifact tree */
+        ArtifactTreeNode: {
+            /** @description Display name of the artifact entry */
+            name: string;
+            /** @description Relative path of the artifact entry within the artifact directory */
+            path: string;
+            type: components["schemas"]["ArtifactNodeType"];
+            /**
+             * Format: int64
+             * @description Size of the artifact file in bytes
+             */
+            size?: number;
+            /** @description Nested artifact entries when this node is a directory */
+            children?: components["schemas"]["ArtifactTreeNode"][];
+        };
+        /** @description Artifact tree for a DAG-run */
+        ArtifactTreeResponse: {
+            items: components["schemas"]["ArtifactTreeNode"][];
+        };
+        /**
+         * @description Preview mode for an artifact file
+         * @enum {string}
+         */
+        ArtifactPreviewKind: ArtifactPreviewKind;
+        /** @description Preview metadata and optional inline content for a DAG-run artifact file */
+        ArtifactPreviewResponse: {
+            /** @description Artifact file name */
+            name: string;
+            /** @description Relative artifact file path */
+            path: string;
+            kind: components["schemas"]["ArtifactPreviewKind"];
+            /** @description Detected MIME type for the artifact file */
+            mimeType: string;
+            /**
+             * Format: int64
+             * @description Artifact file size in bytes
+             */
+            size: number;
+            /** @description Whether inline text content was truncated for preview */
+            truncated: boolean;
+            /** @description Inline preview content for markdown or text artifacts */
+            content?: string;
         };
         /** @description Collected outputs from step executions in a DAG-run, including execution metadata. If the DAG-run completed but no outputs were captured, the outputs object will be empty and metadata fields may be empty strings. */
         DAGRunOutputs: {
@@ -4266,52 +4372,6 @@ export interface components {
         CompleteAgentAuthProviderLoginResponse: {
             provider: components["schemas"]["AgentAuthProviderStatus"];
         };
-        /** @description Skill configuration */
-        SkillResponse: {
-            id: string;
-            name: string;
-            description?: string;
-            version?: string;
-            author?: string;
-            tags?: string[];
-            /** @enum {string} */
-            type: SkillResponseType;
-            knowledge?: string;
-            enabled: boolean;
-        };
-        /** @description List of skills */
-        ListSkillsResponse: {
-            skills: components["schemas"]["SkillResponse"][];
-            pagination: components["schemas"]["Pagination"];
-        };
-        /** @description Request to create a new skill */
-        CreateSkillRequest: {
-            /** @description Optional custom ID (auto-generated from name if omitted) */
-            id?: string;
-            name: string;
-            description?: string;
-            version?: string;
-            author?: string;
-            tags?: string[];
-            knowledge: string;
-        };
-        /** @description Request to update a skill (partial update) */
-        UpdateSkillRequest: {
-            name?: string;
-            description?: string;
-            version?: string;
-            author?: string;
-            tags?: string[];
-            knowledge?: string;
-        };
-        /** @description Request to set the list of enabled skill IDs */
-        SetEnabledSkillsRequest: {
-            skillIds: string[];
-        };
-        /** @description Current enabled skills */
-        SetEnabledSkillsResponse: {
-            enabledSkills: string[];
-        };
         /** @description Soul (agent personality) configuration */
         SoulResponse: {
             id: string;
@@ -4747,6 +4807,8 @@ export interface components {
         DAGName: components["schemas"]["DAGName"];
         /** @description name of the step */
         StepName: string;
+        /** @description Relative artifact file path within the DAG-run artifact directory */
+        ArtifactPath: string;
         /** @description name of the remote node */
         RemoteNode: string;
         /** @description Filter entries after this time (ISO 8601 format) */
@@ -7493,6 +7555,150 @@ export interface operations {
             };
         };
     };
+    getDAGRunArtifacts: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact tree retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactTreeResponse"];
+                };
+            };
+            /** @description Artifact directory not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getDAGRunArtifactPreview: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Relative artifact file path within the DAG-run artifact directory */
+                path: components["parameters"]["ArtifactPath"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact preview retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactPreviewResponse"];
+                };
+            };
+            /** @description Artifact file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadDAGRunArtifact: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Relative artifact file path within the DAG-run artifact directory */
+                path: components["parameters"]["ArtifactPath"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Artifact file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getDAGRunOutputs: {
         parameters: {
             query?: {
@@ -8207,6 +8413,156 @@ export interface operations {
                 };
             };
             /** @description Log file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSubDAGRunArtifacts: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run to retrieve artifacts for */
+                subDAGRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact tree retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactTreeResponse"];
+                };
+            };
+            /** @description Artifact directory not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSubDAGRunArtifactPreview: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Relative artifact file path within the DAG-run artifact directory */
+                path: components["parameters"]["ArtifactPath"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run to preview an artifact for */
+                subDAGRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact preview retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactPreviewResponse"];
+                };
+            };
+            /** @description Artifact file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    downloadSubDAGRunArtifact: {
+        parameters: {
+            query: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Relative artifact file path within the DAG-run artifact directory */
+                path: components["parameters"]["ArtifactPath"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+                /** @description ID of the sub DAG-run to download an artifact for */
+                subDAGRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifact file content */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Artifact file not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -10883,414 +11239,6 @@ export interface operations {
             };
         };
     };
-    listAgentSkills: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description page number of items to fetch (default is 1) */
-                page?: components["parameters"]["Page"];
-                /** @description number of items per page (default is 30, max is 100) */
-                perPage?: components["parameters"]["PerPage"];
-                /** @description Search query (matches name, description, tags) */
-                q?: string;
-                /** @description Comma-separated tag filter (AND semantics) */
-                tags?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of skills */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListSkillsResponse"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Requires admin role */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unexpected error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    createAgentSkill: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateSkillRequest"];
-            };
-        };
-        responses: {
-            /** @description Skill created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SkillResponse"];
-                };
-            };
-            /** @description Invalid request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Requires admin role */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Skill already exists */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unexpected error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    getAgentSkill: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path: {
-                /** @description Skill ID */
-                skillId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Skill details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SkillResponse"];
-                };
-            };
-            /** @description Invalid skill ID */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Requires admin role */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Skill not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unexpected error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    deleteAgentSkill: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path: {
-                /** @description Skill ID */
-                skillId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Skill deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Invalid skill ID */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Requires admin role */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Skill not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unexpected error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    updateAgentSkill: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path: {
-                /** @description Skill ID */
-                skillId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateSkillRequest"];
-            };
-        };
-        responses: {
-            /** @description Skill updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SkillResponse"];
-                };
-            };
-            /** @description Invalid request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Requires admin role */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Skill not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unexpected error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    setEnabledSkills: {
-        parameters: {
-            query?: {
-                /** @description name of the remote node */
-                remoteNode?: components["parameters"]["RemoteNode"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetEnabledSkillsRequest"];
-            };
-        };
-        responses: {
-            /** @description Enabled skills updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SetEnabledSkillsResponse"];
-                };
-            };
-            /** @description Invalid skill ID */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Requires admin role */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unexpected error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     getAgentMemory: {
         parameters: {
             query?: {
@@ -13475,6 +13423,16 @@ export enum ParamDefType {
     number = "number",
     boolean = "boolean"
 }
+export enum ArtifactNodeType {
+    directory = "directory",
+    file = "file"
+}
+export enum ArtifactPreviewKind {
+    markdown = "markdown",
+    text = "text",
+    image = "image",
+    binary = "binary"
+}
 export enum RepeatMode {
     While = "while",
     Until = "until"
@@ -13575,10 +13533,6 @@ export enum UpdateModelConfigRequestThinkingEffort {
     medium = "medium",
     high = "high",
     xhigh = "xhigh"
-}
-export enum SkillResponseType {
-    builtin = "builtin",
-    custom = "custom"
 }
 export enum DocTreeNodeResponseType {
     file = "file",

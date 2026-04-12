@@ -346,6 +346,7 @@ type PathsConfig struct {
 	DocsDir            string
 	Executable         string
 	LogDir             string
+	ArtifactDir        string
 	DataDir            string
 	SuspendFlagsDir    string
 	AdminLogsDir       string

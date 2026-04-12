@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/tooltip';
 import {
   ActivitySquare,
+  Archive,
   FileCode,
   GanttChart,
   GripHorizontal,
@@ -28,6 +29,7 @@ import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
 import { ApprovalTab } from './approval';
+import ArtifactsTab from './artifacts/ArtifactsTab';
 import { ChatHistoryTab } from './chat-history';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
 import { DAGSpecReadOnly } from './dag-editor';
@@ -41,9 +43,10 @@ import { FlowchartType, Graph, TimelineChart } from './visualization';
 type Props = {
   dagRun: components['schemas']['DAGRunDetails'];
   fileName: string;
+  artifactEnabled?: boolean;
 };
 
-type StatusTab = 'status' | 'timeline' | 'outputs' | 'chat' | 'spec' | 'approval';
+type StatusTab = 'status' | 'timeline' | 'outputs' | 'artifacts' | 'chat' | 'spec' | 'approval';
 
 /** Check if the current DAG run is a sub DAG-run (has a different root) */
 function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
@@ -54,7 +57,7 @@ function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
   );
 }
 
-function DAGStatus({ dagRun, fileName }: Props) {
+function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const navigate = useNavigate();
@@ -315,6 +318,7 @@ function DAGStatus({ dagRun, fileName }: Props) {
     (node) => node.status === NodeStatus.Waiting
   ).length || 0;
   const hasWaitingSteps = waitingStepCount > 0;
+  const hasArtifacts = artifactEnabled || !!dagRun.archiveDir;
 
   // Reset to status tab if selected tab is not available
   useEffect(() => {
@@ -327,7 +331,10 @@ function DAGStatus({ dagRun, fileName }: Props) {
     if (activeTab === 'approval' && !hasWaitingSteps) {
       setActiveTab('status');
     }
-  }, [showTimeline, hasChatSteps, hasWaitingSteps, activeTab]);
+    if (activeTab === 'artifacts' && !hasArtifacts) {
+      setActiveTab('status');
+    }
+  }, [showTimeline, hasChatSteps, hasWaitingSteps, hasArtifacts, activeTab]);
 
   // Auto-switch to approval tab when steps enter waiting state
   useEffect(() => {
@@ -379,6 +386,16 @@ function DAGStatus({ dagRun, fileName }: Props) {
           <Package className="h-4 w-4" />
           Outputs
         </Tab>
+        {hasArtifacts && (
+          <Tab
+            isActive={activeTab === 'artifacts'}
+            onClick={() => setActiveTab('artifacts')}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <Archive className="h-4 w-4" />
+            Artifacts
+          </Tab>
+        )}
         {hasChatSteps && (
           <Tab
             isActive={activeTab === 'chat'}
@@ -510,6 +527,10 @@ function DAGStatus({ dagRun, fileName }: Props) {
       {/* Outputs Tab Content */}
       {activeTab === 'outputs' && (
         <DAGRunOutputs dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
+      )}
+
+      {activeTab === 'artifacts' && hasArtifacts && (
+        <ArtifactsTab dagRun={dagRun} artifactEnabled={artifactEnabled} />
       )}
 
       {/* Chat Tab Content */}

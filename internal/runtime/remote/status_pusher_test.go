@@ -77,6 +77,14 @@ func (m *mockCoordinatorClient) StreamLogsTo(ctx context.Context, _ exec.HostInf
 	return m.StreamLogs(ctx)
 }
 
+func (m *mockCoordinatorClient) StreamArtifacts(_ context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	panic("StreamArtifacts not implemented in mock")
+}
+
+func (m *mockCoordinatorClient) StreamArtifactsTo(ctx context.Context, _ exec.HostInfo) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	return m.StreamArtifacts(ctx)
+}
+
 func (m *mockCoordinatorClient) Metrics() coordinator.Metrics {
 	return coordinator.Metrics{}
 }

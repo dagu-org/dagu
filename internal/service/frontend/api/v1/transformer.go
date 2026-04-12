@@ -248,6 +248,7 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		RootDAGRunId:     s.Root.ID,
 		ParentDAGRunName: ptrOf(s.Parent.Name),
 		ParentDAGRunId:   ptrOf(s.Parent.ID),
+		ArchiveDir:       ptrOf(s.ArchiveDir),
 		Log:              s.Log,
 		Name:             s.Name,
 		Params:           ptrOf(s.Params),
@@ -356,7 +357,16 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		paramDefs = ptrOf(defs)
 	}
 
+	var artifacts *api.DAGArtifactsConfig
+	if dag.Artifacts != nil {
+		artifacts = &api.DAGArtifactsConfig{
+			Enabled: dag.Artifacts.Enabled,
+			Dir:     ptrOf(dag.Artifacts.Dir),
+		}
+	}
+
 	return &api.DAGDetails{
+		Artifacts:         artifacts,
 		Name:              dag.Name,
 		Description:       ptrOf(dag.Description),
 		DefaultParams:     ptrOf(dag.DefaultParams),
