@@ -113,10 +113,9 @@ func validateAgentConfigNode(node *yaml.Node, path string) error {
 		return nil
 	}
 	return validateMappingNode(node, path, map[string]yamlFieldRule{
-		"model":         {},
-		"soul":          {},
-		"enabledSkills": {validate: validateStringListNode},
-		"safeMode":      {},
+		"model":    {},
+		"soul":     {},
+		"safeMode": {},
 	})
 }
 

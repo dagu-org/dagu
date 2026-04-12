@@ -77,6 +77,14 @@ func (s *stubCoordinatorClient) StreamLogsTo(ctx context.Context, _ exec.HostInf
 	return s.StreamLogs(ctx)
 }
 
+func (s *stubCoordinatorClient) StreamArtifacts(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubCoordinatorClient) StreamArtifactsTo(ctx context.Context, _ exec.HostInfo) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	return s.StreamArtifacts(ctx)
+}
+
 func (s *stubCoordinatorClient) Metrics() coordinator.Metrics {
 	return coordinator.Metrics{}
 }

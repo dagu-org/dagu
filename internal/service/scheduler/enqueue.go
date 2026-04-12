@@ -34,6 +34,7 @@ func EnqueueCatchupRun(
 	dagRunStore exec.DAGRunStore,
 	queueStore exec.QueueStore,
 	baseLogDir string,
+	baseArtifactDir string,
 	baseConfig string,
 	dag *core.DAG,
 	runID string,
@@ -69,6 +70,14 @@ func EnqueueCatchupRun(
 	if err != nil {
 		return fmt.Errorf("failed to generate catchup log file name: %w", err)
 	}
+	artifactDir := ""
+	if dagCopy.ArtifactsEnabled() {
+		dagArtifactDir := dagCopy.Artifacts.Dir
+		artifactDir, err = logpath.GenerateDir(ctx, baseArtifactDir, dagArtifactDir, dagCopy.Name, runID)
+		if err != nil {
+			return fmt.Errorf("failed to generate catchup artifact directory: %w", err)
+		}
+	}
 
 	att, err := dagRunStore.CreateAttempt(ctx, dagCopy, time.Now(), runID, exec.NewDAGRunAttemptOptions{})
 	if err != nil {
@@ -94,6 +103,7 @@ func EnqueueCatchupRun(
 
 	opts := []transform.StatusOption{
 		transform.WithLogFilePath(logFile),
+		transform.WithArchiveDir(artifactDir),
 		transform.WithAttemptID(att.ID()),
 		transform.WithPreconditions(dagCopy.Preconditions),
 		transform.WithQueuedAt(stringutil.FormatTime(time.Now())),

@@ -78,6 +78,7 @@ func newHASchedulerFixture(t *testing.T) *haSchedulerFixture {
 			DataDir:            filepath.Join(tmpDir, "data"),
 			DAGsDir:            filepath.Join(tmpDir, "dags"),
 			DAGRunsDir:         filepath.Join(tmpDir, "data", "dag-runs"),
+			ArtifactDir:        filepath.Join(tmpDir, "data", "artifacts"),
 			QueueDir:           filepath.Join(tmpDir, "data", "queue"),
 			ProcDir:            filepath.Join(tmpDir, "data", "proc"),
 			ServiceRegistryDir: filepath.Join(tmpDir, "data", "service-registry"),
@@ -96,7 +97,10 @@ func newHASchedulerFixture(t *testing.T) *haSchedulerFixture {
 		DefaultExecMode: config.ExecutionModeLocal,
 	}
 
-	dagRunStore := filedagrun.New(cfg.Paths.DAGRunsDir)
+	dagRunStore := filedagrun.New(
+		cfg.Paths.DAGRunsDir,
+		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
+	)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	procStore := fileproc.New(
 		cfg.Paths.ProcDir,
@@ -262,5 +266,9 @@ func (*staticEntryReader) Start(context.Context) {}
 func (*staticEntryReader) Stop() {}
 
 func (*staticEntryReader) DAGs() []*core.DAG {
+	return nil
+}
+
+func (*staticEntryReader) DAGStore() exec.DAGStore {
 	return nil
 }

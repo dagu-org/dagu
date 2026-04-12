@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/agentsnapshot"
 	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
@@ -92,11 +93,10 @@ func (a *API) ValidateDAGSpec(ctx context.Context, request api.ValidateDAGSpecRe
 	}
 
 	// Load the DAG spec
-	dag, err := spec.LoadYAML(ctx,
+	dag, err := a.dagStore.LoadSpec(ctx,
 		[]byte(request.Body.Spec),
 		spec.WithName(name),
 		spec.WithAllowBuildErrors(),
-		spec.WithoutEval(),
 	)
 
 	var errs []string
@@ -146,10 +146,9 @@ func (a *API) CreateNewDAG(ctx context.Context, request api.CreateNewDAGRequestO
 
 	var yamlSpec []byte
 	if request.Body.Spec != nil && strings.TrimSpace(*request.Body.Spec) != "" {
-		_, err := spec.LoadYAML(ctx,
+		_, err := a.dagStore.LoadSpec(ctx,
 			[]byte(*request.Body.Spec),
 			spec.WithName(request.Body.Name),
-			spec.WithoutEval(),
 		)
 
 		if err != nil {
@@ -228,11 +227,10 @@ func (a *API) GetDAGSpec(ctx context.Context, request api.GetDAGSpecRequestObjec
 		return nil, err
 	}
 
-	dag, err := spec.LoadYAML(ctx,
+	dag, err := a.dagStore.LoadSpec(ctx,
 		[]byte(yamlSpec),
 		spec.WithName(request.FileName),
 		spec.WithAllowBuildErrors(),
-		spec.WithoutEval(),
 	)
 	var errs []string
 
@@ -429,7 +427,57 @@ func (a *API) getDAGDetailsData(ctx context.Context, fileName string) (api.GetDA
 		LocalDags:    localDAGs,
 		Errors:       extractBuildErrors(dag.BuildErrors),
 		Spec:         &yamlSpec,
+		EditorHints:  a.buildDAGEditorHints(ctx, dag, fileName),
 	}, nil
+}
+
+func (a *API) buildDAGEditorHints(ctx context.Context, dag *core.DAG, fileName string) *api.DAGEditorHints {
+	baseConfigData := dag.BaseConfigData
+	if len(baseConfigData) == 0 && a.config.Paths.BaseConfig != "" {
+		raw, err := os.ReadFile(a.config.Paths.BaseConfig) //nolint:gosec
+		switch {
+		case err == nil:
+			baseConfigData = raw
+		case errors.Is(err, os.ErrNotExist):
+			// No base config is a valid state.
+		default:
+			logger.Warn(ctx, "Failed to read base config for DAG editor hints",
+				slog.String("dagFile", fileName),
+				tag.Error(err),
+			)
+			return nil
+		}
+	}
+
+	hints, err := spec.InheritedCustomStepTypeEditorHints(baseConfigData)
+	if err != nil {
+		logger.Warn(ctx, "Failed to build inherited custom step editor hints",
+			slog.String("dagFile", fileName),
+			tag.Error(err),
+		)
+		return nil
+	}
+	if len(hints) == 0 {
+		return nil
+	}
+
+	editorHints := make([]api.InheritedCustomStepTypeHint, 0, len(hints))
+	for _, hint := range hints {
+		apiHint := api.InheritedCustomStepTypeHint{
+			InputSchema: hint.InputSchema,
+			Name:        hint.Name,
+			TargetType:  hint.TargetType,
+		}
+		if hint.Description != "" {
+			desc := hint.Description
+			apiHint.Description = &desc
+		}
+		editorHints = append(editorHints, apiHint)
+	}
+
+	return &api.DAGEditorHints{
+		InheritedCustomStepTypes: editorHints,
+	}
 }
 
 // extractBuildErrors converts a slice of errors to a slice of strings.
@@ -1092,6 +1140,11 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 	taskOpts = append(taskOpts, executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)))
 	if dag.SourceFile != "" {
 		taskOpts = append(taskOpts, executor.WithSourceFile(dag.SourceFile))
+	}
+	if snapshot, err := agentsnapshot.BuildFromPaths(ctx, dag, a.config.Paths, a.dagStore); err != nil {
+		return fmt.Errorf("build distributed agent snapshot: %w", err)
+	} else if len(snapshot) > 0 {
+		taskOpts = append(taskOpts, executor.WithAgentSnapshot(snapshot))
 	}
 
 	task := executor.CreateTask(

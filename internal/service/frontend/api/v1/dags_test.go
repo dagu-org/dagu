@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -155,6 +156,67 @@ func TestDAGWritesAllowedWhenGitSyncDisabled(t *testing.T) {
 
 	// Cleanup
 	server.Client().Delete("/api/v1/dags/test_dag_gitsync_disabled").ExpectStatus(http.StatusNoContent).Send(t)
+}
+
+func TestDAGSpecInheritsBaseGraphType(t *testing.T) {
+	server := test.SetupServer(t)
+
+	require.NoError(t, os.WriteFile(server.Config.Paths.BaseConfig, []byte("type: graph\n"), 0600))
+
+	spec := `
+steps:
+  - name: build
+    command: echo build
+  - name: test
+    command: echo test
+    depends: [build]
+`
+	dagName := "inherits_base_graph_type"
+
+	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: dagName,
+		Spec: &spec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+	t.Cleanup(func() {
+		server.Client().Delete("/api/v1/dags/" + dagName).Send(t)
+	})
+
+	t.Run("ValidateDAGSpec", func(t *testing.T) {
+		resp := server.Client().Post("/api/v1/dags/validate", api.ValidateDAGSpecJSONRequestBody{
+			Name: &dagName,
+			Spec: spec,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.ValidateDAGSpec200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.True(t, body.Valid)
+		require.Empty(t, body.Errors)
+	})
+
+	t.Run("GetDAGSpec", func(t *testing.T) {
+		resp := server.Client().Get("/api/v1/dags/" + dagName + "/spec").
+			ExpectStatus(http.StatusOK).
+			Send(t)
+
+		var body api.GetDAGSpec200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.Empty(t, body.Errors)
+		require.NotNil(t, body.Dag)
+		require.NotNil(t, body.Dag.Steps)
+		require.Len(t, *body.Dag.Steps, 2)
+		require.NotNil(t, (*body.Dag.Steps)[1].Depends)
+		require.Equal(t, []string{"build"}, *(*body.Dag.Steps)[1].Depends)
+	})
+
+	t.Run("UpdateDAGSpec", func(t *testing.T) {
+		resp := server.Client().Put("/api/v1/dags/"+dagName+"/spec", api.UpdateDAGSpecJSONRequestBody{
+			Spec: spec,
+		}).ExpectStatus(http.StatusOK).Send(t)
+
+		var body api.UpdateDAGSpec200JSONResponse
+		resp.Unmarshal(t, &body)
+		require.Empty(t, body.Errors)
+	})
 }
 
 func TestCreateNewDAGPathTraversal(t *testing.T) {
@@ -736,6 +798,7 @@ steps:
 				server.SubCmdBuilder,
 				server.Config.DefaultExecMode,
 				server.Config.Paths.BaseConfig,
+				nil,
 			),
 			config.Queues{
 				Enabled: true,

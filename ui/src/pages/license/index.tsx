@@ -50,6 +50,7 @@ export default function LicensePage() {
           features: data?.features || [],
           expiry: data?.expiry || '',
           gracePeriod: false,
+          graceEndsAt: '',
           community: false,
           source: 'file',
           warningCode: '',
@@ -83,6 +84,7 @@ export default function LicensePage() {
           features: [],
           expiry: '',
           gracePeriod: false,
+          graceEndsAt: '',
           community: true,
           source: '',
           warningCode: '',
@@ -103,7 +105,7 @@ export default function LicensePage() {
       <div>
         <h1 className="text-lg font-semibold">License</h1>
         <p className="text-sm text-muted-foreground">
-          View license status and activate a Dagu Pro license key.
+          View license status and activate a Dagu license or trial key.
         </p>
       </div>
 
@@ -116,15 +118,15 @@ export default function LicensePage() {
         <div className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
           <span className="text-muted-foreground">Status</span>
           <span className="flex items-center gap-1.5">
-            {license.valid ? (
-              <>
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                Active
-              </>
-            ) : license.gracePeriod ? (
+            {license.gracePeriod ? (
               <>
                 <XCircle className="h-3.5 w-3.5 text-amber-500" />
                 Grace Period
+              </>
+            ) : license.valid ? (
+              <>
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                Active
               </>
             ) : license.community ? (
               'Community Edition'
@@ -156,7 +158,7 @@ export default function LicensePage() {
       </div>
 
       {/* Deactivate license */}
-      {license.valid && (
+      {!license.community && (
         <div className="card-obsidian p-4 space-y-3">
           <div className="text-sm font-medium">Deactivate License</div>
           {license.source === 'env' ? (
@@ -219,7 +221,7 @@ export default function LicensePage() {
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          Enter your license key to activate Dagu Pro features. You can obtain a
+          Enter your license or trial key to activate Dagu features. You can obtain a
           key from{' '}
           <a
             href={LICENSE_CONSOLE_URL}
@@ -242,7 +244,7 @@ export default function LicensePage() {
       >
         <p className="text-sm">
           This will deactivate the license on this machine and return to
-          community mode. Pro features (audit, RBAC, SSO) will be disabled
+          community mode. Licensed features (audit, RBAC, SSO) will be disabled
           immediately.
         </p>
       </ConfirmModal>

@@ -235,17 +235,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		filepath.Join(cfg.Paths.DataDir, "agent", "references"),
 	)
 
-	var agentSkillStore agent.SkillStore
-	skillsDir := filepath.Join(cfg.Paths.DAGsDir, "skills")
-	if fileagentskill.SeedExampleSkills(skillsDir) && agentConfigStore != nil {
-		autoEnableExampleSkills(ctx, agentConfigStore)
-	}
-	if skillStore, skillErr := fileagentskill.New(skillsDir); skillErr != nil {
-		logger.Warn(ctx, "Failed to create agent skill store", tag.Error(skillErr))
-	} else {
-		agentSkillStore = skillStore
-	}
-
 	var agentSoulStore agent.SoulStore
 	soulsDir := filepath.Join(cfg.Paths.DAGsDir, "souls")
 	if _, err := fileagentsoul.SeedExampleSouls(ctx, soulsDir); err != nil {
@@ -381,9 +370,20 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 		apiOpts = append(apiOpts, apiv1.WithWorkspaceStore(wsStore))
 	}
 
+	var licenseChecker license.Checker
+	auditEnabled := func() bool {
+		if auditSvc == nil {
+			return false
+		}
+		if licenseChecker == nil {
+			return true
+		}
+		return licenseChecker.IsFeatureEnabled(license.FeatureAudit)
+	}
+
 	var agentAPI *agent.API
 	if agentConfigStore != nil {
-		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSkillStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
+		agentAPI, err = initAgentAPI(ctx, agentConfigStore, agentModelStore, agentSoulStore, agentOAuthManager, &cfg.Paths, referencesDir, cfg.Server.Session.MaxPerUser, dr, auditSvc, auditEnabled, eventSvc, memoryStore, newRemoteNodeAdapter(remoteNodeResolver))
 		if err != nil {
 			logger.Warn(ctx, "Failed to initialize agent API", tag.Error(err))
 		}
@@ -473,26 +473,18 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	// Populate license checker and manager in funcsConfig after opts
 	if srv.licenseManager != nil {
-		srv.funcsConfig.LicenseChecker = srv.licenseManager.Checker()
+		licenseChecker = srv.licenseManager.Checker()
+		srv.funcsConfig.LicenseChecker = licenseChecker
 		srv.funcsConfig.LicenseManager = srv.licenseManager
-	}
-
-	// License feature gating
-	if srv.licenseManager != nil {
-		checker := srv.licenseManager.Checker()
-		if !checker.IsFeatureEnabled(license.FeatureAudit) {
-			srv.auditService = nil
-			srv.auditStore = nil
-		}
-		if !checker.IsFeatureEnabled(license.FeatureSSO) {
-			if srv.builtinOIDCCfg != nil {
-				logger.Error(ctx, "SSO (OIDC) requires a Dagu Pro license; OIDC login is disabled")
-				srv.builtinOIDCCfg = nil
-			}
+		if srv.builtinOIDCCfg != nil {
+			srv.builtinOIDCCfg.LicenseChecker = licenseChecker
 		}
 	}
 
-	// Add audit service to API only if licensed (or no license manager)
+	if srv.licenseManager != nil && srv.builtinOIDCCfg != nil && !srv.licenseManager.Checker().IsFeatureEnabled(license.FeatureSSO) {
+		logger.Warn(ctx, "SSO (OIDC) is configured but currently unavailable because the active license does not enable it")
+	}
+
 	if srv.auditService != nil {
 		apiOpts = append(apiOpts, apiv1.WithAuditService(srv.auditService))
 	}
@@ -516,9 +508,6 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 
 	if memoryStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentMemoryStore(memoryStore))
-	}
-	if agentSkillStore != nil {
-		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSkillStore(agentSkillStore))
 	}
 	if agentSoulStore != nil {
 		allAPIOptions = append(allAPIOptions, apiv1.WithAgentSoulStore(agentSoulStore))
@@ -761,48 +750,23 @@ func initSyncService(ctx context.Context, cfg *config.Config) gitsync.Service {
 	return svc
 }
 
-// autoEnableExampleSkills adds example skill IDs to the agent config's enabled list.
-func autoEnableExampleSkills(ctx context.Context, configStore agent.ConfigStore) {
-	cfg, err := configStore.Load(ctx)
-	if err != nil {
-		logger.Warn(ctx, "Failed to load agent config for auto-enabling skills", tag.Error(err))
-		return
-	}
-
-	existing := make(map[string]struct{}, len(cfg.EnabledSkills))
-	for _, id := range cfg.EnabledSkills {
-		existing[id] = struct{}{}
-	}
-
-	for _, id := range fileagentskill.ExampleSkillIDs() {
-		if _, ok := existing[id]; !ok {
-			cfg.EnabledSkills = append(cfg.EnabledSkills, id)
-		}
-	}
-
-	if err := configStore.Save(ctx, cfg); err != nil {
-		logger.Warn(ctx, "Failed to auto-enable example skills", tag.Error(err))
-	}
-}
-
 // initAgentAPI creates and returns an agent API.
 // The API uses the config store to check enabled status and resolve providers via the model store.
-func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, skillStore agent.SkillStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteContextResolver) (*agent.API, error) {
+func initAgentAPI(ctx context.Context, store *fileagentconfig.Store, modelStore agent.ModelStore, soulStore agent.SoulStore, oauthManager *agentoauth.Manager, paths *config.PathsConfig, referencesDir string, sessionMaxPerUser int, dagStore exec.DAGStore, auditSvc *audit.Service, auditEnabled func() bool, eventSvc *eventstore.Service, memoryStore agent.MemoryStore, remoteResolver agent.RemoteContextResolver) (*agent.API, error) {
 	sessStore, err := filesession.New(paths.SessionsDir, filesession.WithMaxPerUser(sessionMaxPerUser))
 	if err != nil {
 		logger.Warn(ctx, "Failed to create session store, persistence disabled", tag.Error(err))
 	}
 
 	hooks := agent.NewHooks()
-	hooks.OnBeforeToolExec(newAgentPolicyHook(store, auditSvc))
+	hooks.OnBeforeToolExec(newAgentPolicyHook(store, auditSvc, auditEnabled))
 	if auditSvc != nil {
-		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc))
+		hooks.OnAfterToolExec(newAgentAuditHook(auditSvc, auditEnabled))
 	}
 
 	api := agent.NewAPI(agent.APIConfig{
 		ConfigStore:           store,
 		ModelStore:            modelStore,
-		SkillStore:            skillStore,
 		SoulStore:             soulStore,
 		WorkingDir:            paths.DAGsDir,
 		Logger:                slog.Default(),
@@ -844,9 +808,9 @@ func initEventService(cfg *config.Config) (*eventstore.Service, error) {
 }
 
 // newAgentAuditHook returns a hook that logs agent tool executions to the audit service.
-func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
+func newAgentAuditHook(auditSvc *audit.Service, auditEnabled func() bool) agent.AfterToolExecHookFunc {
 	return func(_ context.Context, info agent.ToolExecInfo, result agent.ToolOut) {
-		if info.Audit == nil {
+		if info.Audit == nil || !isAuditEnabled(auditSvc, auditEnabled) {
 			return // tool opted out of audit
 		}
 
@@ -866,6 +830,16 @@ func newAgentAuditHook(auditSvc *audit.Service) agent.AfterToolExecHookFunc {
 			WithIPAddress(info.User.IPAddress)
 		_ = auditSvc.Log(context.Background(), entry)
 	}
+}
+
+func isAuditEnabled(auditSvc *audit.Service, auditEnabled func() bool) bool {
+	if auditSvc == nil {
+		return false
+	}
+	if auditEnabled == nil {
+		return true
+	}
+	return auditEnabled()
 }
 
 // sanitizedRequestLogger wraps httplog's RequestLogger with URL sanitization
@@ -1144,7 +1118,11 @@ func (srv *Server) setupTerminalRoute(ctx context.Context, r *chi.Mux, apiV1Base
 		shell = terminal.GetDefaultShell()
 	}
 	srv.terminalManager = terminal.NewManager(ctx, srv.config.Server.Terminal.MaxSessions)
-	termHandler := terminal.NewHandler(srv.authService, srv.auditService, srv.terminalManager, shell)
+	var auditChecker license.Checker
+	if srv.licenseManager != nil {
+		auditChecker = srv.licenseManager.Checker()
+	}
+	termHandler := terminal.NewHandler(srv.authService, srv.auditService, auditChecker, srv.terminalManager, shell)
 	wsPath := path.Join(apiV1BasePath, "terminal/ws")
 	r.Get(wsPath, termHandler.ServeHTTP)
 	logger.Info(ctx, "Terminal WebSocket route configured", slog.String("path", wsPath))

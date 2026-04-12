@@ -27,12 +27,6 @@ type ToolConfig struct {
 	// AllowedTools restricts which tool names can be constructed.
 	// Nil means all registered tools are allowed.
 	AllowedTools map[string]struct{}
-	// SkillStore provides access to skill data for the use_skill tool.
-	// Nil means skills are not available.
-	SkillStore SkillStore
-	// AllowedSkills restricts which skill IDs the use_skill tool can load.
-	// Nil means all skills in the store are allowed.
-	AllowedSkills map[string]struct{}
 	// RemoteContextResolver provides access to remote CLI contexts for remote_agent tools.
 	// Nil means remote context tools are not available.
 	RemoteContextResolver RemoteContextResolver

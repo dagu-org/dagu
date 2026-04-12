@@ -79,10 +79,6 @@ type LoopConfig struct {
 	SessionStore SessionStore
 	// Registry manages sub-session lifecycle for delegate tools.
 	Registry SubSessionRegistry
-	// SkillStore provides skill loading for delegate skill pre-loading.
-	SkillStore SkillStore
-	// AllowedSkills restricts which skill IDs can be pre-loaded by delegates. Nil = all allowed.
-	AllowedSkills map[string]struct{}
 	// WebSearch configures provider-native web search for requests.
 	WebSearch *llm.WebSearchRequest
 	// AutomataRuntime exposes workflow control methods for restricted Automata sessions.
@@ -119,8 +115,6 @@ type Loop struct {
 	user               UserIdentity
 	sessionStore       SessionStore
 	registry           SubSessionRegistry
-	skillStore         SkillStore
-	allowedSkills      map[string]struct{}
 	webSearch          *llm.WebSearchRequest
 	automataRuntime    AutomataRuntime
 	onTurnComplete     func()
@@ -156,8 +150,6 @@ func NewLoop(config LoopConfig) *Loop {
 		user:             config.User,
 		sessionStore:     config.SessionStore,
 		registry:         config.Registry,
-		skillStore:       config.SkillStore,
-		allowedSkills:    config.AllowedSkills,
 		webSearch:        config.WebSearch,
 		automataRuntime:  config.AutomataRuntime,
 		onTurnComplete:   config.OnTurnComplete,
@@ -207,14 +199,12 @@ func (l *Loop) AppendExternalHistory(message llm.Message) {
 func (l *Loop) UpdateRuntime(
 	tools []*AgentTool,
 	systemPrompt string,
-	allowedSkills map[string]struct{},
 	automataRuntime AutomataRuntime,
 ) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.tools = tools
 	l.systemPrompt = systemPrompt
-	l.allowedSkills = allowedSkills
 	l.automataRuntime = automataRuntime
 }
 
@@ -522,18 +512,16 @@ func (l *Loop) executeTool(ctx context.Context, tc llm.ToolCall) ToolOut {
 	var delegate *DelegateContext
 	if tc.Function.Name == delegateToolName && l.registry != nil {
 		delegate = &DelegateContext{
-			Provider:      provider,
-			Model:         model,
-			SystemPrompt:  l.systemPrompt,
-			Tools:         l.tools,
-			Hooks:         l.hooks,
-			Logger:        l.logger,
-			SessionStore:  l.sessionStore,
-			ParentID:      l.sessionID,
-			User:          user,
-			Registry:      l.registry,
-			SkillStore:    l.skillStore,
-			AllowedSkills: l.allowedSkills,
+			Provider:     provider,
+			Model:        model,
+			SystemPrompt: l.systemPrompt,
+			Tools:        l.tools,
+			Hooks:        l.hooks,
+			Logger:       l.logger,
+			SessionStore: l.sessionStore,
+			ParentID:     l.sessionID,
+			User:         user,
+			Registry:     l.registry,
 		}
 	}
 

@@ -6,16 +6,68 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func backgroundCtx() ToolContext {
 	return ToolContext{Context: context.Background()}
+}
+
+func createPathHelper(tb testing.TB, dir string) string {
+	tb.Helper()
+
+	name := "path-helper"
+	path := filepath.Join(dir, name)
+	content := "#!/bin/sh\nprintf 'path-helper-marker\\n'\n"
+	if runtime.GOOS == "windows" {
+		path += ".cmd"
+		content = "@echo off\r\necho path-helper-marker\r\n"
+	}
+
+	require.NoError(tb, os.WriteFile(path, []byte(content), 0o700))
+	return name
+}
+
+func noBashPath() (string, bool) {
+	return "", false
+}
+
+func bashPathForTests(tb testing.TB) bashPathFinder {
+	tb.Helper()
+
+	path, ok := findBashPath()
+	if !ok {
+		tb.Skip("bash is not available")
+	}
+	return func() (string, bool) { return path, true }
+}
+
+func runCommandWithFinder(
+	tb testing.TB,
+	ctx context.Context,
+	workDir, command string,
+	timeout int,
+	findPath bashPathFinder,
+) ToolOut {
+	tb.Helper()
+
+	return executeCommandWithFinder(ToolContext{
+		Context:    ctx,
+		WorkingDir: workDir,
+	}, BashToolInput{
+		Command: command,
+		Timeout: timeout,
+	}, findPath)
 }
 
 func TestBashTool_Run(t *testing.T) {
@@ -147,7 +199,7 @@ func TestBashTool_Timeout(t *testing.T) {
 		t.Parallel()
 
 		tool := NewBashTool()
-		input := json.RawMessage(`{"command": "sleep 2", "timeout": 1}`)
+		input := json.RawMessage(`{"command": "while :; do :; done", "timeout": 1}`)
 
 		start := time.Now()
 		result := tool.Run(backgroundCtx(), input)
@@ -162,7 +214,7 @@ func TestBashTool_Timeout(t *testing.T) {
 		t.Parallel()
 
 		tool := NewBashTool()
-		input := json.RawMessage(`{"command": "sleep 10"}`)
+		input := json.RawMessage(`{"command": "while :; do :; done", "timeout": 10}`)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -172,7 +224,215 @@ func TestBashTool_Timeout(t *testing.T) {
 		elapsed := time.Since(start)
 
 		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "canceled")
 		assert.Less(t, elapsed, time.Second)
+	})
+}
+
+func TestExecuteCommand_InterpreterFallback(t *testing.T) {
+	t.Parallel()
+
+	t.Run("executes simple echo", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `echo hello`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "hello")
+	})
+
+	t.Run("returns no output for silent commands", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `true`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Equal(t, "(no output)", result.Content)
+	})
+
+	t.Run("captures stderr", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `echo error >&2`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "STDERR")
+		assert.Contains(t, result.Content, "error")
+	})
+
+	t.Run("reports exit failure", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `exit 1`, 0, noBashPath)
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "failed")
+	})
+
+	t.Run("supports pipelines with builtins", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `printf 'hello\n' | while IFS= read -r line; do echo "${line}!"; done`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "hello!")
+	})
+
+	t.Run("respects working directory", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "marker.txt"), []byte("ok"), 0o600))
+
+		result := runCommandWithFinder(t, context.Background(), dir, `test -f marker.txt && echo found`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "found")
+	})
+
+	t.Run("supports variable expansion", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `X=hello; echo "$X"`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "hello")
+	})
+
+	t.Run("supports command substitution", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `echo "$(echo nested)"`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "nested")
+	})
+
+	t.Run("supports bash syntax mode", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `value=hello; [[ "$value" == hello ]] && echo yes`, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "yes")
+	})
+
+	t.Run("runs PATH-installed executables", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		helper := createPathHelper(t, dir)
+		command := fmt.Sprintf("PATH=%q; %s", dir+string(os.PathListSeparator)+"$PATH", helper)
+
+		result := runCommandWithFinder(t, context.Background(), "", command, 0, noBashPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "path-helper-marker")
+	})
+
+	t.Run("reports parse errors", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `if then`, 0, noBashPath)
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, strings.ToLower(result.Content), "parse")
+	})
+}
+
+func TestExecuteCommand_InterpreterFallback_Timeout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("internal timeout is reported as timeout", func(t *testing.T) {
+		t.Parallel()
+
+		start := time.Now()
+		result := runCommandWithFinder(t, context.Background(), "", `while :; do :; done`, 1, noBashPath)
+		elapsed := time.Since(start)
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "timed out")
+		assert.Less(t, elapsed, 2*time.Second)
+	})
+
+	t.Run("parent deadline is reported as cancellation", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		start := time.Now()
+		result := runCommandWithFinder(t, ctx, "", `while :; do :; done`, 10, noBashPath)
+		elapsed := time.Since(start)
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "canceled")
+		assert.Contains(t, result.Content, "deadline exceeded")
+		assert.Less(t, elapsed, time.Second)
+	})
+}
+
+func TestExecuteCommand_BashPath(t *testing.T) {
+	t.Parallel()
+
+	findPath := bashPathForTests(t)
+
+	t.Run("executes simple echo", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `echo hello`, 0, findPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "hello")
+	})
+
+	t.Run("captures stderr", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `echo error >&2`, 0, findPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "STDERR")
+		assert.Contains(t, result.Content, "error")
+	})
+
+	t.Run("reports exit failure", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `exit 1`, 0, findPath)
+
+		assert.True(t, result.IsError)
+		assert.Contains(t, result.Content, "failed")
+	})
+
+	t.Run("supports pipelines", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `printf 'hello\n' | while IFS= read -r line; do echo "${line}!"; done`, 0, findPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "hello!")
+	})
+
+	t.Run("respects working directory", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "marker.txt"), []byte("ok"), 0o600))
+
+		result := runCommandWithFinder(t, context.Background(), dir, `test -f marker.txt && echo found`, 0, findPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "found")
+	})
+
+	t.Run("supports bash syntax", func(t *testing.T) {
+		t.Parallel()
+
+		result := runCommandWithFinder(t, context.Background(), "", `value=hello; [[ "$value" == hello ]] && echo yes`, 0, findPath)
+
+		assert.False(t, result.IsError)
+		assert.Contains(t, result.Content, "yes")
 	})
 }
 
@@ -291,5 +551,31 @@ func TestTruncateOutput(t *testing.T) {
 		result := truncateOutput(exactString)
 
 		assert.Equal(t, exactString, result)
+	})
+}
+
+func TestCappedWriter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("preserves short output", func(t *testing.T) {
+		t.Parallel()
+
+		writer := newCappedWriter(16)
+		n, err := writer.Write([]byte("short"))
+
+		require.NoError(t, err)
+		assert.Equal(t, 5, n)
+		assert.Equal(t, "short", writer.String())
+	})
+
+	t.Run("caps long output and appends marker", func(t *testing.T) {
+		t.Parallel()
+
+		writer := newCappedWriter(len(outputTruncationMarker) + 5)
+		n, err := writer.Write([]byte(strings.Repeat("x", len(outputTruncationMarker)+10)))
+
+		require.NoError(t, err)
+		assert.Equal(t, len(outputTruncationMarker)+10, n)
+		assert.Equal(t, strings.Repeat("x", 5)+outputTruncationMarker, writer.String())
 	})
 }

@@ -73,7 +73,6 @@ type API struct {
 	agentConfigStore    agent.ConfigStore
 	agentModelStore     agent.ModelStore
 	agentMemoryStore    agent.MemoryStore
-	agentSkillStore     agent.SkillStore
 	agentSoulStore      agent.SoulStore
 	agentOAuthManager   *agentoauth.Manager
 	agentAPI            *agent.API
@@ -184,13 +183,6 @@ func WithAgentModelStore(store agent.ModelStore) APIOption {
 func WithAgentMemoryStore(store agent.MemoryStore) APIOption {
 	return func(a *API) {
 		a.agentMemoryStore = store
-	}
-}
-
-// WithAgentSkillStore returns an APIOption that sets the API's agent skill store.
-func WithAgentSkillStore(store agent.SkillStore) APIOption {
-	return func(a *API) {
-		a.agentSkillStore = store
 	}
 }
 
@@ -700,11 +692,21 @@ func (a *API) requireLicensedAudit() error {
 	return nil
 }
 
+func (a *API) isAuditLicensed() bool {
+	if a.auditService == nil {
+		return false
+	}
+	if a.licenseManager == nil {
+		return true
+	}
+	return a.licenseManager.Checker().IsFeatureEnabled(license.FeatureAudit)
+}
+
 // logAudit logs an audit entry with the specified category, action, and details.
 // It silently returns if the audit service is not configured.
 // User and IP are extracted from context; missing user is allowed (recorded as empty).
 func (a *API) logAudit(ctx context.Context, category audit.Category, action string, details any) {
-	if a.auditService == nil {
+	if !a.isAuditLicensed() {
 		return
 	}
 

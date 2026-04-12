@@ -7,6 +7,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { JSONSchema } from '@/lib/schema-utils';
 import { Button } from '../../../../components/ui/button';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useYamlCursorPath } from '../../../../hooks/useYamlCursorPath';
@@ -29,6 +30,10 @@ type DAGEditorWithDocsProps = {
   showDocsButton?: boolean;
   /** Additional content to render in the header (e.g., save button) */
   headerActions?: React.ReactNode;
+  /** Optional document-specific schema */
+  schema?: JSONSchema | null;
+  /** Stable model URI used for per-document schema association */
+  modelUri?: string;
 };
 
 /**
@@ -42,6 +47,8 @@ function DAGEditorWithDocs({
   className,
   showDocsButton = true,
   headerActions,
+  schema,
+  modelUri,
 }: DAGEditorWithDocsProps) {
   // Schema documentation sidebar state (default open, remembers user preference)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -138,6 +145,8 @@ function DAGEditorWithDocs({
             lineNumbers={true}
             onChange={readOnly ? undefined : onChange}
             onCursorPositionChange={handleCursorPositionChange}
+            modelUri={modelUri}
+            schema={schema}
           />
         </div>
         <SchemaDocSidebar
@@ -146,6 +155,7 @@ function DAGEditorWithDocs({
           path={yamlPathInfo.path}
           segments={yamlPathInfo.segments}
           yamlContent={value}
+          schema={schema}
         />
       </div>
     </div>

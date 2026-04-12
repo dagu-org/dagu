@@ -20,8 +20,6 @@ import (
 var workflowAutomataAllowedTools = []string{
 	"read",
 	"think",
-	"search_skills",
-	"use_skill",
 	"list_automata_tasks",
 	"list_allowed_dags",
 	"run_allowed_dag",
@@ -34,8 +32,6 @@ var workflowAutomataAllowedTools = []string{
 var serviceAutomataAllowedTools = []string{
 	"read",
 	"think",
-	"search_skills",
-	"use_skill",
 	"list_automata_tasks",
 	"list_allowed_dags",
 	"run_allowed_dag",
@@ -383,7 +379,6 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 		Model:             def.Agent.Model,
 		AllowedTools:      allowedToolsForDefinition(def),
 		SystemPromptExtra: s.buildSystemPromptExtra(def, state, allowedDAGs),
-		EnabledSkills:     append([]string(nil), def.Agent.EnabledSkills...),
 		Soul:              soul,
 		AllowClearSoul:    def.Agent.Soul == "",
 		AutomataName:      def.Name,

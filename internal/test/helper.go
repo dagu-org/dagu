@@ -28,6 +28,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	exec1 "github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/persis/filebaseconfig"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
 	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filedistributed"
@@ -67,6 +68,7 @@ type Options struct {
 	// Coordinator handler options for shared-nothing worker tests
 	WithStatusPersistence   bool          // Enable status persistence via DAGRunStore
 	WithLogPersistence      bool          // Enable log persistence to filesystem
+	WithArtifactPersistence bool          // Enable artifact persistence to filesystem
 	StaleHeartbeatThreshold time.Duration // Override for handler's stale heartbeat threshold
 	StaleLeaseThreshold     time.Duration // Override for handler's stale lease threshold
 }
@@ -121,6 +123,14 @@ func WithLogPersistence() HelperOption {
 	}
 }
 
+// WithArtifactPersistence enables artifact persistence to filesystem on the coordinator handler.
+// Use this for testing remote artifact uploads from workers.
+func WithArtifactPersistence() HelperOption {
+	return func(opts *Options) {
+		opts.WithArtifactPersistence = true
+	}
+}
+
 // WithServerOptions appends frontend.ServerOption values to be passed when creating the test server.
 func WithServerOptions(serverOpts ...frontend.ServerOption) HelperOption {
 	return func(opts *Options) {
@@ -128,8 +138,9 @@ func WithServerOptions(serverOpts ...frontend.ServerOption) HelperOption {
 	}
 }
 
-// WithStaleThresholds overrides the stale heartbeat and lease thresholds on the
-// coordinator handler. Useful for tests that need faster zombie detection.
+// WithStaleThresholds overrides the shared heartbeat and lease staleness
+// thresholds used by distributed test helpers. Useful for tests that need
+// faster zombie detection or dispatch reservation expiry.
 func WithStaleThresholds(heartbeat, lease time.Duration) HelperOption {
 	return func(opts *Options) {
 		opts.StaleHeartbeatThreshold = heartbeat
@@ -243,13 +254,34 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	ctx = config.WithConfig(ctx, cfg)
 
-	dagStore := filedag.New(cfg.Paths.DAGsDir, filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir), filedag.WithSkipExamples(true))
-	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
+	if cfg.Paths.BaseConfig != "" {
+		baseConfigStore, err := filebaseconfig.New(
+			cfg.Paths.BaseConfig,
+			filebaseconfig.WithSkipDefault(cfg.Core.SkipExamples),
+		)
+		require.NoError(t, err)
+		require.NoError(t, baseConfigStore.Initialize())
+	}
+
+	dagStore := filedag.New(
+		cfg.Paths.DAGsDir,
+		filedag.WithFlagsBaseDir(cfg.Paths.SuspendFlagsDir),
+		filedag.WithBaseConfig(cfg.Paths.BaseConfig),
+		filedag.WithSkipExamples(true),
+	)
+	runStore := filedagrun.New(
+		cfg.Paths.DAGRunsDir,
+		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
+	)
 	procStore := newProcStore(cfg)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)
 	distributedDir := filepath.Join(cfg.Paths.DataDir, "distributed")
-	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir)
+	var dispatchStoreOpts []filedistributed.DispatchTaskStoreOption
+	if options.StaleLeaseThreshold > 0 {
+		dispatchStoreOpts = append(dispatchStoreOpts, filedistributed.WithDispatchReservationTTL(options.StaleLeaseThreshold))
+	}
+	dispatchTaskStore := filedistributed.NewDispatchTaskStore(distributedDir, dispatchStoreOpts...)
 	workerHeartbeatStore := filedistributed.NewWorkerHeartbeatStore(distributedDir)
 	dagRunLeaseStore := filedistributed.NewDAGRunLeaseStore(distributedDir)
 	activeDistributedRunStore := filedistributed.NewActiveDistributedRunStore(distributedDir)
@@ -315,6 +347,7 @@ func writeHelperConfigFile(t *testing.T, cfg *config.Config, configPath string) 
 	configData["paths"] = map[string]any{
 		"dags_dir":             cfg.Paths.DAGsDir,
 		"log_dir":              cfg.Paths.LogDir,
+		"artifact_dir":         cfg.Paths.ArtifactDir,
 		"data_dir":             cfg.Paths.DataDir,
 		"suspend_flags_dir":    cfg.Paths.SuspendFlagsDir,
 		"admin_logs_dir":       cfg.Paths.AdminLogsDir,
@@ -514,7 +547,11 @@ func (h Helper) DAG(t *testing.T, yamlContent string) DAG {
 	err = os.WriteFile(testFile, []byte(yamlContent), 0600)
 	require.NoError(t, err, "failed to write test DAG")
 
-	dag, err := spec.Load(h.Context, testFile)
+	loadOpts := []spec.LoadOption{}
+	if h.Config.Paths.BaseConfig != "" {
+		loadOpts = append(loadOpts, spec.WithBaseConfig(h.Config.Paths.BaseConfig))
+	}
+	dag, err := spec.Load(h.Context, testFile, loadOpts...)
 	require.NoError(t, err, "failed to load test DAG")
 
 	return DAG{

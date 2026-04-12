@@ -328,6 +328,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	// Initialize history repository and history manager
 	hrOpts := []filedagrun.DAGRunStoreOption{
+		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
 		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 		filedagrun.WithLocation(cfg.Core.Location),
 	}
@@ -656,6 +657,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	statusCache.StartEviction(c)
 	schedulerRunStore := filedagrun.New(
 		c.Config.Paths.DAGRunsDir,
+		filedagrun.WithArtifactDir(c.Config.Paths.ArtifactDir),
 		filedagrun.WithLatestStatusToday(false),
 		filedagrun.WithLocation(c.Config.Core.Location),
 		filedagrun.WithHistoryFileCache(statusCache),
@@ -723,10 +725,6 @@ func (c *Context) newSchedulerAutomataService(
 	if err != nil {
 		return nil, err
 	}
-	skillStore, err := fileagentskill.New(filepath.Join(c.Config.Paths.DAGsDir, "skills"))
-	if err != nil {
-		return nil, err
-	}
 	soulStore, err := fileagentsoul.New(c.Context, filepath.Join(c.Config.Paths.DAGsDir, "souls"))
 	if err != nil {
 		return nil, err
@@ -747,7 +745,6 @@ func (c *Context) newSchedulerAutomataService(
 		dagStore,
 		agentConfigStore,
 		modelStore,
-		skillStore,
 		soulStore,
 		sessionStore,
 		memoryStore,
@@ -777,7 +774,6 @@ func (c *Context) newSchedulerAgentAPI(
 	dagStore exec.DAGStore,
 	configStore agent.ConfigStore,
 	modelStore agent.ModelStore,
-	skillStore agent.SkillStore,
 	soulStore agent.SoulStore,
 	sessionStore agent.SessionStore,
 	memoryStore agent.MemoryStore,
@@ -789,7 +785,6 @@ func (c *Context) newSchedulerAgentAPI(
 	agentAPI := agent.NewAPI(agent.APIConfig{
 		ConfigStore:  configStore,
 		ModelStore:   modelStore,
-		SkillStore:   skillStore,
 		SoulStore:    soulStore,
 		WorkingDir:   c.Config.Paths.DAGsDir,
 		Logger:       slog.Default(),
@@ -857,6 +852,7 @@ func (c *Context) dagStore(cfg dagStoreConfig) (exec.DAGStore, error) {
 		c.Config.Paths.DAGsDir,
 		filedag.WithFlagsBaseDir(c.Config.Paths.SuspendFlagsDir),
 		filedag.WithSearchPaths(searchPaths),
+		filedag.WithBaseConfig(c.Config.Paths.BaseConfig),
 		filedag.WithFileCache(cfg.Cache),
 		filedag.WithSkipExamples(c.Config.Core.SkipExamples),
 		filedag.WithSkipDirectoryCreation(cfg.SkipDirectoryCreation),
@@ -877,13 +873,12 @@ type agentStoresResult struct {
 	ConfigStore     agent.ConfigStore
 	ModelStore      agent.ModelStore
 	MemoryStore     agent.MemoryStore
-	SkillStore      agent.SkillStore
 	SoulStore       agent.SoulStore
 	OAuthManager    *agentoauth.Manager
 	ContextResolver agent.RemoteContextResolver
 }
 
-// agentStores creates the agent config, model, memory, and skill stores from the config paths.
+// agentStores creates the agent config, model, memory, and soul stores from the config paths.
 // Errors are logged as warnings; nil stores are returned if creation fails.
 func (c *Context) agentStores() agentStoresResult {
 	var result agentStoresResult
@@ -911,14 +906,6 @@ func (c *Context) agentStores() agentStoresResult {
 		return result
 	}
 	result.MemoryStore = ms
-
-	skillsDir := filepath.Join(c.Config.Paths.DAGsDir, "skills")
-	ss, err := fileagentskill.New(skillsDir)
-	if err != nil {
-		logger.Warn(c, "Failed to create agent skill store", tag.Error(err))
-		return result
-	}
-	result.SkillStore = ss
 
 	soulsDir := filepath.Join(c.Config.Paths.DAGsDir, "souls")
 	soulStore, err := fileagentsoul.New(c, soulsDir)
@@ -966,6 +953,20 @@ func (c *Context) OpenLogFile(
 // GenLogFileName generates a log file name based on the DAG and dag-run ID.
 func (c *Context) GenLogFileName(dag *core.DAG, dagRunID string) (string, error) {
 	return logpath.Generate(c, c.Config.Paths.LogDir, dag.LogDir, dag.Name, dagRunID)
+}
+
+// GenArtifactDir generates an artifact directory path for the DAG run when artifacts are enabled.
+func (c *Context) GenArtifactDir(dag *core.DAG, dagRunID string) (string, error) {
+	if dag == nil || !dag.ArtifactsEnabled() {
+		return "", nil
+	}
+
+	dagArtifactDir := ""
+	if dag.Artifacts != nil {
+		dagArtifactDir = dag.Artifacts.Dir
+	}
+
+	return logpath.GenerateDir(c, c.Config.Paths.ArtifactDir, dagArtifactDir, dag.Name, dagRunID)
 }
 
 // NewCommand creates a new command instance with the given cobra command and run function.
@@ -1072,9 +1073,25 @@ func (c *Context) RecordEarlyFailure(dag *core.DAG, dagRunID string, err error) 
 
 	// 3. Construct the "Failed" status
 	statusBuilder := transform.NewStatusBuilder(dag)
-	logPath, _ := c.GenLogFileName(dag, dagRunID)
+	logPath, logPathErr := c.GenLogFileName(dag, dagRunID)
+	if logPathErr != nil {
+		logger.Warn(c, "Failed to generate log file path for early failure status",
+			tag.Error(logPathErr),
+			tag.DAG(dag.Name),
+			tag.RunID(dagRunID),
+		)
+	}
+	artifactDir, artifactDirErr := c.GenArtifactDir(dag, dagRunID)
+	if artifactDirErr != nil {
+		logger.Warn(c, "Failed to generate artifact directory for early failure status",
+			tag.Error(artifactDirErr),
+			tag.DAG(dag.Name),
+			tag.RunID(dagRunID),
+		)
+	}
 	status := statusBuilder.Create(dagRunID, core.Failed, 0, time.Now(),
 		transform.WithLogFilePath(logPath),
+		transform.WithArchiveDir(artifactDir),
 		transform.WithFinishedAt(time.Now()),
 		transform.WithError(err.Error()),
 	)

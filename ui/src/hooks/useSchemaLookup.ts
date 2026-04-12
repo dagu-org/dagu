@@ -5,6 +5,7 @@ import {
   toPropertyInfo,
   getParentRequired,
   getSiblingProperties,
+  type JSONSchema,
   type SchemaPropertyInfo,
 } from '@/lib/schema-utils';
 
@@ -19,34 +20,50 @@ export interface SchemaLookupResult {
  * Hook to look up schema information for a given YAML path
  * @param path The YAML path to look up
  * @param yamlContent Optional YAML content for context-aware resolution of if-then conditionals
+ * @param schemaOverride Optional document-specific schema override
  */
-export function useSchemaLookup(path: string[], yamlContent?: string): SchemaLookupResult {
+export function useSchemaLookup(
+  path: string[],
+  yamlContent?: string,
+  schemaOverride?: JSONSchema | null
+): SchemaLookupResult {
   const { schema, loading, error } = useSchema();
+  const activeSchema = schemaOverride ?? schema;
+  const hasSchemaOverride = !!schemaOverride;
 
   const result = useMemo(() => {
-    if (!schema || path.length === 0) {
+    if (!activeSchema || path.length === 0) {
       return {
         propertyInfo: null,
         siblingProperties: [],
       };
     }
 
-    const schemaAtPath = getSchemaAtPath(schema, path, yamlContent);
-    const parentRequired = getParentRequired(schema, path, yamlContent);
+    const schemaAtPath = getSchemaAtPath(activeSchema, path, yamlContent);
+    const parentRequired = getParentRequired(activeSchema, path, yamlContent);
     const currentKey = path[path.length - 1] ?? '';
-    const propertyInfo = toPropertyInfo(schemaAtPath, currentKey, path, parentRequired);
-    const siblingProperties = getSiblingProperties(schema, path, yamlContent);
+    const propertyInfo = toPropertyInfo(
+      schemaAtPath,
+      currentKey,
+      path,
+      parentRequired
+    );
+    const siblingProperties = getSiblingProperties(
+      activeSchema,
+      path,
+      yamlContent
+    );
 
     return {
       propertyInfo,
       siblingProperties,
     };
-  }, [schema, path, yamlContent]);
+  }, [activeSchema, path, yamlContent]);
 
   return {
     ...result,
-    loading,
-    error,
+    loading: hasSchemaOverride ? false : loading,
+    error: hasSchemaOverride ? null : error,
   };
 }
 

@@ -222,6 +222,7 @@ func newCoordinator(
 	handler := coordinator.NewHandler(coordinator.HandlerConfig{
 		DAGRunStore:               dagRunStore,
 		LogDir:                    cfg.Paths.LogDir,
+		ArtifactDir:               cfg.Paths.ArtifactDir,
 		Owner:                     exec.CoordinatorEndpoint{ID: instanceID, Host: advertiseAddr, Port: cfg.Coordinator.Port},
 		DispatchTaskStore:         dispatchTaskStore,
 		WorkerHeartbeatStore:      workerHeartbeatStore,

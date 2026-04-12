@@ -1362,18 +1362,11 @@ func TestAPI_CompactSessionIfNeeded_CreatesSummarySession(t *testing.T) {
 	assert.True(t, mgr.safeMode)
 	require.NotNil(t, mgr.loop)
 
-	skillCount := len(mgr.enabledSkills)
-	var skillSummaries []SkillSummary
-	if skillCount > 0 && skillCount <= SkillListThreshold {
-		skillSummaries = LoadSkillSummaries(context.Background(), mgr.skillStore, mgr.enabledSkills)
-	}
 	expectedPrompt := GenerateSystemPrompt(SystemPromptParams{
-		Env:             mgr.environment,
-		Memory:          mgr.loadMemory(),
-		Role:            mgr.user.Role,
-		AvailableSkills: skillSummaries,
-		SkillCount:      skillCount,
-		Soul:            mgr.soul,
+		Env:    mgr.environment,
+		Memory: mgr.loadMemory(),
+		Role:   mgr.user.Role,
+		Soul:   mgr.soul,
 	})
 	assert.Equal(t, expectedPrompt, mgr.loop.systemPrompt)
 

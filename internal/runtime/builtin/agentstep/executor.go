@@ -133,27 +133,8 @@ func (e *Executor) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create LLM provider: %w", err)
 	}
 
-	// Resolve skill store and allowed skills.
-	skillStore := agent.GetSkillStore(ctx)
-	enabledSkills := resolveEnabledSkills(stepCfg, agentCfg)
-	allowedSkills := agent.ToSkillSet(enabledSkills)
-	skillCount := len(enabledSkills)
-	var skillSummaries []agent.SkillSummary
-	if skillCount > 0 && skillCount <= agent.SkillListThreshold {
-		skillSummaries = agent.LoadSkillSummaries(ctx, skillStore, enabledSkills)
-	}
-
-	// Warn about skills referenced in config but missing from the store.
-	if skillStore != nil {
-		for _, id := range enabledSkills {
-			if _, err := skillStore.GetByID(ctx, id); err != nil {
-				logf(stderr, "Warning: skill %q referenced in agent.skills not found in store", id)
-			}
-		}
-	}
-
 	// Build tools filtered by global policy (exclude navigate and ask_user; add output tool).
-	tools := buildTools(ctx, dagCtx, stepCfg, globalPolicy, skillStore, allowedSkills, stdout)
+	tools := buildTools(ctx, dagCtx, stepCfg, globalPolicy, stdout)
 
 	// Load memory content if enabled.
 	var memoryContent agent.MemoryContent
@@ -182,7 +163,7 @@ func (e *Executor) Run(ctx context.Context) error {
 	}
 
 	// Generate system prompt.
-	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, skillSummaries, skillCount, soul)
+	systemPrompt := buildSystemPrompt(dagCtx, stepCfg, memoryContent, soul)
 
 	// Enhance system prompt for push-back re-execution.
 	if e.pushBackIteration > 0 {
@@ -246,17 +227,15 @@ func (e *Executor) Run(ctx context.Context) error {
 	webSearch := resolveWebSearch(stepCfg, agentCfg)
 
 	loop := agent.NewLoop(agent.LoopConfig{
-		Provider:      provider,
-		Model:         modelCfg.Model,
-		Tools:         tools,
-		History:       contextToLLMHistory(e.contextMessages),
-		SystemPrompt:  systemPrompt,
-		SafeMode:      safeMode,
-		Hooks:         hooks,
-		Logger:        slog.Default(),
-		SkillStore:    skillStore,
-		AllowedSkills: allowedSkills,
-		WebSearch:     webSearch,
+		Provider:     provider,
+		Model:        modelCfg.Model,
+		Tools:        tools,
+		History:      contextToLLMHistory(e.contextMessages),
+		SystemPrompt: systemPrompt,
+		SafeMode:     safeMode,
+		Hooks:        hooks,
+		Logger:       slog.Default(),
+		WebSearch:    webSearch,
 		RecordMessage: func(_ context.Context, msg agent.Message) {
 			logMessage(stderr, msg)
 			converted := convertMessage(msg, modelCfg)
@@ -306,7 +285,7 @@ func (e *Executor) Run(ctx context.Context) error {
 
 // buildTools creates the tool list for the agent step.
 // Tools are filtered first by global policy, then by step-level config.
-func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, skillStore agent.SkillStore, allowedSkills map[string]struct{}, stdout io.Writer) []*agent.AgentTool {
+func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, stdout io.Writer) []*agent.AgentTool {
 	dagsDir := ""
 	if dagCtx.DAG != nil {
 		dagsDir = dagCtx.DAG.Location
@@ -319,10 +298,6 @@ func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentSte
 		"patch":  agent.NewPatchTool(dagsDir),
 		"think":  agent.NewThinkTool(),
 		"output": agent.NewOutputTool(stdout),
-	}
-	if skillStore != nil {
-		allTools["use_skill"] = agent.NewUseSkillTool(skillStore, allowedSkills)
-		allTools["search_skills"] = agent.NewSearchSkillsTool(skillStore, allowedSkills)
 	}
 
 	remoteResolver := agent.GetRemoteContextResolver(ctx)
@@ -366,7 +341,7 @@ func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentSte
 }
 
 // buildSystemPrompt generates the system prompt for the agent step.
-func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent, availableSkills []agent.SkillSummary, skillCount int, soul *agent.Soul) string {
+func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memory agent.MemoryContent, soul *agent.Soul) string {
 	env := agent.EnvironmentInfo{}
 	if dagCtx.DAG != nil {
 		env.DAGsDir = dagCtx.DAG.Location
@@ -381,12 +356,10 @@ func buildSystemPrompt(dagCtx exec.Context, stepCfg *core.AgentStepConfig, memor
 	}
 
 	prompt := agent.GenerateSystemPrompt(agent.SystemPromptParams{
-		Env:             env,
-		CurrentDAG:      currentDAG,
-		Memory:          memory,
-		AvailableSkills: availableSkills,
-		SkillCount:      skillCount,
-		Soul:            soul,
+		Env:        env,
+		CurrentDAG: currentDAG,
+		Memory:     memory,
+		Soul:       soul,
 	})
 
 	// Append instruction about the output tool.
@@ -408,24 +381,17 @@ func loadMemoryContent(ctx context.Context, store agent.MemoryStore, dagName str
 	if dagName != "" {
 		dagMem, _ = store.LoadDAGMemory(ctx, dagName)
 	}
+	readOnly := false
+	if roStore, ok := store.(agent.SnapshotReadOnlyMemoryStore); ok {
+		readOnly = roStore.MemoryReadOnly()
+	}
 	return agent.MemoryContent{
 		GlobalMemory: global,
 		DAGMemory:    dagMem,
 		DAGName:      dagName,
 		MemoryDir:    store.MemoryDir(),
+		ReadOnly:     readOnly,
 	}
-}
-
-// resolveEnabledSkills returns the skill IDs the agent is allowed to use.
-// Step-level skills override global; if neither is set, returns nil (no skills).
-func resolveEnabledSkills(stepCfg *core.AgentStepConfig, agentCfg *agent.Config) []string {
-	if stepCfg != nil && len(stepCfg.Skills) > 0 {
-		return stepCfg.Skills
-	}
-	if agentCfg != nil {
-		return agentCfg.EnabledSkills
-	}
-	return nil
 }
 
 // mergeStepBashPolicy merges step-level bash policy over the resolved global policy.

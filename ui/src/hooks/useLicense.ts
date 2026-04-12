@@ -7,6 +7,7 @@ const defaultLicense: LicenseStatus = {
   expiry: '',
   features: [],
   gracePeriod: false,
+  graceEndsAt: '',
   community: true,
   source: '',
   warningCode: '',
@@ -19,5 +20,5 @@ export function useLicense(): LicenseStatus {
 
 export function useHasFeature(feature: string): boolean {
   const license = useLicense();
-  return license.features.includes(feature);
+  return license.features.includes(feature) && (license.valid || license.gracePeriod);
 }

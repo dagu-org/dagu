@@ -35,6 +35,8 @@ type step struct {
 	WorkingDir string `yaml:"working_dir,omitempty"`
 	// Command is the command to run (on shell).
 	Command any `yaml:"command,omitempty"`
+	// Exec is a structured argv form for direct execution without shell parsing.
+	Exec *execSpec `yaml:"exec,omitempty"`
 	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
 	// Can be a string (e.g., "bash -e") or an array (e.g., ["bash", "-e"]).
 	Shell types.ShellValue `yaml:"shell,omitempty"`
@@ -93,7 +95,7 @@ type step struct {
 	// Can be a string (existing container name to exec into) or an object (container configuration).
 	Container any `yaml:"container,omitempty"`
 
-	// Type specifies the executor type (ssh, http, jq, mail, docker, gha, archive).
+	// Type specifies the executor type (ssh, http, jq, mail, docker, archive).
 	Type string `yaml:"type,omitempty"`
 
 	// Config contains executor-specific configuration.
@@ -119,6 +121,11 @@ type step struct {
 	Value string `yaml:"value,omitempty"`
 	// Routes maps patterns to target step names
 	Routes map[string][]string `yaml:"routes,omitempty"`
+}
+
+type execSpec struct {
+	Command string `yaml:"command,omitempty"`
+	Args    []any  `yaml:"args,omitempty"`
 }
 
 // approvalConfig defines the approval configuration for a step.
@@ -917,6 +924,25 @@ func buildStepPreconditions(ctx StepBuildContext, s *step) ([]*core.Condition, e
 
 // buildStepCommand parses the command field in the step definition.
 func buildStepCommand(_ StepBuildContext, s *step, result *core.Step) error {
+	if s.Exec != nil {
+		if s.Command != nil {
+			return core.NewValidationError("exec", s.Exec, fmt.Errorf("exec cannot be used together with command"))
+		}
+		if strings.TrimSpace(s.Script) != "" {
+			return core.NewValidationError("exec", s.Exec, fmt.Errorf("exec cannot be used together with script"))
+		}
+		if !s.Shell.IsZero() {
+			return core.NewValidationError("exec", s.Exec, fmt.Errorf("exec cannot be used together with shell"))
+		}
+		if len(s.ShellPackages) > 0 {
+			return core.NewValidationError("exec", s.Exec, fmt.Errorf("exec cannot be used together with shell_packages"))
+		}
+		if result.ExecutorConfig.Type != "" && result.ExecutorConfig.Type != "command" && result.ExecutorConfig.Type != "shell" {
+			return core.NewValidationError("exec", s.Exec, fmt.Errorf("exec is only supported for direct command execution"))
+		}
+		return buildExecCommand(s.Exec, result)
+	}
+
 	command := s.Command
 
 	// Case 1: command is nil
@@ -938,11 +964,65 @@ func buildStepCommand(_ StepBuildContext, s *step, result *core.Step) error {
 	}
 }
 
+func buildExecCommand(spec *execSpec, result *core.Step) error {
+	if spec == nil {
+		return nil
+	}
+
+	command := strings.TrimSpace(spec.Command)
+	if command == "" {
+		return core.NewValidationError("exec.command", spec.Command, ErrStepCommandIsEmpty)
+	}
+
+	args := make([]string, 0, len(spec.Args))
+	for i, arg := range spec.Args {
+		switch v := arg.(type) {
+		case string:
+			args = append(args, v)
+		case int, int64, uint64, float64, bool:
+			args = append(args, fmt.Sprintf("%v", v))
+		default:
+			return core.NewValidationError(
+				fmt.Sprintf("exec.args[%d]", i),
+				arg,
+				fmt.Errorf("exec args must be strings or primitive values, got %T", arg),
+			)
+		}
+	}
+
+	result.Shell = "direct"
+	result.ShellArgs = nil
+	result.Commands = []core.CommandEntry{{
+		Command:     command,
+		Args:        args,
+		CmdWithArgs: command + buildDisplayArgsSuffix(args),
+	}}
+	return nil
+}
+
+func buildDisplayArgsSuffix(args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	return " " + strings.Join(args, " ")
+}
+
 // buildSingleCommand parses a single command string and populates the Step fields.
 func buildSingleCommand(val string, result *core.Step) error {
 	val = strings.TrimSpace(val)
 	if val == "" {
 		return core.NewValidationError("command", val, ErrStepCommandIsEmpty)
+	}
+
+	// Harness uses command as a prompt, so preserve multiline text as a single
+	// command entry instead of reclassifying it as an inline script.
+	if strings.Contains(val, "\n") && result.ExecutorConfig.Type == "harness" {
+		result.Commands = []core.CommandEntry{
+			{
+				CmdWithArgs: val,
+			},
+		}
+		return nil
 	}
 
 	// If the value is multi-line, treat it as a script
@@ -1256,6 +1336,8 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 			result.ExecutorConfig.Type = "ssh"
 		} else if ctx.dag.Redis != nil {
 			result.ExecutorConfig.Type = "redis"
+		} else if ctx.dag.Harness != nil {
+			result.ExecutorConfig.Type = "harness"
 		}
 	}
 
@@ -1263,8 +1345,36 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 	if result.ExecutorConfig.Type == "redis" && ctx.dag != nil && ctx.dag.Redis != nil {
 		mergeRedisConfig(ctx.dag.Redis, result.ExecutorConfig.Config)
 	}
+	if result.ExecutorConfig.Type == "harness" && ctx.dag != nil && ctx.dag.Harness != nil {
+		result.ExecutorConfig.Config = mergeHarnessConfig(ctx.dag.Harness, s.Config)
+	}
 	if isKubernetesExecutorType(result.ExecutorConfig.Type) && ctx.dag != nil && ctx.dag.Kubernetes != nil {
 		result.ExecutorConfig.Config = mergeKubernetesExecutorConfig(ctx.dag.Kubernetes, result.ExecutorConfig.Config)
+	}
+	if result.ExecutorConfig.Type != "" && !isBuiltinStepTypeName(result.ExecutorConfig.Type) {
+		return core.NewValidationError(
+			"type",
+			result.ExecutorConfig.Type,
+			fmt.Errorf("unknown executor type %q", result.ExecutorConfig.Type),
+		)
+	}
+	if result.ExecutorConfig.Type == "harness" {
+		var defs core.HarnessDefinitions
+		if ctx.dag != nil {
+			defs = ctx.dag.Harnesses
+		}
+		if err := validateHarnessProviderConfig(defs, result.ExecutorConfig.Config); err != nil {
+			return err
+		}
+		fallbacks, err := extractHarnessFallback(cloneHarnessSpecMap(result.ExecutorConfig.Config))
+		if err != nil {
+			return err
+		}
+		for i := range fallbacks {
+			if err := validateHarnessProviderConfig(defs, fallbacks[i]); err != nil {
+				return fmt.Errorf("harness: invalid fallback[%d]: %w", i, err)
+			}
+		}
 	}
 
 	return nil
@@ -1292,6 +1402,31 @@ func mergeRedisConfig(dagRedis *core.RedisConfig, stepConfig map[string]any) {
 	setIfMissing("sentinel_addrs", dagRedis.SentinelAddrs)
 	setIfMissing("cluster_addrs", dagRedis.ClusterAddrs)
 	setIfMissing("max_retries", dagRedis.MaxRetries)
+}
+
+func mergeHarnessConfig(dagHarness *core.HarnessConfig, stepConfig map[string]any) map[string]any {
+	merged := cloneHarnessSpecMap(stepConfig)
+	if merged == nil {
+		merged = make(map[string]any)
+	}
+
+	if dagHarness == nil {
+		return merged
+	}
+
+	for key, value := range dagHarness.Config {
+		if _, exists := merged[key]; !exists {
+			merged[key] = cloneHarnessSpecValue(value)
+		}
+	}
+
+	if _, exists := stepConfig["fallback"]; exists {
+		merged["fallback"] = cloneHarnessSpecValue(stepConfig["fallback"])
+	} else if dagHarness.Fallback != nil {
+		merged["fallback"] = cloneHarnessSpecValue(dagHarness.Fallback)
+	}
+
+	return merged
 }
 
 // isRedisZeroValue checks if a value is a zero value for Redis config merging.

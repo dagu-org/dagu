@@ -88,7 +88,6 @@ type API struct {
 	store                 SessionStore
 	configStore           ConfigStore
 	modelStore            ModelStore
-	skillStore            SkillStore
 	providers             *ProviderCache
 	workingDir            string
 	logger                *slog.Logger
@@ -106,7 +105,6 @@ type API struct {
 type APIConfig struct {
 	ConfigStore           ConfigStore
 	ModelStore            ModelStore
-	SkillStore            SkillStore
 	SoulStore             SoulStore
 	WorkingDir            string
 	Logger                *slog.Logger
@@ -137,7 +135,6 @@ type sessionRuntimeConfig struct {
 	automataName    string
 	title           string
 	safeMode        bool
-	enabledSkills   []string
 	soul            *Soul
 	webSearch       *llm.WebSearchRequest
 	thinkingEffort  llm.ThinkingEffort
@@ -151,7 +148,6 @@ type SessionRuntimeOptions struct {
 	Model             string
 	AllowedTools      []string
 	SystemPromptExtra string
-	EnabledSkills     []string
 	Soul              *Soul
 	AllowClearSoul    bool
 	AutomataName      string
@@ -168,7 +164,6 @@ func NewAPI(cfg APIConfig) *API {
 	return &API{
 		configStore:           cfg.ConfigStore,
 		modelStore:            cfg.ModelStore,
-		skillStore:            cfg.SkillStore,
 		soulStore:             cfg.SoulStore,
 		providers:             NewProviderCache(),
 		workingDir:            cfg.WorkingDir,
@@ -321,15 +316,6 @@ func (a *API) resolveProvider(ctx context.Context, modelID string) (llm.Provider
 		return nil, nil, err
 	}
 	return provider, model, nil
-}
-
-// loadEnabledSkills returns the list of enabled skill IDs from the agent config.
-func (a *API) loadEnabledSkills(ctx context.Context) []string {
-	cfg, err := a.configStore.Load(ctx)
-	if err != nil || cfg == nil {
-		return nil
-	}
-	return cfg.EnabledSkills
 }
 
 func (a *API) loadWebSearch(ctx context.Context) *llm.WebSearchRequest {
@@ -497,6 +483,10 @@ func (a *API) loadMemoryContent(ctx context.Context, dagName, automataName strin
 			a.logger.Debug("failed to load automata memory", "error", err, "automata_name", automataName)
 		}
 	}
+	readOnly := false
+	if roStore, ok := a.memoryStore.(SnapshotReadOnlyMemoryStore); ok {
+		readOnly = roStore.MemoryReadOnly()
+	}
 	return MemoryContent{
 		GlobalMemory:   global,
 		DAGMemory:      dagMemory,
@@ -504,14 +494,8 @@ func (a *API) loadMemoryContent(ctx context.Context, dagName, automataName strin
 		AutomataMemory: automataMemory,
 		AutomataName:   automataName,
 		MemoryDir:      a.memoryStore.MemoryDir(),
+		ReadOnly:       readOnly,
 	}
-}
-
-func (a *API) loadSkillSummaries(ctx context.Context, enabledSkills []string) []SkillSummary {
-	if len(enabledSkills) == 0 || len(enabledSkills) > SkillListThreshold {
-		return nil
-	}
-	return LoadSkillSummaries(ctx, a.skillStore, enabledSkills)
 }
 
 func cloneWebSearchRequest(req *llm.WebSearchRequest) *llm.WebSearchRequest {
@@ -562,7 +546,6 @@ func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMod
 		}
 		return sessionRuntimeConfig{}, wrapAgentConfigError(fmt.Sprintf("agent is not configured properly: failed to resolve %s %q", label, modelID), err)
 	}
-	enabledSkills := append([]string(nil), a.loadEnabledSkills(ctx)...)
 	return sessionRuntimeConfig{
 		modelID:         modelID,
 		resolvedModel:   modelCfg.Model,
@@ -570,7 +553,6 @@ func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMod
 		dagName:         dagName,
 		automataName:    "",
 		safeMode:        safeMode,
-		enabledSkills:   enabledSkills,
 		soul:            a.loadSelectedSoul(ctx),
 		webSearch:       cloneWebSearchRequest(a.loadWebSearch(ctx)),
 		thinkingEffort:  modelThinkingEffort(modelCfg),
@@ -588,7 +570,6 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 	if err != nil {
 		return sessionRuntimeConfig{}, wrapAgentConfigError(fmt.Sprintf("agent is not configured properly: failed to resolve session model %q", modelID), err)
 	}
-	enabledSkills := append([]string(nil), mgr.enabledSkills...)
 	return sessionRuntimeConfig{
 		modelID:         modelID,
 		resolvedModel:   modelCfg.Model,
@@ -597,7 +578,6 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 		automataName:    mgr.automataName,
 		title:           mgr.title,
 		safeMode:        mgr.safeMode,
-		enabledSkills:   enabledSkills,
 		soul:            mgr.soul,
 		webSearch:       cloneWebSearchRequest(mgr.webSearch),
 		thinkingEffort:  modelThinkingEffort(modelCfg),
@@ -621,8 +601,6 @@ func (a *API) buildSessionManagerConfig(id string, user UserIdentity, cfg sessio
 		InputCostPer1M:        cfg.inputCostPer1M,
 		OutputCostPer1M:       cfg.outputCostPer1M,
 		MemoryStore:           a.memoryStore,
-		SkillStore:            a.skillStore,
-		EnabledSkills:         cfg.enabledSkills,
 		DAGName:               cfg.dagName,
 		AutomataName:          cfg.automataName,
 		SessionStore:          a.store,
@@ -653,14 +631,12 @@ func (a *API) ensureSessionLoop(mgr *SessionManager, provider llm.Provider, cfg 
 	return mgr.ensureLoop(provider, cfg.modelID, cfg.resolvedModel)
 }
 
-func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName, automataName string, enabledSkills []string, soul *Soul) string {
+func (a *API) buildSystemPrompt(ctx context.Context, role auth.Role, dagName, automataName string, soul *Soul) string {
 	return GenerateSystemPrompt(SystemPromptParams{
-		Env:             a.environment,
-		Memory:          a.loadMemoryContent(ctx, dagName, automataName),
-		Role:            role,
-		AvailableSkills: a.loadSkillSummaries(ctx, enabledSkills),
-		SkillCount:      len(enabledSkills),
-		Soul:            soul,
+		Env:    a.environment,
+		Memory: a.loadMemoryContent(ctx, dagName, automataName),
+		Role:   role,
+		Soul:   soul,
 	})
 }
 
@@ -979,10 +955,6 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 		}
 	}
 
-	enabledSkills := a.loadEnabledSkills(ctx)
-	if runtimeOpts != nil && runtimeOpts.EnabledSkills != nil {
-		enabledSkills = append([]string(nil), runtimeOpts.EnabledSkills...)
-	}
 	soul := a.loadSelectedSoul(ctx)
 	if runtimeOpts != nil && (runtimeOpts.Soul != nil || runtimeOpts.AllowClearSoul) {
 		soul = runtimeOpts.Soul
@@ -1007,7 +979,6 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 			return runtimeOpts.AutomataName
 		}(), sess.AutomataName),
 		safeMode:        true, // Default to safe mode for reactivated sessions
-		enabledSkills:   enabledSkills,
 		soul:            soul,
 		webSearch:       a.loadWebSearch(ctx),
 		thinkingEffort:  thinkingEffort,
@@ -1214,7 +1185,6 @@ func (a *API) CreateSession(ctx context.Context, user UserIdentity, req ChatRequ
 		modelID:         model,
 		dagName:         dagName,
 		safeMode:        req.SafeMode,
-		enabledSkills:   a.loadEnabledSkills(ctx),
 		soul:            a.loadSoulWithOverride(ctx, req.SoulID),
 		webSearch:       a.loadWebSearch(ctx),
 		thinkingEffort:  modelThinkingEffort(modelCfg),
@@ -1264,9 +1234,6 @@ func (a *API) CreateEmptySessionWithRuntime(
 		return "", err
 	}
 	if runtimeOpts != nil {
-		if runtimeOpts.EnabledSkills != nil {
-			cfg.enabledSkills = append([]string(nil), runtimeOpts.EnabledSkills...)
-		}
 		if runtimeOpts.Soul != nil || runtimeOpts.AllowClearSoul {
 			cfg.soul = runtimeOpts.Soul
 		}
@@ -1283,7 +1250,7 @@ func (a *API) CreateEmptySessionWithRuntime(
 
 // GenerateAssistantMessage runs a one-shot assistant generation without mutating
 // session state. When sessionID is provided, the current session's model, soul,
-// DAG scope, and enabled skills are reused.
+// and DAG scope are reused.
 func (a *API) GenerateAssistantMessage(ctx context.Context, sessionID string, user UserIdentity, dagName, prompt string) (Message, error) {
 	if strings.TrimSpace(prompt) == "" {
 		return Message{}, ErrMessageRequired
@@ -1319,7 +1286,7 @@ func (a *API) GenerateAssistantMessage(ctx context.Context, sessionID string, us
 		}
 	}
 
-	systemPrompt := a.buildSystemPrompt(ctx, user.Role, runtimeCfg.dagName, runtimeCfg.automataName, runtimeCfg.enabledSkills, runtimeCfg.soul)
+	systemPrompt := a.buildSystemPrompt(ctx, user.Role, runtimeCfg.dagName, runtimeCfg.automataName, runtimeCfg.soul)
 	resp, err := a.runOneShotPrompt(ctx, provider, runtimeCfg.resolvedModel, systemPrompt, prompt)
 	if err != nil {
 		return Message{}, err

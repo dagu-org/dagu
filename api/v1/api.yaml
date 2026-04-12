@@ -980,6 +980,8 @@ paths:
                   spec:
                     type: string
                     description: "The DAG specification in YAML format"
+                  editorHints:
+                    $ref: "#/components/schemas/DAGEditorHints"
                 required:
                   - latestDAGRun
                   - suspended
@@ -2246,6 +2248,108 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/artifacts:
+    get:
+      summary: "List artifacts for a DAG-run"
+      description: "Returns the artifact file tree for a DAG-run"
+      operationId: "getDAGRunArtifacts"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/ArtifactRecursive"
+      responses:
+        "200":
+          description: "Artifact tree retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactTreeResponse"
+        "404":
+          description: "Artifact directory not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/artifacts/preview:
+    get:
+      summary: "Preview an artifact for a DAG-run"
+      description: "Returns preview metadata and text content for a single artifact file"
+      operationId: "getDAGRunArtifactPreview"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact preview retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactPreviewResponse"
+        "404":
+          description: "Artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/artifacts/download:
+    get:
+      summary: "Download an artifact for a DAG-run"
+      description: "Downloads a single artifact file from a DAG-run"
+      operationId: "downloadDAGRunArtifact"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: "Artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/outputs:
     get:
       summary: "Retrieve collected outputs from a DAG-run"
@@ -2776,6 +2880,126 @@ paths:
                 type: "string"
         "404":
           description: "Log file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts:
+    get:
+      summary: "List artifacts for a sub DAG-run"
+      description: "Returns the artifact file tree for a specific sub DAG-run"
+      operationId: "getSubDAGRunArtifacts"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to retrieve artifacts for"
+        - $ref: "#/components/parameters/ArtifactRecursive"
+      responses:
+        "200":
+          description: "Artifact tree retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactTreeResponse"
+        "404":
+          description: "Artifact directory not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/preview:
+    get:
+      summary: "Preview an artifact for a sub DAG-run"
+      description: "Returns preview metadata and text content for a single sub DAG-run artifact file"
+      operationId: "getSubDAGRunArtifactPreview"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to preview an artifact for"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact preview retrieved successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactPreviewResponse"
+        "404":
+          description: "Artifact file not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/sub-dag-runs/{subDAGRunId}/artifacts/download:
+    get:
+      summary: "Download an artifact for a sub DAG-run"
+      description: "Downloads a single artifact file from a sub DAG-run"
+      operationId: "downloadSubDAGRunArtifact"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+        - name: "subDAGRunId"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+          description: "ID of the sub DAG-run to download an artifact for"
+        - $ref: "#/components/parameters/ArtifactPath"
+      responses:
+        "200":
+          description: "Artifact file content"
+          headers:
+            Content-Disposition:
+              schema:
+                type: "string"
+              description: "Attachment filename"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: "Artifact file not found"
           content:
             application/json:
               schema:
@@ -4909,313 +5133,6 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: "Model not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Unexpected error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /settings/agent/skills:
-    get:
-      summary: "List agent skills"
-      description: "Returns all configured agent skills with enabled status. Requires admin role."
-      operationId: "listAgentSkills"
-      tags:
-        - "agent"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/Page"
-        - $ref: "#/components/parameters/PerPage"
-        - name: q
-          in: query
-          description: "Search query (matches name, description, tags)"
-          required: false
-          schema:
-            type: string
-        - name: tags
-          in: query
-          description: "Comma-separated tag filter (AND semantics)"
-          required: false
-          schema:
-            type: string
-      responses:
-        "200":
-          description: "List of skills"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListSkillsResponse"
-        "401":
-          description: "Not authenticated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "403":
-          description: "Requires admin role"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Unexpected error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-    post:
-      summary: "Create agent skill"
-      description: "Creates a new agent skill. Requires admin role."
-      operationId: "createAgentSkill"
-      tags:
-        - "agent"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateSkillRequest"
-      responses:
-        "201":
-          description: "Skill created"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SkillResponse"
-        "400":
-          description: "Invalid request"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: "Not authenticated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "403":
-          description: "Requires admin role"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "409":
-          description: "Skill already exists"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Unexpected error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /settings/agent/skills/{skillId}:
-    get:
-      summary: "Get agent skill"
-      description: "Returns a single agent skill by ID. Requires admin role."
-      operationId: "getAgentSkill"
-      tags:
-        - "agent"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - name: skillId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: "Skill ID"
-      responses:
-        "200":
-          description: "Skill details"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SkillResponse"
-        "400":
-          description: "Invalid skill ID"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: "Not authenticated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "403":
-          description: "Requires admin role"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: "Skill not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Unexpected error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-    patch:
-      summary: "Update agent skill"
-      description: "Updates an existing agent skill. Requires admin role."
-      operationId: "updateAgentSkill"
-      tags:
-        - "agent"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - name: skillId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: "Skill ID"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateSkillRequest"
-      responses:
-        "200":
-          description: "Skill updated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SkillResponse"
-        "400":
-          description: "Invalid request"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: "Not authenticated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "403":
-          description: "Requires admin role"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: "Skill not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Unexpected error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-    delete:
-      summary: "Delete agent skill"
-      description: "Deletes an agent skill. Requires admin role."
-      operationId: "deleteAgentSkill"
-      tags:
-        - "agent"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-        - name: skillId
-          in: path
-          required: true
-          schema:
-            type: string
-          description: "Skill ID"
-      responses:
-        "204":
-          description: "Skill deleted"
-        "400":
-          description: "Invalid skill ID"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: "Not authenticated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "403":
-          description: "Requires admin role"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          description: "Skill not found"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        default:
-          description: "Unexpected error"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /settings/agent/enabled-skills:
-    put:
-      summary: "Set enabled agent skills"
-      description: "Sets the list of enabled skill IDs for the AI agent. Requires admin role."
-      operationId: "setEnabledSkills"
-      tags:
-        - "agent"
-      parameters:
-        - $ref: "#/components/parameters/RemoteNode"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SetEnabledSkillsRequest"
-      responses:
-        "200":
-          description: "Enabled skills updated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SetEnabledSkillsResponse"
-        "400":
-          description: "Invalid skill ID"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "401":
-          description: "Not authenticated"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "403":
-          description: "Requires admin role"
           content:
             application/json:
               schema:
@@ -7697,6 +7614,32 @@ components:
       schema:
         type: string
 
+    ArtifactPath:
+      name: path
+      in: query
+      description: "Relative artifact file path within the DAG-run artifact directory. Must not start with '/' or '\\' or contain '..'."
+      required: true
+      schema:
+        allOf:
+          - type: string
+            minLength: 1
+            pattern: "^[^/\\\\].*$"
+          - not:
+              pattern: "\\\\"
+          - not:
+              pattern: "(^|[\\\\/])\\.\\.([\\\\/]|$)"
+          - not:
+              pattern: "^[A-Za-z]:"
+
+    ArtifactRecursive:
+      name: recursive
+      in: query
+      description: "Whether to recursively expand nested artifact directories"
+      required: false
+      schema:
+        type: boolean
+        default: false
+
     RemoteNode:
       name: remoteNode
       in: query
@@ -8912,6 +8855,8 @@ components:
         logDir:
           type: string
           description: "Directory path for storing log files"
+        artifacts:
+          $ref: "#/components/schemas/DAGArtifactsConfig"
         handlerOn:
           $ref: "#/components/schemas/HandlerOn"
         steps:
@@ -8963,6 +8908,40 @@ components:
           $ref: "#/components/schemas/RunConfig"
       required:
         - name
+
+    DAGEditorHints:
+      type: object
+      description: "Editor-only metadata used to synthesize per-document schema hints"
+      properties:
+        inheritedCustomStepTypes:
+          type: array
+          description: "Custom step types inherited from base config and available to the current DAG"
+          items:
+            $ref: "#/components/schemas/InheritedCustomStepTypeHint"
+      required:
+        - inheritedCustomStepTypes
+
+    InheritedCustomStepTypeHint:
+      type: object
+      description: "Resolved editor hint for an inherited custom step type"
+      properties:
+        name:
+          type: string
+          description: "Custom step type name"
+        targetType:
+          type: string
+          description: "Builtin executor type that the custom step expands to"
+        description:
+          type: string
+          description: "Optional custom step description"
+        inputSchema:
+          type: object
+          additionalProperties: true
+          description: "Resolved JSON Schema object used to validate and document config input"
+      required:
+        - name
+        - targetType
+        - inputSchema
 
     ParamScalar:
       anyOf:
@@ -9029,6 +9008,16 @@ components:
       required:
         - disableParamEdit
         - disableRunIdEdit
+
+    DAGArtifactsConfig:
+      type: object
+      description: "Configuration for DAG run artifact storage"
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether artifact storage is enabled for this DAG"
+      required:
+        - enabled
 
     LocalDag:
       type: object
@@ -9138,6 +9127,9 @@ components:
             log:
               type: string
               description: "Path to the log file"
+            artifactsAvailable:
+              type: boolean
+              description: "Whether artifact endpoints are available for this DAG-run"
             nodes:
               type: array
               description: "Status of individual steps within the DAG-run"
@@ -9159,11 +9151,105 @@ components:
             specFromFile:
               type: boolean
               description: "Whether this DAG-run still has a usable source file on disk, so reschedule can load the current spec from that file instead of the stored historical YAML snapshot."
+            sourceFileName:
+              $ref: "#/components/schemas/DAGFileName"
+              description: "File name of the source DAG definition, derived from the DAG-run's source file path. Only set when the source file still exists on disk. Can be used to navigate to the DAG definition page."
           required:
             - rootDAGRunName
             - rootDAGRunId
             - log
+            - artifactsAvailable
             - nodes
+
+    ArtifactNodeType:
+      type: string
+      description: "Artifact tree node type"
+      enum:
+        - "directory"
+        - "file"
+
+    ArtifactTreeNode:
+      type: object
+      description: "A single file or directory in a DAG-run artifact tree"
+      properties:
+        name:
+          type: string
+          description: "Display name of the artifact entry"
+        path:
+          type: string
+          description: "Relative path of the artifact entry within the artifact directory"
+        type:
+          $ref: "#/components/schemas/ArtifactNodeType"
+        size:
+          type: integer
+          format: int64
+          description: "Size of the artifact file in bytes"
+        children:
+          type: array
+          description: "Nested artifact entries when this node is a directory"
+          items:
+            $ref: "#/components/schemas/ArtifactTreeNode"
+      required:
+        - name
+        - path
+        - type
+
+    ArtifactTreeResponse:
+      type: object
+      description: "Artifact tree for a DAG-run"
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactTreeNode"
+      required:
+        - items
+
+    ArtifactPreviewKind:
+      type: string
+      description: "Preview mode for an artifact file"
+      enum:
+        - "markdown"
+        - "text"
+        - "image"
+        - "binary"
+
+    ArtifactPreviewResponse:
+      type: object
+      description: "Preview metadata and optional inline content for a DAG-run artifact file"
+      properties:
+        name:
+          type: string
+          description: "Artifact file name"
+        path:
+          type: string
+          description: "Relative artifact file path"
+        kind:
+          $ref: "#/components/schemas/ArtifactPreviewKind"
+        mimeType:
+          type: string
+          description: "Detected MIME type for the artifact file"
+        size:
+          type: integer
+          format: int64
+          description: "Artifact file size in bytes"
+        tooLarge:
+          type: boolean
+          description: "Whether the artifact exceeds the inline preview size limit"
+        truncated:
+          type: boolean
+          description: "Whether inline text content was truncated for preview"
+        content:
+          type: string
+          description: "Inline preview content for markdown or text artifacts"
+      required:
+        - name
+        - path
+        - kind
+        - mimeType
+        - size
+        - tooLarge
+        - truncated
 
     DAGRunOutputs:
       type: object
@@ -10975,117 +11061,6 @@ components:
         provider:
           $ref: "#/components/schemas/AgentAuthProviderStatus"
 
-    SkillResponse:
-      type: object
-      required:
-        - id
-        - name
-        - type
-        - enabled
-      description: "Skill configuration"
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        description:
-          type: string
-        version:
-          type: string
-        author:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        type:
-          type: string
-          enum: [builtin, custom]
-        knowledge:
-          type: string
-        enabled:
-          type: boolean
-
-    ListSkillsResponse:
-      type: object
-      required:
-        - skills
-        - pagination
-      description: "List of skills"
-      properties:
-        skills:
-          type: array
-          items:
-            $ref: "#/components/schemas/SkillResponse"
-        pagination:
-          $ref: "#/components/schemas/Pagination"
-
-    CreateSkillRequest:
-      type: object
-      required:
-        - name
-        - knowledge
-      description: "Request to create a new skill"
-      properties:
-        id:
-          type: string
-          description: "Optional custom ID (auto-generated from name if omitted)"
-        name:
-          type: string
-        description:
-          type: string
-        version:
-          type: string
-        author:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        knowledge:
-          type: string
-
-    UpdateSkillRequest:
-      type: object
-      description: "Request to update a skill (partial update)"
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        version:
-          type: string
-        author:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        knowledge:
-          type: string
-
-    SetEnabledSkillsRequest:
-      type: object
-      required:
-        - skillIds
-      description: "Request to set the list of enabled skill IDs"
-      properties:
-        skillIds:
-          type: array
-          items:
-            type: string
-
-    SetEnabledSkillsResponse:
-      type: object
-      required:
-        - enabledSkills
-      description: "Current enabled skills"
-      properties:
-        enabledSkills:
-          type: array
-          items:
-            type: string
-
     SoulResponse:
       type: object
       required:
@@ -11949,10 +11924,6 @@ components:
           type: string
         soul:
           type: string
-        enabledSkills:
-          type: array
-          items:
-            type: string
         safeMode:
           type: boolean
 

@@ -20,7 +20,6 @@ type Config struct {
 	Enabled        bool             `json:"enabled"`
 	DefaultModelID string           `json:"defaultModelId,omitempty"`
 	ToolPolicy     ToolPolicyConfig `json:"toolPolicy"`
-	EnabledSkills  []string         `json:"enabledSkills,omitempty"`
 	SelectedSoulID string           `json:"selectedSoulId,omitempty"`
 	WebSearch      *WebSearchConfig `json:"webSearch,omitempty"`
 }
@@ -157,4 +156,5 @@ type MemoryContent struct {
 	AutomataMemory string // Contents of per-Automata MEMORY.md (truncated)
 	AutomataName   string // Name of the Automata (empty if no Automata context)
 	MemoryDir      string // Root memory directory path
+	ReadOnly     bool   // Memory is execution-scoped read-only context
 }

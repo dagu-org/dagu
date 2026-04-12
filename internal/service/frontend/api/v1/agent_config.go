@@ -202,9 +202,6 @@ func cloneAgentConfig(cfg *agent.Config) *agent.Config {
 	if cfg.ToolPolicy.Bash.Rules != nil {
 		cloned.ToolPolicy.Bash.Rules = append([]agent.BashRule(nil), cfg.ToolPolicy.Bash.Rules...)
 	}
-	if cfg.EnabledSkills != nil {
-		cloned.EnabledSkills = append([]string(nil), cfg.EnabledSkills...)
-	}
 	if cfg.WebSearch != nil {
 		ws := *cfg.WebSearch
 		cloned.WebSearch = &ws

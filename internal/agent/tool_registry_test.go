@@ -58,7 +58,7 @@ func TestRegisteredTools_ContainsAllExpected(t *testing.T) {
 	expected := []string{
 		"bash", "read", "patch", "think",
 		"navigate", "ask_user",
-		"delegate", "use_skill", "search_skills",
+		"delegate",
 		"remote_agent", "list_contexts",
 		"list_automata_tasks",
 		"list_allowed_dags", "run_allowed_dag", "retry_automata_run",
@@ -118,7 +118,6 @@ func TestRegisteredTools_FactoriesProduceValidTools(t *testing.T) {
 
 	cfg := ToolConfig{
 		DAGsDir:               "/tmp/test-dags",
-		SkillStore:            &testSkillStore{},
 		RemoteContextResolver: &testRemoteContextResolver{},
 		AutomataRuntime:       &testAutomataRuntime{},
 	}
@@ -141,7 +140,6 @@ func TestCreateTools_UsesRegistry(t *testing.T) {
 
 	tools := CreateTools(ToolConfig{
 		DAGsDir:               "/tmp/dags",
-		SkillStore:            &testSkillStore{},
 		RemoteContextResolver: &testRemoteContextResolver{},
 		AutomataRuntime:       &testAutomataRuntime{},
 	})

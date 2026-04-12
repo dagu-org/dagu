@@ -24,6 +24,7 @@ export type LicenseStatus = {
   expiry: string;
   features: string[];
   gracePeriod: boolean;
+  graceEndsAt?: string;
   community: boolean;
   source: string;
   warningCode: string;

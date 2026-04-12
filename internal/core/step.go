@@ -93,7 +93,7 @@ type Step struct {
 	Parallel *ParallelConfig `json:"parallel,omitempty"`
 	// Env contains environment variables for the step.
 	Env []string `json:"env,omitempty"`
-	// Params contains parameters/inputs for the step (e.g., action inputs for GitHub Actions).
+	// Params contains parameters/inputs for the step.
 	Params Params `json:"params,omitzero"`
 	// Timeout specifies the maximum execution time for the step.
 	// If set, this timeout takes precedence over the DAG-level timeout for this step.

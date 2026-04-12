@@ -691,11 +691,7 @@ func toAPIAutomataAgentConfig(cfg automata.AgentConfig) *api.AutomataAgentConfig
 		SafeMode: new(cfg.SafeMode),
 		Soul:     ptrOf(cfg.Soul),
 	}
-	if len(cfg.EnabledSkills) > 0 {
-		skills := append([]string(nil), cfg.EnabledSkills...)
-		resp.EnabledSkills = &skills
-	}
-	if resp.Model == nil && resp.SafeMode == nil && resp.Soul == nil && resp.EnabledSkills == nil {
+	if resp.Model == nil && resp.SafeMode == nil && resp.Soul == nil {
 		return nil
 	}
 	return resp

@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec"
+	_ "github.com/dagucloud/dagu/internal/runtime/builtin/harness"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -303,6 +304,159 @@ steps:
 	})
 }
 
+func TestLoad_HarnessDefinitionsBaseConfigMerge(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SameNameOverrideReplacesWholeDefinition", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+    option_flags:
+      model: --model
+steps:
+  - command: echo base
+`)
+		child := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: aider
+    prompt_mode: stdin
+steps:
+  - type: harness
+    command: Review this repository
+    config:
+      provider: gemini
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Contains(t, dag.Harnesses, "gemini")
+
+		def := dag.Harnesses["gemini"]
+		require.NotNil(t, def)
+		assert.Equal(t, "aider", def.Binary)
+		assert.Nil(t, def.PrefixArgs)
+		assert.Equal(t, core.HarnessPromptModeStdin, def.PromptMode)
+		assert.Empty(t, def.PromptFlag)
+		assert.Nil(t, def.OptionFlags)
+	})
+
+	t.Run("NullEntryDeletesInheritedDefinition", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: gemini
+    prompt_mode: flag
+    prompt_flag: --prompt
+steps:
+  - command: echo base
+`)
+		child := createTempYAMLFile(t, `
+harnesses:
+  gemini: null
+steps:
+  - command: echo child
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		assert.Nil(t, dag.Harnesses)
+	})
+
+	t.Run("NullDeletionMakesReferenceInvalid", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  gemini:
+    binary: gemini
+    prompt_mode: flag
+    prompt_flag: --prompt
+steps:
+  - command: echo base
+`)
+		child := createTempYAMLFile(t, `
+harnesses:
+  gemini: null
+steps:
+  - type: harness
+    command: Review this repository
+    config:
+      provider: gemini
+`)
+
+		_, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `unknown provider "gemini"`)
+	})
+}
+
+func TestLoad_BaseHarnessConfigBuildsChildSteps(t *testing.T) {
+	t.Parallel()
+
+	t.Run("InheritsBaseHarnessDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  passthrough:
+    binary: cat
+    prompt_mode: stdin
+harness:
+  provider: passthrough
+`)
+		child := createTempYAMLFile(t, `
+steps:
+  - command: Review the repository
+    script: |
+      summarize the current branch
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		assert.Equal(t, "harness", step.ExecutorConfig.Type)
+		assert.Equal(t, "passthrough", step.ExecutorConfig.Config["provider"])
+		assert.Equal(t, "summarize the current branch", step.Script)
+	})
+
+	t.Run("ChildStepCanReferenceBaseHarnessDefinition", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+harnesses:
+  passthrough:
+    binary: cat
+    prompt_mode: stdin
+`)
+		child := createTempYAMLFile(t, `
+steps:
+  - type: harness
+    command: Review the repository
+    config:
+      provider: passthrough
+`)
+
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+
+		step := dag.Steps[0]
+		assert.Equal(t, "harness", step.ExecutorConfig.Type)
+		assert.Equal(t, "passthrough", step.ExecutorConfig.Config["provider"])
+	})
+}
+
 func TestLoadBaseConfig(t *testing.T) {
 	t.Parallel()
 
@@ -548,6 +702,55 @@ steps:
 
 		// Env still inherited from base (since not specified in override DAG)
 		assert.Contains(t, dag.Env, "BASE_ENV=base_value")
+	})
+
+	t.Run("InheritBaseArtifactsConfig", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+artifacts:
+  enabled: true
+  dir: "/base/artifacts"
+`)
+
+		childDAG := createTempYAMLFile(t, `
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Artifacts)
+		assert.True(t, dag.Artifacts.Enabled)
+		assert.Equal(t, "/base/artifacts", dag.Artifacts.Dir)
+	})
+
+	t.Run("OverrideBaseArtifactsConfig", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+artifacts:
+  enabled: true
+  dir: "/base/artifacts"
+`)
+
+		childDAG := createTempYAMLFile(t, `
+artifacts:
+  enabled: true
+  dir: "/override/artifacts"
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Artifacts)
+		assert.True(t, dag.Artifacts.Enabled)
+		assert.Equal(t, "/override/artifacts", dag.Artifacts.Dir)
 	})
 
 	t.Run("InheritBaseWorkingDir", func(t *testing.T) {
@@ -1685,6 +1888,35 @@ steps:
 
 		// DAG-level defaults should override base config defaults
 		require.Equal(t, 600*time.Second, dag.Steps[0].Timeout)
+	})
+
+	t.Run("BaseConfigDefaultsAllowExplicitClears", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 300
+  env:
+    - BASE_ONLY: base-only
+  preconditions:
+    - condition: "test -f /base"
+`)
+		child := createTempYAMLFile(t, `
+defaults:
+  timeout_sec: 0
+  env: []
+  preconditions: []
+
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.Len(t, dag.Steps, 1)
+		require.Zero(t, dag.Steps[0].Timeout)
+		require.Empty(t, dag.Steps[0].Env)
+		require.Empty(t, dag.Steps[0].Preconditions)
 	})
 
 	t.Run("BaseConfigDAGRetryPolicy", func(t *testing.T) {

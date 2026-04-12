@@ -36,6 +36,8 @@ type EntryReader interface {
 	Stop()
 	// DAGs returns a snapshot of all currently loaded DAG definitions.
 	DAGs() []*core.DAG
+	// DAGStore returns the backing store used for loading DAG details and suspension state.
+	DAGStore() exec.DAGStore
 }
 
 var _ EntryReader = (*entryReaderImpl)(nil)
@@ -45,7 +47,7 @@ type entryReaderImpl struct {
 	targetDir string
 	registry  map[string]*core.DAG
 	lock      sync.Mutex
-	dagStore  exec.DAGStore // used by scheduler via type assertion for IsSuspended
+	dagStore  exec.DAGStore
 	watcher   filenotify.FileWatcher
 	quit      chan struct{}
 	closeOnce sync.Once
@@ -223,6 +225,10 @@ func (er *entryReaderImpl) DAGs() []*core.DAG {
 		dags = append(dags, dag)
 	}
 	return dags
+}
+
+func (er *entryReaderImpl) DAGStore() exec.DAGStore {
+	return er.dagStore
 }
 
 func (er *entryReaderImpl) initialize(ctx context.Context) error {

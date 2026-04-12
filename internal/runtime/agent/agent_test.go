@@ -62,8 +62,10 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
+		releaseFile := filepath.Join(t.TempDir(), "release")
 		dag := th.DAG(t, `steps:
-  - "sleep 1"
+  - name: wait-until-released
+    command: "while [ ! -f '`+releaseFile+`' ]; do sleep 0.05; done"
 `)
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		done := make(chan struct{})
@@ -74,10 +76,15 @@ func TestAgent_Run(t *testing.T) {
 			close(done)
 		}()
 
-		dag.AssertCurrentStatus(t, core.Running)
+		require.Eventually(t, func() bool {
+			status, err := th.DAGRunMgr.GetCurrentStatus(context.Background(), dag.DAG, "test-dag-run")
+			if err != nil || status == nil || status.Status != core.Running {
+				return false
+			}
+			return th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, "test-dag-run")
+		}, 2*time.Second, 50*time.Millisecond, "DAG should be running")
 
-		isRunning := th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, "test-dag-run")
-		require.True(t, isRunning, "DAG should be running")
+		require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 
 		// Wait for the DAG to finish
 		<-done

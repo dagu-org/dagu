@@ -24,6 +24,8 @@ type Paths struct {
 	DataDir string
 	// LogsDir is the directory where application logs are stored.
 	LogsDir string
+	// ArtifactsDir is the directory where DAG run artifacts are stored.
+	ArtifactsDir string
 	// AdminLogsDir is the directory where administrative logs are kept.
 	AdminLogsDir string
 	// EventStoreDir is the directory where centralized event logs and inbox files are kept.
@@ -96,6 +98,7 @@ func setXDGPaths(xdg XDGConfig, configDir string) Paths {
 		ConfigDir:       configDir,
 		DataDir:         filepath.Join(xdg.DataHome, AppSlug, "data"),
 		LogsDir:         filepath.Join(xdg.DataHome, AppSlug, "logs"),
+		ArtifactsDir:    filepath.Join(xdg.DataHome, AppSlug, "data", "artifacts"),
 		BaseConfigFile:  filepath.Join(xdg.ConfigHome, AppSlug, "base.yaml"),
 		AdminLogsDir:    filepath.Join(xdg.DataHome, AppSlug, "logs", "admin"),
 		EventStoreDir:   filepath.Join(xdg.DataHome, AppSlug, "logs", "admin", "events"),
@@ -111,6 +114,7 @@ func setUnifiedPaths(configDir string) Paths {
 		ConfigDir:       configDir,
 		DataDir:         filepath.Join(configDir, "data"),
 		LogsDir:         filepath.Join(configDir, "logs"),
+		ArtifactsDir:    filepath.Join(configDir, "data", "artifacts"),
 		BaseConfigFile:  filepath.Join(configDir, "base.yaml"),
 		AdminLogsDir:    filepath.Join(configDir, "logs", "admin"),
 		EventStoreDir:   filepath.Join(configDir, "logs", "admin", "events"),

@@ -301,16 +301,24 @@ func enqueueRetry(ctx *Context, _ exec.DAGRunAttempt, dag *core.DAG, status *exe
 // previously broken queued catchup statuses may have an empty log path, so
 // this fills it in and persists the repaired status before execution.
 func prepareQueuedCatchupRetry(ctx *Context, attempt exec.DAGRunAttempt, dag *core.DAG, status *exec.DAGRunStatus) error {
-	if !exec.IsQueuedCatchup(status) || status.Log != "" {
+	if !exec.IsQueuedCatchup(status) || (status.Log != "" && (!dag.ArtifactsEnabled() || status.ArchiveDir != "")) {
 		return nil
 	}
 
-	logPath, err := ctx.GenLogFileName(dag, status.DAGRunID)
-	if err != nil {
-		return fmt.Errorf("failed to generate queued catchup log file: %w", err)
+	if status.Log == "" {
+		logPath, err := ctx.GenLogFileName(dag, status.DAGRunID)
+		if err != nil {
+			return fmt.Errorf("failed to generate queued catchup log file: %w", err)
+		}
+		status.Log = logPath
 	}
-
-	status.Log = logPath
+	if dag.ArtifactsEnabled() && status.ArchiveDir == "" {
+		artifactDir, err := ctx.GenArtifactDir(dag, status.DAGRunID)
+		if err != nil {
+			return fmt.Errorf("failed to generate queued catchup artifact directory: %w", err)
+		}
+		status.ArchiveDir = artifactDir
+	}
 
 	if err := attempt.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open queued catchup attempt: %w", err)
@@ -343,6 +351,15 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 	}()
 
 	logger.Info(ctx, "Dag-run retry initiated", tag.File(logFile.Name()))
+
+	artifactDir := status.ArchiveDir
+	if artifactDir == "" && dag.ArtifactsEnabled() {
+		var err error
+		artifactDir, err = ctx.GenArtifactDir(dag, status.DAGRunID)
+		if err != nil {
+			return fmt.Errorf("failed to initialize artifact directory: %w", err)
+		}
+	}
 
 	dr, err := ctx.dagStore(dagStoreConfig{
 		SearchPaths:           []string{filepath.Dir(dag.Location)},
@@ -382,10 +399,10 @@ func executeRetry(ctx *Context, dag *core.DAG, status *exec.DAGRunStatus, rootRu
 			AgentConfigStore:           as.ConfigStore,
 			AgentModelStore:            as.ModelStore,
 			AgentMemoryStore:           as.MemoryStore,
-			AgentSkillStore:            as.SkillStore,
 			AgentSoulStore:             as.SoulStore,
 			AgentOAuthManager:          as.OAuthManager,
 			AgentRemoteContextResolver: as.ContextResolver,
+			ArtifactDir:                artifactDir,
 		},
 	)
 

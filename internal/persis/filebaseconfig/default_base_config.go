@@ -16,9 +16,10 @@ const defaultBaseConfig = `# Base DAG Configuration
 
 # -- Active Defaults --
 
-# Execution model. "chain" (default) runs steps sequentially in definition order.
+# Execution model. Keep the default explicit so new base.yaml files are self-describing.
+# "chain" runs steps sequentially in definition order.
 # "graph" runs steps in parallel based on dependency resolution.
-# type: chain
+type: chain
 
 # Behavior when a new run is triggered while one is already active.
 # "skip" = discard the new run. "all" = queue all runs. "latest" = keep only the most recent.
@@ -140,6 +141,25 @@ retry_policy:
 #
 #   # Send error_mail when this step fails.
 #   mail_on_error: true
+
+# -- Custom Step Types --
+# Define reusable step types that expand into builtin-backed steps at load time.
+# The call-site config becomes typed input validated by input_schema.
+# step_types:
+#   greet:
+#     type: command
+#     input_schema:
+#       type: object
+#       additionalProperties: false
+#       required: [message]
+#       properties:
+#         message:
+#           type: string
+#     template:
+#       exec:
+#         command: /bin/echo
+#         args:
+#           - {$input: message}
 
 # -- Lifecycle Handlers --
 # Hooks that run on DAG events. Each handler is a full step definition (supports command,

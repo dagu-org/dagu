@@ -6,8 +6,10 @@ package scheduler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -46,16 +48,17 @@ func (b *syncBuffer) String() string {
 }
 
 type queueFixture struct {
-	t             *testing.T
-	ctx           context.Context
-	logBuffer     *syncBuffer
-	dagRunStore   exec.DAGRunStore
-	leaseStore    exec.DAGRunLeaseStore
-	dispatchStore exec.DispatchTaskStore
-	queueStore    exec.QueueStore
-	procStore     exec.ProcStore
-	processor     *QueueProcessor
-	dag           *core.DAG
+	t              *testing.T
+	ctx            context.Context
+	logBuffer      *syncBuffer
+	dagRunStore    exec.DAGRunStore
+	leaseStore     exec.DAGRunLeaseStore
+	dispatchStore  *filedistributed.DispatchTaskStore
+	distributedDir string
+	queueStore     exec.QueueStore
+	procStore      exec.ProcStore
+	processor      *QueueProcessor
+	dag            *core.DAG
 }
 
 func newQueueFixture(t *testing.T) *queueFixture {
@@ -70,11 +73,12 @@ func newQueueFixture(t *testing.T) *queueFixture {
 
 	return &queueFixture{
 		t: t, ctx: ctx, logBuffer: logBuffer,
-		dagRunStore:   filedagrun.New(filepath.Join(tmpDir, "dag-runs")),
-		leaseStore:    filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed")),
-		dispatchStore: filedistributed.NewDispatchTaskStore(filepath.Join(tmpDir, "distributed")),
-		queueStore:    filequeue.New(filepath.Join(tmpDir, "queue")),
-		procStore:     fileproc.New(filepath.Join(tmpDir, "proc")),
+		distributedDir: filepath.Join(tmpDir, "distributed"),
+		dagRunStore:    filedagrun.New(filepath.Join(tmpDir, "dag-runs")),
+		leaseStore:     filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed")),
+		dispatchStore:  filedistributed.NewDispatchTaskStore(filepath.Join(tmpDir, "distributed")),
+		queueStore:     filequeue.New(filepath.Join(tmpDir, "queue")),
+		procStore:      fileproc.New(filepath.Join(tmpDir, "proc")),
 	}
 }
 
@@ -106,12 +110,16 @@ func (f *queueFixture) withProcessor(cfg config.Queues, opts ...QueueProcessorOp
 	options := append([]QueueProcessorOption{
 		WithBackoffConfig(BackoffConfig{InitialInterval: 10 * time.Millisecond, MaxInterval: 50 * time.Millisecond, MaxRetries: 2}),
 		WithDAGRunLeaseStore(f.leaseStore),
-		WithDispatchTaskStore(f.dispatchStore),
 	}, opts...)
 	f.processor = NewQueueProcessor(f.queueStore, f.dagRunStore, f.procStore,
-		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}}), config.ExecutionModeLocal, ""),
+		NewDAGExecutor(nil, runtime.NewSubCmdBuilder(&config.Config{Paths: config.PathsConfig{Executable: "/usr/bin/dagu"}}), config.ExecutionModeLocal, "", nil),
 		cfg, options...,
 	)
+	f.dispatchStore = filedistributed.NewDispatchTaskStore(
+		f.distributedDir,
+		filedistributed.WithDispatchReservationTTL(f.processor.leaseStaleThresholdOrDefault()),
+	)
+	f.processor.dispatchTaskStore = f.dispatchStore
 	return f
 }
 
@@ -364,6 +372,48 @@ func TestQueueProcessor_SelectRunnableQueueItemsSkipsOutstandingReservations(t *
 	assert.Equal(t, "run-2", selectedRef.ID)
 }
 
+func TestQueueProcessor_StaleOutstandingDispatchReservationsExpire(t *testing.T) {
+	f := newQueueFixture(t).withDAG("distributed-stale-select-dag", 1).
+		withProcessor(config.Queues{}, WithLeaseStaleThreshold(500*time.Millisecond)).
+		simulateQueue(1, false)
+
+	f.enqueueRuns(1)
+
+	runRef := exec.NewDAGRunRef(f.dag.Name, "run-1")
+	attempt, err := f.dagRunStore.FindAttempt(f.ctx, runRef)
+	require.NoError(t, err)
+	status, err := attempt.ReadStatus(f.ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, f.dispatchStore.Enqueue(f.ctx, &coordinatorv1.Task{
+		DagRunId:   runRef.ID,
+		Target:     f.dag.Name,
+		QueueName:  f.dag.Name,
+		AttemptId:  attempt.ID(),
+		AttemptKey: queueAttemptKey(runRef, attempt, status),
+	}))
+	agePendingDispatchReservationFiles(t, f.distributedDir, 2*time.Second)
+
+	count, err := f.processor.countOutstandingDispatchReservations(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+
+	items, err := f.queueStore.List(f.ctx, f.dag.Name)
+	require.NoError(t, err)
+
+	runnable, err := f.processor.selectRunnableQueueItems(f.ctx, items, 1)
+	require.NoError(t, err)
+	require.Len(t, runnable, 1)
+
+	selectedRef, err := runnable[0].Data()
+	require.NoError(t, err)
+	assert.Equal(t, "run-1", selectedRef.ID)
+
+	pendingEntries, err := os.ReadDir(filepath.Join(f.distributedDir, "pending"))
+	require.NoError(t, err)
+	assert.Empty(t, pendingEntries)
+}
+
 func TestQueueProcessor_SuspendedSchedulerManagedQueuedRunsAreAbortedAndDequeued(t *testing.T) {
 	triggers := []core.TriggerType{
 		core.TriggerTypeScheduler,
@@ -420,7 +470,7 @@ func TestQueueProcessor_SuspendedManualQueuedRunStillDispatches(t *testing.T) {
 		queueStore:  f.queueStore,
 		dagRunStore: f.dagRunStore,
 		procStore:   procStore,
-		dagExecutor: NewDAGExecutor(dispatcher, nil, config.ExecutionModeDistributed, ""),
+		dagExecutor: NewDAGExecutor(dispatcher, nil, config.ExecutionModeDistributed, "", nil),
 		isSuspended: func(_ context.Context, name string) bool { return name == dagName },
 		quit:        make(chan struct{}),
 		wakeUpCh:    make(chan struct{}, 1),
@@ -478,6 +528,30 @@ func (m *mockDispatchTaskStore) HasOutstandingAttempt(ctx context.Context, attem
 		return m.hasOutstandingAttemptFunc(ctx, attemptKey, claimTimeout)
 	}
 	return false, nil
+}
+
+func agePendingDispatchReservationFiles(t *testing.T, distributedDir string, age time.Duration) {
+	t.Helper()
+
+	pendingDir := filepath.Join(distributedDir, "pending")
+	entries, err := os.ReadDir(pendingDir)
+	require.NoError(t, err)
+	require.NotEmpty(t, entries)
+
+	targetTime := time.Now().Add(-age).UTC().UnixMilli()
+	for _, entry := range entries {
+		path := filepath.Join(pendingDir, entry.Name())
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(data, &record))
+		record["enqueuedAt"] = targetTime
+
+		updated, err := json.Marshal(record)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, updated, 0o600))
+	}
 }
 
 func TestQueueProcessor_CheckStartupStatusTreatsRunningStatusAsStarted(t *testing.T) {

@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
+	"github.com/dagucloud/dagu/internal/cmn/logpath"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -26,6 +28,7 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileagentconfig"
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
 	"github.com/dagucloud/dagu/internal/persis/fileagentoauth"
+	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filememory"
 	"github.com/dagucloud/dagu/internal/proto/convert"
 	"github.com/dagucloud/dagu/internal/runtime"
@@ -127,9 +130,13 @@ func (h *remoteTaskHandler) handleStart(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
-
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, queuedRun, nil, taskExtraEnvs(task))
+	statusPusher, logStreamer, artifactUploader := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
+	err = h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, artifactUploader, queuedRun, nil, task.AgentSnapshot, taskExtraEnvs(task))
+	var initErr *taskInitError
+	if errors.As(err, &initErr) {
+		h.reportTaskInitFailure(ctx, task, root, parent, statusPusher, initErr.err)
+	}
+	return err
 }
 
 func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1.Task) error {
@@ -161,14 +168,19 @@ func (h *remoteTaskHandler) handleRetry(ctx context.Context, task *coordinatorv1
 		defer cleanup()
 	}
 
-	statusPusher, logStreamer := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
+	statusPusher, logStreamer, artifactUploader := h.createRemoteHandlers(task.DagRunId, dag.Name, root, owner)
 	triggerType := exec.PreservedQueueTriggerType(status)
 
-	return h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, false, &retryConfig{
+	err = h.executeDAGRun(ctx, dag, task.DagRunId, task.AttemptId, task.ScheduleTime, root, parent, statusPusher, logStreamer, artifactUploader, false, &retryConfig{
 		target:      status,
 		stepName:    task.Step,
 		triggerType: triggerType,
-	}, taskExtraEnvs(task))
+	}, task.AgentSnapshot, taskExtraEnvs(task))
+	var initErr *taskInitError
+	if errors.As(err, &initErr) {
+		h.reportTaskInitFailure(ctx, task, root, parent, statusPusher, initErr.err)
+	}
+	return err
 }
 
 func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coordinatorv1.Task, root, parent exec.DAGRunRef, owner exec.HostInfo, loadErr error) {
@@ -200,6 +212,45 @@ func (h *remoteTaskHandler) reportTaskLoadFailure(ctx context.Context, task *coo
 	}
 }
 
+func (h *remoteTaskHandler) reportTaskInitFailure(
+	ctx context.Context,
+	task *coordinatorv1.Task,
+	root exec.DAGRunRef,
+	parent exec.DAGRunRef,
+	statusPusher *remote.StatusPusher,
+	initErr error,
+) {
+	if statusPusher == nil || initErr == nil {
+		return
+	}
+
+	finishedAt := stringutil.FormatTime(time.Now())
+	logger.Warn(ctx, "Failed to initialize DAG on worker",
+		tag.Target(task.Target),
+		tag.RunID(task.DagRunId),
+		tag.Error(initErr),
+	)
+	status := exec.DAGRunStatus{
+		Root:       root,
+		Parent:     parent,
+		Name:       task.Target,
+		DAGRunID:   task.DagRunId,
+		AttemptID:  task.AttemptId,
+		Status:     core.Failed,
+		FinishedAt: finishedAt,
+		Error:      initErr.Error(),
+		Params:     task.Params,
+	}
+
+	if err := statusPusher.Push(ctx, status); err != nil {
+		logger.Warn(ctx, "Failed to report init failure status",
+			tag.Target(task.Target),
+			tag.RunID(task.DagRunId),
+			tag.Error(err),
+		)
+	}
+}
+
 func sanitizeTaskLoadError(target string, loadErr error) string {
 	message := loadErr.Error()
 	rest, ok := strings.CutPrefix(message, "failed to load DAG from ")
@@ -224,8 +275,28 @@ type retryConfig struct {
 type agentStoreBundle struct {
 	configStore  agent.ConfigStore
 	modelStore   agent.ModelStore
+	soulStore    agent.SoulStore
 	memoryStore  agent.MemoryStore
 	oauthManager *agentoauth.Manager
+}
+
+type taskInitError struct {
+	err error
+}
+
+func (e *taskInitError) Error() string {
+	return e.err.Error()
+}
+
+func (e *taskInitError) Unwrap() error {
+	return e.err
+}
+
+func newTaskInitError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &taskInitError{err: err}
 }
 
 func taskExtraEnvs(task *coordinatorv1.Task) []string {
@@ -235,8 +306,8 @@ func taskExtraEnvs(task *coordinatorv1.Task) []string {
 	return []string{exec.EnvKeyExternalStepRetry + "=1"}
 }
 
-// createRemoteHandlers creates the status pusher and log streamer for remote execution.
-func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef, owner ...exec.HostInfo) (*remote.StatusPusher, *remote.LogStreamer) {
+// createRemoteHandlers creates the remote status, log, and artifact transport handlers.
+func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root exec.DAGRunRef, owner ...exec.HostInfo) (*remote.StatusPusher, *remote.LogStreamer, *remote.ArtifactUploader) {
 	var target exec.HostInfo
 	if len(owner) > 0 {
 		target = owner[0]
@@ -251,10 +322,19 @@ func (h *remoteTaskHandler) createRemoteHandlers(dagRunID, dagName string, root 
 		root,
 		target,
 	)
-	return statusPusher, logStreamer
+	artifactUploader := remote.NewArtifactUploader(
+		h.coordinatorClient,
+		h.workerID,
+		dagRunID,
+		dagName,
+		"",
+		root,
+		target,
+	)
+	return statusPusher, logStreamer, artifactUploader
 }
 
-// agentStores creates the agent config, model, memory, and OAuth stores from the config paths.
+// agentStores creates the agent config, model, soul, memory, and OAuth stores from the config paths.
 func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 	acs, err := fileagentconfig.New(h.config.Paths.DataDir)
 	if err != nil {
@@ -271,12 +351,23 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{configStore: acs}
 	}
 
+	soulsDir := filepath.Join(h.config.Paths.DAGsDir, "souls")
+	soulStore, err := fileagentsoul.New(ctx, soulsDir)
+	if err != nil {
+		logger.Warn(ctx, "Failed to create agent soul store", tag.Error(err))
+		return agentStoreBundle{
+			configStore: acs,
+			modelStore:  ams,
+		}
+	}
+
 	ms, err := filememory.New(h.config.Paths.DAGsDir)
 	if err != nil {
 		logger.Warn(ctx, "Failed to create agent memory store", tag.Error(err))
 		return agentStoreBundle{
 			configStore: acs,
 			modelStore:  ams,
+			soulStore:   soulStore,
 		}
 	}
 
@@ -286,6 +377,7 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 		return agentStoreBundle{
 			configStore: acs,
 			modelStore:  ams,
+			soulStore:   soulStore,
 			memoryStore: ms,
 		}
 	}
@@ -293,9 +385,35 @@ func (h *remoteTaskHandler) agentStores(ctx context.Context) agentStoreBundle {
 	return agentStoreBundle{
 		configStore:  acs,
 		modelStore:   ams,
+		soulStore:    soulStore,
 		memoryStore:  ms,
 		oauthManager: oauthManager,
 	}
+}
+
+func (h *remoteTaskHandler) agentStoresFromSnapshot(snapshotPayload []byte) (agentStoreBundle, error) {
+	snapshot, err := agent.UnmarshalSnapshot(snapshotPayload)
+	if err != nil {
+		return agentStoreBundle{}, err
+	}
+	if snapshot == nil {
+		return agentStoreBundle{}, fmt.Errorf("agent snapshot is empty")
+	}
+
+	stores := agent.NewSnapshotStores(snapshot)
+	if stores.ConfigStore == nil {
+		return agentStoreBundle{}, fmt.Errorf("agent snapshot is missing config")
+	}
+	if stores.ModelStore == nil {
+		return agentStoreBundle{}, fmt.Errorf("agent snapshot is missing models")
+	}
+
+	return agentStoreBundle{
+		configStore: stores.ConfigStore,
+		modelStore:  stores.ModelStore,
+		soulStore:   stores.SoulStore,
+		memoryStore: stores.MemoryStore,
+	}, nil
 }
 
 // loadDAG loads the DAG from task definition.
@@ -348,28 +466,52 @@ func (h *remoteTaskHandler) loadDAG(ctx context.Context, task *coordinatorv1.Tas
 
 // agentEnv holds temporary directories and cleanup function for agent execution.
 type agentEnv struct {
-	logDir  string
-	logFile string
-	cleanup func()
+	logDir      string
+	logFile     string
+	artifactDir string
+	cleanup     func()
 }
 
 // createAgentEnv creates temporary directories for agent execution.
 // The cleanup function must be called after execution completes.
 // Includes workerID in path to prevent collisions with concurrent workers on the same host.
-func (h *remoteTaskHandler) createAgentEnv(ctx context.Context, dagRunID string) (*agentEnv, error) {
+func (h *remoteTaskHandler) createAgentEnv(ctx context.Context, dag *core.DAG, dagRunID string) (*agentEnv, error) {
 	logDir := filepath.Join(os.TempDir(), "dagu", "worker-logs", h.workerID, dagRunID)
-	if err := os.MkdirAll(logDir, 0750); err != nil {
+	if err := os.MkdirAll(logDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
+	artifactDir := ""
+	if dag != nil && dag.ArtifactsEnabled() {
+		var err error
+		artifactDir, err = logpath.GenerateDir(
+			ctx,
+			filepath.Join(os.TempDir(), "dagu", "worker-artifacts", h.workerID),
+			"",
+			dag.Name,
+			dagRunID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create artifact directory: %w", err)
+		}
+	}
+
 	return &agentEnv{
-		logDir:  logDir,
-		logFile: filepath.Join(logDir, "scheduler.log"),
+		logDir:      logDir,
+		logFile:     filepath.Join(logDir, "scheduler.log"),
+		artifactDir: artifactDir,
 		cleanup: func() {
 			if err := os.RemoveAll(logDir); err != nil {
 				logger.Warn(ctx, "Failed to cleanup temp log directory",
 					slog.String("path", logDir),
 					tag.Error(err))
+			}
+			if artifactDir != "" {
+				if err := os.RemoveAll(artifactDir); err != nil {
+					logger.Warn(ctx, "Failed to cleanup temp artifact directory",
+						slog.String("path", artifactDir),
+						tag.Error(err))
+				}
 			}
 		},
 	}, nil
@@ -385,21 +527,23 @@ func (h *remoteTaskHandler) executeDAGRun(
 	parent exec.DAGRunRef,
 	statusPusher *remote.StatusPusher,
 	logStreamer *remote.LogStreamer,
+	artifactUploader *remote.ArtifactUploader,
 	queuedRun bool,
 	retry *retryConfig,
+	agentSnapshot []byte,
 	extraEnvs []string,
 ) error {
 	// Create temporary directory for local operations
-	env, err := h.createAgentEnv(ctx, dagRunID)
+	env, err := h.createAgentEnv(ctx, dag, dagRunID)
 	if err != nil {
-		return err
+		return newTaskInitError(err)
 	}
 	defer env.cleanup()
 
 	// Open scheduler log file for writing
 	logFile, err := os.OpenFile(env.logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create scheduler log file: %w", err)
+		return newTaskInitError(fmt.Errorf("failed to create scheduler log file: %w", err))
 	}
 	defer func() {
 		if closeErr := logFile.Close(); closeErr != nil {
@@ -424,7 +568,15 @@ func (h *remoteTaskHandler) executeDAGRun(
 	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithWriter(logWriter)))
 
 	// Create agent stores for agent step execution
-	agentStores := h.agentStores(ctx)
+	var agentStores agentStoreBundle
+	if len(agentSnapshot) > 0 {
+		agentStores, err = h.agentStoresFromSnapshot(agentSnapshot)
+		if err != nil {
+			return newTaskInitError(fmt.Errorf("hydrate agent snapshot: %w", err))
+		}
+	} else {
+		agentStores = h.agentStores(ctx)
+	}
 
 	// Build agent options
 	opts := rtagent.Options{
@@ -442,9 +594,12 @@ func (h *remoteTaskHandler) executeDAGRun(
 		DefaultExecMode:   h.config.DefaultExecMode,
 		AgentConfigStore:  agentStores.configStore,
 		AgentModelStore:   agentStores.modelStore,
+		AgentSoulStore:    agentStores.soulStore,
 		AgentMemoryStore:  agentStores.memoryStore,
 		AgentOAuthManager: agentStores.oauthManager,
 		ScheduleTime:      scheduleTime,
+		ArtifactDir:       env.artifactDir,
+		ArtifactFinalizer: artifactUploader,
 	}
 
 	if retry != nil {

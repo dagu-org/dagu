@@ -38,6 +38,7 @@ type Definition struct {
 	DAGsDir         string `mapstructure:"dags_dir"`
 	Executable      string `mapstructure:"executable"`
 	LogDir          string `mapstructure:"log_dir"`
+	ArtifactDir     string `mapstructure:"artifact_dir"`
 	DataDir         string `mapstructure:"data_dir"`
 	SuspendFlagsDir string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir    string `mapstructure:"admin_logs_dir"`
@@ -183,6 +184,7 @@ type PathsDef struct {
 	DocsDir            string `mapstructure:"docs_dir"`
 	Executable         string `mapstructure:"executable"`
 	LogDir             string `mapstructure:"log_dir"`
+	ArtifactDir        string `mapstructure:"artifact_dir"`
 	DataDir            string `mapstructure:"data_dir"`
 	SuspendFlagsDir    string `mapstructure:"suspend_flags_dir"`
 	AdminLogsDir       string `mapstructure:"admin_logs_dir"`
@@ -444,10 +446,11 @@ type TunnelRateLimitDef struct {
 
 // BotsDef configures bot integrations.
 type BotsDef struct {
-	Provider string          `mapstructure:"provider"`  // "telegram", "slack", etc.
+	Provider string          `mapstructure:"provider"`  // "telegram", "slack", "discord", etc.
 	SafeMode *bool           `mapstructure:"safe_mode"` // Default: true
 	Telegram *TelegramBotDef `mapstructure:"telegram"`
 	Slack    *SlackBotDef    `mapstructure:"slack"`
+	Discord  *DiscordBotDef  `mapstructure:"discord"`
 }
 
 // TelegramBotDef configures the Telegram bot.
@@ -461,6 +464,14 @@ type TelegramBotDef struct {
 type SlackBotDef struct {
 	BotToken             string   `mapstructure:"bot_token"`
 	AppToken             string   `mapstructure:"app_token"`
+	AllowedChannelIDs    []string `mapstructure:"allowed_channel_ids"`
+	InterestedEventTypes []string `mapstructure:"interested_event_types"`
+	RespondToAll         *bool    `mapstructure:"respond_to_all"` // Default: true
+}
+
+// DiscordBotDef configures the Discord bot.
+type DiscordBotDef struct {
+	Token                string   `mapstructure:"token"`
 	AllowedChannelIDs    []string `mapstructure:"allowed_channel_ids"`
 	InterestedEventTypes []string `mapstructure:"interested_event_types"`
 	RespondToAll         *bool    `mapstructure:"respond_to_all"` // Default: true

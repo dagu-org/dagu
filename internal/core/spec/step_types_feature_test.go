@@ -1,0 +1,658 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package spec
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestCustomStepTypes_DAGLocalExecTemplate(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-local
+step_types:
+  greet:
+    type: command
+    description: Send a greeting
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+        repeat:
+          type: integer
+          default: 3
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+          - {$input: repeat}
+steps:
+  - type: greet
+    config:
+      message: hello
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "greet_1", step.Name)
+	assert.Equal(t, "direct", step.Shell)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, "/bin/echo", step.Commands[0].Command)
+	assert.Equal(t, []string{"hello", "3"}, step.Commands[0].Args)
+	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
+	assert.Equal(t, "Send a greeting", step.Description)
+}
+
+func TestCustomStepTypes_CommandTargetInheritsDAGLevelContainer(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-inherit-container
+container:
+  exec: shared-runner
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ json .input.message }}
+steps:
+  - type: greet
+    config:
+      message: hello-from-container
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "container", step.ExecutorConfig.Type)
+	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"hello-from-container"}, step.Commands[0].Args)
+}
+
+func TestCustomStepTypes_CommandTargetWithoutExecUsesImplicitCommandExecutor(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-implicit-command
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ json .input.message }}
+steps:
+  - type: greet
+    config:
+      message: hello-inline
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Empty(t, step.ExecutorConfig.Type)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, "echo", step.Commands[0].Command)
+	assert.Equal(t, []string{"hello-inline"}, step.Commands[0].Args)
+}
+
+func TestCustomStepTypes_BaseConfigRegistry(t *testing.T) {
+	t.Parallel()
+
+	baseYAML := []byte(`
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+`)
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-base
+steps:
+  - type: greet
+    config:
+      message: hello-from-base
+`), WithBaseConfigContent(baseYAML))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "greet_1", step.Name)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"hello-from-base"}, step.Commands[0].Args)
+	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
+}
+
+func TestCustomStepTypes_BaseConfigRegistryNormalizesLookupKeys(t *testing.T) {
+	t.Parallel()
+
+	baseYAML := []byte(`
+step_types:
+  " greet ":
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+`)
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-base-normalized
+steps:
+  - type: greet
+    config:
+      message: hello-from-normalized-base
+`), WithBaseConfigContent(baseYAML))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "greet_1", step.Name)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"hello-from-normalized-base"}, step.Commands[0].Args)
+	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
+}
+
+func TestCustomStepTypes_BaseConfigDefaultsApplyBeforeTemplate(t *testing.T) {
+	t.Parallel()
+
+	baseYAML := []byte(`
+defaults:
+  env:
+    - DEFAULT_ONLY: default-only
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+        args: [hello]
+      env:
+        - TEMPLATE_ONLY: template-only
+`)
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-base-defaults
+steps:
+  - type: greet
+`), WithBaseConfigContent(baseYAML))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, []string{"DEFAULT_ONLY=default-only", "TEMPLATE_ONLY=template-only"}, step.Env)
+	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
+}
+
+func TestCustomStepTypes_DuplicateNameAcrossScopes(t *testing.T) {
+	t.Parallel()
+
+	baseYAML := []byte(`
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+`)
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-duplicate
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+steps:
+  - type: greet
+`), WithBaseConfigContent(baseYAML))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `duplicate custom step type "greet"`)
+}
+
+func TestCustomStepTypes_DuplicateNameAcrossScopesAfterNormalization(t *testing.T) {
+	t.Parallel()
+
+	baseYAML := []byte(`
+step_types:
+  " greet ":
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+`)
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-duplicate-normalized
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+steps:
+  - type: greet
+`), WithBaseConfigContent(baseYAML))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `duplicate custom step type "greet"`)
+}
+
+func TestCustomStepTypes_RejectsForbiddenCallSiteFields(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-forbidden
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+steps:
+  - type: greet
+    command: echo should-fail
+    config:
+      message: hello
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `field "command" is not allowed`)
+}
+
+func TestCustomStepTypes_HandlerSupport(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-handler
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+handler_on:
+  success:
+    type: greet
+    config:
+      message: handler-ok
+steps:
+  - command: echo run
+`))
+	require.NoError(t, err)
+	require.NotNil(t, dag.HandlerOn.Success)
+	assert.Equal(t, "onSuccess", dag.HandlerOn.Success.Name)
+	assert.Equal(t, "direct", dag.HandlerOn.Success.Shell)
+	assert.Equal(t, "greet", dag.HandlerOn.Success.ExecutorConfig.Metadata["custom_type"])
+	require.Len(t, dag.HandlerOn.Success.Commands, 1)
+	assert.Equal(t, []string{"handler-ok"}, dag.HandlerOn.Success.Commands[0].Args)
+}
+
+func TestCustomStepTypes_HandlerAllowsExplicitZeroValueOverrides(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-handler-zero-overrides
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+      timeout_sec: 15
+      mail_on_error: true
+handler_on:
+  success:
+    type: greet
+    config:
+      message: handler-ok
+    timeout_sec: 0
+    mail_on_error: false
+steps:
+  - command: echo run
+`))
+	require.NoError(t, err)
+	require.NotNil(t, dag.HandlerOn.Success)
+	assert.Equal(t, "onSuccess", dag.HandlerOn.Success.Name)
+	assert.Zero(t, dag.HandlerOn.Success.Timeout)
+	assert.False(t, dag.HandlerOn.Success.MailOnError)
+	assert.Equal(t, "greet", dag.HandlerOn.Success.ExecutorConfig.Metadata["custom_type"])
+}
+
+func TestCustomStepTypes_TemplateFieldsOverrideDefaults(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-template-overrides-defaults
+defaults:
+  continue_on: failed
+  retry_policy:
+    limit: 1
+    interval_sec: 60
+  repeat_policy:
+    repeat: while
+    condition: "true"
+    interval_sec: 30
+  timeout_sec: 600
+  mail_on_error: true
+  signal_on_stop: SIGTERM
+  env:
+    - DEFAULT_ONLY: default-only
+  preconditions:
+    - condition: "test -f /default"
+step_types:
+  layered:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+        args: [hello]
+      continue_on: skipped
+      retry_policy:
+        limit: 5
+        interval_sec: 2
+      repeat_policy:
+        repeat: until
+        condition: "cat /tmp/status"
+        expected: done
+        interval_sec: 7
+      timeout_sec: 9
+      mail_on_error: false
+      signal_on_stop: SIGINT
+      env:
+        - TEMPLATE_ONLY: template-only
+      preconditions:
+        - condition: "test -d /template"
+steps:
+  - type: layered
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.True(t, step.ContinueOn.Skipped)
+	assert.False(t, step.ContinueOn.Failure)
+	assert.Equal(t, 5, step.RetryPolicy.Limit)
+	assert.Equal(t, 2*time.Second, step.RetryPolicy.Interval)
+	assert.Equal(t, core.RepeatModeUntil, step.RepeatPolicy.RepeatMode)
+	require.NotNil(t, step.RepeatPolicy.Condition)
+	assert.Equal(t, "cat /tmp/status", step.RepeatPolicy.Condition.Condition)
+	assert.Equal(t, "done", step.RepeatPolicy.Condition.Expected)
+	assert.Equal(t, 7*time.Second, step.RepeatPolicy.Interval)
+	assert.Equal(t, 9*time.Second, step.Timeout)
+	assert.False(t, step.MailOnError)
+	assert.Equal(t, "SIGINT", step.SignalOnStop)
+	assert.Equal(t, []string{"DEFAULT_ONLY=default-only", "TEMPLATE_ONLY=template-only"}, step.Env)
+	require.Len(t, step.Preconditions, 2)
+	assert.Equal(t, "test -f /default", step.Preconditions[0].Condition)
+	assert.Equal(t, "test -d /template", step.Preconditions[1].Condition)
+}
+
+func TestCustomStepTypes_CallSiteOverridesTemplateAndComposesAdditiveFields(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-callsite-overrides-template
+defaults:
+  continue_on: failed
+  retry_policy:
+    limit: 1
+    interval_sec: 60
+  repeat_policy:
+    repeat: until
+    condition: "cat /tmp/default"
+    expected: ready
+    interval_sec: 12
+  timeout_sec: 600
+  mail_on_error: true
+  signal_on_stop: SIGTERM
+  env:
+    - LAYERED: default
+    - DEFAULT_ONLY: default-only
+  preconditions:
+    - condition: "test -f /default"
+step_types:
+  layered:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+        args: [hello]
+      continue_on: skipped
+      retry_policy:
+        limit: 5
+        interval_sec: 2
+      repeat_policy:
+        repeat: while
+        condition: "test -d /template"
+        interval_sec: 7
+      timeout_sec: 9
+      mail_on_error: true
+      signal_on_stop: SIGINT
+      env:
+        - LAYERED: template
+        - TEMPLATE_ONLY: template-only
+      preconditions:
+        - condition: "test -d /template"
+steps:
+  - type: layered
+    continue_on:
+      failed: true
+    retry_policy:
+      limit: 7
+      interval_sec: 3
+    repeat_policy:
+      repeat: until
+      condition: "cat /tmp/call"
+      expected: done
+      interval_sec: 11
+    timeout_sec: 0
+    mail_on_error: false
+    signal_on_stop: SIGQUIT
+    env:
+      - LAYERED: call
+      - CALL_ONLY: call-only
+    preconditions:
+      - condition: "test -x /call"
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.True(t, step.ContinueOn.Failure)
+	assert.False(t, step.ContinueOn.Skipped)
+	assert.Equal(t, 7, step.RetryPolicy.Limit)
+	assert.Equal(t, 3*time.Second, step.RetryPolicy.Interval)
+	assert.Equal(t, core.RepeatModeUntil, step.RepeatPolicy.RepeatMode)
+	require.NotNil(t, step.RepeatPolicy.Condition)
+	assert.Equal(t, "cat /tmp/call", step.RepeatPolicy.Condition.Condition)
+	assert.Equal(t, "done", step.RepeatPolicy.Condition.Expected)
+	assert.Equal(t, 11*time.Second, step.RepeatPolicy.Interval)
+	assert.Zero(t, step.Timeout)
+	assert.False(t, step.MailOnError)
+	assert.Equal(t, "SIGQUIT", step.SignalOnStop)
+	assert.Equal(t, []string{
+		"LAYERED=default",
+		"DEFAULT_ONLY=default-only",
+		"LAYERED=template",
+		"TEMPLATE_ONLY=template-only",
+		"LAYERED=call",
+		"CALL_ONLY=call-only",
+	}, step.Env)
+	require.Len(t, step.Preconditions, 3)
+	assert.Equal(t, "test -f /default", step.Preconditions[0].Condition)
+	assert.Equal(t, "test -d /template", step.Preconditions[1].Condition)
+	assert.Equal(t, "test -x /call", step.Preconditions[2].Condition)
+}
+
+func TestCustomStepTypes_HandlerTemplateFieldsOverrideDefaults(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-handler-default-precedence
+defaults:
+  timeout_sec: 600
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+      timeout_sec: 15
+handler_on:
+  success:
+    type: greet
+    config:
+      message: handler-ok
+steps:
+  - command: echo run
+`))
+	require.NoError(t, err)
+	require.NotNil(t, dag.HandlerOn.Success)
+	assert.Equal(t, "onSuccess", dag.HandlerOn.Success.Name)
+	assert.Equal(t, 15*time.Second, dag.HandlerOn.Success.Timeout)
+	assert.Equal(t, "greet", dag.HandlerOn.Success.ExecutorConfig.Metadata["custom_type"])
+}
+
+func TestStepExec_BuildsDirectCommand(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: exec-step
+steps:
+  - exec:
+      command: /bin/echo
+      args: [hello, 3, true]
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "cmd_1", step.Name)
+	assert.Equal(t, "direct", step.Shell)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, "/bin/echo", step.Commands[0].Command)
+	assert.Equal(t, []string{"hello", "3", "true"}, step.Commands[0].Args)
+}
+
+func TestStepExec_RejectsCommandConflict(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: exec-step-invalid
+steps:
+  - command: echo hello
+    exec:
+      command: /bin/echo
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exec cannot be used together with command")
+}

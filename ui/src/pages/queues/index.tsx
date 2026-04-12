@@ -4,6 +4,7 @@
 import { components } from '@/api/v1/schema';
 import { Layers, Search } from 'lucide-react';
 import React from 'react';
+import { components } from '../../api/v1/schema';
 import { Input } from '../../components/ui/input';
 import { RefreshButton } from '../../components/ui/refresh-button';
 import { AppBarContext } from '../../contexts/AppBarContext';

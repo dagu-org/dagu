@@ -30,7 +30,6 @@ import {
   Gauge,
   Ghost,
   Shield,
-  Sparkles,
   GitBranch,
   Globe,
   History,
@@ -654,14 +653,6 @@ export const mainListItems = React.forwardRef<
                   to="/agent-memory"
                   text="Memory"
                   icon={<Brain size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-                <NavItem
-                  to="/agent-skills"
-                  text="Skills"
-                  icon={<Sparkles size={18} />}
                   isOpen={isOpen}
                   onClick={onNavItemClick}
                   customColor={customColor}

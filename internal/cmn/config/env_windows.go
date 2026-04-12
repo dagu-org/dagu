@@ -30,6 +30,22 @@ func init() {
 		"PSMODULEPATH", // PowerShell specific
 		"HOME",         // Used by Go, Git, and ported tools
 
+		// User profile and per-user data directories used by Git, PowerShell,
+		// .NET tools, and credential helpers.
+		"APPDATA",
+		"LOCALAPPDATA",
+
+		// Common Windows identity and install roots referenced by CLI tools.
+		"USERNAME",
+		"USERDOMAIN",
+		"PROGRAMFILES",
+		"PROGRAMFILES(X86)",
+		"PROGRAMDATA",
+
+		// SSH agent forwarding (Git over SSH, remote operations)
+		"SSH_AUTH_SOCK",
+		"SSH_AGENT_PID",
+
 		// Docker daemon connection (used by Docker SDK's client.FromEnv)
 		"DOCKER_HOST",        // Docker daemon address
 		"DOCKER_TLS_VERIFY",  // Enable TLS verification

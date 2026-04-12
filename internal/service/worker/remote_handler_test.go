@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/cmn/backoff"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
@@ -169,21 +170,89 @@ func (m *mockStreamLogsClient) RecvMsg(any) error {
 	return nil
 }
 
+type mockStreamArtifactsClient struct {
+	chunks   []*coordinatorv1.ArtifactChunk
+	mu       sync.Mutex
+	sendErr  error
+	closeErr error
+	response *coordinatorv1.StreamArtifactsResponse
+	ctx      context.Context
+}
+
+func newMockStreamArtifactsClient() *mockStreamArtifactsClient {
+	return &mockStreamArtifactsClient{
+		chunks: make([]*coordinatorv1.ArtifactChunk, 0),
+		ctx:    context.Background(),
+		response: &coordinatorv1.StreamArtifactsResponse{
+			ChunksReceived: 0,
+			BytesWritten:   0,
+		},
+	}
+}
+
+func (m *mockStreamArtifactsClient) Send(chunk *coordinatorv1.ArtifactChunk) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.sendErr != nil {
+		return m.sendErr
+	}
+	m.chunks = append(m.chunks, chunk)
+	return nil
+}
+
+func (m *mockStreamArtifactsClient) CloseAndRecv() (*coordinatorv1.StreamArtifactsResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closeErr != nil {
+		return nil, m.closeErr
+	}
+	if m.response != nil {
+		m.response.ChunksReceived = uint64(len(m.chunks))
+	}
+	return m.response, nil
+}
+
+func (m *mockStreamArtifactsClient) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (m *mockStreamArtifactsClient) Trailer() metadata.MD {
+	return nil
+}
+
+func (m *mockStreamArtifactsClient) CloseSend() error {
+	return nil
+}
+
+func (m *mockStreamArtifactsClient) Context() context.Context {
+	return m.ctx
+}
+
+func (m *mockStreamArtifactsClient) SendMsg(any) error {
+	return nil
+}
+
+func (m *mockStreamArtifactsClient) RecvMsg(any) error {
+	return nil
+}
+
 type mockRemoteCoordinatorClient struct {
-	AckTaskClaimFunc    func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error)
-	RunHeartbeatFunc    func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error)
-	ReportStatusFunc    func(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
-	ReportStatusToFunc  func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
-	StreamLogsFunc      func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
-	StreamLogsToFunc    func(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
-	GetDAGRunStatusFunc func(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
-	DispatchFunc        func(ctx context.Context, task *coordinatorv1.Task) error
-	PollFunc            func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
-	HeartbeatFunc       func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
-	GetWorkersFunc      func(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
-	CleanupFunc         func(ctx context.Context) error
-	MetricsFunc         func() coordinator.Metrics
-	RequestCancelFunc   func(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error
+	AckTaskClaimFunc      func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.AckTaskClaimRequest) (*coordinatorv1.AckTaskClaimResponse, error)
+	RunHeartbeatFunc      func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.RunHeartbeatRequest) (*coordinatorv1.RunHeartbeatResponse, error)
+	ReportStatusFunc      func(ctx context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+	ReportStatusToFunc    func(ctx context.Context, owner exec.HostInfo, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error)
+	StreamLogsFunc        func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
+	StreamLogsToFunc      func(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamLogsClient, error)
+	StreamArtifactsFunc   func(ctx context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error)
+	StreamArtifactsToFunc func(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error)
+	GetDAGRunStatusFunc   func(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error)
+	DispatchFunc          func(ctx context.Context, task *coordinatorv1.Task) error
+	PollFunc              func(ctx context.Context, policy backoff.RetryPolicy, req *coordinatorv1.PollRequest) (*coordinatorv1.Task, error)
+	HeartbeatFunc         func(ctx context.Context, req *coordinatorv1.HeartbeatRequest) (*coordinatorv1.HeartbeatResponse, error)
+	GetWorkersFunc        func(ctx context.Context) ([]*coordinatorv1.WorkerInfo, error)
+	CleanupFunc           func(ctx context.Context) error
+	MetricsFunc           func() coordinator.Metrics
+	RequestCancelFunc     func(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) error
 }
 
 func newMockRemoteCoordinatorClient() *mockRemoteCoordinatorClient {
@@ -193,6 +262,9 @@ func newMockRemoteCoordinatorClient() *mockRemoteCoordinatorClient {
 		},
 		StreamLogsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamLogsClient, error) {
 			return newMockStreamLogsClient(), nil
+		},
+		StreamArtifactsFunc: func(_ context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+			return newMockStreamArtifactsClient(), nil
 		},
 		GetDAGRunStatusFunc: func(_ context.Context, _, _ string, _ *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 			return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
@@ -243,6 +315,20 @@ func (m *mockRemoteCoordinatorClient) StreamLogsTo(ctx context.Context, owner ex
 		return m.StreamLogsToFunc(ctx, owner)
 	}
 	return m.StreamLogs(ctx)
+}
+
+func (m *mockRemoteCoordinatorClient) StreamArtifacts(ctx context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	if m.StreamArtifactsFunc != nil {
+		return m.StreamArtifactsFunc(ctx)
+	}
+	return newMockStreamArtifactsClient(), nil
+}
+
+func (m *mockRemoteCoordinatorClient) StreamArtifactsTo(ctx context.Context, owner exec.HostInfo) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	if m.StreamArtifactsToFunc != nil {
+		return m.StreamArtifactsToFunc(ctx, owner)
+	}
+	return m.StreamArtifacts(ctx)
 }
 
 func (m *mockRemoteCoordinatorClient) GetDAGRunStatus(ctx context.Context, dagName, dagRunID string, rootRef *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
@@ -600,7 +686,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		}
 
 		root := exec.DAGRunRef{Name: "root-dag", ID: "root-123"}
-		statusPusher, _ := handler.createRemoteHandlers("run-1", "test-dag", root)
+		statusPusher, _, _ := handler.createRemoteHandlers("run-1", "test-dag", root)
 
 		require.NotNil(t, statusPusher)
 	})
@@ -615,7 +701,7 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		}
 
 		root := exec.DAGRunRef{Name: "root-dag", ID: "root-123"}
-		_, logStreamer := handler.createRemoteHandlers("run-1", "test-dag", root)
+		_, logStreamer, _ := handler.createRemoteHandlers("run-1", "test-dag", root)
 
 		require.NotNil(t, logStreamer)
 	})
@@ -630,12 +716,107 @@ func TestCreateRemoteHandlers(t *testing.T) {
 		}
 
 		root := exec.DAGRunRef{Name: "my-root", ID: "root-xyz"}
-		statusPusher, logStreamer := handler.createRemoteHandlers("my-run-id", "my-dag", root)
+		statusPusher, logStreamer, artifactUploader := handler.createRemoteHandlers("my-run-id", "my-dag", root)
 
 		// Both should be created
 		require.NotNil(t, statusPusher)
 		require.NotNil(t, logStreamer)
+		require.NotNil(t, artifactUploader)
 	})
+}
+
+func TestAgentStoresFromSnapshot_HydratesSnapshotStores(t *testing.T) {
+	t.Parallel()
+
+	handler := &remoteTaskHandler{}
+	payload, err := agent.MarshalSnapshot(&agent.Snapshot{
+		Config: &agent.Config{
+			Enabled:        true,
+			DefaultModelID: "model-default",
+		},
+		Models: []*agent.ModelConfig{
+			{
+				ID:       "model-default",
+				Name:     "Default",
+				Provider: "openai",
+				Model:    "gpt-5.4",
+				APIKey:   "test-key",
+			},
+		},
+		Souls: []*agent.Soul{
+			{ID: "helper", Name: "Helper", Content: "be precise"},
+		},
+		Memory: &agent.MemorySnapshot{
+			Global: "global memory",
+			PerDAG: map[string]string{"snapshot-dag": "dag memory"},
+		},
+	})
+	require.NoError(t, err)
+
+	stores, err := handler.agentStoresFromSnapshot(payload)
+	require.NoError(t, err)
+	require.NotNil(t, stores.configStore)
+	require.NotNil(t, stores.modelStore)
+	require.NotNil(t, stores.soulStore)
+	require.NotNil(t, stores.memoryStore)
+	assert.Nil(t, stores.oauthManager)
+
+	cfg, err := stores.configStore.Load(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "model-default", cfg.DefaultModelID)
+	model, err := stores.modelStore.GetByID(context.Background(), "model-default")
+	require.NoError(t, err)
+	assert.Equal(t, "gpt-5.4", model.Model)
+	soul, err := stores.soulStore.GetByID(context.Background(), "helper")
+	require.NoError(t, err)
+	assert.Equal(t, "Helper", soul.Name)
+	globalMemory, err := stores.memoryStore.LoadGlobalMemory(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "global memory", globalMemory)
+}
+
+func TestHandleStart_InvalidSnapshotReportsInitFailure(t *testing.T) {
+	t.Parallel()
+
+	var reported *coordinatorv1.ReportStatusRequest
+	client := newMockRemoteCoordinatorClient()
+	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+		reported = req
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	handler := NewRemoteTaskHandler(RemoteTaskHandlerConfig{
+		WorkerID:          "worker-1",
+		CoordinatorClient: client,
+		Config:            &config.Config{},
+	})
+
+	task := &coordinatorv1.Task{
+		Operation:      coordinatorv1.Operation_OPERATION_START,
+		Target:         "snapshot-dag",
+		RootDagRunName: "snapshot-dag",
+		RootDagRunId:   "run-1",
+		DagRunId:       "run-1",
+		Definition: `
+steps:
+  - name: main
+    command: echo hello
+`,
+		AgentSnapshot: []byte("not-a-valid-snapshot"),
+	}
+
+	err := handler.Handle(context.Background(), task)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "hydrate agent snapshot")
+	require.NotNil(t, reported)
+	require.NotNil(t, reported.Status)
+
+	status, convErr := convert.ProtoToDAGRunStatus(reported.Status)
+	require.NoError(t, convErr)
+	assert.Equal(t, core.Failed, status.Status)
+	assert.Equal(t, "snapshot-dag", status.Name)
+	assert.Equal(t, "run-1", status.DAGRunID)
+	assert.Contains(t, status.Error, "hydrate agent snapshot")
 }
 
 func TestCreateAgentEnv(t *testing.T) {
@@ -649,7 +830,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		env, err := handler.createAgentEnv(ctx, "test-run-123")
+		env, err := handler.createAgentEnv(ctx, nil, "test-run-123")
 
 		require.NoError(t, err)
 		require.NotNil(t, env)
@@ -669,7 +850,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		env, err := handler.createAgentEnv(ctx, "run-456")
+		env, err := handler.createAgentEnv(ctx, nil, "run-456")
 
 		require.NoError(t, err)
 		defer env.cleanup()
@@ -687,7 +868,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		env, err := handler.createAgentEnv(ctx, "specific-run-id")
+		env, err := handler.createAgentEnv(ctx, nil, "specific-run-id")
 
 		require.NoError(t, err)
 		defer env.cleanup()
@@ -703,7 +884,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		env, err := handler.createAgentEnv(ctx, "run-log")
+		env, err := handler.createAgentEnv(ctx, nil, "run-log")
 
 		require.NoError(t, err)
 		defer env.cleanup()
@@ -721,7 +902,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		env, err := handler.createAgentEnv(ctx, "run-cleanup")
+		env, err := handler.createAgentEnv(ctx, nil, "run-cleanup")
 
 		require.NoError(t, err)
 
@@ -746,7 +927,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		env, err := handler.createAgentEnv(ctx, "run-nonexist")
+		env, err := handler.createAgentEnv(ctx, nil, "run-nonexist")
 
 		require.NoError(t, err)
 
@@ -767,7 +948,7 @@ func TestCreateAgentEnv(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		env, err := handler.createAgentEnv(ctx, "run-nested")
+		env, err := handler.createAgentEnv(ctx, nil, "run-nested")
 
 		require.NoError(t, err)
 		defer env.cleanup()
@@ -1138,11 +1319,11 @@ func TestRemoteHandler_UniqueLogDirs(t *testing.T) {
 
 	ctx := context.Background()
 
-	env1, err1 := handler.createAgentEnv(ctx, "run-aaa")
+	env1, err1 := handler.createAgentEnv(ctx, nil, "run-aaa")
 	require.NoError(t, err1)
 	defer env1.cleanup()
 
-	env2, err2 := handler.createAgentEnv(ctx, "run-bbb")
+	env2, err2 := handler.createAgentEnv(ctx, nil, "run-bbb")
 	require.NoError(t, err2)
 	defer env2.cleanup()
 
@@ -1367,11 +1548,11 @@ func TestRemoteHandler_DifferentWorkersDifferentPaths(t *testing.T) {
 
 	ctx := context.Background()
 
-	env1, err1 := handler1.createAgentEnv(ctx, "same-run-id")
+	env1, err1 := handler1.createAgentEnv(ctx, nil, "same-run-id")
 	require.NoError(t, err1)
 	defer env1.cleanup()
 
-	env2, err2 := handler2.createAgentEnv(ctx, "same-run-id")
+	env2, err2 := handler2.createAgentEnv(ctx, nil, "same-run-id")
 	require.NoError(t, err2)
 	defer env2.cleanup()
 
@@ -1473,7 +1654,7 @@ func TestCreateAgentEnv_MkdirAllError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	env, err := handler.createAgentEnv(ctx, "run-invalid")
+	env, err := handler.createAgentEnv(ctx, nil, "run-invalid")
 
 	// On most systems, a null byte in the path should cause an error
 	// If the system allows it (unlikely), the test passes anyway
@@ -1567,10 +1748,10 @@ steps:
 	// Create remote handlers
 	root := exec.DAGRunRef{Name: "root", ID: "root-1"}
 	parent := exec.DAGRunRef{Name: "parent", ID: "parent-1"}
-	statusPusher, logStreamer := handler.createRemoteHandlers("run-error", dag.Name, root)
+	statusPusher, logStreamer, artifactUploader := handler.createRemoteHandlers("run-error", dag.Name, root)
 
 	// Call executeDAGRun directly - should fail at createAgentEnv
-	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", "", root, parent, statusPusher, logStreamer, false, nil, nil)
+	err := handler.executeDAGRun(context.Background(), dag, "run-error", "", "", root, parent, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
 
 	// On systems where null byte in path fails, we should get an error
 	if err != nil {
@@ -1611,11 +1792,197 @@ steps:
 	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
 	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
 	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	artifactUploader := remote.NewArtifactUploader(client, "integration-test-worker", dagRunID, dag.Name, "", root)
 
 	// Call executeDAGRun - this should succeed and log completion
 	// For top-level runs, pass empty parent and ensure root matches dagRunID
-	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, false, nil, nil)
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
 
 	// Should succeed for simple echo command
 	require.NoError(t, err, "executeDAGRun should succeed for simple echo command")
+}
+
+func TestExecuteDAGRun_FailedExecutionStillUploadsArtifacts(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dagContent := `name: remote-handler-failure-artifacts
+artifacts:
+  enabled: true
+steps:
+  - name: fail-step
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+      exit 1
+`
+	dag := th.DAG(t, dagContent)
+
+	stream := newMockStreamArtifactsClient()
+	client := newMockRemoteCoordinatorClient()
+	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+		return stream, nil
+	}
+
+	handler := &remoteTaskHandler{
+		workerID:          "integration-test-worker",
+		coordinatorClient: client,
+		dagRunStore:       th.DAGRunStore,
+		dagStore:          th.DAGStore,
+		dagRunMgr:         th.DAGRunMgr,
+		serviceRegistry:   th.ServiceRegistry,
+		config:            th.Config,
+	}
+
+	dagRunID := "run-failure-artifacts-1"
+	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
+	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
+	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	artifactUploader := remote.NewArtifactUploader(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
+	require.Error(t, err)
+
+	var sawData bool
+	var sawFinal bool
+	for _, chunk := range stream.chunks {
+		if chunk.RelativePath != "out.txt" {
+			continue
+		}
+		if len(chunk.Data) > 0 {
+			sawData = true
+		}
+		if chunk.IsFinal {
+			sawFinal = true
+		}
+	}
+	assert.True(t, sawData, "failed runs should still upload artifact contents")
+	assert.True(t, sawFinal, "failed runs should still finalize artifact uploads")
+}
+
+func TestExecuteDAGRun_ArtifactUploadFailureMarksRunFailed(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dagContent := `name: remote-handler-upload-failure
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifact
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+`
+	dag := th.DAG(t, dagContent)
+
+	stream := newMockStreamArtifactsClient()
+	stream.response = &coordinatorv1.StreamArtifactsResponse{
+		Error: "coordinator write failed",
+	}
+
+	var reported []exec.DAGRunStatus
+	var reportedMu sync.Mutex
+	client := newMockRemoteCoordinatorClient()
+	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+		return stream, nil
+	}
+	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+		status, err := convert.ProtoToDAGRunStatus(req.Status)
+		require.NoError(t, err)
+		reportedMu.Lock()
+		reported = append(reported, *status)
+		reportedMu.Unlock()
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	handler := &remoteTaskHandler{
+		workerID:          "integration-test-worker",
+		coordinatorClient: client,
+		dagRunStore:       th.DAGRunStore,
+		dagStore:          th.DAGStore,
+		dagRunMgr:         th.DAGRunMgr,
+		serviceRegistry:   th.ServiceRegistry,
+		config:            th.Config,
+	}
+
+	dagRunID := "run-upload-failure-1"
+	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
+	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
+	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	artifactUploader := remote.NewArtifactUploader(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "upload artifacts")
+	reportedMu.Lock()
+	require.NotEmpty(t, reported)
+
+	final := reported[len(reported)-1]
+	reportedMu.Unlock()
+	assert.Equal(t, core.Failed, final.Status)
+	assert.Contains(t, final.Error, "failed to upload artifacts")
+}
+
+func TestExecuteDAGRun_FailedExecutionWithArtifactUploadFailurePreservesFailedStatus(t *testing.T) {
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dagContent := `name: remote-handler-failure-upload-failure
+artifacts:
+  enabled: true
+steps:
+  - name: fail-step
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+      exit 1
+`
+	dag := th.DAG(t, dagContent)
+
+	stream := newMockStreamArtifactsClient()
+	stream.response = &coordinatorv1.StreamArtifactsResponse{
+		Error: "coordinator write failed",
+	}
+
+	var reported []exec.DAGRunStatus
+	var reportedMu sync.Mutex
+	client := newMockRemoteCoordinatorClient()
+	client.StreamArtifactsFunc = func(context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+		return stream, nil
+	}
+	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
+		status, err := convert.ProtoToDAGRunStatus(req.Status)
+		require.NoError(t, err)
+		reportedMu.Lock()
+		reported = append(reported, *status)
+		reportedMu.Unlock()
+		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
+	}
+
+	handler := &remoteTaskHandler{
+		workerID:          "integration-test-worker",
+		coordinatorClient: client,
+		dagRunStore:       th.DAGRunStore,
+		dagStore:          th.DAGStore,
+		dagRunMgr:         th.DAGRunMgr,
+		serviceRegistry:   th.ServiceRegistry,
+		config:            th.Config,
+	}
+
+	dagRunID := "run-failure-upload-failure-1"
+	root := exec.DAGRunRef{Name: dag.Name, ID: dagRunID}
+	statusPusher := remote.NewStatusPusher(client, "integration-test-worker")
+	logStreamer := remote.NewLogStreamer(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+	artifactUploader := remote.NewArtifactUploader(client, "integration-test-worker", dagRunID, dag.Name, "", root)
+
+	err := handler.executeDAGRun(th.Context, dag.DAG, dagRunID, "", "", root, exec.DAGRunRef{}, statusPusher, logStreamer, artifactUploader, false, nil, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "upload artifacts")
+	reportedMu.Lock()
+	require.NotEmpty(t, reported)
+
+	final := reported[len(reported)-1]
+	reportedMu.Unlock()
+	assert.Equal(t, core.Failed, final.Status)
+	assert.Contains(t, final.Error, "failed to upload artifacts")
 }

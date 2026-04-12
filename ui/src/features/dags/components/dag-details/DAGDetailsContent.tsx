@@ -27,6 +27,7 @@ type DAGDetailsContentProps = {
   filePath?: string;
   dag: components['schemas']['DAGDetails'];
   currentDAGRun?: components['schemas']['DAGRunDetails'];
+  latestDAGRun?: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
@@ -37,6 +38,7 @@ type DAGDetailsContentProps = {
   navigateToStatusTab?: () => void;
   skipHeader?: boolean;
   localDags?: components['schemas']['LocalDag'][];
+  editorHints?: components['schemas']['DAGEditorHints'];
   /** Custom enqueue handler, threaded to DAGHeader → DAGActions */
   onEnqueue?: (
     params: string,
@@ -60,6 +62,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   filePath,
   dag,
   currentDAGRun,
+  latestDAGRun,
   refreshFn,
   formatDuration,
   activeTab,
@@ -70,6 +73,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   navigateToStatusTab,
   skipHeader = false,
   localDags,
+  editorHints,
   onEnqueue,
   forceEnqueue = false,
   autoOpenStartModal = false,
@@ -333,18 +337,31 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           </div>
 
           <div className={activeTab === 'spec' ? 'visible' : 'hidden'}>
-            <DAGEditButtons fileName={fileName || ''} />
+            <DAGEditButtons
+              fileName={fileName || ''}
+              dagName={dag?.name || fileName || ''}
+              latestDAGRun={latestDAGRun}
+            />
           </div>
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' && currentDAGRun ? (
             <>
-              <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
+              <DAGStatus
+                dagRun={currentDAGRun}
+                fileName={fileName || ''}
+                artifactEnabled={!!dag.artifacts?.enabled}
+              />
               <div className="h-6 flex-shrink-0" />
             </>
           ) : null}
           {activeTab === 'spec' ? (
-            <DAGSpec key={fileName} fileName={fileName} localDags={localDags} />
+            <DAGSpec
+              key={fileName}
+              fileName={fileName}
+              localDags={localDags}
+              editorHints={editorHints}
+            />
           ) : null}
           {activeTab === 'history' ? (
             <>

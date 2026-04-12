@@ -576,7 +576,7 @@ const file_proto_index_v1_index_proto_rawDesc = "" +
 	"\x17auto_retry_max_interval\x18\x19 \x01(\x03R\x14autoRetryMaxInterval\x12\x1d\n" +
 	"\n" +
 	"proc_group\x18\x1a \x01(\tR\tprocGroup\x12*\n" +
-	"\x11suspend_flag_name\x18\x1b \x01(\tR\x0fsuspendFlagNameB1Z/github.com/dagucloud/dagu/proto/index/v1;indexv1b\x06proto3"
+	"\x11suspend_flag_name\x18\x1b \x01(\tR\x0fsuspendFlagNameB2Z0github.com/dagucloud/dagu/proto/index/v1;indexv1b\x06proto3"
 
 var (
 	file_proto_index_v1_index_proto_rawDescOnce sync.Once

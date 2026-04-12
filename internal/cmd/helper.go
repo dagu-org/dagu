@@ -69,8 +69,9 @@ func restoreDAGFromStatus(ctx context.Context, dag *core.DAG, status *exec.DAGRu
 // called after LoadDotEnv() so dotenv values are available during rebuild.
 //
 // The function preserves all JSON-serialized fields from the original DAG and
-// only copies JSON-excluded fields (Env, Params, ParamsJSON, SMTP, SSH,
-// RegistryAuths) from the rebuilt DAG.
+// only copies JSON-excluded fields (Env, Params, ParamsJSON, SMTP, SSH, S3,
+// Redis, Harness, Harnesses, Kubernetes, RegistryAuths, WorkingDirExplicit)
+// from the rebuilt DAG.
 func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	if len(dag.YamlData) == 0 {
 		return dag, nil
@@ -122,7 +123,13 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	dag.ParamsJSON = fresh.ParamsJSON
 	dag.SMTP = fresh.SMTP
 	dag.SSH = fresh.SSH
+	dag.S3 = fresh.S3
+	dag.Redis = fresh.Redis
+	dag.Harness = fresh.Harness
+	dag.Harnesses = fresh.Harnesses
+	dag.Kubernetes = fresh.Kubernetes
 	dag.RegistryAuths = fresh.RegistryAuths
+	dag.WorkingDirExplicit = fresh.WorkingDirExplicit
 
 	core.InitializeDefaults(dag)
 

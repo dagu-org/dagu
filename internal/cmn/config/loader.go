@@ -377,6 +377,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		{"SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.Paths.SuspendFlagsDir},
 		{"DataDir", &cfg.Paths.DataDir, def.Paths.DataDir},
 		{"LogDir", &cfg.Paths.LogDir, def.Paths.LogDir},
+		{"ArtifactDir", &cfg.Paths.ArtifactDir, def.Paths.ArtifactDir},
 		{"AdminLogsDir", &cfg.Paths.AdminLogsDir, def.Paths.AdminLogsDir},
 		{"EventStoreDir", &cfg.Paths.EventStoreDir, def.Paths.EventStoreDir},
 		{"BaseConfig", &cfg.Paths.BaseConfig, def.Paths.BaseConfig},
@@ -1166,6 +1167,14 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 	cfg.Bots.SafeMode = true
 	cfg.Bots.Telegram.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
 	cfg.Bots.Slack.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
+	cfg.Bots.Discord.InterestedEventTypes = append([]string(nil), DefaultBotInterestedEventTypes...)
+	cfg.Bots.Slack.RespondToAll = true
+	cfg.Bots.Discord.RespondToAll = true
+
+	botsDef := def.Bots
+	if botsDef == nil {
+		botsDef = &BotsDef{}
+	}
 
 	// Check env var override for provider
 	if provider := l.v.GetString("bots.provider"); provider != "" {
@@ -1180,33 +1189,26 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypes(raw)
 	}
 
-	if def.Bots == nil {
-		return
-	}
-
 	if cfg.Bots.Provider == BotProviderNone {
-		cfg.Bots.Provider = BotProvider(def.Bots.Provider)
+		cfg.Bots.Provider = BotProvider(botsDef.Provider)
 	}
 
-	if def.Bots.SafeMode != nil {
-		cfg.Bots.SafeMode = *def.Bots.SafeMode
+	if botsDef.SafeMode != nil {
+		cfg.Bots.SafeMode = *botsDef.SafeMode
 	}
 
-	if def.Bots.Telegram != nil {
+	if botsDef.Telegram != nil {
 		if cfg.Bots.Telegram.Token == "" {
-			cfg.Bots.Telegram.Token = def.Bots.Telegram.Token
+			cfg.Bots.Telegram.Token = botsDef.Telegram.Token
 		}
-		if len(def.Bots.Telegram.AllowedChatIDs) > 0 {
-			cfg.Bots.Telegram.AllowedChatIDs = def.Bots.Telegram.AllowedChatIDs
+		if len(botsDef.Telegram.AllowedChatIDs) > 0 {
+			cfg.Bots.Telegram.AllowedChatIDs = botsDef.Telegram.AllowedChatIDs
 		}
-		if def.Bots.Telegram.InterestedEventTypes != nil &&
+		if botsDef.Telegram.InterestedEventTypes != nil &&
 			!hasInterestedEventTypesEnv("BOTS_TELEGRAM_INTERESTED_EVENT_TYPES") {
-			cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypesSlice(def.Bots.Telegram.InterestedEventTypes)
+			cfg.Bots.Telegram.InterestedEventTypes = parseInterestedEventTypesSlice(botsDef.Telegram.InterestedEventTypes)
 		}
 	}
-
-	// Default Slack respond_to_all to true
-	cfg.Bots.Slack.RespondToAll = true
 
 	// Check env var override for Slack tokens
 	if botToken := l.v.GetString("bots.slack.bot_token"); botToken != "" {
@@ -1219,22 +1221,52 @@ func (l *ConfigLoader) loadBotsConfig(cfg *Config, def Definition) {
 		cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypes(raw)
 	}
 
-	if def.Bots.Slack != nil {
+	if botsDef.Slack != nil {
 		if cfg.Bots.Slack.BotToken == "" {
-			cfg.Bots.Slack.BotToken = def.Bots.Slack.BotToken
+			cfg.Bots.Slack.BotToken = botsDef.Slack.BotToken
 		}
 		if cfg.Bots.Slack.AppToken == "" {
-			cfg.Bots.Slack.AppToken = def.Bots.Slack.AppToken
+			cfg.Bots.Slack.AppToken = botsDef.Slack.AppToken
 		}
-		if len(def.Bots.Slack.AllowedChannelIDs) > 0 {
-			cfg.Bots.Slack.AllowedChannelIDs = def.Bots.Slack.AllowedChannelIDs
+		if len(botsDef.Slack.AllowedChannelIDs) > 0 {
+			cfg.Bots.Slack.AllowedChannelIDs = botsDef.Slack.AllowedChannelIDs
 		}
-		if def.Bots.Slack.InterestedEventTypes != nil &&
+		if botsDef.Slack.InterestedEventTypes != nil &&
 			!hasInterestedEventTypesEnv("BOTS_SLACK_INTERESTED_EVENT_TYPES") {
-			cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypesSlice(def.Bots.Slack.InterestedEventTypes)
+			cfg.Bots.Slack.InterestedEventTypes = parseInterestedEventTypesSlice(botsDef.Slack.InterestedEventTypes)
 		}
-		if def.Bots.Slack.RespondToAll != nil {
-			cfg.Bots.Slack.RespondToAll = *def.Bots.Slack.RespondToAll
+		if botsDef.Slack.RespondToAll != nil {
+			cfg.Bots.Slack.RespondToAll = *botsDef.Slack.RespondToAll
+		}
+	}
+
+	// Check env var override for Discord token
+	if token := l.v.GetString("bots.discord.token"); token != "" {
+		cfg.Bots.Discord.Token = token
+	}
+	if _, ok := os.LookupEnv(strings.ToUpper(AppSlug) + "_BOTS_DISCORD_ALLOWED_CHANNEL_IDS"); ok {
+		cfg.Bots.Discord.AllowedChannelIDs = parseStringList(l.v.Get("bots.discord.allowed_channel_ids"))
+	}
+	if raw, ok := lookupInterestedEventTypesEnv("BOTS_DISCORD_INTERESTED_EVENT_TYPES"); ok {
+		cfg.Bots.Discord.InterestedEventTypes = parseInterestedEventTypes(raw)
+	}
+	if _, ok := os.LookupEnv(strings.ToUpper(AppSlug) + "_BOTS_DISCORD_RESPOND_TO_ALL"); ok {
+		cfg.Bots.Discord.RespondToAll = l.v.GetBool("bots.discord.respond_to_all")
+	}
+
+	if botsDef.Discord != nil {
+		if cfg.Bots.Discord.Token == "" {
+			cfg.Bots.Discord.Token = botsDef.Discord.Token
+		}
+		if len(botsDef.Discord.AllowedChannelIDs) > 0 {
+			cfg.Bots.Discord.AllowedChannelIDs = botsDef.Discord.AllowedChannelIDs
+		}
+		if botsDef.Discord.InterestedEventTypes != nil &&
+			!hasInterestedEventTypesEnv("BOTS_DISCORD_INTERESTED_EVENT_TYPES") {
+			cfg.Bots.Discord.InterestedEventTypes = parseInterestedEventTypesSlice(botsDef.Discord.InterestedEventTypes)
+		}
+		if botsDef.Discord.RespondToAll != nil {
+			cfg.Bots.Discord.RespondToAll = *botsDef.Discord.RespondToAll
 		}
 	}
 }
@@ -1328,6 +1360,9 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	if cfg.Paths.EventStoreDir == "" {
 		cfg.Paths.EventStoreDir = filepath.Join(cfg.Paths.AdminLogsDir, "events")
 	}
+	if cfg.Paths.ArtifactDir == "" {
+		cfg.Paths.ArtifactDir = filepath.Join(cfg.Paths.DataDir, "artifacts")
+	}
 
 	if cfg.Paths.DocsDir == "" {
 		cfg.Paths.DocsDir = filepath.Join(cfg.Paths.DAGsDir, "docs")
@@ -1372,6 +1407,7 @@ func (l *ConfigLoader) loadLegacyPaths(cfg *Config, def Definition) error {
 		{"legacy DAGsDir", &cfg.Paths.DAGsDir, def.DAGsDir},
 		{"legacy Executable", &cfg.Paths.Executable, def.Executable},
 		{"legacy LogDir", &cfg.Paths.LogDir, def.LogDir},
+		{"legacy ArtifactDir", &cfg.Paths.ArtifactDir, def.ArtifactDir},
 		{"legacy DataDir", &cfg.Paths.DataDir, def.DataDir},
 		{"legacy SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.SuspendFlagsDir},
 		{"legacy AdminLogsDir", &cfg.Paths.AdminLogsDir, def.AdminLogsDir},
@@ -1487,6 +1523,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("paths.suspend_flags_dir", paths.SuspendFlagsDir)
 	l.v.SetDefault("paths.data_dir", paths.DataDir)
 	l.v.SetDefault("paths.log_dir", paths.LogsDir)
+	l.v.SetDefault("paths.artifact_dir", paths.ArtifactsDir)
 	l.v.SetDefault("paths.admin_logs_dir", paths.AdminLogsDir)
 	l.v.SetDefault("paths.event_store_dir", paths.EventStoreDir)
 	l.v.SetDefault("paths.base_config", paths.BaseConfigFile)
@@ -1675,6 +1712,7 @@ var envBindings = []envBinding{
 	{key: "paths.alt_dags_dir", env: "ALT_DAGS_DIR", isPath: true},
 	{key: "paths.executable", env: "EXECUTABLE", isPath: true},
 	{key: "paths.log_dir", env: "LOG_DIR", isPath: true},
+	{key: "paths.artifact_dir", env: "ARTIFACT_DIR", isPath: true},
 	{key: "paths.data_dir", env: "DATA_DIR", isPath: true},
 	{key: "paths.suspend_flags_dir", env: "SUSPEND_FLAGS_DIR", isPath: true},
 	{key: "paths.admin_logs_dir", env: "ADMIN_LOG_DIR", isPath: true},
@@ -1751,6 +1789,10 @@ var envBindings = []envBinding{
 	{key: "bots.slack.allowed_channel_ids", env: "BOTS_SLACK_ALLOWED_CHANNEL_IDS"},
 	{key: "bots.slack.interested_event_types", env: "BOTS_SLACK_INTERESTED_EVENT_TYPES"},
 	{key: "bots.slack.respond_to_all", env: "BOTS_SLACK_RESPOND_TO_ALL"},
+	{key: "bots.discord.token", env: "BOTS_DISCORD_TOKEN"},
+	{key: "bots.discord.allowed_channel_ids", env: "BOTS_DISCORD_ALLOWED_CHANNEL_IDS"},
+	{key: "bots.discord.interested_event_types", env: "BOTS_DISCORD_INTERESTED_EVENT_TYPES"},
+	{key: "bots.discord.respond_to_all", env: "BOTS_DISCORD_RESPOND_TO_ALL"},
 
 	// License
 	{key: "license.key", env: "LICENSE_KEY"},

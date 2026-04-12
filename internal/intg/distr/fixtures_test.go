@@ -39,6 +39,8 @@ type fixtureConfig struct {
 	workerCount             int
 	workerLabels            map[string]string
 	logPersistence          bool
+	artifactPersistence     bool
+	configMutators          []func(*config.Config)
 	dagsDir                 string
 	baseConfigPath          string
 	workerBaseConfigPath    string // Override worker's base config path (for testing embedded base config)
@@ -70,6 +72,16 @@ func withLabels(labels map[string]string) fixtureOption {
 
 func withLogPersistence() fixtureOption {
 	return func(c *fixtureConfig) { c.logPersistence = true }
+}
+
+func withArtifactPersistence() fixtureOption {
+	return func(c *fixtureConfig) { c.artifactPersistence = true }
+}
+
+func withConfigMutator(mutator func(*config.Config)) fixtureOption {
+	return func(c *fixtureConfig) {
+		c.configMutators = append(c.configMutators, mutator)
+	}
 }
 
 func withDAGsDir(dir string) fixtureOption {
@@ -150,6 +162,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	if cfg.logPersistence {
 		coordOpts = append(coordOpts, test.WithLogPersistence())
 	}
+	if cfg.artifactPersistence {
+		coordOpts = append(coordOpts, test.WithArtifactPersistence())
+	}
 	if cfg.workerMode == sharedFSMode {
 		coordOpts = append(coordOpts, test.WithBuiltExecutable())
 	}
@@ -163,6 +178,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	}
 	if cfg.staleHeartbeatThreshold > 0 || cfg.staleLeaseThreshold > 0 {
 		coordOpts = append(coordOpts, test.WithStaleThresholds(cfg.staleHeartbeatThreshold, cfg.staleLeaseThreshold))
+	}
+	for _, mutate := range cfg.configMutators {
+		coordOpts = append(coordOpts, test.WithConfigMutator(mutate))
 	}
 
 	coord := test.SetupCoordinator(t, coordOpts...)
@@ -334,8 +352,10 @@ func (f *testFixture) startSchedulerWithOptions(
 	}
 
 	schedulerCtx, schedulerCancel := f.schedulerCtx, f.schedulerCancel
+	ownsSchedulerCtx := false
 	if schedulerCtx == nil || schedulerCancel == nil {
-		schedulerCtx, schedulerCancel = context.WithTimeout(f.coord.Context, startupTimeout)
+		schedulerCtx, schedulerCancel = context.WithCancel(f.coord.Context)
+		ownsSchedulerCtx = true
 	}
 	schedulerErrCh := make(chan error, 1)
 
@@ -350,13 +370,36 @@ func (f *testFixture) startSchedulerWithOptions(
 	}(schedulerInst, schedulerCtx, schedulerErrCh)
 
 	var startErr error
-	require.Eventually(f.t, func() bool {
-		if f.scheduler.IsRunning() {
-			return true
-		}
+	startTicker := time.NewTicker(50 * time.Millisecond)
+	defer startTicker.Stop()
+
+	startTimer := time.NewTimer(startupTimeout)
+	defer startTimer.Stop()
+
+	for !f.scheduler.IsRunning() {
+
 		startErr = f.pollSchedulerErr()
-		return startErr != nil
-	}, startupTimeout, 50*time.Millisecond, "scheduler did not start in time")
+		if startErr != nil {
+			break
+		}
+
+		select {
+		case <-startTicker.C:
+		case <-startTimer.C:
+			if ownsSchedulerCtx && schedulerCancel != nil {
+				schedulerCancel()
+				require.Eventually(f.t, func() bool {
+					startErr = f.pollSchedulerErr()
+					return startErr != nil
+				}, time.Second, 25*time.Millisecond, "scheduler startup did not stop after cancellation")
+			}
+
+			if startErr != nil {
+				require.FailNow(f.t, fmt.Sprintf("scheduler did not start in time: %v", startErr))
+			}
+			require.FailNow(f.t, "scheduler did not start in time")
+		}
+	}
 	require.NoError(f.t, startErr)
 }
 
@@ -380,6 +423,7 @@ func (f *testFixture) enqueueCatchup(scheduleTime time.Time) (string, error) {
 		f.coord.DAGRunStore,
 		f.coord.QueueStore,
 		f.coord.Config.Paths.LogDir,
+		f.coord.Config.Paths.ArtifactDir,
 		f.coord.Config.Paths.BaseConfig,
 		f.dagWrapper.DAG,
 		runID,
@@ -551,6 +595,10 @@ func (f *testFixture) logDir() string {
 	return f.coord.LogDir()
 }
 
+func (f *testFixture) artifactDir() string {
+	return f.coord.Config.Paths.ArtifactDir
+}
+
 func findLogFiles(t *testing.T, logDir, dagName, dagRunID, stepName, suffix string) []string {
 	t.Helper()
 
@@ -600,4 +648,15 @@ func getLogContent(t *testing.T, logPath string) string {
 	content, err := os.ReadFile(logPath)
 	require.NoError(t, err, "failed to read log file")
 	return string(content)
+}
+
+func assertArtifactContains(t *testing.T, archiveDir, relativePath, expected string) {
+	t.Helper()
+
+	artifactPath := filepath.Join(archiveDir, relativePath)
+	require.FileExists(t, artifactPath, "artifact should exist: %s", relativePath)
+
+	content, err := os.ReadFile(artifactPath)
+	require.NoError(t, err, "failed to read artifact file %s", artifactPath)
+	assert.Contains(t, string(content), expected, "artifact file should contain expected content")
 }

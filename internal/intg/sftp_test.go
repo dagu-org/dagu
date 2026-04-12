@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagucloud/dagu/internal/core"
@@ -24,9 +23,7 @@ func TestSFTPExecutorIntegration(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dockerClient, err := client.New(client.FromEnv)
-	require.NoError(t, err, "failed to create docker client")
-	defer func() { _ = dockerClient.Close() }()
+	dockerClient := requireDockerClient(t)
 
 	// Start SSH server container (reuses helpers from ssh_test.go)
 	sshServer := startSSHServer(t, th, dockerClient)

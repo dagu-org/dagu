@@ -15,7 +15,6 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/fileagentconfig"
 	"github.com/dagucloud/dagu/internal/persis/fileagentmodel"
 	"github.com/dagucloud/dagu/internal/persis/fileagentoauth"
-	"github.com/dagucloud/dagu/internal/persis/fileagentskill"
 	"github.com/dagucloud/dagu/internal/persis/fileagentsoul"
 	"github.com/dagucloud/dagu/internal/persis/filememory"
 	"github.com/dagucloud/dagu/internal/persis/filesession"
@@ -147,8 +146,6 @@ func TestContext_newSchedulerAgentAPI_WiresOAuthManagerForCodexDefaultModel(t *t
 		Model:    "gpt-5-3-codex",
 	}))
 
-	skillStore, err := fileagentskill.New(filepath.Join(cfg.Paths.DAGsDir, "skills"))
-	require.NoError(t, err)
 	soulStore, err := fileagentsoul.New(ctxBase, filepath.Join(cfg.Paths.DAGsDir, "souls"))
 	require.NoError(t, err)
 	sessionStore, err := filesession.New(cfg.Paths.SessionsDir, filesession.WithMaxPerUser(cfg.Server.Session.MaxPerUser))
@@ -158,7 +155,7 @@ func TestContext_newSchedulerAgentAPI_WiresOAuthManagerForCodexDefaultModel(t *t
 	oauthManager, err := fileagentoauth.NewManager(cfg.Paths.DataDir)
 	require.NoError(t, err)
 
-	api := cmdCtx.newSchedulerAgentAPI(nil, configStore, modelStore, skillStore, soulStore, sessionStore, memoryStore, oauthManager)
+	api := cmdCtx.newSchedulerAgentAPI(nil, configStore, modelStore, soulStore, sessionStore, memoryStore, oauthManager)
 
 	sessionID, err := api.CreateEmptySessionWithRuntime(ctxBase, agent.UserIdentity{
 		UserID:   "admin",

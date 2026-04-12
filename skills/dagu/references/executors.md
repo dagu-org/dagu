@@ -335,22 +335,6 @@ steps:
 
 Config fields: `source` (required), `destination` (required for create), `format` (`zip`, `tar`, `tar.gz`, etc.; inferred from filename if omitted), `compression_level`, `password` (extract/list only), `overwrite`, `strip_components`, `include`/`exclude` (glob patterns).
 
-## gha
-
-Run GitHub Actions locally. Aliases: `gha`, `github_action`, `github-action`.
-
-```yaml
-steps:
-  - name: checkout
-    type: gha
-    command: "actions/checkout@v4"
-    config:
-      runner: catthehacker/ubuntu:act-latest
-      auto_remove: true
-```
-
-Config fields: `runner` (Docker image), `auto_remove`, `network`, `privileged`, `github_instance`, `reuse_containers`, `force_rebuild`. Step-level: `command` (action reference), `params` (action inputs).
-
 ## chat
 
 LLM chat step.
@@ -400,6 +384,56 @@ steps:
 ```
 
 Agent config fields (under `agent:`): `model`, `tools` (with `enabled` list and optional `bash_policy`), `skills` (skill IDs), `soul` (soul ID), `memory` (`enabled` bool), `prompt` (appended to system prompt), `max_iterations` (default 50), `safe_mode` (enable command approval, default true), `web_search`. Also accepts `messages:` at step level.
+
+## harness
+
+Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as DAG steps. The selected attempt's binary must be resolvable when it runs, either from `PATH` or from an explicit path in a custom harness definition.
+
+```yaml
+harnesses:
+  gemini:
+    binary: gemini
+    prefix_args: ["run"]
+    prompt_mode: flag
+    prompt_flag: --prompt
+
+harness:
+  provider: gemini
+  model: gemini-2.5-pro
+  fallback:
+    - provider: claude
+      model: sonnet
+
+steps:
+  - name: generate-tests
+    command: "Write unit tests for the auth module"
+    config:
+      yolo: true
+    output: RESULT
+```
+
+The `command` field is the prompt. `config.provider` can reference either a built-in provider or a named custom entry under top-level `harnesses:`. All non-reserved keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Built-in providers also normalize `snake_case` keys to kebab-case flag names. Reserved keys are `provider` and `fallback`.
+
+Supported providers: `claude`, `codex`, `copilot`, `opencode`, `pi`.
+
+Top-level `harness:` acts as a DAG-wide default. Step-level config overlays the DAG-level primary config, and step-level `fallback` replaces the DAG-level `fallback`. If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`.
+
+`provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
+
+Custom `harnesses:` definitions describe how to invoke arbitrary harness CLIs:
+- `binary`
+- `prefix_args`
+- `prompt_mode`: `arg`, `flag`, or `stdin`
+- `prompt_flag` for `flag` mode
+- `prompt_position`: `before_flags` or `after_flags`
+- `flag_style`: `gnu_long` or `single_dash`
+- `option_flags` to override specific flag tokens
+
+If the step has a `script:` field, its content is piped to stdin for built-in providers and custom `arg`/`flag` harnesses. For custom `stdin` harnesses, stdin receives the prompt followed by a blank line and the script when both are present.
+
+If the primary attempt fails and the context is still active, harness tries fallback configs in order. Failed-attempt stdout is discarded, but stderr remains visible in logs.
+
+Exit codes: 0 = success, 1 = CLI error, 124 = step timed out.
 
 ## router
 

@@ -263,7 +263,7 @@ func TestDispatchAndWaitForStartup_TransientRetryThenSuccess(t *testing.T) {
 		},
 	}
 
-	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "")
+	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "", nil)
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{Status: core.Queued, TriggerType: core.TriggerTypeScheduler}
 
@@ -302,7 +302,7 @@ func TestDispatchAndWaitForStartup_StaleQueueDispatchIsDiscarded(t *testing.T) {
 		},
 	}
 
-	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "")
+	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "", nil)
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{Status: core.Queued, TriggerType: core.TriggerTypeScheduler}
 	runRef := exec.NewDAGRunRef("test-dag", "run-1")
@@ -337,7 +337,7 @@ func TestDispatchAndWaitForStartup_RawStaleQueueDispatchStopsRetry(t *testing.T)
 		},
 	}
 
-	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "")
+	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "", nil)
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{Status: core.Queued, TriggerType: core.TriggerTypeScheduler}
 	runRef := exec.NewDAGRunRef("test-dag", "run-1")
@@ -373,7 +373,7 @@ func TestDispatchAndWaitForStartup_PermanentErrorStopsRetry(t *testing.T) {
 		},
 	}
 
-	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "")
+	dagExec := NewDAGExecutor(disp, nil, config.ExecutionModeDistributed, "", nil)
 	dag := &core.DAG{Name: "test-dag"}
 	status := &exec.DAGRunStatus{Status: core.Queued, TriggerType: core.TriggerTypeScheduler}
 	runRef := exec.NewDAGRunRef("test-dag", "run-1")

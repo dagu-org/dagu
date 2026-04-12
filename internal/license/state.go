@@ -47,9 +47,25 @@ func cloneClaims(c *LicenseClaims) *LicenseClaims {
 		return nil
 	}
 	cp := *c
+	if c.ExpiresAt != nil {
+		expiresAt := *c.ExpiresAt
+		cp.ExpiresAt = &expiresAt
+	}
+	if c.NotBefore != nil {
+		notBefore := *c.NotBefore
+		cp.NotBefore = &notBefore
+	}
+	if c.IssuedAt != nil {
+		issuedAt := *c.IssuedAt
+		cp.IssuedAt = &issuedAt
+	}
 	if c.Features != nil {
 		cp.Features = make([]string, len(c.Features))
 		copy(cp.Features, c.Features)
+	}
+	if c.GraceDays != nil {
+		graceDays := *c.GraceDays
+		cp.GraceDays = &graceDays
 	}
 	return &cp
 }
@@ -106,7 +122,17 @@ func (s *State) isInGracePeriod() bool {
 	if time.Now().Before(expiry) {
 		return false // not expired yet
 	}
-	return time.Now().Before(expiry.Add(gracePeriod))
+	return time.Now().Before(expiry.Add(s.graceDuration()))
+}
+
+func (s *State) graceDuration() time.Duration {
+	if s.claims == nil || s.claims.GraceDays == nil {
+		return gracePeriod
+	}
+	if *s.claims.GraceDays <= 0 {
+		return 0
+	}
+	return time.Duration(*s.claims.GraceDays) * 24 * time.Hour
 }
 
 // WarningCode returns the warning code from the license claims.

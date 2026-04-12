@@ -14,7 +14,9 @@ import (
 
 	apiv1 "github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/license"
 	workspacepkg "github.com/dagucloud/dagu/internal/workspace"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -113,4 +115,40 @@ func TestDefaultFunctionsExposeInitialWorkspacesJSON(t *testing.T) {
 	assert.True(t, workspaces[0].CreatedAt.Equal(createdAt))
 	require.NotNil(t, workspaces[0].UpdatedAt)
 	assert.True(t, workspaces[0].UpdatedAt.Equal(updatedAt))
+}
+
+func TestDefaultFunctionsExposeLicenseGraceEndsAt(t *testing.T) {
+	expiry := time.Date(2026, time.March, 15, 12, 0, 0, 0, time.UTC)
+
+	t.Run("uses claims grace days when present", func(t *testing.T) {
+		var checker license.State
+		graceDays := 30
+		checker.Update(&license.LicenseClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(expiry),
+			},
+			GraceDays: &graceDays,
+		}, "tok")
+
+		funcs := defaultFunctions(&funcsConfig{LicenseChecker: &checker})
+		graceEndsAtFn, ok := funcs["licenseGraceEndsAt"].(func() string)
+		require.True(t, ok)
+
+		assert.Equal(t, "2026-04-14T12:00:00Z", graceEndsAtFn())
+	})
+
+	t.Run("falls back to the default grace period", func(t *testing.T) {
+		var checker license.State
+		checker.Update(&license.LicenseClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(expiry),
+			},
+		}, "tok")
+
+		funcs := defaultFunctions(&funcsConfig{LicenseChecker: &checker})
+		graceEndsAtFn, ok := funcs["licenseGraceEndsAt"].(func() string)
+		require.True(t, ok)
+
+		assert.Equal(t, "2026-03-29T12:00:00Z", graceEndsAtFn())
+	})
 }

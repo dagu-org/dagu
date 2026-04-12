@@ -20,6 +20,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
+	"github.com/dagucloud/dagu/internal/license"
 	authservice "github.com/dagucloud/dagu/internal/service/auth"
 	"github.com/dagucloud/dagu/internal/service/oidcprovision"
 	"golang.org/x/oauth2"
@@ -191,12 +192,13 @@ func isSecureRequest(r *http.Request) bool {
 
 // BuiltinOIDCConfig holds configuration for OIDC under builtin auth mode.
 type BuiltinOIDCConfig struct {
-	Provider      *oidc.Provider
-	Verifier      *oidc.IDTokenVerifier
-	OAuth2Config  *oauth2.Config
-	Provision     *oidcprovision.Service
-	AuthService   *authservice.Service
-	LoginBasePath string // Base path for login page redirect
+	Provider       *oidc.Provider
+	Verifier       *oidc.IDTokenVerifier
+	OAuth2Config   *oauth2.Config
+	Provision      *oidcprovision.Service
+	AuthService    *authservice.Service
+	LicenseChecker license.Checker
+	LoginBasePath  string // Base path for login page redirect
 }
 
 // InitBuiltinOIDCConfig initializes OIDC for builtin auth mode.
@@ -233,6 +235,11 @@ func InitBuiltinOIDCConfig(ctx context.Context, cfg config.AuthOIDC, authSvc *au
 // BuiltinOIDCLoginHandler returns a handler that initiates the OIDC login flow.
 func BuiltinOIDCLoginHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if cfg.LicenseChecker != nil && !cfg.LicenseChecker.IsFeatureEnabled(license.FeatureSSO) {
+			redirectWithError(w, r, cfg.LoginBasePath, "SSO requires an active Dagu license")
+			return
+		}
+
 		state := stringutil.RandomString(16)
 		nonce := stringutil.RandomString(16)
 
@@ -249,6 +256,11 @@ func BuiltinOIDCLoginHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 func BuiltinOIDCCallbackHandler(cfg *BuiltinOIDCConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+
+		if cfg.LicenseChecker != nil && !cfg.LicenseChecker.IsFeatureEnabled(license.FeatureSSO) {
+			redirectWithError(w, r, cfg.LoginBasePath, "SSO requires an active Dagu license")
+			return
+		}
 
 		// Verify state
 		stateCookie, err := r.Cookie(cookieState)

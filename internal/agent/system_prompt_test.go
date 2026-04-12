@@ -176,64 +176,24 @@ func TestGenerateSystemPrompt(t *testing.T) {
 		assert.Contains(t, result, "If no DAG or Automata context is available, ask the user before writing to Global memory")
 	})
 
-	t.Run("lists skills individually when under threshold", func(t *testing.T) {
+	t.Run("read-only memory omits writable guidance and paths", func(t *testing.T) {
 		t.Parallel()
 		env := EnvironmentInfo{DAGsDir: "/dags"}
-		skills := []SkillSummary{
-			{ID: "sql-optimizer", Name: "SQL Optimizer", Description: "Optimizes SQL queries"},
-			{ID: "docker-deploy", Name: "Docker Deployment", Description: "Container best practices"},
+		mem := MemoryContent{
+			GlobalMemory: "Remembered context.",
+			DAGMemory:    "DAG context.",
+			DAGName:      "my-etl",
+			MemoryDir:    "/dags/memory",
+			ReadOnly:     true,
 		}
 
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, AvailableSkills: skills, SkillCount: 2})
+		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Memory: mem, Role: auth.RoleViewer})
 
-		assert.Contains(t, result, "<available_skills>")
-		assert.Contains(t, result, "sql-optimizer")
-		assert.Contains(t, result, "docker-deploy")
-		assert.Contains(t, result, "Use `use_skill`")
-		assert.NotContains(t, result, "You have access to")
-	})
-
-	t.Run("shows count only when above threshold", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, SkillCount: 100})
-
-		assert.Contains(t, result, "<available_skills>")
-		assert.Contains(t, result, "You have access to 100 skills")
-		assert.Contains(t, result, "search_skills")
-		assert.NotContains(t, result, "Use `use_skill` with the skill ID")
-	})
-
-	t.Run("omits skills section when no skills", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer})
-
-		assert.NotContains(t, result, "<available_skills>")
-		assert.NotContains(t, result, "<skill_delegation>")
-	})
-
-	t.Run("includes skill delegation guidance when skills available", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-		skills := []SkillSummary{{ID: "test", Name: "Test Skill"}}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, AvailableSkills: skills, SkillCount: 1})
-
-		assert.Contains(t, result, "<skill_delegation>")
-		assert.Contains(t, result, "delegate")
-		assert.Contains(t, result, "use_skill")
-	})
-
-	t.Run("includes skill delegation guidance when only skill count", func(t *testing.T) {
-		t.Parallel()
-		env := EnvironmentInfo{DAGsDir: "/dags"}
-
-		result := GenerateSystemPrompt(SystemPromptParams{Env: env, Role: auth.RoleViewer, SkillCount: 50})
-
-		assert.Contains(t, result, "<skill_delegation>")
+		assert.Contains(t, result, "<memory_mode>")
+		assert.Contains(t, result, "Memory is read-only execution context in this run.")
+		assert.Contains(t, result, "Do not attempt to persist memory in this run.")
+		assert.NotContains(t, result, "<memory_paths>")
+		assert.NotContains(t, result, "<memory_management>")
 	})
 
 	t.Run("includes soul content when provided", func(t *testing.T) {

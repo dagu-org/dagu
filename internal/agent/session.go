@@ -55,8 +55,6 @@ type SessionManager struct {
 	thinkingEffort        llm.ThinkingEffort
 	totalCost             float64
 	memoryStore           MemoryStore
-	skillStore            SkillStore
-	enabledSkills         []string
 	dagName               string
 	automataName          string
 	sessionStore          SessionStore
@@ -106,8 +104,6 @@ type SessionManagerConfig struct {
 	OutputCostPer1M float64
 	ThinkingEffort  llm.ThinkingEffort
 	MemoryStore     MemoryStore
-	SkillStore      SkillStore
-	EnabledSkills   []string
 	DAGName         string
 	AutomataName    string
 	SessionStore    SessionStore
@@ -206,8 +202,6 @@ func NewSessionManager(cfg SessionManagerConfig) *SessionManager {
 		thinkingEffort:        cfg.ThinkingEffort,
 		totalCost:             totalCost,
 		memoryStore:           cfg.MemoryStore,
-		skillStore:            cfg.SkillStore,
-		enabledSkills:         cfg.EnabledSkills,
 		dagName:               cfg.DAGName,
 		automataName:          cfg.AutomataName,
 		sessionStore:          cfg.SessionStore,
@@ -316,6 +310,12 @@ func (sm *SessionManager) SetWorking(working bool) {
 func (sm *SessionManager) updateWorkingState(working bool) (string, string, float64, bool, bool, func(string, bool), bool, bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+
+	// Ignore late working=true pulses from a loop that is already being
+	// canceled. ensureLoop clears canceling before starting new work.
+	if working && sm.canceling {
+		return "", "", 0, false, false, nil, false, false
+	}
 
 	if sm.working == working {
 		if working {
@@ -822,7 +822,7 @@ func (sm *SessionManager) ensureLoop(provider llm.Provider, modelID string, reso
 
 // createLoop creates a new Loop instance with the current configuration.
 func (sm *SessionManager) createLoop(provider llm.Provider, model string, history []llm.Message, safeMode bool, thinkingEffort llm.ThinkingEffort) *Loop {
-	tools, systemPrompt, allowedSkills := sm.buildRuntimeArtifacts()
+	tools, systemPrompt := sm.buildRuntimeArtifacts()
 	return NewLoop(LoopConfig{
 		Provider:         provider,
 		Model:            model,
@@ -844,40 +844,28 @@ func (sm *SessionManager) createLoop(provider llm.Provider, model string, histor
 		User:             sm.user,
 		SessionStore:     sm.sessionStore,
 		Registry:         sm.registry,
-		SkillStore:       sm.skillStore,
-		AllowedSkills:    allowedSkills,
 		WebSearch:        sm.webSearch,
 		AutomataRuntime:  sm.automataRuntime,
 	})
 }
 
-func (sm *SessionManager) buildRuntimeArtifacts() ([]*AgentTool, string, map[string]struct{}) {
+func (sm *SessionManager) buildRuntimeArtifacts() ([]*AgentTool, string) {
 	memory := sm.loadMemory()
-	allowedSkills := ToSkillSet(sm.enabledSkills)
-	allowedTools := ToSkillSet(sm.allowedTools)
-	skillCount := len(sm.enabledSkills)
-	var skillSummaries []SkillSummary
-	if skillCount > 0 && skillCount <= SkillListThreshold {
-		skillSummaries = LoadSkillSummaries(context.Background(), sm.skillStore, sm.enabledSkills)
-	}
+	allowedTools := toStringSet(sm.allowedTools)
 	tools := CreateTools(ToolConfig{
 		DAGsDir:               sm.environment.DAGsDir,
 		AllowedTools:          allowedTools,
-		SkillStore:            sm.skillStore,
-		AllowedSkills:         allowedSkills,
 		RemoteContextResolver: sm.remoteContextResolver,
 		AutomataRuntime:       sm.automataRuntime,
 	})
 	systemPrompt := GenerateSystemPrompt(SystemPromptParams{
-		Env:             sm.environment,
-		Memory:          memory,
-		Role:            sm.user.Role,
-		AvailableSkills: skillSummaries,
-		SkillCount:      skillCount,
-		Soul:            sm.soul,
-		Extra:           sm.systemPromptExtra,
+		Env:    sm.environment,
+		Memory: memory,
+		Role:   sm.user.Role,
+		Soul:   sm.soul,
+		Extra:  sm.systemPromptExtra,
 	})
-	return tools, systemPrompt, allowedSkills
+	return tools, systemPrompt
 }
 
 // ApplyRuntimeOptions updates runtime-scoped session settings that should be
@@ -894,9 +882,6 @@ func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
 	if opts.AutomataName != "" {
 		sm.automataName = opts.AutomataName
 	}
-	if opts.EnabledSkills != nil {
-		sm.enabledSkills = append([]string(nil), opts.EnabledSkills...)
-	}
 	if opts.Soul != nil || opts.AllowClearSoul {
 		sm.soul = opts.Soul
 	}
@@ -904,9 +889,20 @@ func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
 	sm.mu.Unlock()
 
 	if loop != nil {
-		tools, systemPrompt, allowedSkills := sm.buildRuntimeArtifacts()
-		loop.UpdateRuntime(tools, systemPrompt, allowedSkills, sm.automataRuntime)
+		tools, systemPrompt := sm.buildRuntimeArtifacts()
+		loop.UpdateRuntime(tools, systemPrompt, sm.automataRuntime)
 	}
+}
+
+func toStringSet(values []string) map[string]struct{} {
+	if len(values) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		set[value] = struct{}{}
+	}
+	return set
 }
 
 // loadMemory loads memory content from the memory store.
@@ -933,6 +929,10 @@ func (sm *SessionManager) loadMemory() MemoryContent {
 			sm.logger.Debug("failed to load automata memory", "error", err, "automata_name", sm.automataName)
 		}
 	}
+	readOnly := false
+	if roStore, ok := sm.memoryStore.(SnapshotReadOnlyMemoryStore); ok {
+		readOnly = roStore.MemoryReadOnly()
+	}
 	return MemoryContent{
 		GlobalMemory:   global,
 		DAGMemory:      dagMem,
@@ -940,6 +940,7 @@ func (sm *SessionManager) loadMemory() MemoryContent {
 		AutomataMemory: automataMem,
 		AutomataName:   sm.automataName,
 		MemoryDir:      sm.memoryStore.MemoryDir(),
+		ReadOnly:       readOnly,
 	}
 }
 

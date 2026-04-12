@@ -496,6 +496,14 @@ func (m *mockCoordinatorCli) StreamLogsTo(ctx context.Context, _ exec.HostInfo) 
 	return m.StreamLogs(ctx)
 }
 
+func (m *mockCoordinatorCli) StreamArtifacts(_ context.Context) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	return nil, nil
+}
+
+func (m *mockCoordinatorCli) StreamArtifactsTo(ctx context.Context, _ exec.HostInfo) (coordinatorv1.CoordinatorService_StreamArtifactsClient, error) {
+	return m.StreamArtifacts(ctx)
+}
+
 func (m *mockCoordinatorCli) GetDAGRunStatus(_ context.Context, _, _ string, _ *exec.DAGRunRef) (*coordinatorv1.GetDAGRunStatusResponse, error) {
 	return &coordinatorv1.GetDAGRunStatusResponse{Found: false}, nil
 }

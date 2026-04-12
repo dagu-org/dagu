@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Calendar, RefreshCw, Server, Terminal, Timer } from 'lucide-react';
+import { Calendar, FileText, RefreshCw, Server, Terminal, Timer } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
@@ -135,9 +135,25 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
               )}
           </nav>
 
-          <h1 className="text-2xl font-bold text-foreground truncate">
-            {dagRun.name}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-foreground truncate">
+              {dagRun.name}
+            </h1>
+            {dagRun.sourceFileName && (
+              <a
+                href={`/dags/${encodeURIComponent(dagRun.sourceFileName)}/`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(`/dags/${encodeURIComponent(dagRun.sourceFileName!)}/`);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                title="View DAG Definition"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>Definition</span>
+              </a>
+            )}
+          </div>
         </div>
       </div>
 

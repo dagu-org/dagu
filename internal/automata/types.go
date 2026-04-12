@@ -56,10 +56,9 @@ type AllowedDAGs struct {
 }
 
 type AgentConfig struct {
-	Model         string   `json:"model,omitempty" yaml:"model,omitempty"`
-	Soul          string   `json:"soul,omitempty" yaml:"soul,omitempty"`
-	EnabledSkills []string `json:"enabledSkills,omitempty" yaml:"enabledSkills,omitempty"`
-	SafeMode      bool     `json:"safeMode,omitempty" yaml:"safeMode,omitempty"`
+	Model    string `json:"model,omitempty" yaml:"model,omitempty"`
+	Soul     string `json:"soul,omitempty" yaml:"soul,omitempty"`
+	SafeMode bool   `json:"safeMode,omitempty" yaml:"safeMode,omitempty"`
 }
 
 type ScheduleList []core.Schedule

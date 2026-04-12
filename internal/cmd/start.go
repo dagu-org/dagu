@@ -487,6 +487,11 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 
 	logger.Debug(ctx, "Dag-run initiated", tag.File(logFile.Name()))
 
+	artifactDir, err := ctx.GenArtifactDir(d, dagRunID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize artifact directory for DAG %s: %w", d.Name, err)
+	}
+
 	dr, err := ctx.dagStore(dagStoreConfig{
 		SearchPaths:           []string{filepath.Dir(d.Location)},
 		SkipDirectoryCreation: workerID != "local",
@@ -523,11 +528,11 @@ func executeDAGRun(ctx *Context, d *core.DAG, parent exec.DAGRunRef, dagRunID st
 			AgentConfigStore:           as.ConfigStore,
 			AgentModelStore:            as.ModelStore,
 			AgentMemoryStore:           as.MemoryStore,
-			AgentSkillStore:            as.SkillStore,
 			AgentSoulStore:             as.SoulStore,
 			AgentOAuthManager:          as.OAuthManager,
 			AgentRemoteContextResolver: as.ContextResolver,
 			ScheduleTime:               scheduleTime,
+			ArtifactDir:                artifactDir,
 		},
 	)
 
