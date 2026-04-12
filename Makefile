@@ -309,6 +309,13 @@ bin:
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} ./cmd
 
+# bin-e2e builds the go application with dev-only test hooks needed by browser E2E.
+.PHONY: bin-e2e
+bin-e2e:
+	@printf '%b\n' "${COLOR_GREEN}Building the E2E binary...${COLOR_RESET}"
+	@mkdir -p ${BIN_DIR}
+	@go build -tags=dev -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME}-e2e ./cmd
+
 # build-keepalive builds the keepalive binary for all architectures using Zig.
 .PHONY: build-keepalive
 build-keepalive:
@@ -354,7 +361,7 @@ test-e2e:
 	@cd ui; NODE_OPTIONS="--max-old-space-size=8192" pnpm build
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
-	@$(MAKE) bin
+	@$(MAKE) bin-e2e
 	@cd ui; pnpm test:e2e
 
 # build-ui builds the frontend codes.

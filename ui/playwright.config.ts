@@ -2,7 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 
 const defaultServerPort = '32180';
+const defaultRemoteServerPort = '32182';
 const repoRoot = path.resolve(__dirname, '..');
+const defaultStateDir = path.resolve(__dirname, 'test-results/e2e-stack');
+const defaultBinPath = path.resolve(repoRoot, '.local/bin/dagu-e2e');
 
 function resolveE2EEndpoint(): { baseURL: string; serverPort: string } {
   const explicitBaseURL = process.env.PLAYWRIGHT_BASE_URL;
@@ -26,6 +29,11 @@ function resolveE2EEndpoint(): { baseURL: string; serverPort: string } {
 }
 
 const { baseURL, serverPort } = resolveE2EEndpoint();
+const stateDir = process.env.DAGU_E2E_STATE_DIR ?? defaultStateDir;
+const e2eBinPath = process.env.DAGU_E2E_BIN ?? defaultBinPath;
+
+process.env.DAGU_E2E_STATE_DIR = stateDir;
+process.env.DAGU_E2E_BIN = e2eBinPath;
 
 export default defineConfig({
   testDir: './e2e',
@@ -63,13 +71,13 @@ export default defineConfig({
     stderr: 'pipe',
     env: {
       ...process.env,
-      DAGU_E2E_STATE_DIR:
-        process.env.DAGU_E2E_STATE_DIR ??
-        path.resolve(__dirname, 'test-results/e2e-stack'),
+      DAGU_E2E_STATE_DIR: stateDir,
+      DAGU_E2E_BIN: e2eBinPath,
       DAGU_E2E_SERVER_PORT: serverPort,
       DAGU_E2E_COORDINATOR_PORT:
         process.env.DAGU_E2E_COORDINATOR_PORT ?? '32181',
-      DAGU_E2E_WORKER_ID: process.env.DAGU_E2E_WORKER_ID ?? 'worker-1',
+      DAGU_E2E_REMOTE_SERVER_PORT:
+        process.env.DAGU_E2E_REMOTE_SERVER_PORT ?? defaultRemoteServerPort,
     },
   },
 });

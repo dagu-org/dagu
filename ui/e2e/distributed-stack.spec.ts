@@ -1,31 +1,20 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
+import {
+  enqueueRunFromUI,
+  getQueue,
+  getStepStdout,
+  getWorkers,
+  loadStack,
+  loginViaAPI,
+  loginViaUI,
+  waitForQueueCounts,
+  waitForWorkerSet,
+} from './helpers/e2e';
 
 const DAG_FILE = 'e2e-distributed-queue.yaml';
 const DAG_NAME = 'e2e-distributed-queue';
-const QUEUE_NAME = 'e2e-shared';
-const WORKER_ID = 'worker-1';
 const STEP_NAME = 'hold-and-report';
 const EXPECTED_STEP_OUTPUT = 'e2e distributed worker ok';
-
-type QueueDetails = {
-  name: string;
-  runningCount: number;
-  queuedCount: number;
-  running: Array<{ name: string; dagRunId: string }>;
-};
-
-type WorkersResponse = {
-  workers: Array<{
-    id: string;
-    busyPollers: number;
-    labels: Record<string, string>;
-    runningTasks: Array<{ dagName: string; dagRunId: string }>;
-  }>;
-};
-
-type LogResponse = {
-  content: string;
-};
 
 test('exercises the web UI against the real distributed shared-nothing worker stack', async ({
   page,
@@ -33,197 +22,143 @@ test('exercises the web UI against the real distributed shared-nothing worker st
 }) => {
   test.slow();
 
-  await expect
-    .poll(async () => {
-      const workers = await getWorkers(request);
-      return workers.workers.some((worker) => worker.id === WORKER_ID);
-    })
-    .toBeTruthy();
+  const stack = await loadStack();
+  await loginViaUI(page, stack.auth.adminUsername, stack.auth.adminPassword);
+  const token = await loginViaAPI(
+    request,
+    stack.auth.adminUsername,
+    stack.auth.adminPassword
+  );
 
-  await expect.poll(() => getQueueCounts(request)).toEqual({
+  await waitForWorkerSet(request, token, stack.workers);
+  await waitForQueueCounts(request, token, stack.queues.shared, {
     runningCount: 0,
     queuedCount: 0,
   });
 
   await page.goto('/queues');
-  await expect(page.getByRole('link', { name: /e2e-shared/i })).toBeVisible();
-  await expect(page.getByText('No activity')).toBeVisible();
+  const sharedQueueCard = page.getByRole('link', {
+    name: new RegExp(stack.queues.shared, 'i'),
+  });
+  await expect(sharedQueueCard).toBeVisible();
+  await expect(sharedQueueCard).toContainText('No activity');
 
   await page.goto('/system-status');
   await expect(page.getByRole('heading', { name: 'System Status' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Workers' })).toBeVisible();
-  await expect(page.getByText(WORKER_ID)).toBeVisible();
-  await expect(page.getByText('role=e2e')).toBeVisible();
+  for (const workerId of stack.workers) {
+    await expect(page.getByText(workerId)).toBeVisible();
+  }
+  await expect(page.getByText('role=e2e')).toHaveCount(stack.workers.length);
 
   await page.goto(`/dags/${DAG_FILE}`);
   await expect(page.getByText(DAG_NAME)).toBeVisible();
 
-  const firstRunId = await enqueueRunFromUI(page);
-  await waitForWorkerState(
+  const firstRunId = await enqueueRunFromUI(page, DAG_FILE);
+  const activeWorkerId = await waitForWorkerState(
     request,
+    token,
     {
       busyPollers: 1,
       hasTask: true,
     },
     30_000
   );
-  await expect
-    .poll(() => getQueueCounts(request), {
-      timeout: 30_000,
-    })
-    .toEqual({
+  await waitForQueueCounts(
+    request,
+    token,
+    stack.queues.shared,
+    {
       runningCount: 1,
       queuedCount: 0,
-    });
+    },
+    30_000
+  );
 
-  const secondRunId = await enqueueRunFromUI(page);
+  const secondRunId = await enqueueRunFromUI(page, DAG_FILE);
   expect(secondRunId).not.toBe(firstRunId);
-  await expect
-    .poll(() => getQueueCounts(request), {
-      timeout: 30_000,
-    })
-    .toEqual({
+  await waitForQueueCounts(
+    request,
+    token,
+    stack.queues.shared,
+    {
       runningCount: 1,
       queuedCount: 1,
-    });
+    },
+    30_000
+  );
 
-  await page.goto(`/queues/${QUEUE_NAME}`);
-  await expect(page.getByText(QUEUE_NAME, { exact: true }).first()).toBeVisible();
+  await page.goto(`/queues/${stack.queues.shared}`);
+  await expect(
+    page.getByText(stack.queues.shared, { exact: true }).first()
+  ).toBeVisible();
   await expect(page.getByText('Running (1)')).toBeVisible();
   await expect(page.getByText('Queued (1)')).toBeVisible();
   await expect(page.getByText(DAG_NAME).first()).toBeVisible();
 
   await page.goto('/system-status');
-  await page.getByText(WORKER_ID).click();
+  await page.getByText(activeWorkerId).click();
   await expect(page.getByText(DAG_NAME)).toBeVisible();
-  await waitForWorkerState(
-    request,
-    {
-      busyPollers: 1,
-      hasTask: true,
-    },
-    30_000
-  );
 
   await waitForWorkerState(
     request,
+    token,
     {
       busyPollers: 0,
       hasTask: false,
     },
     120_000
   );
-  await expect
-    .poll(() => getQueueCounts(request), {
-      timeout: 120_000,
-    })
-    .toEqual({
+  await waitForQueueCounts(
+    request,
+    token,
+    stack.queues.shared,
+    {
       runningCount: 0,
       queuedCount: 0,
-    });
+    },
+    120_000
+  );
 
-  await page.goto(`/queues/${QUEUE_NAME}`);
+  await page.goto(`/queues/${stack.queues.shared}`);
   await expect(
     page.getByText('No DAG runs are currently executing in this queue.')
   ).toBeVisible();
   await expect(page.getByText('No queued items in this queue.')).toBeVisible();
 
-  // Shared-nothing workers execute remotely and expose step logs through the coordinator.
   await expect
-    .poll(() => getStepStdout(request, firstRunId), {
+    .poll(() => getStepStdout(request, token, DAG_NAME, firstRunId, STEP_NAME), {
       timeout: 30_000,
     })
     .toContain(EXPECTED_STEP_OUTPUT);
   await expect
-    .poll(() => getStepStdout(request, secondRunId), {
+    .poll(() => getStepStdout(request, token, DAG_NAME, secondRunId, STEP_NAME), {
       timeout: 30_000,
     })
     .toContain(EXPECTED_STEP_OUTPUT);
 });
 
-async function enqueueRunFromUI(page: Page): Promise<string> {
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' &&
-      response.url().includes(`/api/v1/dags/${encodeURIComponent(DAG_FILE)}/enqueue`)
-  );
-
-  await page.getByRole('button', { name: 'Enqueue' }).first().click();
-
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-
-  const enqueueToggle = dialog.getByRole('checkbox', { name: 'Enqueue' });
-  if ((await enqueueToggle.getAttribute('data-state')) !== 'checked') {
-    await enqueueToggle.click();
-  }
-
-  await dialog.getByRole('button', { name: /^Enqueue$/ }).click();
-
-  const response = await responsePromise;
-  expect(response.ok()).toBeTruthy();
-
-  const body = (await response.json()) as { dagRunId?: string };
-  expect(body.dagRunId).toBeTruthy();
-  await expect(dialog).toBeHidden();
-
-  return body.dagRunId as string;
-}
-
-async function getQueueCounts(
-  request: APIRequestContext
-): Promise<{ runningCount: number; queuedCount: number }> {
-  const queue = await getQueue(request);
-  return {
-    runningCount: queue.runningCount,
-    queuedCount: queue.queuedCount,
-  };
-}
-
-async function getQueue(request: APIRequestContext): Promise<QueueDetails> {
-  const response = await request.get(`/api/v1/queues/${encodeURIComponent(QUEUE_NAME)}`);
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as QueueDetails;
-}
-
-async function getWorkers(
-  request: APIRequestContext
-): Promise<WorkersResponse> {
-  const response = await request.get('/api/v1/workers');
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as WorkersResponse;
-}
-
-async function getStepStdout(
-  request: APIRequestContext,
-  dagRunId: string
-): Promise<string> {
-  const response = await request.get(
-    `/api/v1/dag-runs/${encodeURIComponent(DAG_NAME)}/${encodeURIComponent(
-      dagRunId
-    )}/steps/${encodeURIComponent(STEP_NAME)}/log?stream=stdout`
-  );
-  expect(response.ok()).toBeTruthy();
-  const body = (await response.json()) as LogResponse;
-  return body.content;
-}
-
 async function waitForWorkerState(
   request: APIRequestContext,
+  token: string,
   expected: { busyPollers: number; hasTask: boolean },
   timeout: number
-): Promise<void> {
+): Promise<string> {
+  let activeWorkerId = '';
+
   await expect
     .poll(
       async () => {
-        const worker = (await getWorkers(request)).workers.find(
-          (candidate) => candidate.id === WORKER_ID
+        const workers = await getWorkers(request, token);
+        const activeWorker = workers.workers.find((worker) =>
+          worker.runningTasks.some((task) => task.dagName === DAG_NAME)
         );
+        const busyWorker = activeWorker ?? workers.workers.find((worker) => worker.busyPollers > 0);
+        activeWorkerId = activeWorker?.id ?? busyWorker?.id ?? '';
+
         return {
-          busyPollers: worker?.busyPollers ?? 0,
-          hasTask:
-            worker?.runningTasks.some((task) => task.dagName === DAG_NAME) ??
-            false,
+          busyPollers: busyWorker?.busyPollers ?? 0,
+          hasTask: Boolean(activeWorker),
         };
       },
       {
@@ -231,4 +166,6 @@ async function waitForWorkerState(
       }
     )
     .toEqual(expected);
+
+  return activeWorkerId;
 }
