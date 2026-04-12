@@ -386,6 +386,7 @@ function DAGDetailsSidePanel({
                     isModal={true}
                     navigateToStatusTab={navigateToStatusTab}
                     localDags={data.localDags}
+                    editorHints={data.editorHints}
                     onEnqueue={onEnqueue ? handleEnqueue : undefined}
                     forceEnqueue={forceEnqueue}
                     autoOpenStartModal={false}

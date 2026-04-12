@@ -40,11 +40,70 @@ const baseSchema: JSONSchema = {
     step: {
       type: 'object',
       properties: {
+        name: {
+          type: 'string',
+        },
         type: {
           $ref: '#/definitions/executorType',
         },
         config: {
           type: 'object',
+        },
+      },
+      allOf: [],
+    },
+  },
+};
+
+const baseSchemaWithExecutorObject: JSONSchema = {
+  type: 'object',
+  properties: {
+    steps: {
+      type: 'array',
+      items: {
+        $ref: '#/definitions/step',
+      },
+    },
+  },
+  definitions: {
+    executorType: {
+      anyOf: [
+        {
+          type: 'string',
+          enum: ['command'],
+        },
+        {
+          type: 'string',
+          pattern: '^[A-Za-z][A-Za-z0-9_-]*$',
+        },
+      ],
+    },
+    executorObject: {
+      type: 'object',
+      properties: {
+        type: {
+          $ref: '#/definitions/executorType',
+        },
+        config: {
+          type: 'object',
+        },
+      },
+      allOf: [],
+    },
+    step: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+        },
+        type: {
+          $ref: '#/definitions/executorType',
+        },
+        config: {
+          type: 'object',
+        },
+        executor: {
+          $ref: '#/definitions/executorObject',
         },
       },
       allOf: [],
@@ -187,6 +246,40 @@ steps:
     expect(propertyInfo?.enum).toEqual(
       expect.arrayContaining(['command', 'greet'])
     );
+  });
+
+  it('does not augment executor objects that only reuse type/config fields', () => {
+    const schema = buildAugmentedDAGSchema(baseSchemaWithExecutorObject, [
+      {
+        name: 'greet',
+        targetType: 'command',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+      },
+    ]);
+
+    const typeSchema = getSchemaAtPath(
+      schema,
+      ['steps', '0', 'executor', 'type'],
+      `
+steps:
+  - name: example
+    executor:
+      type: command
+`
+    );
+    const propertyInfo = toPropertyInfo(typeSchema, 'type', [
+      'steps',
+      '0',
+      'executor',
+      'type',
+    ]);
+
+    expect(propertyInfo?.enum).toEqual(['command']);
   });
 
   it('resolves internal refs inside local custom input schemas', () => {
