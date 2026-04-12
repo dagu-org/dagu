@@ -5,6 +5,7 @@ package fileutil
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -55,7 +56,16 @@ func ReplaceFileWithRetry(source, target string) error {
 	}
 
 	return retryWindowsFileOp(func() error {
-		if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+		info, err := os.Stat(target)
+		switch {
+		case err == nil:
+			if info.IsDir() {
+				return fmt.Errorf("target path is a directory: %s", target)
+			}
+			if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		case !os.IsNotExist(err):
 			return err
 		}
 		return os.Rename(source, target)

@@ -408,7 +408,7 @@ func (sm *SessionManager) RecordHeartbeat() {
 	sm.mu.Lock()
 	now := time.Now()
 	sm.lastHeartbeat = now
-	sm.lastActivity = now
+	sm.bumpLastActivityLocked(now)
 	sm.mu.Unlock()
 }
 
@@ -423,6 +423,14 @@ func (sm *SessionManager) isCanceling() bool {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	return sm.canceling
+}
+
+func (sm *SessionManager) bumpLastActivityLocked(now time.Time) time.Time {
+	if !sm.lastActivity.IsZero() && !now.After(sm.lastActivity) {
+		now = sm.lastActivity.Add(time.Nanosecond)
+	}
+	sm.lastActivity = now
+	return now
 }
 
 // GetModel returns the model ID used by this session.
@@ -544,7 +552,7 @@ func (sm *SessionManager) RecordExternalMessage(ctx context.Context, msg Message
 	}
 
 	sm.mu.Lock()
-	sm.lastActivity = time.Now()
+	sm.bumpLastActivityLocked(time.Now())
 	loop := sm.loop
 	sm.mu.Unlock()
 
@@ -608,7 +616,7 @@ func (sm *SessionManager) EnqueueChatMessage(ctx context.Context, provider llm.P
 	shouldQueue := sm.working || sm.hasQueuedChatInputLocked()
 	if shouldQueue {
 		sm.queuedChatMessages = append(sm.queuedChatMessages, content)
-		sm.lastActivity = time.Now()
+		sm.bumpLastActivityLocked(time.Now())
 	}
 	loop := sm.loop
 	sm.mu.Unlock()
@@ -674,7 +682,7 @@ func (sm *SessionManager) RestoreQueuedChatInput(text string) {
 	defer sm.mu.Unlock()
 	sm.flushingQueuedChat = false
 	sm.queuedChatMessages = append([]string{text}, sm.queuedChatMessages...)
-	sm.lastActivity = time.Now()
+	sm.bumpLastActivityLocked(time.Now())
 }
 
 // CompleteQueuedChatFlush clears the in-flight flush marker after the queued turn starts.
@@ -702,7 +710,7 @@ func (sm *SessionManager) buildUserMessage(content string, llmMsg *llm.Message) 
 	defer sm.mu.Unlock()
 
 	now := time.Now()
-	sm.lastActivity = now
+	now = sm.bumpLastActivityLocked(now)
 	sm.sequenceID++
 
 	msg := Message{

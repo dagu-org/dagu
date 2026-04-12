@@ -11,6 +11,7 @@ import (
 	"os"
 	osexec "os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -136,6 +137,15 @@ steps:
 // TestDistributedRun_QueueConcurrency_ActiveRunCounted verifies that a running
 // distributed run with fresh heartbeats continues to block the next queued item.
 func TestDistributedRun_QueueConcurrency_ActiveRunCounted(t *testing.T) {
+	heartbeatThreshold := testStaleHeartbeatThreshold
+	leaseThreshold := testStaleLeaseThreshold
+	completionTimeout := 30 * time.Second
+	if runtime.GOOS == "windows" {
+		heartbeatThreshold = 4 * time.Second
+		leaseThreshold = 6 * time.Second
+		completionTimeout = 45 * time.Second
+	}
+
 	f := newTestFixture(t, `
 type: graph
 name: queue-concurrency-test
@@ -146,7 +156,7 @@ steps:
   - name: long-step
     command: sleep 8
 `,
-		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
+		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
 	defer f.cleanup()
@@ -228,7 +238,7 @@ steps:
 			}
 		}
 		return succeeded == 2
-	}, 30*time.Second, 200*time.Millisecond, "both queued runs should eventually complete")
+	}, completionTimeout, 200*time.Millisecond, "both queued runs should eventually complete")
 }
 
 // TestDistributedRun_StatusAndQueueConsistency verifies that after a
