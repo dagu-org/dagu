@@ -337,7 +337,12 @@ func New(
 // Run setups the runner and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	runningStatusDone := make(chan struct{})
+	close(runningStatusDone)
+	defer func() {
+		cancel()
+		<-runningStatusDone
+	}()
 
 	// Set DAG context for all logs in this function
 	ctx = logger.WithValues(ctx,
@@ -770,8 +775,19 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Write the first status just after the start to store the running status.
 	// If the DAG is already finished, skip it.
+	runningStatusDone = make(chan struct{})
 	go execWithRecovery(ctx, func() {
-		time.Sleep(waitForRunning)
+		defer close(runningStatusDone)
+
+		timer := time.NewTimer(waitForRunning)
+		defer timer.Stop()
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+
 		if a.finished.Load() {
 			return
 		}
