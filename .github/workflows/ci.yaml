@@ -102,15 +102,61 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name_suffix: " (core)"
+          - name_suffix: " (core-rest)"
             test_command: |
               go list ./... \
-                | grep -vxE 'github.com/dagucloud/dagu/internal/intg($|/distr$|/queue$)' \
+                | grep -vxE 'github.com/dagucloud/dagu/internal/(agent|intg($|/distr$|/queue$))' \
                 | xargs go test -v -race
-          - name_suffix: " (intg)"
-            test_command: go test -v -race ./internal/intg
-          - name_suffix: " (intg-distr)"
-            test_command: go test -v -race ./internal/intg/distr
+          - name_suffix: " (agent-api)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/agent \
+                '^(Test(NewAPI|API_|FormatMessageWithContexts|FormatContextLine|SelectModel|GetUserIDFromContext|ShouldCompactMessages_|ShouldCancelStuckSession))' \
+                ''
+          - name_suffix: " (agent-runtime)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/agent \
+                '^(Test(RequestCommandApprovalWithTimeout|AskUserRun.*|FormatUserResponse|BashTool_.*|ResolveTimeout|BuildOutput|TruncateOutput|DelegateTool_.*|FilterOutTool|Truncate$|Hooks_.*|TruncateUTF8Bytes_.*|BuildChatInputSpillWrapper_.*|NewLoop|Loop_.*|StartHeartbeatPump|NavigateTool_.*|PatchTool_.*|CountLines|IsDAGFile|ValidateIfDAGFile|ResolveToolPolicy_.*|ValidateToolPolicy|EvaluateBashPolicy|SplitShellCommandSegments|HasUnsupportedShellConstructs|GetModelPresets.*|ProviderCache_.*|HashLLMConfig_.*|CreateLLMProvider_.*|ReadTool_.*|FormatFileContent|TruncateResult|AppendRejectionSummary|RemoteURL|NewRemoteAgentTool_.*|NewListContextsTool_.*))' \
+                ''
+          - name_suffix: " (agent-session)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/agent \
+                '' \
+                '^(Test(NewAPI|API_|FormatMessageWithContexts|FormatContextLine|SelectModel|GetUserIDFromContext|ShouldCompactMessages_|ShouldCancelStuckSession|RequestCommandApprovalWithTimeout|AskUserRun.*|FormatUserResponse|BashTool_.*|ResolveTimeout|BuildOutput|TruncateOutput|DelegateTool_.*|FilterOutTool|Truncate$|Hooks_.*|TruncateUTF8Bytes_.*|BuildChatInputSpillWrapper_.*|NewLoop|Loop_.*|StartHeartbeatPump|NavigateTool_.*|PatchTool_.*|CountLines|IsDAGFile|ValidateIfDAGFile|ResolveToolPolicy_.*|ValidateToolPolicy|EvaluateBashPolicy|SplitShellCommandSegments|HasUnsupportedShellConstructs|GetModelPresets.*|ProviderCache_.*|HashLLMConfig_.*|CreateLLMProvider_.*|ReadTool_.*|FormatFileContent|TruncateResult|AppendRejectionSummary|RemoteURL|NewRemoteAgentTool_.*|NewListContextsTool_.*))'
+          - name_suffix: " (intg-approval-history)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(TestWaitStepApproval|TestApprovalField|TestHistoryCommand_)' \
+                ''
+          - name_suffix: " (intg-infra)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '^(Test(DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|JQExecutor|MailConfigEnvExpansion|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|ShellExecution|SQLExecutor_.*|Server_.*|SSHExecutorIntegration|Router.*|TemplateExecutor|WebhookPayloadEnv|WorkingDirectoryResolution))' \
+                ''
+          - name_suffix: " (intg-rest)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg \
+                '' \
+                '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|JQExecutor|MailConfigEnvExpansion|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|ShellExecution|SQLExecutor_.*|Server_.*|SSHExecutorIntegration|Router.*|TemplateExecutor|WebhookPayloadEnv|WorkingDirectoryResolution))'
+          - name_suffix: " (intg-distr-execution)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '^(Test(BaseConfig_|Coordinator_|Execution_(StatusPushing|LogStreaming|LargeOutput|StartCommand|TagsPropagation|SharedFSMode|WorkDir|QueueLifecycle|QueuedCatchupHappyPath)))' \
+                ''
+          - name_suffix: " (intg-distr-retry-cancel)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '^(Test(Cancellation_|Retry_|OneOffScheduleRunsDistributed))' \
+                ''
+          - name_suffix: " (intg-distr-dispatch)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '^(Test(Execution_ProcHeartbeat_.*|Execution_QueuedDispatch_.*|Parallel_.*|Params_.*))' \
+                ''
+          - name_suffix: " (intg-distr-rest)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/intg/distr \
+                '' \
+                '^(Test(BaseConfig_|Coordinator_|Execution_(StatusPushing|LogStreaming|LargeOutput|StartCommand|TagsPropagation|SharedFSMode|WorkDir|QueueLifecycle|QueuedCatchupHappyPath)|Cancellation_|Retry_|OneOffScheduleRunsDistributed|Execution_ProcHeartbeat_.*|Execution_QueuedDispatch_.*|Parallel_.*|Params_.*))'
           - name_suffix: " (intg-queue)"
             test_command: go test -v -race ./internal/intg/queue
     steps:
@@ -129,4 +175,5 @@ jobs:
       - name: Test (Windows)
         shell: bash
         run: |
+          chmod +x ./scripts/test-shard.sh
           ${{ matrix.test_command }}
