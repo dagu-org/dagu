@@ -850,9 +850,20 @@ func (a *Agent) Run(ctx context.Context) error {
 	finishedStatus := a.Status(ctx)
 
 	if a.artifactFinalizer != nil && a.artifactDir != "" {
+		artifactFinalizeStartedAt := time.Now()
+		logger.Info(ctx, "Finalizing DAG run artifacts before writing terminal status",
+			slog.String("attempt-id", finishedStatus.AttemptID),
+			slog.String("artifact-dir", a.artifactDir),
+		)
 		finalizeCtx, cancelFinalize := context.WithTimeout(context.WithoutCancel(ctx), artifactFinalizeTimeout)
 		defer cancelFinalize()
 		if err := a.artifactFinalizer.Finalize(finalizeCtx, finishedStatus.AttemptID, a.artifactDir); err != nil {
+			logger.Error(ctx, "Failed to finalize DAG run artifacts before writing terminal status",
+				tag.Error(err),
+				slog.String("attempt-id", finishedStatus.AttemptID),
+				slog.String("artifact-dir", a.artifactDir),
+				slog.Duration("elapsed", time.Since(artifactFinalizeStartedAt)),
+			)
 			uploadErr := fmt.Errorf("upload artifacts: %w", err)
 			if finishedStatus.Status.IsSuccess() {
 				finishedStatus.Status = core.Failed
@@ -867,6 +878,12 @@ func (a *Agent) Run(ctx context.Context) error {
 			} else {
 				lastErr = uploadErr
 			}
+		} else {
+			logger.Info(ctx, "Finished DAG run artifact finalization; terminal status can be written",
+				slog.String("attempt-id", finishedStatus.AttemptID),
+				slog.String("artifact-dir", a.artifactDir),
+				slog.Duration("elapsed", time.Since(artifactFinalizeStartedAt)),
+			)
 		}
 	}
 
