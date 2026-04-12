@@ -4,6 +4,7 @@
 package runtime_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -242,14 +243,14 @@ func TestRunStartWithBuiltExecutablePreservesExplicitEnv(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 	t.Setenv("SUBCMD_START_EXPLICIT_ENV", "from-host")
 
-	dagFile := th.DAG(t, `name: built-exec-start-env
+	dagFile := th.DAG(t, fmt.Sprintf(`name: built-exec-start-env
 env:
   - EXPORTED_SECRET: ${SUBCMD_START_EXPLICIT_ENV}
 steps:
   - name: capture
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${SUBCMD_START_EXPLICIT_ENV:-}"
+    command: %q
     output: RESULT
-`)
+`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "SUBCMD_START_EXPLICIT_ENV")))
 
 	spec := th.SubCmdBuilder.Start(dagFile.DAG, runtime.StartOptions{})
 	err := runtime.Start(th.Context, spec)
@@ -271,16 +272,16 @@ func TestRunStartWithBuiltExecutableResolvesEnvSecretFromParentEnv(t *testing.T)
 	th := test.Setup(t, test.WithBuiltExecutable())
 	t.Setenv("SUBCMD_START_SECRET_SOURCE", "from-host")
 
-	dagFile := th.DAG(t, `name: built-exec-start-secret
+	dagFile := th.DAG(t, fmt.Sprintf(`name: built-exec-start-secret
 secrets:
   - name: EXPORTED_SECRET
     provider: env
     key: SUBCMD_START_SECRET_SOURCE
 steps:
   - name: capture
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${SUBCMD_START_SECRET_SOURCE:-}"
+    command: %q
     output: RESULT
-`)
+`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "SUBCMD_START_SECRET_SOURCE")))
 
 	spec := th.SubCmdBuilder.Start(dagFile.DAG, runtime.StartOptions{})
 	for _, entry := range spec.Env {

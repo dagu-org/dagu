@@ -301,10 +301,10 @@ func TestDAG(t *testing.T) {
 	server := test.SetupServer(t)
 
 	t.Run("CreateExecuteDelete", func(t *testing.T) {
-		spec := `
+		spec := fmt.Sprintf(`
 steps:
-  - sleep 1
-`
+  - %s
+`, test.ShellQuote(test.PortableSleepCommand(time.Second)))
 		// Create a new DAG
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 			Name: "test_dag",
@@ -624,10 +624,10 @@ steps:
 	})
 
 	t.Run("EnqueueDAGRunFromSpec", func(t *testing.T) {
-		spec := `
+		spec := fmt.Sprintf(`
 steps:
-  - sleep 1
-`
+  - %s
+`, test.ShellQuote(test.PortableSleepCommand(time.Second)))
 		name := "inline_enqueue_spec"
 
 		resp := server.Client().Post("/api/v1/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
@@ -708,14 +708,14 @@ steps:
 	t.Run("StartPreservesExplicitEnvFromFilteredChild", func(t *testing.T) {
 		t.Setenv("API_START_EXPLICIT_ENV", "from-host")
 
-		spec := `
+		spec := fmt.Sprintf(`
 env:
   - EXPORTED_SECRET: ${API_START_EXPLICIT_ENV}
 steps:
   - name: capture
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${API_START_EXPLICIT_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "API_START_EXPLICIT_ENV"))
 		dagName := "api_start_explicit_env"
 
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
@@ -756,15 +756,15 @@ steps:
 	t.Run("EnqueuePersistsExplicitEnvForFilteredChild", func(t *testing.T) {
 		t.Setenv("API_ENQUEUE_EXPLICIT_ENV", "from-host")
 
-		spec := `
+		spec := fmt.Sprintf(`
 queue: api_enqueue_explicit_env
 env:
   - EXPORTED_SECRET: ${API_ENQUEUE_EXPLICIT_ENV}
 steps:
   - name: capture
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${API_ENQUEUE_EXPLICIT_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "API_ENQUEUE_EXPLICIT_ENV"))
 		dagName := "api_enqueue_explicit_env"
 
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{

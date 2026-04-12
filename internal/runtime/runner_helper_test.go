@@ -23,15 +23,15 @@ import (
 )
 
 func successStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withCommand("true"))
+	return newStep(name, withDepends(depends...), withCommand(test.PortableSuccessCommand()))
 }
 
 func failStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withCommand("false"))
+	return newStep(name, withDepends(depends...), withCommand(test.PortableFailureCommand()))
 }
 
 func waitStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withCommand("true"), withApproval(&core.ApprovalConfig{}))
+	return newStep(name, withDepends(depends...), withCommand(test.PortableSuccessCommand()), withApproval(&core.ApprovalConfig{}))
 }
 
 type stepOption func(*core.Step)

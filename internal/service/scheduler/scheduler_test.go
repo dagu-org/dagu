@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +20,13 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/require"
 )
+
+func schedulerTestTimeout(base time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return base * 3
+	}
+	return base
+}
 
 func TestScheduler(t *testing.T) {
 	t.Parallel()
@@ -267,7 +275,9 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 		t.Fatal("Stop() did not return within 5 seconds")
 	}
 
-	require.False(t, sc.IsRunning(), "scheduler should not be running after stop")
+	require.Eventually(t, func() bool {
+		return !sc.IsRunning()
+	}, schedulerTestTimeout(5*time.Second), 10*time.Millisecond, "scheduler should not be running after stop")
 
 	select {
 	case err := <-errCh:

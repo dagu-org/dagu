@@ -29,8 +29,12 @@ func shellTestPath(path string) string {
 	return filepath.ToSlash(path)
 }
 
+func windowsShellTest() bool {
+	return os.PathSeparator == '\\'
+}
+
 func trimmedCounterReadCommand(counterFile string) string {
-	return fmt.Sprintf("tr -d '\\r\\n' < \"%s\"", shellTestPath(counterFile))
+	return test.PortableReadTrimmedFileCommand(counterFile)
 }
 
 func repeatCounterValueCondition(counterFile string) string {
@@ -38,10 +42,28 @@ func repeatCounterValueCondition(counterFile string) string {
 }
 
 func repeatCounterEqualsCommand(counterFile, expected string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(
+			"if ((Test-Path %s) -and ((%s) -eq %s)) { exit 0 } else { exit 1 }",
+			test.PowerShellQuote(counterFile),
+			trimmedCounterReadCommand(counterFile),
+			test.PowerShellQuote(expected),
+		)
+	}
 	return fmt.Sprintf("test \"$(%s)\" = \"%s\"", trimmedCounterReadCommand(counterFile), expected)
 }
 
 func repeatCounterSetupScript(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					$counterFile = %s
+					if (Test-Path $counterFile) {
+						$COUNT = [int]((Get-Content -Raw -Path $counterFile).TrimEnd("`+"`r"+`", "`+"`n"+`"))
+					} else {
+						$COUNT = 0
+					}
+				`, test.PowerShellQuote(counterFile))
+	}
 	return fmt.Sprintf(`
 					COUNTER_FILE="%s"
 					if [ -f "$COUNTER_FILE" ]; then
@@ -53,6 +75,17 @@ func repeatCounterSetupScript(counterFile string) string {
 }
 
 func repeatCounterScript(counterFile string, emitCount bool) string {
+	if windowsShellTest() {
+		emitLine := ""
+		if emitCount {
+			emitLine = "\n\t\t\t\t\tWrite-Output $COUNT"
+		}
+		return fmt.Sprintf(`
+					%s
+					$COUNT = $COUNT + 1
+					Set-Content -Path $counterFile -Value $COUNT -NoNewline%s
+				`, repeatCounterSetupScript(counterFile), emitLine)
+	}
 	emitLine := ""
 	if emitCount {
 		emitLine = "\n\t\t\t\t\tprintf '%s\\n' \"$COUNT\""
@@ -62,6 +95,125 @@ func repeatCounterScript(counterFile string, emitCount bool) string {
 					COUNT=$((COUNT + 1))
 					printf '%%s' "$COUNT" > "$COUNTER_FILE"%s
 				`, repeatCounterSetupScript(counterFile), emitLine)
+}
+
+func repeatCounterExitCodeScript(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					$counterFile = %s
+					if (Test-Path $counterFile) {
+						exit 0
+					}
+					New-Item -ItemType File -Path $counterFile -Force | Out-Null
+					exit 42
+				`, test.PowerShellQuote(counterFile))
+	}
+	return fmt.Sprintf(`if [ -f %[1]s ]; then exit 0; fi; : > %[1]s; exit 42`, shellTestPath(counterFile))
+}
+
+func retrySpecificExitCodeScript(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					$counterFile = %s
+					if (-not (Test-Path $counterFile)) {
+						Set-Content -Path $counterFile -Value '1' -NoNewline
+						exit 42
+					}
+
+					$COUNT = (Get-Content -Raw -Path $counterFile).TrimEnd("`+"`r"+`", "`+"`n"+`")
+					if ($COUNT -eq '1') {
+						Set-Content -Path $counterFile -Value '2' -NoNewline
+						exit 100
+					}
+				`, test.PowerShellQuote(counterFile))
+	}
+	return fmt.Sprintf(`
+					if [ ! -f "%s" ]; then
+						printf '%%s' "1" > "%s"
+						exit 42
+					else
+						COUNT=$(tr -d '\r\n' < "%s")
+						if [ "$COUNT" -eq "1" ]; then
+							printf '%%s' "2" > "%s"
+							exit 100
+						fi
+					fi
+				`, shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile))
+}
+
+func dagRunStatusUnsetScript() string {
+	if windowsShellTest() {
+		return `if ([string]::IsNullOrEmpty($env:DAG_RUN_STATUS)) { Write-Output unset } else { Write-Output set }`
+	}
+	return `if [ -z "$DAG_RUN_STATUS" ]; then echo unset; else echo set; fi`
+}
+
+func counterThresholdExitScript(counterFile string, threshold, exitAtOrBelow, exitAbove int) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					%s
+					$COUNT = $COUNT + 1
+					Set-Content -Path $counterFile -Value $COUNT -NoNewline
+					if ($COUNT -le %d) {
+						exit %d
+					}
+					exit %d
+				`, repeatCounterSetupScript(counterFile), threshold, exitAtOrBelow, exitAbove)
+	}
+	return fmt.Sprintf(`
+					%s
+					COUNT=$((COUNT + 1))
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"
+					if [ "$COUNT" -le %d ]; then
+						exit %d
+					fi
+					exit %d
+				`, repeatCounterSetupScript(counterFile), threshold, exitAtOrBelow, exitAbove)
+}
+
+func retryOutputSequenceScript(counterFile string, outputs []string, successAttempt int) string {
+	if windowsShellTest() {
+		var body strings.Builder
+		body.WriteString(fmt.Sprintf("\n\t\t\t\t\t$counterFile = %s\n", test.PowerShellQuote(counterFile)))
+		body.WriteString("\t\t\t\t\t$attempt = 1\n")
+		body.WriteString("\t\t\t\t\tif (Test-Path $counterFile) {\n")
+		body.WriteString("\t\t\t\t\t\t$attempt = [int]((Get-Content -Raw -Path $counterFile).TrimEnd(\"`r\", \"`n\")) + 1\n")
+		body.WriteString("\t\t\t\t\t}\n")
+		body.WriteString("\t\t\t\t\tSet-Content -Path $counterFile -Value $attempt -NoNewline\n")
+		body.WriteString("\t\t\t\t\tswitch ($attempt) {\n")
+		for i, output := range outputs {
+			attempt := i + 1
+			exitCode := 1
+			if attempt == successAttempt {
+				exitCode = 0
+			}
+			body.WriteString(fmt.Sprintf("\t\t\t\t\t\t%d { Write-Output %s; exit %d }\n", attempt, test.PowerShellQuote(output), exitCode))
+		}
+		body.WriteString("\t\t\t\t\t\tdefault { exit 1 }\n")
+		body.WriteString("\t\t\t\t\t}\n")
+		return body.String()
+	}
+
+	var body strings.Builder
+	body.WriteString(fmt.Sprintf("\n\t\t\t\t\tCOUNTER_FILE=%q\n", shellTestPath(counterFile)))
+	body.WriteString("\t\t\t\t\tif [ ! -f \"$COUNTER_FILE\" ]; then\n")
+	body.WriteString("\t\t\t\t\t\tATTEMPT=1\n")
+	body.WriteString("\t\t\t\t\telse\n")
+	body.WriteString("\t\t\t\t\t\tATTEMPT=$(($(tr -d '\\r\\n' < \"$COUNTER_FILE\") + 1))\n")
+	body.WriteString("\t\t\t\t\tfi\n")
+	body.WriteString("\t\t\t\t\tprintf '%s' \"$ATTEMPT\" > \"$COUNTER_FILE\"\n")
+	body.WriteString("\t\t\t\t\tcase \"$ATTEMPT\" in\n")
+	for i, output := range outputs {
+		attempt := i + 1
+		exitCode := 1
+		if attempt == successAttempt {
+			exitCode = 0
+		}
+		body.WriteString(fmt.Sprintf("\t\t\t\t\t\t%d)\n\t\t\t\t\t\t\techo %q\n\t\t\t\t\t\t\texit %d\n\t\t\t\t\t\t\t;;\n", attempt, output, exitCode))
+	}
+	body.WriteString("\t\t\t\t\t\t*)\n\t\t\t\t\t\t\texit 1\n\t\t\t\t\t\t\t;;\n")
+	body.WriteString("\t\t\t\t\tesac\n")
+	return body.String()
 }
 
 func TestRunner(t *testing.T) {
@@ -377,13 +529,24 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(`
-					if [ ! -f "`+testFile+`" ]; then
-						touch `+testFile+`
-						exit 1
-					fi
-					exit 0
-				`),
+				withScript(func() string {
+					if windowsShellTest() {
+						return fmt.Sprintf(`
+							if (-not (Test-Path %s)) {
+								%s
+								exit 1
+							}
+							exit 0
+						`, test.PowerShellQuote(testFile), test.PortableCreateEmptyFileCommand(testFile))
+					}
+					return fmt.Sprintf(`
+						if [ ! -f %s ]; then
+							%s
+							exit 1
+						fi
+						exit 0
+					`, test.PosixQuote(testFile), test.PortableCreateEmptyFileCommand(testFile))
+				}()),
 				withRetryPolicy(1, time.Millisecond*50),
 			),
 		)
@@ -501,7 +664,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "true",
+					Condition: test.PortableSuccessCommand(),
 				})),
 			successStep("3", "2"),
 		)
@@ -520,7 +683,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "false",
+					Condition: test.PortableFailureCommand(),
 				})),
 			successStep("3", "2"),
 		)
@@ -635,7 +798,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("false"),
+				withCommand(test.PortableFailureCommand()),
 				withRepeatPolicy(true, time.Millisecond*50),
 			),
 		)
@@ -920,7 +1083,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript("if [ -z \"$DAG_RUN_STATUS\" ]; then echo unset; else echo set; fi"),
+				withScript(dagRunStatusUnsetScript()),
 				withOutput("RESULT"),
 			),
 		)
@@ -993,11 +1156,9 @@ func TestRunner(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		// Script: fail exactly once with exit 42, then succeed on the retry.
-		script := fmt.Sprintf(`if [ -f %[1]s ]; then exit 0; fi; : > %[1]s; exit 42`, countFile)
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(script),
+				withScript(repeatCounterExitCodeScript(countFile)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.ExitCode = []int{42}
@@ -1078,25 +1239,11 @@ func TestRunner(t *testing.T) {
 		// Step that outputs different values on each retry and fails until 3rd attempt
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					COUNTER_FILE="%s"
-					if [ ! -f "$COUNTER_FILE" ]; then
-						printf '%%s' "1" > "$COUNTER_FILE"
-						echo "output_attempt_1"
-						exit 1
-					else
-						COUNT=$(tr -d '\r\n' < "$COUNTER_FILE")
-						if [ "$COUNT" -eq "1" ]; then
-							printf '%%s' "2" > "$COUNTER_FILE"
-							echo "output_attempt_2"
-							exit 1
-						elif [ "$COUNT" -eq "2" ]; then
-							printf '%%s' "3" > "$COUNTER_FILE"
-							echo "output_attempt_3_success"
-							exit 0
-						fi
-					fi
-				`, shellTestPath(counterFile))),
+				withScript(retryOutputSequenceScript(counterFile, []string{
+					"output_attempt_1",
+					"output_attempt_2",
+					"output_attempt_3_success",
+				}, 3)),
 				withOutput("RESULT"),
 				withRetryPolicy(3, time.Millisecond*20),
 			),
@@ -1149,25 +1296,11 @@ func TestRunner(t *testing.T) {
 		// Step that outputs different values on each retry and always fails
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					COUNTER_FILE="%s"
-					if [ ! -f "$COUNTER_FILE" ]; then
-						printf '%%s' "1" > "$COUNTER_FILE"
-						echo "output_attempt_1"
-						exit 1
-					else
-						COUNT=$(tr -d '\r\n' < "$COUNTER_FILE")
-						if [ "$COUNT" -eq "1" ]; then
-							printf '%%s' "2" > "$COUNTER_FILE"
-							echo "output_attempt_2"
-							exit 1
-						elif [ "$COUNT" -eq "2" ]; then
-							printf '%%s' "3" > "$COUNTER_FILE"
-							echo "output_attempt_3"
-							exit 1
-						fi
-					fi
-				`, shellTestPath(counterFile))),
+				withScript(retryOutputSequenceScript(counterFile, []string{
+					"output_attempt_1",
+					"output_attempt_2",
+					"output_attempt_3",
+				}, -1)),
 				withOutput("RESULT"),
 				withRetryPolicy(2, time.Millisecond*20),
 			),
@@ -1444,7 +1577,7 @@ func TestRunner_Metrics(t *testing.T) {
 		successStep("1"),
 		failStep("2"),
 		newStep("3", withPrecondition(&core.Condition{
-			Condition: "false",
+			Condition: test.PortableFailureCommand(),
 		})),
 		successStep("4", "1"),
 	)
@@ -1477,7 +1610,7 @@ func TestRunner_DAGPreconditions(t *testing.T) {
 			Name: "test_dag",
 			Preconditions: []*core.Condition{
 				{
-					Condition: "false", // This will fail
+					Condition: test.PortableFailureCommand(), // This will fail
 				},
 			},
 		}
@@ -1867,18 +2000,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		// Step that returns different exit codes
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ ! -f "%s" ]; then
-						printf '%%s' "1" > "%s"
-						exit 42  # Should retry
-					else
-						COUNT=$(tr -d '\r\n' < "%s")
-						if [ "$COUNT" -eq "1" ]; then
-							printf '%%s' "2" > "%s"
-							exit 100  # Should not retry
-						fi
-					fi
-				`, shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile))),
+				withScript(retrySpecificExitCodeScript(counterFile)),
 				withRetryPolicy(3, 20*time.Millisecond),
 				func(step *core.Step) {
 					step.RetryPolicy.ExitCodes = []int{42} // Only retry on exit code 42
@@ -1928,16 +2050,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					%s
-					COUNT=$((COUNT + 1))
-					printf '%%s' "$COUNT" > "$COUNTER_FILE"
-					if [ "$COUNT" -le 2 ]; then
-						exit 0
-					else
-						exit 1
-					fi
-				`, repeatCounterSetupScript(counterFile))),
+				withScript(counterThresholdExitScript(counterFile, 2, 0, 1)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile // Boolean true mode
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -1963,16 +2076,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					%s
-					COUNT=$((COUNT + 1))
-					printf '%%s' "$COUNT" > "$COUNTER_FILE"
-					if [ "$COUNT" -le 2 ]; then
-						exit 1
-					else
-						exit 0
-					fi
-				`, repeatCounterSetupScript(counterFile))),
+				withScript(counterThresholdExitScript(counterFile, 2, 1, 0)),
 				withContinueOn(core.ContinueOn{
 					ExitCode:    []int{1},
 					Failure:     true,
@@ -2011,11 +2115,11 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("cat "+shellTestPath(counterFile)+" || echo notfound"),
+				withCommand(test.PortableReadFileOrFallbackCommand(counterFile, "notfound")),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test ! -f \"%s\"", shellTestPath(counterFile)),
+						Condition: test.PortableFileMissingCommand(counterFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2092,11 +2196,11 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("cat "+shellTestPath(counterFile)+" || echo notfound"),
+				withCommand(test.PortableReadFileOrFallbackCommand(counterFile, "notfound")),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test -f \"%s\"", shellTestPath(counterFile)),
+						Condition: test.PortableFileExistsCommand(counterFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2165,16 +2269,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					%s
-					COUNT=$((COUNT + 1))
-					printf '%%s' "$COUNT" > "$COUNTER_FILE"
-					if [ "$COUNT" -le 2 ]; then
-						exit 1
-					else
-						exit 42
-					fi
-				`, repeatCounterSetupScript(counterFile))),
+				withScript(counterThresholdExitScript(counterFile, 2, 1, 42)),
 				withContinueOn(core.ContinueOn{
 					ExitCode:    []int{1},
 					Failure:     true,
@@ -2210,7 +2305,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: "false", // Will never be true
+						Condition: test.PortableFailureCommand(), // Will never be true
 					}
 					step.RepeatPolicy.Limit = 3
 					step.RepeatPolicy.Interval = 20 * time.Millisecond

@@ -47,7 +47,7 @@ func TestRunNodeExecution_ExternalStepRetrySkipsRepeatBookkeeping(t *testing.T) 
 	step := core.Step{
 		Name: "retrying-step",
 		Commands: []core.CommandEntry{
-			{Command: "false", CmdWithArgs: "false"},
+			{Command: "exit", Args: []string{"1"}, CmdWithArgs: "exit 1"},
 		},
 		RetryPolicy: core.RetryPolicy{
 			Limit:    1,

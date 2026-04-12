@@ -5,6 +5,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	osrt "runtime"
@@ -211,13 +212,13 @@ func TestTaskHandler(t *testing.T) {
 	t.Run("HandleTaskStartPreservesExplicitEnv", func(t *testing.T) {
 		t.Setenv("WORKER_TASK_START_ENV", "from-host")
 
-		dagContent := `env:
+		dagContent := fmt.Sprintf(`env:
   - EXPORTED_SECRET: ${WORKER_TASK_START_ENV}
 steps:
   - name: capture
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${WORKER_TASK_START_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "WORKER_TASK_START_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		task := runtimeexec.CreateTask(
@@ -241,13 +242,13 @@ steps:
 	t.Run("HandleTaskRetryPreservesExplicitEnv", func(t *testing.T) {
 		t.Setenv("WORKER_TASK_RETRY_ENV", "from-host")
 
-		dagContent := `env:
+		dagContent := fmt.Sprintf(`env:
   - EXPORTED_SECRET: ${WORKER_TASK_RETRY_ENV}
 steps:
   - name: capture
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${WORKER_TASK_RETRY_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "WORKER_TASK_RETRY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		handler := NewTaskHandler(th.Config)
@@ -292,11 +293,11 @@ steps:
 		t.Setenv("KUBERNETES_SERVICE_PORT", "443")
 		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
 
-		dagContent := `steps:
+		dagContent := fmt.Sprintf(`steps:
   - name: capture
-    command: printf '%s|%s|%s' "${KUBERNETES_SERVICE_HOST:-}" "${KUBERNETES_SERVICE_PORT:-}" "${WORKER_TASK_HOST_ONLY_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		task := runtimeexec.CreateTask(
@@ -322,11 +323,11 @@ steps:
 		t.Setenv("KUBERNETES_SERVICE_PORT", "443")
 		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
 
-		dagContent := `steps:
+		dagContent := fmt.Sprintf(`steps:
   - name: capture
-    command: printf '%s|%s|%s' "${KUBERNETES_SERVICE_HOST:-}" "${KUBERNETES_SERVICE_PORT:-}" "${WORKER_TASK_HOST_ONLY_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		handler := NewTaskHandler(th.Config)
@@ -374,11 +375,11 @@ steps:
 		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
 		th := test.Setup(t, test.WithBuiltExecutable())
 
-		dagContent := `steps:
+		dagContent := fmt.Sprintf(`steps:
   - name: capture
-    command: printf '%s|%s|%s' "${WORKER_TASK_EXACT_ENV:-}" "${WORKER_TASK_PREFIX_TOKEN:-}" "${WORKER_TASK_HOST_ONLY_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("WORKER_TASK_EXACT_ENV", "WORKER_TASK_PREFIX_TOKEN", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		task := runtimeexec.CreateTask(
@@ -407,11 +408,11 @@ steps:
 		t.Setenv("WORKER_TASK_HOST_ONLY_ENV", "host-only")
 		th := test.Setup(t, test.WithBuiltExecutable())
 
-		dagContent := `steps:
+		dagContent := fmt.Sprintf(`steps:
   - name: capture
-    command: printf '%s|%s|%s' "${WORKER_TASK_EXACT_ENV:-}" "${WORKER_TASK_PREFIX_TOKEN:-}" "${WORKER_TASK_HOST_ONLY_ENV:-}"
+    command: %q
     output: RESULT
-`
+`, test.PortableEnvOutputCommand("WORKER_TASK_EXACT_ENV", "WORKER_TASK_PREFIX_TOKEN", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		handler := NewTaskHandler(th.Config)

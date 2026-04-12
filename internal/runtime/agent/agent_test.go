@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/runtime/agent"
@@ -21,6 +22,25 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func agentCommandEntry(command string) core.CommandEntry {
+	cmd, args, err := cmdutil.SplitCommand(command)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse command %q: %w", command, err))
+	}
+	return core.CommandEntry{
+		Command:     cmd,
+		Args:        args,
+		CmdWithArgs: command,
+	}
+}
+
+func setAllAgentStepCommands(dag *core.DAG, command string) {
+	entry := agentCommandEntry(command)
+	for i := range dag.Steps {
+		dag.Steps[i].Commands = []core.CommandEntry{entry}
+	}
+}
 
 func TestAgent_Run(t *testing.T) {
 	t.Parallel()
@@ -77,10 +97,10 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
 		releaseFile := filepath.Join(t.TempDir(), "release")
-		dag := th.DAG(t, `steps:
+		dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: wait-until-released
-    command: "while [ ! -f '`+releaseFile+`' ]; do sleep 0.05; done"
-`)
+    command: %q
+`, test.PortableWaitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		done := make(chan struct{})
 
@@ -105,10 +125,10 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `steps:
-  - "true"
-  - "true"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+  - %q
+`, test.PortableSuccessCommand(), test.PortableSuccessCommand()))
 
 		// Set a precondition that always fails
 		dag.Preconditions = []*core.Condition{
@@ -126,9 +146,9 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
-		errDAG := th.DAG(t, `steps:
-  - "false"
-`)
+		errDAG := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableFailureCommand()))
 		dagAgent := errDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -159,10 +179,10 @@ steps:
 		marker := filepath.Join(t.TempDir(), "failure-marker")
 		dag := th.DAG(t, fmt.Sprintf(`handler_on:
   failure:
-    command: "printf failed > '%s'"
+    command: %q
 steps:
-  - "false"
-`, marker))
+  - %q
+`, test.PortableWriteFileCommand(marker, "failed"), test.PortableFailureCommand()))
 		dagAgent := dag.Agent()
 		dagAgent.RunError(t)
 
@@ -216,13 +236,13 @@ steps:
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `handler_on:
+		dag := th.DAG(t, fmt.Sprintf(`handler_on:
   exit:
-    command: "true"
+    command: %q
 steps:
-  - "true"
-  - "true"
-`)
+  - %q
+  - %q
+`, test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand()))
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
 
@@ -306,9 +326,9 @@ func TestAgent_DryRun(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dag := th.DAG(t, `steps:
-  - "true"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, test.PortableSuccessCommand()))
 		dagAgent := dag.Agent(test.WithAgentOptions(agent.Options{Dry: true}))
 
 		dagAgent.RunSuccess(t)
@@ -327,33 +347,33 @@ func TestAgent_Retry(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
 		th := test.Setup(t)
 		// retry DAG that fails
-		dag := th.DAG(t, `type: graph
+		dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
   - name: "1"
-    command: "true"
+    command: %q
   - name: "2"
-    command: "false"
+    command: %q
     continue_on:
       failure: true
     depends: ["1"]
   - name: "3"
-    command: "true"
+    command: %q
     depends: ["2"]
   - name: "4"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
     continue_on:
       skipped: true
   - name: "5"
-    command: "false"
+    command: %q
     depends: ["4"]
   - name: "6"
-    command: "true"
+    command: %q
     depends: ["5"]
   - name: "7"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
@@ -361,13 +381,13 @@ steps:
     continue_on:
       skipped: true
   - name: "8"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
   - name: "9"
-    command: "false"
-`)
+    command: %q
+`, test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand()))
 		dagAgent := dag.Agent()
 
 		dagAgent.RunError(t)
@@ -375,9 +395,7 @@ steps:
 
 		// Modify the DAG to make it successful
 		dagRunStatus := dagAgent.Status(th.Context)
-		for i := range dag.Steps {
-			dag.Steps[i].Commands = []core.CommandEntry{{Command: "true", CmdWithArgs: "true"}}
-		}
+		setAllAgentStepCommands(dag.DAG, test.PortableSuccessCommand())
 
 		// Retry the DAG and check if it is successful
 		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
@@ -396,33 +414,33 @@ steps:
 
 	t.Run("StepRetry", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `type: graph
+		dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
   - name: "1"
-    command: "true"
+    command: %q
   - name: "2"
-    command: "false"
+    command: %q
     continue_on:
       failure: true
     depends: ["1"]
   - name: "3"
-    command: "true"
+    command: %q
     depends: ["2"]
   - name: "4"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
     continue_on:
       skipped: true
   - name: "5"
-    command: "false"
+    command: %q
     depends: ["4"]
   - name: "6"
-    command: "true"
+    command: %q
     depends: ["5"]
   - name: "7"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
@@ -430,13 +448,13 @@ steps:
     continue_on:
       skipped: true
   - name: "8"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
   - name: "9"
-    command: "false"
-`)
+    command: %q
+`, test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand()))
 		dagAgent := dag.Agent()
 
 		// Run the DAG to get a failed status
@@ -450,9 +468,7 @@ steps:
 		}
 
 		// Modify the DAG to make all steps successful
-		for i := range dag.Steps {
-			dag.Steps[i].Commands = []core.CommandEntry{{Command: "true", CmdWithArgs: "true"}}
-		}
+		setAllAgentStepCommands(dag.DAG, test.PortableSuccessCommand())
 
 		// Wait until the current time (RFC3339, second precision) differs
 		// from the previous FinishedAt timestamps so that retried steps
@@ -707,9 +723,9 @@ steps:
 		},
 		{
 			name: "NoOutputs",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - name: step1
-    command: "true"`,
+    command: %q`, test.PortableSuccessCommand()),
 			expected: map[string]string{},
 		},
 	}

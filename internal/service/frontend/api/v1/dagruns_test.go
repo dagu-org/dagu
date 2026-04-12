@@ -22,6 +22,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func dagRunEventuallyTimeout(base time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return base * 3
+	}
+	return base
+}
+
 func TestGetDAGRunSpec(t *testing.T) {
 	server := test.SetupServer(t)
 
@@ -54,7 +61,7 @@ func TestGetDAGRunSpec(t *testing.T) {
 		var dagRunStatus api.GetDAGDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &dagRunStatus)
 		return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
-	}, 10*time.Second, 200*time.Millisecond)
+	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 
 	// Fetch the DAG spec for the DAG run
 	specResp := server.Client().Get(
@@ -135,7 +142,7 @@ func requireDAGRunSpec(t *testing.T, server test.Server, dagName, dagRunID strin
 
 		specResp.Unmarshal(t, &specBody)
 		return specBody.Spec != ""
-	}, 10*time.Second, 200*time.Millisecond)
+	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 
 	return specBody
 }

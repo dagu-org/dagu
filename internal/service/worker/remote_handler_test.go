@@ -1152,12 +1152,17 @@ steps:
       interval_sec: 30
 `)
 
-	var reported []*exec.DAGRunStatus
+	var (
+		mu       sync.Mutex
+		reported []*exec.DAGRunStatus
+	)
 	client := newMockRemoteCoordinatorClient()
 	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 		status, err := convert.ProtoToDAGRunStatus(req.Status)
 		require.NoError(t, err)
+		mu.Lock()
 		reported = append(reported, status)
+		mu.Unlock()
 		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 	}
 
@@ -1185,9 +1190,11 @@ steps:
 	err := handler.handleStart(th.Context, task, false)
 	require.NoError(t, err)
 	require.Less(t, time.Since(started), 5*time.Second)
+	mu.Lock()
 	require.NotEmpty(t, reported)
 
 	final := reported[len(reported)-1]
+	mu.Unlock()
 	require.Equal(t, core.Queued, final.Status)
 	require.Equal(t, []exec.PendingStepRetry{
 		{StepName: "flaky", Interval: 30 * time.Second},

@@ -56,13 +56,13 @@ steps:
 }
 
 func TestGlobalConcurrency(t *testing.T) {
-	f := newFixture(t, `
+	f := newFixture(t, fmt.Sprintf(`
 name: sleep-dag
 queue: global-queue
 steps:
   - name: sleep
-    command: sleep 1
-`, WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
+    command: %s
+`, test.ShellQuote(test.PortableSleepCommand(time.Second))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
 		Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(25 * time.Second)
@@ -71,13 +71,13 @@ steps:
 }
 
 func TestLocalQueueFIFOProcessing(t *testing.T) {
-	f := newFixture(t, `
+	f := newFixture(t, fmt.Sprintf(`
 name: batch-dag
 max_active_runs: 3
 steps:
   - name: sleep
-    command: sleep 1
-`).Enqueue(3).StartScheduler(30 * time.Second)
+    command: %s
+`, test.ShellQuote(test.PortableSleepCommand(time.Second)))).Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(20 * time.Second)
 	f.Stop()
@@ -181,9 +181,9 @@ env:
   - EXPORTED_SECRET: ${%s}
 steps:
   - name: capture
-    command: printf '%%s|%%s' "$EXPORTED_SECRET" "${%s:-}"
+    command: %q
     output: RESULT
-`, rawVar, rawVar), WithQueue("queue-explicit-env"), WithGlobalQueue("queue-explicit-env", 1))
+`, rawVar, test.PortableEnvOutputCommand("EXPORTED_SECRET", rawVar)), WithQueue("queue-explicit-env"), WithGlobalQueue("queue-explicit-env", 1))
 
 	test.RunBuiltCLI(t, f.th.Helper, []string{rawVar + "=from-host"}, "start", f.dag.Location)
 
@@ -233,7 +233,6 @@ steps:
 func TestSchedulerRetryScanner(t *testing.T) {
 	t.Run("EligibleFailedRunRetries", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
-		markerPathForShell := filepath.ToSlash(markerPath)
 		f := newFixture(t, fmt.Sprintf(`
 type: graph
 name: retry-dag
@@ -245,11 +244,11 @@ retry_policy:
   max_interval_sec: 1
 handler_on:
   failure:
-    command: "printf failed > %s"
+    command: %q
 steps:
   - id: retry_step
     command: echo retried
-`, markerPathForShell), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+`, test.PortableWriteFileCommand(markerPath, "failed")), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
 
 		failedAt := time.Now().UTC().Add(-30 * time.Second)
 		runID := f.FailedRunWithMetadata(runStatusOptions{
@@ -282,7 +281,6 @@ steps:
 
 	t.Run("MissingFinishedAtStillRetriesViaCreatedAt", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
-		markerPathForShell := filepath.ToSlash(markerPath)
 		f := newFixture(t, fmt.Sprintf(`
 type: graph
 name: retry-dag
@@ -294,11 +292,11 @@ retry_policy:
   max_interval_sec: 1
 handler_on:
   failure:
-    command: "printf failed > %s"
+    command: %q
 steps:
   - id: retry_step
     command: echo retried
-`, markerPathForShell), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+`, test.PortableWriteFileCommand(markerPath, "failed")), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
 
 		failedAt := time.Now().UTC().Add(-30 * time.Second)
 		runID := f.FailedRunWithMetadata(runStatusOptions{
@@ -327,7 +325,6 @@ steps:
 
 	t.Run("NewerScheduledRunDoesNotSuppressRetry", func(t *testing.T) {
 		markerPath := filepath.Join(t.TempDir(), "failure.marker")
-		markerPathForShell := filepath.ToSlash(markerPath)
 		f := newFixture(t, fmt.Sprintf(`
 type: graph
 name: retry-dag
@@ -339,11 +336,11 @@ retry_policy:
   max_interval_sec: 1
 handler_on:
   failure:
-    command: "printf failed > %s"
+    command: %q
 steps:
   - id: retry_step
     command: echo retried
-`, markerPathForShell), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1), WithRetryWindow(48*time.Hour))
+`, test.PortableWriteFileCommand(markerPath, "failed")), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1), WithRetryWindow(48*time.Hour))
 
 		now := time.Now().UTC()
 		midnight := retryScanReferenceMidnight(now)
