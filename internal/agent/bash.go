@@ -7,10 +7,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/llm"
+	"mvdan.cc/sh/v3/interp"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 func init() {
@@ -28,6 +34,14 @@ const (
 	maxBashTimeout     = 10 * time.Minute
 	maxOutputLength    = 100000
 )
+
+type bashPathFinder func() (string, bool)
+
+type commandRunResult struct {
+	stdout string
+	stderr string
+	err    error
+}
 
 // BashToolInput defines the input parameters for the bash tool.
 type BashToolInput struct {
@@ -83,6 +97,10 @@ func bashRun(toolCtx ToolContext, input json.RawMessage) ToolOut {
 }
 
 func executeCommand(toolCtx ToolContext, args BashToolInput) ToolOut {
+	return executeCommandWithFinder(toolCtx, args, findBashPath)
+}
+
+func executeCommandWithFinder(toolCtx ToolContext, args BashToolInput, findPath bashPathFinder) ToolOut {
 	timeout := resolveTimeout(args.Timeout)
 	parentCtx := toolCtx.Context
 	if parentCtx == nil {
@@ -91,28 +109,136 @@ func executeCommand(toolCtx ToolContext, args BashToolInput) ToolOut {
 	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", args.Command)
-	if toolCtx.WorkingDir != "" {
-		cmd.Dir = toolCtx.WorkingDir
+	var result commandRunResult
+	if bashPath, ok := findPath(); ok {
+		result = executeWithBash(ctx, bashPath, args.Command, toolCtx.WorkingDir)
+	} else {
+		result = executeWithInterpreter(ctx, args.Command, toolCtx.WorkingDir)
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	output := buildOutput(result.stdout, result.stderr)
 
-	err := cmd.Run()
-	output := buildOutput(stdout.String(), stderr.String())
-
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return toolError("Command timed out after %v\n%s", timeout, output)
-		}
-		return toolError("Command failed: %v\n%s", err, output)
+	if result.err != nil {
+		return buildCommandError(result.err, output, timeout, parentCtx)
 	}
 	if output == "" {
 		return ToolOut{Content: "(no output)"}
 	}
 	return ToolOut{Content: output}
+}
+
+func findBashPath() (string, bool) {
+	path, err := exec.LookPath("bash")
+	if err != nil {
+		return "", false
+	}
+	return path, true
+}
+
+func executeWithBash(ctx context.Context, bashPath, command, workDir string) commandRunResult {
+	var stdout, stderr bytes.Buffer
+
+	cmd := exec.Command(bashPath, "-c", command) //nolint:gosec // command is intentionally interpreted by the configured shell tool
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmdutil.SetupCommand(cmd)
+
+	if err := cmd.Start(); err != nil {
+		return commandRunResult{
+			stdout: stdout.String(),
+			stderr: stderr.String(),
+			err:    err,
+		}
+	}
+
+	waitCh := make(chan error, 1)
+	go func() {
+		waitCh <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-waitCh:
+		return commandRunResult{
+			stdout: stdout.String(),
+			stderr: stderr.String(),
+			err:    err,
+		}
+	case <-ctx.Done():
+		select {
+		case err := <-waitCh:
+			return commandRunResult{
+				stdout: stdout.String(),
+				stderr: stderr.String(),
+				err:    err,
+			}
+		default:
+		}
+
+		_ = cmdutil.KillProcessGroup(cmd, os.Kill)
+		<-waitCh
+
+		return commandRunResult{
+			stdout: stdout.String(),
+			stderr: stderr.String(),
+			err:    ctx.Err(),
+		}
+	}
+}
+
+func executeWithInterpreter(ctx context.Context, command, workDir string) commandRunResult {
+	var stdout, stderr bytes.Buffer
+
+	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(bytes.NewBufferString(command), "")
+	if err != nil {
+		return commandRunResult{
+			err: fmt.Errorf("failed to parse command: %w", err),
+		}
+	}
+
+	opts := []interp.RunnerOption{
+		interp.Env(nil),
+		interp.StdIO(nil, &stdout, &stderr),
+	}
+	if workDir != "" {
+		opts = append(opts, interp.Dir(workDir))
+	}
+
+	runner, err := interp.New(opts...)
+	if err != nil {
+		return commandRunResult{
+			err: fmt.Errorf("failed to initialize shell interpreter: %w", err),
+		}
+	}
+
+	err = runner.Run(ctx, file)
+	return commandRunResult{
+		stdout: stdout.String(),
+		stderr: stderr.String(),
+		err:    err,
+	}
+}
+
+func buildCommandError(err error, output string, timeout time.Duration, parentCtx context.Context) ToolOut {
+	if parentCtx != nil && parentCtx.Err() != nil {
+		return toolErrorWithOutput(fmt.Sprintf("Command canceled: %v", parentCtx.Err()), output)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return toolErrorWithOutput(fmt.Sprintf("Command timed out after %v", timeout), output)
+	}
+	if errors.Is(err, context.Canceled) {
+		return toolErrorWithOutput(fmt.Sprintf("Command canceled: %v", err), output)
+	}
+	return toolErrorWithOutput(fmt.Sprintf("Command failed: %v", err), output)
+}
+
+func toolErrorWithOutput(message, output string) ToolOut {
+	if output == "" {
+		return toolError("%s", message)
+	}
+	return toolError("%s\n%s", message, output)
 }
 
 func resolveTimeout(seconds int) time.Duration {

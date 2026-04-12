@@ -42,8 +42,9 @@ func TestBuildChatInputSpillWrapper_IncludesTruncatedPreviewAndInstructions(t *t
 	assert.Contains(t, wrapper, "Preview (truncated):")
 	assert.Contains(t, wrapper, "Treat the file contents as the user's full message.")
 	assert.Contains(t, wrapper, "`read`")
-	assert.Contains(t, wrapper, "`rg`")
-	assert.Contains(t, wrapper, "Do not blindly `cat` the entire file")
+	assert.Contains(t, wrapper, "installed on the host")
+	assert.Contains(t, wrapper, "Do not assume Unix-only helper binaries are available")
+	assert.Contains(t, wrapper, "do not dump the entire file unless necessary")
 	assert.True(t, utf8.ValidString(wrapper))
 }
 

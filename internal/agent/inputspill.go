@@ -149,7 +149,7 @@ func buildChatInputSpillWrapper(path, raw string) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("---\n\n")
-	b.WriteString("Treat the file contents as the user's full message. Inspect it selectively with `read` or shell tools like `rg`, `head`, `tail`, or `sed -n`. Do not blindly `cat` the entire file unless necessary.")
+	b.WriteString("Treat the file contents as the user's full message. Inspect it selectively with `read` first, or with shell commands that are actually installed on the host. Do not assume Unix-only helper binaries are available, and do not dump the entire file unless necessary.")
 	return b.String()
 }
 
