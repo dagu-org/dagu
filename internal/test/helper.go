@@ -269,7 +269,10 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		filedag.WithBaseConfig(cfg.Paths.BaseConfig),
 		filedag.WithSkipExamples(true),
 	)
-	runStore := filedagrun.New(cfg.Paths.DAGRunsDir)
+	runStore := filedagrun.New(
+		cfg.Paths.DAGRunsDir,
+		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
+	)
 	procStore := newProcStore(cfg)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	serviceMonitor := fileserviceregistry.New(cfg.Paths.ServiceRegistryDir)

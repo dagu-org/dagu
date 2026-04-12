@@ -2009,7 +2009,6 @@ paths:
         - $ref: "#/components/parameters/RemoteNode"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
-        - $ref: "#/components/parameters/ArtifactRecursive"
       responses:
         "200":
           description: "A successful response"

@@ -96,7 +96,10 @@ func newHASchedulerFixture(t *testing.T) *haSchedulerFixture {
 		DefaultExecMode: config.ExecutionModeLocal,
 	}
 
-	dagRunStore := filedagrun.New(cfg.Paths.DAGRunsDir)
+	dagRunStore := filedagrun.New(
+		cfg.Paths.DAGRunsDir,
+		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
+	)
 	queueStore := filequeue.New(cfg.Paths.QueueDir)
 	procStore := fileproc.New(
 		cfg.Paths.ProcDir,

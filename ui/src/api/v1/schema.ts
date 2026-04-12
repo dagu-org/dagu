@@ -7241,8 +7241,6 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Whether to recursively expand nested artifact directories */
-                recursive?: components["parameters"]["ArtifactRecursive"];
             };
             header?: never;
             path: {

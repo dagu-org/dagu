@@ -64,11 +64,6 @@ func runDry(ctx *Context, args []string) error {
 
 	ctx.LogToFile(logFile)
 
-	artifactDir, err := ctx.GenArtifactDir(dag, dagRunID)
-	if err != nil {
-		return fmt.Errorf("failed to initialize artifact directory for dag-run %s: %w", dag.Name, err)
-	}
-
 	dagStore, err := ctx.dagStore(dagStoreConfig{
 		SearchPaths: []string{filepath.Dir(dag.Location)},
 	})
@@ -98,7 +93,6 @@ func runDry(ctx *Context, args []string) error {
 			AgentSoulStore:             as.SoulStore,
 			AgentOAuthManager:          as.OAuthManager,
 			AgentRemoteContextResolver: as.ContextResolver,
-			ArtifactDir:                artifactDir,
 		},
 	)
 

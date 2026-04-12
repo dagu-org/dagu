@@ -326,6 +326,7 @@ func NewContext(cmd *cobra.Command, flags []commandLineFlag) (*Context, error) {
 
 	// Initialize history repository and history manager
 	hrOpts := []filedagrun.DAGRunStoreOption{
+		filedagrun.WithArtifactDir(cfg.Paths.ArtifactDir),
 		filedagrun.WithLatestStatusToday(cfg.Server.LatestStatusToday),
 		filedagrun.WithLocation(cfg.Core.Location),
 	}
@@ -654,6 +655,7 @@ func (c *Context) NewScheduler() (*scheduler.Scheduler, error) {
 	statusCache.StartEviction(c)
 	schedulerRunStore := filedagrun.New(
 		c.Config.Paths.DAGRunsDir,
+		filedagrun.WithArtifactDir(c.Config.Paths.ArtifactDir),
 		filedagrun.WithLatestStatusToday(false),
 		filedagrun.WithLocation(c.Config.Core.Location),
 		filedagrun.WithHistoryFileCache(statusCache),
