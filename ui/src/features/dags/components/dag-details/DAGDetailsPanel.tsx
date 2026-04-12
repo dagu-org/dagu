@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, X } from 'lucide-react';
@@ -239,6 +242,7 @@ function DAGDetailsPanel({
                 isModal={true}
                 navigateToStatusTab={() => setActiveTab('status')}
                 localDags={data.localDags}
+                editorHints={data.editorHints}
               />
             </div>
           </div>
