@@ -7,6 +7,8 @@ package dirlock
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -191,7 +193,7 @@ func (l *dirLock) TryLock() error {
 	if err != nil || hostname == "" {
 		hostname = "unknown-host"
 	}
-	token := fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().UnixNano())
+	token := newFenceToken(hostname)
 	tokenPath := filepath.Join(l.lockPath, "owner")
 	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
 		_ = os.RemoveAll(l.lockPath)
@@ -327,4 +329,13 @@ func ForceUnlock(directory string) error {
 func (l *dirLock) isStaleInfo(info os.FileInfo) bool {
 	age := time.Since(info.ModTime())
 	return age > l.opts.StaleThreshold
+}
+
+func newFenceToken(hostname string) string {
+	var suffix [16]byte
+	if _, err := rand.Read(suffix[:]); err == nil {
+		return fmt.Sprintf("%s-%d-%s", hostname, os.Getpid(), hex.EncodeToString(suffix[:]))
+	}
+
+	return fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().UnixNano())
 }
