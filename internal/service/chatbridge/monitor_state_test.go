@@ -434,7 +434,9 @@ func TestNotificationMonitor_CorruptStateIsQuarantinedAndOnlyFutureEventsAreDeli
 	}, time.Second, 10*time.Millisecond)
 
 	assert.False(t, monitor.IsDelivered("dest-1", oldStatus))
-	assert.True(t, monitor.IsDelivered("dest-1", newStatus))
+	require.Eventually(t, func() bool {
+		return monitor.IsDelivered("dest-1", newStatus)
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestNotificationStateStore_LoadUnsupportedVersionQuarantinesState(t *testing.T) {

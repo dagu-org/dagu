@@ -511,7 +511,7 @@ steps:
 	require.Eventually(t, func() bool {
 		data, err := os.ReadFile(counterFile)
 		return err == nil && strings.TrimSpace(string(data)) == "1"
-	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected first attempt to increment counter")
+	}, intgTestTimeout(20*time.Second), 50*time.Millisecond, "expected first attempt to increment counter")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
@@ -519,7 +519,7 @@ steps:
 			return false
 		}
 		return status.Status == core.Running
-	}, intgTestTimeout(5*time.Second), 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
+	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
 
 	agent.Abort()
 

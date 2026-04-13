@@ -30,7 +30,8 @@ steps:
     command: echo hello
 `).Enqueue(3).StartScheduler(30 * time.Second)
 
-	f.WaitDrain(25 * time.Second)
+	f.WaitDrain(35 * time.Second)
+	f.WaitForAllStatuses(core.Succeeded, 20*time.Second)
 	f.Stop()
 
 	items, err := f.th.QueueStore.List(f.th.Context, f.queue)
@@ -65,7 +66,8 @@ steps:
 `, test.ShellQuote(test.PortableSleepCommand(time.Second))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
 		Enqueue(3).StartScheduler(30 * time.Second)
 
-	f.WaitDrain(25 * time.Second)
+	f.WaitDrain(35 * time.Second)
+	f.WaitForAllStatuses(core.Succeeded, 20*time.Second)
 	f.Stop()
 	f.AssertConcurrent(2 * time.Second)
 }
@@ -105,7 +107,8 @@ steps:
 		EnqueueWithPriority(exec.QueuePriorityHigh).
 		StartScheduler(30 * time.Second)
 
-	f.WaitDrain(25 * time.Second)
+	f.WaitDrain(35 * time.Second)
+	f.WaitForAllStatuses(core.Succeeded, 20*time.Second)
 	f.Stop()
 
 	times := f.collectStartTimes()

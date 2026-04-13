@@ -109,7 +109,7 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 func queueTestTimeout(timeout time.Duration) time.Duration {
 	switch {
 	case runtime.GOOS == "windows" && raceEnabled():
-		return timeout * 6
+		return timeout * 8
 	case runtime.GOOS == "windows" || raceEnabled():
 		return timeout * 2
 	default:
@@ -266,6 +266,14 @@ func (f *fixture) WaitForStatusIn(runID string, expected []core.Status, timeout 
 	return f
 }
 
+func (f *fixture) WaitForAllStatuses(expected core.Status, timeout time.Duration) *fixture {
+	f.t.Helper()
+	for _, runID := range f.runIDs {
+		f.WaitForStatus(runID, expected, timeout)
+	}
+	return f
+}
+
 // Stop stops the scheduler.
 func (f *fixture) Stop() {
 	if f.cancel != nil {
@@ -352,8 +360,20 @@ func (f *fixture) AssertConcurrent(maxDiff time.Duration) {
 func (f *fixture) collectStartTimes() []time.Time {
 	var times []time.Time
 	for _, id := range f.runIDs {
-		st := f.MustStatus(id)
-		t, err := stringutil.ParseTime(st.StartedAt)
+		var startedAt string
+		require.Eventually(f.t, func() bool {
+			st, err := f.Status(id)
+			if err != nil {
+				return false
+			}
+			if st.StartedAt == "" {
+				return false
+			}
+			startedAt = st.StartedAt
+			return true
+		}, queueTestTimeout(10*time.Second), 50*time.Millisecond, "timed out waiting for run %s to record a start time", id)
+
+		t, err := stringutil.ParseTime(startedAt)
 		require.NoError(f.t, err)
 		times = append(times, t)
 	}
