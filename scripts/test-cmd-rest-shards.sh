@@ -40,9 +40,13 @@ start_bg "internal-cmd-cleanup" \
   ./scripts/test-shard.sh ./internal/cmd \
   '^(Test(CleanupCommand|CleanupCommandDirectStore|RecordEarlyFailure))$' \
   ''
-start_bg "internal-cmd-retry-restart" \
+start_bg "internal-cmd-restart" \
   ./scripts/test-shard.sh ./internal/cmd \
-  '^(Test(RetryCommandAcceptsDefaultWorkingDirFlag|RestartCommand|RestartCommand_BuiltExecutableRestoresExplicitEnv|RetryCommand|RetryCommand_BuiltExecutableRestoresExplicitEnv))$' \
+  '^(Test(RestartCommand|RestartCommand_BuiltExecutableRestoresExplicitEnv))$' \
+  ''
+start_bg "internal-cmd-retry" \
+  ./scripts/test-shard.sh ./internal/cmd \
+  '^(Test(RetryCommandAcceptsDefaultWorkingDirFlag|RetryCommand|RetryCommand_BuiltExecutableRestoresExplicitEnv))$' \
   ''
 wait_bg
 
@@ -51,7 +55,7 @@ start_bg "internal-cmd-status" \
   '^(TestStatusCommand)$' \
   ''
 start_bg "internal-cmd-rest" \
-  ./scripts/test-shard-split.sh ./internal/cmd 4 \
+  ./scripts/test-shard-split.sh ./internal/cmd 5 \
   '' \
   '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*|CleanupCommand|CleanupCommandDirectStore|RecordEarlyFailure|RetryCommandAcceptsDefaultWorkingDirFlag|RestartCommand|RestartCommand_BuiltExecutableRestoresExplicitEnv|RetryCommand|RetryCommand_BuiltExecutableRestoresExplicitEnv|StatusCommand))$'
 wait_bg

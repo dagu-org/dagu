@@ -12,6 +12,18 @@ shard_count="$2"
 include_pattern="${3:-}"
 exclude_pattern="${4:-}"
 
+package_dir="$(go list -f '{{.Dir}}' "$package")"
+tmp_dir="$(mktemp -d)"
+cleanup() {
+  rm -rf "$tmp_dir"
+}
+trap cleanup EXIT
+
+goexe="$(go env GOEXE)"
+binary="$tmp_dir/$(basename "$package").test${goexe}"
+
+go test -c -race -o "$binary" "$package"
+
 if ! [[ "$shard_count" =~ ^[1-9][0-9]*$ ]]; then
   echo "invalid shard count: $shard_count" >&2
   exit 1
@@ -41,9 +53,12 @@ fi
 
 tests=()
 while IFS= read -r test_name; do
-  tests+=("$test_name")
+	tests+=("$test_name")
 done < <(
-  go test -list '^Test' "$package" \
+  (
+    cd "$package_dir"
+    "$binary" -test.list '^Test'
+  ) \
     | list_filter \
     | { if [[ -n "$include_pattern" ]]; then match_filter "$include_pattern"; else cat; fi; } \
     | { if [[ -n "$exclude_pattern" ]]; then exclude_filter "$exclude_pattern"; else cat; fi; }
@@ -113,7 +128,7 @@ for i in "${!groups[@]}"; do
     continue
   fi
   start_bg "shard-$(( i + 1 ))/${#groups[@]} (${group_counts[$i]} tests)" \
-    go test -v -race "$package" -run "^(${groups[$i]})$"
+    bash -lc "cd \"$package_dir\" && \"$binary\" -test.v -test.timeout=10m -test.run '^(${groups[$i]})$'"
 done
 
 wait_bg

@@ -57,9 +57,13 @@ case "$mode" in
     wait_bg
     ;;
   b)
-    start_bg "intg-distr-parallel-params" \
+    start_bg "intg-distr-parallel" \
       ./scripts/test-shard.sh ./internal/intg/distr \
-      '^(Test(Parallel_.*|Params_.*))' \
+      '^(Test(Parallel_.*))' \
+      ''
+    start_bg "intg-distr-params" \
+      ./scripts/test-shard.sh ./internal/intg/distr \
+      '^(Test(Params_.*))' \
       ''
     start_bg "intg-distr-proc-heartbeat" \
       ./scripts/test-shard.sh ./internal/intg/distr \

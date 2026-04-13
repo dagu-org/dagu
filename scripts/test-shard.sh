@@ -11,12 +11,34 @@ package="$1"
 include_pattern="${2:-}"
 exclude_pattern="${3:-}"
 
+package_dir="$(go list -f '{{.Dir}}' "$package")"
+tmp_dir="$(mktemp -d)"
+cleanup() {
+  rm -rf "$tmp_dir"
+}
+trap cleanup EXIT
+
+goexe="$(go env GOEXE)"
+binary="$tmp_dir/$(basename "$package").test${goexe}"
+
+go test -c -race -o "$binary" "$package"
+
+run_binary() {
+  local regex="${1:-}"
+
+  cd "$package_dir"
+  if [[ -n "$regex" ]]; then
+    exec "$binary" -test.v -test.timeout=10m -test.run "$regex"
+  fi
+  exec "$binary" -test.v -test.timeout=10m
+}
+
 if [[ -z "$include_pattern" && -z "$exclude_pattern" ]]; then
-  exec go test -v -race "$package"
+  run_binary
 fi
 
 if [[ -n "$include_pattern" && -z "$exclude_pattern" ]]; then
-  exec go test -v -race "$package" -run "$include_pattern"
+  run_binary "$include_pattern"
 fi
 
 if command -v rg >/dev/null 2>&1; then
@@ -43,9 +65,12 @@ fi
 
 tests=()
 while IFS= read -r test_name; do
-  tests+=("$test_name")
+	tests+=("$test_name")
 done < <(
-  go test -list '^Test' "$package" \
+  (
+    cd "$package_dir"
+    "$binary" -test.list '^Test'
+  ) \
     | list_filter \
     | { if [[ -n "$include_pattern" ]]; then match_filter "$include_pattern"; else cat; fi; } \
     | { if [[ -n "$exclude_pattern" ]]; then exclude_filter "$exclude_pattern"; else cat; fi; }
@@ -61,4 +86,4 @@ regex="^($(printf '%s\n' "${tests[@]}" | paste -sd'|' -))$"
 echo "Selected ${#tests[@]} tests for $package"
 printf '%s\n' "${tests[@]}"
 
-exec go test -v -race "$package" -run "$regex"
+run_binary "$regex"

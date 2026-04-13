@@ -71,9 +71,13 @@ case "$mode" in
       ./scripts/test-shard.sh ./internal/intg \
       '^(Test(Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv))' \
       ''
-    start_bg "intg-docker-storage" \
+    start_bg "intg-docker-core" \
       ./scripts/test-shard.sh ./internal/intg \
-      '^(Test(DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration))' \
+      '^(Test(DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*))' \
+      ''
+    start_bg "intg-storage-remote" \
+      ./scripts/test-shard.sh ./internal/intg \
+      '^(Test(DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration))' \
       ''
     wait_bg
     ;;
