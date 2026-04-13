@@ -135,13 +135,11 @@ func TestCache_TTLExpiration(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "test-data", data)
 
-	// Wait for TTL to expire (LRU sweeps every ttl/100 = 1ms)
-	time.Sleep(200 * time.Millisecond)
-
-	// Entry should be expired
-	_, ok = cache.Load(filePath)
-	assert.False(t, ok)
-	assert.Equal(t, 0, cache.Size())
+	// Wait for TTL to expire and the async sweeper to remove the entry.
+	require.Eventually(t, func() bool {
+		_, ok := cache.Load(filePath)
+		return !ok && cache.Size() == 0
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestCache_IsStale(t *testing.T) {

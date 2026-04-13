@@ -51,7 +51,7 @@ start_bg "internal-cmd-status" \
   '^(TestStatusCommand)$' \
   ''
 start_bg "internal-cmd-rest" \
-  ./scripts/test-shard-split.sh ./internal/cmd 3 \
+  ./scripts/test-shard-split.sh ./internal/cmd 4 \
   '' \
   '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*|CleanupCommand|CleanupCommandDirectStore|RecordEarlyFailure|RetryCommandAcceptsDefaultWorkingDirFlag|RestartCommand|RestartCommand_BuiltExecutableRestoresExplicitEnv|RetryCommand|RetryCommand_BuiltExecutableRestoresExplicitEnv|StatusCommand))$'
 wait_bg

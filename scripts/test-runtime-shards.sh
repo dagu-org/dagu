@@ -40,7 +40,7 @@ wait_bg() {
 case "$mode" in
   base-a)
     start_bg "runtime-rest" \
-      ./scripts/test-shard.sh ./internal/runtime \
+      ./scripts/test-shard-split.sh ./internal/runtime 2 \
       '' \
       '^TestRunner$'
     start_bg "runtime-runner-early" \
@@ -66,7 +66,10 @@ case "$mode" in
       -run '^TestRunner/(RetrySuccessfulStep|StepReferenceInCommand|StepWithoutID|StepExitCodeReference|OnSuccessHandlerWithStepReferences|OnFailureHandlerWithStepReferences|OnExitHandlerWithMultipleStepReferences|HandlerWithoutIDCannotBeReferenced|HandlersCanOnlyReferenceMainSteps|NodeStatusPartialSuccess|NodeStatusPartialSuccessWithMarkSuccess|MultipleFailuresWithContinueOn|NoSuccessfulStepsWithContinueOn|FailureWithoutContinueOn)$'
     start_bg "runtime-runner-chat-wait" \
       go test -v -race ./internal/runtime \
-      -run '^TestRunner/(HandlerNotCalledForNonChatSteps|HandlerConfiguredCorrectly|SetupChatMessagesNoDependencies|SetupChatMessagesWithDependencies|SetupChatMessagesReadError|SetupChatMessagesDeduplicatesSystem|SaveChatMessagesOnSuccess|SaveChatMessagesWriteError|SaveChatMessagesWithInheritedContext|SaveChatMessagesNoMessages|AgentStepSavesMessages|AgentStepInheritsFromDependency|HandlerNotCalledForAgentStepWithNoMessages|LoadsOwnMessagesForPushedBackAgentStep|NoOpForFirstExecution|NoOpForNonAgentStep|NoOpWithoutApproval|GracefulOnReadError|WaitStepResultsInWaitStatus|WaitStepBlocksDependentNodes|ParallelBranchWithWaitStep|WaitStepAtStart|WaitStepWithInputConfig|MultipleWaitSteps)$'
+      -run '^TestRunner/(HandlerNotCalledForNonChatSteps|HandlerConfiguredCorrectly|SetupChatMessagesNoDependencies|SetupChatMessagesWithDependencies|SetupChatMessagesReadError|SetupChatMessagesDeduplicatesSystem|SaveChatMessagesOnSuccess|SaveChatMessagesWriteError|SaveChatMessagesWithInheritedContext|SaveChatMessagesNoMessages|AgentStepSavesMessages|AgentStepInheritsFromDependency|HandlerNotCalledForAgentStepWithNoMessages|LoadsOwnMessagesForPushedBackAgentStep|NoOpForFirstExecution|NoOpForNonAgentStep|NoOpWithoutApproval|GracefulOnReadError)$'
+    start_bg "runtime-runner-wait" \
+      go test -v -race ./internal/runtime \
+      -run '^TestRunner/(WaitStepResultsInWaitStatus|WaitStepBlocksDependentNodes|ParallelBranchWithWaitStep|WaitStepAtStart|WaitStepWithInputConfig|MultipleWaitSteps)$'
     wait_bg
     ;;
   all)
