@@ -62,9 +62,8 @@ case "$mode" in
       run_filtered_tests \
       '^(Test(Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*))' \
       ''
-    start_bg "intg-queue" \
-      ./scripts/test-shard-split.sh ./internal/intg/queue 2
     wait_bg
+    TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg/queue 1
     ;;
   service-docker)
     setup_test_binary ./internal/intg
@@ -72,10 +71,6 @@ case "$mode" in
     start_bg "intg-router" \
       run_filtered_tests \
       '^(Test(RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation))' \
-      ''
-    start_bg "intg-server-notify" \
-      run_filtered_tests \
-      '^(Test(Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv))' \
       ''
     start_bg "intg-docker-core" \
       run_filtered_tests \
@@ -86,6 +81,9 @@ case "$mode" in
       '^(Test(DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration))' \
       ''
     wait_bg
+    TEST_GO_PARALLEL=1 run_filtered_tests \
+      '^(Test(Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv))' \
+      ''
     ;;
   data-subdag)
     setup_test_binary ./internal/intg
