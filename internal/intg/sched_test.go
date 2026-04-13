@@ -9,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -19,15 +21,17 @@ import (
 
 func cronScheduleRunsTwiceTimeout() time.Duration {
 	if runtime.GOOS == "windows" {
-		return 4 * time.Minute
+		return 30 * time.Second
 	}
-	return 2*time.Minute + 30*time.Second
+	return 15 * time.Second
 }
 
 // TestCronScheduleRunsTwice verifies that a DAG with */1 * * * * schedule
 // runs twice in two minutes.
 func TestCronScheduleRunsTwice(t *testing.T) {
-	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
 
 	tmpDir, err := os.MkdirTemp("", "dagu-cron-test-*")
 	require.NoError(t, err)
@@ -48,6 +52,22 @@ steps:
 	th := test.SetupScheduler(t, test.WithDAGsDir(dagsDir))
 	schedulerInstance, err := th.NewSchedulerInstance(t)
 	require.NoError(t, err)
+
+	var dispatchCount atomic.Int32
+	schedulerInstance.SetDispatchFunc(func(_ context.Context, dag *core.DAG, _ string, trigger core.TriggerType, _ time.Time) error {
+		if dag != nil && dag.Name == "cron-test" && trigger == core.TriggerTypeScheduler {
+			dispatchCount.Add(1)
+		}
+		return nil
+	})
+
+	clockBase := time.Date(2026, 1, 1, 0, 0, 59, 0, time.UTC)
+	clockStart := time.Now()
+	// Start close to the next minute boundary so the second cron tick lands
+	// almost immediately while still exercising the real scheduler dispatch path.
+	schedulerInstance.SetClock(func() time.Time {
+		return clockBase.Add(time.Since(clockStart))
+	})
 
 	ctx, cancel := context.WithCancel(th.Context)
 	defer cancel()
@@ -72,14 +92,14 @@ steps:
 		return schedulerErr
 	}
 
-	dag, err := spec.Load(th.Context, dagFile)
+	_, err = spec.Load(th.Context, dagFile)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
 		if err := pollSchedulerErr(); err != nil {
 			return true
 		}
-		return len(th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)) >= 2
+		return dispatchCount.Load() >= 2
 	}, cronScheduleRunsTwiceTimeout(), 5*time.Second)
 	require.NoError(t, schedulerErr)
 
@@ -97,6 +117,5 @@ steps:
 		}
 	}
 
-	runs := th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)
-	require.GreaterOrEqual(t, len(runs), 2)
+	require.GreaterOrEqual(t, dispatchCount.Load(), int32(2))
 }

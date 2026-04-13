@@ -455,30 +455,36 @@ steps:
 	require.NotEmpty(t, startedRunID, "expected one persisted started sub-run")
 }
 
+func parallelRetryCounterScript(counterFile string) string {
+	if runtime.GOOS == "windows" {
+		return strings.TrimPrefix(fmt.Sprintf(`
+$counterFile = %s
+$count = 0
+if (Test-Path -LiteralPath $counterFile) {
+  $count = [int](Get-Content -Raw -LiteralPath $counterFile).Trim()
+}
+$count++
+Set-Content -LiteralPath $counterFile -Value $count -NoNewline
+exit 1
+`, test.PowerShellQuote(counterFile)), "\n")
+	}
+
+	counterFile = test.PortableShellPath(counterFile)
+	return strings.TrimPrefix(fmt.Sprintf(`
+COUNTER_FILE=%s
+count=0
+if [ -f "$COUNTER_FILE" ]; then
+  count=$(cat "$COUNTER_FILE")
+fi
+count=$((count + 1))
+printf '%%s' "$count" > "$COUNTER_FILE"
+exit 1
+`, test.PosixQuote(counterFile)), "\n")
+}
+
 func TestParallelExecution_AbortSuppressesPendingRetry(t *testing.T) {
 	counterFile := filepath.Join(t.TempDir(), "parallel-retry-counter.txt")
-	childScript := fmt.Sprintf(`
-      COUNTER_FILE=%q
-      count=0
-      if [ -f "$COUNTER_FILE" ]; then
-        count=$(cat "$COUNTER_FILE")
-      fi
-      count=$((count + 1))
-      echo "$count" > "$COUNTER_FILE"
-      exit 1
-`, counterFile)
-	if runtime.GOOS == "windows" {
-		childScript = fmt.Sprintf(`
-      $counterFile = %q
-      $count = 0
-      if (Test-Path $counterFile) {
-        $count = [int](Get-Content -Raw -Path $counterFile).Trim()
-      }
-      $count++
-      Set-Content -Path $counterFile -Value $count -NoNewline
-      exit 1
-`, counterFile)
-	}
+	childScript := parallelRetryCounterScript(counterFile)
 
 	th := test.Setup(t, test.WithBuiltExecutable())
 	dag := th.DAG(t, fmt.Sprintf(`type: graph
@@ -499,8 +505,8 @@ steps:
 %s
     retry_policy:
       limit: 1
-      interval_sec: 2
-`, strings.TrimPrefix(childScript, "\n")))
+      interval_sec: 10
+`, indentTestScript(childScript, 6)))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -511,7 +517,7 @@ steps:
 	require.Eventually(t, func() bool {
 		data, err := os.ReadFile(counterFile)
 		return err == nil && strings.TrimSpace(string(data)) == "1"
-	}, intgTestTimeout(25*time.Second), 50*time.Millisecond, "expected first attempt to increment counter")
+	}, intgTestTimeout(20*time.Second), 50*time.Millisecond, "expected first attempt to increment counter")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)

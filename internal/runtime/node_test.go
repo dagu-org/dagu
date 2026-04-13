@@ -7,10 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -20,15 +22,103 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/runtime"
+	runtimeexec "github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNode(t *testing.T) {
-	t.Parallel()
+const nodeSignalExecutorType = "test-node-signal"
 
+var (
+	registerNodeSignalExecutorOnce sync.Once
+	nodeSignalExecutorFactoryMu    sync.Mutex
+	nodeSignalExecutorFactory      func() *blockingSignalExecutor
+)
+
+type blockingSignalExecutor struct {
+	ready  chan struct{}
+	killed chan os.Signal
+	stdout io.Writer
+	stderr io.Writer
+}
+
+func newBlockingSignalExecutor() *blockingSignalExecutor {
+	return &blockingSignalExecutor{
+		ready:  make(chan struct{}),
+		killed: make(chan os.Signal, 1),
+	}
+}
+
+func (e *blockingSignalExecutor) SetStdout(out io.Writer) { e.stdout = out }
+
+func (e *blockingSignalExecutor) SetStderr(out io.Writer) { e.stderr = out }
+
+func (e *blockingSignalExecutor) Run(ctx context.Context) error {
+	close(e.ready)
+
+	select {
+	case sig := <-e.killed:
+		return fmt.Errorf("signal: %s", sig.String())
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (e *blockingSignalExecutor) Kill(sig os.Signal) error {
+	select {
+	case e.killed <- sig:
+	default:
+	}
+	return nil
+}
+
+func registerNodeSignalExecutor(t *testing.T) {
+	t.Helper()
+
+	registerNodeSignalExecutorOnce.Do(func() {
+		runtimeexec.RegisterExecutor(
+			nodeSignalExecutorType,
+			func(context.Context, core.Step) (runtimeexec.Executor, error) {
+				nodeSignalExecutorFactoryMu.Lock()
+				factory := nodeSignalExecutorFactory
+				nodeSignalExecutorFactoryMu.Unlock()
+				if factory == nil {
+					return nil, fmt.Errorf("node signal executor factory not configured")
+				}
+				return factory(), nil
+			},
+			nil,
+			core.ExecutorCapabilities{},
+		)
+	})
+}
+
+func withNodeSignalExecutor(t *testing.T) (<-chan *blockingSignalExecutor, func()) {
+	t.Helper()
+
+	registerNodeSignalExecutor(t)
+
+	execCh := make(chan *blockingSignalExecutor, 1)
+
+	nodeSignalExecutorFactoryMu.Lock()
+	prev := nodeSignalExecutorFactory
+	nodeSignalExecutorFactory = func() *blockingSignalExecutor {
+		exec := newBlockingSignalExecutor()
+		execCh <- exec
+		return exec
+	}
+	nodeSignalExecutorFactoryMu.Unlock()
+
+	return execCh, func() {
+		nodeSignalExecutorFactoryMu.Lock()
+		nodeSignalExecutorFactory = prev
+		nodeSignalExecutorFactoryMu.Unlock()
+	}
+}
+
+func TestNode(t *testing.T) {
 	t.Run("Execute", func(t *testing.T) {
 		t.Parallel()
 
@@ -42,15 +132,13 @@ func TestNode(t *testing.T) {
 		node.ExecuteFail(t, "exit status 1")
 	})
 	t.Run("Signal", func(t *testing.T) {
-		t.Parallel()
+		execCh, restore := withNodeSignalExecutor(t)
+		defer restore()
 
-		readyFile := filepath.Join(t.TempDir(), "ready")
-		node := setupNode(t, withNodeCommand(fmt.Sprintf("sh -c 'touch %s; sleep 30'", readyFile)))
+		node := setupNode(t, withNodeExecutorType(nodeSignalExecutorType))
 		go func() {
-			require.Eventually(t, func() bool {
-				_, err := os.Stat(readyFile)
-				return err == nil
-			}, 5*time.Second, 5*time.Millisecond)
+			exec := <-execCh
+			<-exec.ready
 			node.Signal(node.Context, syscall.SIGTERM, false)
 		}()
 
@@ -63,15 +151,13 @@ func TestNode(t *testing.T) {
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
-		t.Parallel()
+		execCh, restore := withNodeSignalExecutor(t)
+		defer restore()
 
-		readyFile := filepath.Join(t.TempDir(), "ready")
-		node := setupNode(t, withNodeCommand(fmt.Sprintf("sh -c 'touch %s; sleep 30'", readyFile)), withNodeSignalOnStop("SIGINT"))
+		node := setupNode(t, withNodeExecutorType(nodeSignalExecutorType), withNodeSignalOnStop("SIGINT"))
 		go func() {
-			require.Eventually(t, func() bool {
-				_, err := os.Stat(readyFile)
-				return err == nil
-			}, 5*time.Second, 5*time.Millisecond)
+			exec := <-execCh
+			<-exec.ready
 			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
 		}()
 
@@ -1095,6 +1181,12 @@ func withNodeCommand(command string) nodeOption {
 func withNodeSignalOnStop(signal string) nodeOption {
 	return func(data *runtime.NodeData) {
 		data.Step.SignalOnStop = signal
+	}
+}
+
+func withNodeExecutorType(executorType string) nodeOption {
+	return func(data *runtime.NodeData) {
+		data.Step.ExecutorConfig.Type = executorType
 	}
 }
 

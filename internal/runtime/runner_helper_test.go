@@ -446,6 +446,20 @@ func waitForNodeDoneCountAtLeast(plan *runtime.Plan, name string, minCount int, 
 	}
 }
 
+func waitForNodeRepeated(plan *runtime.Plan, name string, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	for {
+		if node := plan.GetNodeByName(name); node != nil && node.State().Repeated {
+			return true
+		}
+		select {
+		case <-deadline:
+			return false
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+}
+
 // waitForHandlerNodeStatus polls until the runner's handler node for the given
 // handler type reaches the specified status or the timeout expires.
 func waitForHandlerNodeStatus(r *runtime.Runner, handler core.HandlerType, status core.NodeStatus, timeout time.Duration) {

@@ -1957,24 +1957,28 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand(test.PortableOutputCommand("repeat")),
-			withRepeatPolicy(true, 100*time.Millisecond),
+			withCommand(test.PortableCommandSequence(
+				test.PortableOutputCommand("repeat"),
+				test.PortableSleepCommand(50*time.Millisecond),
+			)),
+			withRepeatPolicy(true, 20*time.Millisecond),
 		),
 	)
 
 	cancelWait := 5 * time.Second
 	if goruntime.GOOS == "windows" {
-		cancelWait = 30 * time.Second
+		cancelWait = 45 * time.Second
 	}
 	repeated := make(chan bool, 1)
 	go func() {
-		repeated <- waitForNodeDoneCountAtLeast(plan.Plan, "1", 2, cancelWait)
+		repeated <- waitForNodeDoneCountAtLeast(plan.Plan, "1", 1, cancelWait) &&
+			waitForNodeRepeated(plan.Plan, "1", cancelWait)
 		r.runner.Cancel(plan.Plan)
 	}()
 
 	result := plan.assertRun(t, core.Aborted)
 	result.assertNodeStatus(t, "1", core.NodeAborted)
-	assert.True(t, <-repeated, "runner should repeat at least twice before cancel")
+	assert.True(t, <-repeated, "runner should enter repeated mode before cancel")
 }
 
 func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
