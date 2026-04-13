@@ -1393,11 +1393,11 @@ func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
       echo "OK: LABEL=${LABEL} ID=${ID}"
 `
 	singleValueScript := `
-      if [ "$1" != "simple" ]; then
-        echo "FAIL: TAG='$1' (expected 'simple')"
+      if [ "${1}" != "simple" ]; then
+        echo "FAIL: TAG='${1}' (expected 'simple')"
         exit 1
       fi
-      echo "OK: TAG=$1"
+      echo "OK: TAG=${1}"
 `
 	if runtime.GOOS == "windows" {
 		expandedParamsScript = `
@@ -1426,11 +1426,11 @@ func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
       Write-Output ("OK: LABEL={0} ID={1}" -f "${LABEL}", "${ID}")
 `
 		singleValueScript = `
-      if ("$($args[0])" -ne "simple") {
-        Write-Output ("FAIL: TAG='{0}' (expected 'simple')" -f "$($args[0])")
+      if ("${1}" -ne "simple") {
+        Write-Output ("FAIL: TAG='{0}' (expected 'simple')" -f "${1}")
         exit 1
       }
-      Write-Output ("OK: TAG={0}" -f "$($args[0])")
+      Write-Output ("OK: TAG={0}" -f "${1}")
 `
 	}
 

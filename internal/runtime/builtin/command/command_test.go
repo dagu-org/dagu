@@ -38,6 +38,10 @@ func assertCommandArgs(t *testing.T, got []string, want []string) {
 	assert.Equal(t, want[1:], got[1:])
 }
 
+func expectedPowerShellCommandArgs(shell, command string) []string {
+	return []string{shell, "-Command", powerShellInlineCommand(command)}
+}
+
 func TestDirectShell(t *testing.T) {
 	ctx := context.Background()
 
@@ -144,7 +148,7 @@ func TestShellCommandBuilder_Build(t *testing.T) {
 				Shell:            []string{"powershell"},
 				ShellCommandArgs: "Write-Host hello",
 			},
-			expectedInArgs:  []string{"-Command", "Write-Host hello"},
+			expectedInArgs:  []string{"-Command", powerShellInlineCommand("Write-Host hello")},
 			shouldSkipOnMac: true,
 		},
 		{
@@ -190,7 +194,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 				Shell:            []string{"powershell"},
 				ShellCommandArgs: "Get-Date",
 			},
-			expected: []string{"powershell", "-Command", "Get-Date"},
+			expected: expectedPowerShellCommandArgs("powershell", "Get-Date"),
 		},
 		{
 			name: "PowershellWithExistingCommand",
@@ -198,7 +202,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 				Shell:            []string{"powershell", "-Command"},
 				ShellCommandArgs: "Get-Date",
 			},
-			expected: []string{"powershell", "-Command", "Get-Date"},
+			expected: expectedPowerShellCommandArgs("powershell", "Get-Date"),
 		},
 		{
 			name: "PowershellWithScript",
@@ -1886,7 +1890,7 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 				Shell:            []string{"pwsh"},
 				ShellCommandArgs: "Get-Date",
 			},
-			expectedInArgs: []string{"-Command", "Get-Date"},
+			expectedInArgs: []string{"-Command", powerShellInlineCommand("Get-Date")},
 		},
 		{
 			name: "pwsh.exe basic command",
@@ -1894,7 +1898,7 @@ func TestShellCommandBuilder_PwshCore(t *testing.T) {
 				Shell:            []string{"pwsh.exe"},
 				ShellCommandArgs: "Get-Date",
 			},
-			expectedInArgs: []string{"-Command", "Get-Date"},
+			expectedInArgs: []string{"-Command", powerShellInlineCommand("Get-Date")},
 		},
 		{
 			name: "cmd basic command",
@@ -2191,7 +2195,7 @@ func TestShellCommandBuilder_PowerShellExe(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cmd)
 	assert.Contains(t, cmd.Args, "-Command")
-	assert.Contains(t, cmd.Args, "Get-Date")
+	assert.Contains(t, cmd.Args, powerShellInlineCommand("Get-Date"))
 }
 
 // TestShellCommandArgs_DoesNotIncludeArgs verifies that when running a command
@@ -2226,28 +2230,28 @@ func TestShellCommandArgs_DoesNotIncludeArgs(t *testing.T) {
 			shell:            []string{"powershell"},
 			shellCommandArgs: "Write-Host hello",
 			unwantedArgs:     []string{"-ExtraArg", "should-not-appear"},
-			expectedArgs:     []string{"-Command", "Write-Host hello"},
+			expectedArgs:     []string{"-Command", powerShellInlineCommand("Write-Host hello")},
 		},
 		{
 			name:             "powershell.exe",
 			shell:            []string{"powershell.exe"},
 			shellCommandArgs: "Get-Date",
 			unwantedArgs:     []string{"-Unwanted"},
-			expectedArgs:     []string{"-Command", "Get-Date"},
+			expectedArgs:     []string{"-Command", powerShellInlineCommand("Get-Date")},
 		},
 		{
 			name:             "pwsh",
 			shell:            []string{"pwsh"},
 			shellCommandArgs: "Get-Process",
 			unwantedArgs:     []string{"-Unwanted"},
-			expectedArgs:     []string{"-Command", "Get-Process"},
+			expectedArgs:     []string{"-Command", powerShellInlineCommand("Get-Process")},
 		},
 		{
 			name:             "pwsh.exe",
 			shell:            []string{"pwsh.exe"},
 			shellCommandArgs: "Get-Host",
 			unwantedArgs:     []string{"--bad-arg"},
-			expectedArgs:     []string{"-Command", "Get-Host"},
+			expectedArgs:     []string{"-Command", powerShellInlineCommand("Get-Host")},
 		},
 	}
 

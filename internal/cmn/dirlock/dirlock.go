@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -164,6 +165,9 @@ func (l *dirLock) TryLock() error {
 			// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
 			// Remove stale lock
 			if err := os.RemoveAll(l.lockPath); err != nil && !os.IsNotExist(err) {
+				if isRetryableLockStateError(err) {
+					return ErrLockConflict
+				}
 				return fmt.Errorf("failed to remove stale lock: %w", err)
 			}
 		} else {
@@ -171,6 +175,9 @@ func (l *dirLock) TryLock() error {
 			return ErrLockConflict
 		}
 	} else if !os.IsNotExist(err) {
+		if isRetryableLockStateError(err) {
+			return ErrLockConflict
+		}
 		return fmt.Errorf("failed to check lock status: %w", err)
 	}
 
@@ -182,7 +189,7 @@ func (l *dirLock) TryLock() error {
 	// Try to create the lock directory
 	err = os.Mkdir(l.lockPath, 0700)
 	if err != nil {
-		if os.IsExist(err) {
+		if os.IsExist(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to create lock directory: %w", err)
@@ -202,6 +209,18 @@ func (l *dirLock) TryLock() error {
 	l.fenceToken = token
 	l.isHeld = true
 	return nil
+}
+
+func isRetryableLockStateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if os.IsPermission(err) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "access is denied") ||
+		strings.Contains(msg, "used by another process")
 }
 
 // Lock acquires lock, blocking until available or context is cancelled
