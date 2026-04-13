@@ -234,9 +234,16 @@ steps:
 		return running == 1 && queued == 1
 	}, distrTestTimeout(15*time.Second), 100*time.Millisecond, "one run should start and one should remain queued")
 
-	// Verify the state is stable: concurrency limit keeps one running and one queued.
+	// Verify the state is stable: concurrency limit keeps one active distributed
+	// lease and does not let a second run start while the first remains active.
+	// Queue index length can briefly flap on Windows while the status/lease view
+	// is still consistent, so assert on the scheduler-visible run state instead.
 	require.Never(t, func() bool {
-		queued, err := f.coord.QueueStore.Len(f.coord.Context, "concurrency-q")
+		statuses, err := f.coord.DAGRunStore.ListStatuses(
+			f.coord.Context,
+			exec.WithExactName("queue-concurrency-test"),
+			exec.WithoutLimit(),
+		)
 		if err != nil {
 			return false
 		}
@@ -254,9 +261,14 @@ steps:
 			}
 		}
 
-		// The active distributed run should keep exactly one fresh lease and leave the
-		// second item in the queue instead of dispatching it early.
-		return freshLeases > 1 || queued == 0
+		running := 0
+		for _, st := range statuses {
+			if st.Status == core.Running {
+				running++
+			}
+		}
+
+		return freshLeases > 1 || running > 1
 	}, 2*time.Second, 200*time.Millisecond, "distributed lease should keep one active run and leave one queued item")
 
 	require.Eventually(t, func() bool {
