@@ -26,6 +26,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/signalctx"
 	"github.com/dagucloud/dagu/internal/core"
 	exec1 "github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
@@ -199,7 +200,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		executablePath = buildCurrentExecutable(t, root)
 	}
 
-	ctx := createDefaultContext()
+	ctx := signalctx.WithOSSignalsDisabled(createDefaultContext())
 	// Use a fresh viper instance to avoid any global state issues between tests.
 	v := viper.New()
 	loader := config.NewConfigLoader(v, config.WithAppHomeDir(tmpDir))
