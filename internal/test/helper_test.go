@@ -35,6 +35,15 @@ func TestSetupDoesNotMutatePerTestProcessEnv(t *testing.T) {
 	assert.Contains(t, helper.ChildEnv, "TZ=UTC")
 }
 
+func TestTestShellPath_PrefersNativeWindowsShells(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Skipping Windows-specific test")
+	}
+
+	chosen := strings.ToLower(filepath.Base(testShellPath(t)))
+	assert.Contains(t, []string{"powershell.exe", "pwsh.exe", "cmd.exe"}, chosen)
+}
+
 func assertExecutableEnvValue(t *testing.T, expectedInput, actual string) {
 	t.Helper()
 

@@ -903,20 +903,23 @@ func testShellPath(t *testing.T) string {
 	t.Helper()
 
 	if runtime.GOOS == "windows" {
-		if shPath, err := exec.LookPath("powershell"); err == nil {
+		for _, name := range []string{"powershell.exe", "powershell", "pwsh.exe", "pwsh"} {
+			if shPath, ok := cmdutil.FindExecutable(name); ok {
+				return shPath
+			}
+		}
+		if shPath := windowsSystemPowerShellPath(); shPath != "" {
 			return shPath
 		}
-		if shPath, err := exec.LookPath("pwsh"); err == nil {
-			return shPath
+		if shPath := strings.TrimSpace(os.Getenv("COMSPEC")); shPath != "" {
+			if _, err := os.Stat(shPath); err == nil {
+				return shPath
+			}
 		}
-		if bashPath, ok := cmdutil.FindExecutable("bash"); ok {
-			return bashPath
-		}
-		if shPath, ok := cmdutil.FindExecutable("sh"); ok {
-			return shPath
-		}
-		if shPath, err := exec.LookPath("cmd"); err == nil {
-			return shPath
+		for _, name := range []string{"cmd.exe", "cmd", "bash", "sh"} {
+			if shPath, ok := cmdutil.FindExecutable(name); ok {
+				return shPath
+			}
 		}
 		t.Fatal("no suitable shell found on Windows")
 	}
@@ -924,6 +927,24 @@ func testShellPath(t *testing.T) string {
 	shPath, err := exec.LookPath("sh")
 	require.NoError(t, err, "failed to find sh")
 	return shPath
+}
+
+func windowsSystemPowerShellPath() string {
+	systemRoot := strings.TrimSpace(os.Getenv("SystemRoot"))
+	if systemRoot == "" {
+		return ""
+	}
+
+	for _, candidate := range []string{
+		filepath.Join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+		filepath.Join(systemRoot, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe"),
+	} {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	return ""
 }
 
 func buildHelperChildEnv(base []string, daguHome, configFile, executablePath, shellPath string) []string {
