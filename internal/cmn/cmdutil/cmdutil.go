@@ -70,11 +70,6 @@ func GetShellCommand(configuredShell string) string {
 
 // getWindowsDefaultShell returns the default shell for Windows systems
 func getWindowsDefaultShell() string {
-	// First check if SHELL environment variable is set (e.g., Git Bash, WSL)
-	if systemShell := os.ExpandEnv("${SHELL}"); systemShell != "" {
-		return systemShell
-	}
-
 	// Try PowerShell (preferred on Windows)
 	if psPath, err := exec.LookPath("powershell"); err == nil {
 		return psPath
@@ -88,6 +83,11 @@ func getWindowsDefaultShell() string {
 	// Fallback to cmd.exe
 	if cmdPath, err := exec.LookPath("cmd"); err == nil {
 		return cmdPath
+	}
+
+	// As a last resort, honor SHELL from Git Bash / MSYS / WSL environments.
+	if systemShell := os.ExpandEnv("${SHELL}"); systemShell != "" {
+		return systemShell
 	}
 
 	return ""
