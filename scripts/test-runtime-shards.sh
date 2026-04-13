@@ -40,7 +40,7 @@ wait_bg() {
 case "$mode" in
   base-a-early-rest)
     start_bg "runtime-rest" \
-      ./scripts/test-shard-split.sh ./internal/runtime 4 \
+      ./scripts/test-shard-split.sh ./internal/runtime 6 \
       '' \
       '^(TestRunner$|TestRunner_ErrorHandling$|TestRunner_DAGPreconditions$|TestRunner_StatusDefersForcedStatusUntilTerminal$|TestRunner_SignalHandling$|TestRunner_ComplexDependencyChains$|TestRunner_EdgeCases$|TestRunner_ComplexRetryScenarios$|TestRunner_StepRetryExecution$|TestRunner_StepIDAccess$|TestRunner_EventHandlerStepIDAccess$|TestRunnerPartialSuccess$|TestRunner_ChatMessagesHandler$|TestSetupPushBackConversation$|TestWaitStep$)$'
     start_bg "runtime-runner-early" \
@@ -49,9 +49,15 @@ case "$mode" in
     wait_bg
     ;;
   base-a-retry-output)
-    start_bg "runtime-runner-retry-repeat" \
+    start_bg "runtime-runner-repeat" \
       go test -v -race ./internal/runtime \
-      -run '^TestRunner$/(RetryPolicyFail|RetryWithScript|RetryPolicySuccess|PreconditionMatch|PreconditionNotMatch|PreconditionWithCommandMet|PreconditionWithCommandNotMet|OnExitHandler|OnExitHandlerFail|OnAbortHandler|OnSuccessHandler|OnFailureHandler|CancelOnSignal|Repeat|RepeatFail|StopRepetitiveTaskGracefully|WorkingDirNoExist)$'
+      -run '^TestRunner$/(Repeat|RepeatFail|StopRepetitiveTaskGracefully)$'
+    start_bg "runtime-runner-retry-handlers" \
+      go test -v -race ./internal/runtime \
+      -run '^TestRunner$/(RetryPolicyFail|RetryWithScript|RetryPolicySuccess|OnExitHandler|OnExitHandlerFail|OnAbortHandler|OnSuccessHandler|OnFailureHandler|CancelOnSignal|WorkingDirNoExist)$'
+    start_bg "runtime-runner-preconditions" \
+      go test -v -race ./internal/runtime \
+      -run '^TestRunner$/(PreconditionMatch|PreconditionNotMatch|PreconditionWithCommandMet|PreconditionWithCommandNotMet)$'
     start_bg "runtime-runner-output-specialvars" \
       go test -v -race ./internal/runtime \
       -run '^TestRunner$/(OutputVariables|OutputInheritance|OutputJSONReference|HandlingJSONWithSpecialChars|SpecialVarsDAGRUNLOGFILE|SpecialVarsDAGRUNSTEPSTDOUTFILE|SpecialVarsDAGRUNSTEPSTDERRFILE|SpecialVarsDAGRUNID|SpecialVarsDAGNAME|SpecialVarsDAGRUNSTEPNAME|StdoutPathExpandsStepNameBeforePrepare|StdoutPathExpandsStepEnvBeforePrepare|StdoutPathExpandsUpstreamStepRefBeforePrepare|DAGRunStatusNotAvailableToMainSteps)$'
@@ -70,12 +76,18 @@ case "$mode" in
     wait_bg
     ;;
   base-b-refs-chatwait)
+    start_bg "runtime-agent-subpackage" \
+      ./scripts/test-package-shard.sh \
+      '^github.com/dagucloud/dagu/internal/runtime/agent$'
     start_bg "runtime-runner-refs" \
       go test -v -race ./internal/runtime \
       -run '^(TestRunner_StepRetryExecution|TestRunner_StepIDAccess|TestRunner_EventHandlerStepIDAccess|TestRunnerPartialSuccess)$'
-    start_bg "runtime-runner-chat-wait" \
+    start_bg "runtime-runner-chat" \
       go test -v -race ./internal/runtime \
-      -run '^(TestRunner_ChatMessagesHandler|TestSetupPushBackConversation|TestWaitStep)$'
+      -run '^(TestRunner_ChatMessagesHandler|TestSetupPushBackConversation)$'
+    start_bg "runtime-runner-waitstep" \
+      go test -v -race ./internal/runtime \
+      -run '^TestWaitStep$'
     wait_bg
     ;;
   base-a)

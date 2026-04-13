@@ -266,6 +266,21 @@ steps:
 	})
 
 	t.Run("subprocessExecutesDAGCorrectly", func(t *testing.T) {
+		opts := []fixtureOption{
+			withWorkerMode(sharedFSMode),
+			withLabels(map[string]string{"env": "test"}),
+		}
+		waitTimeout := 25 * time.Second
+		if runtime.GOOS == "windows" && raceEnabled() {
+			// The shared-fs subprocess path is vulnerable to false zombie detection
+			// on Windows while the built helper process is still initializing.
+			opts = append(opts,
+				withZombieDetectionInterval(2*time.Minute),
+				withStaleThresholds(5*time.Minute, 5*time.Minute),
+			)
+			waitTimeout = 45 * time.Second
+		}
+
 		f := newTestFixture(t, `
 type: graph
 name: sharedfs-subprocess-test
@@ -280,14 +295,14 @@ steps:
   - name: task3
     command: echo "subprocess task3"
     depends: [task2]
-`, withWorkerMode(sharedFSMode), withLabels(map[string]string{"env": "test"}))
+`, opts...)
 		defer f.cleanup()
 
 		require.NoError(t, f.enqueue())
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 25*time.Second)
+		status := f.waitForStatus(core.Succeeded, waitTimeout)
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 3)

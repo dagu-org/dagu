@@ -156,21 +156,17 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
-	counterFile := filepath.Join(t.TempDir(), "counter")
-
-	// Load DAG with repeat limit and condition
-	dag := th.DAG(t, fmt.Sprintf(`env:
-  - COUNTER_FILE: %q
-steps:
-  - script: |
-%s
+	// Keep the condition present but constant so the test covers the limit path
+	// without spending minutes in Windows PowerShell script startup.
+	dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %s
     repeat_policy:
       repeat: until
       limit: 5
       interval_sec: 0
       condition: %q
       expected: "10"
-`, counterFile, indentScript(repeatCounterScript(counterFile), 6), repeatCounterValueCondition(counterFile)))
+`, portableDirectSuccessStepYAML(t), repeatLiteralCommandSubstitution("0")))
 	agent := dag.Agent()
 
 	// Run with timeout
