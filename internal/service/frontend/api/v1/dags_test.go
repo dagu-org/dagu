@@ -336,7 +336,7 @@ steps:
 			}
 
 			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
-		}, 5*time.Second, 1*time.Second, "expected DAG to complete")
+		}, dagRunEventuallyTimeout(5*time.Second), time.Second, "expected DAG to complete")
 
 		// Delete the created DAG
 		_ = server.Client().Delete("/api/v1/dags/test_dag").ExpectStatus(http.StatusNoContent).Send(t)
@@ -384,7 +384,7 @@ params:
   - key2: default2
 steps:
   - name: echo_params
-    command: echo "key1=$key1 key2=$key2"
+    command: echo "key1=${key1} key2=${key2}"
 `
 		dagName := "test_json_params"
 
@@ -409,7 +409,7 @@ steps:
 				return false
 			}
 			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
-		}, 10*time.Second, 500*time.Millisecond, "DAG should complete")
+		}, dagRunEventuallyTimeout(10*time.Second), 500*time.Millisecond, "DAG should complete")
 
 		require.NotNil(t, dagRunDetails.DagRun.Params)
 		params := *dagRunDetails.DagRun.Params
@@ -452,7 +452,7 @@ steps:
 				return false
 			}
 			return dagRunDetails.DagRun.Status == api.Status(core.Succeeded)
-		}, 10*time.Second, 500*time.Millisecond, "DAG should complete")
+		}, dagRunEventuallyTimeout(10*time.Second), 500*time.Millisecond, "DAG should complete")
 
 		require.NotNil(t, dagRunDetails.DagRun.Params)
 		params := *dagRunDetails.DagRun.Params
@@ -467,7 +467,7 @@ steps:
 params: "p1 p2"
 steps:
   - name: echo
-    command: echo "$1 $2"
+    command: echo "${1} ${2}"
 `
 		dagName := "test_positional_fewer_allowed"
 
@@ -491,7 +491,7 @@ steps:
 				return false
 			}
 			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
-		}, 5*time.Second, 500*time.Millisecond)
+		}, dagRunEventuallyTimeout(5*time.Second), 500*time.Millisecond)
 
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
@@ -501,7 +501,7 @@ steps:
 params: "p1 p2"
 steps:
   - name: echo
-    command: echo "$1 $2"
+    command: echo "${1} ${2}"
 `
 		dagName := "test_positional_too_many_rejected"
 
@@ -686,7 +686,7 @@ steps:
 				return false
 			}
 			return dagRunStatus.DagRun.Status == api.Status(core.Succeeded)
-		}, 10*time.Second, 500*time.Millisecond, "expected DAG to complete")
+		}, dagRunEventuallyTimeout(10*time.Second), 500*time.Millisecond, "expected DAG to complete")
 
 		resp = server.Client().Get("/api/v1/dags/" + dagName + "/dag-runs").
 			ExpectStatus(http.StatusOK).Send(t)
@@ -819,7 +819,7 @@ steps:
 				return false
 			}
 			return latestStatus.Status == core.Succeeded
-		}, 10*time.Second, 200*time.Millisecond)
+		}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 
 		latestAttempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, body.DagRunId))
 		require.NoError(t, err)

@@ -156,18 +156,18 @@ steps:
 
 		dag := th.DAG(t, `
 secrets:
-  - name: SECRET1
+  - name: FIRST_SECRET
     provider: file
     key: `+secretFile1+`
-  - name: SECRET2
+  - name: SECOND_SECRET
     provider: file
     key: `+secretFile2+`
 
 steps:
   - name: echo-both
     command: |
-      echo "First: ${SECRET1}"
-      echo "Second: ${SECRET2}"
+      `+test.PortableLabeledExpandedOutputCommand("First: ", "${FIRST_SECRET}")+`
+      `+test.PortableLabeledExpandedOutputCommand("Second: ", "${SECOND_SECRET}")+`
     output: RESULT
 `)
 		agent := dag.Agent()
@@ -429,9 +429,9 @@ secrets:
 steps:
   - name: use-secrets-in-env
     command: |
-      echo "Auth header: $AUTH_HEADER"
-      echo "DB pass: $DB_PASS"
-      echo "Strict mode: $STRICT_MODE"
+      `+test.PortableLabeledExpandedOutputCommand("Auth header: ", "${AUTH_HEADER}")+`
+      `+test.PortableLabeledExpandedOutputCommand("DB pass: ", "${DB_PASS}")+`
+      `+test.PortableLabeledExpandedOutputCommand("Strict mode: ", "${STRICT_MODE}")+`
     env:
       AUTH_HEADER: "Bearer ${API_TOKEN}"
       DB_PASS: "${DB_PASSWORD}"

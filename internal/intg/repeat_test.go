@@ -48,7 +48,7 @@ echo "$COUNT"
 
 func repeatPolicyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return base * 6
+		return base * 12
 	}
 	return base
 }
@@ -98,8 +98,12 @@ fi
 `, test.PosixQuote(counterFile), test.PosixQuote(counterFile), test.PosixQuote(counterFile), test.PosixQuote(counterFile), successAfter, removeBlock)
 }
 
-func repeatCommandSubstitution(value string) string {
-	return "`" + test.PortableOutputCommand(value) + "`"
+func repeatLiteralCommandSubstitution(value string) string {
+	return test.PortableCommandSubstitution(test.PortableOutputCommand(value))
+}
+
+func repeatRawCommandSubstitution(command string) string {
+	return test.PortableCommandSubstitution(command)
 }
 
 func TestRepeatPolicy_WithLimit(t *testing.T) {
@@ -158,7 +162,7 @@ steps:
       interval_sec: 0
       condition: %q
       expected: "10"
-`, counterFile, indentScript(repeatCounterScript(counterFile), 6), repeatCommandSubstitution(test.PortableReadFileOrFallbackCommand(counterFile, "0"))))
+`, counterFile, indentScript(repeatCounterScript(counterFile), 6), repeatRawCommandSubstitution(test.PortableReadFileOrFallbackCommand(counterFile, "0"))))
 	agent := dag.Agent()
 
 	// Run with timeout
@@ -462,7 +466,7 @@ func TestRepeatPolicy_LimitFromCommandSubstitution(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 
-	dag := th.DAG(t, fmt.Sprintf("steps:\n  - %s\n    repeat_policy:\n      repeat: true\n      limit: %q\n      interval_sec: 0\n", portableDirectSuccessStepYAML(t), repeatCommandSubstitution("3")))
+	dag := th.DAG(t, fmt.Sprintf("steps:\n  - %s\n    repeat_policy:\n      repeat: true\n      limit: %q\n      interval_sec: 0\n", portableDirectSuccessStepYAML(t), repeatLiteralCommandSubstitution("3")))
 	agent := dag.Agent()
 
 	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))

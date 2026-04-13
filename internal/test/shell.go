@@ -42,6 +42,10 @@ func PortableOutputCommand(value string) string {
 	return fmt.Sprintf("printf '%%s\\n' %s", PosixQuote(value))
 }
 
+func PortableCommandSubstitution(command string) string {
+	return "`" + command + "`"
+}
+
 // PortableExpandedOutputCommand emits a Dagu-resolved ${...} value while keeping
 // shell quoting valid on each platform. The input should be a Dagu reference,
 // not an arbitrary literal string.
@@ -50,6 +54,13 @@ func PortableExpandedOutputCommand(ref string) string {
 		return fmt.Sprintf("Write-Output \"%s\"", ref)
 	}
 	return fmt.Sprintf("printf '%%s\\n' \"%s\"", ref)
+}
+
+func PortableLabeledExpandedOutputCommand(prefix, ref string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("Write-Output \"%s%s\"", prefix, ref)
+	}
+	return fmt.Sprintf("printf '%%s\\n' \"%s%s\"", prefix, ref)
 }
 
 func PortablePwdCommand() string {

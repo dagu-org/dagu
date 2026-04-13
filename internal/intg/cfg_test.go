@@ -738,17 +738,17 @@ env:
 steps:
   - env:
       MY_VAR: "step1_value"
-    command: echo $MY_VAR
+    command: `+test.PortableExpandedOutputCommand("${MY_VAR}")+`
     output: OUT1
 
   - env:
       MY_VAR: $MY_VAR2
-    command: echo $MY_VAR
+    command: `+test.PortableExpandedOutputCommand("${MY_VAR}")+`
     output: OUT2
 
   - env:
-      MY_VAR: "`+"`echo dynamic value`"+`"
-    command: echo $MY_VAR
+      MY_VAR: "`+test.PortableCommandSubstitution(test.PortableOutputCommand("dynamic value"))+`"
+    command: `+test.PortableExpandedOutputCommand("${MY_VAR}")+`
     output: OUT3
 `)
 
