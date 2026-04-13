@@ -42,6 +42,21 @@ func intgTestTimeout(timeout time.Duration) time.Duration {
 	}
 }
 
+func indentTestScript(script string, spaces int) string {
+	script = strings.TrimPrefix(script, "\n")
+	script = strings.TrimRight(script, "\n")
+	if script == "" {
+		return ""
+	}
+
+	indent := strings.Repeat(" ", spaces)
+	lines := strings.Split(script, "\n")
+	for i, line := range lines {
+		lines[i] = indent + line
+	}
+	return strings.Join(lines, "\n")
+}
+
 func requireLinuxContainerRuntime(t *testing.T) {
 	t.Helper()
 

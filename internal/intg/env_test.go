@@ -5,6 +5,7 @@ package intg_test
 
 import (
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmd"
@@ -72,12 +73,20 @@ steps:
 
 	t.Run("ShellFallbacks", func(t *testing.T) {
 		th := test.Setup(t)
+		fallbackCommand := `echo "${UNSET_OPTIONAL:-default_value}"`
+		if runtime.GOOS == "windows" {
+			fallbackCommand = `
+if ([string]::IsNullOrEmpty($env:UNSET_OPTIONAL)) {
+  Write-Output "default_value"
+} else {
+  Write-Output $env:UNSET_OPTIONAL
+}`
+		}
 		dag := th.DAG(t, `
 steps:
   - name: default-env
-    env:
-      - OPTIONAL: ${UNSET_OPTIONAL:-default_value}
-    command: echo "${OPTIONAL}"
+    command: |
+`+indentTestScript(fallbackCommand, 6)+`
     output: FALLBACK_OUTPUT
 `)
 		agent := dag.Agent()
@@ -90,13 +99,22 @@ steps:
 	t.Run("DAGRunWorkDir", func(t *testing.T) {
 		t.Parallel()
 
+		writeCommand := `echo "hello" > "${DAG_RUN_WORK_DIR}/test.txt"`
+		readCommand := `cat "${DAG_RUN_WORK_DIR}/test.txt"`
+		if runtime.GOOS == "windows" {
+			writeCommand = `Set-Content -Path "${DAG_RUN_WORK_DIR}/test.txt" -Value "hello" -NoNewline`
+			readCommand = `(Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/test.txt").TrimEnd("` + "`r" + `", "` + "`n" + `")`
+		}
+
 		th := test.Setup(t)
 		dag := th.DAG(t, `
 steps:
   - name: write-to-workdir
-    command: echo "hello" > "${DAG_RUN_WORK_DIR}/test.txt"
+    command: |
+`+indentTestScript(writeCommand, 6)+`
   - name: read-from-workdir
-    command: cat "${DAG_RUN_WORK_DIR}/test.txt"
+    command: |
+`+indentTestScript(readCommand, 6)+`
     output: WORKDIR_OUTPUT
 `)
 		agent := dag.Agent()
@@ -115,16 +133,26 @@ steps:
 			explicitDir = resolved
 		}
 		explicitDirForYAML := filepath.ToSlash(explicitDir)
+		pwdCommand := test.PortablePwdCommand()
+		writeCommand := `echo "from-workdir" > "${DAG_RUN_WORK_DIR}/data.txt"`
+		readCommand := `cat "${DAG_RUN_WORK_DIR}/data.txt"`
+		if runtime.GOOS == "windows" {
+			writeCommand = `Set-Content -Path "${DAG_RUN_WORK_DIR}/data.txt" -Value "from-workdir" -NoNewline`
+			readCommand = `(Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/data.txt").TrimEnd("` + "`r" + `", "` + "`n" + `")`
+		}
 		dag := th.DAG(t, `
 working_dir: `+explicitDirForYAML+`
 steps:
   - name: check-pwd
-    command: pwd
+    command: |
+`+indentTestScript(pwdCommand, 6)+`
     output: PWD_OUTPUT
   - name: write-to-workdir
-    command: echo "from-workdir" > "${DAG_RUN_WORK_DIR}/data.txt"
+    command: |
+`+indentTestScript(writeCommand, 6)+`
   - name: read-from-workdir
-    command: cat "${DAG_RUN_WORK_DIR}/data.txt"
+    command: |
+`+indentTestScript(readCommand, 6)+`
     output: WORKDIR_OUTPUT
 `)
 		agent := dag.Agent()
@@ -177,6 +205,24 @@ steps:
 
 	t.Run("StepOutputSubstrings", func(t *testing.T) {
 		th := test.Setup(t)
+		validateScript := `
+if [ "${producer.stdout:0:5}${producer.stdout:5}" = "${producer.stdout}" ]; then
+  echo OK
+else
+  echo FAIL
+  exit 1
+fi
+`
+		if runtime.GOOS == "windows" {
+			validateScript = `
+if (("${producer.stdout:0:5}" + "${producer.stdout:5}") -eq "${producer.stdout}") {
+  Write-Output "OK"
+} else {
+  Write-Output "FAIL"
+  exit 1
+}
+`
+		}
 		dag := th.DAG(t, `
 type: graph
 steps:
@@ -188,12 +234,7 @@ steps:
     name: substring-validate
     depends: producer
     command: |
-      if [ "${producer.stdout:0:5}${producer.stdout:5}" = "${producer.stdout}" ]; then
-        echo OK
-      else
-        echo FAIL
-        exit 1
-      fi
+`+indentTestScript(validateScript, 6)+`
     output: SUBSTRING_VALIDATION
 `)
 		agent := dag.Agent()

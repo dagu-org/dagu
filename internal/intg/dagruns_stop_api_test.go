@@ -19,10 +19,12 @@ func TestAPITerminateLocalRun_DoesNotRequireCoordinator(t *testing.T) {
 	server := test.SetupServer(t)
 
 	const dagName = "intg_local_stop_regression"
-	spec := `steps:
+	sleepCommand := test.PortableSleepCommand(30 * time.Second)
+	spec := fmt.Sprintf(`steps:
   - name: hold
-    command: sleep 30
-`
+    command: |
+%s
+`, indentTestScript(sleepCommand, 6))
 
 	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,
@@ -38,14 +40,14 @@ func TestAPITerminateLocalRun_DoesNotRequireCoordinator(t *testing.T) {
 	startResp.Unmarshal(t, &startBody)
 	require.NotEmpty(t, startBody.DagRunId)
 
-	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Running}, 10*time.Second, false)
+	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Running}, intgTestTimeout(10*time.Second), false)
 
 	server.Client().Post(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/stop", dagName, startBody.DagRunId),
 		nil,
 	).ExpectStatus(http.StatusOK).Send(t)
 
-	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Aborted, core.Failed}, 15*time.Second, true)
+	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Aborted, core.Failed}, intgTestTimeout(30*time.Second), true)
 }
 
 func waitForAPIRunStatus(

@@ -28,7 +28,6 @@ if (Test-Path $counterFile) {
 }
 $count++
 Set-Content -Path $counterFile -Value $count -NoNewline
-Write-Output ("Count: {0}" -f $count)
 Write-Output $count
 `, test.PowerShellQuote(counterFile))
 	}
@@ -48,7 +47,7 @@ echo "$COUNT"
 
 func repeatPolicyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return base * 24
+		return intgTestTimeout(base * 2)
 	}
 	return base
 }
@@ -67,7 +66,6 @@ if (Test-Path $counterFile) {
 }
 $count++
 Set-Content -Path $counterFile -Value $count -NoNewline
-Write-Output ("Count: {0}" -f $count)
 if ($count -lt %d) {
   exit 1
 }
@@ -102,8 +100,16 @@ func repeatLiteralCommandSubstitution(value string) string {
 	return test.PortableCommandSubstitution(test.PortableOutputCommand(value))
 }
 
+func repeatPolicyParallel(t *testing.T) {
+	t.Helper()
+
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+}
+
 func TestRepeatPolicy_WithLimit(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	// Load DAG with repeat limit
@@ -140,7 +146,7 @@ func TestRepeatPolicy_WithLimit(t *testing.T) {
 }
 
 func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
@@ -185,7 +191,7 @@ steps:
 }
 
 func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	// Load DAG that repeats with a limit
@@ -220,7 +226,7 @@ func TestRepeatPolicy_WithLimitReachedBeforeCondition(t *testing.T) {
 }
 
 func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	// Load DAG with boolean repeat mode (should repeat while step succeeds, like unconditional while)
@@ -257,7 +263,7 @@ func TestRepeatPolicy_BooleanModeWhileUnconditional(t *testing.T) {
 }
 
 func TestRepeatPolicy_UntilWithExitCode(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
@@ -302,7 +308,7 @@ steps:
 }
 
 func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	// Load DAG with repeat: true (should work as "while" mode)
@@ -339,7 +345,7 @@ func TestRepeatPolicy_BackwardCompatibilityTrue(t *testing.T) {
 }
 
 func TestRepeatPolicy_OnExitCode(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	counterFile := filepath.Join(t.TempDir(), "counter")
@@ -459,7 +465,7 @@ func TestRepeatPolicy_MaxIntervalSecFromEnvVar(t *testing.T) {
 }
 
 func TestRepeatPolicy_LimitFromCommandSubstitution(t *testing.T) {
-	t.Parallel()
+	repeatPolicyParallel(t)
 	th := test.Setup(t)
 
 	dag := th.DAG(t, fmt.Sprintf("steps:\n  - %s\n    repeat_policy:\n      repeat: true\n      limit: %q\n      interval_sec: 0\n", portableDirectSuccessStepYAML(t), repeatLiteralCommandSubstitution("3")))

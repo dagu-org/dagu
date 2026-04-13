@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -167,6 +168,9 @@ func (s *Store) listInboxFilenames() ([]string, error) {
 	names := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), inboxSuffix) {
 			continue
 		}
 		names = append(names, entry.Name())

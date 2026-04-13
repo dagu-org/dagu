@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -686,13 +687,23 @@ steps:
 	t.Run("InitHandler_CannotAccessStepOutputVariables", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
+		initCommand := `echo "step_output:${STEP_OUTPUT:-NOT_YET_AVAILABLE}"`
+		if runtime.GOOS == "windows" {
+			initCommand = `
+if ([string]::IsNullOrEmpty($env:STEP_OUTPUT)) {
+  Write-Output "step_output:NOT_YET_AVAILABLE"
+} else {
+  Write-Output ("step_output:{0}" -f $env:STEP_OUTPUT)
+}
+`
+		}
 
 		// Init handler runs BEFORE steps, so it cannot access step outputs
 		dag := th.DAG(t, `
 handler_on:
   init:
     command: |
-      echo "step_output:${STEP_OUTPUT:-NOT_YET_AVAILABLE}"
+`+indentTestScript(initCommand, 6)+`
     output: INIT_STEP_ACCESS
 
 steps:
