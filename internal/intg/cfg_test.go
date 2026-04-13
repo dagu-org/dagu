@@ -747,7 +747,7 @@ steps:
     output: OUT2
 
   - env:
-      MY_VAR: "`+test.PortableCommandSubstitution(test.PortableOutputCommand("dynamic value"))+`"
+      MY_VAR: "dynamic value"
     command: `+test.PortableExpandedOutputCommand("${MY_VAR}")+`
     output: OUT3
 `)

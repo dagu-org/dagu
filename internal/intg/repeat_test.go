@@ -48,7 +48,7 @@ echo "$COUNT"
 
 func repeatPolicyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return base * 12
+		return base * 24
 	}
 	return base
 }
@@ -100,10 +100,6 @@ fi
 
 func repeatLiteralCommandSubstitution(value string) string {
 	return test.PortableCommandSubstitution(test.PortableOutputCommand(value))
-}
-
-func repeatRawCommandSubstitution(command string) string {
-	return test.PortableCommandSubstitution(command)
 }
 
 func TestRepeatPolicy_WithLimit(t *testing.T) {

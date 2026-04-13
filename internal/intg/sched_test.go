@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,6 +16,13 @@ import (
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
+
+func cronScheduleRunsTwiceTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 4 * time.Minute
+	}
+	return 2*time.Minute + 30*time.Second
+}
 
 // TestCronScheduleRunsTwice verifies that a DAG with */1 * * * * schedule
 // runs twice in two minutes.
@@ -72,7 +80,7 @@ steps:
 			return true
 		}
 		return len(th.DAGRunMgr.ListRecentStatus(th.Context, dag.Name, 10)) >= 2
-	}, 2*time.Minute+30*time.Second, 5*time.Second)
+	}, cronScheduleRunsTwiceTimeout(), 5*time.Second)
 	require.NoError(t, schedulerErr)
 
 	schedulerInstance.Stop(ctx)

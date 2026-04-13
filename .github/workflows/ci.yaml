@@ -125,7 +125,7 @@ jobs:
               ./scripts/test-runtime-shards.sh base-b
           - name_suffix: " (core-service-api)"
             test_command: |
-              ./scripts/test-shard-split.sh ./internal/service/frontend/api/v1 5
+              ./scripts/test-shard-split.sh ./internal/service/frontend/api/v1 3
           - name_suffix: " (core-service)"
             test_command: |
               ./scripts/test-package-shard.sh \
@@ -153,12 +153,12 @@ jobs:
               ./scripts/test-intg-group-shards.sh parallel-issues
           - name_suffix: " (intg-rest-a-m)"
             test_command: |
-              ./scripts/test-shard-split.sh ./internal/intg 4 \
+              ./scripts/test-shard-split.sh ./internal/intg 3 \
                 '^Test([A-M].*)' \
                 '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))'
           - name_suffix: " (intg-rest-n-z)"
             test_command: |
-              ./scripts/test-shard-split.sh ./internal/intg 4 \
+              ./scripts/test-shard-split.sh ./internal/intg 3 \
                 '^Test([N-Z].*)' \
                 '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))'
           - name_suffix: " (intg-distr-a)"
