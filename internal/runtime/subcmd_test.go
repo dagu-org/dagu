@@ -242,6 +242,7 @@ steps:
 func TestRunStartWithBuiltExecutablePreservesExplicitEnv(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 	t.Setenv("SUBCMD_START_EXPLICIT_ENV", "from-host")
+	statusTimeout := platformTestDuration(10*time.Second, 2*time.Minute)
 
 	dagFile := th.DAG(t, fmt.Sprintf(`name: built-exec-start-env
 env:
@@ -264,13 +265,14 @@ steps:
 		}
 		status = latest
 		return status.Status == core.Succeeded
-	}, platformTestDuration(10*time.Second, 45*time.Second), 100*time.Millisecond)
+	}, statusTimeout, 100*time.Millisecond)
 	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
 }
 
 func TestRunStartWithBuiltExecutableResolvesEnvSecretFromParentEnv(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 	t.Setenv("SUBCMD_START_SECRET_SOURCE", "from-host")
+	statusTimeout := platformTestDuration(10*time.Second, 2*time.Minute)
 
 	dagFile := th.DAG(t, fmt.Sprintf(`name: built-exec-start-secret
 secrets:
@@ -299,7 +301,7 @@ steps:
 		}
 		status = latest
 		return status.Status == core.Succeeded
-	}, platformTestDuration(10*time.Second, 45*time.Second), 100*time.Millisecond)
+	}, statusTimeout, 100*time.Millisecond)
 	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
 }
 

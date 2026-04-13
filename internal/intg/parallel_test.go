@@ -455,37 +455,7 @@ steps:
 	require.NotEmpty(t, startedRunID, "expected one persisted started sub-run")
 }
 
-func parallelRetryCounterScript(counterFile string) string {
-	if runtime.GOOS == "windows" {
-		return strings.TrimPrefix(fmt.Sprintf(`
-$counterFile = %s
-$count = 0
-if (Test-Path -LiteralPath $counterFile) {
-  $count = [int](Get-Content -Raw -LiteralPath $counterFile).Trim()
-}
-$count++
-Set-Content -LiteralPath $counterFile -Value $count -NoNewline
-exit 1
-`, test.PowerShellQuote(counterFile)), "\n")
-	}
-
-	counterFile = test.PortableShellPath(counterFile)
-	return strings.TrimPrefix(fmt.Sprintf(`
-COUNTER_FILE=%s
-count=0
-if [ -f "$COUNTER_FILE" ]; then
-  count=$(cat "$COUNTER_FILE")
-fi
-count=$((count + 1))
-printf '%%s' "$count" > "$COUNTER_FILE"
-exit 1
-`, test.PosixQuote(counterFile)), "\n")
-}
-
 func TestParallelExecution_AbortSuppressesPendingRetry(t *testing.T) {
-	counterFile := filepath.Join(t.TempDir(), "parallel-retry-counter.txt")
-	childScript := parallelRetryCounterScript(counterFile)
-
 	th := test.Setup(t, test.WithBuiltExecutable())
 	dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
@@ -501,12 +471,11 @@ params:
   - ITEM: ""
 steps:
   - name: flaky
-    command: |
-%s
+    command: %q
     retry_policy:
       limit: 1
       interval_sec: 10
-`, indentTestScript(childScript, 6)))
+`, test.PortableFailureCommand()))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -514,10 +483,21 @@ steps:
 		errCh <- agent.Run(agent.Context)
 	}()
 
+	startedRunID := ""
 	require.Eventually(t, func() bool {
-		data, err := os.ReadFile(counterFile)
-		return err == nil && strings.TrimSpace(string(data)) == "1"
-	}, intgTestTimeout(20*time.Second), 50*time.Millisecond, "expected first attempt to increment counter")
+		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+		if err != nil || status.Status != core.Running || len(status.Nodes) == 0 {
+			return false
+		}
+
+		childStatus, ok := findStartedParallelSubRunStatus(t, dag, &status)
+		if !ok || len(childStatus.Nodes) == 0 {
+			return false
+		}
+
+		startedRunID = childStatus.DAGRunID
+		return childStatus.Nodes[0].DoneCount >= 1
+	}, intgTestTimeout(20*time.Second), 50*time.Millisecond, "expected child DAG to finish its first attempt before abort")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
@@ -543,10 +523,11 @@ steps:
 	require.Len(t, finalStatus.Nodes, 1)
 	require.Equal(t, core.NodeAborted, finalStatus.Nodes[0].Status)
 
-	require.Never(t, func() bool {
-		data, readErr := os.ReadFile(counterFile)
-		return readErr != nil || strings.TrimSpace(string(data)) != "1"
-	}, 3*time.Second, 50*time.Millisecond, "retry should not launch after abort")
+	rootRun := exec.NewDAGRunRef(finalStatus.Name, finalStatus.DAGRunID)
+	childStatus, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, startedRunID)
+	require.NoError(t, err)
+	require.Len(t, childStatus.Nodes, 1)
+	require.Equal(t, 1, childStatus.Nodes[0].DoneCount, "retry should not launch after abort")
 }
 
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
@@ -1716,4 +1697,22 @@ func countStartedParallelSubRuns(t *testing.T, dag test.DAG, status *exec.DAGRun
 		}
 	}
 	return started
+}
+
+func findStartedParallelSubRunStatus(t *testing.T, dag test.DAG, status *exec.DAGRunStatus) (*exec.DAGRunStatus, bool) {
+	t.Helper()
+
+	if len(status.Nodes) == 0 {
+		return nil, false
+	}
+
+	rootRun := exec.NewDAGRunRef(status.Name, status.DAGRunID)
+	for _, subRun := range status.Nodes[0].SubRuns {
+		subStatus, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID)
+		if err == nil {
+			return subStatus, true
+		}
+	}
+
+	return nil, false
 }

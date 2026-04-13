@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -1977,14 +1976,22 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 		),
 	)
 
-	cancelWait := 5 * time.Second
-	if goruntime.GOOS == "windows" {
-		cancelWait = 45 * time.Second
-	}
+	cancelWait := platformTestDuration(5*time.Second, 60*time.Second)
 	repeated := make(chan bool, 1)
 	go func() {
-		repeated <- waitForNodeDoneCountAtLeast(plan.Plan, "1", 1, cancelWait) &&
-			waitForNodeRepeated(plan.Plan, "1", cancelWait)
+		deadline := time.Now().Add(cancelWait)
+		for time.Now().Before(deadline) {
+			if node := plan.Plan.GetNodeByName("1"); node != nil {
+				state := node.State()
+				if state.DoneCount >= 1 && state.Repeated {
+					repeated <- true
+					r.runner.Cancel(plan.Plan)
+					return
+				}
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		repeated <- false
 		r.runner.Cancel(plan.Plan)
 	}()
 

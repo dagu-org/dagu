@@ -18,33 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func repeatCounterScript(counterFile string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(`
-$counterFile = %s
-$count = 0
-if ([System.IO.File]::Exists($counterFile)) {
-  $count = [int][System.IO.File]::ReadAllText($counterFile).Trim()
-}
-$count++
-[System.IO.File]::WriteAllText($counterFile, [string]$count)
-Write-Output $count
-`, test.PowerShellQuote(counterFile))
-	}
-
-	counterFile = test.PortableShellPath(counterFile)
-	return fmt.Sprintf(`
-COUNT=0
-if [ -f %s ]; then
-  COUNT=$(cat %s)
-fi
-COUNT=$((COUNT + 1))
-printf '%%s' "$COUNT" > %s
-echo "Count: $COUNT"
-echo "$COUNT"
-`, test.PosixQuote(counterFile), test.PosixQuote(counterFile), test.PosixQuote(counterFile))
-}
-
 func repeatPolicyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
 		if raceEnabled() {
@@ -101,10 +74,6 @@ fi
 
 func repeatLiteralCommandSubstitution(value string) string {
 	return test.PortableCommandSubstitution(test.PortableOutputCommand(value))
-}
-
-func repeatCounterValueCondition(counterFile string) string {
-	return test.PortableReadTrimmedFileCommand(counterFile)
 }
 
 func repeatPolicyParallel(t *testing.T) {

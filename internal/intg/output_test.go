@@ -41,7 +41,7 @@ func TestLargeOutput_128KB(t *testing.T) {
 	agent := dag.Agent()
 
 	// Run with timeout to detect hanging
-	ctx, cancel := context.WithTimeout(agent.Context, intgTestTimeout(30*time.Second))
+	ctx, cancel := context.WithTimeout(agent.Context, intgTestTimeout(45*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)

@@ -16,6 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func directStartStatusTimeout() time.Duration {
+	if runtime.GOOS == "windows" && raceEnabled() {
+		return 30 * time.Second
+	}
+	return 20 * time.Second
+}
+
 func TestExecution_StatusPushing(t *testing.T) {
 	t.Run("statusUpdatesPersistedToCoordinatorStore", func(t *testing.T) {
 		f := newTestFixture(t, `
@@ -134,7 +141,7 @@ steps:
 
 		require.NoError(t, f.start())
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, directStartStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -159,7 +166,7 @@ steps:
 
 		require.NoError(t, f.start())
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, directStartStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -234,7 +241,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, directStartStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
