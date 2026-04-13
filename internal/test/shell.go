@@ -102,7 +102,7 @@ func PortableCreateEmptyFileCommand(path string) string {
 
 func PortableReadTrimmedFileCommand(path string) string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("Get-Content -Raw -Path %s | ForEach-Object { $_.TrimEnd(\"`r\", \"`n\") }", PowerShellQuote(path))
+		return fmt.Sprintf("(Get-Content -Raw -Path %s).TrimEnd(\"`r\", \"`n\")", PowerShellQuote(path))
 	}
 	return fmt.Sprintf("tr -d '\\r\\n' < %s", PosixQuote(path))
 }

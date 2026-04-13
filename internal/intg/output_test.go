@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -18,6 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func outputsTestParallel(t *testing.T) {
+	t.Helper()
+
+	if runtime.GOOS != "windows" || !raceEnabled() {
+		t.Parallel()
+	}
+}
 
 func TestLargeOutput_128KB(t *testing.T) {
 	th := test.Setup(t)
@@ -53,7 +62,7 @@ func TestLargeOutput_128KB(t *testing.T) {
 }
 
 func TestOutputsCollection(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	tests := []struct {
 		name            string
@@ -269,7 +278,7 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			outputsTestParallel(t)
 
 			th := test.Setup(t)
 			dag := th.DAG(t, tt.dagYAML)
@@ -291,7 +300,7 @@ steps:
 }
 
 func TestOutputsCollection_FailedDAG(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	th := test.Setup(t)
 	dag := th.DAG(t, `
@@ -327,7 +336,7 @@ steps:
 }
 
 func TestOutputsCollection_CamelCaseConversion(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	tests := []struct {
 		envVarName    string
@@ -342,7 +351,7 @@ func TestOutputsCollection_CamelCaseConversion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.envVarName, func(t *testing.T) {
-			t.Parallel()
+			outputsTestParallel(t)
 
 			th := test.Setup(t)
 			dag := th.DAG(t, `
@@ -363,7 +372,7 @@ steps:
 }
 
 func TestOutputsCollection_SecretsMasked(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	th := test.Setup(t)
 
@@ -401,7 +410,7 @@ steps:
 }
 
 func TestOutputsCollection_MetadataIncluded(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	th := test.Setup(t)
 	dag := th.DAG(t, `

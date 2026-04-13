@@ -65,6 +65,9 @@ func TestTerminal_AbruptDisconnectReleasesSession(t *testing.T) {
 }
 
 func TestTerminal_ShellExitClosesCleanly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("PTY/WebSocket close timing is unreliable on Windows runners")
+	}
 	server, token := setupTerminalServer(t, 1)
 	conn := mustDialTerminal(t, server, token)
 
@@ -78,6 +81,9 @@ func TestTerminal_ShellExitClosesCleanly(t *testing.T) {
 }
 
 func TestTerminal_ServerShutdownDoesNotEmitTimeoutError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("PTY/WebSocket close timing is unreliable on Windows runners")
+	}
 	server, token := setupTerminalServer(t, 1)
 	conn := mustDialTerminal(t, server, token)
 

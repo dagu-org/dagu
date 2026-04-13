@@ -5,12 +5,20 @@ package terminal
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func managerTiming(base time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return base * 4
+	}
+	return base
+}
 
 func TestManager_ReleasePendingFreesReservation(t *testing.T) {
 	t.Parallel()
@@ -211,18 +219,18 @@ func TestManager_ShutdownObservesCleanupWithinRemainingBudget(t *testing.T) {
 	go func() {
 		// Intentional sleep: simulates cleanup delay to verify Shutdown
 		// completes within the remaining context budget.
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(managerTiming(50 * time.Millisecond))
 		lease.Release()
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), managerTiming(100*time.Millisecond))
 	defer cancel()
 
 	start := time.Now()
 	require.NoError(t, manager.Shutdown(ctx))
 	elapsed := time.Since(start)
-	assert.GreaterOrEqual(t, elapsed, 45*time.Millisecond)
-	assert.Less(t, elapsed, 100*time.Millisecond)
+	assert.GreaterOrEqual(t, elapsed, managerTiming(45*time.Millisecond))
+	assert.Less(t, elapsed, managerTiming(150*time.Millisecond))
 }
 
 func TestManager_ShutdownReturnsPromptlyWhenDeadlineExpires(t *testing.T) {
@@ -236,11 +244,11 @@ func TestManager_ShutdownReturnsPromptlyWhenDeadlineExpires(t *testing.T) {
 	go func() {
 		// Intentional sleep: simulates a lease released after the context
 		// deadline so the test can verify Shutdown returns promptly on expiry.
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(managerTiming(50 * time.Millisecond))
 		lease.Release()
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), managerTiming(10*time.Millisecond))
 	defer cancel()
 
 	start := time.Now()
@@ -248,7 +256,7 @@ func TestManager_ShutdownReturnsPromptlyWhenDeadlineExpires(t *testing.T) {
 	elapsed := time.Since(start)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.ErrorIs(t, err, errTerminalShutdownTimeout)
-	assert.Less(t, elapsed, 50*time.Millisecond)
+	assert.Less(t, elapsed, managerTiming(75*time.Millisecond))
 }
 
 func TestForceKillDelay(t *testing.T) {

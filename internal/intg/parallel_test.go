@@ -567,7 +567,7 @@ steps:
 }
 
 func TestParallelExecution_PartialFailure(t *testing.T) {
-	const dagContent = `steps:
+	dagContent := `steps:
   - call: child-conditional-fail
     parallel:
       items:
@@ -588,6 +588,29 @@ steps:
       fi
       echo "Processing: $1"
 `
+	if runtime.GOOS == "windows" {
+		dagContent = `steps:
+  - call: child-conditional-fail
+    parallel:
+      items:
+        - "ok1"
+        - "fail"
+        - "ok2"
+        - "fail"
+        - "ok3"
+---
+name: child-conditional-fail
+params:
+  - INPUT: "default"
+steps:
+  - command: |
+      if ("$1" -eq "fail") {
+        Write-Output "Failing as requested"
+        exit 1
+      }
+      Write-Output ("Processing: {0}" -f "$1")
+`
+	}
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -957,11 +980,7 @@ steps:
 func TestParallelExecution_ObjectItemProperties(t *testing.T) {
 	const dagContent = `steps:
   - command: |
-      echo '[
-        {"region": "us-east-1", "bucket": "data-us"},
-        {"region": "eu-west-1", "bucket": "data-eu"},
-        {"region": "ap-south-1", "bucket": "data-ap"}
-      ]'
+      echo '[{"region":"us-east-1","bucket":"data-us"},{"region":"eu-west-1","bucket":"data-eu"},{"region":"ap-south-1","bucket":"data-ap"}]'
     output: CONFIGS
 
   - call: sync-data
@@ -980,9 +999,9 @@ params:
   - BUCKET: ""
 steps:
   - script: |
-      echo "Syncing data from region: $REGION"
-      echo "Using bucket: $BUCKET"
-      echo "Sync completed for $BUCKET in $REGION"
+      echo "Syncing data from region: ${REGION}"
+      echo "Using bucket: ${BUCKET}"
+      echo "Sync completed for ${BUCKET} in ${REGION}"
     output: SYNC_RESULT
 `
 
@@ -1031,12 +1050,8 @@ func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(testDataDir, file), []byte(content), 0644))
 	}
 
-	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "process-file", []byte(`
-params:
-  - ITEM: ""
-steps:
-  - script: |
-      FILE="$ITEM"
+	processFileScript := `
+      FILE="${ITEM}"
       echo "Processing file: ${FILE}"
       if [ -f "${FILE}" ]; then
         LINE_COUNT=$(wc -l < "${FILE}")
@@ -1045,12 +1060,38 @@ steps:
         echo "ERROR: File not found"
         exit 1
       fi
+`
+	discoverCommand := fmt.Sprintf("find %s -name '*.csv' -type f", test.PosixQuote(test.PortableShellPath(testDataDir)))
+	if runtime.GOOS == "windows" {
+		processFileScript = `
+      $file = "${ITEM}"
+      Write-Output ("Processing file: {0}" -f $file)
+      if (Test-Path -LiteralPath $file) {
+        $lineCount = (Get-Content -Path $file | Measure-Object -Line).Lines
+        Write-Output ("File has {0} lines" -f $lineCount)
+      } else {
+        Write-Output "ERROR: File not found"
+        exit 1
+      }
+`
+		discoverCommand = fmt.Sprintf(
+			"Get-ChildItem -Path %s -Filter '*.csv' -File -Recurse | Select-Object -ExpandProperty FullName",
+			test.PowerShellQuote(testDataDir),
+		)
+	}
+
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "process-file", []byte(fmt.Sprintf(`
+params:
+  - ITEM: ""
+steps:
+  - script: |
+%s
     output: PROCESS_RESULT
-`))
+`, strings.TrimPrefix(processFileScript, "\n"))))
 
 	dag := helper.DAG(t, fmt.Sprintf(`
 steps:
-  - command: find %s -name "*.csv" -type f
+  - command: %s
     output: FILES
 
   - call: process-file
@@ -1058,7 +1099,7 @@ steps:
     params:
       - ITEM: ${ITEM}
     output: RESULTS
-`, filepath.ToSlash(testDataDir)))
+`, discoverCommand))
 
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
@@ -1099,7 +1140,7 @@ steps:
 }
 
 func TestParallelExecution_StaticObjectItems(t *testing.T) {
-	const dagContent = `steps:
+	dagContent := `steps:
   - call: deploy-service
     parallel:
       max_concurrent: 3
@@ -1129,26 +1170,78 @@ params:
 steps:
   - script: |
       echo "Validating deployment parameters..."
-      if [ -z "$SERVICE_NAME" ] || [ -z "$PORT" ] || [ -z "$REPLICAS" ]; then
+      if [ -z "${SERVICE_NAME}" ] || [ -z "${PORT}" ] || [ -z "${REPLICAS}" ]; then
         echo "ERROR: Missing required parameters"
         exit 1
       fi
-      echo "Service: $SERVICE_NAME"
-      echo "Port: $PORT"
-      echo "Replicas: $REPLICAS"
+      echo "Service: ${SERVICE_NAME}"
+      echo "Port: ${PORT}"
+      echo "Replicas: ${REPLICAS}"
     output: VALIDATE_RESULT
   - script: |
-      echo "Deploying $SERVICE_NAME..."
-      echo "  - Binding to port $PORT"
-      echo "  - Scaling to $REPLICAS replicas"
+      echo "Deploying ${SERVICE_NAME}..."
+      echo "  - Binding to port ${PORT}"
+      echo "  - Scaling to ${REPLICAS} replicas"
       sleep 1
-      if [ "$SERVICE_NAME" = "api-service" ]; then
-        echo "ERROR: Failed to deploy $SERVICE_NAME - port $PORT already in use"
+      if [ "${SERVICE_NAME}" = "api-service" ]; then
+        echo "ERROR: Failed to deploy ${SERVICE_NAME} - port ${PORT} already in use"
         exit 1
       fi
-      echo "Successfully deployed $SERVICE_NAME"
+      echo "Successfully deployed ${SERVICE_NAME}"
     output: DEPLOY_RESULT
 `
+	if runtime.GOOS == "windows" {
+		dagContent = `steps:
+  - call: deploy-service
+    parallel:
+      max_concurrent: 3
+      items:
+        - name: web-service
+          port: 8080
+          replicas: 3
+        - name: api-service
+          port: 8081
+          replicas: 2
+        - name: worker-service
+          port: 8082
+          replicas: 5
+    params:
+      - SERVICE_NAME: ${ITEM.name}
+      - PORT: ${ITEM.port}
+      - REPLICAS: ${ITEM.replicas}
+    continue_on:
+      failure: true
+    output: DEPLOYMENT_RESULTS
+---
+name: deploy-service
+params:
+  - SERVICE_NAME: ""
+  - PORT: ""
+  - REPLICAS: ""
+steps:
+  - script: |
+      Write-Output "Validating deployment parameters..."
+      if ([string]::IsNullOrEmpty("${SERVICE_NAME}") -or [string]::IsNullOrEmpty("${PORT}") -or [string]::IsNullOrEmpty("${REPLICAS}")) {
+        Write-Output "ERROR: Missing required parameters"
+        exit 1
+      }
+      Write-Output ("Service: {0}" -f "${SERVICE_NAME}")
+      Write-Output ("Port: {0}" -f "${PORT}")
+      Write-Output ("Replicas: {0}" -f "${REPLICAS}")
+    output: VALIDATE_RESULT
+  - script: |
+      Write-Output ("Deploying {0}..." -f "${SERVICE_NAME}")
+      Write-Output ("  - Binding to port {0}" -f "${PORT}")
+      Write-Output ("  - Scaling to {0} replicas" -f "${REPLICAS}")
+      Start-Sleep -Seconds 1
+      if ("${SERVICE_NAME}" -eq "api-service") {
+        Write-Output ("ERROR: Failed to deploy {0} - port {1} already in use" -f "${SERVICE_NAME}", "${PORT}")
+        exit 1
+      }
+      Write-Output ("Successfully deployed {0}" -f "${SERVICE_NAME}")
+    output: DEPLOY_RESULT
+`
+	}
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -1274,6 +1367,73 @@ steps:
 // split into individual KEY=VALUE pairs after expansion.
 // See: https://github.com/dagucloud/dagu/issues/1658
 func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
+	expandedParamsScript := `
+      if [ -z "${A}" ] || [ -z "${B}" ]; then
+        echo "FAIL: A='${A}' B='${B}' (expected A=1 B=2)"
+        exit 1
+      fi
+      echo "OK: NAME=${NAME} A=${A} B=${B}"
+`
+	multiExpandScript := `
+      if [ -z "${X}" ] || [ -z "${Y}" ]; then
+        echo "FAIL: NAME='${NAME}' X='${X}' Y='${Y}'"
+        exit 1
+      fi
+      echo "OK: NAME=${NAME} X=${X} Y=${Y}"
+`
+	namedSpacesScript := `
+      if [ "${LABEL}" != "hello world" ]; then
+        echo "FAIL: LABEL='${LABEL}' (expected 'hello world')"
+        exit 1
+      fi
+      if [ "${ID}" != "1" ]; then
+        echo "FAIL: ID='${ID}' (expected '1')"
+        exit 1
+      fi
+      echo "OK: LABEL=${LABEL} ID=${ID}"
+`
+	singleValueScript := `
+      if [ "$1" != "simple" ]; then
+        echo "FAIL: TAG='$1' (expected 'simple')"
+        exit 1
+      fi
+      echo "OK: TAG=$1"
+`
+	if runtime.GOOS == "windows" {
+		expandedParamsScript = `
+      if ([string]::IsNullOrEmpty("${A}") -or [string]::IsNullOrEmpty("${B}")) {
+        Write-Output ("FAIL: A='{0}' B='{1}' (expected A=1 B=2)" -f "${A}", "${B}")
+        exit 1
+      }
+      Write-Output ("OK: NAME={0} A={1} B={2}" -f "${NAME}", "${A}", "${B}")
+`
+		multiExpandScript = `
+      if ([string]::IsNullOrEmpty("${X}") -or [string]::IsNullOrEmpty("${Y}")) {
+        Write-Output ("FAIL: NAME='{0}' X='{1}' Y='{2}'" -f "${NAME}", "${X}", "${Y}")
+        exit 1
+      }
+      Write-Output ("OK: NAME={0} X={1} Y={2}" -f "${NAME}", "${X}", "${Y}")
+`
+		namedSpacesScript = `
+      if ("${LABEL}" -ne "hello world") {
+        Write-Output ("FAIL: LABEL='{0}' (expected 'hello world')" -f "${LABEL}")
+        exit 1
+      }
+      if ("${ID}" -ne "1") {
+        Write-Output ("FAIL: ID='{0}' (expected '1')" -f "${ID}")
+        exit 1
+      }
+      Write-Output ("OK: LABEL={0} ID={1}" -f "${LABEL}", "${ID}")
+`
+		singleValueScript = `
+      if ("$1" -ne "simple") {
+        Write-Output ("FAIL: TAG='{0}' (expected 'simple')" -f "$1")
+        exit 1
+      }
+      Write-Output ("OK: TAG={0}" -f "$1")
+`
+	}
+
 	cases := []struct {
 		name            string
 		dag             string
@@ -1282,7 +1442,7 @@ func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
 	}{
 		{
 			name: "positional_expands_to_multiple_params",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"name": "test", "extra": "A=1 B=2"}]'
     output: ITEMS
@@ -1300,13 +1460,9 @@ params:
   - B: ""
 steps:
   - script: |
-      if [ -z "$A" ] || [ -z "$B" ]; then
-        echo "FAIL: A='$A' B='$B' (expected A=1 B=2)"
-        exit 1
-      fi
-      echo "OK: NAME=$NAME A=$A B=$B"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(expandedParamsScript, "\n")),
 			expectedSubRuns: 1,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 1, results.Summary.Succeeded)
@@ -1317,7 +1473,7 @@ steps:
 		},
 		{
 			name: "multiple_items_different_expansions",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"name":"alpha","extra":"X=10 Y=20"}, {"name":"beta","extra":"X=30 Y=40"}]'
     output: ITEMS
@@ -1335,13 +1491,9 @@ params:
   - Y: ""
 steps:
   - script: |
-      if [ -z "$X" ] || [ -z "$Y" ]; then
-        echo "FAIL: NAME='$NAME' X='$X' Y='$Y'"
-        exit 1
-      fi
-      echo "OK: NAME=$NAME X=$X Y=$Y"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(multiExpandScript, "\n")),
 			expectedSubRuns: 2,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 2, results.Summary.Succeeded)
@@ -1363,7 +1515,7 @@ steps:
 		},
 		{
 			name: "named_param_with_spaces_preserved",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"label": "hello world", "id": "1"}]'
     output: ITEMS
@@ -1380,17 +1532,9 @@ params:
   - ID: ""
 steps:
   - script: |
-      if [ "$LABEL" != "hello world" ]; then
-        echo "FAIL: LABEL='$LABEL' (expected 'hello world')"
-        exit 1
-      fi
-      if [ "$ID" != "1" ]; then
-        echo "FAIL: ID='$ID' (expected '1')"
-        exit 1
-      fi
-      echo "OK: LABEL=$LABEL ID=$ID"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(namedSpacesScript, "\n")),
 			expectedSubRuns: 1,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 1, results.Summary.Succeeded)
@@ -1401,7 +1545,7 @@ steps:
 		},
 		{
 			name: "positional_single_value_no_split",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"tag": "simple"}]'
     output: ITEMS
@@ -1417,13 +1561,9 @@ params:
   - TAG: ""
 steps:
   - script: |
-      if [ "$1" != "simple" ]; then
-        echo "FAIL: \$1='$1' (expected 'simple')"
-        exit 1
-      fi
-      echo "OK: TAG=$1"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(singleValueScript, "\n")),
 			expectedSubRuns: 1,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 1, results.Summary.Succeeded)

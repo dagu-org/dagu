@@ -217,8 +217,6 @@ func retryOutputSequenceScript(counterFile string, outputs []string, successAtte
 }
 
 func TestRunner(t *testing.T) {
-	testScript := test.TestdataPath(t, filepath.Join("runtime", "runner", "testfile.sh"))
-
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
 		t.Parallel()
 		r := setupRunner(t, withMaxActiveRuns(1))
@@ -396,11 +394,15 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
 		r := setupRunner(t)
+		command := "echo test_output >&2; echo test_output; false"
+		if windowsShellTest() {
+			command = "Write-Error 'test_output'; Write-Output 'test_output'; exit 1"
+		}
 
 		// 1 (exit code 1) -> 2
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo test_output >&2; echo test_output; false"), // write to stderr and stdout
+				withCommand(command), // write to stderr and stdout
 				withContinueOn(core.ContinueOn{
 					Output: []string{
 						"test_output",
@@ -486,12 +488,21 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeNotStarted)
 	})
 	t.Run("Timeout", func(t *testing.T) {
-		r := setupRunner(t, withTimeout(time.Millisecond*500))
+		dagTimeout := 500 * time.Millisecond
+		firstSleep := 100 * time.Millisecond
+		secondSleep := 500 * time.Millisecond
+		if windowsShellTest() {
+			dagTimeout = 3 * time.Second
+			firstSleep = 200 * time.Millisecond
+			secondSleep = 5 * time.Second
+		}
+
+		r := setupRunner(t, withTimeout(dagTimeout))
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
 		plan := r.newPlan(t,
-			newStep("1", withCommand("sleep 0.1")),
-			newStep("2", withCommand("sleep 0.5"), withDepends("1")),
+			newStep("1", withCommand(test.PortableSleepCommand(firstSleep))),
+			newStep("2", withCommand(test.PortableSleepCommand(secondSleep)), withDepends("1")),
 			successStep("3", "2"),
 		)
 
@@ -510,7 +521,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(fmt.Sprintf("%s %s", testScript, file)),
+				withCommand(test.PortableFileExistsCommand(file)),
 				withRetryPolicy(2, 0),
 			),
 		)
@@ -571,7 +582,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(fmt.Sprintf("%s %s", testScript, file)),
+				withCommand(test.PortableFileExistsCommand(file)),
 				withRetryPolicy(3, time.Millisecond*50),
 			),
 		)
@@ -951,9 +962,12 @@ func TestRunner(t *testing.T) {
 		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
-		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		outputRaw, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+		output, ok := outputRaw.(string)
+		require.True(t, ok, "output variable is not a string")
+		require.True(t, strings.HasPrefix(output, "RESULT="), "unexpected output %q", output)
+		require.True(t, strings.HasSuffix(strings.TrimPrefix(output, "RESULT="), ".log"), "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDOUTFILE", func(t *testing.T) {
 		r := setupRunner(t)
@@ -965,9 +979,12 @@ func TestRunner(t *testing.T) {
 		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
-		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		outputRaw, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.out$`, output, "unexpected output %q", output)
+		output, ok := outputRaw.(string)
+		require.True(t, ok, "output variable is not a string")
+		require.True(t, strings.HasPrefix(output, "RESULT="), "unexpected output %q", output)
+		require.True(t, strings.HasSuffix(strings.TrimPrefix(output, "RESULT="), ".out"), "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDERRFILE", func(t *testing.T) {
 		r := setupRunner(t)
@@ -979,9 +996,12 @@ func TestRunner(t *testing.T) {
 		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
-		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		outputRaw, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.err$`, output, "unexpected output %q", output)
+		output, ok := outputRaw.(string)
+		require.True(t, ok, "output variable is not a string")
+		require.True(t, strings.HasPrefix(output, "RESULT="), "unexpected output %q", output)
+		require.True(t, strings.HasSuffix(strings.TrimPrefix(output, "RESULT="), ".err"), "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNID", func(t *testing.T) {
 		r := setupRunner(t)

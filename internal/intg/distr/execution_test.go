@@ -424,7 +424,7 @@ steps:
 
 			items, err := f.coord.QueueStore.ListByDAGName(f.coord.Context, f.dagWrapper.ProcGroup(), f.dagWrapper.Name)
 			return err == nil && len(items) == 0
-		}, 25*time.Second, 200*time.Millisecond, "Queue should be empty after success")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Queue should be empty after success")
 	})
 
 	t.Run("queuedStatusBeforeSchedulerStarts", func(t *testing.T) {

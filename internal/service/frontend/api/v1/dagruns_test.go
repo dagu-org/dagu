@@ -303,24 +303,31 @@ steps:
 	startResp.Unmarshal(t, &startBody)
 	require.NotEmpty(t, startBody.DagRunId)
 
-	status := waitForDAGRunStatus(
-		t,
-		server,
-		"parent_dag_for_subdag_spec",
-		startBody.DagRunId,
-		15*time.Second,
+	status := waitForDAGRunStatus(t, server, "parent_dag_for_subdag_spec", startBody.DagRunId, 30*time.Second,
 		func(status *exec.DAGRunStatus) bool {
-			return status.Status == core.Succeeded &&
-				len(status.Nodes) == 1 &&
-				len(status.Nodes[0].SubRuns) == 1
+			return status.Status == core.Succeeded && len(status.Nodes) == 1
 		},
 	)
 	require.Len(t, status.Nodes, 1, "Expected 1 node (the call_child step)")
 
-	// Extract the sub-DAG run ID from the call step
-	callNode := status.Nodes[0]
+	var persisted exec.DAGRunStatus
+	require.Eventually(t, func() bool {
+		attempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef("parent_dag_for_subdag_spec", startBody.DagRunId))
+		if err != nil {
+			return false
+		}
+		current, err := attempt.ReadStatus(server.Context)
+		if err != nil {
+			return false
+		}
+		persisted = *current
+		return persisted.Status == core.Succeeded &&
+			len(persisted.Nodes) == 1 &&
+			len(persisted.Nodes[0].SubRuns) == 1
+	}, dagRunEventuallyTimeout(30*time.Second), 200*time.Millisecond)
+
+	callNode := persisted.Nodes[0]
 	require.Equal(t, "call_child", callNode.Step.Name)
-	require.Len(t, callNode.SubRuns, 1, "Expected exactly one sub-DAG run")
 	subDAGRunID := callNode.SubRuns[0].DAGRunID
 
 	// Test 1: Fetch the sub-DAG spec successfully
