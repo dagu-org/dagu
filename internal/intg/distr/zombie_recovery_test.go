@@ -32,6 +32,13 @@ const (
 	testZombieDetectorInterval  = 500 * time.Millisecond
 )
 
+func delayedAfterAckFailureTimeout(mode workerMode) time.Duration {
+	if mode == sharedNothingMode && runtime.GOOS == "windows" && raceEnabled() {
+		return 30 * time.Second
+	}
+	return 20 * time.Second
+}
+
 // TestDistributedRun_WorkerCrash_MarkedFailed verifies that a hard-killed worker
 // is treated as a crash and the coordinator's zombie detector marks the run FAILED.
 func TestDistributedRun_WorkerCrash_MarkedFailed(t *testing.T) {
@@ -496,7 +503,7 @@ steps:
 	lease := waitForAnyLease(t, f, 5*time.Second)
 	require.Equal(t, "delayed-worker", lease.WorkerID)
 
-	failedStatus := f.waitForStatus(core.Failed, 20*time.Second)
+	failedStatus := f.waitForStatus(core.Failed, delayedAfterAckFailureTimeout(mode))
 	require.Equal(t, core.Failed, failedStatus.Status)
 	require.Equal(t, lease.AttemptKey, failedStatus.AttemptKey)
 

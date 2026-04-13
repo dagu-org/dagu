@@ -456,6 +456,12 @@ steps:
 }
 
 func TestParallelExecution_AbortSuppressesPendingRetry(t *testing.T) {
+	markerFile := filepath.Join(t.TempDir(), "parallel-first-attempt.marker")
+	childScript := test.PortableCommandSequence(
+		test.PortableCreateEmptyFileCommand(markerFile),
+		test.PortableFailureCommand(),
+	)
+
 	th := test.Setup(t, test.WithBuiltExecutable())
 	dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
@@ -471,11 +477,12 @@ params:
   - ITEM: ""
 steps:
   - name: flaky
-    command: %q
+    command: |
+%s
     retry_policy:
       limit: 1
       interval_sec: 10
-`, test.PortableFailureCommand()))
+`, indentTestScript(childScript, 6)))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -483,29 +490,35 @@ steps:
 		errCh <- agent.Run(agent.Context)
 	}()
 
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(markerFile)
+		return err == nil
+	}, intgTestTimeout(20*time.Second), 50*time.Millisecond, "expected first attempt to create marker file before abort")
+
 	startedRunID := ""
+	rootRun := exec.DAGRunRef{}
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 		if err != nil || status.Status != core.Running || len(status.Nodes) == 0 {
 			return false
 		}
 
-		childStatus, ok := findStartedParallelSubRunStatus(t, dag, &status)
-		if !ok || len(childStatus.Nodes) == 0 {
+		if len(status.Nodes[0].SubRuns) != 1 || countStartedParallelSubRuns(t, dag, &status) != 1 {
 			return false
 		}
 
-		startedRunID = childStatus.DAGRunID
-		return childStatus.Nodes[0].DoneCount >= 1
-	}, intgTestTimeout(20*time.Second), 50*time.Millisecond, "expected child DAG to finish its first attempt before abort")
+		rootRun = exec.NewDAGRunRef(status.Name, status.DAGRunID)
+		startedRunID = status.Nodes[0].SubRuns[0].DAGRunID
+		return startedRunID != ""
+	}, intgTestTimeout(15*time.Second), 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
 
 	require.Eventually(t, func() bool {
-		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-		if err != nil {
+		childStatus, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, startedRunID)
+		if err != nil || len(childStatus.Nodes) == 0 {
 			return false
 		}
-		return status.Status == core.Running
-	}, intgTestTimeout(15*time.Second), 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
+		return childStatus.Nodes[0].DoneCount >= 1
+	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected child DAG to finish its first attempt before abort")
 
 	agent.Abort()
 
@@ -523,7 +536,16 @@ steps:
 	require.Len(t, finalStatus.Nodes, 1)
 	require.Equal(t, core.NodeAborted, finalStatus.Nodes[0].Status)
 
-	rootRun := exec.NewDAGRunRef(finalStatus.Name, finalStatus.DAGRunID)
+	rootRun = exec.NewDAGRunRef(finalStatus.Name, finalStatus.DAGRunID)
+	startedRunID = ""
+	for _, subRun := range finalStatus.Nodes[0].SubRuns {
+		if _, subErr := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); subErr != nil {
+			continue
+		}
+		startedRunID = subRun.DAGRunID
+	}
+	require.NotEmpty(t, startedRunID, "expected one persisted started sub-run")
+
 	childStatus, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, startedRunID)
 	require.NoError(t, err)
 	require.Len(t, childStatus.Nodes, 1)
@@ -1697,22 +1719,4 @@ func countStartedParallelSubRuns(t *testing.T, dag test.DAG, status *exec.DAGRun
 		}
 	}
 	return started
-}
-
-func findStartedParallelSubRunStatus(t *testing.T, dag test.DAG, status *exec.DAGRunStatus) (*exec.DAGRunStatus, bool) {
-	t.Helper()
-
-	if len(status.Nodes) == 0 {
-		return nil, false
-	}
-
-	rootRun := exec.NewDAGRunRef(status.Name, status.DAGRunID)
-	for _, subRun := range status.Nodes[0].SubRuns {
-		subStatus, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID)
-		if err == nil {
-			return subStatus, true
-		}
-	}
-
-	return nil, false
 }

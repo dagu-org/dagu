@@ -4,7 +4,10 @@
 package api_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,6 +61,85 @@ func waitForDAGRunStatus(
 	}, dagRunEventuallyTimeout(timeout), 200*time.Millisecond)
 
 	return status
+}
+
+func waitForStoredDAGRunStatus(
+	t *testing.T,
+	server test.Server,
+	dagName string,
+	dagRunID string,
+	timeout time.Duration,
+	predicate func(*exec.DAGRunStatus) bool,
+) *exec.DAGRunStatus {
+	t.Helper()
+
+	ref := exec.NewDAGRunRef(dagName, dagRunID)
+	var status *exec.DAGRunStatus
+	require.Eventually(t, func() bool {
+		attempt, err := server.DAGRunStore.FindAttempt(server.Context, ref)
+		if err != nil {
+			return false
+		}
+		current, err := attempt.ReadStatus(server.Context)
+		if err != nil || current == nil {
+			return false
+		}
+		status = current
+		return predicate(current)
+	}, dagRunEventuallyTimeout(timeout), 200*time.Millisecond)
+
+	return status
+}
+
+func postJSONWithConservativeTransport(t *testing.T, server test.Server, path string, body any) (int, []byte) {
+	t.Helper()
+
+	payload, err := json.Marshal(body)
+	require.NoError(t, err, "failed to marshal request body")
+
+	transport := &http.Transport{
+		DisableCompression: true,
+		DisableKeepAlives:  true,
+	}
+	t.Cleanup(transport.CloseIdleConnections)
+
+	client := &http.Client{Transport: transport}
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("http://%s:%d%s", server.Config.Server.Host, server.Config.Server.Port, path),
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err, "failed to build POST request")
+
+	req.Close = true
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept-Encoding", "identity")
+	req.Header.Set("Connection", "close")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	require.NoError(t, err, "failed to make POST request")
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "failed to read response body")
+
+	return resp.StatusCode, responseBody
+}
+
+func syncSuccessDagSpec() string {
+	if runtime.GOOS == "windows" {
+		return `steps:
+  - name: echo-step
+    shell: cmd
+    command: "echo hello sync"`
+	}
+
+	return `steps:
+  - name: echo-step
+    command: "echo hello sync"`
 }
 
 func TestGetDAGRunSpec(t *testing.T) {
@@ -565,7 +647,7 @@ steps:
 	require.NotEmpty(t, startBody.DagRunId)
 
 	// Wait for DAG to enter Wait status
-	waitForDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	waitForStoredDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Waiting
 	})
 
@@ -582,7 +664,7 @@ steps:
 	require.Equal(t, "wait-step", rejectBody.StepName)
 
 	// Verify DAG status is Rejected
-	waitForDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	waitForStoredDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Rejected
 	})
 }
@@ -1071,9 +1153,7 @@ steps:
 func TestExecuteDAGSync(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `steps:
-  - name: echo-step
-    command: "echo hello sync"`
+	dagSpec := syncSuccessDagSpec()
 
 	// Create a new DAG
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
@@ -1083,12 +1163,13 @@ func TestExecuteDAGSync(t *testing.T) {
 
 	// Execute synchronously with timeout
 	timeout := dagRunSyncTimeoutSeconds()
-	syncResp := server.Client().Post("/api/v1/dags/sync_test_dag/start-sync", api.ExecuteDAGSyncJSONRequestBody{
+	statusCode, responseBody := postJSONWithConservativeTransport(t, server, "/api/v1/dags/sync_test_dag/start-sync", api.ExecuteDAGSyncJSONRequestBody{
 		Timeout: timeout,
-	}).ExpectStatus(http.StatusOK).Send(t)
+	})
+	require.Equal(t, http.StatusOK, statusCode, "unexpected status code")
 
 	var syncBody api.ExecuteDAGSync200JSONResponse
-	syncResp.Unmarshal(t, &syncBody)
+	require.NoError(t, json.Unmarshal(responseBody, &syncBody))
 
 	// Verify the response contains full DAGRunDetails
 	require.NotEmpty(t, syncBody.DagRun.DagRunId)
