@@ -212,6 +212,8 @@ func waitForTerminalSessionReady(t *testing.T, conn *websocket.Conn) {
 			}
 		case terminalpkg.MessageTypeError:
 			require.Failf(t, "terminal session emitted error while starting", "%s", msg.Data)
+		case terminalpkg.MessageTypeInput, terminalpkg.MessageTypeResize, terminalpkg.MessageTypeClose:
+			// Ignore client-originated frames if they appear in the stream unexpectedly.
 		}
 	}
 }

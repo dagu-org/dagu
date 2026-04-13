@@ -118,10 +118,7 @@ jobs:
                 '^(TestCmdStart_PositionalParamValidation)$'
           - name_suffix: " (core-cmd-rest)"
             test_command: |
-              go test -v -race ./cmd
-              ./scripts/test-shard.sh ./internal/cmd \
-                '' \
-                '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*))'
+              ./scripts/test-cmd-rest-shards.sh
           - name_suffix: " (core-cmn)"
             test_command: |
               ./scripts/test-package-shard.sh \
@@ -136,7 +133,7 @@ jobs:
                 '^github.com/dagucloud/dagu/internal/persis(/|$)'
           - name_suffix: " (core-runtime-base)"
             test_command: |
-              go test -v -race ./internal/runtime
+              ./scripts/test-runtime-shards.sh
           - name_suffix: " (core-runtime-subpackages)"
             test_command: |
               ./scripts/test-package-shard.sh \
@@ -298,4 +295,6 @@ jobs:
         run: |
           chmod +x ./scripts/test-shard.sh
           chmod +x ./scripts/test-package-shard.sh
+          chmod +x ./scripts/test-cmd-rest-shards.sh
+          chmod +x ./scripts/test-runtime-shards.sh
           ${{ matrix.test_command }}

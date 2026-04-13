@@ -827,8 +827,13 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "1", core.NodeAborted)
 
 		node := result.nodeByName(t, "1")
-		// done count should be 1 because 2nd execution is canceled
-		require.Equal(t, 1, node.State().DoneCount)
+		// Windows can report the cancellation before the first repeat is committed,
+		// but it must never count a completed second execution.
+		if windowsShellTest() {
+			require.LessOrEqual(t, node.State().DoneCount, 1)
+		} else {
+			require.Equal(t, 1, node.State().DoneCount)
+		}
 	})
 	t.Run("RepeatFail", func(t *testing.T) {
 		r := setupRunner(t)

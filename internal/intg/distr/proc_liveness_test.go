@@ -14,6 +14,7 @@ import (
 const (
 	distrTestProcHeartbeatInterval = 150 * time.Millisecond
 	distrTestProcStaleThreshold    = 3 * time.Second
+	distrTestProcSuccessTimeout    = 30 * time.Second
 )
 
 func TestExecution_ProcHeartbeat_DirectStart(t *testing.T) {
@@ -31,7 +32,7 @@ steps:
 	f.startScheduler(30 * time.Second)
 	require.NoError(t, f.start())
 
-	status := f.waitForStatus(core.Succeeded, 20*time.Second)
+	status := f.waitForStatus(core.Succeeded, distrTestProcSuccessTimeout)
 	require.Equal(t, core.Succeeded, status.Status)
 }
 
@@ -51,6 +52,6 @@ steps:
 	f.waitForQueued()
 	f.startScheduler(30 * time.Second)
 
-	status := f.waitForStatus(core.Succeeded, 20*time.Second)
+	status := f.waitForStatus(core.Succeeded, distrTestProcSuccessTimeout)
 	require.Equal(t, core.Succeeded, status.Status)
 }

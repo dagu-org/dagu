@@ -23,7 +23,7 @@ func TestSetupDoesNotMutatePerTestProcessEnv(t *testing.T) {
 
 	assert.Equal(t, "/original/dagu-home", os.Getenv("DAGU_HOME"))
 	assert.Equal(t, "/original/config.yaml", os.Getenv("DAGU_CONFIG"))
-	assert.Equal(t, helperExpectedExecutableEnvValue("/original/dagu"), os.Getenv("DAGU_EXECUTABLE"))
+	assertExecutableEnvValue(t, "/original/dagu", os.Getenv("DAGU_EXECUTABLE"))
 	assert.Equal(t, "/original/shell", os.Getenv("SHELL"))
 
 	assert.Contains(t, helper.ChildEnv, "DAGU_HOME="+helper.tmpDir)
@@ -35,20 +35,20 @@ func TestSetupDoesNotMutatePerTestProcessEnv(t *testing.T) {
 	assert.Contains(t, helper.ChildEnv, "TZ=UTC")
 }
 
-func helperExpectedExecutableEnvValue(value string) string {
+func assertExecutableEnvValue(t *testing.T, expectedInput, actual string) {
+	t.Helper()
+
 	if runtime.GOOS != "windows" {
-		return value
+		assert.Equal(t, expectedInput, actual)
+		return
 	}
 
-	if strings.HasPrefix(value, "/") {
-		drive := os.Getenv("SystemDrive")
-		if drive == "" {
-			drive = filepath.VolumeName(os.TempDir())
-		}
-		if drive != "" {
-			return filepath.Join(drive+string(os.PathSeparator), filepath.FromSlash(strings.TrimPrefix(value, "/")))
-		}
+	if after, ok := strings.CutPrefix(expectedInput, "/"); ok {
+		normalized := filepath.FromSlash(after)
+		assert.Regexp(t, `^[A-Za-z]:\\.+`, actual)
+		assert.True(t, strings.HasSuffix(strings.ToLower(actual), strings.ToLower(`\`+normalized)), "unexpected executable env value %q", actual)
+		return
 	}
 
-	return filepath.FromSlash(value)
+	assert.Equal(t, filepath.FromSlash(expectedInput), actual)
 }
