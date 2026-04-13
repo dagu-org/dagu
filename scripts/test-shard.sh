@@ -15,6 +15,10 @@ if [[ -z "$include_pattern" && -z "$exclude_pattern" ]]; then
   exec go test -v -race "$package"
 fi
 
+if [[ -n "$include_pattern" && -z "$exclude_pattern" ]]; then
+  exec go test -v -race "$package" -run "$include_pattern"
+fi
+
 if command -v rg >/dev/null 2>&1; then
   match_filter() {
     rg "$1" || true

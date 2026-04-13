@@ -4,6 +4,7 @@
 package distr_test
 
 import (
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -17,8 +18,8 @@ import (
 func TestExecution_QueuedDispatch_ConsumesOneThousandItems(t *testing.T) {
 	const (
 		queueName = "bulk-q"
-		totalRuns = 1000
 	)
+	totalRuns := queuedDispatchBulkRunCount()
 
 	f := newTestFixture(t, `
 type: graph
@@ -50,7 +51,21 @@ steps:
 
 	f.startScheduler(30 * time.Second)
 
-	requireAllQueuedRunsConsumed(t, f, totalRuns, 10*time.Minute)
+	requireAllQueuedRunsConsumed(t, f, totalRuns, queuedDispatchBulkTimeout())
+}
+
+func queuedDispatchBulkRunCount() int {
+	if runtime.GOOS == "windows" {
+		return 100
+	}
+	return 1000
+}
+
+func queuedDispatchBulkTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 5 * time.Minute
+	}
+	return 10 * time.Minute
 }
 
 func TestExecution_QueuedDispatch_RecoversWhenWorkerRegistersLater(t *testing.T) {

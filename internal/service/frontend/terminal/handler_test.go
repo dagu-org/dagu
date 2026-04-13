@@ -29,6 +29,9 @@ import (
 )
 
 func TestTerminal_SessionLimitReturnsHTTP429(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("PTY-backed terminal sessions are unsupported on Windows")
+	}
 	server, token := setupTerminalServer(t, 1)
 	conn := mustDialTerminal(t, server, token)
 	t.Cleanup(func() { _ = conn.Close(websocket.StatusNormalClosure, "test complete") })

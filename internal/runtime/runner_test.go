@@ -1586,6 +1586,9 @@ func TestRunner_ErrorHandling(t *testing.T) {
 	t.Run("SetupError", func(t *testing.T) {
 		// Create a runner with invalid log directory
 		invalidLogDir := "/nonexistent/path/that/should/not/exist"
+		if windowsShellTest() {
+			invalidLogDir = filepath.Join(t.TempDir(), "invalid*logdir")
+		}
 		r := setupRunner(t, func(cfg *runtime.Config) {
 			cfg.LogDir = invalidLogDir
 		})

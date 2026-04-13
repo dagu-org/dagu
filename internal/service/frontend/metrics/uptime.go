@@ -10,25 +10,31 @@ import (
 )
 
 var (
-	startTime time.Time
-	uptime    atomic.Int64
+	startUnixNano atomic.Int64
+	uptime        atomic.Int64
 )
 
 // StartUptime starts the uptime counter
 func StartUptime(ctx context.Context) {
-	startTime = time.Now()
-	go func() {
+	startedAt := time.Now()
+	startUnixNano.Store(startedAt.UnixNano())
+	uptime.Store(0)
+
+	go func(start time.Time) {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
 		for {
-			ms := time.Since(startTime).Milliseconds()
+			ms := time.Since(start).Milliseconds()
 			uptime.Store(ms / 1000)
 
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(time.Second):
+			case <-ticker.C:
 			}
 		}
-	}()
+	}(startedAt)
 }
 
 // GetUptime returns the current uptime in seconds

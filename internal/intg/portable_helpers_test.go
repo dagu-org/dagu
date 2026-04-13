@@ -20,13 +20,20 @@ func directCommandYAML(t *testing.T, commandName string, args ...string) string 
 	commandPath, err := osexec.LookPath(commandName)
 	require.NoError(t, err)
 
-	elements := append([]string{commandPath}, args...)
-	quoted := make([]string, len(elements))
-	for i, element := range elements {
-		quoted[i] = strconv.Quote(element)
+	quotedArgs := make([]string, len(args))
+	for i, arg := range args {
+		quotedArgs[i] = strconv.Quote(arg)
 	}
 
-	return fmt.Sprintf("shell: direct\n    command: [%s]", strings.Join(quoted, ", "))
+	if len(quotedArgs) == 0 {
+		return fmt.Sprintf("exec:\n      command: %s", strconv.Quote(commandPath))
+	}
+
+	return fmt.Sprintf(
+		"exec:\n      command: %s\n      args: [%s]",
+		strconv.Quote(commandPath),
+		strings.Join(quotedArgs, ", "),
+	)
 }
 
 func portableDirectSuccessStepYAML(t *testing.T) string {

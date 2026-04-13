@@ -131,9 +131,12 @@ jobs:
             test_command: |
               ./scripts/test-package-shard.sh \
                 '^github.com/dagucloud/dagu/internal/persis(/|$)'
-          - name_suffix: " (core-runtime-base)"
+          - name_suffix: " (core-runtime-base-a)"
             test_command: |
-              ./scripts/test-runtime-shards.sh
+              ./scripts/test-runtime-shards.sh base-a
+          - name_suffix: " (core-runtime-base-b)"
+            test_command: |
+              ./scripts/test-runtime-shards.sh base-b
           - name_suffix: " (core-runtime-subpackages)"
             test_command: |
               ./scripts/test-package-shard.sh \
@@ -144,8 +147,7 @@ jobs:
                 '^github.com/dagucloud/dagu/internal/runtime/builtin(/|$)'
           - name_suffix: " (core-service-api)"
             test_command: |
-              ./scripts/test-package-shard.sh \
-                '^github.com/dagucloud/dagu/internal/service/frontend/api/v1$'
+              ./scripts/test-shard-split.sh ./internal/service/frontend/api/v1 3
           - name_suffix: " (core-service-terminal)"
             test_command: |
               ./scripts/test-package-shard.sh \
@@ -217,7 +219,7 @@ jobs:
                 ''
           - name_suffix: " (intg-parallel-core)"
             test_command: |
-              ./scripts/test-shard.sh ./internal/intg \
+              ./scripts/test-shard-split.sh ./internal/intg 2 \
                 '^(Test(ParallelExecution_.*))' \
                 ''
           - name_suffix: " (intg-parallel-issues)"
@@ -276,7 +278,8 @@ jobs:
                 '^(Test(CustomStepTypes_.*|SubDAG_.*|DistributedRun_.*))' \
                 ''
           - name_suffix: " (intg-queue)"
-            test_command: go test -v -race ./internal/intg/queue
+            test_command: |
+              ./scripts/test-shard-split.sh ./internal/intg/queue 2
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -294,6 +297,7 @@ jobs:
         shell: bash
         run: |
           chmod +x ./scripts/test-shard.sh
+          chmod +x ./scripts/test-shard-split.sh
           chmod +x ./scripts/test-package-shard.sh
           chmod +x ./scripts/test-cmd-rest-shards.sh
           chmod +x ./scripts/test-runtime-shards.sh
