@@ -560,9 +560,9 @@ func TestCache_TTLEvictionAutomatic(t *testing.T) {
 	}
 	assert.Equal(t, 5, cache.Size())
 
-	// Wait for TTL expiration + cleanup sweep
-	time.Sleep(200 * time.Millisecond)
-
-	// Entries should have been automatically evicted (no manual trigger needed)
-	assert.Equal(t, 0, cache.Size())
+	// Wait for TTL expiration and allow the async sweeper to catch up on slower
+	// runners before asserting that everything has been evicted.
+	require.Eventually(t, func() bool {
+		return cache.Size() == 0
+	}, time.Second, 10*time.Millisecond)
 }

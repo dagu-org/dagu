@@ -22,7 +22,7 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	claimTimeout := 500 * time.Millisecond
+	claimTimeout := 3 * time.Second
 	store := NewDispatchTaskStore(
 		filepath.Join(t.TempDir(), "distributed"),
 		WithDispatchReservationTTL(claimTimeout),
@@ -80,7 +80,7 @@ func TestDispatchTaskStore_ClaimRecycleAndSelectorFiltering(t *testing.T) {
 	require.NotNil(t, gpuClaim)
 	assert.Equal(t, "run-a", gpuClaim.Task.DagRunId)
 
-	ageClaimedDispatchTask(t, store, claimed.ClaimToken, 2*time.Second, 2*time.Second)
+	ageClaimedDispatchTask(t, store, claimed.ClaimToken, 10*time.Second, 10*time.Second)
 
 	reclaimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
 		WorkerID:     "worker-2",
