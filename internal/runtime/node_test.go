@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -1153,21 +1152,6 @@ type nodeHelper struct {
 }
 
 type nodeOption func(*runtime.NodeData)
-
-func withNodeCmdArgs(t *testing.T, cmdWithArgs string) nodeOption {
-	t.Helper()
-	cmd, args, err := cmdutil.SplitCommand(cmdWithArgs)
-	if err != nil {
-		t.Fatalf("failed to parse command %q: %v", cmdWithArgs, err)
-	}
-	return func(data *runtime.NodeData) {
-		data.Step.Commands = []core.CommandEntry{{
-			Command:     cmd,
-			Args:        args,
-			CmdWithArgs: cmdWithArgs,
-		}}
-	}
-}
 
 func withNodeCommand(command string) nodeOption {
 	return func(data *runtime.NodeData) {
