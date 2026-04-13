@@ -1981,7 +1981,7 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 	go func() {
 		deadline := time.Now().Add(cancelWait)
 		for time.Now().Before(deadline) {
-			if node := plan.Plan.GetNodeByName("1"); node != nil {
+			if node := plan.GetNodeByName("1"); node != nil {
 				state := node.State()
 				if state.DoneCount >= 1 && state.Repeated {
 					repeated <- true
