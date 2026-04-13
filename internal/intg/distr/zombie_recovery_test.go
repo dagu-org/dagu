@@ -96,9 +96,17 @@ func TestDistributedRun_DelayedAfterAck_DoesNotExecuteAfterStaleCleanup(t *testi
 func TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive(t *testing.T) {
 	heartbeatThreshold := testStaleHeartbeatThreshold
 	leaseThreshold := testStaleLeaseThreshold
+	sleepDuration := 8 * time.Second
+	freshWindow := 2 * time.Second
+	leaseObservationWindow := leaseThreshold + time.Second
+	finalStatusTimeout := 15 * time.Second
 	if runtime.GOOS == "windows" {
-		heartbeatThreshold = 4 * time.Second
-		leaseThreshold = 6 * time.Second
+		heartbeatThreshold = 8 * time.Second
+		leaseThreshold = 12 * time.Second
+		sleepDuration = 20 * time.Second
+		freshWindow = 10 * time.Second
+		leaseObservationWindow = leaseThreshold + 2*time.Second
+		finalStatusTimeout = 45 * time.Second
 	}
 
 	f := newTestFixture(t, fmt.Sprintf(`
@@ -109,7 +117,7 @@ worker_selector:
 steps:
   - name: long-step
     command: %s
-`, test.ShellQuote(test.PortableSleepCommand(8*time.Second))),
+`, test.ShellQuote(test.PortableSleepCommand(sleepDuration))),
 		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
@@ -122,6 +130,7 @@ steps:
 	status := f.waitForStatus(core.Running, 15*time.Second)
 	require.NotEmpty(t, status.AttemptKey)
 	initialLease := waitForLease(t, f, status.AttemptKey, 5*time.Second).LastHeartbeatAt
+	runningSince := time.Now()
 
 	require.Eventually(t, func() bool {
 		lease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
@@ -136,13 +145,24 @@ steps:
 	require.Equal(t, core.Running, status.Status)
 	lease := waitForLease(t, f, status.AttemptKey, 5*time.Second)
 	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
-	freshWindow := 2 * time.Second
-	if runtime.GOOS == "windows" {
-		freshWindow = 5 * time.Second
-	}
 	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), freshWindow)
+	require.Eventually(t, func() bool {
+		status, err := f.latestStatus()
+		if err != nil || status.Status != core.Running {
+			return false
+		}
+		lease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
+		if err != nil || lease == nil {
+			return false
+		}
+		if time.Since(runningSince) < leaseObservationWindow {
+			return false
+		}
+		return time.Since(time.UnixMilli(lease.LastHeartbeatAt)) <= freshWindow
+	}, leaseObservationWindow+freshWindow, 200*time.Millisecond,
+		"run should remain active with a fresh lease beyond the stale threshold")
 
-	finalStatus := f.waitForStatus(core.Succeeded, 15*time.Second)
+	finalStatus := f.waitForStatus(core.Succeeded, finalStatusTimeout)
 	assert.Equal(t, core.Succeeded, finalStatus.Status)
 }
 
