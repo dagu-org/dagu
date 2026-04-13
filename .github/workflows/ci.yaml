@@ -140,11 +140,15 @@ jobs:
             test_command: |
               ./scripts/test-shard-split.sh ./internal/service/frontend/api/v1 4 \
                 '' \
-                '^(Test(ApproveDAGRunStep(|WithInputs|MissingRequired|NotWaiting)|RejectDAGRunStep(|NotWaiting)|Webhooks_RequiresDeveloperOrAbove|Webhooks_TriggerInvalidToken))$'
+                '^(Test(ApproveDAGRunStep(|WithInputs|MissingRequired|NotWaiting)|RejectDAGRunStep(|NotWaiting)|ExecuteDAGSync(|Timeout|WithWaitingStatus|Singleton)|GetSubDAGRunSpec|Webhooks_RequiresDeveloperOrAbove|Webhooks_TriggerInvalidToken))$'
           - name_suffix: " (core-service-api-slow)"
             test_command: |
               go test -v -race ./internal/service/frontend/api/v1 \
                 -run '^(Test(ApproveDAGRunStep(|WithInputs|MissingRequired|NotWaiting)|RejectDAGRunStep(|NotWaiting)|Webhooks_RequiresDeveloperOrAbove|Webhooks_TriggerInvalidToken))$'
+          - name_suffix: " (core-service-api-sync-subdag)"
+            test_command: |
+              go test -v -race ./internal/service/frontend/api/v1 \
+                -run '^(Test(ExecuteDAGSync(|Timeout|WithWaitingStatus|Singleton)|GetSubDAGRunSpec))$'
           - name_suffix: " (core-service)"
             test_command: |
               ./scripts/test-package-shard.sh \

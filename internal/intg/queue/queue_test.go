@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -57,19 +58,30 @@ steps:
 }
 
 func TestGlobalConcurrency(t *testing.T) {
+	sleepDuration := time.Second
+	maxDiff := 2 * time.Second
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		sleepDuration = 12 * time.Second
+		maxDiff = 10 * time.Second
+	case runtime.GOOS == "windows":
+		sleepDuration = 4 * time.Second
+		maxDiff = 3 * time.Second
+	}
+
 	f := newFixture(t, fmt.Sprintf(`
 name: sleep-dag
 queue: global-queue
 steps:
   - name: sleep
     command: %s
-`, test.ShellQuote(test.PortableSleepCommand(time.Second))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
+`, test.ShellQuote(test.PortableSleepCommand(sleepDuration))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
 		Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(35 * time.Second)
 	f.WaitForAllStatuses(core.Succeeded, 20*time.Second)
 	f.Stop()
-	f.AssertConcurrent(2 * time.Second)
+	f.AssertConcurrent(maxDiff)
 }
 
 func TestLocalQueueFIFOProcessing(t *testing.T) {

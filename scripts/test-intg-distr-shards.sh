@@ -50,9 +50,13 @@ case "$mode" in
       run_filtered_tests \
       '^(Test(BaseConfig_.*|Coordinator_.*|Execution_(StatusPushing|LogStreaming|LargeOutput)))' \
       ''
-    start_bg "intg-distr-direct-queue" \
+    start_bg "intg-distr-direct-metadata" \
       run_filtered_tests \
-      '^(TestExecution_(StartCommand|TagsPropagation|SharedFSMode|WorkDir|QueueLifecycle|QueuedCatchupHappyPath))' \
+      '^(TestExecution_(StartCommand|TagsPropagation|QueueLifecycle|QueuedCatchupHappyPath))' \
+      ''
+    start_bg "intg-distr-sharedfs-workdir" \
+      run_filtered_tests \
+      '^(TestExecution_(SharedFSMode|WorkDir))' \
       ''
     start_bg "intg-distr-retry-cancel" \
       run_filtered_tests \

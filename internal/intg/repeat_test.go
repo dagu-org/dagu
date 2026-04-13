@@ -103,6 +103,10 @@ func repeatLiteralCommandSubstitution(value string) string {
 	return test.PortableCommandSubstitution(test.PortableOutputCommand(value))
 }
 
+func repeatCounterValueCondition(counterFile string) string {
+	return test.PortableReadTrimmedFileCommand(counterFile)
+}
+
 func repeatPolicyParallel(t *testing.T) {
 	t.Helper()
 
@@ -160,14 +164,13 @@ func TestRepeatPolicy_WithLimitAndCondition(t *testing.T) {
 steps:
   - script: |
 %s
-    output: FINAL_COUNT
     repeat_policy:
       repeat: until
       limit: 5
       interval_sec: 0
-      condition: "$FINAL_COUNT"
+      condition: %q
       expected: "10"
-`, counterFile, indentScript(repeatCounterScript(counterFile), 6)))
+`, counterFile, indentScript(repeatCounterScript(counterFile), 6), repeatCounterValueCondition(counterFile)))
 	agent := dag.Agent()
 
 	// Run with timeout

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	osexec "os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -35,14 +34,6 @@ func dagRunSyncTimeoutSeconds() int {
 		return 120
 	}
 	return 30
-}
-
-func directWhoamiCommandPath(t *testing.T) string {
-	t.Helper()
-
-	path, err := osexec.LookPath("whoami")
-	require.NoError(t, err)
-	return path
 }
 
 func waitForDAGRunStatus(
@@ -278,7 +269,7 @@ func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
 
 func TestGetSubDAGRunSpec(t *testing.T) {
 	server := test.SetupServer(t)
-	whoamiPath := directWhoamiCommandPath(t)
+	childCommand := test.PortableOutputCommand("subdag-spec")
 
 	// Create a parent DAG with an inline sub-DAG definition
 	dagSpec := fmt.Sprintf(`steps:
@@ -293,8 +284,7 @@ params:
   - MSG
 steps:
   - name: echo_message
-    shell: direct
-    command: [%q]`, whoamiPath)
+    command: %q`, childCommand)
 
 	// Create the parent DAG
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
@@ -334,7 +324,7 @@ steps:
 	require.NotEmpty(t, subSpecBody.Spec, "Sub-DAG spec should not be empty")
 	require.Contains(t, subSpecBody.Spec, "child_dag", "Spec should contain child_dag name")
 	require.Contains(t, subSpecBody.Spec, "echo_message", "Spec should contain echo_message step")
-	require.Contains(t, subSpecBody.Spec, filepath.Base(whoamiPath), "Spec should contain the command")
+	require.Contains(t, subSpecBody.Spec, "subdag-spec", "Spec should contain the command")
 
 	// Test 2: 404 for non-existent sub-DAG run ID
 	_ = server.Client().Get(
@@ -407,7 +397,7 @@ steps:
 func TestApproveDAGRunStepWithInputs(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `type: graph
+	dagSpec := fmt.Sprintf(`type: graph
 steps:
   - name: wait-step
     command: "true"
@@ -420,7 +410,7 @@ steps:
         - reason
   - name: after-wait
     depends: [wait-step]
-    command: "echo reason=$reason approver=$approver"`
+    command: %q`, test.PortableEnvOutputCommand("reason", "approver"))
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "approval_inputs_dag",
@@ -455,9 +445,27 @@ steps:
 	require.True(t, approveBody.Resumed)
 
 	// Wait for DAG to complete
-	waitForDAGRunStatus(t, server, "approval_inputs_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	status := waitForDAGRunStatus(t, server, "approval_inputs_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Succeeded
 	})
+	require.Len(t, status.Nodes, 2)
+
+	var waitNode, afterWaitNode *exec.Node
+	for _, node := range status.Nodes {
+		switch node.Step.Name {
+		case "wait-step":
+			waitNode = node
+		case "after-wait":
+			afterWaitNode = node
+		}
+	}
+	require.NotNil(t, waitNode)
+	require.NotNil(t, afterWaitNode)
+	require.Equal(t, inputs, waitNode.ApprovalInputs)
+
+	stdout, err := os.ReadFile(afterWaitNode.Stdout)
+	require.NoError(t, err)
+	require.Equal(t, "testing|test-user", strings.TrimSpace(string(stdout)))
 }
 
 func TestApproveDAGRunStepMissingRequired(t *testing.T) {
