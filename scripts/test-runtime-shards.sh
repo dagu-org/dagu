@@ -38,7 +38,7 @@ wait_bg() {
 }
 
 case "$mode" in
-  base-a)
+  base-a-early-rest)
     start_bg "runtime-rest" \
       ./scripts/test-shard-split.sh ./internal/runtime 4 \
       '' \
@@ -46,6 +46,9 @@ case "$mode" in
     start_bg "runtime-runner-early" \
       go test -v -race ./internal/runtime \
       -run '^TestRunner/(SequentialStepsSuccess|SequentialStepsWithFailure|ParallelSteps|ParallelStepsWithFailure|ComplexCommand|ContinueOnFailure|ContinueOnSkip|ContinueOnExitCode|ContinueOnOutputStdout|ContinueOnOutputStderr|ContinueOnOutputRegexp|ContinueOnMarkSuccess|Cancel|Timeout)$'
+    wait_bg
+    ;;
+  base-a-retry-output)
     start_bg "runtime-runner-retry-repeat" \
       go test -v -race ./internal/runtime \
       -run '^TestRunner/(RetryPolicyFail|RetryWithScript|RetryPolicySuccess|PreconditionMatch|PreconditionNotMatch|PreconditionWithCommandMet|PreconditionWithCommandNotMet|OnExitHandler|OnExitHandlerFail|OnAbortHandler|OnSuccessHandler|OnFailureHandler|CancelOnSignal|Repeat|RepeatFail|StopRepetitiveTaskGracefully|WorkingDirNoExist)$'
@@ -54,13 +57,16 @@ case "$mode" in
       -run '^TestRunner/(OutputVariables|OutputInheritance|OutputJSONReference|HandlingJSONWithSpecialChars|SpecialVarsDAGRUNLOGFILE|SpecialVarsDAGRUNSTEPSTDOUTFILE|SpecialVarsDAGRUNSTEPSTDERRFILE|SpecialVarsDAGRUNID|SpecialVarsDAGNAME|SpecialVarsDAGRUNSTEPNAME|StdoutPathExpandsStepNameBeforePrepare|StdoutPathExpandsStepEnvBeforePrepare|StdoutPathExpandsUpstreamStepRefBeforePrepare|DAGRunStatusNotAvailableToMainSteps)$'
     wait_bg
     ;;
-  base-b)
+  base-b-policies-advanced)
     start_bg "runtime-runner-repeat-policies" \
       go test -v -race ./internal/runtime \
       -run '^TestRunner/(RepeatPolicyRepeatsUntilCommandConditionMatchesExpected|RepeatPolicyRepeatWhileConditionExits0|RepeatPolicyRepeatsWhileCommandExitCodeMatches|RepeatPolicyRepeatsUntilFileConditionMatchesExpected|RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected|RetryPolicyWithOutputCapture|FailedStepWithOutputCapture|RetryPolicySubDAGRunWithOutputCapture|SingleStepTimeoutFailsStep|TimeoutPreemptsRetriesAndMarksFailed|ParallelStepsTimeoutFailIndividually|StepLevelTimeoutOverridesLongDAGTimeoutAndFails|RejectedTakesPrecedenceOverWaiting)$'
     start_bg "runtime-runner-advanced" \
       go test -v -race ./internal/runtime \
       -run '^TestRunner/(SetupError|PanicRecovery|DAGPreconditionNotMet|RunningStatusWinsBeforeForcedTerminalStatus|SignalWithDoneChannel|SignalWithOverride|DiamondDependency|ComplexFailurePropagation|EmptyPlan|SingleNodePlan|AllNodesFail|RetryWithSignalTermination|RetryWithSpecificExitCodes|RepeatPolicyBooleanTrueRepeatsWhileStepSucceeds|RepeatPolicyBooleanTrueWithFailureStopsOnFailure|RepeatPolicyUntilModeWithoutConditionRepeatsOnFailure|RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds|RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches|RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds|RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches|RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches|RepeatPolicyLimit|RepeatPolicyOutputVariablesReloadedBeforeConditionEval)$'
+    wait_bg
+    ;;
+  base-b-refs-chatwait)
     start_bg "runtime-runner-refs" \
       go test -v -race ./internal/runtime \
       -run '^TestRunner/(RetrySuccessfulStep|StepReferenceInCommand|StepWithoutID|StepExitCodeReference|OnSuccessHandlerWithStepReferences|OnFailureHandlerWithStepReferences|OnExitHandlerWithMultipleStepReferences|HandlerWithoutIDCannotBeReferenced|HandlersCanOnlyReferenceMainSteps|NodeStatusPartialSuccess|NodeStatusPartialSuccessWithMarkSuccess|MultipleFailuresWithContinueOn|NoSuccessfulStepsWithContinueOn|FailureWithoutContinueOn)$'
@@ -71,6 +77,14 @@ case "$mode" in
       go test -v -race ./internal/runtime \
       -run '^TestRunner/(WaitStepResultsInWaitStatus|WaitStepBlocksDependentNodes|ParallelBranchWithWaitStep|WaitStepAtStart|WaitStepWithInputConfig|MultipleWaitSteps)$'
     wait_bg
+    ;;
+  base-a)
+    "$0" base-a-early-rest
+    "$0" base-a-retry-output
+    ;;
+  base-b)
+    "$0" base-b-policies-advanced
+    "$0" base-b-refs-chatwait
     ;;
   all)
     "$0" base-a

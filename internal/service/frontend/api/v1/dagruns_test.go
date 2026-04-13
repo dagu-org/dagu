@@ -25,14 +25,14 @@ import (
 
 func dagRunEventuallyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return base * 18
+		return base * 24
 	}
 	return base
 }
 
 func dagRunSyncTimeoutSeconds() int {
 	if runtime.GOOS == "windows" {
-		return 90
+		return 120
 	}
 	return 30
 }

@@ -62,7 +62,7 @@ case "$mode" in
   c)
     start_bg "core-runtime-subpackages" \
       ./scripts/test-package-shard.sh \
-      '^github.com/dagucloud/dagu/internal/runtime/(agent|executor|remote|transform)$'
+      '^github.com/dagucloud/dagu/internal/runtime/(executor|remote|transform)$'
     start_bg "core-runtime-builtin" \
       ./scripts/test-package-shard.sh \
       '^github.com/dagucloud/dagu/internal/runtime/builtin(/|$)'

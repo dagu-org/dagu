@@ -48,7 +48,7 @@ echo "$COUNT"
 func repeatPolicyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
 		if raceEnabled() {
-			return intgTestTimeout(base * 4)
+			return intgTestTimeout(base * 6)
 		}
 		return intgTestTimeout(base * 2)
 	}

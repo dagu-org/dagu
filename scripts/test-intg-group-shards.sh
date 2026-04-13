@@ -7,7 +7,7 @@ source "$(dirname "$0")/test-shard-lib.sh"
 mode="${1:-}"
 
 if [[ -z "$mode" ]]; then
-  echo "usage: $0 <general|service-docker|data-subdag|parallel-issues>" >&2
+  echo "usage: $0 <general|service-docker|data-subdag|parallel-issues|parallel-issue-1274|parallel-issue-1658|parallel-issue-1790>" >&2
   exit 1
 fi
 
@@ -106,6 +106,21 @@ case "$mode" in
     run_sharded_tests 4 \
       '^(Test(Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))' \
       ''
+    ;;
+  parallel-issue-1274)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
+    run_filtered_tests '^(TestIssue1274_.*)$' ''
+    ;;
+  parallel-issue-1658)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
+    run_filtered_tests '^(TestIssue1658_.*)$' ''
+    ;;
+  parallel-issue-1790)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
+    run_filtered_tests '^(TestIssue1790_ParallelCallPathItemResolution)$' ''
     ;;
   *)
     echo "unknown mode: $mode" >&2
