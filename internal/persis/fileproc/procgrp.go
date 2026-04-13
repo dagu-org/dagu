@@ -194,7 +194,7 @@ func (pg *ProcGroup) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) er
 
 func removeProcFileWithRetry(path string) error {
 	var lastErr error
-	for attempt := 0; attempt < 12; attempt++ {
+	for attempt := range 12 {
 		err := os.Remove(path)
 		if err == nil || errors.Is(err, os.ErrNotExist) {
 			return nil
