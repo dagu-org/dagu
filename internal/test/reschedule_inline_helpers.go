@@ -16,6 +16,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/service/coordinator"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/stretchr/testify/require"
@@ -109,10 +110,16 @@ func AssertInlineRescheduledRunParams(t *testing.T, server Server, dagName, dagR
 func WaitForAttemptSnapshot(t *testing.T, server Server, dagName, dagRunID string) exec.DAGRunAttempt {
 	t.Helper()
 
+	store := filedagrun.New(
+		server.Config.Paths.DAGRunsDir,
+		filedagrun.WithLatestStatusToday(server.Config.Server.LatestStatusToday),
+		filedagrun.WithLocation(server.Config.Core.Location),
+	)
+
 	var attempt exec.DAGRunAttempt
 	require.Eventually(t, func() bool {
 		var err error
-		attempt, err = server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, dagRunID))
+		attempt, err = store.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, dagRunID))
 		return err == nil
 	}, rescheduleEventuallyTimeout(10*time.Second), 100*time.Millisecond)
 
