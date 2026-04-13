@@ -140,10 +140,21 @@ jobs:
               TEST_GO_PARALLEL=2 ./scripts/test-shard-split.sh ./internal/intg 12 \
                 '^Test(ParallelExecution_.*)' \
                 '^(Test(ParallelExecution_(AbortSuppressesPendingRetry|OutputCaptureWithRetry|ObjectItemProperties)))$'
-          - name_suffix: " (intg-parallel-heavy)"
+          - name_suffix: " (intg-parallel-abort)"
             test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 3 \
-                '^(Test(ParallelExecution_(AbortSuppressesPendingRetry|OutputCaptureWithRetry|ObjectItemProperties)))$'
+              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 1 \
+                '^TestParallelExecution_AbortSuppressesPendingRetry$' \
+                ''
+          - name_suffix: " (intg-parallel-output-retry)"
+            test_command: |
+              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 1 \
+                '^TestParallelExecution_OutputCaptureWithRetry$' \
+                ''
+          - name_suffix: " (intg-parallel-object-items)"
+            test_command: |
+              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 1 \
+                '^TestParallelExecution_ObjectItemProperties$' \
+                ''
           - name_suffix: " (intg-parallel-issues)"
             test_command: |
               TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 2 \
@@ -177,7 +188,14 @@ jobs:
               ./scripts/test-intg-distr-shards.sh b
           - name_suffix: " (intg-distr-c)"
             test_command: |
-              ./scripts/test-intg-distr-shards.sh c
+              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg/distr 1 \
+                '^(Test(CustomStepTypes_.*|SubDAG_.*|DistributedRun_.*))' \
+                ''
+          - name_suffix: " (intg-distr-heavy)"
+            test_command: |
+              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg/distr 1 \
+                '^TestExecution_QueuedDispatch_ConsumesOneThousandItems$' \
+                ''
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
