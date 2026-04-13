@@ -160,9 +160,9 @@ steps:
       repeat: until
       limit: 5
       interval_sec: 0
-      condition: %q
+      condition: "$FINAL_COUNT"
       expected: "10"
-`, counterFile, indentScript(repeatCounterScript(counterFile), 6), repeatRawCommandSubstitution(test.PortableReadFileOrFallbackCommand(counterFile, "0"))))
+`, counterFile, indentScript(repeatCounterScript(counterFile), 6)))
 	agent := dag.Agent()
 
 	// Run with timeout

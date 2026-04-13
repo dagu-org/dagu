@@ -125,7 +125,7 @@ jobs:
               ./scripts/test-runtime-shards.sh base-b
           - name_suffix: " (core-service-api)"
             test_command: |
-              ./scripts/test-shard-split.sh ./internal/service/frontend/api/v1 10
+              ./scripts/test-shard-split.sh ./internal/service/frontend/api/v1 5
           - name_suffix: " (core-service)"
             test_command: |
               ./scripts/test-package-shard.sh \

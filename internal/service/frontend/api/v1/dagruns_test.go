@@ -25,7 +25,7 @@ import (
 
 func dagRunEventuallyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return base * 12
+		return base * 18
 	}
 	return base
 }

@@ -17,6 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func assertEquivalentPath(t *testing.T, expected, actual string) {
+	t.Helper()
+	require.Equal(t, filepath.Clean(expected), filepath.Clean(filepath.FromSlash(actual)))
+}
+
 func TestHandlerOn(t *testing.T) {
 	t.Parallel()
 
@@ -817,7 +822,7 @@ steps:
 
 		status := agent.Status(th.Context)
 		require.NotNil(t, status.OnSuccess)
-		require.Equal(t, filepath.Join(tempDir, "handler_succeeded.log"), status.OnSuccess.Step.Stdout)
+		assertEquivalentPath(t, filepath.Join(tempDir, "handler_succeeded.log"), status.OnSuccess.Step.Stdout)
 
 		content, err := os.ReadFile(status.OnSuccess.Step.Stdout)
 		require.NoError(t, err)
@@ -854,7 +859,7 @@ steps:
 		status := agent.Status(th.Context)
 		require.Equal(t, core.Waiting, status.Status)
 		require.NotNil(t, status.OnWait)
-		require.Equal(t, filepath.Join(tempDir, "wait_approval-gate.log"), status.OnWait.Step.Stdout)
+		assertEquivalentPath(t, filepath.Join(tempDir, "wait_approval-gate.log"), status.OnWait.Step.Stdout)
 
 		content, err := os.ReadFile(status.OnWait.Step.Stdout)
 		require.NoError(t, err)

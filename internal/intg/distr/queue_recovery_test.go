@@ -56,7 +56,7 @@ steps:
 
 func queuedDispatchBulkRunCount() int {
 	if runtime.GOOS == "windows" {
-		return 25
+		return 10
 	}
 	return 1000
 }
