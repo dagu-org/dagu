@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/test-shard-lib.sh"
+
 mode="${1:-}"
 
 if [[ -z "$mode" ]]; then
@@ -42,20 +44,22 @@ wait_bg() {
 
 case "$mode" in
   general)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
     start_bg "intg-approval" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(WaitStepApproval|ApprovalField))' \
       ''
     start_bg "intg-history" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(TestHistoryCommand_)' \
       ''
     start_bg "intg-output" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*))' \
       ''
     start_bg "intg-params" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*))' \
       ''
     start_bg "intg-queue" \
@@ -63,37 +67,43 @@ case "$mode" in
     wait_bg
     ;;
   service-docker)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
     start_bg "intg-router" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation))' \
       ''
     start_bg "intg-server-notify" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv))' \
       ''
     start_bg "intg-docker-core" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*))' \
       ''
     start_bg "intg-storage-remote" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration))' \
       ''
     wait_bg
     ;;
   data-subdag)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
     start_bg "intg-data-shell" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution))' \
       ''
     start_bg "intg-subdag" \
-      ./scripts/test-shard.sh ./internal/intg \
+      run_filtered_tests \
       '^(Test(CallSubDAG|NestedThreeLevelDAG|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation))' \
       ''
     wait_bg
     ;;
   parallel-issues)
-    ./scripts/test-shard-split.sh ./internal/intg 3 \
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
+    run_sharded_tests 4 \
       '^(Test(Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))' \
       ''
     ;;

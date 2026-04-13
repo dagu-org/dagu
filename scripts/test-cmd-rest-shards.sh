@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/test-shard-lib.sh"
+
 pids=()
 names=()
 
@@ -35,27 +37,31 @@ wait_bg() {
   return "$status"
 }
 
+setup_test_binary ./internal/cmd
+trap cleanup_test_binary EXIT
+
 start_bg "cmd-package" go test -v -race ./cmd
 start_bg "internal-cmd-cleanup" \
-  ./scripts/test-shard.sh ./internal/cmd \
+  run_filtered_tests \
   '^(Test(CleanupCommand|CleanupCommandDirectStore|RecordEarlyFailure))$' \
   ''
 start_bg "internal-cmd-restart" \
-  ./scripts/test-shard.sh ./internal/cmd \
+  run_filtered_tests \
   '^(Test(RestartCommand|RestartCommand_BuiltExecutableRestoresExplicitEnv))$' \
   ''
 start_bg "internal-cmd-retry" \
-  ./scripts/test-shard.sh ./internal/cmd \
+  run_filtered_tests \
   '^(Test(RetryCommandAcceptsDefaultWorkingDirFlag|RetryCommand|RetryCommand_BuiltExecutableRestoresExplicitEnv))$' \
   ''
+
 wait_bg
 
 start_bg "internal-cmd-status" \
-  ./scripts/test-shard.sh ./internal/cmd \
+  run_filtered_tests \
   '^(TestStatusCommand)$' \
   ''
 start_bg "internal-cmd-rest" \
-  ./scripts/test-shard-split.sh ./internal/cmd 5 \
+  run_sharded_tests 6 \
   '' \
   '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*|CleanupCommand|CleanupCommandDirectStore|RecordEarlyFailure|RetryCommandAcceptsDefaultWorkingDirFlag|RestartCommand|RestartCommand_BuiltExecutableRestoresExplicitEnv|RetryCommand|RetryCommand_BuiltExecutableRestoresExplicitEnv|StatusCommand))$'
 wait_bg

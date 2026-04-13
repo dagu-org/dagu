@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/test-shard-lib.sh"
+
 mode="${1:-}"
 
 if [[ -z "$mode" ]]; then
@@ -42,46 +44,52 @@ wait_bg() {
 
 case "$mode" in
   a)
+    setup_test_binary ./internal/intg/distr
+    trap cleanup_test_binary EXIT
     start_bg "intg-distr-baseconfig-status" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(Test(BaseConfig_.*|Coordinator_.*|Execution_(StatusPushing|LogStreaming|LargeOutput)))' \
       ''
     start_bg "intg-distr-direct-queue" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(TestExecution_(StartCommand|TagsPropagation|SharedFSMode|WorkDir|QueueLifecycle|QueuedCatchupHappyPath))' \
       ''
     start_bg "intg-distr-retry-cancel" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(Test(Cancellation_.*|Retry_.*|OneOffScheduleRunsDistributed))' \
       ''
     wait_bg
     ;;
   b)
+    setup_test_binary ./internal/intg/distr
+    trap cleanup_test_binary EXIT
     start_bg "intg-distr-parallel" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(Test(Parallel_.*))' \
       ''
     start_bg "intg-distr-params" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(Test(Params_.*))' \
       ''
     start_bg "intg-distr-proc-heartbeat" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(TestExecution_ProcHeartbeat_.*)' \
       ''
     start_bg "intg-distr-queued-dispatch" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(TestExecution_QueuedDispatch_(RecoversWhenWorkerRegistersLater|RecoversWhenMatchingWorkerRegistersLater))' \
       ''
     wait_bg
     ;;
   c)
+    setup_test_binary ./internal/intg/distr
+    trap cleanup_test_binary EXIT
     start_bg "intg-distr-queued-dispatch-heavy" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(TestExecution_QueuedDispatch_ConsumesOneThousandItems)' \
       ''
     start_bg "intg-distr-rest" \
-      ./scripts/test-shard.sh ./internal/intg/distr \
+      run_filtered_tests \
       '^(Test(CustomStepTypes_.*|SubDAG_.*|DistributedRun_.*))' \
       ''
     wait_bg

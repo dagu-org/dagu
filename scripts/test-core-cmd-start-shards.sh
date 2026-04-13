@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/test-shard-lib.sh"
+
 pids=()
 names=()
 
@@ -33,12 +35,16 @@ wait_bg() {
   return "$status"
 }
 
+setup_test_binary ./internal/cmd
+trap cleanup_test_binary EXIT
+
 start_bg "internal-cmd-start-positional" \
-  ./scripts/test-shard.sh ./internal/cmd \
+  run_filtered_tests \
   '^(TestCmdStart_PositionalParamValidation)$' \
   ''
 start_bg "internal-cmd-start-other" \
-  ./scripts/test-shard-split.sh ./internal/cmd 2 \
+  run_sharded_tests 3 \
   '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*))' \
   '^(TestCmdStart_PositionalParamValidation)$'
+
 wait_bg
