@@ -263,19 +263,17 @@ steps:
 		f.StartScheduler(40 * time.Second)
 		defer f.Stop()
 
-		_, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
+		latest, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
 				status.AutoRetryCount == 1
 		})
 		require.NoError(t, err)
-
-		f.WaitDrain(5 * time.Second)
-
-		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Succeeded, latest.Status)
 		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
 		assert.Equal(t, 1, latest.AutoRetryCount)
+
+		f.WaitDrain(5 * time.Second)
 		assert.Equal(t, markerModTime, readMarkerModTime(t, markerPath))
 	})
 
@@ -310,14 +308,12 @@ steps:
 		f.StartScheduler(40 * time.Second)
 		defer f.Stop()
 
-		_, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
+		latest, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
 				status.AutoRetryCount == 1
 		})
 		require.NoError(t, err)
-
-		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Succeeded, latest.Status)
 		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
 		assert.Equal(t, 1, latest.AutoRetryCount)
@@ -365,14 +361,12 @@ steps:
 		f.StartScheduler(35 * time.Second)
 		defer f.Stop()
 
-		_, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
+		latest, err := f.WaitForStatusMatch(runID, 25*time.Second, func(status *exec.DAGRunStatus) bool {
 			return status.Status == core.Succeeded &&
 				status.AttemptID != originalAttemptID &&
 				status.AutoRetryCount == 1
 		})
 		require.NoError(t, err)
-
-		latest := f.MustStatus(runID)
 		assert.Equal(t, core.Succeeded, latest.Status)
 		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
 		assert.Equal(t, 1, latest.AutoRetryCount)

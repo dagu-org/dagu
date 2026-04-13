@@ -32,6 +32,7 @@ func TestTerminal_SessionLimitReturnsHTTP429(t *testing.T) {
 	server, token := setupTerminalServer(t, 1)
 	conn := mustDialTerminal(t, server, token)
 	t.Cleanup(func() { _ = conn.Close(websocket.StatusNormalClosure, "test complete") })
+	waitForTerminalSessionReady(t, conn)
 
 	require.Eventually(t, func() bool {
 		secondConn, resp, err := dialTerminal(server, token)
@@ -185,6 +186,34 @@ func waitForTerminalSlot(t *testing.T, server test.Server, token string) {
 		}
 		return false
 	}, terminalTestTimeout(5*time.Second), 50*time.Millisecond, "terminal slot was not released within timeout")
+}
+
+func waitForTerminalSessionReady(t *testing.T, conn *websocket.Conn) {
+	t.Helper()
+
+	sendInput(t, conn, "\r\n")
+
+	ctx, cancel := context.WithTimeout(context.Background(), terminalTestTimeout(5*time.Second))
+	defer cancel()
+
+	for {
+		_, data, err := conn.Read(ctx)
+		require.NoError(t, err, "terminal session did not become ready")
+
+		var msg terminalpkg.Message
+		require.NoError(t, json.Unmarshal(data, &msg))
+
+		switch msg.Type {
+		case terminalpkg.MessageTypeOutput:
+			decoded, err := msg.DecodeData()
+			require.NoError(t, err)
+			if len(decoded) > 0 {
+				return
+			}
+		case terminalpkg.MessageTypeError:
+			require.Failf(t, "terminal session emitted error while starting", "%s", msg.Data)
+		}
+	}
 }
 
 func sendInput(t *testing.T, conn *websocket.Conn, input string) {

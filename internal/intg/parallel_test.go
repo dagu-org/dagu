@@ -1080,14 +1080,14 @@ func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
 		)
 	}
 
-	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "process-file", []byte(fmt.Sprintf(`
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "process-file", fmt.Appendf(nil, `
 params:
   - ITEM: ""
 steps:
   - script: |
 %s
     output: PROCESS_RESULT
-`, strings.TrimPrefix(processFileScript, "\n"))))
+`, strings.TrimPrefix(processFileScript, "\n")))
 
 	dag := helper.DAG(t, fmt.Sprintf(`
 steps:

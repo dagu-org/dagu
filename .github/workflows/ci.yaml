@@ -106,10 +106,22 @@ jobs:
             test_command: |
               ./scripts/test-package-shard.sh \
                 '^github.com/dagucloud/dagu/(api/v1|proto/coordinator/v1|proto/index/v1|skills)$|^github.com/dagucloud/dagu/internal/(agent/schema|agentoauth|agentsnapshot|auth($|/tokensecret$)|clicontext|license|output|proto/convert|remotenode|test($|util$)|tunnel|upgrade|workspace)$'
-          - name_suffix: " (core-cmd)"
+          - name_suffix: " (core-cmd-start-positional)"
             test_command: |
-              ./scripts/test-package-shard.sh \
-                '^github.com/dagucloud/dagu/cmd$|^github.com/dagucloud/dagu/internal/cmd$'
+              ./scripts/test-shard.sh ./internal/cmd \
+                '^(TestCmdStart_PositionalParamValidation)$' \
+                ''
+          - name_suffix: " (core-cmd-start-other)"
+            test_command: |
+              ./scripts/test-shard.sh ./internal/cmd \
+                '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*))' \
+                '^(TestCmdStart_PositionalParamValidation)$'
+          - name_suffix: " (core-cmd-rest)"
+            test_command: |
+              go test -v -race ./cmd
+              ./scripts/test-shard.sh ./internal/cmd \
+                '' \
+                '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*))'
           - name_suffix: " (core-cmn)"
             test_command: |
               ./scripts/test-package-shard.sh \
@@ -124,8 +136,11 @@ jobs:
                 '^github.com/dagucloud/dagu/internal/persis(/|$)'
           - name_suffix: " (core-runtime-base)"
             test_command: |
+              go test -v -race ./internal/runtime
+          - name_suffix: " (core-runtime-subpackages)"
+            test_command: |
               ./scripts/test-package-shard.sh \
-                '^github.com/dagucloud/dagu/internal/runtime($|/(agent|executor|remote|transform)$)'
+                '^github.com/dagucloud/dagu/internal/runtime/(agent|executor|remote|transform)$'
           - name_suffix: " (core-runtime-builtin)"
             test_command: |
               ./scripts/test-package-shard.sh \

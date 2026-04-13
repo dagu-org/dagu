@@ -94,6 +94,13 @@ func TestDistributedRun_DelayedAfterAck_DoesNotExecuteAfterStaleCleanup(t *testi
 // long-running quiet step remains RUNNING past the lease threshold because
 // coordinator-owned heartbeat refreshes keep the lease fresh.
 func TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive(t *testing.T) {
+	heartbeatThreshold := testStaleHeartbeatThreshold
+	leaseThreshold := testStaleLeaseThreshold
+	if runtime.GOOS == "windows" {
+		heartbeatThreshold = 4 * time.Second
+		leaseThreshold = 6 * time.Second
+	}
+
 	f := newTestFixture(t, fmt.Sprintf(`
 type: graph
 name: quiet-heartbeat-test
@@ -103,7 +110,7 @@ steps:
   - name: long-step
     command: %s
 `, test.ShellQuote(test.PortableSleepCommand(8*time.Second))),
-		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
+		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
 	defer f.cleanup()

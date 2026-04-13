@@ -489,11 +489,9 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("Timeout", func(t *testing.T) {
 		dagTimeout := 500 * time.Millisecond
-		firstSleep := 100 * time.Millisecond
 		secondSleep := 500 * time.Millisecond
 		if windowsShellTest() {
 			dagTimeout = 3 * time.Second
-			firstSleep = 200 * time.Millisecond
 			secondSleep = 5 * time.Second
 		}
 
@@ -501,7 +499,7 @@ func TestRunner(t *testing.T) {
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
 		plan := r.newPlan(t,
-			newStep("1", withCommand(test.PortableSleepCommand(firstSleep))),
+			newStep("1", withCommand(test.PortableSuccessCommand())),
 			newStep("2", withCommand(test.PortableSleepCommand(secondSleep)), withDepends("1")),
 			successStep("3", "2"),
 		)
@@ -792,10 +790,28 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("Repeat", func(t *testing.T) {
 		r := setupRunner(t)
+		repeatMarker := filepath.Join(t.TempDir(), "repeat.marker")
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("sleep 0.1"),
+				withScript(func() string {
+					if windowsShellTest() {
+						return fmt.Sprintf(`
+								if (-not (Test-Path %s)) {
+									%s
+									exit 0
+								}
+								%s
+							`, test.PowerShellQuote(repeatMarker), test.PortableCreateEmptyFileCommand(repeatMarker), test.PortableSleepCommand(5*time.Second))
+					}
+					return fmt.Sprintf(`
+							if [ ! -f %s ]; then
+								%s
+								exit 0
+							fi
+							%s
+						`, test.PosixQuote(repeatMarker), test.PortableCreateEmptyFileCommand(repeatMarker), test.PortableSleepCommand(5*time.Second))
+				}()),
 				withRepeatPolicy(true, time.Millisecond*100),
 			),
 		)
@@ -867,7 +883,11 @@ func TestRunner(t *testing.T) {
 
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
-		require.Contains(t, result.Error.Error(), "no such file or directory")
+		if windowsShellTest() {
+			require.Contains(t, strings.ToLower(result.Error.Error()), "cannot find the path specified")
+		} else {
+			require.Contains(t, result.Error.Error(), "no such file or directory")
+		}
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
 		t.Parallel()
@@ -912,7 +932,10 @@ func TestRunner(t *testing.T) {
 
 		node := result.nodeByName(t, "3")
 		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
-		require.Equal(t, "RESULT=hello world", output, "expected output %q, got %q", "hello world", output)
+		outputText, ok := output.(string)
+		require.True(t, ok, "output variable is not a string")
+		normalizedOutput := "RESULT=" + strings.Join(strings.Fields(strings.TrimPrefix(outputText, "RESULT=")), " ")
+		require.Equal(t, "RESULT=hello world", normalizedOutput, "expected output %q, got %q", "hello world", output)
 
 		node2 := result.nodeByName(t, "5")
 		output2, _ := node2.NodeData().State.OutputVariables.Load("RESULT2")
@@ -923,8 +946,8 @@ func TestRunner(t *testing.T) {
 
 		jsonData := `{"key": "value"}`
 		plan := r.newPlan(t,
-			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
-			newStep("2", withCommand("echo ${OUT.key}"), withDepends("1"), withOutput("RESULT")),
+			newStep("1", withCommand(test.PortableOutputCommand(jsonData)), withOutput("OUT")),
+			newStep("2", withCommand(test.PortableExpandedOutputCommand("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -938,10 +961,10 @@ func TestRunner(t *testing.T) {
 	t.Run("HandlingJSONWithSpecialChars", func(t *testing.T) {
 		r := setupRunner(t)
 
-		jsonData := `{\n\t"key": "value"\n}`
+		jsonData := "{\n\t\"key\": \"value\"\n}"
 		plan := r.newPlan(t,
-			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
-			newStep("2", withCommand("echo '${OUT.key}'"), withDepends("1"), withOutput("RESULT")),
+			newStep("1", withCommand(test.PortableOutputCommand(jsonData)), withOutput("OUT")),
+			newStep("2", withCommand(test.PortableExpandedOutputCommand("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -956,7 +979,7 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand(test.PortableExpandedOutputCommand("${DAG_RUN_LOG_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -973,7 +996,7 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand(test.PortableExpandedOutputCommand("${DAG_RUN_STEP_STDOUT_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -990,7 +1013,7 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand(test.PortableExpandedOutputCommand("${DAG_RUN_STEP_STDERR_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
