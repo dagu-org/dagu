@@ -973,7 +973,24 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 }
 
 func TestParallelExecution_ObjectItemProperties(t *testing.T) {
-	const dagContent = `steps:
+	childSpec := `steps:
+  - script: |
+      echo "Syncing data from region: ${REGION}"
+      echo "Using bucket: ${BUCKET}"
+      echo "Sync completed for ${BUCKET} in ${REGION}"
+    output: SYNC_RESULT
+`
+	if runtime.GOOS == "windows" {
+		childSpec = `steps:
+  - script: |
+      Write-Output ("Syncing data from region: " + $env:REGION)
+      Write-Output ("Using bucket: " + $env:BUCKET)
+      Write-Output ("Sync completed for " + $env:BUCKET + " in " + $env:REGION)
+    output: SYNC_RESULT
+`
+	}
+
+	dagContent := `steps:
   - command: |
       echo '[{"region":"us-east-1","bucket":"data-us"},{"region":"eu-west-1","bucket":"data-eu"},{"region":"ap-south-1","bucket":"data-ap"}]'
     output: CONFIGS
@@ -992,13 +1009,7 @@ name: sync-data
 params:
   - REGION: ""
   - BUCKET: ""
-steps:
-  - script: |
-      echo "Syncing data from region: ${REGION}"
-      echo "Using bucket: ${BUCKET}"
-      echo "Sync completed for ${BUCKET} in ${REGION}"
-    output: SYNC_RESULT
-`
+` + childSpec
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)

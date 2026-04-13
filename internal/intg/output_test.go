@@ -6,6 +6,7 @@ package intg_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -33,11 +34,20 @@ func TestLargeOutput_128KB(t *testing.T) {
 
 	// Load DAG that reads a 128KB file
 	textFilePath := test.TestdataPath(t, "integration/large-output-128kb.txt")
-	dag := th.DAG(t, `steps:
+	dagSpec := `steps:
   - name: read-128kb-file
-    command: `+test.PortableReadFileCommand(textFilePath)+`
+    command: ` + test.PortableReadFileCommand(textFilePath) + `
     output: OUTPUT_128KB
-`)
+`
+	if runtime.GOOS == "windows" {
+		dagSpec = fmt.Sprintf(`steps:
+  - name: read-128kb-file
+    shell: cmd
+    command: 'type "%s"'
+    output: OUTPUT_128KB
+`, textFilePath)
+	}
+	dag := th.DAG(t, dagSpec)
 	agent := dag.Agent()
 
 	// Run with timeout to detect hanging
