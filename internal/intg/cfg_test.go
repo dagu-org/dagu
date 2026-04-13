@@ -657,27 +657,29 @@ func TestSkippedPreconditions(t *testing.T) {
 
 	// Setup the test helper with the integration DAGs directory.
 	th := test.Setup(t)
+	skipNo := test.PortableCommandSubstitution(test.PortableOutputCommand("no"))
+	skipYes := test.PortableCommandSubstitution(test.PortableOutputCommand("yes"))
 	// Load the DAG from inline YAML.
-	dag := th.DAG(t, `type: graph  # Use graph mode to avoid implicit dependencies
+	dag := th.DAG(t, fmt.Sprintf(`type: graph  # Use graph mode to avoid implicit dependencies
 steps:
   - command: echo "executed"
     output: OUT_RUN
   - command: echo "should not execute"
     preconditions:
-      - condition: "`+"`"+`echo no`+"`"+`"
+      - condition: %q
         expected: "yes"
     output: OUT_SKIP1
   - command: echo "should execute"
     preconditions:
-      - condition: "`+"`"+`echo yes`+"`"+`"
+      - condition: %q
         expected: "yes"
     output: OUT_SKIP2
-`)
+`, skipNo, skipYes))
 	agent := dag.Agent()
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT_RUN":   "executed",
-		"OUT_SKIP":  "",
+		"OUT_SKIP1": "",
 		"OUT_SKIP2": "should execute",
 	})
 }

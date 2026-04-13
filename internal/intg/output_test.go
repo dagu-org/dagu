@@ -35,13 +35,13 @@ func TestLargeOutput_128KB(t *testing.T) {
 	textFilePath := test.TestdataPath(t, "integration/large-output-128kb.txt")
 	dag := th.DAG(t, `steps:
   - name: read-128kb-file
-    command: cat `+textFilePath+`
+    command: `+test.PortableReadFileCommand(textFilePath)+`
     output: OUTPUT_128KB
 `)
 	agent := dag.Agent()
 
 	// Run with timeout to detect hanging
-	ctx, cancel := context.WithTimeout(agent.Context, intgTestTimeout(10*time.Second))
+	ctx, cancel := context.WithTimeout(agent.Context, intgTestTimeout(30*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)

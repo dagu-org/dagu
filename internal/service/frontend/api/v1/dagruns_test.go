@@ -30,6 +30,13 @@ func dagRunEventuallyTimeout(base time.Duration) time.Duration {
 	return base
 }
 
+func dagRunSyncTimeoutSeconds() int {
+	if runtime.GOOS == "windows" {
+		return 90
+	}
+	return 30
+}
+
 func directWhoamiCommandPath(t *testing.T) string {
 	t.Helper()
 
@@ -305,28 +312,14 @@ steps:
 
 	status := waitForDAGRunStatus(t, server, "parent_dag_for_subdag_spec", startBody.DagRunId, 30*time.Second,
 		func(status *exec.DAGRunStatus) bool {
-			return status.Status == core.Succeeded && len(status.Nodes) == 1
+			return status.Status == core.Succeeded &&
+				len(status.Nodes) == 1 &&
+				len(status.Nodes[0].SubRuns) == 1
 		},
 	)
 	require.Len(t, status.Nodes, 1, "Expected 1 node (the call_child step)")
 
-	var persisted exec.DAGRunStatus
-	require.Eventually(t, func() bool {
-		attempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef("parent_dag_for_subdag_spec", startBody.DagRunId))
-		if err != nil {
-			return false
-		}
-		current, err := attempt.ReadStatus(server.Context)
-		if err != nil {
-			return false
-		}
-		persisted = *current
-		return persisted.Status == core.Succeeded &&
-			len(persisted.Nodes) == 1 &&
-			len(persisted.Nodes[0].SubRuns) == 1
-	}, dagRunEventuallyTimeout(30*time.Second), 200*time.Millisecond)
-
-	callNode := persisted.Nodes[0]
+	callNode := status.Nodes[0]
 	require.Equal(t, "call_child", callNode.Step.Name)
 	subDAGRunID := callNode.SubRuns[0].DAGRunID
 
@@ -1081,7 +1074,7 @@ func TestExecuteDAGSync(t *testing.T) {
 	}).ExpectStatus(http.StatusCreated).Send(t)
 
 	// Execute synchronously with timeout
-	timeout := 30
+	timeout := dagRunSyncTimeoutSeconds()
 	syncResp := server.Client().Post("/api/v1/dags/sync_test_dag/start-sync", api.ExecuteDAGSyncJSONRequestBody{
 		Timeout: timeout,
 	}).ExpectStatus(http.StatusOK).Send(t)

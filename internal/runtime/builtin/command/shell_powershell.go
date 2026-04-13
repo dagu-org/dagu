@@ -50,7 +50,9 @@ func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.C
 	}
 
 	if scriptPath := b.normalizeScriptPath(); scriptPath != "" {
-		args = append(args, scriptPath)
+		args = append(args, powerShellInlineCommand(scriptPath))
+	} else {
+		args = append(args, powerShellInlineCommand(""))
 	}
 
 	return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec

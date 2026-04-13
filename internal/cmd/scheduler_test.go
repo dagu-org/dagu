@@ -22,7 +22,7 @@ func TestSchedulerCommand(t *testing.T) {
 	})
 	t.Run("StartSchedulerWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		cancelWhenLogContains(t, th, "dagu_test")
+		cancelWhenLogContains(t, th, "Scheduler started", "dagu_test")
 
 		th.RunCommand(t, cmd.Scheduler(), test.CmdTest{
 			Args:        []string{"scheduler", "--config", test.TestdataPath(t, "cli/config_test.yaml")},

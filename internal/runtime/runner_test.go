@@ -394,10 +394,11 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
 		r := setupRunner(t)
-		command := "echo test_output >&2; echo test_output; false"
-		if windowsShellTest() {
-			command = "Write-Error 'test_output'; Write-Output 'test_output'; exit 1"
-		}
+		command := test.PortableCommandSequence(
+			test.PortableStderrCommand("test_output"),
+			test.PortableOutputCommand("test_output"),
+			test.PortableFailureCommand(),
+		)
 
 		// 1 (exit code 1) -> 2
 		plan := r.newPlan(t,
@@ -1406,7 +1407,10 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 		r := setupRunner(t)
 		plan := r.newPlan(t,
 			newStep("retry_timeout",
-				withCommand("sleep 0.15 && false"),
+				withCommand(test.PortableCommandSequence(
+					test.PortableSleepCommand(150*time.Millisecond),
+					test.PortableFailureCommand(),
+				)),
 				withRetryPolicy(5, 50*time.Millisecond), // would retry many times if not timed out
 				withStepTimeout(100*time.Millisecond),   // shorter than sleep
 			),
@@ -1905,7 +1909,10 @@ func TestRunner_TimeoutDuringRetry(t *testing.T) {
 	// Step that will keep retrying until timeout
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand("sleep 0.1 && false"),
+			withCommand(test.PortableCommandSequence(
+				test.PortableSleepCommand(100*time.Millisecond),
+				test.PortableFailureCommand(),
+			)),
 			withRetryPolicy(10, 50*time.Millisecond), // Many retries
 		),
 	)
@@ -1921,7 +1928,11 @@ func TestRunner_TimeoutDuringRetry(t *testing.T) {
 
 func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 	r := setupRunner(t,
-		withOnExit(newStep("onExit", withScript("echo handler started && sleep 0.1 && echo handler done"))),
+		withOnExit(newStep("onExit", withScript(test.PortableCommandSequence(
+			test.PortableOutputCommand("handler started"),
+			test.PortableSleepCommand(100*time.Millisecond),
+			test.PortableOutputCommand("handler done"),
+		)))),
 	)
 
 	plan := r.newPlan(t, successStep("1"))
@@ -1945,7 +1956,7 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand("echo repeat"),
+			withCommand(test.PortableOutputCommand("repeat")),
 			withRepeatPolicy(true, 100*time.Millisecond),
 		),
 	)
@@ -1969,7 +1980,7 @@ func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
 	// Test repeat with limit
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand("echo repeat"),
+			withCommand(test.PortableOutputCommand("repeat")),
 			withRepeatPolicy(true, 100*time.Millisecond),
 			func(step *core.Step) {
 				step.RepeatPolicy.Limit = 3
@@ -2435,7 +2446,7 @@ func TestRunner_StepIDVariableExpansion(t *testing.T) {
 		),
 		newStep("step3",
 			// This should have access to both step1 and step2 outputs via IDs
-			withCommand("echo $OUT1 $OUT2"),
+			withCommand(test.PortableEnvOutputCommandWithSeparator(" ", "OUT1", "OUT2")),
 			withOutput("COMBINED"),
 			withDepends("step2"),
 		),
@@ -2478,11 +2489,10 @@ func TestRunner_RetryPolicyDefaults(t *testing.T) {
 	// Test retry with unhandled error type (not exec.ExitError)
 	plan := r.newPlan(t,
 		newStep("1",
-			withScript(`
-				# This will cause a different type of error
-				echo "Test error" >&2
-				exit 1
-			`),
+			withScript(test.PortableCommandSequence(
+				test.PortableStderrCommand("Test error"),
+				test.PortableFailureCommand(),
+			)),
 			withRetryPolicy(1, 20*time.Millisecond),
 		),
 	)
@@ -2661,7 +2671,10 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("worker_step",
 				withID("worker"),
-				withCommand("echo 'Worker processing done' && exit 0"),
+				withCommand(test.PortableCommandSequence(
+					test.PortableOutputCommand("Worker processing done"),
+					test.PortableSuccessCommand(),
+				)),
 				withDepends("main_step"),
 			),
 		)
@@ -2701,7 +2714,10 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("failing_step",
 				withID("failing"),
-				withCommand("echo 'Error occurred' >&2 && exit 1"),
+				withCommand(test.PortableCommandSequence(
+					test.PortableStderrCommand("Error occurred"),
+					test.PortableFailureCommand(),
+				)),
 				withDepends("setup"),
 			),
 		)
@@ -2746,7 +2762,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("third",
 				withID("step3"),
-				withCommand("echo 'Warning message' >&2"),
+				withCommand(test.PortableStderrCommand("Warning message")),
 				withDepends("second"),
 			),
 		)
@@ -2812,7 +2828,10 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("main",
 				withID("main"),
-				withCommand("echo 'Processing' && exit 0"),
+				withCommand(test.PortableCommandSequence(
+					test.PortableOutputCommand("Processing"),
+					test.PortableSuccessCommand(),
+				)),
 			),
 		)
 

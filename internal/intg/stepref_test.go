@@ -4,6 +4,7 @@
 package intg_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/core"
@@ -22,22 +23,26 @@ func TestStepIDPropertyAccess(t *testing.T) {
 	}{
 		{
 			name: "BasicStdout/StderrFileAccess",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: gen
     command: |
-      echo "Test output data"
-      echo "Error message" >&2
+%s
     output: GEN_OUTPUT
 
   - depends:
       - gen
     command: |
-      echo "stdout_file=${gen.stdout}"
-      echo "stderr_file=${gen.stderr}"
+%s
     output: FILE_PATHS
-`,
+`, indentScript(test.PortableCommandSequence(
+				test.PortableOutputCommand("Test output data"),
+				test.PortableStderrCommand("Error message"),
+			), 6), indentScript(test.PortableCommandSequence(
+				test.PortableOutputCommand("stdout_file=${gen.stdout}"),
+				test.PortableOutputCommand("stderr_file=${gen.stderr}"),
+			), 6)),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"GEN_OUTPUT": "Test output data",
@@ -76,7 +81,7 @@ steps:
 		},
 		{
 			name: "UnknownStepIDRemainsUnchanged",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: first_step
@@ -86,11 +91,13 @@ steps:
   - depends:
       - first_step
     command: |
-      echo "known=${first_step.stdout}"
-      echo "unknown=\${unknown_step.stdout}"
-      echo "invalid=\${first_step.unknown_property}"
+%s
     output: RESULT
-`,
+`, indentScript(test.PortableCommandSequence(
+				test.PortableOutputCommand("known=${first_step.stdout}"),
+				test.PortableOutputCommand("unknown=${unknown_step.stdout}"),
+				test.PortableOutputCommand("invalid=${first_step.unknown_property}"),
+			), 6)),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"FIRST_OUT": "Hello",
@@ -362,7 +369,7 @@ steps:
 		},
 		{
 			name: "OutputWithoutCapture",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: no_output
@@ -371,10 +378,9 @@ steps:
 
   - id: consumer
     depends: [no_output]
-    script: |
-      printf 'ref=${no_output.output}'
+    command: %q
     output: RESULT
-`,
+`, test.PortableOutputCommand("ref=${no_output.output}")),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"RESULT": "ref=${no_output.output}",
@@ -382,20 +388,18 @@ steps:
 		},
 		{
 			name: "OutputPrecedenceOverJSONPath",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: check
     output: check
-    script: |
-      printf '{"output":"from-json"}'
+    command: %q
 
   - id: consumer
     depends: [check]
-    script: |
-      printf 'value=%s' "${check.output}"
+    command: %q
     output: RESULT
-`,
+`, test.PortableOutputCommand(`{"output":"from-json"}`), test.PortableOutputCommand("value=${check.output}")),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"check":  `{"output":"from-json"}`,

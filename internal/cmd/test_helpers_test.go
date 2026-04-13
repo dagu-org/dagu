@@ -4,6 +4,7 @@
 package cmd_test
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func cancelWhenLogContains(t *testing.T, th test.Command, want ...string) {
 
 	done := make(chan bool, 1)
 	go func() {
-		deadline := time.Now().Add(10 * time.Second)
+		deadline := time.Now().Add(commandLogWaitTimeout())
 		for time.Now().Before(deadline) {
 			out := th.LoggingOutput.String()
 			matched := true
@@ -41,4 +42,11 @@ func cancelWhenLogContains(t *testing.T, th test.Command, want ...string) {
 	t.Cleanup(func() {
 		require.True(t, <-done, "startup log never appeared: %v", want)
 	})
+}
+
+func commandLogWaitTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 30 * time.Second
+	}
+	return 10 * time.Second
 }

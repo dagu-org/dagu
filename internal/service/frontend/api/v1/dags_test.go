@@ -744,7 +744,7 @@ steps:
 				return false
 			}
 			return status.Status == core.Succeeded
-		}, 10*time.Second, 200*time.Millisecond)
+		}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 
 		attempt, err := server.DAGRunStore.FindAttempt(server.Context, ref)
 		require.NoError(t, err)

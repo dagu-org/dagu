@@ -6,21 +6,38 @@ package intg_test
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/test"
 )
 
+func powerShellEnvOrLiteral(value string) string {
+	if strings.HasPrefix(value, "${") && strings.HasSuffix(value, "}") && len(value) > 3 {
+		return "$env:" + value[2:len(value)-1]
+	}
+	return fmt.Sprintf("%q", value)
+}
+
 func numericPreconditionCommand(left, operator, right string) string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("if ([int]%s %s [int]%s) { exit 0 } else { exit 1 }", left, operator, right)
+		return fmt.Sprintf(
+			"if ([int](%s) %s [int](%s)) { exit 0 } else { exit 1 }",
+			powerShellEnvOrLiteral(left),
+			operator,
+			powerShellEnvOrLiteral(right),
+		)
 	}
 	return fmt.Sprintf("test %s %s %s", left, operator, right)
 }
 
 func stringPreconditionCommand(left, right string) string {
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("if (%q -eq %q) { exit 0 } else { exit 1 }", left, right)
+		return fmt.Sprintf(
+			"if (([string](%s)) -eq ([string](%s))) { exit 0 } else { exit 1 }",
+			powerShellEnvOrLiteral(left),
+			powerShellEnvOrLiteral(right),
+		)
 	}
 	return fmt.Sprintf("test %s = %s", left, right)
 }

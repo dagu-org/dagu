@@ -42,6 +42,25 @@ func PortableOutputCommand(value string) string {
 	return fmt.Sprintf("printf '%%s\\n' %s", PosixQuote(value))
 }
 
+func PortableStderrCommand(value string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("[Console]::Error.WriteLine(%s)", PowerShellQuote(value))
+	}
+	return fmt.Sprintf("printf '%%s\\n' %s 1>&2", PosixQuote(value))
+}
+
+func PortableCommandSequence(commands ...string) string {
+	nonEmpty := make([]string, 0, len(commands))
+	for _, command := range commands {
+		command = strings.TrimSpace(command)
+		if command == "" {
+			continue
+		}
+		nonEmpty = append(nonEmpty, command)
+	}
+	return strings.Join(nonEmpty, "\n")
+}
+
 func PortableCommandSubstitution(command string) string {
 	return "`" + command + "`"
 }
@@ -171,6 +190,13 @@ func PortableReadTrimmedFileCommand(path string) string {
 	return fmt.Sprintf("tr -d '\\r\\n' < %s", PosixQuote(path))
 }
 
+func PortableReadFileCommand(path string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("Get-Content -Raw -Path %s", PowerShellQuote(path))
+	}
+	return fmt.Sprintf("cat %s", PosixQuote(path))
+}
+
 func PortableReadFileOrFallbackCommand(path, fallback string) string {
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf(
@@ -197,7 +223,7 @@ func PortableFileMissingCommand(path string) string {
 	return fmt.Sprintf("test ! -f %s", PosixQuote(path))
 }
 
-func PortableEnvOutputCommand(names ...string) string {
+func PortableEnvOutputCommandWithSeparator(separator string, names ...string) string {
 	if len(names) == 0 {
 		if runtime.GOOS == "windows" {
 			return "Write-Output ''"
@@ -211,8 +237,9 @@ func PortableEnvOutputCommand(names ...string) string {
 			refs = append(refs, "$env:"+name)
 		}
 		return fmt.Sprintf(
-			"Write-Output ((@(%s) | ForEach-Object { if ($null -eq $_) { '' } else { [string]$_ } }) -join '|')",
+			"Write-Output ((@(%s) | ForEach-Object { if ($null -eq $_) { '' } else { [string]$_ } }) -join %s)",
 			strings.Join(refs, ", "),
+			PowerShellQuote(separator),
 		)
 	}
 
@@ -222,5 +249,9 @@ func PortableEnvOutputCommand(names ...string) string {
 		placeholders = append(placeholders, "%s")
 		values = append(values, fmt.Sprintf("${%s:-}", name))
 	}
-	return fmt.Sprintf("printf '%s' %s", strings.Join(placeholders, "|"), strings.Join(values, " "))
+	return fmt.Sprintf("printf '%s' %s", strings.Join(placeholders, separator), strings.Join(values, " "))
+}
+
+func PortableEnvOutputCommand(names ...string) string {
+	return PortableEnvOutputCommandWithSeparator("|", names...)
 }

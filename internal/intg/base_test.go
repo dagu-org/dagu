@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
@@ -18,6 +19,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+func readHandlerOutput(raw []byte) string {
+	if len(raw) >= 2 {
+		if raw[0] == 0xff && raw[1] == 0xfe {
+			return fileutil.DecodeString("utf-16", raw)
+		}
+		if raw[0] == 0xfe && raw[1] == 0xff {
+			return fileutil.DecodeString("utf-16be", raw)
+		}
+	}
+	return string(raw)
+}
 
 func TestBaseDAGSpecialEnvVarsInHandler(t *testing.T) {
 	t.Parallel()
@@ -90,7 +103,7 @@ func TestBaseDAGSpecialEnvVarsInHandler(t *testing.T) {
 	output, err := os.ReadFile(outputFile)
 	require.NoError(t, err, "handler output file should exist")
 
-	outputStr := string(output)
+	outputStr := readHandlerOutput(output)
 	require.Contains(t, outputStr, "DAG_NAME=", "DAG_NAME should be set")
 	require.Contains(t, outputStr, "DAG_RUN_ID=", "DAG_RUN_ID should be set")
 	require.Contains(t, outputStr, "DAG_RUN_LOG_FILE=", "DAG_RUN_LOG_FILE should be set")
@@ -209,7 +222,7 @@ steps:
 	// Verify DAG's own handler ran
 	dagOutput, err := os.ReadFile(dagMarkerFile)
 	require.NoError(t, err)
-	require.Contains(t, string(dagOutput), "DAG", "DAG's own failure handler should have run")
+	require.Contains(t, readHandlerOutput(dagOutput), "DAG", "DAG's own failure handler should have run")
 
 	// Verify base handler did NOT run
 	_, err = os.ReadFile(baseMarkerFile)

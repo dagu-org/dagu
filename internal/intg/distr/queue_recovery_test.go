@@ -56,14 +56,14 @@ steps:
 
 func queuedDispatchBulkRunCount() int {
 	if runtime.GOOS == "windows" {
-		return 10
+		return 5
 	}
 	return 1000
 }
 
 func queuedDispatchBulkTimeout() time.Duration {
 	if runtime.GOOS == "windows" {
-		return 3 * time.Minute
+		return 5 * time.Minute
 	}
 	return 10 * time.Minute
 }

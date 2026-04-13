@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -182,12 +184,36 @@ func (pg *ProcGroup) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) er
 	if current.Fresh || !sameProcEntry(current, entry) {
 		return nil
 	}
-	if err := os.Remove(entry.FilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := removeProcFileWithRetry(entry.FilePath); err != nil {
 		return err
 	}
 	_ = os.Remove(filepath.Dir(entry.FilePath))
 	logger.Info(ctx, "Removed stale proc file", tag.File(entry.FilePath))
 	return nil
+}
+
+func removeProcFileWithRetry(path string) error {
+	var lastErr error
+	for attempt := 0; attempt < 12; attempt++ {
+		err := os.Remove(path)
+		if err == nil || errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if !isRetryableProcRemoveError(err) {
+			return err
+		}
+		lastErr = err
+		time.Sleep(time.Duration(attempt+1) * 25 * time.Millisecond)
+	}
+	return lastErr
+}
+
+func isRetryableProcRemoveError(err error) bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "used by another process") || strings.Contains(msg, "access is denied")
 }
 
 func (pg *ProcGroup) listEntriesLocked(_ context.Context) ([]exec.ProcEntry, error) {

@@ -604,11 +604,11 @@ params:
   - INPUT: "default"
 steps:
   - command: |
-      if ("$1" -eq "fail") {
+      if ("$($args[0])" -eq "fail") {
         Write-Output "Failing as requested"
         exit 1
       }
-      Write-Output ("Processing: {0}" -f "$1")
+      Write-Output ("Processing: {0}" -f "$($args[0])")
 `
 	}
 
@@ -1426,11 +1426,11 @@ func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
       Write-Output ("OK: LABEL={0} ID={1}" -f "${LABEL}", "${ID}")
 `
 		singleValueScript = `
-      if ("$1" -ne "simple") {
-        Write-Output ("FAIL: TAG='{0}' (expected 'simple')" -f "$1")
+      if ("$($args[0])" -ne "simple") {
+        Write-Output ("FAIL: TAG='{0}' (expected 'simple')" -f "$($args[0])")
         exit 1
       }
-      Write-Output ("OK: TAG={0}" -f "$1")
+      Write-Output ("OK: TAG={0}" -f "$($args[0])")
 `
 	}
 

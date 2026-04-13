@@ -69,6 +69,29 @@ func hasShebang(script string) bool {
 	return strings.HasPrefix(script, "#!")
 }
 
+var powerShellPreambleStatements = []string{
+	"$ErrorActionPreference = 'Stop'",
+	"$PSNativeCommandUseErrorActionPreference = $true",
+	"$utf8NoBom = [System.Text.UTF8Encoding]::new($false)",
+	"[Console]::InputEncoding = $utf8NoBom",
+	"[Console]::OutputEncoding = $utf8NoBom",
+	"$OutputEncoding = $utf8NoBom",
+	"$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'",
+}
+
+func powerShellPreamble() string {
+	return strings.Join(powerShellPreambleStatements, "\n")
+}
+
+func powerShellInlineCommand(command string) string {
+	parts := append([]string{}, powerShellPreambleStatements...)
+	command = strings.TrimSpace(command)
+	if command != "" {
+		parts = append(parts, command)
+	}
+	return strings.Join(parts, "; ")
+}
+
 // scriptLineOffset returns the number of lines prepended by preprocessScript
 // for the given shell. This is needed to map error line numbers back to the
 // user's original script content.
@@ -77,7 +100,7 @@ func scriptLineOffset(scriptFile string) int {
 		return 0
 	}
 	if cmdutil.GetScriptExtension(scriptFile) == ".ps1" {
-		return 2 // preprocessScript prepends 2 lines for PowerShell
+		return len(powerShellPreambleStatements)
 	}
 	return 0
 }
@@ -87,10 +110,7 @@ func scriptLineOffset(scriptFile string) int {
 func preprocessScript(script, ext string) string {
 	switch ext {
 	case ".ps1":
-		// For PowerShell scripts, prepend error handling settings:
-		// $ErrorActionPreference = 'Stop' - stops on cmdlet errors
-		// $PSNativeCommandUseErrorActionPreference = $true - stops on non-zero exit codes (PowerShell 7.4+)
-		return "$ErrorActionPreference = 'Stop'\n$PSNativeCommandUseErrorActionPreference = $true\n" + script
+		return powerShellPreamble() + "\n" + script
 	default:
 		return script
 	}
