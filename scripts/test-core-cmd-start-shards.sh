@@ -38,7 +38,7 @@ start_bg "internal-cmd-start-positional" \
   '^(TestCmdStart_PositionalParamValidation)$' \
   ''
 start_bg "internal-cmd-start-other" \
-  ./scripts/test-shard.sh ./internal/cmd \
+  ./scripts/test-shard-split.sh ./internal/cmd 2 \
   '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*))' \
   '^(TestCmdStart_PositionalParamValidation)$'
 wait_bg
