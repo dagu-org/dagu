@@ -454,7 +454,7 @@ steps:
 	require.NotEmpty(t, startBody.DagRunId)
 
 	// Wait for DAG to enter Wait status
-	waitForDAGRunStatus(t, server, "approval_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	waitForStoredDAGRunStatus(t, server, "approval_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Waiting
 	})
 
@@ -471,7 +471,7 @@ steps:
 	require.True(t, approveBody.Resumed)
 
 	// Wait for DAG to complete
-	waitForDAGRunStatus(t, server, "approval_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	waitForStoredDAGRunStatus(t, server, "approval_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Succeeded
 	})
 }
@@ -902,14 +902,13 @@ steps:
 
 	test.ProcessQueuedInlineRun(t, server, dagName)
 
-	attempt, dag := test.WaitForAttemptSnapshotWithDAG(t, server, dagName, body.DagRunId)
+	_, dag := test.WaitForAttemptSnapshotWithDAG(t, server, dagName, body.DagRunId)
 	require.Contains(t, string(dag.YamlData), "echo current file")
 	require.Equal(t, dagPath, dag.SourceFile)
 
-	require.Eventually(t, func() bool {
-		status, err := attempt.ReadStatus(server.Context)
-		return err == nil && status.Status == core.Succeeded
-	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+	waitForStoredDAGRunStatus(t, server, dagName, body.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Succeeded
+	})
 }
 
 func TestRescheduleDAGRunRequiresQueuesEnabled(t *testing.T) {

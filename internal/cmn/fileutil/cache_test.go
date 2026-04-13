@@ -239,6 +239,43 @@ func TestCache_LoadLatest(t *testing.T) {
 	assert.Equal(t, 2, loadCount)
 }
 
+func TestCache_LoadLatest_DetectsSubsecondMtimeChanges(t *testing.T) {
+	t.Parallel()
+
+	cache := NewCache[string]("test", 100, time.Hour)
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("alpha"), 0o644))
+
+	baseTime := time.Unix(1_700_000_000, 100_000_000)
+	require.NoError(t, os.Chtimes(filePath, baseTime, baseTime))
+
+	loadCount := 0
+	loader := func() (string, error) {
+		loadCount++
+		return "loaded-data", nil
+	}
+
+	_, err := cache.LoadLatest(filePath, loader)
+	require.NoError(t, err)
+	require.Equal(t, 1, loadCount)
+
+	require.NoError(t, os.WriteFile(filePath, []byte("bravo"), 0o644))
+	nextTime := baseTime.Add(200 * time.Millisecond)
+	require.NoError(t, os.Chtimes(filePath, nextTime, nextTime))
+
+	initialInfo, err := os.Stat(filePath)
+	require.NoError(t, err)
+	if initialInfo.ModTime().Unix() != nextTime.Unix() || initialInfo.ModTime().UnixNano() != nextTime.UnixNano() {
+		t.Skip("filesystem does not preserve sub-second mtimes")
+	}
+
+	_, err = cache.LoadLatest(filePath, loader)
+	require.NoError(t, err)
+	assert.Equal(t, 2, loadCount)
+}
+
 func TestCache_LoadLatest_FileNotFound(t *testing.T) {
 	t.Parallel()
 
