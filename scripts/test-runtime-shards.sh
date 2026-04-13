@@ -40,7 +40,7 @@ wait_bg() {
 case "$mode" in
   base-a)
     start_bg "runtime-rest" \
-      ./scripts/test-shard-split.sh ./internal/runtime 2 \
+      ./scripts/test-shard-split.sh ./internal/runtime 4 \
       '' \
       '^TestRunner$'
     start_bg "runtime-runner-early" \

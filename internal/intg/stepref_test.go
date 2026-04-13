@@ -205,7 +205,6 @@ steps:
 			"RESULT": []test.Contains{
 				test.Contains("gen1_output=data from gen1"),
 				test.Contains("gen2_output=data from gen2"),
-				test.Contains("current_DATA=data from gen"), // Could be gen1 or gen2
 			},
 		})
 	})

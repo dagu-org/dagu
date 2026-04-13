@@ -62,7 +62,7 @@ type fixtureOption func(*fixtureConfig)
 func distrTestTimeout(timeout time.Duration) time.Duration {
 	switch {
 	case goruntime.GOOS == "windows" && raceEnabled():
-		return timeout * 4
+		return timeout * 5
 	case goruntime.GOOS == "windows" || raceEnabled():
 		return timeout * 2
 	default:

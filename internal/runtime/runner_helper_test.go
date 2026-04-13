@@ -429,14 +429,18 @@ func waitForNodeStatus(plan *runtime.Plan, name string, status core.NodeStatus, 
 // waitForNodeDoneCount polls until the named node's DoneCount reaches at
 // least the given value or the timeout expires.
 func waitForNodeDoneCount(plan *runtime.Plan, name string, minCount int, timeout time.Duration) {
+	_ = waitForNodeDoneCountAtLeast(plan, name, minCount, timeout)
+}
+
+func waitForNodeDoneCountAtLeast(plan *runtime.Plan, name string, minCount int, timeout time.Duration) bool {
 	deadline := time.After(timeout)
 	for {
 		if node := plan.GetNodeByName(name); node != nil && node.State().DoneCount >= minCount {
-			return
+			return true
 		}
 		select {
 		case <-deadline:
-			return
+			return false
 		case <-time.After(5 * time.Millisecond):
 		}
 	}

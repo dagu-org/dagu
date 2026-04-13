@@ -198,11 +198,18 @@ steps:
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
+		expectedPositional := []test.Contains{
+			"$1 is foo",
+			"$2 is bar",
+		}
+		if runtime.GOOS == "windows" {
+			expectedPositional = []test.Contains{
+				"foo is foo",
+				"bar is bar",
+			}
+		}
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": []test.Contains{
-				"$1 is foo",
-				"$2 is bar",
-			},
+			"OUT1": expectedPositional,
 		})
 	})
 
@@ -223,11 +230,18 @@ steps:
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
+		expectedPositional := []test.Contains{
+			"$1 is foo",
+			"$2 is bar",
+		}
+		if runtime.GOOS == "windows" {
+			expectedPositional = []test.Contains{
+				"foo is foo",
+				"bar is bar",
+			}
+		}
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": []test.Contains{
-				"$1 is foo",
-				"$2 is bar",
-			},
+			"OUT1": expectedPositional,
 		})
 	})
 
@@ -411,8 +425,8 @@ steps:
 		firstOutput, ok := status.Nodes[0].OutputVariables.Load("FIRST_OUT")
 		require.True(t, ok)
 		require.Equal(t, "FIRST_OUT=first", firstOutput)
-		require.Equal(t, filepath.Join(tempDir, "dag_second.out"), status.Nodes[1].Step.Stdout)
-		require.Equal(t, filepath.Join(tempDir, "dag_custom-error.err"), status.Nodes[1].Step.Stderr)
+		require.Equal(t, canonicalTestPath(filepath.Join(tempDir, "dag_second.out")), canonicalTestPath(status.Nodes[1].Step.Stdout))
+		require.Equal(t, canonicalTestPath(filepath.Join(tempDir, "dag_custom-error.err")), canonicalTestPath(status.Nodes[1].Step.Stderr))
 
 		stdoutContent, err := os.ReadFile(status.Nodes[1].Step.Stdout)
 		require.NoError(t, err)

@@ -23,11 +23,11 @@ func repeatCounterScript(counterFile string) string {
 		return fmt.Sprintf(`
 $counterFile = %s
 $count = 0
-if (Test-Path $counterFile) {
-  $count = [int](Get-Content -Raw -Path $counterFile).Trim()
+if ([System.IO.File]::Exists($counterFile)) {
+  $count = [int][System.IO.File]::ReadAllText($counterFile).Trim()
 }
 $count++
-Set-Content -Path $counterFile -Value $count -NoNewline
+[System.IO.File]::WriteAllText($counterFile, [string]$count)
 Write-Output $count
 `, test.PowerShellQuote(counterFile))
 	}
@@ -48,7 +48,7 @@ echo "$COUNT"
 func repeatPolicyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
 		if raceEnabled() {
-			return intgTestTimeout(base * 3)
+			return intgTestTimeout(base * 4)
 		}
 		return intgTestTimeout(base * 2)
 	}
@@ -64,11 +64,11 @@ func repeatExitCodeScript(counterFile string, successAfter int, removeOnSuccess 
 		return fmt.Sprintf(`
 $counterFile = %s
 $count = 0
-if (Test-Path $counterFile) {
-  $count = [int](Get-Content -Raw -Path $counterFile).Trim()
+if ([System.IO.File]::Exists($counterFile)) {
+  $count = [int][System.IO.File]::ReadAllText($counterFile).Trim()
 }
 $count++
-Set-Content -Path $counterFile -Value $count -NoNewline
+[System.IO.File]::WriteAllText($counterFile, [string]$count)
 if ($count -lt %d) {
   exit 1
 }

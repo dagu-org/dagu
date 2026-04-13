@@ -103,7 +103,7 @@ steps:
 		readCommand := `cat "${DAG_RUN_WORK_DIR}/test.txt"`
 		if runtime.GOOS == "windows" {
 			writeCommand = `Set-Content -Path "${DAG_RUN_WORK_DIR}/test.txt" -Value "hello" -NoNewline`
-			readCommand = `(Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/test.txt").TrimEnd("` + "`r" + `", "` + "`n" + `")`
+			readCommand = `Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/test.txt"`
 		}
 
 		th := test.Setup(t)
@@ -138,7 +138,7 @@ steps:
 		readCommand := `cat "${DAG_RUN_WORK_DIR}/data.txt"`
 		if runtime.GOOS == "windows" {
 			writeCommand = `Set-Content -Path "${DAG_RUN_WORK_DIR}/data.txt" -Value "from-workdir" -NoNewline`
-			readCommand = `(Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/data.txt").TrimEnd("` + "`r" + `", "` + "`n" + `")`
+			readCommand = `Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/data.txt"`
 		}
 		dag := th.DAG(t, `
 working_dir: `+explicitDirForYAML+`
