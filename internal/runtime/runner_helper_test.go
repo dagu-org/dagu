@@ -220,10 +220,17 @@ func setupRunner(t *testing.T, opts ...runnerOption) testHelper {
 	r := runtime.New(cfg)
 
 	return testHelper{
-		Helper: test.Setup(t),
+		Helper: th,
 		runner: r,
 		cfg:    cfg,
 	}
+}
+
+func platformTestDuration(nonWindows, windows time.Duration) time.Duration {
+	if windowsShellTest() {
+		return windows
+	}
+	return nonWindows
 }
 
 func (th testHelper) newPlan(t *testing.T, steps ...core.Step) planHelper {

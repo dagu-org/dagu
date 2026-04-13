@@ -22,7 +22,7 @@ import (
 )
 
 func TestManager(t *testing.T) {
-	th := test.Setup(t)
+	th := test.Setup(t, test.WithBuiltExecutable())
 
 	t.Run("Valid", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
@@ -120,13 +120,20 @@ steps:
 		err := runtime.Start(th.Context, spec)
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, core.Succeeded)
+		var status exec.DAGRunStatus
+		require.Eventually(t, func() bool {
+			latest, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+			if err != nil {
+				return false
+			}
+			status = latest
+			t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
+			return latest.Status == core.Succeeded
+		}, platformTestDuration(30*time.Second, 4*time.Minute), time.Second)
 
 		// Get the sub dag-run status.
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-		require.NoError(t, err)
-		dagRunID := dagRunStatus.DAGRunID
-		subDAGRun := dagRunStatus.Nodes[0].SubRuns[0]
+		dagRunID := status.DAGRunID
+		subDAGRun := status.Nodes[0].SubRuns[0]
 
 		root := exec.NewDAGRunRef(dag.Name, dagRunID)
 		subDAGRunStatus, err := th.DAGRunMgr.FindSubDAGRunStatus(th.Context, root, subDAGRun.DAGRunID)

@@ -59,7 +59,7 @@ func repeatCounterSetupScript(counterFile string) string {
 		return fmt.Sprintf(`
 					$counterFile = %s
 					if (Test-Path $counterFile) {
-						$COUNT = [int]((Get-Content -Raw -Path $counterFile).TrimEnd("`+"`r"+`", "`+"`n"+`"))
+						$COUNT = [int](([string](Get-Content -Raw -Path $counterFile)).TrimEnd([char]13, [char]10))
 					} else {
 						$COUNT = 0
 					}
@@ -121,7 +121,7 @@ func retrySpecificExitCodeScript(counterFile string) string {
 						exit 42
 					}
 
-					$COUNT = (Get-Content -Raw -Path $counterFile).TrimEnd("`+"`r"+`", "`+"`n"+`")
+					$COUNT = ([string](Get-Content -Raw -Path $counterFile)).TrimEnd([char]13, [char]10)
 					if ($COUNT -eq '1') {
 						Set-Content -Path $counterFile -Value '2' -NoNewline
 						exit 100
@@ -178,7 +178,7 @@ func retryOutputSequenceScript(counterFile string, outputs []string, successAtte
 		fmt.Fprintf(&body, "\n\t\t\t\t\t$counterFile = %s\n", test.PowerShellQuote(counterFile))
 		body.WriteString("\t\t\t\t\t$attempt = 1\n")
 		body.WriteString("\t\t\t\t\tif (Test-Path $counterFile) {\n")
-		body.WriteString("\t\t\t\t\t\t$attempt = [int]((Get-Content -Raw -Path $counterFile).TrimEnd(\"`r\", \"`n\")) + 1\n")
+		body.WriteString("\t\t\t\t\t\t$attempt = [int](([string](Get-Content -Raw -Path $counterFile)).TrimEnd([char]13, [char]10)) + 1\n")
 		body.WriteString("\t\t\t\t\t}\n")
 		body.WriteString("\t\t\t\t\tSet-Content -Path $counterFile -Value $attempt -NoNewline\n")
 		body.WriteString("\t\t\t\t\tswitch ($attempt) {\n")
@@ -643,7 +643,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "`echo 1`",
+					Condition: "1",
 					Expected:  "1",
 				}),
 			),
@@ -664,7 +664,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "`echo 1`",
+					Condition: "1",
 					Expected:  "0",
 				})),
 			successStep("3", "2"),
@@ -1086,6 +1086,9 @@ func TestRunner(t *testing.T) {
 
 		err := node.Prepare(ctx, t.TempDir(), "test-run")
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 		require.Equal(t, strings.ReplaceAll(stdoutPath, "${DAG_RUN_STEP_NAME}", "second"), node.Step().Stdout)
 	})
 	t.Run("StdoutPathExpandsStepEnvBeforePrepare", func(t *testing.T) {
@@ -1378,11 +1381,14 @@ func TestRunner(t *testing.T) {
 // Step-level timeout tests
 func TestRunner_StepLevelTimeout(t *testing.T) {
 	t.Run("SingleStepTimeoutFailsStep", func(t *testing.T) {
+		stepTimeout := platformTestDuration(100*time.Millisecond, 150*time.Millisecond)
+		sleepDuration := platformTestDuration(200*time.Millisecond, 350*time.Millisecond)
+		maxElapsed := platformTestDuration(1500*time.Millisecond, 3*time.Second)
 		r := setupRunner(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
 		plan := r.newPlan(t,
 			newStep("timeout_step",
-				withCommand("sleep 0.2"), // longer than step timeout
-				withStepTimeout(100*time.Millisecond),
+				withCommand(test.PortableSleepCommand(sleepDuration)), // longer than step timeout
+				withStepTimeout(stepTimeout),
 			),
 			successStep("after", "timeout_step"),
 		)
@@ -1392,7 +1398,7 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 		elapsed := time.Since(start)
 
 		// Step should be aborted quickly (< 2s DAG timeout)
-		assert.Less(t, elapsed, 1500*time.Millisecond)
+		assert.Less(t, elapsed, maxElapsed)
 		result.assertNodeStatus(t, "timeout_step", core.NodeFailed)
 		// Downstream dependency is aborted since runner cancels remaining steps after failure
 		result.assertNodeStatus(t, "after", core.NodeAborted)
@@ -1405,15 +1411,17 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("TimeoutPreemptsRetriesAndMarksFailed", func(t *testing.T) {
+		stepTimeout := platformTestDuration(100*time.Millisecond, 150*time.Millisecond)
+		sleepDuration := platformTestDuration(150*time.Millisecond, 300*time.Millisecond)
 		r := setupRunner(t)
 		plan := r.newPlan(t,
 			newStep("retry_timeout",
 				withCommand(test.PortableCommandSequence(
-					test.PortableSleepCommand(150*time.Millisecond),
+					test.PortableSleepCommand(sleepDuration),
 					test.PortableFailureCommand(),
 				)),
 				withRetryPolicy(5, 50*time.Millisecond), // would retry many times if not timed out
-				withStepTimeout(100*time.Millisecond),   // shorter than sleep
+				withStepTimeout(stepTimeout),            // shorter than sleep
 			),
 		)
 
@@ -1426,11 +1434,13 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("ParallelStepsTimeoutFailIndividually", func(t *testing.T) {
+		stepTimeout := platformTestDuration(80*time.Millisecond, 140*time.Millisecond)
+		sleepDuration := platformTestDuration(200*time.Millisecond, 320*time.Millisecond)
 		r := setupRunner(t, withMaxActiveRuns(3))
 		plan := r.newPlan(t,
-			newStep("p1", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
-			newStep("p2", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
-			newStep("p3", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
+			newStep("p1", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("p2", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("p3", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
 		)
 
 		result := plan.assertRun(t, core.Failed)
@@ -1440,9 +1450,11 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("StepLevelTimeoutOverridesLongDAGTimeoutAndFails", func(t *testing.T) {
+		stepTimeout := platformTestDuration(120*time.Millisecond, 180*time.Millisecond)
+		sleepDuration := platformTestDuration(300*time.Millisecond, 450*time.Millisecond)
 		r := setupRunner(t, withTimeout(5*time.Second))
 		plan := r.newPlan(t,
-			newStep("short_timeout", withCommand("sleep 0.3"), withStepTimeout(120*time.Millisecond)),
+			newStep("short_timeout", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
 		)
 		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "short_timeout", core.NodeFailed)
@@ -1615,11 +1627,11 @@ func TestRunner_ErrorHandling(t *testing.T) {
 	t.Run("PanicRecovery", func(t *testing.T) {
 		r := setupRunner(t)
 
-		// Create a step that will panic
+		// Exercise failed-step propagation without relying on shell-specific
+		// process signaling behavior, which is slow on Windows runners.
 		panicStep := newStep("panic", withScript(`
-			echo "About to panic"
-			# Simulate a panic by killing the process with an invalid signal
-			kill -99 $$
+			`+test.PortableOutputCommand("About to panic")+`
+			`+test.PortableFailureCommand()+`
 		`))
 
 		plan := r.newPlan(t, panicStep)

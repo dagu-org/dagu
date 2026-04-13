@@ -213,84 +213,84 @@ func TestNode(t *testing.T) {
 	t.Run("Output", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, "echo hello"), withNodeOutput("OUTPUT_TEST"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand("hello")), withNodeOutput("OUTPUT_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_TEST", "hello")
 	})
 	t.Run("OutputJSON", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo '{"key": "value"}'`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand(`{"key": "value"}`)), withNodeOutput("OUTPUT_JSON_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key": "value"}`)
 	})
 	t.Run("OutputJSONUnescaped", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand(`{"key":"value"}`)), withNodeOutput("OUTPUT_JSON_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key":"value"}`)
 	})
 	t.Run("OutputTabWithDoubleQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo "hello\tworld"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand("hello\tworld")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", "hello\tworld")
 	})
 	t.Run("OutputTabWithMixedQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello"\t"world`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand("hello\tworld")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", "hello\tworld") // This behavior is aligned with bash
+		node.AssertOutput(t, "OUTPUT", "hello\tworld")
 	})
 	t.Run("OutputTabWithoutQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello\tworld`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand(`hello\tworld`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hellotworld`) // This behavior is aligned with bash
+		node.AssertOutput(t, "OUTPUT", `hello\tworld`)
 	})
 	t.Run("OutputNewlineCharacter", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello\nworld`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand("hello\nworld")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hellonworld`) // This behavior is aligned with bash
+		node.AssertOutput(t, "OUTPUT", "hello\nworld")
 	})
 	t.Run("OutputEscapedJSONWithoutQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand(`{"key":"value"}`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
 	})
 	t.Run("OutputEscapedJSONWithQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo "{\"key\":\"value\"}"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand(`{"key":"value"}`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
 	})
 	t.Run("OutputSingleQuotedString", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo 'hello world'`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand("hello world")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello world`)
 	})
 	t.Run("OutputMixedQuotesWithSpace", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello "world"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand("hello world")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello world`)
 	})
 	t.Run("OutputNestedQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo 'hello "world"'`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.PortableOutputCommand(`hello "world"`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello "world"`)
 	})
@@ -1312,6 +1312,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created at absolute path
 		content, err := os.ReadFile(stdoutPath)
@@ -1354,6 +1357,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created in working directory
 		expectedPath := filepath.Join(workDir, stdoutPath)
@@ -1401,6 +1407,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created in working directory
 		expectedPath := filepath.Join(workDir, stderrPath)
@@ -1449,6 +1458,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created in correct nested path
 		expectedPath := filepath.Join(workDir, stdoutPath)

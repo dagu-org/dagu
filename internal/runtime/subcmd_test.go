@@ -264,7 +264,7 @@ steps:
 		}
 		status = latest
 		return status.Status == core.Succeeded
-	}, 10*time.Second, 100*time.Millisecond)
+	}, platformTestDuration(10*time.Second, 45*time.Second), 100*time.Millisecond)
 	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
 }
 
@@ -299,7 +299,7 @@ steps:
 		}
 		status = latest
 		return status.Status == core.Succeeded
-	}, 10*time.Second, 100*time.Millisecond)
+	}, platformTestDuration(10*time.Second, 45*time.Second), 100*time.Millisecond)
 	require.Equal(t, "from-host|", test.StatusOutputValue(t, &status, "RESULT"))
 }
 
