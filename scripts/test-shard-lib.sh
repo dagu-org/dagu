@@ -55,13 +55,24 @@ list_selected_tests() {
 
 run_test_binary() {
   local regex="${1:-}"
+  local timeout="${TEST_BINARY_TIMEOUT:-10m}"
+  local parallel="${TEST_GO_PARALLEL:-}"
+  local args=(
+    -test.v
+    "-test.timeout=${timeout}"
+  )
+
+  if [[ -n "$parallel" ]]; then
+    args+=("-test.parallel=${parallel}")
+  fi
+
+  if [[ -n "$regex" ]]; then
+    args+=(-test.run "$regex")
+  fi
 
   (
     cd "$TEST_SHARD_PACKAGE_DIR"
-    if [[ -n "$regex" ]]; then
-      exec "$TEST_SHARD_BINARY" -test.v -test.timeout=10m -test.run "$regex"
-    fi
-    exec "$TEST_SHARD_BINARY" -test.v -test.timeout=10m
+    exec "$TEST_SHARD_BINARY" "${args[@]}"
   )
 }
 

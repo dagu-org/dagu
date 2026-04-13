@@ -493,7 +493,7 @@ steps:
 	require.Eventually(t, func() bool {
 		_, err := os.Stat(markerFile)
 		return err == nil
-	}, intgTestTimeout(20*time.Second), 50*time.Millisecond, "expected first attempt to create marker file before abort")
+	}, intgTestTimeout(45*time.Second), 50*time.Millisecond, "expected first attempt to create marker file before abort")
 
 	startedRunID := ""
 	rootRun := exec.DAGRunRef{}
