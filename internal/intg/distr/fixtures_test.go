@@ -39,6 +39,7 @@ const (
 type fixtureConfig struct {
 	workerMode              workerMode
 	workerCount             int
+	workerMaxActiveRuns     int
 	workerLabels            map[string]string
 	logPersistence          bool
 	configMutators          []func(*config.Config)
@@ -76,6 +77,10 @@ func withWorkerMode(mode workerMode) fixtureOption {
 
 func withWorkerCount(n int) fixtureOption {
 	return func(c *fixtureConfig) { c.workerCount = n }
+}
+
+func withWorkerMaxActiveRuns(n int) fixtureOption {
+	return func(c *fixtureConfig) { c.workerMaxActiveRuns = n }
 }
 
 func withLabels(labels map[string]string) fixtureOption {
@@ -128,26 +133,28 @@ func withZombieDetectionInterval(interval time.Duration) fixtureOption {
 }
 
 type testFixture struct {
-	t                 *testing.T
-	coord             *test.Coordinator
-	dagWrapper        *test.DAG
-	coordinatorClient coordinator.Client
-	workers           []*worker.Worker
-	scheduler         *scheduler.Scheduler
-	schedulerCancel   context.CancelFunc
-	schedulerCtx      context.Context
-	schedulerErrCh    chan error
-	schedulerErr      error
-	schedulerErrSet   bool
+	t                   *testing.T
+	coord               *test.Coordinator
+	dagWrapper          *test.DAG
+	coordinatorClient   coordinator.Client
+	workerMaxActiveRuns int
+	workers             []*worker.Worker
+	scheduler           *scheduler.Scheduler
+	schedulerCancel     context.CancelFunc
+	schedulerCtx        context.Context
+	schedulerErrCh      chan error
+	schedulerErr        error
+	schedulerErrSet     bool
 }
 
 func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixture {
 	t.Helper()
 
 	cfg := &fixtureConfig{
-		workerMode:   sharedNothingMode,
-		workerCount:  1,
-		workerLabels: map[string]string{"test": "true"},
+		workerMode:          sharedNothingMode,
+		workerCount:         1,
+		workerMaxActiveRuns: 10,
+		workerLabels:        map[string]string{"test": "true"},
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -192,9 +199,10 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	coord.Config.Queues.Enabled = true
 
 	f := &testFixture{
-		t:                 t,
-		coord:             coord,
-		coordinatorClient: coord.GetCoordinatorClient(t),
+		t:                   t,
+		coord:               coord,
+		coordinatorClient:   coord.GetCoordinatorClient(t),
+		workerMaxActiveRuns: cfg.workerMaxActiveRuns,
 	}
 
 	for i := range cfg.workerCount {
@@ -248,7 +256,7 @@ func (f *testFixture) setupSharedNothingWorkerWithAfterAckHook(
 		Config:            workerConfig,
 	}
 
-	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
+	w := worker.NewWorker(workerID, f.workerMaxActiveRuns, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewRemoteTaskHandler(handlerCfg))
 	if afterAckHook != nil {
 		w.SetAfterTaskAckHook(afterAckHook)
@@ -268,7 +276,7 @@ func (f *testFixture) setupSharedFSWorkerWithAfterAckHook(
 ) *worker.Worker {
 	f.t.Helper()
 
-	w := worker.NewWorker(workerID, 10, f.coordinatorClient, labels, f.coord.Config)
+	w := worker.NewWorker(workerID, f.workerMaxActiveRuns, f.coordinatorClient, labels, f.coord.Config)
 	w.SetHandler(worker.NewTaskHandler(f.coord.Config))
 	if afterAckHook != nil {
 		w.SetAfterTaskAckHook(afterAckHook)

@@ -31,7 +31,8 @@ steps:
   - name: step1
     command: echo "executed"
 `,
-		withWorkerCount(10),
+		withWorkerCount(queuedDispatchWorkerCount()),
+		withWorkerMaxActiveRuns(queuedDispatchWorkerMaxActiveRuns()),
 		withLabels(map[string]string{"tier": "queue"}),
 		withConfigMutator(func(c *config.Config) {
 			c.Queues.Enabled = true
@@ -61,6 +62,20 @@ func queuedDispatchBulkRunCount() int {
 	return 1000
 }
 
+func queuedDispatchWorkerCount() int {
+	if runtime.GOOS == "windows" {
+		return 2
+	}
+	return 10
+}
+
+func queuedDispatchWorkerMaxActiveRuns() int {
+	if runtime.GOOS == "windows" {
+		return 1
+	}
+	return 10
+}
+
 func queuedDispatchBulkTimeout() time.Duration {
 	if runtime.GOOS == "windows" {
 		return 5 * time.Minute
@@ -77,7 +92,7 @@ worker_selector:
 steps:
   - name: step1
     command: echo "executed"
-`, withWorkerCount(0))
+`, withWorkerCount(0), withWorkerMaxActiveRuns(1))
 	defer f.cleanup()
 
 	require.NoError(t, f.enqueue())
@@ -102,7 +117,7 @@ worker_selector:
 steps:
   - name: step1
     command: echo "executed"
-`, withWorkerCount(0))
+`, withWorkerCount(0), withWorkerMaxActiveRuns(1))
 	defer f.cleanup()
 
 	f.setupSharedNothingWorker("mismatched-worker", map[string]string{"tier": "other"}, "")

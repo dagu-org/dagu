@@ -362,9 +362,12 @@ steps:
 	require.Equal(t, core.Running, status.Status)
 	require.NotEmpty(t, status.AttemptKey)
 
-	lease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
-	require.NoError(t, err)
-	require.NotNil(t, lease)
+	var lease *exec.DAGRunLease
+	require.Eventually(t, func() bool {
+		var err error
+		lease, err = f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
+		return err == nil && lease != nil
+	}, distrTestTimeout(5*time.Second), 100*time.Millisecond, "shared lease should exist while run is active")
 	assert.Equal(t, status.AttemptKey, lease.AttemptKey)
 	assert.Equal(t, status.AttemptID, lease.AttemptID)
 	assert.Equal(t, "worker-1", lease.WorkerID)

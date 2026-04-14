@@ -79,11 +79,10 @@ case "$mode" in
       run_filtered_tests \
       '^(TestExecution_ProcHeartbeat_.*)' \
       ''
-    start_bg "intg-distr-queued-dispatch" \
-      run_filtered_tests \
+    wait_bg
+    TEST_GO_PARALLEL=1 run_filtered_tests \
       '^(TestExecution_QueuedDispatch_(RecoversWhenWorkerRegistersLater|RecoversWhenMatchingWorkerRegistersLater))' \
       ''
-    wait_bg
     ;;
   c)
     setup_test_binary ./internal/intg/distr
