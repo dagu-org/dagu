@@ -2076,15 +2076,15 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 	cancelWait := platformTestDuration(5*time.Second, 30*time.Second)
 	started := make(chan bool, 1)
 	go func() {
-		started <- waitForRepeatCounterAtLeast(counterFile, 2, cancelWait)
-		time.Sleep(platformTestDuration(50*time.Millisecond, 500*time.Millisecond))
+		started <- waitForNodeRepeatRunning(plan.Plan, "1", cancelWait)
 		r.runner.Cancel(plan.Plan)
 	}()
 
 	result := plan.assertRun(t, core.Aborted)
 	result.assertNodeStatus(t, "1", core.NodeAborted)
-	assert.True(t, <-started, "runner should start before cancel")
-	assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
+	node := result.nodeByName(t, "1")
+	assert.True(t, <-started, "runner should enter repeated run before cancel")
+	assert.Equal(t, 1, node.State().DoneCount)
 }
 
 func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
