@@ -58,7 +58,7 @@ type schedulerConfig struct {
 // newFixture creates a new queue integration test fixture.
 func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 	t.Helper()
-	if !raceEnabled() {
+	if !raceEnabled() && runtime.GOOS != "windows" {
 		t.Parallel()
 	}
 
