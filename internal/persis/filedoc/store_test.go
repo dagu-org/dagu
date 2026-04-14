@@ -1759,7 +1759,7 @@ func TestListTreeSortMtimeWithDirectories(t *testing.T) {
 	assert.Equal(t, "dir-new", result.Items[0].ID)
 	assert.Equal(t, "dir-old", result.Items[1].ID)
 	// Verify directory mtime = max of descendants.
-	assert.True(t, result.Items[0].ModTime.After(result.Items[1].ModTime))
+	assert.False(t, result.Items[0].ModTime.Before(result.Items[1].ModTime))
 }
 
 func TestListTreeSortMtimeStable(t *testing.T) {

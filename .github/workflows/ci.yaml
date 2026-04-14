@@ -123,5 +123,6 @@ jobs:
           go test \
             -json \
             -timeout=20m \
+            -p=2 \
             -ldflags=-extldflags=-Wl \
             ./...

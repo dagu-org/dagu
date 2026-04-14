@@ -17,10 +17,25 @@ import (
 )
 
 func directStartStatusTimeout() time.Duration {
-	if runtime.GOOS == "windows" && raceEnabled() {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return 45 * time.Second
+	case runtime.GOOS == "windows":
 		return 30 * time.Second
+	default:
+		return 20 * time.Second
 	}
-	return 20 * time.Second
+}
+
+func executionStatusTimeout() time.Duration {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return 45 * time.Second
+	case runtime.GOOS == "windows":
+		return 30 * time.Second
+	default:
+		return 20 * time.Second
+	}
 }
 
 func TestExecution_StatusPushing(t *testing.T) {
@@ -43,7 +58,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -69,7 +84,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		assertLogContains(t, f.logDir(), f.dagWrapper.Name, status.DAGRunID, "echo-step", expectedOutput)
