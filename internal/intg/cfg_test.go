@@ -639,6 +639,8 @@ steps:
 }
 
 func TestCallSubDAG(t *testing.T) {
+	t.Parallel()
+
 	th := test.Setup(t)
 
 	// Use multi-document YAML to include both parent and sub DAG
@@ -666,6 +668,8 @@ steps:
 }
 
 func TestNestedThreeLevelDAG(t *testing.T) {
+	t.Parallel()
+
 	th := test.Setup(t)
 
 	// Create the grandsub DAG as a separate file

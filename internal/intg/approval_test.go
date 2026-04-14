@@ -13,6 +13,8 @@ import (
 
 func TestWaitStepApproval(t *testing.T) {
 	t.Run("WaitStepEntersWaitStatus", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -44,6 +46,8 @@ steps:
 	})
 
 	t.Run("WaitStepBlocksDependentNodes", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -80,6 +84,8 @@ steps:
 	})
 
 	t.Run("ParallelBranchWithWaitStep", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -117,6 +123,8 @@ steps:
 
 func TestApprovalField(t *testing.T) {
 	t.Run("ApprovalFieldOnCommandStep", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -148,6 +156,8 @@ steps:
 	})
 
 	t.Run("ApprovalFieldOnScriptStep", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -176,6 +186,8 @@ steps:
 	})
 
 	t.Run("ApprovalFieldWithInputConfig", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -207,6 +219,8 @@ steps:
 	})
 
 	t.Run("MultipleApprovalSteps", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -237,6 +251,8 @@ steps:
 	})
 
 	t.Run("ApprovalStepWithDependency", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		testDAG := th.DAG(t, `
@@ -270,6 +286,8 @@ steps:
 	})
 
 	t.Run("ApprovalFieldOnCallStep", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		// Create the sub-DAG first

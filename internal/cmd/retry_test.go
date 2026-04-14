@@ -24,6 +24,8 @@ import (
 
 func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAGWithFilePath", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, `params: "p1"
@@ -57,6 +59,8 @@ steps:
 	})
 
 	t.Run("RetryDAGWithName", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, `params: "p1"
@@ -90,6 +94,8 @@ steps:
 	})
 
 	t.Run("QueuedCatchupRegeneratesLogAndPreservesTriggerType", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, `name: queued-catchup-dag
@@ -130,6 +136,8 @@ steps:
 	})
 
 	t.Run("QueuedRetryCreatesNewAttempt", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, `name: queued-retry-dag
@@ -187,6 +195,8 @@ steps:
 	})
 
 	t.Run("RetryAllowsRootFlagPointingAtSameRun", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, `name: retry-root-same-run
@@ -272,6 +282,8 @@ steps:
 	})
 
 	t.Run("TrueRetryKeepsRetryTriggerType", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, `name: retry-trigger-dag

@@ -17,6 +17,8 @@ import (
 )
 
 func TestHistoryCommand_Basic(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -47,6 +49,8 @@ steps:
 }
 
 func TestHistoryCommand_FilterByName(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 

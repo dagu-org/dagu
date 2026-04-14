@@ -21,6 +21,8 @@ import (
 )
 
 func TestStartCommand(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	dagStart := th.DAG(t, `max_active_runs: 1
@@ -76,6 +78,8 @@ steps:
 }
 
 func TestStartCommand_BuiltExecutablePreservesExplicitEnv(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t, test.WithBuiltExecutable())
 
 	dag := th.DAG(t, `name: built-start-explicit-env
@@ -97,6 +101,8 @@ steps:
 
 func TestCmdStart_BackwardCompatibility(t *testing.T) {
 	t.Run("ShouldRejectParametersAfterWithoutSeparator", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagContent := `
 params: KEY1=default1 KEY2=default2
@@ -114,6 +120,8 @@ steps:
 	})
 
 	t.Run("ShouldAcceptParamsFlag", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagContent := `
 params: KEY=default
@@ -139,6 +147,8 @@ steps:
 }
 
 func TestCmdStart_PositionalParamValidation(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	dagFile := th.CreateDAGFile(t, "test-positional-params.yaml", `
