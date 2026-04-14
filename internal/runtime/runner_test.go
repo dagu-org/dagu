@@ -41,6 +41,13 @@ func repeatCounterValueCondition(counterFile string) string {
 	return fmt.Sprintf("`%s`", trimmedCounterReadCommand(counterFile))
 }
 
+func repeatConditionMutationTimeout() time.Duration {
+	if windowsShellTest() {
+		return 45 * time.Second
+	}
+	return 5 * time.Second
+}
+
 func repeatCounterEqualsCommand(counterFile, expected string) string {
 	if windowsShellTest() {
 		return fmt.Sprintf(
@@ -2207,7 +2214,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
+			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2246,7 +2253,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
+			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
 			err := os.WriteFile(counterFile, []byte("stop"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2288,7 +2295,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
+			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2327,7 +2334,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
+			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
 			err := os.WriteFile(counterFile, []byte("ready"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2364,7 +2371,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
+			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()

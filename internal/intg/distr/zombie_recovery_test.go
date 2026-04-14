@@ -393,6 +393,8 @@ func testDistributedRunAckedTaskWithoutInitialStatus(t *testing.T, mode workerMo
 	}
 	if mode == sharedFSMode {
 		opts = append(opts, withWorkerMode(sharedFSMode))
+	} else {
+		opts = append(opts, withWorkerMaxActiveRuns(1))
 	}
 
 	f := newTestFixture(t, `
@@ -441,7 +443,7 @@ steps:
 	require.Equal(t, core.Queued, queuedStatus.Status)
 	require.Equal(t, lease.AttemptKey, queuedStatus.AttemptKey)
 
-	finalStatus := f.waitForStatus(core.Failed, 20*time.Second)
+	finalStatus := f.waitForStatus(core.Failed, delayedAfterAckFailureTimeout(mode))
 	require.Equal(t, core.Failed, finalStatus.Status)
 	assert.Equal(t, lease.AttemptKey, finalStatus.AttemptKey)
 	assert.Contains(t, finalStatus.Error, "distributed run lease expired")

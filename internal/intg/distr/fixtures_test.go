@@ -17,6 +17,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filewatermark"
 	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/dagucloud/dagu/internal/runtime/transform"
@@ -547,7 +548,7 @@ func (f *testFixture) waitForStatus(expected core.Status, timeout time.Duration)
 			return true
 		}
 		var err error
-		status, err = f.coord.DAGRunMgr.GetLatestStatus(f.coord.Context, f.dagWrapper.DAG)
+		status, err = f.latestStoredStatus()
 		if err != nil {
 			return false
 		}
@@ -568,7 +569,7 @@ func (f *testFixture) waitForStatusIn(expected []core.Status, timeout time.Durat
 			return true
 		}
 		var err error
-		status, err = f.coord.DAGRunMgr.GetLatestStatus(f.coord.Context, f.dagWrapper.DAG)
+		status, err = f.latestStoredStatus()
 		if err != nil {
 			return false
 		}
@@ -601,7 +602,30 @@ func (f *testFixture) pollSchedulerErr() error {
 }
 
 func (f *testFixture) latestStatus() (exec.DAGRunStatus, error) {
-	return f.coord.DAGRunMgr.GetLatestStatus(f.coord.Context, f.dagWrapper.DAG)
+	return f.latestStoredStatus()
+}
+
+func (f *testFixture) latestStoredStatus() (exec.DAGRunStatus, error) {
+	store := filedagrun.New(
+		f.coord.Config.Paths.DAGRunsDir,
+		filedagrun.WithLatestStatusToday(f.coord.Config.Server.LatestStatusToday),
+		filedagrun.WithLocation(f.coord.Config.Core.Location),
+	)
+
+	attempt, err := store.LatestAttempt(f.coord.Context, f.dagWrapper.Name)
+	if err != nil {
+		return exec.DAGRunStatus{}, err
+	}
+
+	status, err := attempt.ReadStatus(f.coord.Context)
+	if err != nil {
+		return exec.DAGRunStatus{}, err
+	}
+	if status == nil {
+		return exec.DAGRunStatus{}, exec.ErrCorruptedStatusFile
+	}
+
+	return *status, nil
 }
 
 func (f *testFixture) stop(dagRunID string) error {

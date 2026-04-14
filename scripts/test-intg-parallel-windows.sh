@@ -4,39 +4,8 @@ set -euo pipefail
 
 source "$(dirname "$0")/test-shard-lib.sh"
 
-pids=()
-names=()
-
-start_bg() {
-  local name="$1"
-  shift
-
-  echo "Starting $name"
-  (
-    set -euo pipefail
-    "$@"
-  ) &
-  pids+=("$!")
-  names+=("$name")
-}
-
-wait_bg() {
-  local status=0
-
-  for i in "${!pids[@]}"; do
-    if ! wait "${pids[$i]}"; then
-      echo "::error::${names[$i]} failed"
-      status=1
-    else
-      echo "Finished ${names[$i]}"
-    fi
-  done
-
-  return "$status"
-}
-
 run_parallel_core() {
-  TEST_GO_PARALLEL=2 run_sharded_tests 12 \
+  TEST_GO_PARALLEL=1 run_sharded_tests 4 \
     '^(Test(ParallelExecution_.*))' \
     '^(Test(ParallelExecution_(AbortSuppressesPendingRetry|OutputCaptureWithRetry|ObjectItemProperties)))$'
 }
@@ -62,15 +31,8 @@ run_parallel_object_items() {
 setup_test_binary ./internal/intg
 trap cleanup_test_binary EXIT
 
-start_bg "intg-parallel-core" \
-  run_parallel_core
-start_bg "intg-parallel-issues" \
-  run_parallel_issues
-start_bg "intg-parallel-abort" \
-  run_parallel_abort
-start_bg "intg-parallel-output-retry" \
-  run_parallel_output_retry
-start_bg "intg-parallel-object-items" \
-  run_parallel_object_items
-
-wait_bg
+run_parallel_core
+run_parallel_issues
+run_parallel_abort
+run_parallel_output_retry
+run_parallel_object_items

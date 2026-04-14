@@ -68,9 +68,8 @@ steps:
 
 	if enqueue {
 		ProcessQueuedInlineRun(t, server, dagName)
-		statusAttempt := WaitForAttemptSnapshot(t, server, dagName, dagRunID)
 		require.Eventually(t, func() bool {
-			status, err := statusAttempt.ReadStatus(server.Context)
+			status, err := latestStoredAttemptStatus(server, dagName, dagRunID)
 			return err == nil && status.Status == core.Succeeded
 		}, rescheduleEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 	}
@@ -93,18 +92,32 @@ steps:
 func AssertInlineRescheduledRunParams(t *testing.T, server Server, dagName, dagRunID string) {
 	t.Helper()
 
-	attempt := WaitForAttemptSnapshot(t, server, dagName, dagRunID)
 	require.Eventually(t, func() bool {
-		status, err := attempt.ReadStatus(server.Context)
+		status, err := latestStoredAttemptStatus(server, dagName, dagRunID)
 		if err != nil {
 			return false
 		}
 		return status.Status == core.Succeeded
 	}, rescheduleEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 
-	status, err := attempt.ReadStatus(server.Context)
+	status, err := latestStoredAttemptStatus(server, dagName, dagRunID)
 	require.NoError(t, err)
 	require.Equal(t, []string{"KEY=hello world", "COUNT=3"}, status.ParamsList)
+}
+
+func latestStoredAttemptStatus(server Server, dagName, dagRunID string) (*exec.DAGRunStatus, error) {
+	store := filedagrun.New(
+		server.Config.Paths.DAGRunsDir,
+		filedagrun.WithLatestStatusToday(server.Config.Server.LatestStatusToday),
+		filedagrun.WithLocation(server.Config.Core.Location),
+	)
+
+	attempt, err := store.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, dagRunID))
+	if err != nil {
+		return nil, err
+	}
+
+	return attempt.ReadStatus(server.Context)
 }
 
 func WaitForAttemptSnapshot(t *testing.T, server Server, dagName, dagRunID string) exec.DAGRunAttempt {
