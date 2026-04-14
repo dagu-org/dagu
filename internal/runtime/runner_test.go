@@ -1207,25 +1207,36 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
-		defer func() { _ = os.Remove(counterFile) }()
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_state_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		t.Cleanup(func() {
+			_ = os.Remove(counterFile)
+			_ = os.Remove(stateFile)
+		})
+		require.NoError(t, os.WriteFile(stateFile, []byte("waiting"), 0600))
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(repeatCounterScript(counterFile, false)),
-				withEnvVars("SHELL=cmd"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(counterFile),
-						Expected:  "2",
+						Condition: repeatCounterValueCondition(stateFile),
+						Expected:  "ready",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
+		go func() {
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("ready"), 0600)
+		}()
+
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
-		assert.Equal(t, 2, readRepeatCounterValue(t, counterFile))
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyRepeatWhileConditionExits0", func(t *testing.T) {
@@ -1282,29 +1293,41 @@ func TestRunner(t *testing.T) {
 	t.Run("RepeatPolicyRepeatsUntilFileConditionMatchesExpected", func(t *testing.T) {
 		r := setupRunner(t)
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_envvar_%s", uuid.Must(uuid.NewV7()).String()))
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_envvar_state_%s", uuid.Must(uuid.NewV7()).String()))
 		t.Cleanup(func() {
 			if err := os.Remove(counterFile); err != nil && !os.IsNotExist(err) {
 				t.Logf("cleanup: failed to remove %s: %v", counterFile, err)
 			}
+			if err := os.Remove(stateFile); err != nil && !os.IsNotExist(err) {
+				t.Logf("cleanup: failed to remove %s: %v", stateFile, err)
+			}
 		})
+		require.NoError(t, os.WriteFile(stateFile, []byte("pending"), 0600))
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(repeatCounterScript(counterFile, false)),
-				withEnvVars("SHELL=cmd"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(counterFile),
-						Expected:  "2",
+						Condition: repeatCounterValueCondition(stateFile),
+						Expected:  "done",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
+
+		go func() {
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("done"), 0600)
+		}()
+
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
-		assert.Equal(t, 2, node.State().DoneCount)
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {

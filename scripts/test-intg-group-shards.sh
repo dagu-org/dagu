@@ -7,7 +7,7 @@ source "$(dirname "$0")/test-shard-lib.sh"
 mode="${1:-}"
 
 if [[ -z "$mode" ]]; then
-  echo "usage: $0 <general|service-docker|data-subdag|parallel-issues|parallel-issue-1274|parallel-issue-1658|parallel-issue-1790>" >&2
+  echo "usage: $0 <general|general-core|approval|history|service-docker|data-subdag|parallel-issues|parallel-issue-1274|parallel-issue-1658|parallel-issue-1790>" >&2
   exit 1
 fi
 
@@ -68,6 +68,38 @@ case "$mode" in
       ''
     wait_bg
     TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg/queue 1
+    ;;
+  general-core)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
+    start_bg "intg-output-core" \
+      run_filtered_tests \
+      '^(Test(LargeOutput_128KB|OutputsCollection_MixedOutputConfigurations|OutputsCollection_FailedDAG|OutputValidation_.*))' \
+      ''
+    start_bg "intg-output-camelcase" \
+      run_sharded_tests 4 \
+      '^(TestOutputsCollection_CamelCaseConversion_.*)$' \
+      ''
+    start_bg "intg-params" \
+      run_sharded_tests 2 \
+      '^(Test(Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*))' \
+      ''
+    wait_bg
+    TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg/queue 1
+    ;;
+  approval)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
+    TEST_GO_PARALLEL=1 run_sharded_tests 2 \
+      '^(Test(WaitStepApproval|ApprovalField))$' \
+      ''
+    ;;
+  history)
+    setup_test_binary ./internal/intg
+    trap cleanup_test_binary EXIT
+    TEST_GO_PARALLEL=1 run_sharded_tests 2 \
+      '^(TestHistoryCommand_.*)$' \
+      ''
     ;;
   service-docker)
     setup_test_binary ./internal/intg

@@ -144,9 +144,15 @@ jobs:
           - name_suffix: " (core-service-and-agent)"
             test_command: |
               ./scripts/test-service-and-agent-windows.sh
-          - name_suffix: " (intg-general)"
+          - name_suffix: " (intg-approval)"
             test_command: |
-              ./scripts/test-intg-group-shards.sh general
+              ./scripts/test-intg-group-shards.sh approval
+          - name_suffix: " (intg-history)"
+            test_command: |
+              ./scripts/test-intg-group-shards.sh history
+          - name_suffix: " (intg-general-core)"
+            test_command: |
+              ./scripts/test-intg-group-shards.sh general-core
           - name_suffix: " (intg-service-docker)"
             test_command: |
               ./scripts/test-intg-group-shards.sh service-docker
