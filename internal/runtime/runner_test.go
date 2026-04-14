@@ -78,22 +78,6 @@ func readRepeatCounterValue(t *testing.T, counterFile string) int {
 	return value
 }
 
-func waitForRepeatCounterValueAtLeast(counterFile string, minValue int, timeout time.Duration) bool {
-	deadline := time.After(timeout)
-	for {
-		if data, err := os.ReadFile(counterFile); err == nil {
-			if value, convErr := strconv.Atoi(strings.TrimSpace(string(data))); convErr == nil && value >= minValue {
-				return true
-			}
-		}
-		select {
-		case <-deadline:
-			return false
-		case <-time.After(5 * time.Millisecond):
-		}
-	}
-}
-
 func repeatCounterEqualsCommand(counterFile, expected string) string {
 	if windowsShellTest() {
 		return fmt.Sprintf(
