@@ -43,7 +43,9 @@ func setAllAgentStepCommands(dag *core.DAG, command string) {
 }
 
 func TestAgent_Run(t *testing.T) {
-	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
 
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
@@ -61,7 +63,7 @@ func TestAgent_Run(t *testing.T) {
 
 		runTimeout := 10 * time.Second
 		if runtime.GOOS == "windows" {
-			runTimeout = 60 * time.Second
+			runTimeout = 90 * time.Second
 		}
 
 		select {

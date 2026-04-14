@@ -42,10 +42,9 @@ func TestLargeOutput_128KB(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		dagSpec = fmt.Sprintf(`steps:
   - name: read-128kb-file
-    script: |
-      [Console]::Out.Write([string](Get-Content -Raw -LiteralPath %s))
+    command: cmd /d /c type %s
     output: OUTPUT_128KB
-`, test.PowerShellQuote(textFilePath))
+`, `"`+textFilePath+`"`)
 	}
 	dag := th.DAG(t, dagSpec)
 	agent := dag.Agent()

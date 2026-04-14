@@ -54,16 +54,25 @@ start_bg_run_test_binary() {
 }
 
 case "$mode" in
-  base-a-early-rest)
+  base-a-early)
     setup_test_binary ./internal/runtime
     trap cleanup_test_binary EXIT
-    start_bg "runtime-rest" \
-      run_sharded_tests 6 \
-      '' \
-      '^(TestRunner$|TestRunner_ErrorHandling$|TestRunner_DAGPreconditions$|TestRunner_StatusDefersForcedStatusUntilTerminal$|TestRunner_SignalHandling$|TestRunner_ComplexDependencyChains$|TestRunner_EdgeCases$|TestRunner_ComplexRetryScenarios$|TestRunner_StepRetryExecution$|TestRunner_StepIDAccess$|TestRunner_EventHandlerStepIDAccess$|TestRunnerPartialSuccess$|TestRunner_ChatMessagesHandler$|TestSetupPushBackConversation$|TestWaitStep$)$'
     start_bg "runtime-runner-early" \
       run_test_binary '^TestRunner$/(SequentialStepsSuccess|SequentialStepsWithFailure|ParallelSteps|ParallelStepsWithFailure|ComplexCommand|ContinueOnFailure|ContinueOnSkip|ContinueOnExitCode|ContinueOnOutputStdout|ContinueOnOutputStderr|ContinueOnOutputRegexp|ContinueOnMarkSuccess|Cancel|Timeout)$'
+    start_bg "runtime-runner-repeat-cancel" \
+      run_test_binary '^TestRunner_RepeatPolicyWithCancel$'
     wait_bg
+    ;;
+  base-a-rest)
+    setup_test_binary ./internal/runtime
+    trap cleanup_test_binary EXIT
+    run_sharded_tests 6 \
+      '' \
+      '^(TestRunner$|TestRunner_ErrorHandling$|TestRunner_DAGPreconditions$|TestRunner_StatusDefersForcedStatusUntilTerminal$|TestRunner_SignalHandling$|TestRunner_ComplexDependencyChains$|TestRunner_EdgeCases$|TestRunner_ComplexRetryScenarios$|TestRunner_StepRetryExecution$|TestRunner_StepIDAccess$|TestRunner_EventHandlerStepIDAccess$|TestRunnerPartialSuccess$|TestRunner_ChatMessagesHandler$|TestSetupPushBackConversation$|TestWaitStep$|TestRunner_RepeatPolicyWithCancel$)$'
+    ;;
+  base-a-early-rest)
+    "$0" base-a-early
+    "$0" base-a-rest
     ;;
   base-a-retry-output)
     setup_test_binary ./internal/runtime
@@ -99,12 +108,15 @@ case "$mode" in
       '^TestRunner_ComplexRetryScenarios/(RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds|RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches|RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds|RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches|RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches|RepeatPolicyOutputVariablesReloadedBeforeConditionEval)$'
     wait_bg
     ;;
-  base-b-refs-chatwait)
+  base-b-agent)
+    start_bg "runtime-agent-subpackage" \
+      env TEST_GO_PARALLEL=1 ./scripts/test-package-shard.sh \
+      '^github.com/dagucloud/dagu/internal/runtime/agent$'
+    wait_bg
+    ;;
+  base-b-refs)
     setup_test_binary ./internal/runtime
     trap cleanup_test_binary EXIT
-    start_bg "runtime-agent-subpackage" \
-      ./scripts/test-package-shard.sh \
-      '^github.com/dagucloud/dagu/internal/runtime/agent$'
     start_bg "runtime-runner-refs" \
       run_test_binary '^(TestRunner_StepRetryExecution|TestRunner_StepIDAccess|TestRunner_EventHandlerStepIDAccess|TestRunnerPartialSuccess)$'
     start_bg "runtime-runner-chat" \
@@ -112,6 +124,10 @@ case "$mode" in
     start_bg "runtime-runner-waitstep" \
       run_test_binary '^TestWaitStep$'
     wait_bg
+    ;;
+  base-b-refs-chatwait)
+    "$0" base-b-agent
+    "$0" base-b-refs
     ;;
   base-a)
     "$0" base-a-early-rest

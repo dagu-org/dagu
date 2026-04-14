@@ -43,7 +43,7 @@ wait_bg() {
 }
 
 case "$mode" in
-  a)
+  a-core)
     setup_test_binary ./internal/intg/distr
     trap cleanup_test_binary EXIT
     echo "Starting intg-distr-baseconfig-status"
@@ -63,12 +63,19 @@ case "$mode" in
       '^(TestExecution_(SharedFSMode|WorkDir))' \
       ''
     echo "Finished intg-distr-sharedfs-workdir"
-
+    ;;
+  a-retry)
+    setup_test_binary ./internal/intg/distr
+    trap cleanup_test_binary EXIT
     echo "Starting intg-distr-retry-cancel"
     TEST_GO_PARALLEL=1 TEST_BINARY_TIMEOUT=12m run_filtered_tests \
       '^(Test(Cancellation_.*|Retry_.*|OneOffScheduleRunsDistributed))' \
       ''
     echo "Finished intg-distr-retry-cancel"
+    ;;
+  a)
+    "$0" a-core
+    "$0" a-retry
     ;;
   b)
     setup_test_binary ./internal/intg/distr

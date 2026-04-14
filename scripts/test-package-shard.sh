@@ -43,4 +43,13 @@ fi
 echo "Selected ${#packages[@]} packages"
 printf '%s\n' "${packages[@]}"
 
-exec go test -v -race "${packages[@]}"
+args=(
+  -v
+  -race
+)
+
+if [[ -n "${TEST_GO_PARALLEL:-}" ]]; then
+  args+=(-parallel "${TEST_GO_PARALLEL}")
+fi
+
+exec go test "${args[@]}" "${packages[@]}"

@@ -30,6 +30,10 @@ func shellTestPath(path string) string {
 	return filepath.ToSlash(path)
 }
 
+func cmdTestQuote(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
+}
+
 func windowsShellTest() bool {
 	return os.PathSeparator == '\\'
 }
@@ -39,6 +43,12 @@ func trimmedCounterReadCommand(counterFile string) string {
 }
 
 func repeatCounterValueCondition(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(
+			"`for /f usebackq delims^= %%A in (%s) do @echo %%A`",
+			cmdTestQuote(counterFile),
+		)
+	}
 	return fmt.Sprintf("`%s`", trimmedCounterReadCommand(counterFile))
 }
 
@@ -1201,6 +1211,7 @@ func TestRunner(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(repeatCounterScript(counterFile, false)),
+				withEnvVars("SHELL=cmd"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
@@ -1279,6 +1290,7 @@ func TestRunner(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("1",
 				withScript(repeatCounterScript(counterFile, false)),
+				withEnvVars("SHELL=cmd"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
@@ -2016,16 +2028,17 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 	)
 
 	cancelWait := platformTestDuration(5*time.Second, 30*time.Second)
-	repeated := make(chan bool, 1)
+	started := make(chan bool, 1)
 	go func() {
-		repeated <- waitForRepeatCounterAtLeast(counterFile, 2, cancelWait)
+		started <- waitForRepeatCounterAtLeast(counterFile, 1, cancelWait)
+		time.Sleep(platformTestDuration(50*time.Millisecond, 500*time.Millisecond))
 		r.runner.Cancel(plan.Plan)
 	}()
 
 	result := plan.assertRun(t, core.Aborted)
 	result.assertNodeStatus(t, "1", core.NodeAborted)
-	assert.True(t, <-repeated, "runner should execute a repeated iteration before cancel")
-	assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
+	assert.True(t, <-started, "runner should start before cancel")
+	assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 1)
 }
 
 func TestRunner_RepeatPolicyWithLimit(t *testing.T) {

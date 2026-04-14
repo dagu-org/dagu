@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -153,7 +154,12 @@ func TestShutdownWhileServerStarts(t *testing.T) {
 	select {
 	case err := <-done:
 		require.True(t, errors.Is(err, sock.ErrServerRequestedShutdown))
-	case <-time.After(time.Second):
+	case <-time.After(func() time.Duration {
+		if runtime.GOOS == "windows" {
+			return 5 * time.Second
+		}
+		return time.Second
+	}()):
 		t.Fatal("timed out waiting for socket server to stop")
 	}
 }

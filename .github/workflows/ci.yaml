@@ -102,24 +102,42 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name_suffix: " (core-cmd)"
+          - name_suffix: " (core-cmd-start)"
             test_command: |
-              ./scripts/test-core-cmd-windows.sh
-          - name_suffix: " (core-packages)"
+              ./scripts/test-core-cmd-start-shards.sh
+          - name_suffix: " (core-cmd-status)"
             test_command: |
-              ./scripts/test-core-packages-windows.sh
-          - name_suffix: " (core-runtime-base-a-early-rest)"
+              ./scripts/test-cmd-rest-shards.sh status
+          - name_suffix: " (core-cmd-rest)"
             test_command: |
-              ./scripts/test-runtime-shards.sh base-a-early-rest
+              ./scripts/test-cmd-rest-shards.sh rest
+          - name_suffix: " (core-packages-a)"
+            test_command: |
+              ./scripts/test-core-package-shards.sh a
+          - name_suffix: " (core-packages-b)"
+            test_command: |
+              ./scripts/test-core-package-shards.sh b
+          - name_suffix: " (core-packages-c)"
+            test_command: |
+              ./scripts/test-core-package-shards.sh c
+          - name_suffix: " (core-runtime-base-a-early)"
+            test_command: |
+              ./scripts/test-runtime-shards.sh base-a-early
+          - name_suffix: " (core-runtime-base-a-rest)"
+            test_command: |
+              ./scripts/test-runtime-shards.sh base-a-rest
           - name_suffix: " (core-runtime-base-a-retry-output)"
             test_command: |
               ./scripts/test-runtime-shards.sh base-a-retry-output
           - name_suffix: " (core-runtime-base-b-policies-advanced)"
             test_command: |
               ./scripts/test-runtime-shards.sh base-b-policies-advanced
+          - name_suffix: " (core-runtime-base-b-agent)"
+            test_command: |
+              ./scripts/test-runtime-shards.sh base-b-agent
           - name_suffix: " (core-runtime-base-b-refs-chatwait)"
             test_command: |
-              ./scripts/test-runtime-shards.sh base-b-refs-chatwait
+              ./scripts/test-runtime-shards.sh base-b-refs
           - name_suffix: " (core-service-api)"
             test_command: |
               ./scripts/test-service-api-windows.sh
@@ -135,9 +153,12 @@ jobs:
           - name_suffix: " (intg-data-subdag)"
             test_command: |
               ./scripts/test-intg-group-shards.sh data-subdag
-          - name_suffix: " (intg-parallel)"
+          - name_suffix: " (intg-parallel-core)"
             test_command: |
-              ./scripts/test-intg-parallel-windows.sh
+              ./scripts/test-intg-parallel-windows.sh core
+          - name_suffix: " (intg-parallel-extras)"
+            test_command: |
+              ./scripts/test-intg-parallel-windows.sh extras
           - name_suffix: " (intg-rest-a-m)"
             test_command: |
               ./scripts/test-intg-rest-a-m-windows.sh
@@ -156,9 +177,12 @@ jobs:
               TEST_GO_PARALLEL=2 ./scripts/test-shard-split.sh ./internal/intg 4 \
                 '^Test([T-Z].*)' \
                 '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))'
-          - name_suffix: " (intg-distr-a)"
+          - name_suffix: " (intg-distr-a-core)"
             test_command: |
-              ./scripts/test-intg-distr-shards.sh a
+              ./scripts/test-intg-distr-shards.sh a-core
+          - name_suffix: " (intg-distr-a-retry)"
+            test_command: |
+              ./scripts/test-intg-distr-shards.sh a-retry
           - name_suffix: " (intg-distr-b)"
             test_command: |
               ./scripts/test-intg-distr-shards.sh b
