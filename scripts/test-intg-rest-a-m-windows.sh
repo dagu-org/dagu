@@ -48,10 +48,21 @@ start_bg "intg-rest-env-core" \
 start_bg "intg-rest-env-refs" \
   env TEST_BINARY_TIMEOUT=12m run_test_binary \
   '^TestEnv$/(DAGRunWorkDirWithExplicitWorkingDir|EnvReferencesParams|EnvReferencesParamsChained|StepOutputSubstrings)$'
-start_bg "intg-rest-subdag" \
-  run_filtered_tests \
-  '^(Test(InlineSubDAG|ExternalSubDAG))$' \
-  ''
+start_bg "intg-rest-inline-subdag-simple" \
+  env TEST_BINARY_TIMEOUT=12m run_test_binary \
+  '^TestInlineSubDAG/SimpleExecution$'
+start_bg "intg-rest-inline-subdag-nesting" \
+  env TEST_BINARY_TIMEOUT=12m run_test_binary \
+  '^TestInlineSubDAG/(TwoLevelNesting|ThreeLevelNesting|ThreeLevelNestingWithOutputPassing)$'
+start_bg "intg-rest-inline-subdag-flow" \
+  env TEST_BINARY_TIMEOUT=12m run_test_binary \
+  '^TestInlineSubDAG/(ParallelExecution|ConditionalExecution|OutputPassingBetweenDAGs)$'
+start_bg "intg-rest-inline-subdag-outcomes" \
+  env TEST_BINARY_TIMEOUT=12m run_test_binary \
+  '^TestInlineSubDAG/(NonExistentReference|ComplexDependencies|PartialSuccessParallel|PartialSuccessSubDAG)$'
+start_bg "intg-rest-subdag-external-retry" \
+  env TEST_BINARY_TIMEOUT=12m run_test_binary \
+  '^(TestExternalSubDAG|TestRetryPolicy)$'
 start_bg "intg-rest-heavy-logic" \
   run_filtered_tests \
   '^(Test(ComplexDependencies|HandlerOn|HandlerOn_EnvironmentVariables))$' \

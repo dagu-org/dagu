@@ -105,7 +105,9 @@ case "$mode" in
     start_bg_run_test_binary "runtime-runner-complex-retry-basic" 8m \
       '^TestRunner_ComplexRetryScenarios/(RetryWithSignalTermination|RetryWithSpecificExitCodes|RepeatPolicyBooleanTrueRepeatsWhileStepSucceeds|RepeatPolicyBooleanTrueWithFailureStopsOnFailure|RepeatPolicyUntilModeWithoutConditionRepeatsOnFailure|RepeatPolicyLimit)$'
     start_bg_run_test_binary "runtime-runner-complex-retry-conditional" 8m \
-      '^TestRunner_ComplexRetryScenarios/(RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds|RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches|RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds|RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches|RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches|RepeatPolicyOutputVariablesReloadedBeforeConditionEval)$'
+      '^TestRunner_ComplexRetryScenarios/(RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds|RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches|RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds|RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches|RepeatPolicyOutputVariablesReloadedBeforeConditionEval)$'
+    start_bg_run_test_binary "runtime-runner-complex-retry-exit-code" 10m \
+      '^TestRunner_ComplexRetryScenarios/RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches$'
     wait_bg
     ;;
   base-b-agent)

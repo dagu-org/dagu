@@ -215,13 +215,14 @@ steps:
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
 		releaseFile := filepath.Join(t.TempDir(), "release")
+		dagRunID := "test-dag-run-receive-signal"
 		t.Cleanup(func() {
 			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
 		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
 `, test.PortableWaitForFileScript(releaseFile, 50*time.Millisecond)))
-		dagAgent := dag.Agent()
+		dagAgent := dag.Agent(test.WithDAGRunID(dagRunID))
 		done := make(chan struct{})
 
 		go func() {
@@ -229,8 +230,13 @@ steps:
 			close(done)
 		}()
 
-		// wait for the DAG to start
-		dag.AssertLatestStatus(t, core.Running)
+		require.Eventually(t, func() bool {
+			status, err := th.DAGRunMgr.GetCurrentStatus(context.Background(), dag.DAG, dagRunID)
+			if err != nil || status == nil || status.Status != core.Running {
+				return false
+			}
+			return th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, dagRunID)
+		}, 2*time.Minute, 250*time.Millisecond, "expected DAG to reach running state before abort")
 
 		// send a signal to cancel the DAG
 		dagAgent.Abort()

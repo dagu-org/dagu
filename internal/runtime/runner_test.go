@@ -2466,12 +2466,6 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 			),
 		)
 
-		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
-			f, _ := os.Create(counterFile)
-			_ = f.Close()
-		}()
-
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
