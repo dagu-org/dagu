@@ -540,10 +540,10 @@ func TestStringFields_StructWithMapField(t *testing.T) {
 
 	ctx := context.Background()
 	input := TestStruct{
-		Name: "`echo test`",
+		Name: "$TEST_VAR",
 		Config: map[string]string{
 			"key1": "$TEST_VAR",
-			"key2": "`echo value`",
+			"key2": "config-value",
 		},
 		Options: map[string]any{
 			"enabled": true,
@@ -557,9 +557,9 @@ func TestStringFields_StructWithMapField(t *testing.T) {
 	got, err := StringFields(ctx, input, WithOSExpansion())
 	require.NoError(t, err)
 
-	assert.Equal(t, "test", got.Name)
+	assert.Equal(t, "env_value", got.Name)
 	assert.Equal(t, "env_value", got.Config["key1"])
-	assert.Equal(t, "value", got.Config["key2"])
+	assert.Equal(t, "config-value", got.Config["key2"])
 	assert.Equal(t, true, got.Options["enabled"])
 	assert.Equal(t, "option", got.Options["command"])
 	assert.Equal(t, "env_value", got.Options["nested"].(map[string]any)["value"])

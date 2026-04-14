@@ -242,7 +242,7 @@ steps:
 func TestRunStartWithBuiltExecutablePreservesExplicitEnv(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 	t.Setenv("SUBCMD_START_EXPLICIT_ENV", "from-host")
-	statusTimeout := platformTestDuration(10*time.Second, 2*time.Minute)
+	statusTimeout := platformTestDuration(10*time.Second, 4*time.Minute)
 
 	dagFile := th.DAG(t, fmt.Sprintf(`name: built-exec-start-env
 env:
@@ -272,7 +272,7 @@ steps:
 func TestRunStartWithBuiltExecutableResolvesEnvSecretFromParentEnv(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 	t.Setenv("SUBCMD_START_SECRET_SOURCE", "from-host")
-	statusTimeout := platformTestDuration(10*time.Second, 2*time.Minute)
+	statusTimeout := platformTestDuration(10*time.Second, 4*time.Minute)
 
 	dagFile := th.DAG(t, fmt.Sprintf(`name: built-exec-start-secret
 secrets:

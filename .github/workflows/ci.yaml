@@ -135,31 +135,9 @@ jobs:
           - name_suffix: " (intg-data-subdag)"
             test_command: |
               ./scripts/test-intg-group-shards.sh data-subdag
-          - name_suffix: " (intg-parallel-core)"
+          - name_suffix: " (intg-parallel)"
             test_command: |
-              TEST_GO_PARALLEL=2 ./scripts/test-shard-split.sh ./internal/intg 12 \
-                '^Test(ParallelExecution_.*)' \
-                '^(Test(ParallelExecution_(AbortSuppressesPendingRetry|OutputCaptureWithRetry|ObjectItemProperties)))$'
-          - name_suffix: " (intg-parallel-abort)"
-            test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 1 \
-                '^TestParallelExecution_AbortSuppressesPendingRetry$' \
-                ''
-          - name_suffix: " (intg-parallel-output-retry)"
-            test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 1 \
-                '^TestParallelExecution_OutputCaptureWithRetry$' \
-                ''
-          - name_suffix: " (intg-parallel-object-items)"
-            test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 1 \
-                '^TestParallelExecution_ObjectItemProperties$' \
-                ''
-          - name_suffix: " (intg-parallel-issues)"
-            test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 2 \
-                '^(Test(Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))' \
-                ''
+              ./scripts/test-intg-parallel-windows.sh
           - name_suffix: " (intg-rest-a-m)"
             test_command: |
               ./scripts/test-shard-split.sh ./internal/intg 4 \
@@ -223,6 +201,7 @@ jobs:
           chmod +x ./scripts/test-agent-shards.sh
           chmod +x ./scripts/test-core-package-shards.sh
           chmod +x ./scripts/test-intg-group-shards.sh
+          chmod +x ./scripts/test-intg-parallel-windows.sh
           chmod +x ./scripts/test-intg-distr-shards.sh
           chmod +x ./scripts/test-runtime-shards.sh
           ${{ matrix.test_command }}

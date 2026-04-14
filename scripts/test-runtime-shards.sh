@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/test-shard-lib.sh"
+
 mode="${1:-all}"
 
 pids=()
@@ -39,55 +41,52 @@ wait_bg() {
 
 case "$mode" in
   base-a-early-rest)
+    setup_test_binary ./internal/runtime
+    trap cleanup_test_binary EXIT
     start_bg "runtime-rest" \
-      ./scripts/test-shard-split.sh ./internal/runtime 6 \
+      run_sharded_tests 6 \
       '' \
       '^(TestRunner$|TestRunner_ErrorHandling$|TestRunner_DAGPreconditions$|TestRunner_StatusDefersForcedStatusUntilTerminal$|TestRunner_SignalHandling$|TestRunner_ComplexDependencyChains$|TestRunner_EdgeCases$|TestRunner_ComplexRetryScenarios$|TestRunner_StepRetryExecution$|TestRunner_StepIDAccess$|TestRunner_EventHandlerStepIDAccess$|TestRunnerPartialSuccess$|TestRunner_ChatMessagesHandler$|TestSetupPushBackConversation$|TestWaitStep$)$'
     start_bg "runtime-runner-early" \
-      go test -v -race ./internal/runtime \
-      -run '^TestRunner$/(SequentialStepsSuccess|SequentialStepsWithFailure|ParallelSteps|ParallelStepsWithFailure|ComplexCommand|ContinueOnFailure|ContinueOnSkip|ContinueOnExitCode|ContinueOnOutputStdout|ContinueOnOutputStderr|ContinueOnOutputRegexp|ContinueOnMarkSuccess|Cancel|Timeout)$'
+      run_test_binary '^TestRunner$/(SequentialStepsSuccess|SequentialStepsWithFailure|ParallelSteps|ParallelStepsWithFailure|ComplexCommand|ContinueOnFailure|ContinueOnSkip|ContinueOnExitCode|ContinueOnOutputStdout|ContinueOnOutputStderr|ContinueOnOutputRegexp|ContinueOnMarkSuccess|Cancel|Timeout)$'
     wait_bg
     ;;
   base-a-retry-output)
+    setup_test_binary ./internal/runtime
+    trap cleanup_test_binary EXIT
     start_bg "runtime-runner-repeat" \
-      go test -v -race ./internal/runtime \
-      -run '^TestRunner$/(Repeat|RepeatFail|StopRepetitiveTaskGracefully)$'
+      run_test_binary '^TestRunner$/(Repeat|RepeatFail|StopRepetitiveTaskGracefully)$'
     start_bg "runtime-runner-retry-handlers" \
-      go test -v -race ./internal/runtime \
-      -run '^TestRunner$/(RetryPolicyFail|RetryWithScript|RetryPolicySuccess|OnExitHandler|OnExitHandlerFail|OnAbortHandler|OnSuccessHandler|OnFailureHandler|CancelOnSignal|WorkingDirNoExist)$'
+      run_test_binary '^TestRunner$/(RetryPolicyFail|RetryWithScript|RetryPolicySuccess|OnExitHandler|OnExitHandlerFail|OnAbortHandler|OnSuccessHandler|OnFailureHandler|CancelOnSignal|WorkingDirNoExist)$'
     start_bg "runtime-runner-preconditions" \
-      go test -v -race ./internal/runtime \
-      -run '^TestRunner$/(PreconditionMatch|PreconditionNotMatch|PreconditionWithCommandMet|PreconditionWithCommandNotMet)$'
+      run_test_binary '^TestRunner$/(PreconditionMatch|PreconditionNotMatch|PreconditionWithCommandMet|PreconditionWithCommandNotMet)$'
     start_bg "runtime-runner-output-specialvars" \
-      go test -v -race ./internal/runtime \
-      -run '^TestRunner$/(OutputVariables|OutputInheritance|OutputJSONReference|HandlingJSONWithSpecialChars|SpecialVarsDAGRUNLOGFILE|SpecialVarsDAGRUNSTEPSTDOUTFILE|SpecialVarsDAGRUNSTEPSTDERRFILE|SpecialVarsDAGRUNID|SpecialVarsDAGNAME|SpecialVarsDAGRUNSTEPNAME|StdoutPathExpandsStepNameBeforePrepare|StdoutPathExpandsStepEnvBeforePrepare|StdoutPathExpandsUpstreamStepRefBeforePrepare|DAGRunStatusNotAvailableToMainSteps)$'
+      run_test_binary '^TestRunner$/(OutputVariables|OutputInheritance|OutputJSONReference|HandlingJSONWithSpecialChars|SpecialVarsDAGRUNLOGFILE|SpecialVarsDAGRUNSTEPSTDOUTFILE|SpecialVarsDAGRUNSTEPSTDERRFILE|SpecialVarsDAGRUNID|SpecialVarsDAGNAME|SpecialVarsDAGRUNSTEPNAME|StdoutPathExpandsStepNameBeforePrepare|StdoutPathExpandsStepEnvBeforePrepare|StdoutPathExpandsUpstreamStepRefBeforePrepare|DAGRunStatusNotAvailableToMainSteps)$'
     wait_bg
     ;;
   base-b-policies-advanced)
+    setup_test_binary ./internal/runtime
+    trap cleanup_test_binary EXIT
     start_bg "runtime-runner-repeat-policies" \
-      go test -v -race ./internal/runtime \
-      -run '^TestRunner$/(RepeatPolicyRepeatsUntilCommandConditionMatchesExpected|RepeatPolicyRepeatWhileConditionExits0|RepeatPolicyRepeatsWhileCommandExitCodeMatches|RepeatPolicyRepeatsUntilFileConditionMatchesExpected|RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected|RetryPolicyWithOutputCapture|FailedStepWithOutputCapture|RetryPolicySubDAGRunWithOutputCapture|SingleStepTimeoutFailsStep|TimeoutPreemptsRetriesAndMarksFailed|ParallelStepsTimeoutFailIndividually|StepLevelTimeoutOverridesLongDAGTimeoutAndFails|RejectedTakesPrecedenceOverWaiting)$'
+      run_test_binary '^TestRunner$/(RepeatPolicyRepeatsUntilCommandConditionMatchesExpected|RepeatPolicyRepeatWhileConditionExits0|RepeatPolicyRepeatsWhileCommandExitCodeMatches|RepeatPolicyRepeatsUntilFileConditionMatchesExpected|RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected|RetryPolicyWithOutputCapture|FailedStepWithOutputCapture|RetryPolicySubDAGRunWithOutputCapture|SingleStepTimeoutFailsStep|TimeoutPreemptsRetriesAndMarksFailed|ParallelStepsTimeoutFailIndividually|StepLevelTimeoutOverridesLongDAGTimeoutAndFails|RejectedTakesPrecedenceOverWaiting)$'
     start_bg "runtime-runner-advanced-parents" \
-      go test -v -race ./internal/runtime \
-      -run '^(TestRunner_ErrorHandling|TestRunner_DAGPreconditions|TestRunner_StatusDefersForcedStatusUntilTerminal|TestRunner_SignalHandling|TestRunner_ComplexDependencyChains|TestRunner_EdgeCases)$'
+      run_test_binary '^(TestRunner_ErrorHandling|TestRunner_DAGPreconditions|TestRunner_StatusDefersForcedStatusUntilTerminal|TestRunner_SignalHandling|TestRunner_ComplexDependencyChains|TestRunner_EdgeCases)$'
     start_bg "runtime-runner-complex-retry" \
-      go test -v -race ./internal/runtime \
-      -run '^TestRunner_ComplexRetryScenarios$'
+      run_test_binary '^TestRunner_ComplexRetryScenarios$'
     wait_bg
     ;;
   base-b-refs-chatwait)
+    setup_test_binary ./internal/runtime
+    trap cleanup_test_binary EXIT
     start_bg "runtime-agent-subpackage" \
       ./scripts/test-package-shard.sh \
       '^github.com/dagucloud/dagu/internal/runtime/agent$'
     start_bg "runtime-runner-refs" \
-      go test -v -race ./internal/runtime \
-      -run '^(TestRunner_StepRetryExecution|TestRunner_StepIDAccess|TestRunner_EventHandlerStepIDAccess|TestRunnerPartialSuccess)$'
+      run_test_binary '^(TestRunner_StepRetryExecution|TestRunner_StepIDAccess|TestRunner_EventHandlerStepIDAccess|TestRunnerPartialSuccess)$'
     start_bg "runtime-runner-chat" \
-      go test -v -race ./internal/runtime \
-      -run '^(TestRunner_ChatMessagesHandler|TestSetupPushBackConversation)$'
+      run_test_binary '^(TestRunner_ChatMessagesHandler|TestSetupPushBackConversation)$'
     start_bg "runtime-runner-waitstep" \
-      go test -v -race ./internal/runtime \
-      -run '^TestWaitStep$'
+      run_test_binary '^TestWaitStep$'
     wait_bg
     ;;
   base-a)

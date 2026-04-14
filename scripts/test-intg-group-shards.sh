@@ -55,11 +55,11 @@ case "$mode" in
       '^(TestHistoryCommand_)' \
       ''
     start_bg "intg-output" \
-      run_filtered_tests \
+      run_sharded_tests 2 \
       '^(Test(LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*))' \
       ''
     start_bg "intg-params" \
-      run_filtered_tests \
+      run_sharded_tests 2 \
       '^(Test(Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*))' \
       ''
     wait_bg
