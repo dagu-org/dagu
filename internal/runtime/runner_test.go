@@ -61,6 +61,27 @@ func readRepeatCounterValue(t *testing.T, counterFile string) int {
 	return value
 }
 
+func waitForRepeatCounterAtLeast(counterFile string, minCount int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		data, err := os.ReadFile(counterFile)
+		switch {
+		case err == nil:
+			value, convErr := strconv.Atoi(strings.TrimSpace(string(data)))
+			if convErr == nil && value >= minCount {
+				return true
+			}
+		case !os.IsNotExist(err):
+			return false
+		}
+
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func repeatCounterEqualsCommand(counterFile, expected string) string {
 	if windowsShellTest() {
 		return fmt.Sprintf(
@@ -1179,7 +1200,7 @@ func TestRunner(t *testing.T) {
 		defer func() { _ = os.Remove(counterFile) }()
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(repeatCounterScript(counterFile, true)),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
@@ -1193,8 +1214,7 @@ func TestRunner(t *testing.T) {
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
-		node := result.nodeByName(t, "1")
-		assert.Equal(t, 2, node.State().DoneCount)
+		assert.Equal(t, 2, readRepeatCounterValue(t, counterFile))
 	})
 
 	t.Run("RepeatPolicyRepeatWhileConditionExits0", func(t *testing.T) {
@@ -1985,27 +2005,27 @@ func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 
 func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 	r := setupRunner(t)
+	counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_cancel_%s.txt", uuid.Must(uuid.NewV7()).String()))
+	defer func() { _ = os.Remove(counterFile) }()
 
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand(test.PortableCommandSequence(
-				test.PortableOutputCommand("repeat"),
-				test.PortableSleepCommand(50*time.Millisecond),
-			)),
+			withScript(repeatCounterScript(counterFile, false)),
 			withRepeatPolicy(true, 20*time.Millisecond),
 		),
 	)
 
-	cancelWait := platformTestDuration(5*time.Second, 60*time.Second)
+	cancelWait := platformTestDuration(5*time.Second, 30*time.Second)
 	repeated := make(chan bool, 1)
 	go func() {
-		repeated <- waitForNodeRepeatScheduled(plan.Plan, "1", cancelWait)
+		repeated <- waitForRepeatCounterAtLeast(counterFile, 2, cancelWait)
 		r.runner.Cancel(plan.Plan)
 	}()
 
 	result := plan.assertRun(t, core.Aborted)
 	result.assertNodeStatus(t, "1", core.NodeAborted)
 	assert.True(t, <-repeated, "runner should execute a repeated iteration before cancel")
+	assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 }
 
 func TestRunner_RepeatPolicyWithLimit(t *testing.T) {

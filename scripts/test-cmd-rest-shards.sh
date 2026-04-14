@@ -44,10 +44,18 @@ trap cleanup_test_binary EXIT
 
 case "$mode" in
   status)
-    start_bg "internal-cmd-status" \
-      run_filtered_tests \
-      '^(TestStatusCommand)$' \
-      ''
+    start_bg "internal-cmd-status-core" \
+      run_test_binary \
+      '^TestStatusCommand/(StatusDAGRunning|StatusDAGSuccess|StatusDAGError|StatusDAGWithParams|StatusDAGWithSpecificRunID)$'
+    start_bg "internal-cmd-status-runs" \
+      run_test_binary \
+      '^TestStatusCommand/(StatusDAGMultipleRuns|StatusDAGWithSkippedSteps|StatusDAGCancel|StatusDAGWithManySteps|StatusDAGByName)$'
+    start_bg "internal-cmd-status-metadata" \
+      run_test_binary \
+      '^TestStatusCommand/(StatusDAGWithPID|StatusDAGWithAttemptID|StatusDAGWithLogPaths|StatusDAGWithBinaryLogContent)$'
+    start_bg "internal-cmd-status-subdag" \
+      run_test_binary \
+      '^TestStatusCommand/(StatusSubDAGRun|StatusSubDAGRunMissingParentRunID|StatusSubDAGRunNotFound)$'
     wait_bg
     ;;
   rest)

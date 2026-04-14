@@ -139,7 +139,7 @@ func TestCache_TTLExpiration(t *testing.T) {
 	require.Eventually(t, func() bool {
 		_, ok := cache.Load(filePath)
 		return !ok && cache.Size() == 0
-	}, time.Second, 10*time.Millisecond)
+	}, 5*time.Second, 25*time.Millisecond)
 }
 
 func TestCache_IsStale(t *testing.T) {

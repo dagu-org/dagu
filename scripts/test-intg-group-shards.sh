@@ -54,9 +54,13 @@ case "$mode" in
       run_filtered_tests \
       '^(TestHistoryCommand_)' \
       ''
-    start_bg "intg-output" \
-      run_sharded_tests 2 \
-      '^(Test(LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*))' \
+    start_bg "intg-output-core" \
+      run_filtered_tests \
+      '^(Test(LargeOutput_128KB|OutputsCollection_MixedOutputConfigurations|OutputsCollection_FailedDAG|OutputValidation_.*))' \
+      ''
+    start_bg "intg-output-camelcase" \
+      run_sharded_tests 4 \
+      '^(TestOutputsCollection_CamelCaseConversion_.*)$' \
       ''
     start_bg "intg-params" \
       run_sharded_tests 2 \

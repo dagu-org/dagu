@@ -38,10 +38,18 @@ wait_bg() {
 setup_test_binary ./internal/cmd
 trap cleanup_test_binary EXIT
 
-start_bg "internal-cmd-start-positional" \
-  run_filtered_tests \
-  '^(TestCmdStart_PositionalParamValidation)$' \
-  ''
+start_bg "internal-cmd-start-positional-a" \
+  run_test_binary \
+  '^TestCmdStart_PositionalParamValidation/(AllowsTooFewAfterDash|RejectsTooManyAfterDash)$'
+start_bg "internal-cmd-start-positional-b" \
+  run_test_binary \
+  '^TestCmdStart_PositionalParamValidation/(AllowsTooFewWithParamsFlag|AllowsNamedOnlyWithPositionalDefaults)$'
+start_bg "internal-cmd-start-positional-c" \
+  run_test_binary \
+  '^TestCmdStart_PositionalParamValidation/(AllowsJSONParamsWithoutPositionalValidation|AllowsJSONAfterDashWithoutPositionalValidation)$'
+start_bg "internal-cmd-start-positional-d" \
+  run_test_binary \
+  '^TestCmdStart_PositionalParamValidation/(AllowsNamedPairsWhenNoParamsDeclared|AllowsPositionalWhenNoParamsDeclared)$'
 start_bg "internal-cmd-start-other" \
   run_sharded_tests 3 \
   '^(Test(StartCommand|StartCommand_BuiltExecutablePreservesExplicitEnv|CmdStart_.*))' \

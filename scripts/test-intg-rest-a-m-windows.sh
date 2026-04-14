@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+source "$(dirname "$0")/test-shard-lib.sh"
+
+pids=()
+names=()
+
+start_bg() {
+  local name="$1"
+  shift
+
+  echo "Starting $name"
+  (
+    set -euo pipefail
+    "$@"
+  ) &
+  pids+=("$!")
+  names+=("$name")
+}
+
+wait_bg() {
+  local status=0
+
+  for i in "${!pids[@]}"; do
+    if ! wait "${pids[$i]}"; then
+      echo "::error::${names[$i]} failed"
+      status=1
+    else
+      echo "Finished ${names[$i]}"
+    fi
+  done
+
+  return "$status"
+}
+
+setup_test_binary ./internal/intg
+trap cleanup_test_binary EXIT
+
+start_bg "intg-rest-dag-execution" \
+  run_filtered_tests \
+  '^TestDAGExecution$' \
+  ''
+start_bg "intg-rest-env" \
+  run_filtered_tests \
+  '^TestEnv$' \
+  ''
+start_bg "intg-rest-subdag" \
+  run_filtered_tests \
+  '^(Test(InlineSubDAG|ExternalSubDAG))$' \
+  ''
+start_bg "intg-rest-heavy-logic" \
+  run_filtered_tests \
+  '^(Test(ComplexDependencies|HandlerOn|HandlerOn_EnvironmentVariables))$' \
+  ''
+start_bg "intg-rest-remainder" \
+  run_sharded_tests 4 \
+  '^Test([A-M].*)' \
+  '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution|DAGExecution|Env|ComplexDependencies|InlineSubDAG|ExternalSubDAG|HandlerOn(_.*)?))'
+
+wait_bg

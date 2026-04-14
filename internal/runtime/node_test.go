@@ -1134,13 +1134,13 @@ func TestNodeShouldContinue(t *testing.T) {
 				Status:   tt.nodeStatus,
 				ExitCode: tt.exitCode,
 			})
-			t.Cleanup(func() {
-				require.NoError(t, node.Teardown())
-			})
 
 			if tt.setupOutput != nil {
 				tt.setupOutput(t, node)
 			}
+			t.Cleanup(func() {
+				require.NoError(t, node.Teardown())
+			})
 
 			// Now we can test the public method directly
 			node.SetStatus(tt.nodeStatus)

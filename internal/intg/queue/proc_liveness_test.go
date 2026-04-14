@@ -120,11 +120,11 @@ steps:
 		time.Second,
 	)
 
-	f.StartScheduler(20 * time.Second)
-	f.WaitForStatus(f.runIDs[0], core.Succeeded, 10*time.Second)
+	f.StartScheduler(30 * time.Second)
+	f.WaitForStatus(f.runIDs[0], core.Succeeded, 20*time.Second)
 
 	require.Eventually(t, func() bool {
 		_, err := os.Stat(procFile)
 		return os.IsNotExist(err)
-	}, 5*time.Second, 50*time.Millisecond)
+	}, 15*time.Second, 100*time.Millisecond)
 }

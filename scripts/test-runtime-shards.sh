@@ -39,6 +39,20 @@ wait_bg() {
   return "$status"
 }
 
+start_bg_run_test_binary() {
+  local name="$1"
+  local timeout="$2"
+  local regex="$3"
+
+  echo "Starting $name"
+  (
+    set -euo pipefail
+    TEST_BINARY_TIMEOUT="$timeout" run_test_binary "$regex"
+  ) &
+  pids+=("$!")
+  names+=("$name")
+}
+
 case "$mode" in
   base-a-early-rest)
     setup_test_binary ./internal/runtime
@@ -71,13 +85,19 @@ case "$mode" in
     run_test_binary '^(TestRunner_ErrorHandling|TestRunner_DAGPreconditions|TestRunner_StatusDefersForcedStatusUntilTerminal|TestRunner_SignalHandling|TestRunner_ComplexDependencyChains|TestRunner_EdgeCases)$'
     echo "Finished runtime-runner-advanced-parents"
 
-    echo "Starting runtime-runner-repeat-policies"
-    TEST_BINARY_TIMEOUT=12m run_test_binary '^TestRunner$/(RepeatPolicyRepeatsUntilCommandConditionMatchesExpected|RepeatPolicyRepeatWhileConditionExits0|RepeatPolicyRepeatsWhileCommandExitCodeMatches|RepeatPolicyRepeatsUntilFileConditionMatchesExpected|RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected|RetryPolicyWithOutputCapture|FailedStepWithOutputCapture|RetryPolicySubDAGRunWithOutputCapture|SingleStepTimeoutFailsStep|TimeoutPreemptsRetriesAndMarksFailed|ParallelStepsTimeoutFailIndividually|StepLevelTimeoutOverridesLongDAGTimeoutAndFails|RejectedTakesPrecedenceOverWaiting)$'
-    echo "Finished runtime-runner-repeat-policies"
+    start_bg_run_test_binary "runtime-runner-repeat-conditions" 8m \
+      '^TestRunner$/(RepeatPolicyRepeatsUntilCommandConditionMatchesExpected|RepeatPolicyRepeatWhileConditionExits0|RepeatPolicyRepeatsWhileCommandExitCodeMatches)$'
+    start_bg_run_test_binary "runtime-runner-repeat-sources" 8m \
+      '^TestRunner$/(RepeatPolicyRepeatsUntilFileConditionMatchesExpected|RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected)$'
+    start_bg_run_test_binary "runtime-runner-repeat-timeouts" 8m \
+      '^TestRunner$/(RetryPolicyWithOutputCapture|FailedStepWithOutputCapture|RetryPolicySubDAGRunWithOutputCapture|SingleStepTimeoutFailsStep|TimeoutPreemptsRetriesAndMarksFailed|ParallelStepsTimeoutFailIndividually|StepLevelTimeoutOverridesLongDAGTimeoutAndFails|RejectedTakesPrecedenceOverWaiting)$'
+    wait_bg
 
-    echo "Starting runtime-runner-complex-retry"
-    TEST_BINARY_TIMEOUT=12m run_test_binary '^TestRunner_ComplexRetryScenarios$'
-    echo "Finished runtime-runner-complex-retry"
+    start_bg_run_test_binary "runtime-runner-complex-retry-basic" 8m \
+      '^TestRunner_ComplexRetryScenarios/(RetryWithSignalTermination|RetryWithSpecificExitCodes|RepeatPolicyBooleanTrueRepeatsWhileStepSucceeds|RepeatPolicyBooleanTrueWithFailureStopsOnFailure|RepeatPolicyUntilModeWithoutConditionRepeatsOnFailure|RepeatPolicyLimit)$'
+    start_bg_run_test_binary "runtime-runner-complex-retry-conditional" 8m \
+      '^TestRunner_ComplexRetryScenarios/(RepeatPolicyWhileWithConditionRepeatsWhileConditionSucceeds|RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches|RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds|RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches|RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches|RepeatPolicyOutputVariablesReloadedBeforeConditionEval)$'
+    wait_bg
     ;;
   base-b-refs-chatwait)
     setup_test_binary ./internal/runtime
