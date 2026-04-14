@@ -2044,7 +2044,7 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 
 	plan := r.newPlan(t,
 		newStep("1",
-			withScript(repeatCounterThenSleepScript(counterFile, 2, platformTestDuration(3*time.Second, 10*time.Second))),
+			withCommand(repeatCounterThenSleepScript(counterFile, 2, platformTestDuration(3*time.Second, 10*time.Second))),
 			withRepeatPolicy(true, 20*time.Millisecond),
 		),
 	)
