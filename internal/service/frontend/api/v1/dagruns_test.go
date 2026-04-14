@@ -439,15 +439,15 @@ steps:
 func TestApproveDAGRunStep(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `type: graph
+	dagSpec := fmt.Sprintf(`type: graph
 steps:
   - name: wait-step
-    command: "true"
+    command: %q
     approval:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
-    command: "echo approved"`
+    command: "echo approved"`, test.PortableSuccessCommand())
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "approval_test_dag",
@@ -491,7 +491,7 @@ func TestApproveDAGRunStepWithInputs(t *testing.T) {
 	dagSpec := fmt.Sprintf(`type: graph
 steps:
   - name: wait-step
-    command: "true"
+    command: %q
     approval:
       prompt: "Please provide reason"
       input:
@@ -501,7 +501,7 @@ steps:
         - reason
   - name: after-wait
     depends: [wait-step]
-    command: %q`, test.PortableEnvOutputCommand("reason", "approver"))
+    command: %q`, test.PortableSuccessCommand(), test.PortableEnvOutputCommand("reason", "approver"))
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "approval_inputs_dag",
@@ -562,10 +562,10 @@ steps:
 func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `type: graph
+	dagSpec := fmt.Sprintf(`type: graph
 steps:
   - name: wait-step
-    command: "true"
+    command: %q
     approval:
       prompt: "Please provide reason"
       input:
@@ -574,7 +574,7 @@ steps:
         - reason
   - name: after-wait
     depends: [wait-step]
-    command: "echo done"`
+    command: "echo done"`, test.PortableSuccessCommand())
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "approval_required_dag",
@@ -633,15 +633,15 @@ func TestApproveDAGRunStepNotWaiting(t *testing.T) {
 func TestRejectDAGRunStep(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := `type: graph
+	dagSpec := fmt.Sprintf(`type: graph
 steps:
   - name: wait-step
-    command: "true"
+    command: %q
     approval:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
-    command: "echo should not run"`
+    command: "echo should not run"`, test.PortableSuccessCommand())
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "rejection_test_dag",
