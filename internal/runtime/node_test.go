@@ -188,7 +188,7 @@ func TestNode(t *testing.T) {
 
 		file := node.NodeData().Step.Stdout
 		dat, _ := os.ReadFile(file)
-		require.Equalf(t, "hello\n", string(dat), "unexpected stdout content: %s", string(dat))
+		require.Equalf(t, "hello\n", strings.ReplaceAll(string(dat), "\r\n", "\n"), "unexpected stdout content: %s", string(dat))
 	})
 	t.Run("Stderr", func(t *testing.T) {
 		t.Parallel()
@@ -446,6 +446,9 @@ Line 5: Process completed
 			node := runtime.NewNode(step, runtime.NodeState{})
 			err := node.Prepare(ctx, tempDir, "test-run")
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				require.NoError(t, node.Teardown())
+			})
 
 			// For non-existent log file test, we skip the log file write
 			if tt.name != "non-existent log file" && logFile != "" {
@@ -1130,6 +1133,9 @@ func TestNodeShouldContinue(t *testing.T) {
 			node := runtime.NewNode(step, runtime.NodeState{
 				Status:   tt.nodeStatus,
 				ExitCode: tt.exitCode,
+			})
+			t.Cleanup(func() {
+				require.NoError(t, node.Teardown())
 			})
 
 			if tt.setupOutput != nil {

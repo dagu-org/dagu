@@ -1986,7 +1986,7 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 	cancelWait := platformTestDuration(5*time.Second, 60*time.Second)
 	repeated := make(chan bool, 1)
 	go func() {
-		repeated <- waitForNodeDoneCountAtLeast(plan.Plan, "1", 2, cancelWait)
+		repeated <- waitForNodeRepeatScheduled(plan.Plan, "1", cancelWait)
 		r.runner.Cancel(plan.Plan)
 	}()
 
@@ -2214,7 +2214,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
+			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2253,7 +2253,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
+			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
 			err := os.WriteFile(counterFile, []byte("stop"), 0600)
 			require.NoError(t, err)
 		}()
@@ -2295,7 +2295,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
+			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
 			f, _ := os.Create(counterFile)
 			_ = f.Close()
 		}()
@@ -2334,7 +2334,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, repeatConditionMutationTimeout())
+			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
 			err := os.WriteFile(counterFile, []byte("ready"), 0600)
 			require.NoError(t, err)
 		}()

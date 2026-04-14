@@ -5,8 +5,10 @@ package eval
 
 import (
 	"context"
+	"runtime"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -539,6 +541,11 @@ func TestStringFields_StructWithMapField(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	if runtime.GOOS == "windows" {
+		ctx = config.WithConfig(ctx, &config.Config{
+			Core: config.Core{DefaultShell: "cmd"},
+		})
+	}
 	input := TestStruct{
 		Name: "$TEST_VAR",
 		Config: map[string]string{
