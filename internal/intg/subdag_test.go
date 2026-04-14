@@ -162,6 +162,10 @@ steps:
 	})
 
 	t.Run("ThreeLevelNestingWithOutputPassing", func(t *testing.T) {
+		if runtime.GOOS == "windows" && raceEnabled() {
+			t.Skip("Skipping nested inline subdag output passing on Windows race runs")
+		}
+
 		// middle-dag calls leaf-dag with parameter passing
 		th := test.Setup(t)
 

@@ -28,6 +28,11 @@ func schedulerTestTimeout(base time.Duration) time.Duration {
 	return base
 }
 
+func setupSchedulerWithoutDAGs(t *testing.T) *test.Scheduler {
+	t.Helper()
+	return test.SetupScheduler(t, test.WithDAGsDir(t.TempDir()))
+}
+
 func TestScheduler(t *testing.T) {
 	t.Parallel()
 
@@ -134,7 +139,7 @@ func TestFileLockPreventsMultipleInstances(t *testing.T) {
 
 	entryReader := newMockJobManager()
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 
 	// Create first scheduler instance
 	sc1, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
@@ -211,10 +216,13 @@ func TestScheduler_StopSchedule(t *testing.T) {
 		},
 	}
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 	sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 	require.NoError(t, err)
 	sc.SetClock(func() time.Time { return now })
+	sc.SetDispatchFunc(func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
+		return nil
+	})
 
 	// GetLatestStatus must return Running for the stop guard
 	sc.SetGetLatestStatusFunc(func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
@@ -253,7 +261,7 @@ func TestScheduler_GracefulShutdown(t *testing.T) {
 		},
 	}
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 	sc, err := scheduler.New(th.Config, entryReader, th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 	require.NoError(t, err)
 	sc.SetClock(func() time.Time { return now })
@@ -291,7 +299,7 @@ func TestScheduler_StopReleasesLock(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 	ctx := context.Background()
 
 	// Start and stop first scheduler.
@@ -316,7 +324,7 @@ func TestScheduler_StopAfterContextCancellation(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 
 	sc, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 	require.NoError(t, err)
@@ -361,7 +369,7 @@ func TestScheduler_StopWhileWaitingForLock(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 
 	sc1, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 	require.NoError(t, err)
@@ -421,7 +429,7 @@ func TestScheduler_StartFailureCleansUpPartialStartup(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 
 	sc1, err := scheduler.New(
 		th.Config,
@@ -455,7 +463,7 @@ func TestScheduler_SelfFencesOnOwnershipLoss(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 
-	th := test.SetupScheduler(t)
+	th := setupSchedulerWithoutDAGs(t)
 	ctx := context.Background()
 
 	sc, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)

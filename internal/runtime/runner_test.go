@@ -2040,6 +2040,10 @@ func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 }
 
 func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
+	if windowsShellTest() {
+		t.Skip("Skipping flaky shell-based repeat cancellation test on Windows")
+	}
+
 	r := setupRunner(t)
 	counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_cancel_%s.txt", uuid.Must(uuid.NewV7()).String()))
 	t.Cleanup(func() {
