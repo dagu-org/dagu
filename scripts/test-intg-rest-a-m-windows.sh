@@ -42,10 +42,12 @@ start_bg "intg-rest-dag-execution" \
   run_filtered_tests \
   '^TestDAGExecution$' \
   ''
-start_bg "intg-rest-env" \
-  run_filtered_tests \
-  '^TestEnv$' \
-  ''
+start_bg "intg-rest-env-core" \
+  env TEST_BINARY_TIMEOUT=12m run_test_binary \
+  '^TestEnv$/(EnvVariables|Derivatives|ShellFallbacks|DAGRunWorkDir)$'
+start_bg "intg-rest-env-refs" \
+  env TEST_BINARY_TIMEOUT=12m run_test_binary \
+  '^TestEnv$/(DAGRunWorkDirWithExplicitWorkingDir|EnvReferencesParams|EnvReferencesParamsChained|StepOutputSubstrings)$'
 start_bg "intg-rest-subdag" \
   run_filtered_tests \
   '^(Test(InlineSubDAG|ExternalSubDAG))$' \

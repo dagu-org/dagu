@@ -49,6 +49,16 @@ func repeatCounterValueCondition(counterFile string) string {
 	return test.PortableCommandSubstitution(trimmedCounterReadCommand(counterFile))
 }
 
+func repeatExpectedCondition(counterFile, expected string) *core.Condition {
+	if windowsShellTest() {
+		return &core.Condition{Condition: repeatCounterEqualsCommand(counterFile, expected)}
+	}
+	return &core.Condition{
+		Condition: repeatCounterValueCondition(counterFile),
+		Expected:  expected,
+	}
+}
+
 func repeatConditionMutationTimeout() time.Duration {
 	if windowsShellTest() {
 		return 90 * time.Second
@@ -1215,10 +1225,7 @@ func TestRunner(t *testing.T) {
 				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(stateFile),
-						Expected:  "ready",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "ready")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
@@ -1305,10 +1312,7 @@ func TestRunner(t *testing.T) {
 				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(stateFile),
-						Expected:  "done",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "done")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
@@ -2101,10 +2105,7 @@ func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 			func(step *core.Step) {
 				step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 				step.RepeatPolicy.Limit = 5
-				step.RepeatPolicy.Condition = &core.Condition{
-					Condition: repeatCounterValueCondition(counterFile),
-					Expected:  "10", // Would repeat forever but limit stops at 5
-				}
+				step.RepeatPolicy.Condition = repeatExpectedCondition(counterFile, "10") // Would repeat forever but limit stops at 5
 			},
 		),
 	)
@@ -2324,10 +2325,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(stateFile),
-						Expected:  "continue",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "continue")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
@@ -2417,10 +2415,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(stateFile),
-						Expected:  "ready",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "ready")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
