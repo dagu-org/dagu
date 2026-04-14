@@ -148,6 +148,8 @@ func runParallelExecutionItemSourceCase(t *testing.T, tc parallelExecutionItemSo
 }
 
 func TestParallelExecution_ItemSources_SimpleItems(t *testing.T) {
+	t.Parallel()
+
 	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
 		dag: `steps:
   - call: child-echo
@@ -165,6 +167,8 @@ func TestParallelExecution_ItemSources_SimpleItems(t *testing.T) {
 }
 
 func TestParallelExecution_ItemSources_ObjectItems(t *testing.T) {
+	t.Parallel()
+
 	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
 		dag: `steps:
   - call: child-process
@@ -191,6 +195,8 @@ func TestParallelExecution_ItemSources_ObjectItems(t *testing.T) {
 }
 
 func TestParallelExecution_ItemSources_VariableReference(t *testing.T) {
+	t.Parallel()
+
 	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
 		dag: `params:
   - ITEMS: '["alpha", "beta", "gamma", "delta"]'
@@ -205,6 +211,8 @@ steps:
 }
 
 func TestParallelExecution_ItemSources_SpaceSeparated(t *testing.T) {
+	t.Parallel()
+
 	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
 		dag: `env:
   - SERVERS: "server1 server2 server3"
@@ -219,6 +227,8 @@ steps:
 }
 
 func TestParallelExecution_ItemSources_DirectVariable(t *testing.T) {
+	t.Parallel()
+
 	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
 		dag: `env:
   - ITEMS: '["task1", "task2", "task3"]'

@@ -87,6 +87,8 @@ steps:
 }
 
 func TestHistoryCommand_FilterByStatus(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -123,6 +125,8 @@ steps:
 }
 
 func TestHistoryCommand_JSONFormat(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -148,6 +152,8 @@ steps:
 }
 
 func TestHistoryCommand_RunIDDisplay(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -178,6 +184,8 @@ steps:
 }
 
 func TestHistoryCommand_DateFiltering(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -210,6 +218,8 @@ steps:
 }
 
 func TestHistoryCommand_Errors(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	tests := []struct {
@@ -263,6 +273,8 @@ func TestHistoryCommand_Errors(t *testing.T) {
 }
 
 func TestHistoryCommand_EmptyResults(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	// Query for non-existent DAG - stdout is not captured in LoggingOutput,
@@ -274,6 +286,8 @@ func TestHistoryCommand_EmptyResults(t *testing.T) {
 }
 
 func TestHistoryCommand_Tags(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -313,6 +327,8 @@ steps:
 }
 
 func TestHistoryCommand_Limit(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 

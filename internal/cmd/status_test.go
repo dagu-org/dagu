@@ -52,6 +52,8 @@ func stopDAGAndWait(t *testing.T, th test.Command, dagLocation string, done <-ch
 
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGRunning", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "1"
@@ -72,6 +74,8 @@ func TestStatusCommand(t *testing.T) {
 	})
 
 	t.Run("StatusDAGSuccess", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -87,6 +91,8 @@ func TestStatusCommand(t *testing.T) {
 	})
 
 	t.Run("StatusDAGError", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "error"
@@ -128,6 +134,8 @@ func TestStatusCommand(t *testing.T) {
 	})
 
 	t.Run("StatusDAGWithParams", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `params:
   - param1
@@ -146,6 +154,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithSpecificRunID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -163,6 +173,8 @@ steps:
 	})
 
 	t.Run("StatusDAGMultipleRuns", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -186,6 +198,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithSkippedSteps", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "check"
@@ -242,6 +256,8 @@ steps:
 	})
 
 	t.Run("StatusDAGCancel", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "1"
@@ -263,6 +279,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithManySteps", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "step1"
@@ -296,6 +314,8 @@ steps:
 	})
 
 	t.Run("StatusDAGByName", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -311,6 +331,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithPID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "1"
@@ -331,6 +353,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithAttemptID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -354,6 +378,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithLogPaths", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -369,6 +395,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithBinaryLogContent", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -412,6 +440,8 @@ steps:
 	})
 
 	t.Run("StatusSubDAGRun", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t, test.WithBuiltExecutable())
 		dagFile := th.DAG(t, `steps:
   - name: run-child
@@ -463,6 +493,8 @@ steps:
 	})
 
 	t.Run("StatusSubDAGRunMissingParentRunID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -474,6 +506,8 @@ steps:
 	})
 
 	t.Run("StatusSubDAGRunNotFound", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"

@@ -222,6 +222,8 @@ steps:
 }
 
 func TestCmdStart_NamedParamsIgnorePositionalCount(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	dagFile := th.CreateDAGFile(t, "test-named-params.yaml", `
@@ -239,6 +241,8 @@ steps:
 
 func TestCmdStart_FromRunID(t *testing.T) {
 	t.Run("ReschedulesWithStoredParameters", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `params: "alpha beta"
