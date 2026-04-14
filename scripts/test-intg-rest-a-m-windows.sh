@@ -65,8 +65,17 @@ start_bg "intg-rest-subdag-external-retry" \
   '^(TestExternalSubDAG|TestRetryPolicy)$'
 start_bg "intg-rest-heavy-logic" \
   run_filtered_tests \
-  '^(Test(ComplexDependencies|HandlerOn|HandlerOn_EnvironmentVariables))$' \
+  '^(Test(ComplexDependencies|HandlerOn))$' \
   ''
+start_bg "intg-rest-handler-env-core" \
+  env TEST_BINARY_TIMEOUT=12m TEST_GO_PARALLEL=1 run_test_binary \
+  '^TestHandlerOn_EnvironmentVariables/(InitHandler_BaseEnvVars|InitHandler_DAGRunStatus_IsRunning|SuccessHandler_AllEnvVars|FailureHandler_AllEnvVars)$'
+start_bg "intg-rest-handler-env-handlers" \
+  env TEST_BINARY_TIMEOUT=12m TEST_GO_PARALLEL=1 run_test_binary \
+  '^TestHandlerOn_EnvironmentVariables/(ExitHandler_AllEnvVars_OnSuccess|ExitHandler_AllEnvVars_OnFailure|AbortHandler_AllEnvVars|StepOutputVars_NotAvailableInHandlers|Handlers_CanAccessStepOutputVariables|InitHandler_CannotAccessStepOutputVariables)$'
+start_bg "intg-rest-handler-env-wait" \
+  env TEST_BINARY_TIMEOUT=12m TEST_GO_PARALLEL=1 run_test_binary \
+  '^TestHandlerOn_EnvironmentVariables/(WaitHandler_DAG_WAITING_STEPS_EnvVar|WaitHandler_EnvVarFormat|SuccessHandler_StdoutPathExpandsDAGRunStatus|WaitHandler_StdoutPathExpandsWaitingSteps)$'
 start_bg "intg-rest-remainder" \
   run_sharded_tests 4 \
   '^Test([A-M].*)' \

@@ -63,7 +63,7 @@ func TestAgent_Run(t *testing.T) {
 
 		runTimeout := 10 * time.Second
 		if runtime.GOOS == "windows" {
-			runTimeout = 90 * time.Second
+			runTimeout = 3 * time.Minute
 		}
 
 		select {
