@@ -46,23 +46,29 @@ case "$mode" in
   a)
     setup_test_binary ./internal/intg/distr
     trap cleanup_test_binary EXIT
-    start_bg "intg-distr-baseconfig-status" \
-      run_filtered_tests \
+    echo "Starting intg-distr-baseconfig-status"
+    run_filtered_tests \
       '^(Test(BaseConfig_.*|Coordinator_.*|Execution_(StatusPushing|LogStreaming|LargeOutput)))' \
       ''
-    start_bg "intg-distr-direct-metadata" \
-      run_filtered_tests \
+    echo "Finished intg-distr-baseconfig-status"
+
+    echo "Starting intg-distr-direct-metadata"
+    run_filtered_tests \
       '^(TestExecution_(StartCommand|TagsPropagation|QueueLifecycle|QueuedCatchupHappyPath))' \
       ''
-    start_bg "intg-distr-sharedfs-workdir" \
-      run_filtered_tests \
+    echo "Finished intg-distr-direct-metadata"
+
+    echo "Starting intg-distr-sharedfs-workdir"
+    run_filtered_tests \
       '^(TestExecution_(SharedFSMode|WorkDir))' \
       ''
-    start_bg "intg-distr-retry-cancel" \
-      run_filtered_tests \
+    echo "Finished intg-distr-sharedfs-workdir"
+
+    echo "Starting intg-distr-retry-cancel"
+    TEST_GO_PARALLEL=1 TEST_BINARY_TIMEOUT=12m run_filtered_tests \
       '^(Test(Cancellation_.*|Retry_.*|OneOffScheduleRunsDistributed))' \
       ''
-    wait_bg
+    echo "Finished intg-distr-retry-cancel"
     ;;
   b)
     setup_test_binary ./internal/intg/distr

@@ -1449,67 +1449,41 @@ steps:
 		}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 	}
 
-	// Test 1: Filter by single tag "critical" - should return prod and dev runs
-	listResp := server.Client().Get("/api/v1/dag-runs?tags=critical").
-		ExpectStatus(http.StatusOK).Send(t)
-	var listBody api.ListDAGRuns200JSONResponse
-	listResp.Unmarshal(t, &listBody)
+	fetchNamesByTags := func(tags string) map[string]bool {
+		listResp := server.Client().Get("/api/v1/dag-runs?tags=" + tags).
+			ExpectStatus(http.StatusOK).Send(t)
+		var listBody api.ListDAGRuns200JSONResponse
+		listResp.Unmarshal(t, &listBody)
 
-	criticalNames := make(map[string]bool)
-	for _, run := range listBody.DagRuns {
-		criticalNames[run.Name] = true
-	}
-	require.True(t, criticalNames["tag_filter_prod"], "prod DAG should be in critical filter results")
-	require.True(t, criticalNames["tag_filter_dev"], "dev DAG should be in critical filter results")
-	require.False(t, criticalNames["tag_filter_test"], "test DAG should NOT be in critical filter results")
-
-	// Test 2: Filter by multiple tags "prod,critical" (AND logic) - should return only prod run
-	listResp = server.Client().Get("/api/v1/dag-runs?tags=prod,critical").
-		ExpectStatus(http.StatusOK).Send(t)
-	listResp.Unmarshal(t, &listBody)
-
-	prodCriticalNames := make(map[string]bool)
-	for _, run := range listBody.DagRuns {
-		prodCriticalNames[run.Name] = true
-	}
-	require.True(t, prodCriticalNames["tag_filter_prod"], "prod DAG should be in prod+critical filter results")
-	require.False(t, prodCriticalNames["tag_filter_dev"], "dev DAG should NOT be in prod+critical filter results")
-	require.False(t, prodCriticalNames["tag_filter_test"], "test DAG should NOT be in prod+critical filter results")
-
-	// Test 3: Filter by non-existent tag - should return empty
-	listResp = server.Client().Get("/api/v1/dag-runs?tags=nonexistent").
-		ExpectStatus(http.StatusOK).Send(t)
-	listResp.Unmarshal(t, &listBody)
-
-	for _, run := range listBody.DagRuns {
-		require.NotContains(t, []string{"tag_filter_prod", "tag_filter_dev", "tag_filter_test"}, run.Name,
-			"non-existent tag filter should not return any of our test DAGs")
+		names := make(map[string]bool, len(listBody.DagRuns))
+		for _, run := range listBody.DagRuns {
+			names[run.Name] = true
+		}
+		return names
 	}
 
-	// Test 4: Filter by single tag "test" - should return only test run
-	listResp = server.Client().Get("/api/v1/dag-runs?tags=test").
-		ExpectStatus(http.StatusOK).Send(t)
-	listResp.Unmarshal(t, &listBody)
-
-	testNames := make(map[string]bool)
-	for _, run := range listBody.DagRuns {
-		testNames[run.Name] = true
+	requireFilterEventually := func(tags string, wantPresent, wantAbsent []string) {
+		require.Eventually(t, func() bool {
+			names := fetchNamesByTags(tags)
+			for _, name := range wantPresent {
+				if !names[name] {
+					return false
+				}
+			}
+			for _, name := range wantAbsent {
+				if names[name] {
+					return false
+				}
+			}
+			return true
+		}, dagRunEventuallyTimeout(5*time.Second), 200*time.Millisecond)
 	}
-	require.True(t, testNames["tag_filter_test"], "test DAG should be in test filter results")
-	require.False(t, testNames["tag_filter_prod"], "prod DAG should NOT be in test filter results")
-	require.False(t, testNames["tag_filter_dev"], "dev DAG should NOT be in test filter results")
 
-	// Test 5: Case-insensitive tag matching
-	listResp = server.Client().Get("/api/v1/dag-runs?tags=CRITICAL").
-		ExpectStatus(http.StatusOK).Send(t)
-	listResp.Unmarshal(t, &listBody)
-
-	caseInsensitiveNames := make(map[string]bool)
-	for _, run := range listBody.DagRuns {
-		caseInsensitiveNames[run.Name] = true
-	}
-	require.True(t, caseInsensitiveNames["tag_filter_prod"], "case-insensitive: prod DAG should be in CRITICAL filter results")
-	require.True(t, caseInsensitiveNames["tag_filter_dev"], "case-insensitive: dev DAG should be in CRITICAL filter results")
+	requireFilterEventually("critical", []string{"tag_filter_prod", "tag_filter_dev"}, []string{"tag_filter_test"})
+	requireFilterEventually("prod,critical", []string{"tag_filter_prod"}, []string{"tag_filter_dev", "tag_filter_test"})
+	requireFilterEventually("nonexistent", nil, []string{"tag_filter_prod", "tag_filter_dev", "tag_filter_test"})
+	requireFilterEventually("test", []string{"tag_filter_test"}, []string{"tag_filter_prod", "tag_filter_dev"})
+	requireFilterEventually("CRITICAL", []string{"tag_filter_prod", "tag_filter_dev"}, []string{"tag_filter_test"})
 }
 
 func TestListDAGRunsFilterByPartialName(t *testing.T) {

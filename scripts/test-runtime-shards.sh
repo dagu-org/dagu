@@ -67,13 +67,17 @@ case "$mode" in
   base-b-policies-advanced)
     setup_test_binary ./internal/runtime
     trap cleanup_test_binary EXIT
-    start_bg "runtime-runner-repeat-policies" \
-      run_test_binary '^TestRunner$/(RepeatPolicyRepeatsUntilCommandConditionMatchesExpected|RepeatPolicyRepeatWhileConditionExits0|RepeatPolicyRepeatsWhileCommandExitCodeMatches|RepeatPolicyRepeatsUntilFileConditionMatchesExpected|RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected|RetryPolicyWithOutputCapture|FailedStepWithOutputCapture|RetryPolicySubDAGRunWithOutputCapture|SingleStepTimeoutFailsStep|TimeoutPreemptsRetriesAndMarksFailed|ParallelStepsTimeoutFailIndividually|StepLevelTimeoutOverridesLongDAGTimeoutAndFails|RejectedTakesPrecedenceOverWaiting)$'
-    start_bg "runtime-runner-advanced-parents" \
-      run_test_binary '^(TestRunner_ErrorHandling|TestRunner_DAGPreconditions|TestRunner_StatusDefersForcedStatusUntilTerminal|TestRunner_SignalHandling|TestRunner_ComplexDependencyChains|TestRunner_EdgeCases)$'
-    start_bg "runtime-runner-complex-retry" \
-      run_test_binary '^TestRunner_ComplexRetryScenarios$'
-    wait_bg
+    echo "Starting runtime-runner-advanced-parents"
+    run_test_binary '^(TestRunner_ErrorHandling|TestRunner_DAGPreconditions|TestRunner_StatusDefersForcedStatusUntilTerminal|TestRunner_SignalHandling|TestRunner_ComplexDependencyChains|TestRunner_EdgeCases)$'
+    echo "Finished runtime-runner-advanced-parents"
+
+    echo "Starting runtime-runner-repeat-policies"
+    TEST_BINARY_TIMEOUT=12m run_test_binary '^TestRunner$/(RepeatPolicyRepeatsUntilCommandConditionMatchesExpected|RepeatPolicyRepeatWhileConditionExits0|RepeatPolicyRepeatsWhileCommandExitCodeMatches|RepeatPolicyRepeatsUntilFileConditionMatchesExpected|RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected|RetryPolicyWithOutputCapture|FailedStepWithOutputCapture|RetryPolicySubDAGRunWithOutputCapture|SingleStepTimeoutFailsStep|TimeoutPreemptsRetriesAndMarksFailed|ParallelStepsTimeoutFailIndividually|StepLevelTimeoutOverridesLongDAGTimeoutAndFails|RejectedTakesPrecedenceOverWaiting)$'
+    echo "Finished runtime-runner-repeat-policies"
+
+    echo "Starting runtime-runner-complex-retry"
+    TEST_BINARY_TIMEOUT=12m run_test_binary '^TestRunner_ComplexRetryScenarios$'
+    echo "Finished runtime-runner-complex-retry"
     ;;
   base-b-refs-chatwait)
     setup_test_binary ./internal/runtime

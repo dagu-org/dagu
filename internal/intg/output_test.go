@@ -361,40 +361,38 @@ steps:
 	assert.False(t, hasAfterFail, "output from step after failure should not be collected")
 }
 
-func TestOutputsCollection_CamelCaseConversion(t *testing.T) {
+func runOutputsCollectionCamelCaseConversion(t *testing.T, envVarName, expectedKey, expectedValue string) {
 	outputsTestParallel(t)
 
-	tests := []struct {
-		envVarName    string
-		expectedKey   string
-		expectedValue string
-	}{
-		{"SIMPLE", "simple", "SIMPLE=test_value"},
-		{"TWO_WORDS", "twoWords", "TWO_WORDS=test_value"},
-		{"MULTIPLE_WORD_NAME", "multipleWordName", "MULTIPLE_WORD_NAME=test_value"},
-		{"ALREADY_CAMEL_Case", "alreadyCamelCase", "ALREADY_CAMEL_Case=test_value"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.envVarName, func(t *testing.T) {
-			outputsTestParallel(t)
-
-			th := test.Setup(t)
-			dag := th.DAG(t, `
+	th := test.Setup(t)
+	dag := th.DAG(t, `
 steps:
   - name: step1
-    command: echo "`+tt.envVarName+`=test_value"
-    output: `+tt.envVarName+`
+    command: echo "`+envVarName+`=test_value"
+    output: `+envVarName+`
 `)
-			agent := dag.Agent()
-			agent.RunSuccess(t)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
 
-			outputs := readOutputsFile(t, th, dag.DAG)
-			require.NotNil(t, outputs)
-			// Value includes the KEY= prefix from the original output
-			assert.Equal(t, tt.expectedValue, outputs[tt.expectedKey])
-		})
-	}
+	outputs := readOutputsFile(t, th, dag.DAG)
+	require.NotNil(t, outputs)
+	assert.Equal(t, expectedValue, outputs[expectedKey])
+}
+
+func TestOutputsCollection_CamelCaseConversion_Simple(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "SIMPLE", "simple", "SIMPLE=test_value")
+}
+
+func TestOutputsCollection_CamelCaseConversion_TwoWords(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "TWO_WORDS", "twoWords", "TWO_WORDS=test_value")
+}
+
+func TestOutputsCollection_CamelCaseConversion_MultipleWordName(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "MULTIPLE_WORD_NAME", "multipleWordName", "MULTIPLE_WORD_NAME=test_value")
+}
+
+func TestOutputsCollection_CamelCaseConversion_AlreadyCamelCase(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "ALREADY_CAMEL_Case", "alreadyCamelCase", "ALREADY_CAMEL_Case=test_value")
 }
 
 func TestOutputsCollection_SecretsMasked(t *testing.T) {

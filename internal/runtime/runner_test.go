@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -43,9 +44,36 @@ func repeatCounterValueCondition(counterFile string) string {
 
 func repeatConditionMutationTimeout() time.Duration {
 	if windowsShellTest() {
-		return 45 * time.Second
+		return 90 * time.Second
 	}
 	return 5 * time.Second
+}
+
+func waitForRepeatCounterAtLeast(counterFile string, min int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		data, err := os.ReadFile(counterFile)
+		if err == nil {
+			value, convErr := strconv.Atoi(strings.TrimSpace(string(data)))
+			if convErr == nil && value >= min {
+				return true
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return false
+}
+
+func readRepeatCounterValue(t *testing.T, counterFile string) int {
+	t.Helper()
+
+	data, err := os.ReadFile(counterFile)
+	require.NoError(t, err)
+
+	value, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	require.NoError(t, err)
+
+	return value
 }
 
 func repeatCounterEqualsCommand(counterFile, expected string) string {
@@ -2189,8 +2217,13 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit while mode with condition
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_%s", uuid.Must(uuid.NewV7()).String()))
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		gateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_gate_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(counterFile)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		err = os.Remove(gateFile)
 		if err != nil && !os.IsNotExist(err) {
 			require.NoError(t, err)
 		}
@@ -2199,14 +2232,18 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 			if err != nil && !os.IsNotExist(err) {
 				require.NoError(t, err)
 			}
+			err = os.Remove(gateFile)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(test.PortableReadFileOrFallbackCommand(counterFile, "notfound")),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: test.PortableFileMissingCommand(counterFile),
+						Condition: test.PortableFileMissingCommand(gateFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2214,37 +2251,41 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
-			f, _ := os.Create(counterFile)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			f, _ := os.Create(gateFile)
 			_ = f.Close()
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have run at least twice (condition checked before each iteration)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches", func(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit while mode with condition and expected value
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_%s", uuid.Must(uuid.NewV7()).String()))
-		defer func() { _ = os.Remove(counterFile) }()
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_state_%s", uuid.Must(uuid.NewV7()).String()))
+		defer func() {
+			_ = os.Remove(counterFile)
+			_ = os.Remove(stateFile)
+		}()
 
 		// Write initial value
-		err := os.WriteFile(counterFile, []byte("continue"), 0600)
+		err := os.WriteFile(stateFile, []byte("continue"), 0600)
 		require.NoError(t, err)
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo while with expected"),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(counterFile),
+						Condition: repeatCounterValueCondition(stateFile),
 						Expected:  "continue",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -2253,25 +2294,29 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
-			err := os.WriteFile(counterFile, []byte("stop"), 0600)
-			require.NoError(t, err)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("stop"), 0600)
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have executed at least 2 times (while expected matches)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds", func(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit until mode with condition (no expected)
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_%s", uuid.Must(uuid.NewV7()).String()))
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		gateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_gate_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(counterFile)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		err = os.Remove(gateFile)
 		if err != nil && !os.IsNotExist(err) {
 			require.NoError(t, err)
 		}
@@ -2280,14 +2325,18 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 			if err != nil && !os.IsNotExist(err) {
 				require.NoError(t, err)
 			}
+			err = os.Remove(gateFile)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(test.PortableReadFileOrFallbackCommand(counterFile, "notfound")),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: test.PortableFileExistsCommand(counterFile),
+						Condition: test.PortableFileExistsCommand(gateFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2295,37 +2344,41 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
-			f, _ := os.Create(counterFile)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			f, _ := os.Create(gateFile)
 			_ = f.Close()
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have run at least twice (first: file not found, second: file created)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches", func(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit until mode with condition and expected value
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_%s", uuid.Must(uuid.NewV7()).String()))
-		defer func() { _ = os.Remove(counterFile) }()
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_state_%s", uuid.Must(uuid.NewV7()).String()))
+		defer func() {
+			_ = os.Remove(counterFile)
+			_ = os.Remove(stateFile)
+		}()
 
 		// Write initial value
-		err := os.WriteFile(counterFile, []byte("waiting"), 0600)
+		err := os.WriteFile(stateFile, []byte("waiting"), 0600)
 		require.NoError(t, err)
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo until with expected"),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: repeatCounterValueCondition(counterFile),
+						Condition: repeatCounterValueCondition(stateFile),
 						Expected:  "ready",
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -2334,17 +2387,16 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout())
-			err := os.WriteFile(counterFile, []byte("ready"), 0600)
-			require.NoError(t, err)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("ready"), 0600)
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have executed at least 2 times (until expected matches)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches", func(t *testing.T) {

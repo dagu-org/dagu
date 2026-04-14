@@ -38,17 +38,20 @@ wait_bg() {
 setup_test_binary ./internal/service/frontend/api/v1
 trap cleanup_test_binary EXIT
 
-start_bg "core-service-api-main" \
-  run_sharded_tests 4 \
+echo "Starting core-service-api-main"
+run_sharded_tests 4 \
   '' \
   '^(Test(ApproveDAGRunStep(|WithInputs|MissingRequired|NotWaiting)|RejectDAGRunStep(|NotWaiting)|ExecuteDAGSync(|Timeout|WithWaitingStatus|Singleton)|GetSubDAGRunSpec|Webhooks_RequiresDeveloperOrAbove|Webhooks_TriggerInvalidToken))$'
-start_bg "core-service-api-slow" \
-  run_filtered_tests \
+echo "Finished core-service-api-main"
+
+echo "Starting core-service-api-slow"
+run_filtered_tests \
   '^(Test(ApproveDAGRunStep(|WithInputs|MissingRequired|NotWaiting)|RejectDAGRunStep(|NotWaiting)|Webhooks_RequiresDeveloperOrAbove|Webhooks_TriggerInvalidToken))$' \
   ''
-start_bg "core-service-api-sync-subdag" \
-  run_filtered_tests \
+echo "Finished core-service-api-slow"
+
+echo "Starting core-service-api-sync-subdag"
+run_filtered_tests \
   '^(Test(ExecuteDAGSync(|Timeout|WithWaitingStatus|Singleton)|GetSubDAGRunSpec))$' \
   ''
-
-wait_bg
+echo "Finished core-service-api-sync-subdag"
