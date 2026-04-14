@@ -124,5 +124,6 @@ jobs:
             -json \
             -timeout=20m \
             -p=2 \
+            -parallel=1 \
             -ldflags=-extldflags=-Wl \
             ./...
