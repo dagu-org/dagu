@@ -70,14 +70,14 @@ func GetShellCommand(configuredShell string) string {
 
 // getWindowsDefaultShell returns the default shell for Windows systems
 func getWindowsDefaultShell() string {
-	// Try PowerShell (preferred on Windows)
-	if psPath, err := exec.LookPath("powershell"); err == nil {
-		return psPath
-	}
-
 	// Try PowerShell Core (cross-platform PowerShell)
 	if pwshPath, err := exec.LookPath("pwsh"); err == nil {
 		return pwshPath
+	}
+
+	// Try Windows PowerShell
+	if psPath, err := exec.LookPath("powershell"); err == nil {
+		return psPath
 	}
 
 	// Fallback to cmd.exe

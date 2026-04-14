@@ -5,6 +5,8 @@ package cmd_test
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -282,28 +284,17 @@ steps:
 		t.Parallel()
 
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
-  - name: "step1"
-    command: "echo 'Step 1'"
-  - name: "step2"
-    command: "echo 'Step 2'"
-  - name: "step3"
-    command: "echo 'Step 3'"
-  - name: "step4"
-    command: "echo 'Step 4'"
-  - name: "step5"
-    command: "echo 'Step 5'"
-  - name: "step6"
-    command: "echo 'Step 6'"
-  - name: "step7"
-    command: "echo 'Step 7'"
-  - name: "step8"
-    command: "echo 'Step 8'"
-  - name: "step9"
-    command: "echo 'Step 9'"
-  - name: "step10"
-    command: "echo 'Step 10'"
-`)
+		stepCount := 10
+		if runtime.GOOS == "windows" {
+			// The status renderer behavior is the same with fewer steps, and
+			// Windows CI pays a large per-step shell startup cost.
+			stepCount = 4
+		}
+		var dagContent string
+		for i := range stepCount {
+			dagContent += fmt.Sprintf("  - name: \"step%d\"\n    command: \"echo 'Step %d'\"\n", i+1, i+1)
+		}
+		dagFile := th.DAG(t, "steps:\n"+dagContent)
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 

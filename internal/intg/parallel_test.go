@@ -28,6 +28,33 @@ type parallelExecutionItemSourceCase struct {
 	verify            func(*testing.T, *exec.DAGRunStatus, *exec.Node)
 }
 
+func yamlParallelItems(key string, items []string) string {
+	var b strings.Builder
+	for _, item := range items {
+		fmt.Fprintf(&b, "        - %s: %q\n", key, item)
+	}
+	return b.String()
+}
+
+func jsonConfigItems(items []struct {
+	region string
+	bucket string
+}) string {
+	var parts []string
+	for _, item := range items {
+		parts = append(parts, fmt.Sprintf(`{"region":"%s","bucket":"%s"}`, item.region, item.bucket))
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func yamlEchoLines(lines []string) string {
+	var b strings.Builder
+	for _, line := range lines {
+		fmt.Fprintf(&b, "      echo '%s'\n", line)
+	}
+	return b.String()
+}
+
 func parallelChildEchoDAG() string {
 	if runtime.GOOS == "windows" {
 		return `---
@@ -251,19 +278,21 @@ steps:
 }
 
 func TestParallelExecution_WithOutput(t *testing.T) {
-	dagContent := `steps:
+	items := []string{"A", "B", "C"}
+	if runtime.GOOS == "windows" {
+		items = items[:2]
+	}
+	dagContent := fmt.Sprintf(`steps:
   - call: child-with-output
     parallel:
       items:
-        - ITEM: "A"
-        - ITEM: "B"
-        - ITEM: "C"
+%s
     output: PARALLEL_RESULTS
   - command: |
       echo "Parallel execution results:"
       echo "${PARALLEL_RESULTS}"
     output: FINAL_OUTPUT
-` + parallelChildWithOutputDAG()
+`, yamlParallelItems("ITEM", items)) + parallelChildWithOutputDAG()
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -280,7 +309,7 @@ func TestParallelExecution_WithOutput(t *testing.T) {
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
 	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
-	require.Len(t, parallelNode.SubRuns, 3)
+	require.Len(t, parallelNode.SubRuns, len(items))
 
 	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded for node %s", parallelNode.Step.Name)
 	rawOutput, ok := parallelNode.OutputVariables.Load("PARALLEL_RESULTS")
@@ -288,13 +317,14 @@ func TestParallelExecution_WithOutput(t *testing.T) {
 	raw, ok := rawOutput.(string)
 	require.True(t, ok, "output %q is not a string", "PARALLEL_RESULTS")
 	results := parseParallelResults(t, raw)
-	require.Equal(t, 3, results.Summary.Total)
-	require.Equal(t, 3, results.Summary.Succeeded)
+	require.Equal(t, len(items), results.Summary.Total)
+	require.Equal(t, len(items), results.Summary.Succeeded)
 	require.Equal(t, 0, results.Summary.Failed)
 
 	outputs := collectOutputs(results.Outputs, "TASK_OUTPUT")
-	require.Len(t, outputs, 3)
-	for _, expected := range []string{"TASK_RESULT_A", "TASK_RESULT_B", "TASK_RESULT_C"} {
+	require.Len(t, outputs, len(items))
+	for _, item := range items {
+		expected := "TASK_RESULT_" + item
 		found := false
 		for _, out := range outputs {
 			if strings.Contains(out, expected) {
@@ -975,6 +1005,17 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
 }
 
 func TestParallelExecution_ObjectItemProperties(t *testing.T) {
+	configItems := []struct {
+		region string
+		bucket string
+	}{
+		{region: "us-east-1", bucket: "data-us"},
+		{region: "eu-west-1", bucket: "data-eu"},
+		{region: "ap-south-1", bucket: "data-ap"},
+	}
+	if runtime.GOOS == "windows" {
+		configItems = configItems[:2]
+	}
 	childSpec := `steps:
   - script: |
       echo "Syncing data from region: ${REGION}"
@@ -992,9 +1033,9 @@ func TestParallelExecution_ObjectItemProperties(t *testing.T) {
 `
 	}
 
-	dagContent := `steps:
+	dagContent := fmt.Sprintf(`steps:
   - command: |
-      echo '[{"region":"us-east-1","bucket":"data-us"},{"region":"eu-west-1","bucket":"data-eu"},{"region":"ap-south-1","bucket":"data-ap"}]'
+      echo '%s'
     output: CONFIGS
 
   - call: sync-data
@@ -1011,7 +1052,7 @@ name: sync-data
 params:
   - REGION: ""
   - BUCKET: ""
-` + childSpec
+`, jsonConfigItems(configItems)) + childSpec
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -1028,7 +1069,7 @@ params:
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	syncNode := dagStatus.Nodes[1]
 	require.Equal(t, core.NodeSucceeded, syncNode.Status)
-	require.Len(t, syncNode.SubRuns, 3)
+	require.Len(t, syncNode.SubRuns, len(configItems))
 
 	require.NotNil(t, syncNode.OutputVariables, "no outputs recorded for node %s", syncNode.Step.Name)
 	rawRaw, ok := syncNode.OutputVariables.Load("RESULTS")
@@ -1036,13 +1077,15 @@ params:
 	raw, ok := rawRaw.(string)
 	require.True(t, ok, "output %q is not a string", "RESULTS")
 	results := parseParallelResults(t, raw)
-	require.Equal(t, 3, results.Summary.Total)
-	require.Equal(t, 3, results.Summary.Succeeded)
+	require.Equal(t, len(configItems), results.Summary.Total)
+	require.Equal(t, len(configItems), results.Summary.Succeeded)
 	require.Equal(t, 0, results.Summary.Failed)
 
-	require.Contains(t, raw, "Syncing data from region: us-east-1")
-	require.Contains(t, raw, "Using bucket: data-us")
-	require.Contains(t, raw, "Sync completed for data-ap in ap-south-1")
+	for _, item := range configItems {
+		require.Contains(t, raw, "Syncing data from region: "+item.region)
+		require.Contains(t, raw, "Using bucket: "+item.bucket)
+		require.Contains(t, raw, "Sync completed for "+item.bucket+" in "+item.region)
+	}
 }
 
 func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
@@ -1327,11 +1370,17 @@ steps:
 // TestIssue1274_ParallelJSONMultipleItems tests that parallel execution
 // correctly handles multiple JSON items from output (should dispatch N jobs)
 func TestIssue1274_ParallelJSONMultipleItems(t *testing.T) {
-	const dagContent = `steps:
+	jsonLines := []string{
+		`{"file": "file1.txt", "config": "prod"}`,
+		`{"file": "file2.txt", "config": "test"}`,
+		`{"file": "file3.txt", "config": "dev"}`,
+	}
+	if runtime.GOOS == "windows" {
+		jsonLines = jsonLines[:2]
+	}
+	dagContent := fmt.Sprintf(`steps:
   - command: |
-      echo '{"file": "file1.txt", "config": "prod"}'
-      echo '{"file": "file2.txt", "config": "test"}'
-      echo '{"file": "file3.txt", "config": "dev"}'
+%s
     output: jsonList
 
   - call: issue-1274-worker-multi
@@ -1350,7 +1399,7 @@ params:
 steps:
   - name: Process JSON item
     command: echo "Processing file=${aJson.file} config=${aJson.config}"
-`
+`, yamlEchoLines(jsonLines))
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -1367,7 +1416,7 @@ steps:
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	parallelNode := dagStatus.Nodes[1]
 	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
-	require.Len(t, parallelNode.SubRuns, 3, "should dispatch exactly 3 worker instances for 3 JSON items")
+	require.Len(t, parallelNode.SubRuns, len(jsonLines), "should dispatch one worker instance per JSON item")
 }
 
 // TestIssue1658_ParallelCallExpandedParamsSplitting tests that when a call step

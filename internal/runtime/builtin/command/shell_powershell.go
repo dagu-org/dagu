@@ -14,6 +14,16 @@ type powerShell struct{}
 
 var _ Shell = (*powerShell)(nil)
 
+func appendPowerShellStartupArgs(args []string) []string {
+	if !slices.Contains(args, "-NoProfile") {
+		args = append(args, "-NoProfile")
+	}
+	if !slices.Contains(args, "-NonInteractive") {
+		args = append(args, "-NonInteractive")
+	}
+	return args
+}
+
 func (s *powerShell) Match(name string) bool {
 	switch name {
 	case "powershell.exe", "powershell", "pwsh.exe", "pwsh":
@@ -37,12 +47,12 @@ func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.C
 	// When running just a script file with PowerShell (no explicit command)
 	// e.g., powershell -ExecutionPolicy Bypass -File script.ps1
 	if b.Script != "" {
-		args := []string{"-ExecutionPolicy", "Bypass", "-File", b.Script}
+		args := appendPowerShellStartupArgs([]string{"-ExecutionPolicy", "Bypass", "-File", b.Script})
 		return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
 	}
 
 	// Running a command string via PowerShell
-	args := cloneArgs(b.Shell[1:])
+	args := appendPowerShellStartupArgs(cloneArgs(b.Shell[1:]))
 
 	// PowerShell uses -Command instead of -c
 	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {

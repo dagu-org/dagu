@@ -1576,7 +1576,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 		case <-time.After(500 * time.Millisecond):
 			// Quick check to avoid busy waiting, but still responsive
-			if a.plan != nil && !a.plan.IsRunning() {
+			if a.plan != nil && !a.plan.HasActiveNodes() {
 				logger.Info(ctx, "No running processes detected, termination complete")
 				return
 			}

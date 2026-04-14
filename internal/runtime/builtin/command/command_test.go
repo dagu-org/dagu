@@ -39,7 +39,7 @@ func assertCommandArgs(t *testing.T, got []string, want []string) {
 }
 
 func expectedPowerShellCommandArgs(shell, command string) []string {
-	return []string{shell, "-Command", powerShellInlineCommand(command)}
+	return []string{shell, "-NoProfile", "-NonInteractive", "-Command", powerShellInlineCommand(command)}
 }
 
 func TestDirectShell(t *testing.T) {

@@ -904,7 +904,7 @@ func testShellPath(t *testing.T) string {
 	t.Helper()
 
 	if runtime.GOOS == "windows" {
-		for _, name := range []string{"powershell.exe", "powershell", "pwsh.exe", "pwsh"} {
+		for _, name := range []string{"pwsh.exe", "pwsh", "powershell.exe", "powershell"} {
 			if shPath, ok := cmdutil.FindExecutable(name); ok {
 				return shPath
 			}
