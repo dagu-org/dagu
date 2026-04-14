@@ -22,6 +22,10 @@ else
   }
 fi
 
+go_test_race_enabled() {
+  [[ "${TEST_GO_RACE:-1}" != "0" ]]
+}
+
 setup_test_binary() {
   TEST_SHARD_PACKAGE="${1:?package is required}"
   TEST_SHARD_PACKAGE_DIR="$(go list -f '{{.Dir}}' "$TEST_SHARD_PACKAGE")"
@@ -31,7 +35,12 @@ setup_test_binary() {
   goexe="$(go env GOEXE)"
   TEST_SHARD_BINARY="$TEST_SHARD_TMP_DIR/$(basename "$TEST_SHARD_PACKAGE").test${goexe}"
 
-  go test -c -race -o "$TEST_SHARD_BINARY" "$TEST_SHARD_PACKAGE"
+  local args=(-c -o "$TEST_SHARD_BINARY")
+  if go_test_race_enabled; then
+    args+=(-race)
+  fi
+
+  go test "${args[@]}" "$TEST_SHARD_PACKAGE"
 }
 
 cleanup_test_binary() {

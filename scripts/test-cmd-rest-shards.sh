@@ -59,7 +59,11 @@ case "$mode" in
     wait_bg
     ;;
   rest)
-    start_bg "cmd-package" go test -v -race ./cmd
+    cmd_args=(-v)
+    if go_test_race_enabled; then
+      cmd_args+=(-race)
+    fi
+    start_bg "cmd-package" go test "${cmd_args[@]}" ./cmd
     start_bg "internal-cmd-cleanup" \
       run_filtered_tests \
       '^(Test(CleanupCommand|CleanupCommandDirectStore|RecordEarlyFailure))$' \

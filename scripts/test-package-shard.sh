@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+source "$(dirname "$0")/test-shard-lib.sh"
+
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 <include-regex> [exclude-regex]" >&2
   exit 1
@@ -45,8 +47,11 @@ printf '%s\n' "${packages[@]}"
 
 args=(
   -v
-  -race
 )
+
+if go_test_race_enabled; then
+  args+=(-race)
+fi
 
 if [[ -n "${TEST_GO_PARALLEL:-}" ]]; then
   args+=(-parallel "${TEST_GO_PARALLEL}")

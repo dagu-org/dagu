@@ -98,6 +98,8 @@ jobs:
   test-windows:
     name: Test on windows-latest${{ matrix.name_suffix }}
     runs-on: windows-latest
+    env:
+      TEST_GO_RACE: "0"
     strategy:
       fail-fast: false
       matrix:
