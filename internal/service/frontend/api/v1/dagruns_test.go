@@ -1220,11 +1220,11 @@ func TestExecuteDAGSyncWithWaitingStatus(t *testing.T) {
 	server := test.SetupServer(t)
 
 	// Create a DAG with approval step that will wait for approval
-	dagSpec := `steps:
+	dagSpec := fmt.Sprintf(`steps:
   - name: wait-step
-    command: "true"
+    command: %q
     approval:
-      prompt: "Approve this"`
+      prompt: "Approve this"`, test.PortableSuccessCommand())
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "sync_waiting_dag",
