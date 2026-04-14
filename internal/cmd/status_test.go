@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -290,11 +291,11 @@ steps:
 			// Windows CI pays a large per-step shell startup cost.
 			stepCount = 4
 		}
-		var dagContent string
+		var dagContent strings.Builder
 		for i := range stepCount {
-			dagContent += fmt.Sprintf("  - name: \"step%d\"\n    command: \"echo 'Step %d'\"\n", i+1, i+1)
+			dagContent.WriteString(fmt.Sprintf("  - name: \"step%d\"\n    command: \"echo 'Step %d'\"\n", i+1, i+1))
 		}
-		dagFile := th.DAG(t, "steps:\n"+dagContent)
+		dagFile := th.DAG(t, "steps:\n"+dagContent.String())
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
