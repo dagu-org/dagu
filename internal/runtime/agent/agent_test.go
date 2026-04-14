@@ -134,7 +134,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Set a precondition that always fails
 		dag.Preconditions = []*core.Condition{
-			{Condition: "`echo 1`", Expected: "0"},
+			{Condition: test.PortableCommandSubstitution(test.PortableOutputCommand("1")), Expected: "0"},
 		}
 
 		dagAgent := dag.Agent()
@@ -214,9 +214,13 @@ steps:
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
+		releaseFile := filepath.Join(t.TempDir(), "release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
-`, test.PortableSleepCommand(3*time.Second)))
+`, test.PortableWaitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 		done := make(chan struct{})
 
@@ -231,7 +235,11 @@ steps:
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
 
-		<-done
+		select {
+		case <-done:
+		case <-time.After(30 * time.Second):
+			t.Fatal("timed out waiting for DAG cancellation")
+		}
 
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, core.Aborted)

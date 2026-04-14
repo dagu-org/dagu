@@ -201,13 +201,31 @@ func TestSessionManager_AcceptUserMessage(t *testing.T) {
 	t.Run("starts loop and queues message", func(t *testing.T) {
 		t.Parallel()
 
-		provider := newStopProvider("hi")
+		entered := make(chan struct{})
+		provider := &mockLLMProvider{
+			chatFunc: func(ctx context.Context, _ *llm.ChatRequest) (*llm.ChatResponse, error) {
+				select {
+				case <-entered:
+				default:
+					close(entered)
+				}
+				<-ctx.Done()
+				return nil, ctx.Err()
+			},
+		}
 
 		sm := NewSessionManager(SessionManagerConfig{})
 		err := sm.AcceptUserMessage(context.Background(), provider, "config-id", "provider-model", "hello")
 
 		require.NoError(t, err)
-		assert.True(t, sm.IsWorking())
+		select {
+		case <-entered:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for active turn")
+		}
+		require.Eventually(t, func() bool {
+			return sm.IsWorking()
+		}, time.Second, 10*time.Millisecond)
 
 		_ = sm.Cancel(context.Background())
 	})
