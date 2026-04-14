@@ -119,11 +119,9 @@ jobs:
       - name: Test (Windows)
         shell: bash
         run: |
-          GOBIN="$(pwd)/.local/bin" go install gotest.tools/gotestsum
-          GOEXE="$(go env GOEXE)"
           go clean -testcache
-          "./.local/bin/gotestsum${GOEXE}" --format=standard-quiet -- \
-            -v \
+          go test \
+            -json \
             -timeout=20m \
             -ldflags=-extldflags=-Wl \
             ./...

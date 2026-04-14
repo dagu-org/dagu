@@ -477,9 +477,8 @@ func stableCurrentMinute(t *testing.T) time.Time {
 
 	now := time.Now().UTC()
 	if now.Second() >= 50 {
-		nextSafe := now.Truncate(time.Minute).Add(time.Minute + 2*time.Second)
-		time.Sleep(time.Until(nextSafe))
+		return now.Truncate(time.Minute).Add(-time.Minute)
 	}
 
-	return time.Now().UTC().Truncate(time.Minute)
+	return now.Truncate(time.Minute)
 }
