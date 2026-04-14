@@ -30,10 +30,6 @@ func shellTestPath(path string) string {
 	return filepath.ToSlash(path)
 }
 
-func cmdTestQuote(value string) string {
-	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
-}
-
 func windowsShellTest() bool {
 	return os.PathSeparator == '\\'
 }
@@ -43,13 +39,7 @@ func trimmedCounterReadCommand(counterFile string) string {
 }
 
 func repeatCounterValueCondition(counterFile string) string {
-	if windowsShellTest() {
-		return fmt.Sprintf(
-			"`for /f usebackq delims^= %%A in (%s) do @echo %%A`",
-			cmdTestQuote(counterFile),
-		)
-	}
-	return fmt.Sprintf("`%s`", trimmedCounterReadCommand(counterFile))
+	return test.PortableCommandSubstitution(trimmedCounterReadCommand(counterFile))
 }
 
 func repeatConditionMutationTimeout() time.Duration {
@@ -69,27 +59,6 @@ func readRepeatCounterValue(t *testing.T, counterFile string) int {
 	require.NoError(t, err)
 
 	return value
-}
-
-func waitForRepeatCounterAtLeast(counterFile string, minCount int, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for {
-		data, err := os.ReadFile(counterFile)
-		switch {
-		case err == nil:
-			value, convErr := strconv.Atoi(strings.TrimSpace(string(data)))
-			if convErr == nil && value >= minCount {
-				return true
-			}
-		case !os.IsNotExist(err):
-			return false
-		}
-
-		if time.Now().After(deadline) {
-			return false
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
 }
 
 func repeatCounterEqualsCommand(counterFile, expected string) string {
