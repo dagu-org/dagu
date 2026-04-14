@@ -436,7 +436,7 @@ steps:
 				return false
 			}
 			return status.Status == core.Succeeded && status.DAGRunID == originalRunID
-		}, 25*time.Second, 200*time.Millisecond, "Retry should complete with same run ID")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Retry should complete with same run ID")
 
 		finalStatus, err := f.latestStatus()
 		require.NoError(t, err)

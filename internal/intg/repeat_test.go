@@ -23,7 +23,7 @@ func repeatPolicyTimeout(base time.Duration) time.Duration {
 		if raceEnabled() {
 			return intgTestTimeout(base * 6)
 		}
-		return intgTestTimeout(base * 2)
+		return intgTestTimeout(base * 4)
 	}
 	return base
 }

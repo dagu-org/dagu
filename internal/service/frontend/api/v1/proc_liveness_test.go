@@ -29,7 +29,7 @@ const (
 
 func apiProcEventuallyTimeout(base time.Duration) time.Duration {
 	if runtime.GOOS == "windows" {
-		return base * 3
+		return base * 6
 	}
 	return base
 }

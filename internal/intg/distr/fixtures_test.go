@@ -65,7 +65,9 @@ func distrTestTimeout(timeout time.Duration) time.Duration {
 	switch {
 	case goruntime.GOOS == "windows" && raceEnabled():
 		return timeout * 5
-	case goruntime.GOOS == "windows" || raceEnabled():
+	case goruntime.GOOS == "windows":
+		return timeout * 4
+	case raceEnabled():
 		return timeout * 2
 	default:
 		return timeout

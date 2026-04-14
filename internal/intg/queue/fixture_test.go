@@ -111,7 +111,9 @@ func queueTestTimeout(timeout time.Duration) time.Duration {
 	switch {
 	case runtime.GOOS == "windows" && raceEnabled():
 		return timeout * 8
-	case runtime.GOOS == "windows" || raceEnabled():
+	case runtime.GOOS == "windows":
+		return timeout * 4
+	case raceEnabled():
 		return timeout * 2
 	default:
 		return timeout

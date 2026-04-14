@@ -80,6 +80,12 @@ case "$mode" in
   b)
     setup_test_binary ./internal/intg/distr
     trap cleanup_test_binary EXIT
+    echo "Starting intg-distr-proc-heartbeat"
+    TEST_GO_PARALLEL=1 run_filtered_tests \
+      '^(TestExecution_ProcHeartbeat_.*)' \
+      ''
+    echo "Finished intg-distr-proc-heartbeat"
+
     start_bg "intg-distr-parallel" \
       run_filtered_tests \
       '^(Test(Parallel_.*))' \
@@ -87,10 +93,6 @@ case "$mode" in
     start_bg "intg-distr-params" \
       run_filtered_tests \
       '^(Test(Params_.*))' \
-      ''
-    start_bg "intg-distr-proc-heartbeat" \
-      run_filtered_tests \
-      '^(TestExecution_ProcHeartbeat_.*)' \
       ''
     wait_bg
     TEST_GO_PARALLEL=1 run_filtered_tests \
