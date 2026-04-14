@@ -266,8 +266,10 @@ steps:
 
 		th := test.Setup(t)
 
-		// Create a custom working directory
-		workDir := t.TempDir()
+		// Keep the working dir under the helper temp root so Windows cleanup
+		// does not fail while the runtime is still releasing file handles.
+		workDir := filepath.Join(th.Config.Paths.DataDir, "relative-secret-working-dir")
+		require.NoError(t, os.MkdirAll(workDir, 0750))
 		secretValue := "relative-path-secret-999"
 
 		// Create secret file directly in the working directory
@@ -354,8 +356,10 @@ steps:
 
 		th := test.Setup(t)
 
-		// Create a working directory that's different from where the DAG file is
-		workDir := t.TempDir()
+		// Keep the working dir under the helper temp root so Windows cleanup
+		// does not fail while the runtime is still releasing file handles.
+		workDir := filepath.Join(th.Config.Paths.DataDir, "dag-location-secret-working-dir")
+		require.NoError(t, os.MkdirAll(workDir, 0750))
 
 		secretValue := "dag-location-secret-123"
 
