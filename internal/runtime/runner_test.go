@@ -49,21 +49,6 @@ func repeatConditionMutationTimeout() time.Duration {
 	return 5 * time.Second
 }
 
-func waitForRepeatCounterAtLeast(counterFile string, min int, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		data, err := os.ReadFile(counterFile)
-		if err == nil {
-			value, convErr := strconv.Atoi(strings.TrimSpace(string(data)))
-			if convErr == nil && value >= min {
-				return true
-			}
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	return false
-}
-
 func readRepeatCounterValue(t *testing.T, counterFile string) int {
 	t.Helper()
 
