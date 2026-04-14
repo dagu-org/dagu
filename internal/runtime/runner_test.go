@@ -39,6 +39,13 @@ func trimmedCounterReadCommand(counterFile string) string {
 }
 
 func repeatCounterValueCondition(counterFile string) string {
+	if windowsShellTest() {
+		return test.PortableCommandSubstitution(fmt.Sprintf(
+			"if (Test-Path %s) { [System.IO.File]::ReadAllText(%s).TrimEnd([char]13,[char]10) } else { '' }",
+			test.PowerShellQuote(counterFile),
+			test.PowerShellQuote(counterFile),
+		))
+	}
 	return test.PortableCommandSubstitution(trimmedCounterReadCommand(counterFile))
 }
 
@@ -117,25 +124,25 @@ func repeatCounterScript(counterFile string, emitCount bool) string {
 				`, repeatCounterSetupScript(counterFile), emitLine)
 }
 
-func repeatCounterThenSleepScript(counterFile string, sleepAfterCount int, sleepDuration time.Duration) string {
+func repeatCounterThenSleepScript(counterFile string, _ int, sleepDuration time.Duration) string {
 	if windowsShellTest() {
 		return fmt.Sprintf(`
-					%s
-					$COUNT = $COUNT + 1
-					Set-Content -Path $counterFile -Value $COUNT -NoNewline
-					if ($COUNT -ge %d) {
+					$counterFile = %s
+					if (Test-Path $counterFile) {
 						%s
+					} else {
+						New-Item -ItemType File -Path $counterFile -Force | Out-Null
 					}
-				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.PortableSleepCommand(sleepDuration))
+				`, test.PowerShellQuote(counterFile), test.PortableSleepCommand(sleepDuration))
 	}
 	return fmt.Sprintf(`
-					%s
-					COUNT=$((COUNT + 1))
-					printf '%%s' "$COUNT" > "$COUNTER_FILE"
-					if [ "$COUNT" -ge %d ]; then
+					COUNTER_FILE="%s"
+					if [ -f "$COUNTER_FILE" ]; then
 						%s
+					else
+						: > "$COUNTER_FILE"
 					fi
-				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.PortableSleepCommand(sleepDuration))
+				`, shellTestPath(counterFile), test.PortableSleepCommand(sleepDuration))
 }
 
 func repeatCounterExitCodeScript(counterFile string) string {
