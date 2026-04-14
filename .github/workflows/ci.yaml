@@ -96,114 +96,10 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   test-windows:
-    name: Test on windows-latest${{ matrix.name_suffix }}
+    name: Test on windows-latest
     runs-on: windows-latest
     env:
       TEST_GO_RACE: "0"
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name_suffix: " (core-cmd-start)"
-            test_command: |
-              ./scripts/test-core-cmd-start-shards.sh
-          - name_suffix: " (core-cmd-status)"
-            test_command: |
-              ./scripts/test-cmd-rest-shards.sh status
-          - name_suffix: " (core-cmd-rest)"
-            test_command: |
-              ./scripts/test-cmd-rest-shards.sh rest
-          - name_suffix: " (core-packages-a)"
-            test_command: |
-              ./scripts/test-core-package-shards.sh a
-          - name_suffix: " (core-packages-b)"
-            test_command: |
-              ./scripts/test-core-package-shards.sh b
-          - name_suffix: " (core-packages-c)"
-            test_command: |
-              ./scripts/test-core-package-shards.sh c
-          - name_suffix: " (core-runtime-base-a-early)"
-            test_command: |
-              ./scripts/test-runtime-shards.sh base-a-early
-          - name_suffix: " (core-runtime-base-a-rest)"
-            test_command: |
-              ./scripts/test-runtime-shards.sh base-a-rest
-          - name_suffix: " (core-runtime-base-a-retry-output)"
-            test_command: |
-              ./scripts/test-runtime-shards.sh base-a-retry-output
-          - name_suffix: " (core-runtime-base-b-policies-advanced)"
-            test_command: |
-              ./scripts/test-runtime-shards.sh base-b-policies-advanced
-          - name_suffix: " (core-runtime-base-b-agent)"
-            test_command: |
-              ./scripts/test-runtime-shards.sh base-b-agent
-          - name_suffix: " (core-runtime-base-b-refs-chatwait)"
-            test_command: |
-              ./scripts/test-runtime-shards.sh base-b-refs
-          - name_suffix: " (core-service-api)"
-            test_command: |
-              ./scripts/test-service-api-windows.sh
-          - name_suffix: " (core-service-and-agent)"
-            test_command: |
-              ./scripts/test-service-and-agent-windows.sh
-          - name_suffix: " (intg-approval)"
-            test_command: |
-              ./scripts/test-intg-group-shards.sh approval
-          - name_suffix: " (intg-history)"
-            test_command: |
-              ./scripts/test-intg-group-shards.sh history
-          - name_suffix: " (intg-general-core)"
-            test_command: |
-              ./scripts/test-intg-group-shards.sh general-core
-          - name_suffix: " (intg-service-docker)"
-            test_command: |
-              ./scripts/test-intg-group-shards.sh service-docker
-          - name_suffix: " (intg-data-subdag)"
-            test_command: |
-              ./scripts/test-intg-group-shards.sh data-subdag
-          - name_suffix: " (intg-parallel-core)"
-            test_command: |
-              ./scripts/test-intg-parallel-windows.sh core
-          - name_suffix: " (intg-parallel-extras)"
-            test_command: |
-              ./scripts/test-intg-parallel-windows.sh extras
-          - name_suffix: " (intg-rest-a-m)"
-            test_command: |
-              ./scripts/test-intg-rest-a-m-windows.sh
-          - name_suffix: " (intg-rest-n-r)"
-            test_command: |
-              ./scripts/test-shard-split.sh ./internal/intg 5 \
-                '^Test([N-R].*)' \
-                '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))'
-          - name_suffix: " (intg-rest-s)"
-            test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg 5 \
-                '^Test(S.*)' \
-                '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))'
-          - name_suffix: " (intg-rest-t-z)"
-            test_command: |
-              TEST_GO_PARALLEL=2 ./scripts/test-shard-split.sh ./internal/intg 4 \
-                '^Test([T-Z].*)' \
-                '^(Test(WaitStepApproval|ApprovalField|HistoryCommand_|DockerExecutor(_.*)?|DAGLevelContainer|StepLevelContainer|Container.*|DAGLevelRedis|MinIOContainer_.*|SFTPExecutorIntegration|SSHExecutorIntegration|RouterExecutor|RouterComplexScenarios|RouterStepStatus|RouterValidation|Server_.*|MailConfigEnvExpansion|WebhookPayloadEnv|JQExecutor|ShellExecution|SQLExecutor_.*|TemplateExecutor|WorkingDirectoryResolution|CallSubDAG|NestedThreeLevelDAG|LargeOutput_128KB|OutputsCollection(_.*)?|OutputValidation_.*|ParamValidation_.*|NoSchema_NoRegression|FullPipeline_ParamAndOutputValidation|Params_.*|InlineParams_.*|Issue1182_.*|Issue1252_.*|ParallelExecution_.*|Issue1274_.*|Issue1658_.*|Issue1790_ParallelCallPathItemResolution))'
-          - name_suffix: " (intg-distr-a-core)"
-            test_command: |
-              ./scripts/test-intg-distr-shards.sh a-core
-          - name_suffix: " (intg-distr-a-retry)"
-            test_command: |
-              ./scripts/test-intg-distr-shards.sh a-retry
-          - name_suffix: " (intg-distr-b)"
-            test_command: |
-              ./scripts/test-intg-distr-shards.sh b
-          - name_suffix: " (intg-distr-c)"
-            test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg/distr 1 \
-                '^(Test(CustomStepTypes_.*|SubDAG_.*|DistributedRun_.*))' \
-                ''
-          - name_suffix: " (intg-distr-heavy)"
-            test_command: |
-              TEST_GO_PARALLEL=1 ./scripts/test-shard-split.sh ./internal/intg/distr 1 \
-                '^TestExecution_QueuedDispatch_ConsumesOneThousandItems$' \
-                ''
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -223,16 +119,11 @@ jobs:
       - name: Test (Windows)
         shell: bash
         run: |
-          chmod +x ./scripts/test-shard.sh
-          chmod +x ./scripts/test-shard-split.sh
-          chmod +x ./scripts/test-package-shard.sh
-          chmod +x ./scripts/test-core-cmd-start-shards.sh
-          chmod +x ./scripts/test-cmd-rest-shards.sh
-          chmod +x ./scripts/test-agent-shards.sh
-          chmod +x ./scripts/test-core-package-shards.sh
-          chmod +x ./scripts/test-intg-group-shards.sh
-          chmod +x ./scripts/test-intg-parallel-windows.sh
-          chmod +x ./scripts/test-intg-rest-a-m-windows.sh
-          chmod +x ./scripts/test-intg-distr-shards.sh
-          chmod +x ./scripts/test-runtime-shards.sh
-          ${{ matrix.test_command }}
+          GOBIN="$(pwd)/.local/bin" go install gotest.tools/gotestsum
+          GOEXE="$(go env GOEXE)"
+          go clean -testcache
+          "./.local/bin/gotestsum${GOEXE}" --format=standard-quiet -- \
+            -v \
+            -timeout=20m \
+            -ldflags=-extldflags=-Wl \
+            ./...

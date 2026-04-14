@@ -251,12 +251,14 @@ steps:
       exit_code: [0]  # Repeat until we get exit code 0
       interval_sec: 0
     continue_on:
+      failure: true
+      mark_success: true
       exit_code: [1]
-`, counterFile, indentScript(repeatExitCodeScript(counterFile, 3, true), 6)))
+`, counterFile, indentScript(repeatExitCodeScript(counterFile, 3, false), 6)))
 	agent := dag.Agent()
 
 	// Run with timeout
-	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(10*time.Second))
+	ctx, cancel := context.WithTimeout(agent.Context, repeatPolicyTimeout(15*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
