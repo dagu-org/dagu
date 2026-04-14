@@ -124,25 +124,25 @@ func repeatCounterScript(counterFile string, emitCount bool) string {
 				`, repeatCounterSetupScript(counterFile), emitLine)
 }
 
-func repeatCounterThenSleepScript(counterFile string, _ int, sleepDuration time.Duration) string {
+func repeatCounterThenSleepScript(counterFile string, sleepAfterCount int, sleepDuration time.Duration) string {
 	if windowsShellTest() {
 		return fmt.Sprintf(`
-					$counterFile = %s
-					if (Test-Path $counterFile) {
+					%s
+					$COUNT = $COUNT + 1
+					Set-Content -Path $counterFile -Value $COUNT -NoNewline
+					if ($COUNT -ge %d) {
 						%s
-					} else {
-						New-Item -ItemType File -Path $counterFile -Force | Out-Null
 					}
-				`, test.PowerShellQuote(counterFile), test.PortableSleepCommand(sleepDuration))
+				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.PortableSleepCommand(sleepDuration))
 	}
 	return fmt.Sprintf(`
-					COUNTER_FILE="%s"
-					if [ -f "$COUNTER_FILE" ]; then
+					%s
+					COUNT=$((COUNT + 1))
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"
+					if [ "$COUNT" -ge %d ]; then
 						%s
-					else
-						: > "$COUNTER_FILE"
 					fi
-				`, shellTestPath(counterFile), test.PortableSleepCommand(sleepDuration))
+				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.PortableSleepCommand(sleepDuration))
 }
 
 func repeatCounterExitCodeScript(counterFile string) string {
@@ -2044,7 +2044,7 @@ func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
 
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand(repeatCounterThenSleepScript(counterFile, 2, platformTestDuration(3*time.Second, 10*time.Second))),
+			withScript(repeatCounterThenSleepScript(counterFile, 2, platformTestDuration(3*time.Second, 10*time.Second))),
 			withRepeatPolicy(true, 20*time.Millisecond),
 		),
 	)
