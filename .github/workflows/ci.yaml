@@ -119,7 +119,6 @@ jobs:
       - name: Test (Windows)
         shell: bash
         run: |
-          go clean -testcache
           go test \
             -timeout=20m \
             -ldflags=-extldflags=-Wl \
