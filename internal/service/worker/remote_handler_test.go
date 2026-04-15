@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -226,6 +227,56 @@ func (m *mockStreamArtifactsClient) CloseSend() error {
 
 func (m *mockStreamArtifactsClient) Context() context.Context {
 	return m.ctx
+}
+
+func artifactUploadTestDAGContent(name, stepName string, fail bool) string {
+	if runtime.GOOS == "windows" {
+		if fail {
+			return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: cmd
+    command: |
+      > "%%DAG_RUN_ARTIFACTS_DIR%%\\out.txt" <nul set /p =artifact
+      exit /b 1
+`, name, stepName)
+		}
+
+		return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: cmd
+    command: |
+      > "%%DAG_RUN_ARTIFACTS_DIR%%\\out.txt" <nul set /p =artifact
+`, name, stepName)
+	}
+
+	if fail {
+		return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: /bin/sh
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+      exit 1
+`, name, stepName)
+	}
+
+	return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: /bin/sh
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+`, name, stepName)
 }
 
 func (m *mockStreamArtifactsClient) SendMsg(any) error {
@@ -1814,15 +1865,7 @@ func TestExecuteDAGRun_FailedExecutionStillUploadsArtifacts(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dagContent := `name: remote-handler-failure-artifacts
-artifacts:
-  enabled: true
-steps:
-  - name: fail-step
-    command: |
-      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
-      exit 1
-`
+	dagContent := artifactUploadTestDAGContent("remote-handler-failure-artifacts", "fail-step", true)
 	dag := th.DAG(t, dagContent)
 
 	stream := newMockStreamArtifactsClient()
@@ -1872,14 +1915,7 @@ func TestExecuteDAGRun_ArtifactUploadFailureMarksRunFailed(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dagContent := `name: remote-handler-upload-failure
-artifacts:
-  enabled: true
-steps:
-  - name: write-artifact
-    command: |
-      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
-`
+	dagContent := artifactUploadTestDAGContent("remote-handler-upload-failure", "write-artifact", false)
 	dag := th.DAG(t, dagContent)
 
 	stream := newMockStreamArtifactsClient()
@@ -1935,15 +1971,7 @@ func TestExecuteDAGRun_FailedExecutionWithArtifactUploadFailurePreservesFailedSt
 
 	th := test.Setup(t)
 
-	dagContent := `name: remote-handler-failure-upload-failure
-artifacts:
-  enabled: true
-steps:
-  - name: fail-step
-    command: |
-      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
-      exit 1
-`
+	dagContent := artifactUploadTestDAGContent("remote-handler-failure-upload-failure", "fail-step", true)
 	dag := th.DAG(t, dagContent)
 
 	stream := newMockStreamArtifactsClient()

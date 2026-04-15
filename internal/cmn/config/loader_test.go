@@ -861,7 +861,7 @@ paths:
   artifact_dir: "/custom/artifacts"
 `)
 
-	assert.Equal(t, "/custom/artifacts", cfg.Paths.ArtifactDir)
+	assert.Equal(t, resolvedTestPath(t, "/custom/artifacts"), cfg.Paths.ArtifactDir)
 }
 
 func TestLoad_ArtifactDirFromEnv(t *testing.T) {
@@ -869,7 +869,7 @@ func TestLoad_ArtifactDirFromEnv(t *testing.T) {
 		"DAGU_ARTIFACT_DIR": "/env/artifacts",
 	})
 
-	assert.Equal(t, "/env/artifacts", cfg.Paths.ArtifactDir)
+	assert.Equal(t, resolvedTestPath(t, "/env/artifacts"), cfg.Paths.ArtifactDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {
