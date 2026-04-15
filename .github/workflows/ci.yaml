@@ -250,6 +250,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Build (Windows)
+        shell: bash
+        run: |
+          mkdir -p ./.local/bin
+          go build -o ./.local/bin/dagu.exe ./cmd
+
       - name: Test (Windows)
         shell: bash
         run: |
