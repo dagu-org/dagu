@@ -426,8 +426,12 @@ steps:
 
 func TestParallelExecution_AbortStopsPendingLaunches(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
+	releaseFile := filepath.Join(t.TempDir(), "parallel-abort.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 
-	dag := th.DAG(t, `type: graph
+	dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
   - name: process-items
     call: child-slow
@@ -444,8 +448,9 @@ params:
   - ITEM: ""
 steps:
   - name: hold
-    command: sleep 30
-`)
+    command: |
+%s
+`, indentTestScript(waitForFileCommand(releaseFile), 6)))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -1240,7 +1245,6 @@ steps:
       echo "Deploying ${SERVICE_NAME}..."
       echo "  - Binding to port ${PORT}"
       echo "  - Scaling to ${REPLICAS} replicas"
-      sleep 1
       if [ "${SERVICE_NAME}" = "api-service" ]; then
         echo "ERROR: Failed to deploy ${SERVICE_NAME} - port ${PORT} already in use"
         exit 1
@@ -1291,7 +1295,6 @@ steps:
       Write-Output ("Deploying {0}..." -f "${SERVICE_NAME}")
       Write-Output ("  - Binding to port {0}" -f "${PORT}")
       Write-Output ("  - Scaling to {0} replicas" -f "${REPLICAS}")
-      Start-Sleep -Seconds 1
       if ("${SERVICE_NAME}" -eq "api-service") {
         Write-Output ("ERROR: Failed to deploy {0} - port {1} already in use" -f "${SERVICE_NAME}", "${PORT}")
         exit 1

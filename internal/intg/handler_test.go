@@ -5,13 +5,11 @@ package intg_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -291,10 +289,7 @@ handler_on:
 steps:
   - name: long-running
     command: |
-`+indentTestScript(test.ForOS(
-		fmt.Sprintf("while [ ! -f %s ]; do\n  true\n  sleep 0.05\ndone", test.PosixQuote(releaseFile)),
-		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(releaseFile)),
-	), 6)+`
+`+indentTestScript(waitForFileCommand(releaseFile), 6)+`
 `)
 
 	// Verify parsing: abort field maps to the canonical abort handler
@@ -581,6 +576,10 @@ steps:
 	t.Run("AbortHandler_AllEnvVars", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
+		releaseFile := filepath.Join(t.TempDir(), "abort-env.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
 
 		dag := th.DAG(t, `
 handler_on:
@@ -591,7 +590,8 @@ handler_on:
 
 steps:
   - name: long-running
-    command: `+test.Sleep(10*time.Second)+`
+    command: |
+`+indentTestScript(waitForFileCommand(releaseFile), 6)+`
 `)
 		dagAgent := dag.Agent()
 

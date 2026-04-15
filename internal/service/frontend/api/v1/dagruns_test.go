@@ -40,6 +40,13 @@ func dagRunSyncTimeoutSeconds() int {
 	return 30
 }
 
+func holdUntilFileExistsCommand(path string) string {
+	return test.ForOS(
+		fmt.Sprintf("while [ ! -f %s ]; do\n  sleep 0.05\ndone", test.PosixQuote(path)),
+		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(path)),
+	)
+}
+
 func waitForDAGRunStatus(
 	t *testing.T,
 	server test.Server,
@@ -1204,11 +1211,16 @@ func TestExecuteDAGSync(t *testing.T) {
 
 func TestExecuteDAGSyncTimeout(t *testing.T) {
 	server := test.SetupServer(t)
+	releaseFile := filepath.Join(t.TempDir(), "sync-timeout.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 
 	// Create a DAG with a step that takes longer than the timeout
-	dagSpec := `steps:
+	dagSpec := fmt.Sprintf(`steps:
   - name: slow-step
-    command: "sleep 10"`
+    command: |
+%s`, indentCommandBlock(holdUntilFileExistsCommand(releaseFile), 6))
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "sync_timeout_dag",
@@ -1227,6 +1239,11 @@ func TestExecuteDAGSyncTimeout(t *testing.T) {
 	require.Contains(t, errBody.Message, "timeout")
 	require.Contains(t, errBody.Message, "DAG run continues in background")
 	require.NotEmpty(t, errBody.DagRunId, "408 response should include dagRunId for tracking")
+
+	require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
+	waitForDAGRunStatus(t, server, "sync_timeout_dag", errBody.DagRunId, 15*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Succeeded
+	})
 }
 
 func TestExecuteDAGSyncWithWaitingStatus(t *testing.T) {
@@ -1354,11 +1371,16 @@ func assertRescheduleSpecSourceFlag(t *testing.T, server test.Server, dagName, d
 
 func TestExecuteDAGSyncSingleton(t *testing.T) {
 	server := test.SetupServer(t)
+	releaseFile := filepath.Join(t.TempDir(), "sync-singleton.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 
 	// Create a DAG with a slow step
-	dagSpec := `steps:
+	dagSpec := fmt.Sprintf(`steps:
   - name: slow-step
-    command: "sleep 5"`
+    command: |
+%s`, indentCommandBlock(holdUntilFileExistsCommand(releaseFile), 6))
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "sync_singleton_dag",
@@ -1380,6 +1402,11 @@ func TestExecuteDAGSyncSingleton(t *testing.T) {
 		Timeout:   timeout,
 		Singleton: &singleton,
 	}).ExpectStatus(http.StatusConflict).Send(t)
+
+	require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
+	waitForDAGRunStatus(t, server, "sync_singleton_dag", startBody.DagRunId, 15*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Succeeded
+	})
 }
 
 func TestListDAGRunsFilterByTags(t *testing.T) {

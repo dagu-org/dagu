@@ -569,7 +569,7 @@ steps:
   - name: step1
     command: echo "direct start"
   - name: step2
-    command: sleep 0.1
+    command: echo "done"
     depends: [step1]
 `, withWorkerMode(sharedFSMode))
 		defer f.cleanup()
@@ -592,7 +592,7 @@ steps:
   - name: step1
     command: echo "no name field"
   - name: step2
-    command: sleep 0.1
+    command: echo "done"
     depends: [step1]
 `, withWorkerMode(sharedFSMode))
 		defer f.cleanup()

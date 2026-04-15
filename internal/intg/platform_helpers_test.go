@@ -5,12 +5,14 @@ package intg_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/test"
 	"github.com/moby/moby/client"
 )
 
@@ -55,6 +57,13 @@ func indentTestScript(script string, spaces int) string {
 		lines[i] = indent + line
 	}
 	return strings.Join(lines, "\n")
+}
+
+func waitForFileCommand(path string) string {
+	return test.ForOS(
+		fmt.Sprintf("while [ ! -f %s ]; do\n  sleep 0.05\ndone", test.PosixQuote(path)),
+		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(path)),
+	)
 }
 
 func requireLinuxContainerRuntime(t *testing.T) {

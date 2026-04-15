@@ -28,10 +28,7 @@ func TestAPITerminateLocalRun_DoesNotRequireCoordinator(t *testing.T) {
   - name: hold
     command: |
 %s
-`, indentTestScript(test.ForOS(
-		fmt.Sprintf("while [ ! -f %s ]; do\n  true\n  sleep 0.05\ndone", test.PosixQuote(releaseFile)),
-		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(releaseFile)),
-	), 6))
+`, indentTestScript(waitForFileCommand(releaseFile), 6))
 
 	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,

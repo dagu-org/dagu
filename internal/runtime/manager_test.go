@@ -27,7 +27,7 @@ func TestManager(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 		ctx := th.Context
 
@@ -153,7 +153,7 @@ steps:
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 		ctx := th.Context
 		cli := th.DAGRunMgr
@@ -169,7 +169,7 @@ steps:
 	t.Run("GetLatestStatusRepairsStaleRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -201,7 +201,7 @@ steps:
 	t.Run("GetSavedStatusRepairsStaleRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -229,7 +229,7 @@ steps:
 	t.Run("GetLatestStatusKeepsFreshRunDuringStartupGrace", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -257,7 +257,7 @@ steps:
 	t.Run("GetSavedStatusKeepsFreshRunDuringStartupGrace", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -281,7 +281,7 @@ steps:
 	t.Run("GetSavedStatusDoesNotRepairDistributedRunWhenLeaseMissing", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -310,7 +310,7 @@ steps:
 	t.Run("GetLatestStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -340,7 +340,7 @@ steps:
 	t.Run("GetCurrentStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -370,7 +370,7 @@ steps:
 	t.Run("GetLatestStatusDoesNotRepairDistributedRunWhenLeaseMissing", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()

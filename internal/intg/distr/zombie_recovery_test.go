@@ -39,18 +39,31 @@ func delayedAfterAckFailureTimeout(mode workerMode) time.Duration {
 	return 20 * time.Second
 }
 
+func waitForReleaseFileScript(path string) string {
+	return test.ForOS(
+		fmt.Sprintf("while [ ! -f %s ]; do\n  sleep 0.05\ndone", test.PosixQuote(path)),
+		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(path)),
+	)
+}
+
 // TestDistributedRun_WorkerCrash_MarkedFailed verifies that a hard-killed worker
 // is treated as a crash and the coordinator's zombie detector marks the run FAILED.
 func TestDistributedRun_WorkerCrash_MarkedFailed(t *testing.T) {
-	f := newTestFixture(t, `
+	releaseFile := filepath.Join(t.TempDir(), "worker-crash.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
+
+	f := newTestFixture(t, fmt.Sprintf(`
 type: graph
 name: zombie-crash-test
 worker_selector:
   test: "true"
 steps:
   - name: long-step
-    command: sleep 300
-`,
+    command: |
+%s
+`, indentYAMLBlock(waitForReleaseFileScript(releaseFile), 6)),
 		withWorkerCount(0),
 		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
@@ -103,20 +116,22 @@ func TestDistributedRun_DelayedAfterAck_DoesNotExecuteAfterStaleCleanup(t *testi
 func TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive(t *testing.T) {
 	heartbeatThreshold := testStaleHeartbeatThreshold
 	leaseThreshold := testStaleLeaseThreshold
-	sleepDuration := 8 * time.Second
 	freshWindow := 2 * time.Second
 	leaseObservationWindow := leaseThreshold + time.Second
 	finalStatusTimeout := 15 * time.Second
 	if runtime.GOOS == "windows" {
 		heartbeatThreshold = 12 * time.Second
 		leaseThreshold = 20 * time.Second
-		sleepDuration = 45 * time.Second
 		// Windows service startup and timer scheduling can lag enough that the
 		// refreshed lease is still valid but older than the nominal stale window.
 		freshWindow = leaseThreshold + 5*time.Second
 		leaseObservationWindow = leaseThreshold + 3*time.Second
 		finalStatusTimeout = 90 * time.Second
 	}
+	releaseFile := filepath.Join(t.TempDir(), "quiet-heartbeat.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 
 	f := newTestFixture(t, fmt.Sprintf(`
 type: graph
@@ -125,8 +140,9 @@ worker_selector:
   test: "true"
 steps:
   - name: long-step
-    command: %s
-`, test.ShellQuote(test.Sleep(sleepDuration))),
+    command: |
+%s
+`, indentYAMLBlock(waitForReleaseFileScript(releaseFile), 6)),
 		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
@@ -159,6 +175,7 @@ steps:
 		// The Windows signal/file-handle path is flaky after this point, but the
 		// behavior under test is already proven: coordinator heartbeats refreshed
 		// the lease while the quiet run remained active.
+		require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 		return
 	}
 	require.Eventually(t, func() bool {
@@ -170,6 +187,7 @@ steps:
 	lease = waitForLease(t, f, status.AttemptKey, 5*time.Second)
 	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
 
+	require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 	finalStatus := f.waitForStatus(core.Succeeded, finalStatusTimeout)
 	assert.Equal(t, core.Succeeded, finalStatus.Status)
 }
@@ -185,6 +203,10 @@ func TestDistributedRun_QueueConcurrency_ActiveRunCounted(t *testing.T) {
 		leaseThreshold = 6 * time.Second
 		completionTimeout = 45 * time.Second
 	}
+	releaseFile := filepath.Join(t.TempDir(), "queue-concurrency.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 
 	f := newTestFixture(t, fmt.Sprintf(`
 type: graph
@@ -194,8 +216,9 @@ worker_selector:
   test: "true"
 steps:
   - name: long-step
-    command: %s
-`, test.ShellQuote(test.Sleep(8*time.Second))),
+    command: |
+%s
+`, indentYAMLBlock(waitForReleaseFileScript(releaseFile), 6)),
 		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
@@ -274,6 +297,7 @@ steps:
 		}, 2*time.Second, 200*time.Millisecond, "distributed lease should keep one active run and leave one queued item")
 	}
 
+	require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 	require.Eventually(t, func() bool {
 		statuses, err := f.coord.DAGRunStore.ListStatuses(
 			f.coord.Context,
@@ -345,15 +369,21 @@ steps:
 // TestDistributedRun_CoordinatorOwnsSharedLease verifies that distributed runs
 // create a shared lease while active and remove it after completion.
 func TestDistributedRun_CoordinatorOwnsSharedLease(t *testing.T) {
-	f := newTestFixture(t, `
+	releaseFile := filepath.Join(t.TempDir(), "lease-stamp.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
+
+	f := newTestFixture(t, fmt.Sprintf(`
 type: graph
 name: lease-stamp-test
 worker_selector:
   test: "true"
 steps:
   - name: step1
-    command: sleep 3
-`,
+    command: |
+%s
+`, indentYAMLBlock(waitForReleaseFileScript(releaseFile), 6)),
 	)
 	defer f.cleanup()
 
@@ -377,6 +407,7 @@ steps:
 	assert.Equal(t, "test-coordinator", lease.Owner.ID)
 	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), 5*time.Second)
 
+	require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 	finalStatus := f.waitForStatus(core.Succeeded, 20*time.Second)
 	require.Equal(t, core.Succeeded, finalStatus.Status)
 
