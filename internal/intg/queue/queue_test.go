@@ -65,8 +65,10 @@ func TestGlobalConcurrency(t *testing.T) {
 		sleepDuration = 12 * time.Second
 		maxDiff = 10 * time.Second
 	case runtime.GOOS == "windows":
-		sleepDuration = 4 * time.Second
-		maxDiff = 3 * time.Second
+		// StartedAt is second-granularity in persisted queue statuses, so give
+		// Windows enough overlap budget to avoid false negatives from rounding.
+		sleepDuration = 6 * time.Second
+		maxDiff = 5 * time.Second
 	}
 
 	f := newFixture(t, fmt.Sprintf(`
