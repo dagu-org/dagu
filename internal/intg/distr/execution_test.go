@@ -325,6 +325,19 @@ steps:
 		f.startScheduler(30 * time.Second)
 
 		status := f.waitForStatus(core.Succeeded, waitTimeout)
+		require.Eventually(t, func() bool {
+			latest, err := f.latestStoredStatus()
+			if err != nil || latest.Status != core.Succeeded || len(latest.Nodes) != 3 {
+				return false
+			}
+			for _, node := range latest.Nodes {
+				if node.StartedAt == "" || node.StartedAt == "-" || node.FinishedAt == "" || node.FinishedAt == "-" {
+					return false
+				}
+			}
+			status = latest
+			return true
+		}, waitTimeout, 100*time.Millisecond, "shared-fs subprocess run should persist per-node timestamps before assertions")
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 3)

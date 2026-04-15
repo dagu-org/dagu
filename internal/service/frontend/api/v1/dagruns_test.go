@@ -100,6 +100,20 @@ func waitForStoredDAGRunStatus(
 	return status
 }
 
+func hasNodeWithStatus(status *exec.DAGRunStatus, stepName string, nodeStatus core.NodeStatus) bool {
+	if status == nil {
+		return false
+	}
+
+	for _, node := range status.Nodes {
+		if node.Step.Name == stepName && node.Status == nodeStatus {
+			return true
+		}
+	}
+
+	return false
+}
+
 func postJSONWithConservativeTransport(t *testing.T, server test.Server, path string, body any) (int, []byte) {
 	t.Helper()
 
@@ -464,7 +478,7 @@ steps:
 
 	// Wait for DAG to enter Wait status
 	waitForStoredDAGRunStatus(t, server, "approval_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
-		return status.Status == core.Waiting
+		return status.Status == core.Waiting && hasNodeWithStatus(status, "wait-step", core.NodeWaiting)
 	})
 
 	// Approve the wait step
@@ -517,8 +531,8 @@ steps:
 	require.NotEmpty(t, startBody.DagRunId)
 
 	// Wait for DAG to enter Wait status
-	waitForDAGRunStatus(t, server, "approval_inputs_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
-		return status.Status == core.Waiting
+	waitForStoredDAGRunStatus(t, server, "approval_inputs_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Waiting && hasNodeWithStatus(status, "wait-step", core.NodeWaiting)
 	})
 
 	// Approve with inputs
@@ -536,7 +550,7 @@ steps:
 	require.True(t, approveBody.Resumed)
 
 	// Wait for DAG to complete
-	status := waitForDAGRunStatus(t, server, "approval_inputs_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	status := waitForStoredDAGRunStatus(t, server, "approval_inputs_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Succeeded
 	})
 	require.Len(t, status.Nodes, 2)
@@ -589,8 +603,8 @@ steps:
 	startResp.Unmarshal(t, &startBody)
 
 	// Wait for DAG to enter Wait status
-	waitForDAGRunStatus(t, server, "approval_required_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
-		return status.Status == core.Waiting
+	waitForStoredDAGRunStatus(t, server, "approval_required_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Waiting && hasNodeWithStatus(status, "wait-step", core.NodeWaiting)
 	})
 
 	// Try to approve without required input - should fail

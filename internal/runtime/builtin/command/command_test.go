@@ -202,7 +202,7 @@ func TestBuildPowerShellCommand(t *testing.T) {
 				Shell:            []string{"powershell", "-Command"},
 				ShellCommandArgs: "Get-Date",
 			},
-			expected: expectedPowerShellCommandArgs("powershell", "Get-Date"),
+			expected: []string{"powershell", "-Command", "-NoProfile", "-NonInteractive", powerShellInlineCommand("Get-Date")},
 		},
 		{
 			name: "PowershellWithScript",
