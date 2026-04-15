@@ -6,6 +6,7 @@
  *
  * @module features/dags/components/dag-editor
  */
+import { useCanWrite } from '@/contexts/AuthContext';
 import BorderedBox from '@/ui/BorderedBox';
 import { AlertTriangle, Save, Undo2 } from 'lucide-react';
 import React, { useEffect } from 'react';
@@ -16,7 +17,6 @@ import { useErrorModal } from '../../../../components/ui/error-modal';
 import { useSimpleToast } from '../../../../components/ui/simple-toast';
 import { Tab, Tabs } from '../../../../components/ui/tabs';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useConfig } from '../../../../contexts/ConfigContext';
 import { useSchema } from '../../../../contexts/SchemaContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient, useQuery } from '../../../../hooks/api';
@@ -60,15 +60,13 @@ type Props = {
 function DAGSpec({ fileName, localDags, editorHints }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const editable = useCanWrite();
   const client = useClient();
-  const config = useConfig();
   const { schema: baseSchema } = useSchema();
   const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
   const { setHasUnsavedChanges } = useUnsavedChanges();
 
-  // Editability is derived from permissions; no explicit toggle
-  const editable = !!config.permissions.writeDags;
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState('parent');
 

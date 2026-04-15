@@ -347,7 +347,11 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         <div className="flex-1 flex flex-col min-h-0">
           {activeTab === 'status' && currentDAGRun ? (
             <>
-              <DAGStatus dagRun={currentDAGRun} fileName={fileName || ''} />
+              <DAGStatus
+                dagRun={currentDAGRun}
+                fileName={fileName || ''}
+                artifactEnabled={!!dag.artifacts?.enabled}
+              />
               <div className="h-6 flex-shrink-0" />
             </>
           ) : null}

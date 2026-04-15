@@ -54,6 +54,7 @@ func inspectContainer(ctx context.Context, dockerClient *client.Client, containe
 }
 
 func TestDockerExecutor(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
 
 	tests := []dockerExecutorTest{
@@ -112,6 +113,7 @@ type containerTest struct {
 }
 
 func TestDAGLevelContainer(t *testing.T) {
+	requireDockerDaemon(t)
 	t.Parallel()
 	requireLinuxContainerRuntime(t)
 
@@ -417,6 +419,7 @@ steps:
 }
 
 func TestContainerPullPolicy(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
 
 	th := test.Setup(t)
@@ -451,6 +454,7 @@ steps:
 }
 
 func TestContainerStartup_Entrypoint_WithHealthyFallback(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
 
 	th := test.Setup(t)
@@ -476,8 +480,8 @@ steps:
 }
 
 func TestContainerStartup_Command_LongRunning(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
-
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -504,9 +508,7 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	requireLinuxContainerRuntime(t)
 
 	th := test.Setup(t)
-	dockerClient, err := client.New(client.FromEnv)
-	require.NoError(t, err, "failed to create docker client")
-	defer func() { _ = dockerClient.Close() }()
+	dockerClient := requireDockerClient(t)
 
 	containerName := fmt.Sprintf("dagu-existing-%d", time.Now().UnixNano())
 	containerID := createLongRunningContainer(t, th, dockerClient, containerName)
@@ -532,6 +534,7 @@ steps:
 }
 
 func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
 
 	th := test.Setup(t)
@@ -668,6 +671,7 @@ func waitForContainerStop(t *testing.T, th test.Helper, dockerClient *client.Cli
 // which allows specifying a container field directly on a step instead of
 // using the executor syntax.
 func TestStepLevelContainer(t *testing.T) {
+	requireDockerDaemon(t)
 	t.Parallel()
 	requireLinuxContainerRuntime(t)
 
@@ -1093,9 +1097,7 @@ func TestContainerExecMode(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.New(client.FromEnv)
-	require.NoError(t, err, "failed to create docker client")
-	defer func() { _ = dockerClient.Close() }()
+	dockerClient := requireDockerClient(t)
 
 	// Create a long-running container for exec tests
 	containerName := fmt.Sprintf("dagu-exec-mode-%d", time.Now().UnixNano())
@@ -1270,8 +1272,8 @@ steps:
 
 // TestContainerExecNotFound tests that exec mode fails when the container doesn't exist.
 func TestContainerExecNotFound(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
-
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1296,9 +1298,7 @@ func TestContainerExecNotRunning(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.New(client.FromEnv)
-	require.NoError(t, err, "failed to create docker client")
-	defer func() { _ = dockerClient.Close() }()
+	dockerClient := requireDockerClient(t)
 
 	// Create a container but don't start it
 	containerName := fmt.Sprintf("dagu-exec-stopped-%d", time.Now().UnixNano())
@@ -1342,8 +1342,8 @@ steps:
 // is passed to Docker and waitFor: healthy waits for the container to become
 // healthy (not just running). Uses a file creation delay to prove actual waiting.
 func TestContainerCustomHealthcheck(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
-
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1375,8 +1375,8 @@ steps:
 
 // TestContainerCustomHealthcheck_StepLevel tests custom healthcheck at step level.
 func TestContainerCustomHealthcheck_StepLevel(t *testing.T) {
+	requireDockerDaemon(t)
 	requireLinuxContainerRuntime(t)
-
 	t.Parallel()
 
 	th := test.Setup(t)
@@ -1414,9 +1414,7 @@ func TestContainerExecVariableExpansion(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	dockerClient, err := client.New(client.FromEnv)
-	require.NoError(t, err, "failed to create docker client")
-	defer func() { _ = dockerClient.Close() }()
+	dockerClient := requireDockerClient(t)
 
 	// Create a long-running container for exec tests
 	containerName := fmt.Sprintf("dagu-exec-var-%d", time.Now().UnixNano())

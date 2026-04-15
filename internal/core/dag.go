@@ -128,6 +128,8 @@ type DAG struct {
 	PresolvedBuildEnv map[string]string `json:"presolvedBuildEnv,omitempty"`
 	// LogDir is the directory where the logs are stored.
 	LogDir string `json:"logDir,omitempty"`
+	// Artifacts config controls optional DAG run artifact storage.
+	Artifacts *ArtifactsConfig `json:"artifacts,omitempty"`
 	// LogOutput specifies how stdout and stderr are handled in log files.
 	// Can be "separate" (default) for separate .out and .err files,
 	// or "merged" for a single combined .log file.
@@ -269,6 +271,12 @@ type ParamDef struct {
 	Pattern     *string  `json:"pattern,omitempty"`
 }
 
+// ArtifactsConfig controls DAG run artifact storage.
+type ArtifactsConfig struct {
+	Enabled bool   `json:"enabled"`
+	Dir     string `json:"dir,omitempty"`
+}
+
 // DAGRetryPolicy contains the retry policy for a DAG run.
 type DAGRetryPolicy struct {
 	// Limit is the maximum number of retry attempts allowed.
@@ -314,6 +322,10 @@ func (d *DAG) Clone() *DAG {
 	clone.dotenvOnce = sync.Once{}
 	if d.PresolvedBuildEnv != nil {
 		clone.PresolvedBuildEnv = maps.Clone(d.PresolvedBuildEnv)
+	}
+	if d.Artifacts != nil {
+		artifactsCopy := *d.Artifacts
+		clone.Artifacts = &artifactsCopy
 	}
 	if d.Harness != nil {
 		clone.Harness = cloneHarnessConfig(d.Harness)
@@ -528,6 +540,11 @@ func (d *DAG) initializeDefaults() {
 // InitializeDefaults exposes initializeDefaults for packages that prepare DAGs before execution.
 func InitializeDefaults(d *DAG) {
 	d.initializeDefaults()
+}
+
+// ArtifactsEnabled reports whether the DAG has artifact storage enabled.
+func (d *DAG) ArtifactsEnabled() bool {
+	return d != nil && d.Artifacts != nil && d.Artifacts.Enabled
 }
 
 // ParamsMap returns the parameters as a map.

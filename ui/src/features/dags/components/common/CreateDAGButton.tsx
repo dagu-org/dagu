@@ -4,11 +4,11 @@
  * @module features/dags/components/common
  */
 import { Button } from '@/components/ui/button';
+import { useCanWrite } from '@/contexts/AuthContext';
 import { Plus } from 'lucide-react';
 import React from 'react';
 import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 
 /**
@@ -17,13 +17,13 @@ import { useClient } from '../../../../hooks/api';
  */
 function CreateDAGButton() {
   const appBarContext = React.useContext(AppBarContext);
+  const canWrite = useCanWrite();
   const client = useClient();
-  const config = useConfig();
   const [error, setError] = React.useState<string | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  if (!config.permissions.writeDags) {
+  if (!canWrite) {
     return null;
   }
 

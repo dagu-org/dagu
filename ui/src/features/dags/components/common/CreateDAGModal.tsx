@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
+import { useCanWrite } from '@/contexts/AuthContext';
 import { Plus } from 'lucide-react';
 import { useContext, useState } from 'react';
 import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
-import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
 
 /**
@@ -12,13 +12,13 @@ import { useClient } from '../../../../hooks/api';
  */
 function CreateDAGModal() {
   const appBarContext = useContext(AppBarContext);
+  const canWrite = useCanWrite();
   const client = useClient();
-  const config = useConfig();
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  if (!config.permissions.writeDags) {
+  if (!canWrite) {
     return null;
   }
 

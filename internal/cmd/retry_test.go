@@ -261,6 +261,7 @@ steps:
 			th.DAGRunStore,
 			th.QueueStore,
 			th.Config.Paths.LogDir,
+			th.Config.Paths.ArtifactDir,
 			th.Config.Paths.BaseConfig,
 			metadataOnly,
 			runID,

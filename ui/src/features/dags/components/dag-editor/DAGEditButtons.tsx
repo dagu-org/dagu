@@ -4,6 +4,7 @@
  * @module features/dags/components/dag-editor
  */
 import { useAgentChatContext } from '@/features/agent';
+import { useCanWrite } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { Sparkles, PencilLine, Trash2 } from 'lucide-react';
@@ -35,6 +36,7 @@ type Props = {
  */
 function DAGEditButtons({ fileName, dagName, latestDAGRun }: Props) {
   const appBarContext = React.useContext(AppBarContext);
+  const canWrite = useCanWrite();
   const client = useClient();
   const config = useConfig();
   const { preferences } = useUserPreferences();
@@ -55,7 +57,7 @@ function DAGEditButtons({ fileName, dagName, latestDAGRun }: Props) {
     React.useState(false);
   const improveLaunchInFlightRef = React.useRef(false);
 
-  if (!config.permissions.writeDags) {
+  if (!canWrite) {
     return null;
   }
 

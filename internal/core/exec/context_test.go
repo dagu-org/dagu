@@ -230,6 +230,40 @@ func TestNewContext_DAGRunWorkDir(t *testing.T) {
 	}
 }
 
+func TestNewContext_DAGRunArtifactsDir(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		artifactDir string
+		expectSet   bool
+	}{
+		{name: "ArtifactDirSet", artifactDir: "/data/artifacts/test-dag/dag-run_20260412_000000Z_run-1", expectSet: true},
+		{name: "ArtifactDirEmpty", artifactDir: "", expectSet: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			dag := &core.DAG{Name: "test-dag"}
+			var opts []exec.ContextOption
+			if tt.artifactDir != "" {
+				opts = append(opts, exec.WithArtifactDir(tt.artifactDir))
+			}
+			ctx = exec.NewContext(ctx, dag, "run-1", "test.log", opts...)
+			rCtx := exec.GetContext(ctx)
+			result := rCtx.UserEnvsMap()
+			if tt.expectSet {
+				assert.Equal(t, tt.artifactDir, result[exec.EnvKeyDAGRunArtifactsDir])
+			} else {
+				_, ok := result[exec.EnvKeyDAGRunArtifactsDir]
+				assert.False(t, ok, "DAG_RUN_ARTIFACTS_DIR should not be set")
+			}
+		})
+	}
+}
+
 func TestNewContext_AllEnvsUsesFilteredBaseEnv(t *testing.T) {
 	t.Setenv("EXEC_CONTEXT_HOST_ONLY", "host-value")
 

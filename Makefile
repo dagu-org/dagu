@@ -309,6 +309,13 @@ bin:
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} ./cmd
 
+# bin-e2e builds the go application for browser E2E tests.
+.PHONY: bin-e2e
+bin-e2e:
+	@printf '%b\n' "${COLOR_GREEN}Building the E2E binary...${COLOR_RESET}"
+	@mkdir -p ${BIN_DIR}
+	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME}-e2e ./cmd
+
 # build-keepalive builds the keepalive binary for all architectures using Zig.
 .PHONY: build-keepalive
 build-keepalive:
@@ -343,6 +350,18 @@ build-keepalive:
 .PHONY: ui
 # ui builds the frontend codes.
 ui: clean-ui build-ui cp-assets
+
+.PHONY: test-e2e
+test-e2e:
+	@printf '%b\n' "${COLOR_GREEN}Installing frontend dependencies...${COLOR_RESET}"
+	@cd ui; pnpm install --frozen-lockfile
+	@printf '%b\n' "${COLOR_GREEN}Installing Playwright browser...${COLOR_RESET}"
+	@cd ui; pnpm test:e2e:install
+	@printf '%b\n' "${COLOR_GREEN}Running browser E2E tests...${COLOR_RESET}"
+	@cd ui; NODE_OPTIONS="--max-old-space-size=8192" pnpm build
+	@$(MAKE) cp-assets
+	@$(MAKE) bin-e2e
+	@cd ui; pnpm test:e2e
 
 # build-ui builds the frontend codes.
 .PHONY: build-ui

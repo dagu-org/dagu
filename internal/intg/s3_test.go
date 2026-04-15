@@ -18,6 +18,7 @@ const minioImage = "minio/minio:RELEASE.2024-10-02T17-50-41Z"
 // TestMinIOContainer_WithMCCommands tests S3-like operations using MinIO's mc client
 // inside a container. This validates the container-based workflow pattern for object storage.
 func TestMinIOContainer_WithMCCommands(t *testing.T) {
+	requireDockerDaemon(t)
 	t.Parallel()
 	requireLinuxContainerRuntime(t)
 

@@ -43,6 +43,7 @@ type fixtureConfig struct {
 	workerMaxActiveRuns     int
 	workerLabels            map[string]string
 	logPersistence          bool
+	artifactPersistence     bool
 	configMutators          []func(*config.Config)
 	dagsDir                 string
 	baseConfigPath          string
@@ -92,6 +93,10 @@ func withLabels(labels map[string]string) fixtureOption {
 
 func withLogPersistence() fixtureOption {
 	return func(c *fixtureConfig) { c.logPersistence = true }
+}
+
+func withArtifactPersistence() fixtureOption {
+	return func(c *fixtureConfig) { c.artifactPersistence = true }
 }
 
 func withConfigMutator(mutator func(*config.Config)) fixtureOption {
@@ -179,6 +184,9 @@ func newTestFixture(t *testing.T, yaml string, opts ...fixtureOption) *testFixtu
 	}))
 	if cfg.logPersistence {
 		coordOpts = append(coordOpts, test.WithLogPersistence())
+	}
+	if cfg.artifactPersistence {
+		coordOpts = append(coordOpts, test.WithArtifactPersistence())
 	}
 	if cfg.workerMode == sharedFSMode {
 		coordOpts = append(coordOpts, test.WithBuiltExecutable())
@@ -492,6 +500,7 @@ func (f *testFixture) enqueueCatchup(scheduleTime time.Time) (string, error) {
 		f.coord.DAGRunStore,
 		f.coord.QueueStore,
 		f.coord.Config.Paths.LogDir,
+		f.coord.Config.Paths.ArtifactDir,
 		f.coord.Config.Paths.BaseConfig,
 		f.dagWrapper.DAG,
 		runID,
@@ -689,6 +698,10 @@ func (f *testFixture) logDir() string {
 	return f.coord.LogDir()
 }
 
+func (f *testFixture) artifactDir() string {
+	return f.coord.Config.Paths.ArtifactDir
+}
+
 func findLogFiles(t *testing.T, logDir, dagName, dagRunID, stepName, suffix string) []string {
 	t.Helper()
 
@@ -738,4 +751,15 @@ func getLogContent(t *testing.T, logPath string) string {
 	content, err := os.ReadFile(logPath)
 	require.NoError(t, err, "failed to read log file")
 	return string(content)
+}
+
+func assertArtifactContains(t *testing.T, archiveDir, relativePath, expected string) {
+	t.Helper()
+
+	artifactPath := filepath.Join(archiveDir, relativePath)
+	require.FileExists(t, artifactPath, "artifact should exist: %s", relativePath)
+
+	content, err := os.ReadFile(artifactPath)
+	require.NoError(t, err, "failed to read artifact file %s", artifactPath)
+	assert.Contains(t, string(content), expected, "artifact file should contain expected content")
 }

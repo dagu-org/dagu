@@ -400,6 +400,39 @@ func TestDataRootRemoveOld(t *testing.T) {
 		assert.False(t, fileutil.FileExists(completedRun.baseDir), "Completed dag-run should be removed")
 		assert.True(t, fileutil.FileExists(waitingRun.baseDir), "Waiting dag-run should be preserved")
 	})
+	t.Run("RemoveOldRemovesArtifactDirs", func(t *testing.T) {
+		root := setupTestDataRoot(t)
+
+		oldTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+		dagRun := root.CreateTestDAGRun(t, "artifact-run", exec.NewUTC(oldTime))
+
+		artifactDir := filepath.Join(root.artifactDir, "artifact-run")
+		require.NoError(t, os.MkdirAll(artifactDir, 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(artifactDir, "report.md"), []byte("artifact"), 0o600))
+
+		attempt, err := dagRun.CreateAttempt(root.Context, exec.NewUTC(oldTime), nil, "")
+		require.NoError(t, err)
+		require.NoError(t, attempt.Open(root.Context))
+
+		status := exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   dagRun.dagRunID,
+			Status:     core.Succeeded,
+			ArchiveDir: artifactDir,
+		}
+		require.NoError(t, attempt.Write(root.Context, status))
+		require.NoError(t, attempt.Close(root.Context))
+
+		err = os.Chtimes(attempt.file, oldTime, oldTime)
+		require.NoError(t, err)
+
+		require.DirExists(t, artifactDir)
+
+		removedIDs, err := root.RemoveOld(root.Context, 0, false)
+		require.NoError(t, err)
+		assert.Contains(t, removedIDs, "artifact-run")
+		assert.NoDirExists(t, artifactDir)
+	})
 }
 
 func TestDataRootRename(t *testing.T) {
@@ -577,7 +610,7 @@ func setupTestDataRoot(t *testing.T) *DataRootTest {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	root := NewDataRoot(tmpDir, "test-dag")
+	root := NewDataRootWithArtifactDir(tmpDir, "test-dag", filepath.Join(tmpDir, "artifacts"))
 	return &DataRootTest{DataRoot: root, TB: t, Context: context.Background()}
 }
 

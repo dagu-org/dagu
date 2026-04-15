@@ -191,7 +191,7 @@ export default function UsersPage() {
           <span>
             User management features (create, edit, delete) require a{' '}
             <Link to="/license" className="text-primary underline underline-offset-2">
-              Pro license
+              license or trial
             </Link>
             . Password reset is available for all admins.
           </span>

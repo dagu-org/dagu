@@ -28,6 +28,7 @@ var legacyToSnakeCaseKey = map[string]string{
 	"permissionrundags":      "permission_run_dags",
 	"dagsdir":                "dags_dir",
 	"logdir":                 "log_dir",
+	"artifactdir":            "artifact_dir",
 	"datadir":                "data_dir",
 	"suspendflagsdir":        "suspend_flags_dir",
 	"adminlogsdir":           "admin_logs_dir",
@@ -70,6 +71,7 @@ var legacyToSnakeCaseKey = map[string]string{
 	// Paths
 	"paths.dagsdir":            "paths.dags_dir",
 	"paths.logdir":             "paths.log_dir",
+	"paths.artifactdir":        "paths.artifact_dir",
 	"paths.datadir":            "paths.data_dir",
 	"paths.suspendflagsdir":    "paths.suspend_flags_dir",
 	"paths.adminlogsdir":       "paths.admin_logs_dir",

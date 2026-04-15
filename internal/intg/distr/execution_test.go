@@ -5,6 +5,7 @@ package distr_test
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -133,6 +135,171 @@ steps:
 
 		lineCount := strings.Count(content, "\n")
 		assert.GreaterOrEqual(t, lineCount, 2000, "should have at least 2000 lines")
+	})
+}
+
+func TestExecution_Artifacts(t *testing.T) {
+	t.Run("sharedNothingUploadsArtifactsToCoordinatorFilesystem", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: shared-nothing-artifact-test
+worker_selector:
+  test: "true"
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifacts
+    command: |
+      test -n "${DAG_RUN_ARTIFACTS_DIR}"
+      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
+      printf "artifact from shared-nothing worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`, withArtifactPersistence())
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+		require.DirExists(t, status.ArchiveDir)
+		assert.True(t, strings.HasPrefix(status.ArchiveDir, filepath.Join(f.artifactDir(), f.dagWrapper.Name)+string(os.PathSeparator)))
+		assertArtifactContains(t, status.ArchiveDir, "reports/summary.md", "artifact from shared-nothing worker")
+	})
+
+	t.Run("sharedNothingFailedRunsStillUploadArtifactsToCoordinatorFilesystem", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: shared-nothing-failed-artifact-test
+worker_selector:
+  test: "true"
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifacts-and-fail
+    command: |
+      test -n "${DAG_RUN_ARTIFACTS_DIR}"
+      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
+      printf "artifact from failed shared-nothing worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+      exit 1
+`, withArtifactPersistence())
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Failed, 20*time.Second)
+
+		require.Equal(t, core.Failed, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+		require.DirExists(t, status.ArchiveDir)
+		assert.True(t, strings.HasPrefix(status.ArchiveDir, filepath.Join(f.artifactDir(), f.dagWrapper.Name)+string(os.PathSeparator)))
+		assertArtifactContains(t, status.ArchiveDir, "reports/summary.md", "artifact from failed shared-nothing worker")
+	})
+
+	t.Run("sharedNothingCreatesEmptyArtifactDirectoryWhenNoFilesAreWritten", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: shared-nothing-empty-artifact-test
+worker_selector:
+  test: "true"
+artifacts:
+  enabled: true
+steps:
+  - name: no-artifacts-written
+    command: |
+      test -n "${DAG_RUN_ARTIFACTS_DIR}"
+      echo "no artifacts written"
+`, withArtifactPersistence())
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+		require.DirExists(t, status.ArchiveDir)
+		assert.True(t, strings.HasPrefix(status.ArchiveDir, filepath.Join(f.artifactDir(), f.dagWrapper.Name)+string(os.PathSeparator)))
+
+		entries, err := os.ReadDir(status.ArchiveDir)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+	})
+
+	t.Run("sharedFSWritesArtifactsToSharedFilesystem", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: sharedfs-artifact-test
+worker_selector:
+  test: "true"
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifacts
+    command: |
+      test -n "${DAG_RUN_ARTIFACTS_DIR}"
+      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
+      printf "artifact from shared filesystem worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`, withWorkerMode(sharedFSMode))
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+		require.DirExists(t, status.ArchiveDir)
+		assert.True(t, strings.HasPrefix(status.ArchiveDir, filepath.Join(f.artifactDir(), f.dagWrapper.Name)+string(os.PathSeparator)))
+		assertArtifactContains(t, status.ArchiveDir, "reports/summary.md", "artifact from shared filesystem worker")
+	})
+
+	t.Run("coordinatorRejectsStaleAttemptArtifactChunks", func(t *testing.T) {
+		f := newTestFixture(t, `
+name: stale-attempt-artifact-test
+worker_selector:
+  test: "true"
+artifacts:
+  enabled: true
+steps:
+  - name: write-artifacts
+    command: |
+      test -n "${DAG_RUN_ARTIFACTS_DIR}"
+      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
+      printf "artifact from latest attempt\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`, withArtifactPersistence())
+		defer f.cleanup()
+
+		require.NoError(t, f.enqueue())
+		f.waitForQueued()
+		f.startScheduler(30 * time.Second)
+
+		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		require.Equal(t, core.Succeeded, status.Status)
+
+		stream, err := f.coordinatorClient.StreamArtifacts(f.coord.Context)
+		require.NoError(t, err)
+		require.NoError(t, stream.Send(&coordinatorv1.ArtifactChunk{
+			WorkerId:           "stale-worker",
+			DagRunId:           status.DAGRunID,
+			DagName:            f.dagWrapper.Name,
+			AttemptId:          "stale-attempt",
+			OwnerCoordinatorId: "test-coordinator",
+			RelativePath:       "reports/stale.txt",
+			Data:               []byte("stale artifact"),
+		}))
+
+		_, err = stream.CloseAndRecv()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not match latest attempt")
+
+		_, statErr := os.Stat(filepath.Join(status.ArchiveDir, "reports", "stale.txt"))
+		require.Error(t, statErr)
+		assert.True(t, os.IsNotExist(statErr))
 	})
 }
 

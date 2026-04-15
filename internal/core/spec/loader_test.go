@@ -705,6 +705,55 @@ steps:
 		assert.Contains(t, dag.Env, "BASE_ENV=base_value")
 	})
 
+	t.Run("InheritBaseArtifactsConfig", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+artifacts:
+  enabled: true
+  dir: "/base/artifacts"
+`)
+
+		childDAG := createTempYAMLFile(t, `
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Artifacts)
+		assert.True(t, dag.Artifacts.Enabled)
+		assert.Equal(t, "/base/artifacts", dag.Artifacts.Dir)
+	})
+
+	t.Run("OverrideBaseArtifactsConfig", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+artifacts:
+  enabled: true
+  dir: "/base/artifacts"
+`)
+
+		childDAG := createTempYAMLFile(t, `
+artifacts:
+  enabled: true
+  dir: "/override/artifacts"
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Artifacts)
+		assert.True(t, dag.Artifacts.Enabled)
+		assert.Equal(t, "/override/artifacts", dag.Artifacts.Dir)
+	})
+
 	t.Run("InheritBaseWorkingDir", func(t *testing.T) {
 		t.Parallel()
 

@@ -14,6 +14,8 @@ var legacyToSnakeCaseKey = map[string]string{
 	"catchupWindow":     "catchup_window",
 	"overlapPolicy":     "overlap_policy",
 	"logDir":            "log_dir",
+	"artifactDir":       "artifacts.dir",
+	"enableArtifact":    "artifacts.enabled",
 	"logOutput":         "log_output",
 	"handlerOn":         "handler_on",
 	"mailOn":            "mail_on",

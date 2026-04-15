@@ -125,7 +125,7 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 	if err != nil {
 		if errors.Is(err, authservice.ErrInvalidCredentials) {
 			// Log failed login attempt
-			if a.auditService != nil {
+			if a.isAuditLicensed() {
 				details, err := json.Marshal(map[string]string{"reason": "invalid_credentials"})
 				if err != nil {
 					logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))
@@ -142,7 +142,7 @@ func (a *API) Login(ctx context.Context, request api.LoginRequestObject) (api.Lo
 			}, nil
 		}
 		if errors.Is(err, authservice.ErrUserDisabled) {
-			if a.auditService != nil {
+			if a.isAuditLicensed() {
 				details, err := json.Marshal(map[string]string{"reason": "account_disabled"})
 				if err != nil {
 					logger.Warn(ctx, "Failed to marshal audit details", tag.Error(err))

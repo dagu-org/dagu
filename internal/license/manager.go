@@ -315,6 +315,10 @@ func (m *Manager) doHeartbeat(ctx context.Context, ad *ActivationData) {
 					slog.String("error", cloudErr.Message))
 				m.state.Update(nil, "")
 				return
+			case 400: // Expired - keep cached token so runtime can enforce expiry/grace locally
+				m.logger.Warn("License heartbeat reported an expired license, continuing with cached token",
+					slog.String("error", cloudErr.Message))
+				return
 			}
 		}
 		// Network error or other transient failure - continue with cached JWT

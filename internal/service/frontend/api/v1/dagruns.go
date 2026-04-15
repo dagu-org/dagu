@@ -9,12 +9,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +50,10 @@ var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
 const dagRunReadTimeout = 10 * time.Second
 const statusClientClosedRequest = 499
+const artifactTextPreviewMaxBytes int64 = 2 * 1024 * 1024
+const artifactImagePreviewMaxBytes int64 = 5 * 1024 * 1024
+
+var errArtifactUnavailable = errors.New("artifact directory not found")
 
 const (
 	manualStepSettleTimeout      = 5 * time.Second
@@ -802,6 +810,92 @@ func (a *API) DownloadDAGRunLog(ctx context.Context, request api.DownloadDAGRunL
 		Headers: api.DownloadDAGRunLog200ResponseHeaders{
 			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", filename),
 		},
+	}, nil
+}
+
+func (a *API) GetDAGRunArtifacts(ctx context.Context, request api.GetDAGRunArtifactsRequestObject) (api.GetDAGRunArtifactsResponseObject, error) {
+	status, err := a.getDAGRunArtifactStatus(ctx, request.Name, request.DagRunId)
+	if err != nil {
+		if isArtifactStatusNotFound(err) {
+			return api.GetDAGRunArtifacts404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for dag-run %s", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("get dag-run artifact status: %w", err)
+	}
+
+	items, err := listArtifactTree(status.ArchiveDir, artifactListRecursive(request.Params.Recursive))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return api.GetDAGRunArtifacts404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for dag-run %s", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("list dag-run artifacts: %w", err)
+	}
+
+	return api.GetDAGRunArtifacts200JSONResponse{
+		Items: items,
+	}, nil
+}
+
+func (a *API) GetDAGRunArtifactPreview(ctx context.Context, request api.GetDAGRunArtifactPreviewRequestObject) (api.GetDAGRunArtifactPreviewResponseObject, error) {
+	status, err := a.getDAGRunArtifactStatus(ctx, request.Name, request.DagRunId)
+	if err != nil {
+		if isArtifactStatusNotFound(err) {
+			return api.GetDAGRunArtifactPreview404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for dag-run %s", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("get dag-run artifact status: %w", err)
+	}
+
+	preview, err := buildArtifactPreview(status.ArchiveDir, string(request.Params.Path))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return api.GetDAGRunArtifactPreview404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact file not found for dag-run %s", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("preview dag-run artifact: %w", err)
+	}
+
+	return api.GetDAGRunArtifactPreview200JSONResponse(preview), nil
+}
+
+func (a *API) DownloadDAGRunArtifact(ctx context.Context, request api.DownloadDAGRunArtifactRequestObject) (api.DownloadDAGRunArtifactResponseObject, error) {
+	status, err := a.getDAGRunArtifactStatus(ctx, request.Name, request.DagRunId)
+	if err != nil {
+		if isArtifactStatusNotFound(err) {
+			return api.DownloadDAGRunArtifact404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for dag-run %s", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("get dag-run artifact status: %w", err)
+	}
+
+	file, info, err := openArtifactFile(status.ArchiveDir, string(request.Params.Path))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return api.DownloadDAGRunArtifact404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact file not found for dag-run %s", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("open dag-run artifact: %w", err)
+	}
+
+	return api.DownloadDAGRunArtifact200ApplicationoctetStreamResponse{
+		Body: file,
+		Headers: api.DownloadDAGRunArtifact200ResponseHeaders{
+			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", sanitizeFilename(info.Name())),
+		},
+		ContentLength: info.Size(),
 	}, nil
 }
 
@@ -1804,6 +1898,92 @@ func (a *API) DownloadSubDAGRunLog(ctx context.Context, request api.DownloadSubD
 		Headers: api.DownloadSubDAGRunLog200ResponseHeaders{
 			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", filename),
 		},
+	}, nil
+}
+
+func (a *API) GetSubDAGRunArtifacts(ctx context.Context, request api.GetSubDAGRunArtifactsRequestObject) (api.GetSubDAGRunArtifactsResponseObject, error) {
+	status, err := a.getSubDAGRunArtifactStatus(ctx, request.Name, request.DagRunId, request.SubDAGRunId)
+	if err != nil {
+		if isArtifactStatusNotFound(err) {
+			return &api.GetSubDAGRunArtifacts404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("get sub dag-run artifact status: %w", err)
+	}
+
+	items, err := listArtifactTree(status.ArchiveDir, artifactListRecursive(request.Params.Recursive))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return &api.GetSubDAGRunArtifacts404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("list sub dag-run artifacts: %w", err)
+	}
+
+	return &api.GetSubDAGRunArtifacts200JSONResponse{
+		Items: items,
+	}, nil
+}
+
+func (a *API) GetSubDAGRunArtifactPreview(ctx context.Context, request api.GetSubDAGRunArtifactPreviewRequestObject) (api.GetSubDAGRunArtifactPreviewResponseObject, error) {
+	status, err := a.getSubDAGRunArtifactStatus(ctx, request.Name, request.DagRunId, request.SubDAGRunId)
+	if err != nil {
+		if isArtifactStatusNotFound(err) {
+			return &api.GetSubDAGRunArtifactPreview404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("get sub dag-run artifact status: %w", err)
+	}
+
+	preview, err := buildArtifactPreview(status.ArchiveDir, string(request.Params.Path))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return &api.GetSubDAGRunArtifactPreview404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact file not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("preview sub dag-run artifact: %w", err)
+	}
+
+	return api.GetSubDAGRunArtifactPreview200JSONResponse(preview), nil
+}
+
+func (a *API) DownloadSubDAGRunArtifact(ctx context.Context, request api.DownloadSubDAGRunArtifactRequestObject) (api.DownloadSubDAGRunArtifactResponseObject, error) {
+	status, err := a.getSubDAGRunArtifactStatus(ctx, request.Name, request.DagRunId, request.SubDAGRunId)
+	if err != nil {
+		if isArtifactStatusNotFound(err) {
+			return &api.DownloadSubDAGRunArtifact404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact directory not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("get sub dag-run artifact status: %w", err)
+	}
+
+	file, info, err := openArtifactFile(status.ArchiveDir, string(request.Params.Path))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, errArtifactUnavailable) {
+			return &api.DownloadSubDAGRunArtifact404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("artifact file not found for sub dag-run %s", request.SubDAGRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("open sub dag-run artifact: %w", err)
+	}
+
+	return &api.DownloadSubDAGRunArtifact200ApplicationoctetStreamResponse{
+		Body: file,
+		Headers: api.DownloadSubDAGRunArtifact200ResponseHeaders{
+			ContentDisposition: fmt.Sprintf("attachment; filename=\"%s\"", sanitizeFilename(info.Name())),
+		},
+		ContentLength: info.Size(),
 	}, nil
 }
 
@@ -3164,6 +3344,285 @@ func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error
 		TotalLines:    totalLines,
 		HasMore:       hasMore,
 	}, nil
+}
+
+func (a *API) getDAGRunArtifactStatus(ctx context.Context, dagName, dagRunID string) (*exec.DAGRunStatus, error) {
+	var (
+		attempt exec.DAGRunAttempt
+		err     error
+	)
+	if dagRunID == "latest" {
+		attempt, err = a.dagRunStore.LatestAttempt(ctx, dagName)
+	} else {
+		attempt, err = a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dagName, dagRunID))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if status == nil || status.ArchiveDir == "" {
+		return nil, errArtifactUnavailable
+	}
+	return status, nil
+}
+
+func (a *API) getSubDAGRunArtifactStatus(ctx context.Context, dagName, dagRunID, subDAGRunID string) (*exec.DAGRunStatus, error) {
+	attempt, err := a.dagRunStore.FindSubAttempt(ctx, exec.NewDAGRunRef(dagName, dagRunID), subDAGRunID)
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if status == nil || status.ArchiveDir == "" {
+		return nil, errArtifactUnavailable
+	}
+	return status, nil
+}
+
+func isArtifactStatusNotFound(err error) bool {
+	return errors.Is(err, exec.ErrDAGRunIDNotFound) ||
+		errors.Is(err, exec.ErrNoStatusData) ||
+		errors.Is(err, errArtifactUnavailable)
+}
+
+func artifactListRecursive(recursive *api.ArtifactRecursive) bool {
+	return recursive != nil && bool(*recursive)
+}
+
+func listArtifactTree(archiveDir string, recursive bool) ([]api.ArtifactTreeNode, error) {
+	if archiveDir == "" {
+		return nil, errArtifactUnavailable
+	}
+	info, err := os.Stat(archiveDir)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, errArtifactUnavailable
+	}
+	return listArtifactTreeNodes(archiveDir, archiveDir, recursive)
+}
+
+func listArtifactTreeNodes(rootDir, currentDir string, recursive bool) ([]api.ArtifactTreeNode, error) {
+	entries, err := os.ReadDir(currentDir)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := make([]api.ArtifactTreeNode, 0, len(entries))
+	for _, entry := range entries {
+		if fileutil.IsSymlinkDirEntry(entry) {
+			continue
+		}
+		node, err := buildArtifactTreeNode(rootDir, currentDir, entry, recursive)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, node)
+	}
+
+	sortArtifactTreeNodes(nodes)
+	return nodes, nil
+}
+
+func sortArtifactTreeNodes(nodes []api.ArtifactTreeNode) {
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].Type != nodes[j].Type {
+			return nodes[i].Type == api.ArtifactNodeTypeDirectory
+		}
+		leftLower := strings.ToLower(nodes[i].Name)
+		rightLower := strings.ToLower(nodes[j].Name)
+		if leftLower != rightLower {
+			return leftLower < rightLower
+		}
+		return nodes[i].Name < nodes[j].Name
+	})
+}
+
+func buildArtifactTreeNode(rootDir, currentDir string, entry fs.DirEntry, recursive bool) (api.ArtifactTreeNode, error) {
+	fullPath := filepath.Join(currentDir, entry.Name())
+	relPath, err := filepath.Rel(rootDir, fullPath)
+	if err != nil {
+		return api.ArtifactTreeNode{}, err
+	}
+	relPath = filepath.ToSlash(relPath)
+
+	nodeType := api.ArtifactNodeTypeFile
+	if entry.IsDir() {
+		nodeType = api.ArtifactNodeTypeDirectory
+	}
+
+	node := api.ArtifactTreeNode{
+		Name: entry.Name(),
+		Path: relPath,
+		Type: nodeType,
+	}
+
+	info, err := entry.Info()
+	if err != nil {
+		return api.ArtifactTreeNode{}, err
+	}
+	if entry.IsDir() && recursive {
+		children, err := listArtifactTreeNodes(rootDir, fullPath, recursive)
+		if err != nil {
+			return api.ArtifactTreeNode{}, err
+		}
+		if len(children) > 0 {
+			node.Children = &children
+		}
+		return node, nil
+	}
+
+	size := info.Size()
+	node.Size = &size
+	return node, nil
+}
+
+func resolveArtifactPath(archiveDir, relPath string) (string, error) {
+	if archiveDir == "" {
+		return "", errArtifactUnavailable
+	}
+	resolved, err := fileutil.ResolveExistingPathWithinBase(archiveDir, relPath)
+	if errors.Is(err, fileutil.ErrPathEscapesBase) {
+		return "", os.ErrNotExist
+	}
+	return resolved, err
+}
+
+func buildArtifactPreview(archiveDir, relPath string) (api.ArtifactPreviewResponse, error) {
+	absPath, err := resolveArtifactPath(archiveDir, relPath)
+	if err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return api.ArtifactPreviewResponse{}, os.ErrNotExist
+	}
+
+	file, err := os.Open(filepath.Clean(absPath))
+	if err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	sniffBytes, err := io.ReadAll(io.LimitReader(file, 512))
+	if err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+	mimeType := detectArtifactMimeType(absPath, sniffBytes)
+	kind := artifactPreviewKind(relPath, mimeType)
+	previewLimit := artifactPreviewLimit(kind)
+	tooLarge := previewLimit > 0 && info.Size() > previewLimit
+
+	resp := api.ArtifactPreviewResponse{
+		Name:      filepath.Base(absPath),
+		Path:      filepath.ToSlash(filepath.Clean(relPath)),
+		Kind:      kind,
+		MimeType:  mimeType,
+		Size:      info.Size(),
+		TooLarge:  tooLarge,
+		Truncated: false,
+	}
+	if tooLarge || previewLimit <= 0 {
+		return resp, nil
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+
+	previewBytes, err := io.ReadAll(io.LimitReader(file, previewLimit+1))
+	if err != nil {
+		return api.ArtifactPreviewResponse{}, err
+	}
+	if int64(len(previewBytes)) > previewLimit {
+		previewBytes = previewBytes[:previewLimit]
+		resp.Truncated = true
+	}
+	if kind == api.ArtifactPreviewKindMarkdown || kind == api.ArtifactPreviewKindText {
+		content := string(previewBytes)
+		resp.Content = &content
+	}
+	return resp, nil
+}
+
+func openArtifactFile(archiveDir, relPath string) (*os.File, os.FileInfo, error) {
+	absPath, err := resolveArtifactPath(archiveDir, relPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, nil, os.ErrNotExist
+	}
+
+	file, err := os.Open(filepath.Clean(absPath))
+	if err != nil {
+		return nil, nil, err
+	}
+	return file, info, nil
+}
+
+func detectArtifactMimeType(path string, previewBytes []byte) string {
+	if ext := strings.ToLower(filepath.Ext(path)); ext != "" {
+		if detected := mime.TypeByExtension(ext); detected != "" {
+			if mediaType, _, err := mime.ParseMediaType(detected); err == nil && mediaType != "" {
+				return mediaType
+			}
+			return detected
+		}
+	}
+	if len(previewBytes) == 0 {
+		return "application/octet-stream"
+	}
+	return http.DetectContentType(previewBytes)
+}
+
+func artifactPreviewKind(path, mimeType string) api.ArtifactPreviewKind {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".md", ".markdown", ".mdown", ".mkd":
+		return api.ArtifactPreviewKindMarkdown
+	}
+	if strings.HasPrefix(mimeType, "image/") {
+		return api.ArtifactPreviewKindImage
+	}
+	if strings.HasPrefix(mimeType, "text/") ||
+		strings.Contains(mimeType, "json") ||
+		strings.Contains(mimeType, "xml") ||
+		strings.Contains(mimeType, "yaml") ||
+		strings.Contains(mimeType, "toml") ||
+		strings.Contains(mimeType, "javascript") {
+		return api.ArtifactPreviewKindText
+	}
+	return api.ArtifactPreviewKindBinary
+}
+
+func artifactPreviewLimit(kind api.ArtifactPreviewKind) int64 {
+	switch kind {
+	case api.ArtifactPreviewKindMarkdown, api.ArtifactPreviewKindText:
+		return artifactTextPreviewMaxBytes
+	case api.ArtifactPreviewKindImage:
+		return artifactImagePreviewMaxBytes
+	case api.ArtifactPreviewKindBinary:
+		return 0
+	}
+	return 0
 }
 
 // GetDAGRunsListData returns DAG runs list for SSE.

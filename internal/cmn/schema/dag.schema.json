@@ -491,6 +491,21 @@
       "type": "string",
       "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."
     },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable per-DAG-run artifact storage."
+        },
+        "dir": {
+          "type": "string",
+          "description": "Base directory for storing artifacts for this DAG. Defaults to the global artifact_dir when omitted."
+        }
+      },
+      "description": "Artifact storage configuration for this DAG."
+    },
     "log_output": {
       "type": "string",
       "enum": ["separate", "merged"],

@@ -377,6 +377,7 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 		{"SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.Paths.SuspendFlagsDir},
 		{"DataDir", &cfg.Paths.DataDir, def.Paths.DataDir},
 		{"LogDir", &cfg.Paths.LogDir, def.Paths.LogDir},
+		{"ArtifactDir", &cfg.Paths.ArtifactDir, def.Paths.ArtifactDir},
 		{"AdminLogsDir", &cfg.Paths.AdminLogsDir, def.Paths.AdminLogsDir},
 		{"EventStoreDir", &cfg.Paths.EventStoreDir, def.Paths.EventStoreDir},
 		{"BaseConfig", &cfg.Paths.BaseConfig, def.Paths.BaseConfig},
@@ -1359,6 +1360,9 @@ func (l *ConfigLoader) finalizePaths(cfg *Config) {
 	if cfg.Paths.EventStoreDir == "" {
 		cfg.Paths.EventStoreDir = filepath.Join(cfg.Paths.AdminLogsDir, "events")
 	}
+	if cfg.Paths.ArtifactDir == "" {
+		cfg.Paths.ArtifactDir = filepath.Join(cfg.Paths.DataDir, "artifacts")
+	}
 
 	if cfg.Paths.DocsDir == "" {
 		cfg.Paths.DocsDir = filepath.Join(cfg.Paths.DAGsDir, "docs")
@@ -1403,6 +1407,7 @@ func (l *ConfigLoader) loadLegacyPaths(cfg *Config, def Definition) error {
 		{"legacy DAGsDir", &cfg.Paths.DAGsDir, def.DAGsDir},
 		{"legacy Executable", &cfg.Paths.Executable, def.Executable},
 		{"legacy LogDir", &cfg.Paths.LogDir, def.LogDir},
+		{"legacy ArtifactDir", &cfg.Paths.ArtifactDir, def.ArtifactDir},
 		{"legacy DataDir", &cfg.Paths.DataDir, def.DataDir},
 		{"legacy SuspendFlagsDir", &cfg.Paths.SuspendFlagsDir, def.SuspendFlagsDir},
 		{"legacy AdminLogsDir", &cfg.Paths.AdminLogsDir, def.AdminLogsDir},
@@ -1518,6 +1523,7 @@ func (l *ConfigLoader) setViperDefaultValues(paths Paths) {
 	l.v.SetDefault("paths.suspend_flags_dir", paths.SuspendFlagsDir)
 	l.v.SetDefault("paths.data_dir", paths.DataDir)
 	l.v.SetDefault("paths.log_dir", paths.LogsDir)
+	l.v.SetDefault("paths.artifact_dir", paths.ArtifactsDir)
 	l.v.SetDefault("paths.admin_logs_dir", paths.AdminLogsDir)
 	l.v.SetDefault("paths.event_store_dir", paths.EventStoreDir)
 	l.v.SetDefault("paths.base_config", paths.BaseConfigFile)
@@ -1706,6 +1712,7 @@ var envBindings = []envBinding{
 	{key: "paths.alt_dags_dir", env: "ALT_DAGS_DIR", isPath: true},
 	{key: "paths.executable", env: "EXECUTABLE", isPath: true},
 	{key: "paths.log_dir", env: "LOG_DIR", isPath: true},
+	{key: "paths.artifact_dir", env: "ARTIFACT_DIR", isPath: true},
 	{key: "paths.data_dir", env: "DATA_DIR", isPath: true},
 	{key: "paths.suspend_flags_dir", env: "SUSPEND_FLAGS_DIR", isPath: true},
 	{key: "paths.admin_logs_dir", env: "ADMIN_LOG_DIR", isPath: true},

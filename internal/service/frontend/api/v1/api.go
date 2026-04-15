@@ -684,11 +684,21 @@ func (a *API) requireLicensedAudit() error {
 	return nil
 }
 
+func (a *API) isAuditLicensed() bool {
+	if a.auditService == nil {
+		return false
+	}
+	if a.licenseManager == nil {
+		return true
+	}
+	return a.licenseManager.Checker().IsFeatureEnabled(license.FeatureAudit)
+}
+
 // logAudit logs an audit entry with the specified category, action, and details.
 // It silently returns if the audit service is not configured.
 // User and IP are extracted from context; missing user is allowed (recorded as empty).
 func (a *API) logAudit(ctx context.Context, category audit.Category, action string, details any) {
-	if a.auditService == nil {
+	if !a.isAuditLicensed() {
 		return
 	}
 

@@ -73,6 +73,9 @@ func SetupCoordinator(t *testing.T, opts ...HelperOption) *Coordinator {
 	if options.WithLogPersistence {
 		cfg.LogDir = helper.Config.Paths.LogDir
 	}
+	if options.WithArtifactPersistence {
+		cfg.ArtifactDir = helper.Config.Paths.ArtifactDir
+	}
 	if helper.StaleHeartbeatThreshold > 0 {
 		cfg.StaleHeartbeatThreshold = helper.StaleHeartbeatThreshold
 	}

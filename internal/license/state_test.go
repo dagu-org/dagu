@@ -87,32 +87,52 @@ func TestState_ClaimsDeepCopy(t *testing.T) {
 	t.Run("mutating returned claims does not affect state", func(t *testing.T) {
 		t.Parallel()
 		var s State
-		s.Update(validClaims(), "tok")
+		claims := validClaims()
+		graceDays := 7
+		claims.GraceDays = &graceDays
+		s.Update(claims, "tok")
 
 		got := s.Claims()
 		require.NotNil(t, got)
 		got.Features = append(got.Features, "mutated-feature")
 		got.Plan = "mutated-plan"
+		require.NotNil(t, got.GraceDays)
+		*got.GraceDays = 0
+		require.NotNil(t, got.ExpiresAt)
+		got.ExpiresAt.Time = time.Now().Add(-24 * time.Hour)
 
 		original := s.Claims()
 		require.NotNil(t, original)
 		assert.Equal(t, "pro", original.Plan)
 		assert.NotContains(t, original.Features, "mutated-feature")
+		require.NotNil(t, original.GraceDays)
+		assert.Equal(t, 7, *original.GraceDays)
+		require.NotNil(t, original.ExpiresAt)
+		assert.True(t, original.ExpiresAt.After(time.Now()))
 	})
 
 	t.Run("mutating input claims does not affect stored state", func(t *testing.T) {
 		t.Parallel()
 		var s State
 		claims := validClaims()
+		graceDays := 5
+		claims.GraceDays = &graceDays
 		s.Update(claims, "tok")
 
 		claims.Features = append(claims.Features, "injected")
 		claims.Plan = "injected-plan"
+		*claims.GraceDays = 0
+		require.NotNil(t, claims.ExpiresAt)
+		claims.ExpiresAt.Time = time.Now().Add(-24 * time.Hour)
 
 		got := s.Claims()
 		require.NotNil(t, got)
 		assert.Equal(t, "pro", got.Plan)
 		assert.NotContains(t, got.Features, "injected")
+		require.NotNil(t, got.GraceDays)
+		assert.Equal(t, 5, *got.GraceDays)
+		require.NotNil(t, got.ExpiresAt)
+		assert.True(t, got.ExpiresAt.After(time.Now()))
 	})
 }
 
@@ -184,6 +204,23 @@ func TestState_IsFeatureEnabled(t *testing.T) {
 		assert.True(t, s.IsFeatureEnabled(FeatureSSO))
 		// A feature not in the claims should still return false.
 		assert.False(t, s.IsFeatureEnabled("nonexistent-feature"))
+	})
+
+	t.Run("expired trial with zero grace disables features immediately", func(t *testing.T) {
+		t.Parallel()
+		var s State
+		zero := 0
+		claims := &LicenseClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Minute)),
+			},
+			Plan:      "trial",
+			Features:  []string{FeatureAudit},
+			GraceDays: &zero,
+		}
+		s.Update(claims, "tok")
+		assert.False(t, s.IsFeatureEnabled(FeatureAudit))
+		assert.False(t, s.IsGracePeriod())
 	})
 }
 

@@ -20,7 +20,7 @@ const (
 )
 
 // newAgentPolicyHook returns a before-tool hook that enforces agent tool policy.
-func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) agent.BeforeToolExecHookFunc {
+func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service, auditEnabled func() bool) agent.BeforeToolExecHookFunc {
 	return func(ctx context.Context, info agent.ToolExecInfo) error {
 		if configStore == nil {
 			return fmt.Errorf("agent policy unavailable")
@@ -28,7 +28,7 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 
 		cfg, err := configStore.Load(ctx)
 		if err != nil || cfg == nil {
-			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "failed to load policy configuration",
 			})
@@ -36,7 +36,7 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 		}
 
 		if err := agent.ValidateToolPolicy(cfg.ToolPolicy); err != nil {
-			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "invalid policy configuration",
 			})
@@ -46,7 +46,7 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 		policy := agent.ResolveToolPolicy(cfg.ToolPolicy)
 
 		if !agent.IsToolEnabledResolved(policy, info.ToolName) {
-			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "tool disabled",
 			})
@@ -59,7 +59,7 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 
 		decision, err := agent.EvaluateBashPolicyResolved(policy, info.Input)
 		if err != nil {
-			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, map[string]any{
+			logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyDenied, map[string]any{
 				"tool_name": info.ToolName,
 				"reason":    "bash policy evaluation failed",
 			})
@@ -90,27 +90,27 @@ func newAgentPolicyHook(configStore agent.ConfigStore, auditSvc *audit.Service) 
 			approved, approvalErr := info.RequestCommandApproval(ctx, decision.Command, reason)
 			if approvalErr != nil {
 				details["approval_result"] = "error"
-				logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, details)
+				logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyDenied, details)
 				return fmt.Errorf("bash command denied by policy (approval failed: %w)", approvalErr)
 			}
 			if approved {
 				details["approval_result"] = "approved"
-				logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyOverride, details)
+				logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyOverride, details)
 				return nil
 			}
 			details["approval_result"] = "rejected"
-			logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, details)
+			logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyDenied, details)
 			return fmt.Errorf("bash command denied by policy")
 		}
 
 		details["approval_result"] = "blocked"
-		logPolicyEvent(ctx, auditSvc, info, auditActionToolPolicyDenied, details)
+		logPolicyEvent(ctx, auditSvc, auditEnabled, info, auditActionToolPolicyDenied, details)
 		return fmt.Errorf("bash command denied by policy")
 	}
 }
 
-func logPolicyEvent(ctx context.Context, auditSvc *audit.Service, info agent.ToolExecInfo, action string, details map[string]any) {
-	if auditSvc == nil {
+func logPolicyEvent(ctx context.Context, auditSvc *audit.Service, auditEnabled func() bool, info agent.ToolExecInfo, action string, details map[string]any) {
+	if !isAuditEnabled(auditSvc, auditEnabled) {
 		return
 	}
 	if details == nil {
