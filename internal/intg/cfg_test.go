@@ -53,7 +53,7 @@ steps:
 	t.Run("Pipe", func(t *testing.T) {
 		t.Parallel()
 
-		pipeCommand := test.PortableLabeledExpandedOutputCommand("hello ", "$NAME")
+		pipeCommand := test.LabeledExpandedOutput("hello ", "$NAME")
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
@@ -130,8 +130,8 @@ steps:
 	t.Run("NamedParams", func(t *testing.T) {
 		t.Parallel()
 
-		nameCommand := test.PortableExpandedOutputCommand("$NAME")
-		greetingCommand := test.PortableLabeledExpandedOutputCommand("Hello, ", "$NAME")
+		nameCommand := test.ExpandedOutput("$NAME")
+		greetingCommand := test.LabeledExpandedOutput("Hello, ", "$NAME")
 		dag := th.DAG(t, `type: graph
 params:
   NAME: "Dagu"
@@ -159,8 +159,8 @@ steps:
 	t.Run("NamedParamsList", func(t *testing.T) {
 		t.Parallel()
 
-		nameCommand := test.PortableExpandedOutputCommand("$NAME")
-		greetingCommand := test.PortableLabeledExpandedOutputCommand("Hello, ", "$NAME")
+		nameCommand := test.ExpandedOutput("$NAME")
+		greetingCommand := test.LabeledExpandedOutput("Hello, ", "$NAME")
 		dag := th.DAG(t, `params:
   - NAME: "Dagu"
   - AGE: 30
@@ -270,8 +270,8 @@ steps:
 	t.Run("RegexPrecondition", func(t *testing.T) {
 		t.Parallel()
 
-		out1Command := test.PortableOutputCommand("abc run def")
-		out2Command := test.PortableOutputCommand("match")
+		out1Command := test.Output("abc run def")
+		out2Command := test.Output("match")
 		dag := th.DAG(t, `steps:
   - command: |
 `+indentTestScript(out1Command, 6)+`
@@ -337,9 +337,9 @@ steps:
 	t.Run("EnvScript", func(t *testing.T) {
 		t.Parallel()
 
-		envScript := test.PortableCommandSequence(
-			test.PortableLabeledExpandedOutputCommand("E1 is ", "$E1"),
-			test.PortableLabeledExpandedOutputCommand("E2 is ", "$E2"),
+		envScript := test.JoinLines(
+			test.LabeledExpandedOutput("E1 is ", "$E1"),
+			test.LabeledExpandedOutput("E2 is ", "$E2"),
 		)
 		dag := th.DAG(t, `env:
   - "E1": foo
@@ -398,9 +398,9 @@ steps:
 		stderrPath := filepath.Join(tempDir, "dag_${LOG_SUFFIX}.err")
 		stdoutPathForYAML := filepath.ToSlash(stdoutPath)
 		stderrPathForYAML := filepath.ToSlash(stderrPath)
-		secondCommand := test.PortableCommandSequence(
-			test.PortableOutputCommand("meh"),
-			test.PortableStderrCommand("oops"),
+		secondCommand := test.JoinLines(
+			test.Output("meh"),
+			test.Stderr("oops"),
 		)
 
 		dag := th.DAG(t, `steps:
@@ -712,9 +712,9 @@ func TestSkippedPreconditions(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	runCommand := test.PortableOutputCommand("executed")
-	skipCommand := test.PortableOutputCommand("should not execute")
-	executeCommand := test.PortableOutputCommand("should execute")
+	runCommand := test.Output("executed")
+	skipCommand := test.Output("should not execute")
+	executeCommand := test.Output("should execute")
 	dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
   - name: run
@@ -805,17 +805,17 @@ env:
 steps:
   - env:
       MY_VAR: "step1_value"
-    command: `+test.PortableExpandedOutputCommand("${MY_VAR}")+`
+    command: `+test.ExpandedOutput("${MY_VAR}")+`
     output: OUT1
 
   - env:
       MY_VAR: $MY_VAR2
-    command: `+test.PortableExpandedOutputCommand("${MY_VAR}")+`
+    command: `+test.ExpandedOutput("${MY_VAR}")+`
     output: OUT2
 
   - env:
       MY_VAR: "dynamic value"
-    command: `+test.PortableExpandedOutputCommand("${MY_VAR}")+`
+    command: `+test.ExpandedOutput("${MY_VAR}")+`
     output: OUT3
 `)
 
@@ -853,7 +853,7 @@ func TestStepWorkingDir(t *testing.T) {
 	dag := th.DAG(t, `
 steps:
   - working_dir: `+stepWorkDir+`
-    command: `+test.PortablePwdCommand()+`
+    command: `+test.ForOS("pwd", "(Get-Location).Path")+`
     output: STEP_DIR
 `)
 

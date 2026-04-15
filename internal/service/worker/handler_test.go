@@ -225,7 +225,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "WORKER_TASK_START_ENV"))
+`, test.EnvOutput("EXPORTED_SECRET", "WORKER_TASK_START_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		task := runtimeexec.CreateTask(
@@ -255,7 +255,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "WORKER_TASK_RETRY_ENV"))
+`, test.EnvOutput("EXPORTED_SECRET", "WORKER_TASK_RETRY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		handler := NewTaskHandler(th.Config)
@@ -304,7 +304,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT", "WORKER_TASK_HOST_ONLY_ENV"))
+`, test.EnvOutput("KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		task := runtimeexec.CreateTask(
@@ -334,7 +334,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT", "WORKER_TASK_HOST_ONLY_ENV"))
+`, test.EnvOutput("KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		handler := NewTaskHandler(th.Config)
@@ -386,7 +386,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("WORKER_TASK_EXACT_ENV", "WORKER_TASK_PREFIX_TOKEN", "WORKER_TASK_HOST_ONLY_ENV"))
+`, test.EnvOutput("WORKER_TASK_EXACT_ENV", "WORKER_TASK_PREFIX_TOKEN", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		task := runtimeexec.CreateTask(
@@ -419,7 +419,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("WORKER_TASK_EXACT_ENV", "WORKER_TASK_PREFIX_TOKEN", "WORKER_TASK_HOST_ONLY_ENV"))
+`, test.EnvOutput("WORKER_TASK_EXACT_ENV", "WORKER_TASK_PREFIX_TOKEN", "WORKER_TASK_HOST_ONLY_ENV"))
 		dag := th.DAG(t, dagContent)
 		runID := uuid.Must(uuid.NewV7()).String()
 		handler := NewTaskHandler(th.Config)

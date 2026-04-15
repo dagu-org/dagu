@@ -62,7 +62,7 @@ func TestManager(t *testing.T) {
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "`+test.PortableSuccessCommand()+`"
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -112,7 +112,7 @@ steps:
 name: tree_child
 steps:
   - name: "1"
-    command: "`+test.PortableSuccessCommand()+`"
+    command: "exit 0"
 ---
 `)
 

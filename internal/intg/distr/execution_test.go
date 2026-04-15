@@ -77,17 +77,17 @@ func artifactWriteCommand(content string, fail bool) string {
 	if fail {
 		commands = append(commands, "exit 1")
 	}
-	return test.PortableCommandSequence(commands...)
+	return test.JoinLines(commands...)
 }
 
 func artifactNoWriteCommand() string {
 	if runtime.GOOS == "windows" {
-		return test.PortableCommandSequence(
+		return test.JoinLines(
 			"if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }",
 			"Write-Output 'no artifacts written'",
 		)
 	}
-	return test.PortableCommandSequence(
+	return test.JoinLines(
 		`test -n "${DAG_RUN_ARTIFACTS_DIR}"`,
 		`echo "no artifacts written"`,
 	)

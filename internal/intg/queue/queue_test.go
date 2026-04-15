@@ -77,7 +77,7 @@ queue: global-queue
 steps:
   - name: sleep
     command: %s
-`, test.ShellQuote(test.PortableSleepCommand(sleepDuration))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
+`, test.ShellQuote(test.Sleep(sleepDuration))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
 		Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(35 * time.Second)
@@ -93,7 +93,7 @@ max_active_runs: 3
 steps:
   - name: sleep
     command: %s
-`, test.ShellQuote(test.PortableSleepCommand(time.Second)))).Enqueue(3).StartScheduler(30 * time.Second)
+`, test.ShellQuote(test.Sleep(time.Second)))).Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(20 * time.Second)
 	f.Stop()
@@ -200,7 +200,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, rawVar, test.PortableEnvOutputCommand("EXPORTED_SECRET", rawVar)), WithQueue("queue-explicit-env"), WithGlobalQueue("queue-explicit-env", 1))
+`, rawVar, test.EnvOutput("EXPORTED_SECRET", rawVar)), WithQueue("queue-explicit-env"), WithGlobalQueue("queue-explicit-env", 1))
 
 	test.RunBuiltCLI(t, f.th.Helper, []string{rawVar + "=from-host"}, "start", f.dag.Location)
 
@@ -265,7 +265,10 @@ handler_on:
 steps:
   - id: retry_step
     command: echo retried
-`, test.PortableWriteFileCommand(markerPath, "failed")), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+`, test.ForOS(
+			fmt.Sprintf("printf '%%s' %s > %s", test.PosixQuote("failed"), test.PosixQuote(markerPath)),
+			fmt.Sprintf("Set-Content -Path %s -Value %s -NoNewline", test.PowerShellQuote(markerPath), test.PowerShellQuote("failed")),
+		)), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
 
 		failedAt := time.Now().UTC().Add(-30 * time.Second)
 		runID := f.FailedRunWithMetadata(runStatusOptions{
@@ -311,7 +314,10 @@ handler_on:
 steps:
   - id: retry_step
     command: echo retried
-`, test.PortableWriteFileCommand(markerPath, "failed")), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
+`, test.ForOS(
+			fmt.Sprintf("printf '%%s' %s > %s", test.PosixQuote("failed"), test.PosixQuote(markerPath)),
+			fmt.Sprintf("Set-Content -Path %s -Value %s -NoNewline", test.PowerShellQuote(markerPath), test.PowerShellQuote("failed")),
+		)), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1))
 
 		failedAt := time.Now().UTC().Add(-30 * time.Second)
 		runID := f.FailedRunWithMetadata(runStatusOptions{
@@ -353,7 +359,10 @@ handler_on:
 steps:
   - id: retry_step
     command: echo retried
-`, test.PortableWriteFileCommand(markerPath, "failed")), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1), WithRetryWindow(48*time.Hour))
+`, test.ForOS(
+			fmt.Sprintf("printf '%%s' %s > %s", test.PosixQuote("failed"), test.PosixQuote(markerPath)),
+			fmt.Sprintf("Set-Content -Path %s -Value %s -NoNewline", test.PowerShellQuote(markerPath), test.PowerShellQuote("failed")),
+		)), WithQueue("retry-queue"), WithGlobalQueue("retry-queue", 1), WithRetryWindow(48*time.Hour))
 
 		now := time.Now().UTC()
 		midnight := retryScanReferenceMidnight(now)

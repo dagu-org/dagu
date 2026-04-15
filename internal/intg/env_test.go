@@ -135,7 +135,7 @@ steps:
 			explicitDir = resolved
 		}
 		explicitDirForYAML := filepath.ToSlash(explicitDir)
-		pwdCommand := test.PortablePwdCommand()
+		pwdCommand := test.ForOS("pwd", "(Get-Location).Path")
 		writeCommand := `echo "from-workdir" > "${DAG_RUN_WORK_DIR}/data.txt"`
 		readCommand := `cat "${DAG_RUN_WORK_DIR}/data.txt"`
 		if runtime.GOOS == "windows" {

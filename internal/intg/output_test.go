@@ -36,7 +36,7 @@ func TestLargeOutput_128KB(t *testing.T) {
 	textFilePath := test.TestdataPath(t, "integration/large-output-128kb.txt")
 	dagSpec := `steps:
   - name: read-128kb-file
-    command: ` + test.PortableReadFileCommand(textFilePath) + `
+    command: ` + fmt.Sprintf("cat %s", test.PosixQuote(textFilePath)) + `
     output: OUTPUT_128KB
 `
 	if runtime.GOOS == "windows" {

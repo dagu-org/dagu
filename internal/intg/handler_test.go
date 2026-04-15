@@ -5,6 +5,7 @@ package intg_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -278,6 +279,10 @@ func TestHandlerOn_Abort(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
+	releaseFile := filepath.Join(t.TempDir(), "abort.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 	dag := th.DAG(t, `
 handler_on:
   abort:
@@ -285,7 +290,11 @@ handler_on:
 
 steps:
   - name: long-running
-    command: `+test.PortableSleepCommand(10*time.Second)+`
+    command: |
+`+indentTestScript(test.ForOS(
+		fmt.Sprintf("while [ ! -f %s ]; do\n  true\n  sleep 0.05\ndone", test.PosixQuote(releaseFile)),
+		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(releaseFile)),
+	), 6)+`
 `)
 
 	// Verify parsing: abort field maps to the canonical abort handler
@@ -582,7 +591,7 @@ handler_on:
 
 steps:
   - name: long-running
-    command: `+test.PortableSleepCommand(10*time.Second)+`
+    command: `+test.Sleep(10*time.Second)+`
 `)
 		dagAgent := dag.Agent()
 

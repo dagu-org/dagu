@@ -374,7 +374,7 @@ func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
 
 func TestGetSubDAGRunSpec(t *testing.T) {
 	server := test.SetupServer(t)
-	childCommand := test.PortableOutputCommand("subdag-spec")
+	childCommand := test.Output("subdag-spec")
 
 	// Create a parent DAG with an inline sub-DAG definition
 	dagSpec := fmt.Sprintf(`steps:
@@ -461,7 +461,7 @@ steps:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
-    command: "echo approved"`, test.PortableSuccessCommand())
+    command: "echo approved"`, "exit 0")
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "approval_test_dag",
@@ -515,7 +515,7 @@ steps:
         - reason
   - name: after-wait
     depends: [wait-step]
-    command: %q`, test.PortableSuccessCommand(), test.PortableEnvOutputCommand("reason", "approver"))
+    command: %q`, "exit 0", test.EnvOutput("reason", "approver"))
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "approval_inputs_dag",
@@ -588,7 +588,7 @@ steps:
         - reason
   - name: after-wait
     depends: [wait-step]
-    command: "echo done"`, test.PortableSuccessCommand())
+    command: "echo done"`, "exit 0")
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "approval_required_dag",
@@ -654,7 +654,7 @@ steps:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
-    command: "echo should not run"`, test.PortableSuccessCommand())
+    command: "echo should not run"`, "exit 0")
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "rejection_test_dag",
@@ -1237,7 +1237,7 @@ func TestExecuteDAGSyncWithWaitingStatus(t *testing.T) {
   - name: wait-step
     command: %q
     approval:
-      prompt: "Approve this"`, test.PortableSuccessCommand())
+      prompt: "Approve this"`, "exit 0")
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: "sync_waiting_dag",

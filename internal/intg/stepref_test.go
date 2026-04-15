@@ -36,12 +36,12 @@ steps:
     command: |
 %s
     output: FILE_PATHS
-`, indentScript(test.PortableCommandSequence(
-				test.PortableOutputCommand("Test output data"),
-				test.PortableStderrCommand("Error message"),
-			), 6), indentScript(test.PortableCommandSequence(
-				test.PortableOutputCommand("stdout_file=${gen.stdout}"),
-				test.PortableOutputCommand("stderr_file=${gen.stderr}"),
+`, indentScript(test.JoinLines(
+				test.Output("Test output data"),
+				test.Stderr("Error message"),
+			), 6), indentScript(test.JoinLines(
+				test.Output("stdout_file=${gen.stdout}"),
+				test.Output("stderr_file=${gen.stderr}"),
 			), 6)),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
@@ -93,10 +93,10 @@ steps:
     command: |
 %s
     output: RESULT
-`, indentScript(test.PortableCommandSequence(
-				test.PortableOutputCommand("known=${first_step.stdout}"),
-				test.PortableOutputCommand("unknown=${unknown_step.stdout}"),
-				test.PortableOutputCommand("invalid=${first_step.unknown_property}"),
+`, indentScript(test.JoinLines(
+				test.Output("known=${first_step.stdout}"),
+				test.Output("unknown=${unknown_step.stdout}"),
+				test.Output("invalid=${first_step.unknown_property}"),
 			), 6)),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
@@ -379,7 +379,7 @@ steps:
     depends: [no_output]
     command: %q
     output: RESULT
-`, test.PortableOutputCommand("ref=${no_output.output}")),
+`, test.Output("ref=${no_output.output}")),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"RESULT": "ref=${no_output.output}",
@@ -398,7 +398,7 @@ steps:
     depends: [check]
     command: %q
     output: RESULT
-`, test.PortableOutputCommand(`{"output":"from-json"}`), test.PortableOutputCommand("value=${check.output}")),
+`, test.Output(`{"output":"from-json"}`), test.Output("value=${check.output}")),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"check":  `{"output":"from-json"}`,

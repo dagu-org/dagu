@@ -126,7 +126,7 @@ worker_selector:
 steps:
   - name: long-step
     command: %s
-`, test.ShellQuote(test.PortableSleepCommand(sleepDuration))),
+`, test.ShellQuote(test.Sleep(sleepDuration))),
 		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)
@@ -195,7 +195,7 @@ worker_selector:
 steps:
   - name: long-step
     command: %s
-`, test.ShellQuote(test.PortableSleepCommand(8*time.Second))),
+`, test.ShellQuote(test.Sleep(8*time.Second))),
 		withStaleThresholds(heartbeatThreshold, leaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	)

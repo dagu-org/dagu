@@ -28,7 +28,7 @@ name: queued-proc-heartbeat
 steps:
   - name: sleep
     command: %s
-`, test.ShellQuote(test.PortableSleepCommand(6*time.Second))), WithProcConfig(queueTestProcHeartbeatInterval, queueTestProcHeartbeatInterval, queueTestProcStaleThreshold)).
+`, test.ShellQuote(test.Sleep(6*time.Second))), WithProcConfig(queueTestProcHeartbeatInterval, queueTestProcHeartbeatInterval, queueTestProcStaleThreshold)).
 		Enqueue(1).
 		StartScheduler(30 * time.Second)
 	defer f.Stop()

@@ -49,7 +49,7 @@ if ($count -lt %d) {
 `, test.PowerShellQuote(counterFile), successAfter, removeBlock)
 	}
 
-	counterFile = test.PortableShellPath(counterFile)
+	counterFile = test.ShellPath(counterFile)
 	removeBlock := ""
 	if removeOnSuccess {
 		removeBlock = fmt.Sprintf("rm -f %s\n", test.PosixQuote(counterFile))
@@ -73,7 +73,7 @@ fi
 }
 
 func repeatLiteralCommandSubstitution(value string) string {
-	return test.PortableCommandSubstitution(test.PortableOutputCommand(value))
+	return "`" + test.Output(value) + "`"
 }
 
 func repeatPolicyParallel(t *testing.T) {

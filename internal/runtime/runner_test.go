@@ -34,19 +34,50 @@ func windowsShellTest() bool {
 	return os.PathSeparator == '\\'
 }
 
+func shellSubstitution(command string) string {
+	return "`" + command + "`"
+}
+
 func trimmedCounterReadCommand(counterFile string) string {
-	return test.PortableReadTrimmedFileCommand(counterFile)
+	if windowsShellTest() {
+		return fmt.Sprintf(
+			"(& { $content = Get-Content -Raw -LiteralPath %s -ErrorAction SilentlyContinue; if ($null -eq $content) { '' } else { ([string]$content).TrimEnd([char]13, [char]10) } })",
+			test.PowerShellQuote(counterFile),
+		)
+	}
+	return fmt.Sprintf("tr -d '\\r\\n' < %s", test.PosixQuote(counterFile))
+}
+
+func createEmptyFileCommand(path string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf("New-Item -ItemType File -Path %s -Force | Out-Null", test.PowerShellQuote(path))
+	}
+	return fmt.Sprintf(": > %s", test.PosixQuote(path))
+}
+
+func fileExistsCommand(path string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf("if (Test-Path %s) { exit 0 } else { exit 1 }", test.PowerShellQuote(path))
+	}
+	return fmt.Sprintf("test -f %s", test.PosixQuote(path))
+}
+
+func fileMissingCommand(path string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf("if (-not (Test-Path %s)) { exit 0 } else { exit 1 }", test.PowerShellQuote(path))
+	}
+	return fmt.Sprintf("test ! -f %s", test.PosixQuote(path))
 }
 
 func repeatCounterValueCondition(counterFile string) string {
 	if windowsShellTest() {
-		return test.PortableCommandSubstitution(fmt.Sprintf(
+		return shellSubstitution(fmt.Sprintf(
 			"if (Test-Path %s) { [System.IO.File]::ReadAllText(%s).TrimEnd([char]13,[char]10) } else { '' }",
 			test.PowerShellQuote(counterFile),
 			test.PowerShellQuote(counterFile),
 		))
 	}
-	return test.PortableCommandSubstitution(trimmedCounterReadCommand(counterFile))
+	return shellSubstitution(trimmedCounterReadCommand(counterFile))
 }
 
 func repeatExpectedCondition(counterFile, expected string) *core.Condition {
@@ -143,7 +174,7 @@ func repeatCounterThenSleepScript(counterFile string, sleepAfterCount int, sleep
 					if ($COUNT -ge %d) {
 						%s
 					}
-				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.PortableSleepCommand(sleepDuration))
+				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.Sleep(sleepDuration))
 	}
 	return fmt.Sprintf(`
 					%s
@@ -152,7 +183,7 @@ func repeatCounterThenSleepScript(counterFile string, sleepAfterCount int, sleep
 					if [ "$COUNT" -ge %d ]; then
 						%s
 					fi
-				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.PortableSleepCommand(sleepDuration))
+				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.Sleep(sleepDuration))
 }
 
 func repeatCounterExitCodeScript(counterFile string) string {
@@ -452,10 +483,10 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
 		r := setupRunner(t)
-		command := test.PortableCommandSequence(
-			test.PortableStderrCommand("test_output"),
-			test.PortableOutputCommand("test_output"),
-			test.PortableFailureCommand(),
+		command := test.JoinLines(
+			test.Stderr("test_output"),
+			test.Output("test_output"),
+			"exit 1",
 		)
 
 		// 1 (exit code 1) -> 2
@@ -558,8 +589,8 @@ func TestRunner(t *testing.T) {
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
 		plan := r.newPlan(t,
-			newStep("1", withCommand(test.PortableSuccessCommand())),
-			newStep("2", withCommand(test.PortableSleepCommand(secondSleep)), withDepends("1")),
+			newStep("1", withCommand("exit 0")),
+			newStep("2", withCommand(test.Sleep(secondSleep)), withDepends("1")),
 			successStep("3", "2"),
 		)
 
@@ -578,7 +609,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(test.PortableFileExistsCommand(file)),
+				withCommand(fileExistsCommand(file)),
 				withRetryPolicy(2, 0),
 			),
 		)
@@ -605,7 +636,7 @@ func TestRunner(t *testing.T) {
 								exit 1
 							}
 							exit 0
-						`, test.PowerShellQuote(testFile), test.PortableCreateEmptyFileCommand(testFile))
+						`, test.PowerShellQuote(testFile), createEmptyFileCommand(testFile))
 					}
 					return fmt.Sprintf(`
 						if [ ! -f %s ]; then
@@ -613,7 +644,7 @@ func TestRunner(t *testing.T) {
 							exit 1
 						fi
 						exit 0
-					`, test.PosixQuote(testFile), test.PortableCreateEmptyFileCommand(testFile))
+					`, test.PosixQuote(testFile), createEmptyFileCommand(testFile))
 				}()),
 				withRetryPolicy(1, time.Millisecond*50),
 			),
@@ -639,7 +670,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(test.PortableFileExistsCommand(file)),
+				withCommand(fileExistsCommand(file)),
 				withRetryPolicy(3, time.Millisecond*50),
 			),
 		)
@@ -742,7 +773,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: test.PortableSuccessCommand(),
+					Condition: "exit 0",
 				})),
 			successStep("3", "2"),
 		)
@@ -761,7 +792,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: test.PortableFailureCommand(),
+					Condition: "exit 1",
 				})),
 			successStep("3", "2"),
 		)
@@ -861,7 +892,7 @@ func TestRunner(t *testing.T) {
 									exit 0
 								}
 								%s
-							`, test.PowerShellQuote(repeatMarker), test.PortableCreateEmptyFileCommand(repeatMarker), test.PortableSleepCommand(5*time.Second))
+							`, test.PowerShellQuote(repeatMarker), createEmptyFileCommand(repeatMarker), test.Sleep(5*time.Second))
 					}
 					return fmt.Sprintf(`
 							if [ ! -f %s ]; then
@@ -869,7 +900,7 @@ func TestRunner(t *testing.T) {
 								exit 0
 							fi
 							%s
-						`, test.PosixQuote(repeatMarker), test.PortableCreateEmptyFileCommand(repeatMarker), test.PortableSleepCommand(5*time.Second))
+						`, test.PosixQuote(repeatMarker), createEmptyFileCommand(repeatMarker), test.Sleep(5*time.Second))
 				}()),
 				withRepeatPolicy(true, time.Millisecond*100),
 			),
@@ -899,7 +930,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(test.PortableFailureCommand()),
+				withCommand("exit 1"),
 				withRepeatPolicy(true, time.Millisecond*50),
 			),
 		)
@@ -1010,8 +1041,8 @@ func TestRunner(t *testing.T) {
 
 		jsonData := `{"key": "value"}`
 		plan := r.newPlan(t,
-			newStep("1", withCommand(test.PortableOutputCommand(jsonData)), withOutput("OUT")),
-			newStep("2", withCommand(test.PortableExpandedOutputCommand("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
+			newStep("1", withCommand(test.Output(jsonData)), withOutput("OUT")),
+			newStep("2", withCommand(test.ExpandedOutput("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -1027,8 +1058,8 @@ func TestRunner(t *testing.T) {
 
 		jsonData := "{\n\t\"key\": \"value\"\n}"
 		plan := r.newPlan(t,
-			newStep("1", withCommand(test.PortableOutputCommand(jsonData)), withOutput("OUT")),
-			newStep("2", withCommand(test.PortableExpandedOutputCommand("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
+			newStep("1", withCommand(test.Output(jsonData)), withOutput("OUT")),
+			newStep("2", withCommand(test.ExpandedOutput("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -1043,7 +1074,7 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand(test.PortableExpandedOutputCommand("${DAG_RUN_LOG_FILE}")), withOutput("RESULT")),
+			newStep("1", withCommand(test.ExpandedOutput("${DAG_RUN_LOG_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -1060,7 +1091,7 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand(test.PortableExpandedOutputCommand("${DAG_RUN_STEP_STDOUT_FILE}")), withOutput("RESULT")),
+			newStep("1", withCommand(test.ExpandedOutput("${DAG_RUN_STEP_STDOUT_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -1077,7 +1108,7 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand(test.PortableExpandedOutputCommand("${DAG_RUN_STEP_STDERR_FILE}")), withOutput("RESULT")),
+			newStep("1", withCommand(test.ExpandedOutput("${DAG_RUN_STEP_STDERR_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -1462,7 +1493,7 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 		r := setupRunner(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
 		plan := r.newPlan(t,
 			newStep("timeout_step",
-				withCommand(test.PortableSleepCommand(sleepDuration)), // longer than step timeout
+				withCommand(test.Sleep(sleepDuration)), // longer than step timeout
 				withStepTimeout(stepTimeout),
 			),
 			successStep("after", "timeout_step"),
@@ -1491,9 +1522,9 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 		r := setupRunner(t)
 		plan := r.newPlan(t,
 			newStep("retry_timeout",
-				withCommand(test.PortableCommandSequence(
-					test.PortableSleepCommand(sleepDuration),
-					test.PortableFailureCommand(),
+				withCommand(test.JoinLines(
+					test.Sleep(sleepDuration),
+					"exit 1",
 				)),
 				withRetryPolicy(5, 50*time.Millisecond), // would retry many times if not timed out
 				withStepTimeout(stepTimeout),            // shorter than sleep
@@ -1513,9 +1544,9 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 		sleepDuration := platformTestDuration(200*time.Millisecond, 320*time.Millisecond)
 		r := setupRunner(t, withMaxActiveRuns(3))
 		plan := r.newPlan(t,
-			newStep("p1", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
-			newStep("p2", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
-			newStep("p3", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("p1", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("p2", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("p3", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
 		)
 
 		result := plan.assertRun(t, core.Failed)
@@ -1529,7 +1560,7 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 		sleepDuration := platformTestDuration(300*time.Millisecond, 450*time.Millisecond)
 		r := setupRunner(t, withTimeout(5*time.Second))
 		plan := r.newPlan(t,
-			newStep("short_timeout", withCommand(test.PortableSleepCommand(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("short_timeout", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
 		)
 		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "short_timeout", core.NodeFailed)
@@ -1705,8 +1736,8 @@ func TestRunner_ErrorHandling(t *testing.T) {
 		// Exercise failed-step propagation without relying on shell-specific
 		// process signaling behavior, which is slow on Windows runners.
 		panicStep := newStep("panic", withScript(`
-			`+test.PortableOutputCommand("About to panic")+`
-			`+test.PortableFailureCommand()+`
+			`+test.Output("About to panic")+`
+			exit 1
 		`))
 
 		plan := r.newPlan(t, panicStep)
@@ -1724,7 +1755,7 @@ func TestRunner_Metrics(t *testing.T) {
 		successStep("1"),
 		failStep("2"),
 		newStep("3", withPrecondition(&core.Condition{
-			Condition: test.PortableFailureCommand(),
+			Condition: "exit 1",
 		})),
 		successStep("4", "1"),
 	)
@@ -1757,7 +1788,7 @@ func TestRunner_DAGPreconditions(t *testing.T) {
 			Name: "test_dag",
 			Preconditions: []*core.Condition{
 				{
-					Condition: test.PortableFailureCommand(), // This will fail
+					Condition: "exit 1", // This will fail
 				},
 			},
 		}
@@ -1997,9 +2028,9 @@ func TestRunner_TimeoutDuringRetry(t *testing.T) {
 	// Step that will keep retrying until timeout
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand(test.PortableCommandSequence(
-				test.PortableSleepCommand(100*time.Millisecond),
-				test.PortableFailureCommand(),
+			withCommand(test.JoinLines(
+				test.Sleep(100*time.Millisecond),
+				"exit 1",
 			)),
 			withRetryPolicy(10, 50*time.Millisecond), // Many retries
 		),
@@ -2016,10 +2047,10 @@ func TestRunner_TimeoutDuringRetry(t *testing.T) {
 
 func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 	r := setupRunner(t,
-		withOnExit(newStep("onExit", withScript(test.PortableCommandSequence(
-			test.PortableOutputCommand("handler started"),
-			test.PortableSleepCommand(100*time.Millisecond),
-			test.PortableOutputCommand("handler done"),
+		withOnExit(newStep("onExit", withScript(test.JoinLines(
+			test.Output("handler started"),
+			test.Sleep(100*time.Millisecond),
+			test.Output("handler done"),
 		)))),
 	)
 
@@ -2082,7 +2113,7 @@ func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
 	// Test repeat with limit
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand(test.PortableOutputCommand("repeat")),
+			withCommand(test.Output("repeat")),
 			withRepeatPolicy(true, 100*time.Millisecond),
 			func(step *core.Step) {
 				step.RepeatPolicy.Limit = 3
@@ -2293,7 +2324,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: test.PortableFileMissingCommand(gateFile),
+						Condition: fileMissingCommand(gateFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2383,7 +2414,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: test.PortableFileExistsCommand(gateFile),
+						Condition: fileExistsCommand(gateFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2482,7 +2513,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: test.PortableFailureCommand(), // Will never be true
+						Condition: "exit 1", // Will never be true
 					}
 					step.RepeatPolicy.Limit = 3
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -2557,7 +2588,7 @@ func TestRunner_StepIDVariableExpansion(t *testing.T) {
 		),
 		newStep("step3",
 			// This should have access to both step1 and step2 outputs via IDs
-			withCommand(test.PortableEnvOutputCommandWithSeparator(" ", "OUT1", "OUT2")),
+			withCommand(test.EnvOutputWithSeparator(" ", "OUT1", "OUT2")),
 			withOutput("COMBINED"),
 			withDepends("step2"),
 		),
@@ -2600,9 +2631,9 @@ func TestRunner_RetryPolicyDefaults(t *testing.T) {
 	// Test retry with unhandled error type (not exec.ExitError)
 	plan := r.newPlan(t,
 		newStep("1",
-			withScript(test.PortableCommandSequence(
-				test.PortableStderrCommand("Test error"),
-				test.PortableFailureCommand(),
+			withScript(test.JoinLines(
+				test.Stderr("Test error"),
+				"exit 1",
 			)),
 			withRetryPolicy(1, 20*time.Millisecond),
 		),
@@ -2782,9 +2813,9 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("worker_step",
 				withID("worker"),
-				withCommand(test.PortableCommandSequence(
-					test.PortableOutputCommand("Worker processing done"),
-					test.PortableSuccessCommand(),
+				withCommand(test.JoinLines(
+					test.Output("Worker processing done"),
+					"exit 0",
 				)),
 				withDepends("main_step"),
 			),
@@ -2825,9 +2856,9 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("failing_step",
 				withID("failing"),
-				withCommand(test.PortableCommandSequence(
-					test.PortableStderrCommand("Error occurred"),
-					test.PortableFailureCommand(),
+				withCommand(test.JoinLines(
+					test.Stderr("Error occurred"),
+					"exit 1",
 				)),
 				withDepends("setup"),
 			),
@@ -2873,7 +2904,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("third",
 				withID("step3"),
-				withCommand(test.PortableStderrCommand("Warning message")),
+				withCommand(test.Stderr("Warning message")),
 				withDepends("second"),
 			),
 		)
@@ -2939,9 +2970,9 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("main",
 				withID("main"),
-				withCommand(test.PortableCommandSequence(
-					test.PortableOutputCommand("Processing"),
-					test.PortableSuccessCommand(),
+				withCommand(test.JoinLines(
+					test.Output("Processing"),
+					"exit 0",
 				)),
 			),
 		)

@@ -501,9 +501,12 @@ steps:
 
 func TestParallelExecution_AbortSuppressesPendingRetry(t *testing.T) {
 	markerFile := filepath.Join(t.TempDir(), "parallel-first-attempt.marker")
-	childScript := test.PortableCommandSequence(
-		test.PortableCreateEmptyFileCommand(markerFile),
-		test.PortableFailureCommand(),
+	childScript := test.JoinLines(
+		test.ForOS(
+			fmt.Sprintf(": > %s", test.PosixQuote(markerFile)),
+			fmt.Sprintf("New-Item -ItemType File -Path %s -Force | Out-Null", test.PowerShellQuote(markerFile)),
+		),
+		"exit 1",
 	)
 
 	th := test.Setup(t, test.WithBuiltExecutable())
@@ -1116,7 +1119,7 @@ func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
         exit 1
       fi
 `
-	discoverCommand := fmt.Sprintf("find %s -name '*.csv' -type f", test.PosixQuote(test.PortableShellPath(testDataDir)))
+	discoverCommand := fmt.Sprintf("find %s -name '*.csv' -type f", test.PosixQuote(test.ShellPath(testDataDir)))
 	if runtime.GOOS == "windows" {
 		processFileScript = `
       $file = "${ITEM}"

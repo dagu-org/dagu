@@ -42,6 +42,36 @@ func setAllAgentStepCommands(dag *core.DAG, command string) {
 	}
 }
 
+func waitForFileScript(path string, pollInterval time.Duration) string {
+	if runtime.GOOS == "windows" {
+		millis := pollInterval.Milliseconds()
+		if millis <= 0 {
+			millis = 1
+		}
+		return fmt.Sprintf(`
+while (-not (Test-Path %s)) {
+  Start-Sleep -Milliseconds %d
+}
+`, test.PowerShellQuote(path), millis)
+	}
+	return fmt.Sprintf(`
+while [ ! -f %s ]; do
+  %s
+done
+`, test.PosixQuote(path), test.Sleep(pollInterval))
+}
+
+func writeFileCommand(path, content string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("Set-Content -Path %s -Value %s -NoNewline", test.PowerShellQuote(path), test.PowerShellQuote(content))
+	}
+	return fmt.Sprintf("printf '%%s' %s > %s", test.PosixQuote(content), test.PosixQuote(path))
+}
+
+func pwdCommand() string {
+	return test.ForOS("pwd", "(Get-Location).Path")
+}
+
 func TestAgent_Run(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Parallel()
@@ -49,9 +79,9 @@ func TestAgent_Run(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, fmt.Sprintf(`steps:
-  - %q
-`, test.PortableSleepCommand(time.Second)))
+		dag := th.DAG(t, `steps:
+  - "exit 0"
+`)
 		dagAgent := dag.Agent()
 
 		dag.AssertLatestStatus(t, core.NotStarted)
@@ -77,9 +107,9 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, fmt.Sprintf(`steps:
-  - %q
-`, test.PortableSleepCommand(time.Second)))
+		dag := th.DAG(t, `steps:
+  - "exit 0"
+`)
 		dagAgent := dag.Agent()
 
 		// Create a history file by running a DAG
@@ -102,7 +132,7 @@ func TestAgent_Run(t *testing.T) {
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: wait-until-released
     command: %q
-`, test.PortableWaitForFileScript(releaseFile, 50*time.Millisecond)))
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		done := make(chan struct{})
 
@@ -130,11 +160,11 @@ func TestAgent_Run(t *testing.T) {
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
   - %q
-`, test.PortableSuccessCommand(), test.PortableSuccessCommand()))
+`, "exit 0", "exit 0"))
 
 		// Set a precondition that always fails
 		dag.Preconditions = []*core.Condition{
-			{Condition: test.PortableCommandSubstitution(test.PortableOutputCommand("1")), Expected: "0"},
+			{Condition: "`" + test.Output("1") + "`", Expected: "0"},
 		}
 
 		dagAgent := dag.Agent()
@@ -150,7 +180,7 @@ func TestAgent_Run(t *testing.T) {
 		th := test.Setup(t)
 		errDAG := th.DAG(t, fmt.Sprintf(`steps:
   - %q
-`, test.PortableFailureCommand()))
+`, "exit 1"))
 		dagAgent := errDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -184,7 +214,7 @@ steps:
     command: %q
 steps:
   - %q
-`, test.PortableWriteFileCommand(marker, "failed"), test.PortableFailureCommand()))
+`, writeFileCommand(marker, "failed"), "exit 1"))
 		dagAgent := dag.Agent()
 		dagAgent.RunError(t)
 
@@ -205,7 +235,7 @@ steps:
 steps:
   - %q
   - %q
-`, test.PortableSleepCommand(time.Second), test.PortableSleepCommand(2*time.Second)))
+`, test.Sleep(time.Second), test.Sleep(2*time.Second)))
 		dagAgent := timeoutDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -221,7 +251,7 @@ steps:
 		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
-`, test.PortableWaitForFileScript(releaseFile, 50*time.Millisecond)))
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent(test.WithDAGRunID(dagRunID))
 		done := make(chan struct{})
 
@@ -258,7 +288,7 @@ steps:
 steps:
   - %q
   - %q
-`, test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand()))
+`, "exit 0", "exit 0", "exit 0"))
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
 
@@ -285,7 +315,7 @@ func TestAgent_WorkingDirExpansion(t *testing.T) {
 		dag := th.DAG(t, `working_dir: $TEST_WORK_DIR
 steps:
   - name: check-pwd
-    command: `+test.PortablePwdCommand()+`
+    command: `+pwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -310,7 +340,7 @@ steps:
 working_dir: $CUSTOM_DIR
 steps:
   - name: check-pwd
-    command: `+test.PortablePwdCommand()+`
+    command: `+pwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -327,7 +357,7 @@ steps:
 		dag := th.DAG(t, `working_dir: ~
 steps:
   - name: check-pwd
-    command: `+test.PortablePwdCommand()+`
+    command: `+pwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -344,7 +374,7 @@ func TestAgent_DryRun(t *testing.T) {
 
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
-`, test.PortableSuccessCommand()))
+`, "exit 0"))
 		dagAgent := dag.Agent(test.WithAgentOptions(agent.Options{Dry: true}))
 
 		dagAgent.RunSuccess(t)
@@ -403,7 +433,7 @@ steps:
         expected: "1"
   - name: "9"
     command: %q
-`, test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand()))
+`, "exit 0", "exit 1", "exit 0", "exit 0", "exit 1", "exit 0", "exit 0", "exit 0", "exit 1"))
 		dagAgent := dag.Agent()
 
 		dagAgent.RunError(t)
@@ -411,7 +441,7 @@ steps:
 
 		// Modify the DAG to make it successful
 		dagRunStatus := dagAgent.Status(th.Context)
-		setAllAgentStepCommands(dag.DAG, test.PortableSuccessCommand())
+		setAllAgentStepCommands(dag.DAG, "exit 0")
 
 		// Retry the DAG and check if it is successful
 		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
@@ -470,7 +500,7 @@ steps:
         expected: "1"
   - name: "9"
     command: %q
-`, test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableSuccessCommand(), test.PortableFailureCommand()))
+`, "exit 0", "exit 1", "exit 0", "exit 0", "exit 1", "exit 0", "exit 0", "exit 0", "exit 1"))
 		dagAgent := dag.Agent()
 
 		// Run the DAG to get a failed status
@@ -484,7 +514,7 @@ steps:
 		}
 
 		// Modify the DAG to make all steps successful
-		setAllAgentStepCommands(dag.DAG, test.PortableSuccessCommand())
+		setAllAgentStepCommands(dag.DAG, "exit 0")
 
 		// Wait until the current time (RFC3339, second precision) differs
 		// from the previous FinishedAt timestamps so that retried steps
@@ -547,10 +577,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
-		// Start a long-running DAG
+		releaseFile := filepath.Join(t.TempDir(), "http-valid.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
-`, test.PortableSleepCommand(10*time.Second)))
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 		ctx := th.Context
 		go func() {
@@ -581,10 +614,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
-		// Start a long-running DAG
+		releaseFile := filepath.Join(t.TempDir(), "http-invalid.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
-`, test.PortableSleepCommand(10*time.Second)))
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 
 		go func() {
@@ -611,10 +647,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
-		// Start a long-running DAG
+		releaseFile := filepath.Join(t.TempDir(), "http-cancel.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - %q
-`, test.PortableSleepCommand(10*time.Second)))
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 
 		done := make(chan struct{})
@@ -741,7 +780,7 @@ steps:
 			name: "NoOutputs",
 			dag: fmt.Sprintf(`steps:
   - name: step1
-    command: %q`, test.PortableSuccessCommand()),
+    command: %q`, "exit 0"),
 			expected: map[string]string{},
 		},
 	}
@@ -803,7 +842,7 @@ func TestAgent_SubDAGRunVisibleWhileRunning(t *testing.T) {
 steps:
   - name: slow-step
     command: %q
-`, test.PortableWaitForFileScript(releaseFile, 100*time.Millisecond)))
+`, waitForFileScript(releaseFile, 100*time.Millisecond)))
 
 	// The preceding step must run long enough for the one-shot 100ms status timer
 	// to fire (and exhaust itself) BEFORE run-child starts. This replicates the
@@ -817,7 +856,7 @@ steps:
     call: child-slow
     depends:
       - pre-step
-`, test.PortableSleepCommand(time.Second)))
+`, test.Sleep(time.Second)))
 
 	a := parent.Agent()
 	runErr := make(chan error, 1)

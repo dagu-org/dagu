@@ -304,7 +304,7 @@ func TestDAG(t *testing.T) {
 		spec := fmt.Sprintf(`
 steps:
   - %s
-`, test.ShellQuote(test.PortableSleepCommand(time.Second)))
+`, test.ShellQuote("exit 0"))
 		// Create a new DAG
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 			Name: "test_dag",
@@ -627,7 +627,7 @@ steps:
 		spec := fmt.Sprintf(`
 steps:
   - %s
-`, test.ShellQuote(test.PortableSleepCommand(time.Second)))
+`, test.ShellQuote("exit 0"))
 		name := "inline_enqueue_spec"
 
 		resp := server.Client().Post("/api/v1/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
@@ -715,7 +715,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "API_START_EXPLICIT_ENV"))
+`, test.EnvOutput("EXPORTED_SECRET", "API_START_EXPLICIT_ENV"))
 		dagName := "api_start_explicit_env"
 
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
@@ -764,7 +764,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "API_ENQUEUE_EXPLICIT_ENV"))
+`, test.EnvOutput("EXPORTED_SECRET", "API_ENQUEUE_EXPLICIT_ENV"))
 		dagName := "api_enqueue_explicit_env"
 
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{

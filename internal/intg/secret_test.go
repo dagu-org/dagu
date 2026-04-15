@@ -166,8 +166,8 @@ secrets:
 steps:
   - name: echo-both
     command: |
-      `+test.PortableLabeledExpandedOutputCommand("First: ", "${FIRST_SECRET}")+`
-      `+test.PortableLabeledExpandedOutputCommand("Second: ", "${SECOND_SECRET}")+`
+      `+test.LabeledExpandedOutput("First: ", "${FIRST_SECRET}")+`
+      `+test.LabeledExpandedOutput("Second: ", "${SECOND_SECRET}")+`
     output: RESULT
 `)
 		agent := dag.Agent()
@@ -433,9 +433,9 @@ secrets:
 steps:
   - name: use-secrets-in-env
     command: |
-      `+test.PortableLabeledExpandedOutputCommand("Auth header: ", "${AUTH_HEADER}")+`
-      `+test.PortableLabeledExpandedOutputCommand("DB pass: ", "${DB_PASS}")+`
-      `+test.PortableLabeledExpandedOutputCommand("Strict mode: ", "${STRICT_MODE}")+`
+      `+test.LabeledExpandedOutput("Auth header: ", "${AUTH_HEADER}")+`
+      `+test.LabeledExpandedOutput("DB pass: ", "${DB_PASS}")+`
+      `+test.LabeledExpandedOutput("Strict mode: ", "${STRICT_MODE}")+`
     env:
       AUTH_HEADER: "Bearer ${API_TOKEN}"
       DB_PASS: "${DB_PASSWORD}"

@@ -251,7 +251,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "SUBCMD_START_EXPLICIT_ENV")))
+`, test.EnvOutput("EXPORTED_SECRET", "SUBCMD_START_EXPLICIT_ENV")))
 
 	spec := th.SubCmdBuilder.Start(dagFile.DAG, runtime.StartOptions{})
 	err := runtime.Start(th.Context, spec)
@@ -283,7 +283,7 @@ steps:
   - name: capture
     command: %q
     output: RESULT
-`, test.PortableEnvOutputCommand("EXPORTED_SECRET", "SUBCMD_START_SECRET_SOURCE")))
+`, test.EnvOutput("EXPORTED_SECRET", "SUBCMD_START_SECRET_SOURCE")))
 
 	spec := th.SubCmdBuilder.Start(dagFile.DAG, runtime.StartOptions{})
 	for _, entry := range spec.Env {

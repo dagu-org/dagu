@@ -39,7 +39,7 @@ if ($count -eq "1") {
 `, test.PowerShellQuote(counterFile)), "\n")
 	}
 
-	counterFile = test.PortableShellPath(counterFile)
+	counterFile = test.ShellPath(counterFile)
 	return strings.TrimPrefix(fmt.Sprintf(`
 COUNTER_FILE=%s
 if [ ! -f "$COUNTER_FILE" ]; then

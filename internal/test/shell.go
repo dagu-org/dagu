@@ -12,6 +12,25 @@ import (
 	"time"
 )
 
+func ForOS(posix, windows string) string {
+	if runtime.GOOS == "windows" {
+		return windows
+	}
+	return posix
+}
+
+func JoinLines(lines ...string) string {
+	nonEmpty := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		nonEmpty = append(nonEmpty, line)
+	}
+	return strings.Join(nonEmpty, "\n")
+}
+
 func PosixQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
@@ -21,48 +40,28 @@ func PowerShellQuote(value string) string {
 }
 
 func ShellQuote(value string) string {
+	return ForOS(PosixQuote(value), PowerShellQuote(value))
+}
+
+func ShellPath(path string) string {
 	if runtime.GOOS == "windows" {
-		return PowerShellQuote(value)
+		return filepath.ToSlash(path)
 	}
-	return PosixQuote(value)
+	return path
 }
 
-func PortableSuccessCommand() string {
-	return "exit 0"
-}
-
-func PortableFailureCommand() string {
-	return "exit 1"
-}
-
-func PortableOutputCommand(value string) string {
+func Output(value string) string {
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf("Write-Output %s", PowerShellQuote(value))
 	}
 	return fmt.Sprintf("printf '%%s\\n' %s", PosixQuote(value))
 }
 
-func PortableStderrCommand(value string) string {
+func Stderr(value string) string {
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf("[Console]::Error.WriteLine(%s)", PowerShellQuote(value))
 	}
 	return fmt.Sprintf("printf '%%s\\n' %s 1>&2", PosixQuote(value))
-}
-
-func PortableCommandSequence(commands ...string) string {
-	nonEmpty := make([]string, 0, len(commands))
-	for _, command := range commands {
-		command = strings.TrimSpace(command)
-		if command == "" {
-			continue
-		}
-		nonEmpty = append(nonEmpty, command)
-	}
-	return strings.Join(nonEmpty, "\n")
-}
-
-func PortableCommandSubstitution(command string) string {
-	return "`" + command + "`"
 }
 
 func portableEnvNameFromRef(ref string) (string, bool) {
@@ -102,10 +101,10 @@ func portablePowerShellEnvExpr(ref string) (string, bool) {
 	return "$env:" + name, true
 }
 
-// PortableExpandedOutputCommand emits a Dagu-resolved ${...} value while keeping
-// shell quoting valid on each platform. The input should be a Dagu reference,
-// not an arbitrary literal string.
-func PortableExpandedOutputCommand(ref string) string {
+// ExpandedOutput emits a Dagu-resolved ${...} value while keeping shell quoting
+// valid on each platform. The input should be a Dagu reference, not an
+// arbitrary literal string.
+func ExpandedOutput(ref string) string {
 	if runtime.GOOS == "windows" {
 		if expr, ok := portablePowerShellEnvExpr(ref); ok {
 			return "Write-Output " + expr
@@ -115,7 +114,7 @@ func PortableExpandedOutputCommand(ref string) string {
 	return fmt.Sprintf("printf '%%s\\n' \"%s\"", ref)
 }
 
-func PortableLabeledExpandedOutputCommand(prefix, ref string) string {
+func LabeledExpandedOutput(prefix, ref string) string {
 	if runtime.GOOS == "windows" {
 		if expr, ok := portablePowerShellEnvExpr(ref); ok {
 			return fmt.Sprintf("Write-Output (%s + [string](%s))", PowerShellQuote(prefix), expr)
@@ -125,21 +124,7 @@ func PortableLabeledExpandedOutputCommand(prefix, ref string) string {
 	return fmt.Sprintf("printf '%%s\\n' \"%s%s\"", prefix, ref)
 }
 
-func PortablePwdCommand() string {
-	if runtime.GOOS == "windows" {
-		return "(Get-Location).Path"
-	}
-	return "pwd"
-}
-
-func PortableShellPath(path string) string {
-	if runtime.GOOS == "windows" {
-		return filepath.ToSlash(path)
-	}
-	return path
-}
-
-func PortableSleepCommand(d time.Duration) string {
+func Sleep(d time.Duration) string {
 	if runtime.GOOS == "windows" {
 		millis := d.Milliseconds()
 		if millis <= 0 {
@@ -150,83 +135,7 @@ func PortableSleepCommand(d time.Duration) string {
 	return fmt.Sprintf("sleep %s", strconv.FormatFloat(d.Seconds(), 'f', -1, 64))
 }
 
-func PortableWaitForFileScript(path string, pollInterval time.Duration) string {
-	if runtime.GOOS == "windows" {
-		millis := pollInterval.Milliseconds()
-		if millis <= 0 {
-			millis = 1
-		}
-		return fmt.Sprintf(`
-while (-not (Test-Path %s)) {
-  Start-Sleep -Milliseconds %d
-}
-`, PowerShellQuote(path), millis)
-	}
-	return fmt.Sprintf(`
-while [ ! -f %s ]; do
-  %s
-done
-`, PosixQuote(path), PortableSleepCommand(pollInterval))
-}
-
-func PortableWriteFileCommand(path, content string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("Set-Content -Path %s -Value %s -NoNewline", PowerShellQuote(path), PowerShellQuote(content))
-	}
-	return fmt.Sprintf("printf '%%s' %s > %s", PosixQuote(content), PosixQuote(path))
-}
-
-func PortableCreateEmptyFileCommand(path string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("New-Item -ItemType File -Path %s -Force | Out-Null", PowerShellQuote(path))
-	}
-	return fmt.Sprintf(": > %s", PosixQuote(path))
-}
-
-func PortableReadTrimmedFileCommand(path string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(
-			"(& { $content = Get-Content -Raw -LiteralPath %s -ErrorAction SilentlyContinue; if ($null -eq $content) { '' } else { ([string]$content).TrimEnd([char]13, [char]10) } })",
-			PowerShellQuote(path),
-		)
-	}
-	return fmt.Sprintf("tr -d '\\r\\n' < %s", PosixQuote(path))
-}
-
-func PortableReadFileCommand(path string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("Get-Content -Raw -Path %s", PowerShellQuote(path))
-	}
-	return fmt.Sprintf("cat %s", PosixQuote(path))
-}
-
-func PortableReadFileOrFallbackCommand(path, fallback string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(
-			"if (Test-Path %s) { %s } else { Write-Output %s }",
-			PowerShellQuote(path),
-			PortableReadTrimmedFileCommand(path),
-			PowerShellQuote(fallback),
-		)
-	}
-	return fmt.Sprintf("cat %s 2>/dev/null || printf '%%s\\n' %s", PosixQuote(path), PosixQuote(fallback))
-}
-
-func PortableFileExistsCommand(path string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("if (Test-Path %s) { exit 0 } else { exit 1 }", PowerShellQuote(path))
-	}
-	return fmt.Sprintf("test -f %s", PosixQuote(path))
-}
-
-func PortableFileMissingCommand(path string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("if (-not (Test-Path %s)) { exit 0 } else { exit 1 }", PowerShellQuote(path))
-	}
-	return fmt.Sprintf("test ! -f %s", PosixQuote(path))
-}
-
-func PortableEnvOutputCommandWithSeparator(separator string, names ...string) string {
+func EnvOutputWithSeparator(separator string, names ...string) string {
 	if len(names) == 0 {
 		if runtime.GOOS == "windows" {
 			return "Write-Output ''"
@@ -255,6 +164,6 @@ func PortableEnvOutputCommandWithSeparator(separator string, names ...string) st
 	return fmt.Sprintf("printf '%s' %s", strings.Join(placeholders, separator), strings.Join(values, " "))
 }
 
-func PortableEnvOutputCommand(names ...string) string {
-	return PortableEnvOutputCommandWithSeparator("|", names...)
+func EnvOutput(names ...string) string {
+	return EnvOutputWithSeparator("|", names...)
 }

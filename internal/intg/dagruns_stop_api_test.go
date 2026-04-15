@@ -6,6 +6,7 @@ package intg_test
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -19,12 +20,18 @@ func TestAPITerminateLocalRun_DoesNotRequireCoordinator(t *testing.T) {
 	server := test.SetupServer(t)
 
 	const dagName = "intg_local_stop_regression"
-	sleepCommand := test.PortableSleepCommand(30 * time.Second)
+	releaseFile := t.TempDir() + "/release"
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 	spec := fmt.Sprintf(`steps:
   - name: hold
     command: |
 %s
-`, indentTestScript(sleepCommand, 6))
+`, indentTestScript(test.ForOS(
+		fmt.Sprintf("while [ ! -f %s ]; do\n  true\n  sleep 0.05\ndone", test.PosixQuote(releaseFile)),
+		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(releaseFile)),
+	), 6))
 
 	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,
