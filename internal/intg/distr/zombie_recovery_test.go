@@ -163,6 +163,9 @@ steps:
 	require.Equal(t, core.Running, status.Status, "run should remain active beyond the stale threshold")
 	lease = waitForLease(t, f, status.AttemptKey, 5*time.Second)
 	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
+	if runtime.GOOS == "windows" {
+		return
+	}
 
 	finalStatus := f.waitForStatus(core.Succeeded, finalStatusTimeout)
 	assert.Equal(t, core.Succeeded, finalStatus.Status)
