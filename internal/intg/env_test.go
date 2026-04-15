@@ -4,9 +4,11 @@
 package intg_test
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/core"
@@ -128,7 +130,7 @@ steps:
 		t.Parallel()
 
 		th := test.Setup(t)
-		explicitDir := t.TempDir()
+		explicitDir := mustTempDirWithRetryCleanup(t)
 		if resolved, err := filepath.EvalSymlinks(explicitDir); err == nil {
 			explicitDir = resolved
 		}
@@ -244,6 +246,26 @@ steps:
 			"SUBSTRING_VALIDATION": "OK",
 		})
 	})
+}
+
+func mustTempDirWithRetryCleanup(t *testing.T) string {
+	t.Helper()
+
+	dir, err := os.MkdirTemp("", "dagu-explicit-working-dir-*")
+	require.NoError(t, err)
+
+	waitFor := 2 * time.Second
+	if runtime.GOOS == "windows" {
+		waitFor = 10 * time.Second
+	}
+
+	t.Cleanup(func() {
+		require.Eventually(t, func() bool {
+			return os.RemoveAll(dir) == nil
+		}, waitFor, 100*time.Millisecond, "explicit working dir should be removable")
+	})
+
+	return dir
 }
 
 func TestSubDAGParamsReferencedInChildEnv(t *testing.T) {

@@ -47,13 +47,64 @@ func outputCommandEntry(script string) core.CommandEntry {
 	if osrt.GOOS == "windows" {
 		return core.CommandEntry{
 			Command: "powershell",
-			Args:    []string{"-Command", script},
+			Args: []string{
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				script,
+			},
 		}
 	}
 	return core.CommandEntry{
 		Command: "sh",
 		Args:    []string{"-c", script},
 	}
+}
+
+func outputCommandTimeout() time.Duration {
+	if osrt.GOOS == "windows" {
+		return 20 * time.Second
+	}
+	return 5 * time.Second
+}
+
+func outputDeadlockTimeout() time.Duration {
+	if osrt.GOOS == "windows" {
+		return 30 * time.Second
+	}
+	return 10 * time.Second
+}
+
+func outputCommandCleanupWait() time.Duration {
+	if osrt.GOOS == "windows" {
+		return 10 * time.Second
+	}
+	return 2 * time.Second
+}
+
+func startNodeExecuteAsync(t *testing.T, node *Node, ctx context.Context) <-chan error {
+	t.Helper()
+
+	done := make(chan error, 1)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		done <- node.Execute(ctx)
+	}()
+
+	t.Cleanup(func() {
+		node.Cancel()
+		select {
+		case <-finished:
+		case <-time.After(outputCommandCleanupWait()):
+		}
+		_ = node.Teardown()
+	})
+
+	return done
 }
 
 func TestNode_LargeOutput(t *testing.T) {
@@ -115,10 +166,7 @@ func TestNode_LargeOutput(t *testing.T) {
 			require.NoError(t, err)
 
 			// Execute with timeout to detect hanging
-			done := make(chan error, 1)
-			go func() {
-				done <- node.Execute(ctx)
-			}()
+			done := startNodeExecuteAsync(t, node, ctx)
 
 			select {
 			case err := <-done:
@@ -145,16 +193,11 @@ func TestNode_LargeOutput(t *testing.T) {
 						t.Error("OutputVariables is nil")
 					}
 				}
-			case <-time.After(5 * time.Second):
+			case <-time.After(outputCommandTimeout()):
 				if !tt.expectHang {
 					t.Errorf("Command hung unexpectedly for output size %d bytes", tt.outputSize)
 				}
-				// Cancel the context to clean up
-				node.Cancel()
 			}
-
-			// Cleanup
-			_ = node.Teardown()
 		})
 	}
 }
@@ -178,10 +221,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	require.NoError(t, err)
 
 	// This should complete without hanging
-	done := make(chan error, 1)
-	go func() {
-		done <- node.Execute(ctx)
-	}()
+	done := startNodeExecuteAsync(t, node, ctx)
 
 	select {
 	case err := <-done:
@@ -197,11 +237,9 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 			output = output[idx+1:]
 		}
 		assert.Len(t, output, 64*1024+1, "output should be exactly 64KB + 1 byte")
-	case <-time.After(10 * time.Second):
+	case <-time.After(outputDeadlockTimeout()):
 		t.Fatal("Command execution hung - possible deadlock detected")
 	}
-
-	_ = node.Teardown()
 }
 
 func TestNode_OutputExceedsLimit(t *testing.T) {
