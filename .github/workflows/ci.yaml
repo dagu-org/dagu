@@ -121,8 +121,6 @@ jobs:
         run: |
           go clean -testcache
           go test \
-            -json \
             -timeout=20m \
-            -p=1 \
             -ldflags=-extldflags=-Wl \
             ./...
