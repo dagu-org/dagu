@@ -110,12 +110,12 @@ func TestDistributedRun_HeartbeatRefreshKeepsQuietRunAlive(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		heartbeatThreshold = 8 * time.Second
 		leaseThreshold = 12 * time.Second
-		sleepDuration = 20 * time.Second
+		sleepDuration = 30 * time.Second
 		// Windows service startup and timer scheduling can lag enough that the
 		// refreshed lease is still valid but older than the nominal stale window.
 		freshWindow = leaseThreshold + 2*time.Second
-		leaseObservationWindow = leaseThreshold + 4*time.Second
-		finalStatusTimeout = 45 * time.Second
+		leaseObservationWindow = leaseThreshold + 2*time.Second
+		finalStatusTimeout = 60 * time.Second
 	}
 
 	f := newTestFixture(t, fmt.Sprintf(`
