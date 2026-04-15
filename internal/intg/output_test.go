@@ -77,8 +77,15 @@ type outputsCollectionCase struct {
 	validateOutputs func(*testing.T, map[string]string)
 }
 
-var outputsCollectionCases = map[string]outputsCollectionCase{
-	"SimpleStringOutput": {
+type namedOutputsCollectionCase struct {
+	name string
+	outputsCollectionCase
+}
+
+var outputsCollectionCases = []namedOutputsCollectionCase{
+	{
+		name: "SimpleStringOutput",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 steps:
   - name: produce-output
@@ -98,7 +105,10 @@ steps:
 			assert.Equal(t, "RESULT=42", outputs["result"])
 		},
 	},
-	"OutputWithCustomKey": {
+	},
+	{
+		name: "OutputWithCustomKey",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 steps:
   - name: produce-output
@@ -120,7 +130,10 @@ steps:
 			assert.False(t, hasDefault, "should not have default key when custom key is specified")
 		},
 	},
-	"OutputWithOmit": {
+	},
+	{
+		name: "OutputWithOmit",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 steps:
   - name: step1
@@ -147,7 +160,10 @@ steps:
 			assert.False(t, hasHidden, "omitted output should not be in outputs.json")
 		},
 	},
-	"MultipleStepsWithOutputs": {
+	},
+	{
+		name: "MultipleStepsWithOutputs",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 steps:
   - name: step1
@@ -177,7 +193,10 @@ steps:
 			assert.Equal(t, "STATUS=completed", outputs["status"])
 		},
 	},
-	"LastOneWinsForDuplicateKeys": {
+	},
+	{
+		name: "LastOneWinsForDuplicateKeys",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 type: graph
 steps:
@@ -201,7 +220,10 @@ steps:
 			assert.Equal(t, "VALUE=second", outputs["value"])
 		},
 	},
-	"NoOutputsProduced": {
+	},
+	{
+		name: "NoOutputsProduced",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 steps:
   - name: step1
@@ -217,7 +239,10 @@ steps:
 			assert.Nil(t, outputs)
 		},
 	},
-	"OutputWithDollarPrefix": {
+	},
+	{
+		name: "OutputWithDollarPrefix",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 steps:
   - name: step1
@@ -235,7 +260,10 @@ steps:
 			assert.Equal(t, "MY_VAR=value123", outputs["myVar"])
 		},
 	},
-	"MixedOutputConfigurations": {
+	},
+	{
+		name: "MixedOutputConfigurations",
+		outputsCollectionCase: outputsCollectionCase{
 		dagYAML: `
 steps:
   - name: simple
@@ -269,14 +297,12 @@ steps:
 			assert.False(t, hasSecret)
 		},
 	},
+	},
 }
 
-func runOutputsCollectionCase(t *testing.T, name string) {
+func runOutputsCollectionCase(t *testing.T, tc outputsCollectionCase) {
 	t.Helper()
 	outputsTestParallel(t)
-
-	tc, ok := outputsCollectionCases[name]
-	require.Truef(t, ok, "missing outputs collection case %q", name)
 
 	th := test.Setup(t)
 	dag := th.DAG(t, tc.dagYAML)
@@ -292,36 +318,13 @@ func runOutputsCollectionCase(t *testing.T, name string) {
 	tc.validateOutputs(t, outputs)
 }
 
-func TestOutputsCollection_SimpleStringOutput(t *testing.T) {
-	runOutputsCollectionCase(t, "SimpleStringOutput")
-}
-
-func TestOutputsCollection_OutputWithCustomKey(t *testing.T) {
-	runOutputsCollectionCase(t, "OutputWithCustomKey")
-}
-
-func TestOutputsCollection_OutputWithOmit(t *testing.T) {
-	runOutputsCollectionCase(t, "OutputWithOmit")
-}
-
-func TestOutputsCollection_MultipleStepsWithOutputs(t *testing.T) {
-	runOutputsCollectionCase(t, "MultipleStepsWithOutputs")
-}
-
-func TestOutputsCollection_LastOneWinsForDuplicateKeys(t *testing.T) {
-	runOutputsCollectionCase(t, "LastOneWinsForDuplicateKeys")
-}
-
-func TestOutputsCollection_NoOutputsProduced(t *testing.T) {
-	runOutputsCollectionCase(t, "NoOutputsProduced")
-}
-
-func TestOutputsCollection_OutputWithDollarPrefix(t *testing.T) {
-	runOutputsCollectionCase(t, "OutputWithDollarPrefix")
-}
-
-func TestOutputsCollection_MixedOutputConfigurations(t *testing.T) {
-	runOutputsCollectionCase(t, "MixedOutputConfigurations")
+func TestOutputsCollection(t *testing.T) {
+	for _, tc := range outputsCollectionCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runOutputsCollectionCase(t, tc.outputsCollectionCase)
+		})
+	}
 }
 
 func TestOutputsCollection_FailedDAG(t *testing.T) {
