@@ -6,6 +6,7 @@ package distr_test
 import (
 	"context"
 	"os"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -126,6 +127,19 @@ steps:
 
 func TestParallel_PartialFailure(t *testing.T) {
 	t.Run("partialFailurePropagatesToParentStep", func(t *testing.T) {
+		childCommand := `      if [ "$1" = "fail" ]; then
+        echo "Simulated failure"
+        exit 1
+      fi
+      echo "Processed $1"`
+		if runtime.GOOS == "windows" {
+			childCommand = `      if ("${1}" -eq "fail") {
+        Write-Output "Simulated failure"
+        exit 1
+      }
+      Write-Output ("Processed {0}" -f "${1}")`
+		}
+
 		f := newTestFixture(t, `
 steps:
   - name: process-items
@@ -142,11 +156,7 @@ worker_selector:
 steps:
   - name: run
     command: |
-      if [ "$1" = "fail" ]; then
-        echo "Simulated failure"
-        exit 1
-      fi
-      echo "Processed $1"
+`+childCommand+`
 `, withLabels(map[string]string{"type": "test-worker"}), withLogPersistence())
 
 		agent := f.dagWrapper.Agent()
