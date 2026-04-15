@@ -293,7 +293,7 @@ steps:
 		}
 		var dagContent strings.Builder
 		for i := range stepCount {
-			dagContent.WriteString(fmt.Sprintf("  - name: \"step%d\"\n    command: \"echo 'Step %d'\"\n", i+1, i+1))
+			fmt.Fprintf(&dagContent, "  - name: \"step%d\"\n    command: \"echo 'Step %d'\"\n", i+1, i+1)
 		}
 		dagFile := th.DAG(t, "steps:\n"+dagContent.String())
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
