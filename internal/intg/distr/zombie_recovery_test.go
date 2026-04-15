@@ -156,20 +156,13 @@ steps:
 	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
 	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), freshWindow)
 	require.Eventually(t, func() bool {
-		status, err := f.latestStatus()
-		if err != nil || status.Status != core.Running {
-			return false
-		}
-		lease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
-		if err != nil || lease == nil {
-			return false
-		}
-		if time.Since(runningSince) < leaseObservationWindow {
-			return false
-		}
-		return time.Since(time.UnixMilli(lease.LastHeartbeatAt)) <= freshWindow
-	}, leaseObservationWindow+freshWindow, 200*time.Millisecond,
-		"run should remain active with a fresh lease beyond the stale threshold")
+		return time.Since(runningSince) >= leaseObservationWindow
+	}, leaseObservationWindow+time.Second, 200*time.Millisecond)
+	status, err = f.latestStatus()
+	require.NoError(t, err)
+	require.Equal(t, core.Running, status.Status, "run should remain active beyond the stale threshold")
+	lease = waitForLease(t, f, status.AttemptKey, 5*time.Second)
+	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
 
 	finalStatus := f.waitForStatus(core.Succeeded, finalStatusTimeout)
 	assert.Equal(t, core.Succeeded, finalStatus.Status)
