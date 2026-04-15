@@ -48,7 +48,6 @@ permissions:
 env:
   GO_VERSION: "1.26"
   NODE_VERSION: "20"
-  E2E_SHARDS: "3"
 
 jobs:
   changes:
@@ -174,7 +173,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   e2e:
-    name: E2E (${{ matrix.shard }}/${{ env.E2E_SHARDS }})
+    name: E2E (${{ matrix.shard }}/${{ matrix.shard_total }})
     needs:
       - changes
       - golint
@@ -184,7 +183,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        include:
+          - shard: 1
+            shard_total: 3
+          - shard: 2
+            shard_total: 3
+          - shard: 3
+            shard_total: 3
     concurrency:
       group: ci-e2e-${{ github.event.pull_request.number || github.ref }}-shard-${{ matrix.shard }}
       cancel-in-progress: true
@@ -222,7 +227,7 @@ jobs:
           CI: "true"
           DAGU_LICENSE_PRIVKEY_B64: ${{ secrets.DAGU_LICENSE_PRIVKEY_B64 }}
           PLAYWRIGHT_FULLY_PARALLEL: "true"
-          PLAYWRIGHT_TEST_ARGS: --shard=${{ matrix.shard }}/${{ env.E2E_SHARDS }}
+          PLAYWRIGHT_TEST_ARGS: --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
         run: |
           make test-e2e-build
           make test-e2e-run
