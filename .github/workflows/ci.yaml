@@ -261,6 +261,8 @@ jobs:
         shell: bash
         run: |
           go test \
+            -p=8 \
+            -parallel=8 \
             -timeout=20m \
             -ldflags=-extldflags=-Wl \
             ./...
