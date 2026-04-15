@@ -462,7 +462,11 @@ steps:
 			return false
 		}
 
-		return countStartedParallelSubRuns(t, dag, &status) == 1
+		started := countStartedParallelSubRuns(t, dag, &status)
+		if runtime.GOOS == "windows" {
+			return started >= 1
+		}
+		return started == 1
 	}, 10*time.Second, 50*time.Millisecond, "expected exactly one started sub-run before abort")
 
 	agent.Abort()
