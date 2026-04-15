@@ -48,6 +48,7 @@ permissions:
 env:
   GO_VERSION: "1.26"
   NODE_VERSION: "20"
+  E2E_SHARDS: "3"
 
 jobs:
   changes:
@@ -173,15 +174,19 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   e2e:
-    name: E2E
+    name: E2E (${{ matrix.shard }}/${{ env.E2E_SHARDS }})
     needs:
       - changes
       - golint
     if: needs.changes.outputs.e2e == 'true' && (needs.golint.result == 'success' || needs.golint.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     concurrency:
-      group: ci-e2e-${{ github.event.pull_request.number || github.ref }}
+      group: ci-e2e-${{ github.event.pull_request.number || github.ref }}-shard-${{ matrix.shard }}
       cancel-in-progress: true
     steps:
       - name: Check out code
@@ -216,13 +221,17 @@ jobs:
         env:
           CI: "true"
           DAGU_LICENSE_PRIVKEY_B64: ${{ secrets.DAGU_LICENSE_PRIVKEY_B64 }}
-        run: make test-e2e
+          PLAYWRIGHT_FULLY_PARALLEL: "true"
+          PLAYWRIGHT_TEST_ARGS: --shard=${{ matrix.shard }}/${{ env.E2E_SHARDS }}
+        run: |
+          make test-e2e-build
+          make test-e2e-run
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: ui/playwright-report
           if-no-files-found: ignore
           retention-days: 7
@@ -231,7 +240,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-test-results
+          name: playwright-test-results-shard-${{ matrix.shard }}
           path: ui/test-results
           if-no-files-found: ignore
           retention-days: 7
