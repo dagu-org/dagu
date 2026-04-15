@@ -1067,13 +1067,13 @@ steps:
 	}, dagRunEventuallyTimeout(15*time.Second), 200*time.Millisecond)
 
 	server.Client().Post(
-		fmt.Sprintf("/api/v1/dag-runs/%s/%s/retry", "single_retry_local_dag", startBody.DagRunId),
-		api.RetryDAGRunJSONRequestBody{DagRunId: startBody.DagRunId},
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/retry", "single_retry_local_dag", "latest"),
+		api.RetryDAGRunJSONRequestBody{},
 	).ExpectStatus(http.StatusOK).Send(t)
 
 	require.Eventually(t, func() bool {
 		resp := server.Client().Get(
-			fmt.Sprintf("/api/v1/dag-runs/%s/%s", "single_retry_local_dag", startBody.DagRunId),
+			fmt.Sprintf("/api/v1/dag-runs/%s/%s", "single_retry_local_dag", "latest"),
 		).Send(t)
 		if resp.Response.StatusCode() != http.StatusOK {
 			return false
