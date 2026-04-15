@@ -42,6 +42,10 @@ func expectedPowerShellCommandArgs(shell, command string) []string {
 	return []string{shell, "-NoProfile", "-NonInteractive", "-Command", powerShellInlineCommand(command)}
 }
 
+func expectedPowerShellScriptArgs(shell, script string) []string {
+	return []string{shell, "-ExecutionPolicy", "Bypass", "-NoProfile", "-NonInteractive", "-File", script}
+}
+
 func TestDirectShell(t *testing.T) {
 	ctx := context.Background()
 
@@ -202,10 +206,26 @@ func TestBuildPowerShellCommand(t *testing.T) {
 				Shell:            []string{"powershell", "-Command"},
 				ShellCommandArgs: "Get-Date",
 			},
-			expected: []string{"powershell", "-Command", "-NoProfile", "-NonInteractive", powerShellInlineCommand("Get-Date")},
+			expected: expectedPowerShellCommandArgs("powershell", "Get-Date"),
+		},
+		{
+			name: "PowershellWithExistingCommandAlias",
+			builder: shellCommandBuilder{
+				Shell:            []string{"powershell", "-C"},
+				ShellCommandArgs: "Get-Date",
+			},
+			expected: []string{"powershell", "-NoProfile", "-NonInteractive", "-C", powerShellInlineCommand("Get-Date")},
 		},
 		{
 			name: "PowershellWithScript",
+			builder: shellCommandBuilder{
+				Shell:  []string{"powershell"},
+				Script: "test.ps1",
+			},
+			expected: expectedPowerShellScriptArgs("powershell", "test.ps1"),
+		},
+		{
+			name: "PowershellWithExplicitCommandAndScript",
 			builder: shellCommandBuilder{
 				Shell:   []string{"powershell"},
 				Command: "python",

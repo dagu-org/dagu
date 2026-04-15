@@ -7,6 +7,7 @@ import (
 	"context"
 	"os/exec"
 	"slices"
+	"strings"
 )
 
 // powerShell handles both Windows PowerShell and PowerShell Core (pwsh).
@@ -15,13 +16,47 @@ type powerShell struct{}
 var _ Shell = (*powerShell)(nil)
 
 func appendPowerShellStartupArgs(args []string) []string {
-	if !slices.Contains(args, "-NoProfile") {
-		args = append(args, "-NoProfile")
+	startupArgs := make([]string, 0, 2)
+	if !containsPowerShellArg(args, "-NoProfile") {
+		startupArgs = append(startupArgs, "-NoProfile")
 	}
-	if !slices.Contains(args, "-NonInteractive") {
-		args = append(args, "-NonInteractive")
+	if !containsPowerShellArg(args, "-NonInteractive") {
+		startupArgs = append(startupArgs, "-NonInteractive")
 	}
-	return args
+	if len(startupArgs) == 0 {
+		return args
+	}
+
+	insertAt := len(args)
+	if idx := indexOfPowerShellArg(args, "-Command", "-C", "-File", "-F"); idx >= 0 {
+		insertAt = idx
+	}
+
+	result := make([]string, 0, len(args)+len(startupArgs))
+	result = append(result, args[:insertAt]...)
+	result = append(result, startupArgs...)
+	result = append(result, args[insertAt:]...)
+	return result
+}
+
+func containsPowerShellArg(args []string, target string) bool {
+	for _, arg := range args {
+		if strings.EqualFold(arg, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func indexOfPowerShellArg(args []string, targets ...string) int {
+	for i, arg := range args {
+		for _, target := range targets {
+			if strings.EqualFold(arg, target) {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 func (s *powerShell) Match(name string) bool {
