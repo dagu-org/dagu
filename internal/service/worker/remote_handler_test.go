@@ -237,10 +237,12 @@ artifacts:
   enabled: true
 steps:
   - name: %s
-    shell: cmd
+    shell: powershell
     command: |
-      > "%%DAG_RUN_ARTIFACTS_DIR%%\\out.txt" <nul set /p =artifact
-      exit /b 1
+      if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }
+      New-Item -ItemType Directory -Path $env:DAG_RUN_ARTIFACTS_DIR -Force | Out-Null
+      [System.IO.File]::WriteAllText((Join-Path $env:DAG_RUN_ARTIFACTS_DIR 'out.txt'), 'artifact')
+      exit 1
 `, name, stepName)
 		}
 
@@ -249,9 +251,11 @@ artifacts:
   enabled: true
 steps:
   - name: %s
-    shell: cmd
+    shell: powershell
     command: |
-      > "%%DAG_RUN_ARTIFACTS_DIR%%\\out.txt" <nul set /p =artifact
+      if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }
+      New-Item -ItemType Directory -Path $env:DAG_RUN_ARTIFACTS_DIR -Force | Out-Null
+      [System.IO.File]::WriteAllText((Join-Path $env:DAG_RUN_ARTIFACTS_DIR 'out.txt'), 'artifact')
 `, name, stepName)
 	}
 

@@ -262,7 +262,7 @@ func TestDispatchTaskStore_ExpiredClaimsRefreshPendingAge(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	reservationTTL := 500 * time.Millisecond
+	reservationTTL := 2 * time.Second
 	store := NewDispatchTaskStore(
 		filepath.Join(t.TempDir(), "distributed"),
 		WithDispatchReservationTTL(reservationTTL),
@@ -284,7 +284,7 @@ func TestDispatchTaskStore_ExpiredClaimsRefreshPendingAge(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, claimed)
 
-	ageClaimedDispatchTask(t, store, claimed.ClaimToken, 2*time.Second, 2*time.Second)
+	ageClaimedDispatchTask(t, store, claimed.ClaimToken, 10*time.Second, 10*time.Second)
 
 	reclaimed, err := store.ClaimNext(ctx, exec.DispatchTaskClaim{
 		WorkerID:     "worker-2",

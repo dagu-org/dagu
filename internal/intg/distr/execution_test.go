@@ -4,6 +4,7 @@
 package distr_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/test"
 	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +40,57 @@ func executionStatusTimeout() time.Duration {
 	default:
 		return 20 * time.Second
 	}
+}
+
+func artifactStepShellYAML() string {
+	if runtime.GOOS == "windows" {
+		return "    shell: powershell\n"
+	}
+	return "    shell: /bin/sh\n"
+}
+
+func indentYAMLBlock(s string, spaces int) string {
+	prefix := strings.Repeat(" ", spaces)
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = prefix + line
+	}
+	return strings.Join(lines, "\n")
+}
+
+func artifactWriteCommand(content string, fail bool) string {
+	var commands []string
+	if runtime.GOOS == "windows" {
+		commands = append(commands,
+			"if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }",
+			"$reportsDir = Join-Path $env:DAG_RUN_ARTIFACTS_DIR 'reports'",
+			"New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null",
+			fmt.Sprintf("[System.IO.File]::WriteAllText((Join-Path $reportsDir 'summary.md'), %s)", test.PowerShellQuote(content)),
+		)
+	} else {
+		commands = append(commands,
+			`test -n "${DAG_RUN_ARTIFACTS_DIR}"`,
+			`mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"`,
+			fmt.Sprintf(`printf '%%s\n' %s > "$DAG_RUN_ARTIFACTS_DIR/reports/summary.md"`, test.PosixQuote(content)),
+		)
+	}
+	if fail {
+		commands = append(commands, "exit 1")
+	}
+	return test.PortableCommandSequence(commands...)
+}
+
+func artifactNoWriteCommand() string {
+	if runtime.GOOS == "windows" {
+		return test.PortableCommandSequence(
+			"if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }",
+			"Write-Output 'no artifacts written'",
+		)
+	}
+	return test.PortableCommandSequence(
+		`test -n "${DAG_RUN_ARTIFACTS_DIR}"`,
+		`echo "no artifacts written"`,
+	)
 }
 
 func TestExecution_StatusPushing(t *testing.T) {
@@ -148,10 +201,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from shared-nothing worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from shared-nothing worker", false), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 
@@ -177,11 +228,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts-and-fail
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from failed shared-nothing worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
-      exit 1
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from failed shared-nothing worker", true), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 
@@ -207,9 +255,8 @@ artifacts:
   enabled: true
 steps:
   - name: no-artifacts-written
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      echo "no artifacts written"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactNoWriteCommand(), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 
@@ -238,10 +285,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from shared filesystem worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from shared filesystem worker", false), 6)+`
 `, withWorkerMode(sharedFSMode))
 		defer f.cleanup()
 
@@ -267,10 +312,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from latest attempt\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from latest attempt", false), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 

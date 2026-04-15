@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -284,7 +285,7 @@ handler_on:
 
 steps:
   - name: long-running
-    command: sleep 10
+    command: `+test.PortableSleepCommand(10*time.Second)+`
 `)
 
 	// Verify parsing: abort field maps to the canonical abort handler
@@ -581,7 +582,7 @@ handler_on:
 
 steps:
   - name: long-running
-    command: sleep 10
+    command: `+test.PortableSleepCommand(10*time.Second)+`
 `)
 		dagAgent := dag.Agent()
 
