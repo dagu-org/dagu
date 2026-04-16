@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -126,25 +127,47 @@ steps:
 		runID := uuid.New().String()
 		agent := f.dagWrapper.Agent(test.WithDAGRunID(runID))
 
-		done := make(chan struct{})
+		errCh := make(chan error, 1)
 		go func() {
-			agent.RunCancel(t)
-			close(done)
+			errCh <- agent.Run(agent.Context)
 		}()
 
+		var subRunID string
 		require.Eventually(t, func() bool {
-			status, err := f.dagWrapper.DAGRunMgr.GetCurrentStatus(context.Background(), f.dagWrapper.DAG, runID)
-			if err != nil || status == nil || status.Status != core.Running {
+			status := agent.Status(context.Background())
+			if status.DAGRunID != runID || status.Status != core.Running {
 				return false
 			}
-			return f.dagWrapper.DAGRunMgr.IsRunning(context.Background(), f.dagWrapper.DAG, runID)
-		}, 2*time.Minute, 250*time.Millisecond, "expected parent DAG to reach running state before cancellation")
+			for _, node := range status.Nodes {
+				if node.Step.Name != "run-local-on-worker" || node.Status != core.NodeRunning || len(node.SubRuns) == 0 {
+					continue
+				}
+				subRunID = node.SubRuns[0].DAGRunID
+				return subRunID != ""
+			}
+			return false
+		}, 30*time.Second, 100*time.Millisecond, "expected parent DAG to start sub DAG before cancellation")
+
+		rootRef := exec.NewDAGRunRef(f.dagWrapper.Name, runID)
+		require.Eventually(t, func() bool {
+			status, err := f.dagWrapper.DAGRunMgr.FindSubDAGRunStatus(context.Background(), rootRef, subRunID)
+			return err == nil && status != nil && status.Status == core.Running
+		}, 30*time.Second, 100*time.Millisecond, "expected sub DAG to reach running state before cancellation")
 
 		require.NoError(t, f.stop(runID))
 
 		f.dagWrapper.AssertLatestStatus(t, core.Aborted)
 
-		<-done
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(30 * time.Second):
+			t.Fatal("timed out waiting for parent DAG cancellation")
+		}
+
+		subStatus, err := f.dagWrapper.DAGRunMgr.FindSubDAGRunStatus(context.Background(), rootRef, subRunID)
+		require.NoError(t, err)
+		require.Equal(t, core.Aborted, subStatus.Status)
 	})
 }
 
