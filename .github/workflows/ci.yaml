@@ -224,7 +224,14 @@ jobs:
     needs:
       - changes
       - golint
-    if: needs.changes.outputs.e2e == 'true' && (needs.golint.result == 'success' || needs.golint.result == 'skipped')
+      - test-ubuntu
+      - test-windows
+    if: >-
+      always() &&
+      needs.changes.outputs.e2e == 'true' &&
+      (needs.golint.result == 'success' || needs.golint.result == 'skipped') &&
+      (needs.test-ubuntu.result == 'success' || needs.test-ubuntu.result == 'skipped') &&
+      (needs.test-windows.result == 'success' || needs.test-windows.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     strategy:
