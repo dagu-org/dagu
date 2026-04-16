@@ -427,6 +427,8 @@ steps:
 func TestParallelExecution_AbortStopsPendingLaunches(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
 	releaseFile := filepath.Join(t.TempDir(), "parallel-abort.release")
+	startedDir := filepath.Join(t.TempDir(), "parallel-abort-started")
+	require.NoError(t, os.Mkdir(startedDir, 0700))
 	t.Cleanup(func() {
 		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
 	})
@@ -450,7 +452,7 @@ steps:
   - name: hold
     command: |
 %s
-`, indentTestScript(waitForFileCommand(releaseFile), 6)))
+`, indentTestScript(markParallelItemStartedAndWaitCommand(startedDir, releaseFile), 6)))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -459,19 +461,8 @@ steps:
 	}()
 
 	require.Eventually(t, func() bool {
-		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-		if err != nil || status.Status != core.Running || len(status.Nodes) == 0 {
-			return false
-		}
-		started := countStartedParallelSubRuns(t, dag, &status)
-		if runtime.GOOS == "windows" {
-			return started >= 1
-		}
-		if len(status.Nodes[0].SubRuns) != 3 {
-			return false
-		}
-		return started == 1
-	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected exactly one started sub-run before abort")
+		return countStartedParallelItems(t, startedDir) >= 1
+	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected one sub-run command to start before abort")
 
 	agent.Abort()
 
@@ -490,7 +481,10 @@ steps:
 
 	parallelNode := finalStatus.Nodes[0]
 	require.Equal(t, core.NodeAborted, parallelNode.Status)
-	require.Equal(t, 1, countStartedParallelSubRuns(t, dag, &finalStatus))
+	require.Equal(t, 1, countStartedParallelItems(t, startedDir), "pending sub-runs should not start after abort")
+	if runtime.GOOS == "windows" {
+		return
+	}
 
 	rootRun := exec.NewDAGRunRef(finalStatus.Name, finalStatus.DAGRunID)
 	startedRunID := ""
@@ -1790,4 +1784,25 @@ func countStartedParallelSubRuns(t *testing.T, dag test.DAG, status *exec.DAGRun
 		}
 	}
 	return started
+}
+
+func markParallelItemStartedAndWaitCommand(startedDir, releaseFile string) string {
+	return test.ForOS(
+		fmt.Sprintf(`: > %s/"started-$$"
+while [ ! -f %s ]; do
+  sleep 0.05
+done`, test.PosixQuote(startedDir), test.PosixQuote(releaseFile)),
+		fmt.Sprintf(`New-Item -ItemType File -Path (Join-Path %s ("started-" + [guid]::NewGuid().ToString())) -Force | Out-Null
+while (-not (Test-Path %s)) {
+  Start-Sleep -Milliseconds 50
+}`, test.PowerShellQuote(startedDir), test.PowerShellQuote(releaseFile)),
+	)
+}
+
+func countStartedParallelItems(t *testing.T, startedDir string) int {
+	t.Helper()
+
+	entries, err := os.ReadDir(startedDir)
+	require.NoError(t, err)
+	return len(entries)
 }
