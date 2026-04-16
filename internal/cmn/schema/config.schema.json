@@ -503,6 +503,9 @@
       "properties": {
         "vault": {
           "$ref": "#/definitions/VaultSecretsDef"
+        },
+        "kubernetes": {
+          "$ref": "#/definitions/KubernetesSecretsDef"
         }
       }
     },
@@ -518,6 +521,25 @@
         "token": {
           "type": "string",
           "description": "Default Vault token."
+        }
+      }
+    },
+    "KubernetesSecretsDef": {
+      "type": "object",
+      "description": "Global Kubernetes Secret client defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "description": "Default Kubernetes namespace for secret lookups."
+        },
+        "kubeconfig": {
+          "type": "string",
+          "description": "Default kubeconfig path for secret lookups."
+        },
+        "context": {
+          "type": "string",
+          "description": "Default kubeconfig context for secret lookups."
         }
       }
     },
