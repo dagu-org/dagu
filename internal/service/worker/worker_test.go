@@ -585,8 +585,14 @@ func TestWorkerConnectionFailure(t *testing.T) {
 
 		// Stop worker
 		cancel()
-		_ = w.Stop(context.Background())
-		<-done
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stopCancel()
+		require.NoError(t, w.Stop(stopCtx))
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Worker did not stop within timeout")
+		}
 
 		// Verify coordinator client is in failed state
 		metrics := mockCoordinatorCli.Metrics()
