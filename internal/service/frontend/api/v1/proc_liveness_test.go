@@ -41,11 +41,12 @@ func TestServerProcHeartbeat_StartAPI(t *testing.T) {
 		cfg.Proc.StaleThreshold = apiTestProcStaleThreshold
 	}))
 
-	spec := `
+	release := newHoldFile(t)
+	spec := fmt.Sprintf(`
 steps:
   - name: sleep
-    command: sleep 6
-`
+    command: |
+%s`, indentCommandBlock(holdUntilFileExistsCommand(release), 6))
 	dagName := "api-proc-heartbeat"
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,
@@ -74,6 +75,8 @@ steps:
 		alive, err := server.ProcStore.IsRunAlive(server.Context, dagName, ref)
 		return err == nil && alive
 	}, apiProcEventuallyTimeout(10*time.Second), 50*time.Millisecond)
+
+	releaseHoldFile(t, release)
 
 	require.Eventually(t, func() bool {
 		statusResp := server.Client().Get(fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)).

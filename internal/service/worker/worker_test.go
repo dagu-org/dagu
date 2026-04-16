@@ -566,22 +566,27 @@ func TestWorkerConnectionFailure(t *testing.T) {
 		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
 		w.SetHandler(&mockHandler{})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// Start worker
+		done := make(chan struct{})
 		go func() {
 			_ = w.Start(ctx)
+			close(done)
 		}()
 
-		// Wait for context timeout
-		<-ctx.Done()
+		require.Eventually(t, func() bool {
+			return pollCount.Load() > 1
+		}, 2*time.Second, 10*time.Millisecond, "Should retry on connection failures")
 
 		// Should have attempted multiple polls despite failures
 		assert.Greater(t, pollCount.Load(), int32(1), "Should retry on connection failures")
 
 		// Stop worker
+		cancel()
 		_ = w.Stop(context.Background())
+		<-done
 
 		// Verify coordinator client is in failed state
 		metrics := mockCoordinatorCli.Metrics()

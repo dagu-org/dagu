@@ -4,6 +4,7 @@
 package cmd_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -114,10 +115,11 @@ func TestCleanupCommand(t *testing.T) {
 		th := test.SetupCommand(t)
 
 		// Create a DAG that runs for a while
-		dag := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    command: sleep 30
-`)
+    command: %q
+`, holdUntilFileExistsCommand(release)))
 
 		done := make(chan struct{})
 		go func() {
@@ -139,11 +141,7 @@ func TestCleanupCommand(t *testing.T) {
 		// Verify the running DAG is still there (should be preserved)
 		dag.AssertLatestStatus(t, core.Running)
 
-		// Stop the DAG
-		th.RunCommand(t, cmd.Stop(), test.CmdTest{
-			Args: []string{"stop", dag.Location},
-		})
-
+		releaseHoldFile(t, release)
 		<-done
 	})
 

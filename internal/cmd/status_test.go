@@ -46,22 +46,16 @@ func waitForDAGRunning(t *testing.T, th test.Command, dagLocation string) {
 	}, time.Second*3, time.Millisecond*50)
 }
 
-// stopDAGAndWait stops a DAG and waits for the goroutine to complete.
-func stopDAGAndWait(t *testing.T, th test.Command, dagLocation string, done <-chan struct{}) {
-	t.Helper()
-	th.RunCommand(t, cmd.Stop(), test.CmdTest{Args: []string{"stop", dagLocation}})
-	<-done
-}
-
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGRunning", func(t *testing.T) {
 		t.Parallel()
 
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dagFile := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    command: sleep 10
-`)
+    command: %q
+`, holdUntilFileExistsCommand(release)))
 		done := make(chan struct{})
 		go func() {
 			th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dagFile.Location}})
@@ -73,7 +67,8 @@ func TestStatusCommand(t *testing.T) {
 		err := executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		stopDAGAndWait(t, th, dagFile.Location, done)
+		releaseHoldFile(t, release)
+		<-done
 	})
 
 	t.Run("StatusDAGSuccess", func(t *testing.T) {
@@ -262,10 +257,11 @@ steps:
 		t.Parallel()
 
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dagFile := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    command: sleep 10
-`)
+    command: %q
+`, holdUntilFileExistsCommand(release)))
 		done := make(chan struct{})
 		go func() {
 			th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dagFile.Location}})
@@ -326,10 +322,11 @@ steps:
 		t.Parallel()
 
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dagFile := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    command: sleep 10
-`)
+    command: %q
+`, holdUntilFileExistsCommand(release)))
 		done := make(chan struct{})
 		go func() {
 			th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dagFile.Location}})
@@ -341,7 +338,8 @@ steps:
 		err := executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		stopDAGAndWait(t, th, dagFile.Location, done)
+		releaseHoldFile(t, release)
+		<-done
 	})
 
 	t.Run("StatusDAGWithAttemptID", func(t *testing.T) {
