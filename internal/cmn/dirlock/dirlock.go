@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -212,14 +213,12 @@ func (l *dirLock) TryLock() error {
 }
 
 func isRetryableLockStateError(err error) bool {
-	if err == nil {
+	if err == nil || runtime.GOOS != "windows" {
 		return false
 	}
-	if os.IsPermission(err) {
-		return true
-	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "access is denied") ||
+	return strings.Contains(msg, "cannot access the file") ||
+		strings.Contains(msg, "sharing violation") ||
 		strings.Contains(msg, "used by another process")
 }
 

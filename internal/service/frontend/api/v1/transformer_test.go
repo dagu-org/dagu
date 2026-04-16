@@ -98,6 +98,22 @@ func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
 	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
 }
 
+func TestToDAGDetailsIncludesArtifactsDir(t *testing.T) {
+	details := toDAGDetails(&core.DAG{
+		Name: "artifacts-dir",
+		Artifacts: &core.ArtifactsConfig{
+			Enabled: true,
+			Dir:     "/var/lib/dagu/artifacts",
+		},
+	})
+
+	require.NotNil(t, details)
+	require.NotNil(t, details.Artifacts)
+	assert.True(t, details.Artifacts.Enabled)
+	require.NotNil(t, details.Artifacts.Dir)
+	assert.Equal(t, "/var/lib/dagu/artifacts", *details.Artifacts.Dir)
+}
+
 func TestToDAGIncludesTypedSchedules(t *testing.T) {
 	cronSchedule, err := core.NewCronSchedule("*/5 * * * *")
 	require.NoError(t, err)
