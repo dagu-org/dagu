@@ -79,5 +79,11 @@ func TestResolvePathWithinBaseAllowsRootBase(t *testing.T) {
 
 	resolved, err := ResolvePathWithinBase(string(filepath.Separator), filepath.Join("tmp", "artifact.txt"))
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(string(filepath.Separator), "tmp", "artifact.txt"), resolved)
+
+	root := string(filepath.Separator)
+	if volume := filepath.VolumeName(resolved); volume != "" {
+		root = volume + string(filepath.Separator)
+	}
+
+	assert.Equal(t, filepath.Join(root, "tmp", "artifact.txt"), resolved)
 }

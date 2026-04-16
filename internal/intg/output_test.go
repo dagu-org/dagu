@@ -6,8 +6,10 @@ package intg_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -19,20 +21,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func outputsTestParallel(t *testing.T) {
+	t.Helper()
+
+	if runtime.GOOS != "windows" || !raceEnabled() {
+		t.Parallel()
+	}
+}
+
 func TestLargeOutput_128KB(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG that reads a 128KB file
 	textFilePath := test.TestdataPath(t, "integration/large-output-128kb.txt")
-	dag := th.DAG(t, `steps:
+	dagSpec := `steps:
   - name: read-128kb-file
-    command: cat `+textFilePath+`
+    command: ` + fmt.Sprintf("cat %s", test.PosixQuote(textFilePath)) + `
     output: OUTPUT_128KB
-`)
+`
+	if runtime.GOOS == "windows" {
+		dagSpec = fmt.Sprintf(`steps:
+  - name: read-128kb-file
+    command: cmd /d /c type %s
+    output: OUTPUT_128KB
+`, `"`+textFilePath+`"`)
+	}
+	dag := th.DAG(t, dagSpec)
 	agent := dag.Agent()
 
 	// Run with timeout to detect hanging
-	ctx, cancel := context.WithTimeout(agent.Context, 10*time.Second)
+	ctx, cancel := context.WithTimeout(agent.Context, intgTestTimeout(45*time.Second))
 	defer cancel()
 
 	err := agent.Run(ctx)
@@ -52,18 +70,22 @@ func TestLargeOutput_128KB(t *testing.T) {
 	assert.Equal(t, "read-128kb-file", dagRunStatus.Nodes[0].Step.Name)
 }
 
-func TestOutputsCollection(t *testing.T) {
-	t.Parallel()
+type outputsCollectionCase struct {
+	dagYAML         string
+	runFunc         func(*testing.T, context.Context, *test.Agent)
+	validateFunc    func(*testing.T, exec.DAGRunStatus)
+	validateOutputs func(*testing.T, map[string]string)
+}
 
-	tests := []struct {
-		name            string
-		dagYAML         string
-		runFunc         func(*testing.T, context.Context, *test.Agent)
-		validateFunc    func(*testing.T, exec.DAGRunStatus)
-		validateOutputs func(*testing.T, map[string]string)
-	}{
-		{
-			name: "SimpleStringOutput",
+type namedOutputsCollectionCase struct {
+	name string
+	outputsCollectionCase
+}
+
+var outputsCollectionCases = []namedOutputsCollectionCase{
+	{
+		name: "SimpleStringOutput",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
   - name: produce-output
@@ -80,12 +102,13 @@ steps:
 			},
 			validateOutputs: func(t *testing.T, outputs map[string]string) {
 				require.NotNil(t, outputs)
-				// Output value includes the KEY= prefix from command output
-				assert.Equal(t, "RESULT=42", outputs["result"]) // SCREAMING_SNAKE to camelCase
+				assert.Equal(t, "RESULT=42", outputs["result"])
 			},
 		},
-		{
-			name: "OutputWithCustomKey",
+	},
+	{
+		name: "OutputWithCustomKey",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
   - name: produce-output
@@ -102,14 +125,15 @@ steps:
 			},
 			validateOutputs: func(t *testing.T, outputs map[string]string) {
 				require.NotNil(t, outputs)
-				// Value includes the original KEY= prefix
 				assert.Equal(t, "MY_VALUE=hello world", outputs["customKeyName"])
 				_, hasDefault := outputs["myValue"]
 				assert.False(t, hasDefault, "should not have default key when custom key is specified")
 			},
 		},
-		{
-			name: "OutputWithOmit",
+	},
+	{
+		name: "OutputWithOmit",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
   - name: step1
@@ -136,8 +160,10 @@ steps:
 				assert.False(t, hasHidden, "omitted output should not be in outputs.json")
 			},
 		},
-		{
-			name: "MultipleStepsWithOutputs",
+	},
+	{
+		name: "MultipleStepsWithOutputs",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
   - name: step1
@@ -167,8 +193,10 @@ steps:
 				assert.Equal(t, "STATUS=completed", outputs["status"])
 			},
 		},
-		{
-			name: "LastOneWinsForDuplicateKeys",
+	},
+	{
+		name: "LastOneWinsForDuplicateKeys",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 type: graph
 steps:
@@ -189,12 +217,13 @@ steps:
 			},
 			validateOutputs: func(t *testing.T, outputs map[string]string) {
 				require.NotNil(t, outputs)
-				// Last step wins
 				assert.Equal(t, "VALUE=second", outputs["value"])
 			},
 		},
-		{
-			name: "NoOutputsProduced",
+	},
+	{
+		name: "NoOutputsProduced",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
   - name: step1
@@ -207,12 +236,13 @@ steps:
 				require.Equal(t, core.Succeeded, status.Status)
 			},
 			validateOutputs: func(t *testing.T, outputs map[string]string) {
-				// No outputs.json should be created when no outputs
 				assert.Nil(t, outputs)
 			},
 		},
-		{
-			name: "OutputWithDollarPrefix",
+	},
+	{
+		name: "OutputWithDollarPrefix",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
   - name: step1
@@ -230,8 +260,10 @@ steps:
 				assert.Equal(t, "MY_VAR=value123", outputs["myVar"])
 			},
 		},
-		{
-			name: "MixedOutputConfigurations",
+	},
+	{
+		name: "MixedOutputConfigurations",
+		outputsCollectionCase: outputsCollectionCase{
 			dagYAML: `
 steps:
   - name: simple
@@ -258,40 +290,44 @@ steps:
 			},
 			validateOutputs: func(t *testing.T, outputs map[string]string) {
 				require.NotNil(t, outputs)
-				assert.Len(t, outputs, 2) // simple + keyed, NOT secret
+				assert.Len(t, outputs, 2)
 				assert.Equal(t, "SIMPLE_OUT=simple_value", outputs["simpleOut"])
 				assert.Equal(t, "KEYED=keyed_value", outputs["renamedKey"])
 				_, hasSecret := outputs["secret"]
 				assert.False(t, hasSecret)
 			},
 		},
-	}
+	},
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+func runOutputsCollectionCase(t *testing.T, tc outputsCollectionCase) {
+	t.Helper()
+	outputsTestParallel(t)
 
-			th := test.Setup(t)
-			dag := th.DAG(t, tt.dagYAML)
-			agent := dag.Agent()
+	th := test.Setup(t)
+	dag := th.DAG(t, tc.dagYAML)
+	agent := dag.Agent()
 
-			// Run the DAG
-			tt.runFunc(t, agent.Context, agent)
+	tc.runFunc(t, agent.Context, agent)
 
-			// Validate DAG run status
-			status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-			require.NoError(t, err)
-			tt.validateFunc(t, status)
+	status, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+	require.NoError(t, err)
+	tc.validateFunc(t, status)
 
-			// Read outputs.json if it exists
-			outputs := readOutputsFile(t, th, dag.DAG)
-			tt.validateOutputs(t, outputs)
+	outputs := readOutputsFile(t, th, dag.DAG)
+	tc.validateOutputs(t, outputs)
+}
+
+func TestOutputsCollection(t *testing.T) {
+	for _, tc := range outputsCollectionCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runOutputsCollectionCase(t, tc.outputsCollectionCase)
 		})
 	}
 }
 
 func TestOutputsCollection_FailedDAG(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	th := test.Setup(t)
 	dag := th.DAG(t, `
@@ -326,44 +362,42 @@ steps:
 	assert.False(t, hasAfterFail, "output from step after failure should not be collected")
 }
 
-func TestOutputsCollection_CamelCaseConversion(t *testing.T) {
-	t.Parallel()
+func runOutputsCollectionCamelCaseConversion(t *testing.T, envVarName, expectedKey, expectedValue string) {
+	outputsTestParallel(t)
 
-	tests := []struct {
-		envVarName    string
-		expectedKey   string
-		expectedValue string
-	}{
-		{"SIMPLE", "simple", "SIMPLE=test_value"},
-		{"TWO_WORDS", "twoWords", "TWO_WORDS=test_value"},
-		{"MULTIPLE_WORD_NAME", "multipleWordName", "MULTIPLE_WORD_NAME=test_value"},
-		{"ALREADY_CAMEL_Case", "alreadyCamelCase", "ALREADY_CAMEL_Case=test_value"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.envVarName, func(t *testing.T) {
-			t.Parallel()
-
-			th := test.Setup(t)
-			dag := th.DAG(t, `
+	th := test.Setup(t)
+	dag := th.DAG(t, `
 steps:
   - name: step1
-    command: echo "`+tt.envVarName+`=test_value"
-    output: `+tt.envVarName+`
+    command: echo "`+envVarName+`=test_value"
+    output: `+envVarName+`
 `)
-			agent := dag.Agent()
-			agent.RunSuccess(t)
+	agent := dag.Agent()
+	agent.RunSuccess(t)
 
-			outputs := readOutputsFile(t, th, dag.DAG)
-			require.NotNil(t, outputs)
-			// Value includes the KEY= prefix from the original output
-			assert.Equal(t, tt.expectedValue, outputs[tt.expectedKey])
-		})
-	}
+	outputs := readOutputsFile(t, th, dag.DAG)
+	require.NotNil(t, outputs)
+	assert.Equal(t, expectedValue, outputs[expectedKey])
+}
+
+func TestOutputsCollection_CamelCaseConversion_Simple(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "SIMPLE", "simple", "SIMPLE=test_value")
+}
+
+func TestOutputsCollection_CamelCaseConversion_TwoWords(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "TWO_WORDS", "twoWords", "TWO_WORDS=test_value")
+}
+
+func TestOutputsCollection_CamelCaseConversion_MultipleWordName(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "MULTIPLE_WORD_NAME", "multipleWordName", "MULTIPLE_WORD_NAME=test_value")
+}
+
+func TestOutputsCollection_CamelCaseConversion_AlreadyCamelCase(t *testing.T) {
+	runOutputsCollectionCamelCaseConversion(t, "ALREADY_CAMEL_Case", "alreadyCamelCase", "ALREADY_CAMEL_Case=test_value")
 }
 
 func TestOutputsCollection_SecretsMasked(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	th := test.Setup(t)
 
@@ -401,7 +435,7 @@ steps:
 }
 
 func TestOutputsCollection_MetadataIncluded(t *testing.T) {
-	t.Parallel()
+	outputsTestParallel(t)
 
 	th := test.Setup(t)
 	dag := th.DAG(t, `

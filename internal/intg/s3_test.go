@@ -20,6 +20,7 @@ const minioImage = "minio/minio:RELEASE.2024-10-02T17-50-41Z"
 func TestMinIOContainer_WithMCCommands(t *testing.T) {
 	requireDockerDaemon(t)
 	t.Parallel()
+	requireLinuxContainerRuntime(t)
 
 	tempDir, err := os.MkdirTemp("", "dagu-s3-test-*")
 	require.NoError(t, err)

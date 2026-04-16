@@ -5,9 +5,7 @@ package cmd_test
 
 import (
 	"fmt"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/test"
@@ -22,12 +20,7 @@ func TestCoordinatorCommand(t *testing.T) {
 
 	t.Run("StartCoordinator", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "Coordinator initialization")
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args:        []string{"coordinator", fmt.Sprintf("--coordinator.port=%s", port)},
@@ -37,12 +30,7 @@ func TestCoordinatorCommand(t *testing.T) {
 
 	t.Run("StartCoordinatorWithHost", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "Coordinator initialization")
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args:        []string{"coordinator", "--coordinator.host=0.0.0.0", fmt.Sprintf("--coordinator.port=%s", port)},
@@ -52,12 +40,7 @@ func TestCoordinatorCommand(t *testing.T) {
 
 	t.Run("StartCoordinatorWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "Coordinator initialization")
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args:        []string{"coordinator", "--config", test.TestdataPath(t, "cli/config_test.yaml")},
 			ExpectedOut: []string{"Coordinator initialization", "9876"},
@@ -66,12 +49,7 @@ func TestCoordinatorCommand(t *testing.T) {
 
 	t.Run("StartCoordinatorWithTLS", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "Coordinator initialization")
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args: []string{
@@ -86,12 +64,7 @@ func TestCoordinatorCommand(t *testing.T) {
 
 	t.Run("StartCoordinatorWithMutualTLS", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "Coordinator initialization")
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args: []string{
@@ -107,12 +80,7 @@ func TestCoordinatorCommand(t *testing.T) {
 
 	t.Run("StartCoordinatorWithAdvertiseAddress", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "Coordinator initialization")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "Coordinator initialization")
 		port := findPort(t)
 		th.RunCommand(t, cmd.CmdCoordinator(), test.CmdTest{
 			Args: []string{

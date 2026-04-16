@@ -79,6 +79,11 @@ func newHTTP(ctx context.Context, step core.Step) (executor.Executor, error) {
 				url = cmd.Args[0]
 			}
 		}
+	} else {
+		method = step.Command
+		if len(step.Args) > 0 {
+			url = step.Args[0]
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

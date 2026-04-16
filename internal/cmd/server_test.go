@@ -6,9 +6,7 @@ package cmd_test
 import (
 	"fmt"
 	"net"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/test"
@@ -18,12 +16,7 @@ import (
 func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "Server is starting")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "Server is starting")
 		port := findPort(t)
 		th.RunCommand(t, cmd.Server(), test.CmdTest{
 			Args:        []string{"server", fmt.Sprintf("--port=%s", port)},
@@ -33,12 +26,7 @@ func TestServerCommand(t *testing.T) {
 	})
 	t.Run("StartServerWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			require.Eventually(t, func() bool {
-				return strings.Contains(th.LoggingOutput.String(), "54321")
-			}, 5*time.Second, 50*time.Millisecond)
-			th.Cancel()
-		}()
+		cancelWhenLogContains(t, th, "54321")
 		th.RunCommand(t, cmd.Server(), test.CmdTest{
 			Args:        []string{"server", "--config", test.TestdataPath(t, "cli/config_test.yaml")},
 			ExpectedOut: []string{"54321"},

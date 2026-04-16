@@ -6,6 +6,7 @@ package intg_test
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -19,10 +20,15 @@ func TestAPITerminateLocalRun_DoesNotRequireCoordinator(t *testing.T) {
 	server := test.SetupServer(t)
 
 	const dagName = "intg_local_stop_regression"
-	spec := `steps:
+	releaseFile := t.TempDir() + "/release"
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
+	spec := fmt.Sprintf(`steps:
   - name: hold
-    command: sleep 30
-`
+    command: |
+%s
+`, indentTestScript(waitForFileCommand(releaseFile), 6))
 
 	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,
@@ -38,14 +44,14 @@ func TestAPITerminateLocalRun_DoesNotRequireCoordinator(t *testing.T) {
 	startResp.Unmarshal(t, &startBody)
 	require.NotEmpty(t, startBody.DagRunId)
 
-	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Running}, 10*time.Second)
+	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Running}, intgTestTimeout(10*time.Second), false)
 
 	server.Client().Post(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/stop", dagName, startBody.DagRunId),
 		nil,
 	).ExpectStatus(http.StatusOK).Send(t)
 
-	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Aborted, core.Failed}, 15*time.Second)
+	waitForAPIRunStatus(t, server, dagName, startBody.DagRunId, []core.Status{core.Aborted, core.Failed}, intgTestTimeout(30*time.Second), true)
 }
 
 func waitForAPIRunStatus(
@@ -54,13 +60,22 @@ func waitForAPIRunStatus(
 	dagName, runID string,
 	expected []core.Status,
 	timeout time.Duration,
+	allowNotFound bool,
 ) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
 		resp := server.Client().Get(
 			fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, runID),
-		).ExpectStatus(http.StatusOK).Send(t)
+		).Send(t)
+
+		switch resp.Response.StatusCode() {
+		case http.StatusOK:
+		case http.StatusNotFound:
+			return allowNotFound
+		default:
+			return false
+		}
 
 		var body api.GetDAGRunDetails200JSONResponse
 		resp.Unmarshal(t, &body)

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/license"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,8 +107,10 @@ func TestSave_FilePermissions(t *testing.T) {
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 
-	assert.Equal(t, os.FileMode(filePerm), info.Mode().Perm(),
-		"activation file should have 0600 permissions")
+	if testutil.SupportsPOSIXPermissionBits() {
+		assert.Equal(t, os.FileMode(filePerm), info.Mode().Perm(),
+			"activation file should have 0600 permissions")
+	}
 }
 
 // TestSave_DirectoryPermissions verifies that Save creates the directory with
@@ -123,8 +126,10 @@ func TestSave_DirectoryPermissions(t *testing.T) {
 	info, err := os.Stat(dir)
 	require.NoError(t, err)
 
-	assert.Equal(t, os.FileMode(dirPerm), info.Mode().Perm(),
-		"license directory should have 0700 permissions")
+	if testutil.SupportsPOSIXPermissionBits() {
+		assert.Equal(t, os.FileMode(dirPerm), info.Mode().Perm(),
+			"license directory should have 0700 permissions")
+	}
 }
 
 // TestSave_PrettyPrintedJSON verifies that the file contains indented JSON
@@ -183,16 +188,10 @@ func TestLoad_InvalidJSON(t *testing.T) {
 // sits in the path where the directory should be.
 func TestLoad_ReadError(t *testing.T) {
 	t.Parallel()
-	base := t.TempDir()
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, activationFile), 0700))
 
-	// Place a regular file where the license directory would be, so that
-	// anything trying to read a file inside it will fail.
-	blocker := filepath.Join(base, "blocker")
-	require.NoError(t, os.WriteFile(blocker, []byte("i am a file"), 0600))
-
-	// The store's dir is the blocker file itself; the full path would be
-	// <blocker>/activation.json which is impossible to read.
-	s := New(blocker)
+	s := New(dir)
 
 	result, err := s.Load()
 	require.Error(t, err)

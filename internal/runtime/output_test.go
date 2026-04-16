@@ -6,8 +6,10 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
+	osrt "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,93 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func repeatedXOutputScript(size int) string {
+	if osrt.GOOS == "windows" {
+		return fmt.Sprintf("$value = 'x' * %d; [Console]::Write($value)", size)
+	}
+	return fmt.Sprintf("head -c %d /dev/zero | tr '\\000' 'x'", size)
+}
+
+func concurrentRepeatedXOutputScript(processes, bytesPerProcess int) string {
+	if osrt.GOOS == "windows" {
+		return fmt.Sprintf("1..%d | ForEach-Object { [Console]::Write((\"Process {0}: \" -f $_)); [Console]::Write('x' * %d); [Console]::Write([Environment]::NewLine) }", processes, bytesPerProcess)
+	}
+	return fmt.Sprintf(`
+		for i in $(seq 1 %d); do
+			(
+				printf 'Process %%s: ' "$i"
+				head -c %d /dev/zero | tr '\000' 'x'
+				printf '\n'
+			) &
+		done
+		wait
+	`, processes, bytesPerProcess)
+}
+
+func outputCommandEntry(script string) core.CommandEntry {
+	if osrt.GOOS == "windows" {
+		return core.CommandEntry{
+			Command: "powershell",
+			Args: []string{
+				"-NoLogo",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				script,
+			},
+		}
+	}
+	return core.CommandEntry{
+		Command: "sh",
+		Args:    []string{"-c", script},
+	}
+}
+
+func outputCommandTimeout() time.Duration {
+	if osrt.GOOS == "windows" {
+		return 20 * time.Second
+	}
+	return 5 * time.Second
+}
+
+func outputDeadlockTimeout() time.Duration {
+	if osrt.GOOS == "windows" {
+		return 30 * time.Second
+	}
+	return 10 * time.Second
+}
+
+func outputCommandCleanupWait() time.Duration {
+	if osrt.GOOS == "windows" {
+		return 10 * time.Second
+	}
+	return 2 * time.Second
+}
+
+func startNodeExecuteAsync(t *testing.T, node *Node, ctx context.Context) <-chan error {
+	t.Helper()
+
+	done := make(chan error, 1)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		done <- node.Execute(ctx)
+	}()
+
+	t.Cleanup(func() {
+		node.Cancel()
+		select {
+		case <-finished:
+		case <-time.After(outputCommandCleanupWait()):
+		}
+		_ = node.Teardown()
+	})
+
+	return done
+}
 
 func TestNode_LargeOutput(t *testing.T) {
 	tests := []struct {
@@ -28,31 +117,31 @@ func TestNode_LargeOutput(t *testing.T) {
 		{
 			name:       "SmallOutput",
 			outputSize: 1024, // 1KB
-			script:     `python3 -c "print('x' * 1024)"`,
+			script:     repeatedXOutputScript(1024),
 			expectHang: false,
 		},
 		{
 			name:       "MediumOutput",
 			outputSize: 32 * 1024, // 32KB
-			script:     `python3 -c "print('x' * (32 * 1024))"`,
+			script:     repeatedXOutputScript(32 * 1024),
 			expectHang: false,
 		},
 		{
 			name:       "LargeOutputJustBelow64KB",
 			outputSize: 63 * 1024, // 63KB
-			script:     `python3 -c "print('x' * (63 * 1024))"`,
+			script:     repeatedXOutputScript(63 * 1024),
 			expectHang: false,
 		},
 		{
 			name:       "LargeOutputAt64KB",
 			outputSize: 64 * 1024, // 64KB
-			script:     `python3 -c "print('x' * (64 * 1024))"`,
+			script:     repeatedXOutputScript(64 * 1024),
 			expectHang: false, // Fixed - no longer hangs
 		},
 		{
 			name:       "LargeOutputAbove64KB",
 			outputSize: 128 * 1024, // 128KB
-			script:     `python3 -c "print('x' * (128 * 1024))"`,
+			script:     repeatedXOutputScript(128 * 1024),
 			expectHang: false, // Fixed - no longer hangs
 		},
 	}
@@ -60,12 +149,9 @@ func TestNode_LargeOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			step := core.Step{
-				Name:   "test",
-				Output: "RESULT",
-				Commands: []core.CommandEntry{{
-					Command: "sh",
-					Args:    []string{"-c", tt.script},
-				}},
+				Name:     "test",
+				Output:   "RESULT",
+				Commands: []core.CommandEntry{outputCommandEntry(tt.script)},
 			}
 
 			node := NewNode(step, NodeState{})
@@ -80,10 +166,7 @@ func TestNode_LargeOutput(t *testing.T) {
 			require.NoError(t, err)
 
 			// Execute with timeout to detect hanging
-			done := make(chan error, 1)
-			go func() {
-				done <- node.Execute(ctx)
-			}()
+			done := startNodeExecuteAsync(t, node, ctx)
 
 			select {
 			case err := <-done:
@@ -110,16 +193,11 @@ func TestNode_LargeOutput(t *testing.T) {
 						t.Error("OutputVariables is nil")
 					}
 				}
-			case <-time.After(5 * time.Second):
+			case <-time.After(outputCommandTimeout()):
 				if !tt.expectHang {
 					t.Errorf("Command hung unexpectedly for output size %d bytes", tt.outputSize)
 				}
-				// Cancel the context to clean up
-				node.Cancel()
 			}
-
-			// Cleanup
-			_ = node.Teardown()
 		})
 	}
 }
@@ -127,15 +205,9 @@ func TestNode_LargeOutput(t *testing.T) {
 func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	// Test specifically for the pipe deadlock issue
 	step := core.Step{
-		Name:   "deadlock-test",
-		Output: "RESULT",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args: []string{"-c", `
-			# Generate exactly 64KB + 1 byte to trigger pipe buffer deadlock
-			python3 -c "import sys; sys.stdout.write('x' * (64 * 1024 + 1)); sys.stdout.flush()"
-		`},
-		}},
+		Name:     "deadlock-test",
+		Output:   "RESULT",
+		Commands: []core.CommandEntry{outputCommandEntry(repeatedXOutputScript(64*1024 + 1))},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -149,10 +221,7 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 	require.NoError(t, err)
 
 	// This should complete without hanging
-	done := make(chan error, 1)
-	go func() {
-		done <- node.Execute(ctx)
-	}()
+	done := startNodeExecuteAsync(t, node, ctx)
 
 	select {
 	case err := <-done:
@@ -168,25 +237,17 @@ func TestNode_OutputCaptureDeadlock(t *testing.T) {
 			output = output[idx+1:]
 		}
 		assert.Len(t, output, 64*1024+1, "output should be exactly 64KB + 1 byte")
-	case <-time.After(10 * time.Second):
+	case <-time.After(outputDeadlockTimeout()):
 		t.Fatal("Command execution hung - possible deadlock detected")
 	}
-
-	_ = node.Teardown()
 }
 
 func TestNode_OutputExceedsLimit(t *testing.T) {
 	// Test that output exceeding the limit returns an error
 	step := core.Step{
-		Name:   "exceed-limit-test",
-		Output: "RESULT",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args: []string{"-c", `
-			# Generate 2MB of output (exceeds default 1MB limit)
-			python3 -c "print('x' * (2 * 1024 * 1024))"
-		`},
-		}},
+		Name:     "exceed-limit-test",
+		Output:   "RESULT",
+		Commands: []core.CommandEntry{outputCommandEntry(repeatedXOutputScript(2 * 1024 * 1024))},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -213,15 +274,9 @@ func TestNode_OutputExceedsLimit(t *testing.T) {
 func TestNode_CustomOutputLimit(t *testing.T) {
 	// Test with custom output limit
 	step := core.Step{
-		Name:   "custom-limit-test",
-		Output: "RESULT",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args: []string{"-c", `
-			# Generate 100KB of output
-			python3 -c "print('x' * (100 * 1024))"
-		`},
-		}},
+		Name:     "custom-limit-test",
+		Output:   "RESULT",
+		Commands: []core.CommandEntry{outputCommandEntry(repeatedXOutputScript(100 * 1024))},
 	}
 
 	node := NewNode(step, NodeState{})
@@ -251,18 +306,9 @@ func TestNode_CustomOutputLimit(t *testing.T) {
 func TestNode_ConcurrentOutputCapture(t *testing.T) {
 	// Test that output capture doesn't interfere with concurrent writes
 	step := core.Step{
-		Name: "concurrent-test",
-		Commands: []core.CommandEntry{{
-			Command: "sh",
-			Args: []string{"-c", `
-			# Generate output from multiple processes concurrently
-			for i in $(seq 1 10); do
-				(python3 -c "print('Process ' + str($i) + ': ' + 'x' * 10000)") &
-			done
-			wait
-		`},
-		}},
-		Output: "RESULT",
+		Name:     "concurrent-test",
+		Commands: []core.CommandEntry{outputCommandEntry(concurrentRepeatedXOutputScript(10, 10000))},
+		Output:   "RESULT",
 	}
 
 	node := NewNode(step, NodeState{})

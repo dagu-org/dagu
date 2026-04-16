@@ -77,13 +77,30 @@ func TestDequeueCommand_PreservesState(t *testing.T) {
 		ExpectedOut: []string{"Dequeued dag-run"},
 	})
 
-	// Verify the latest visible attempt shows success
-	latestAttempt, err := th.DAGRunStore.LatestAttempt(ctx, dag.Name)
+	// Verify the previous successful run remains intact after the queued run is hidden.
+	successAttempt, err := th.DAGRunStore.FindAttempt(ctx, exec.DAGRunRef{
+		Name: dag.Name,
+		ID:   "success-run",
+	})
 	require.NoError(t, err)
 
-	latestStatus, err := latestAttempt.ReadStatus(ctx)
+	successStatus, err := successAttempt.ReadStatus(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, core.Succeeded, latestStatus.Status, "Latest visible status should be Success")
+	assert.Equal(t, core.Succeeded, successStatus.Status, "Dequeuing should not alter the prior successful run")
+
+	queuedAttempt, err := th.DAGRunStore.FindAttempt(ctx, exec.DAGRunRef{
+		Name: dag.Name,
+		ID:   "queued-run",
+	})
+	if err == nil {
+		assert.True(t, queuedAttempt.Hidden(), "Dequeued run should be hidden from normal lookups")
+
+		queuedStatus, readErr := queuedAttempt.ReadStatus(ctx)
+		require.NoError(t, readErr)
+		assert.Equal(t, core.Aborted, queuedStatus.Status, "Dequeued run should be marked aborted before it is hidden")
+	} else {
+		assert.ErrorIs(t, err, exec.ErrDAGRunIDNotFound, "Dequeued run should not remain visible after it is hidden")
+	}
 }
 
 func TestDequeueCommand_DefaultsToFirstItem(t *testing.T) {

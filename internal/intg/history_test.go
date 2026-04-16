@@ -17,6 +17,8 @@ import (
 )
 
 func TestHistoryCommand_Basic(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -47,6 +49,8 @@ steps:
 }
 
 func TestHistoryCommand_FilterByName(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -83,6 +87,8 @@ steps:
 }
 
 func TestHistoryCommand_FilterByStatus(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -119,6 +125,8 @@ steps:
 }
 
 func TestHistoryCommand_JSONFormat(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -144,6 +152,8 @@ steps:
 }
 
 func TestHistoryCommand_RunIDDisplay(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -174,6 +184,8 @@ steps:
 }
 
 func TestHistoryCommand_DateFiltering(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -206,6 +218,8 @@ steps:
 }
 
 func TestHistoryCommand_Errors(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	tests := []struct {
@@ -259,6 +273,8 @@ func TestHistoryCommand_Errors(t *testing.T) {
 }
 
 func TestHistoryCommand_EmptyResults(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
 	// Query for non-existent DAG - stdout is not captured in LoggingOutput,
@@ -270,6 +286,8 @@ func TestHistoryCommand_EmptyResults(t *testing.T) {
 }
 
 func TestHistoryCommand_Tags(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -309,6 +327,8 @@ steps:
 }
 
 func TestHistoryCommand_Limit(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
@@ -323,13 +343,10 @@ steps:
 		th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dag.Location}})
 		expected := i + 1
 		require.Eventually(t, func() bool {
-			statuses, err := th.DAGRunStore.ListStatuses(ctx)
-			if err != nil {
-				return false
-			}
+			statuses := th.DAGRunMgr.ListRecentStatus(ctx, dag.Name, expected)
 			count := 0
 			for _, s := range statuses {
-				if s.Name == "test-limit" && s.Status == core.Succeeded {
+				if s.Status == core.Succeeded {
 					count++
 				}
 			}

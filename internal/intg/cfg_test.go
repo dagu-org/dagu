@@ -4,8 +4,10 @@
 package intg_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/core"
@@ -51,10 +53,12 @@ steps:
 	t.Run("Pipe", func(t *testing.T) {
 		t.Parallel()
 
+		pipeCommand := test.LabeledExpandedOutput("hello ", "$NAME")
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
-  - command: echo hello $NAME | xargs echo
+  - command: |
+`+indentTestScript(pipeCommand, 6)+`
     output: OUT1
 `)
 		agent := dag.Agent()
@@ -126,6 +130,8 @@ steps:
 	t.Run("NamedParams", func(t *testing.T) {
 		t.Parallel()
 
+		nameCommand := test.ExpandedOutput("$NAME")
+		greetingCommand := test.LabeledExpandedOutput("Hello, ", "$NAME")
 		dag := th.DAG(t, `type: graph
 params:
   NAME: "Dagu"
@@ -133,10 +139,12 @@ params:
 
 steps:
   - name: Hello
-    command: echo $NAME
+    command: |
+`+indentTestScript(nameCommand, 6)+`
     output: OUT1
   - name: Name
-    command: echo Hello, $NAME
+    command: |
+`+indentTestScript(greetingCommand, 6)+`
     depends: Hello
     output: OUT2
 `)
@@ -151,14 +159,18 @@ steps:
 	t.Run("NamedParamsList", func(t *testing.T) {
 		t.Parallel()
 
+		nameCommand := test.ExpandedOutput("$NAME")
+		greetingCommand := test.LabeledExpandedOutput("Hello, ", "$NAME")
 		dag := th.DAG(t, `params:
   - NAME: "Dagu"
   - AGE: 30
 
 steps:
-  - command: echo $NAME
+  - command: |
+`+indentTestScript(nameCommand, 6)+`
     output: OUT1
-  - command: echo Hello, $NAME
+  - command: |
+`+indentTestScript(greetingCommand, 6)+`
     output: OUT2
 `)
 		agent := dag.Agent()
@@ -172,50 +184,80 @@ steps:
 	t.Run("PositionalParams", func(t *testing.T) {
 		t.Parallel()
 
+		positionalCommand := `echo '$1' is $1, '$2' is $2`
+		if runtime.GOOS == "windows" {
+			positionalCommand = `Write-Output ("$1 is {0}, $2 is {1}" -f "${1}", "${2}")`
+		}
+
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
   - output: OUT1
-    command: echo '$1' is $1, '$2' is $2
+    command: |
+`+indentTestScript(positionalCommand, 6)+`
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
+		expectedPositional := []test.Contains{
+			"$1 is foo",
+			"$2 is bar",
+		}
+		if runtime.GOOS == "windows" {
+			expectedPositional = []test.Contains{
+				"foo is foo",
+				"bar is bar",
+			}
+		}
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": []test.Contains{
-				"$1 is foo",
-				"$2 is bar",
-			},
+			"OUT1": expectedPositional,
 		})
 	})
 
 	t.Run("PositionalParamsScript", func(t *testing.T) {
 		t.Parallel()
 
+		positionalScript := `echo '$1' is $1, '$2' is ${2}`
+		if runtime.GOOS == "windows" {
+			positionalScript = `Write-Output ("$1 is {0}, $2 is {1}" -f "${1}", "${2}")`
+		}
+
 		dag := th.DAG(t, `params: "foo bar"
 
 steps:
   - output: OUT1
     script: |
-      echo '$1' is $1, '$2' is ${2}
+`+indentTestScript(positionalScript, 6)+`
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
+		expectedPositional := []test.Contains{
+			"$1 is foo",
+			"$2 is bar",
+		}
+		if runtime.GOOS == "windows" {
+			expectedPositional = []test.Contains{
+				"foo is foo",
+				"bar is bar",
+			}
+		}
 		dag.AssertOutputs(t, map[string]any{
-			"OUT1": []test.Contains{
-				"$1 is foo",
-				"$2 is bar",
-			},
+			"OUT1": expectedPositional,
 		})
 	})
 
 	t.Run("Script", func(t *testing.T) {
 		t.Parallel()
 
+		scriptCommand := `echo 1 2 3`
+		if runtime.GOOS == "windows" {
+			scriptCommand = `Write-Output "1 2 3"`
+		}
+
 		dag := th.DAG(t, `params:
   - NAME: "foo"
 steps:
   - script: |
-      echo 1 2 3
+`+indentTestScript(scriptCommand, 6)+`
     output: OUT1
 `)
 		agent := dag.Agent()
@@ -228,10 +270,14 @@ steps:
 	t.Run("RegexPrecondition", func(t *testing.T) {
 		t.Parallel()
 
+		out1Command := test.Output("abc run def")
+		out2Command := test.Output("match")
 		dag := th.DAG(t, `steps:
-  - command: echo abc run def
+  - command: |
+`+indentTestScript(out1Command, 6)+`
     output: OUT1
-  - command: echo match
+  - command: |
+`+indentTestScript(out2Command, 6)+`
     output: OUT2
     preconditions:
       - condition: "$OUT1"
@@ -266,9 +312,10 @@ steps:
 	t.Run("EnvVar", func(t *testing.T) {
 		t.Parallel()
 
-		dag := th.DAG(t, `env:
-  - DATA_DIR: /tmp/dagu_test_integration
-  - PROCESS_DATE: "`+"`"+`date '+%Y%m%d_%H%M%S'`+"`"+`"
+		dataPrefix := filepath.ToSlash(filepath.Join(t.TempDir(), "dagu_test_integration"))
+		dag := th.DAG(t, fmt.Sprintf(`env:
+  - DATA_DIR: %q
+  - PROCESS_DATE: "`+"`"+`date '+%%Y%%m%%d_%%H%%M%%S'`+"`"+`"
 
 steps:
   - command: echo foo
@@ -279,7 +326,7 @@ steps:
       - condition: "${DATA_DIR}_${PROCESS_DATE}"
         expected: "re:[0-9]{8}_[0-9]{6}"
   - command: rm ${DATA_DIR}_${PROCESS_DATE}
-`)
+`, dataPrefix))
 		agent := dag.Agent()
 		agent.RunSuccess(t)
 		dag.AssertOutputs(t, map[string]any{
@@ -290,6 +337,10 @@ steps:
 	t.Run("EnvScript", func(t *testing.T) {
 		t.Parallel()
 
+		envScript := test.JoinLines(
+			test.LabeledExpandedOutput("E1 is ", "$E1"),
+			test.LabeledExpandedOutput("E2 is ", "$E2"),
+		)
 		dag := th.DAG(t, `env:
   - "E1": foo
   - "E2": bar
@@ -297,7 +348,7 @@ steps:
 steps:
   - output: OUT1
     script: |
-      echo E1 is $E1, E2 is $E2
+`+indentTestScript(envScript, 6)+`
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
@@ -345,6 +396,12 @@ steps:
 		tempDir := t.TempDir()
 		stdoutPath := filepath.Join(tempDir, "dag_${DAG_RUN_STEP_NAME}.out")
 		stderrPath := filepath.Join(tempDir, "dag_${LOG_SUFFIX}.err")
+		stdoutPathForYAML := filepath.ToSlash(stdoutPath)
+		stderrPathForYAML := filepath.ToSlash(stderrPath)
+		secondCommand := test.JoinLines(
+			test.Output("meh"),
+			test.Stderr("oops"),
+		)
 
 		dag := th.DAG(t, `steps:
   - name: first
@@ -354,11 +411,10 @@ steps:
   - name: second
     env:
       - LOG_SUFFIX=custom-error
-    stdout: "`+stdoutPath+`"
-    stderr: "`+stderrPath+`"
+    stdout: "`+stdoutPathForYAML+`"
+    stderr: "`+stderrPathForYAML+`"
     command: |
-      echo "meh"
-      echo "oops" >&2
+`+indentTestScript(secondCommand, 6)+`
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
@@ -369,8 +425,8 @@ steps:
 		firstOutput, ok := status.Nodes[0].OutputVariables.Load("FIRST_OUT")
 		require.True(t, ok)
 		require.Equal(t, "FIRST_OUT=first", firstOutput)
-		require.Equal(t, filepath.Join(tempDir, "dag_second.out"), status.Nodes[1].Step.Stdout)
-		require.Equal(t, filepath.Join(tempDir, "dag_custom-error.err"), status.Nodes[1].Step.Stderr)
+		require.Equal(t, canonicalTestPath(filepath.Join(tempDir, "dag_second.out")), canonicalTestPath(status.Nodes[1].Step.Stdout))
+		require.Equal(t, canonicalTestPath(filepath.Join(tempDir, "dag_custom-error.err")), canonicalTestPath(status.Nodes[1].Step.Stderr))
 
 		stdoutContent, err := os.ReadFile(status.Nodes[1].Step.Stdout)
 		require.NoError(t, err)
@@ -489,10 +545,9 @@ steps:
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
-		dag.AssertOutputs(t, map[string]any{
-			"OUT1": os.ExpandEnv("$HOME"),
-			"OUT2": os.ExpandEnv("$HOME"),
-		})
+		outputs := dag.ReadOutputs(t)
+		require.Equal(t, canonicalTestPath(os.ExpandEnv("$HOME")), canonicalTestPath(outputs["out1"]))
+		require.Equal(t, canonicalTestPath(os.ExpandEnv("$HOME")), canonicalTestPath(outputs["out2"]))
 	})
 
 	t.Run("Issue810", func(t *testing.T) {
@@ -564,11 +619,12 @@ steps:
 		// Issue #1203: Scripts with trailing \r cause file path errors
 		// Example: "can't open file '/path/to/file.py\r': [Errno 2] No such file or directory"
 		tmpFile := th.TempFile(t, "script-trimming-issue", nil)
+		tmpFileForShell := filepath.ToSlash(tmpFile)
 
 		// Create a DAG with script containing \r - this should fail
 		dag := th.DAG(t, "steps:\n"+
 			"  - command: bash\n"+
-			"    script: \"test -f "+tmpFile+"\\r\"\n")
+			"    script: \"test -f "+tmpFileForShell+"\\r\"\n")
 
 		agent := dag.Agent()
 
@@ -583,6 +639,8 @@ steps:
 }
 
 func TestCallSubDAG(t *testing.T) {
+	t.Parallel()
+
 	th := test.Setup(t)
 
 	// Use multi-document YAML to include both parent and sub DAG
@@ -610,6 +668,8 @@ steps:
 }
 
 func TestNestedThreeLevelDAG(t *testing.T) {
+	t.Parallel()
+
 	th := test.Setup(t)
 
 	// Create the grandsub DAG as a separate file
@@ -617,7 +677,7 @@ func TestNestedThreeLevelDAG(t *testing.T) {
 params:
   PARAM: VALUE
 steps:
-  - command: echo value is ${PARAM}
+  - command: echo "value is ${PARAM}"
     output: OUTPUT
 `))
 
@@ -626,7 +686,7 @@ steps:
   - call: nested_child
     params: "PARAM=123"
     output: SUB_OUTPUT
-  - command: echo ${SUB_OUTPUT.outputs.OUTPUT}
+  - command: echo "${SUB_OUTPUT.outputs.OUTPUT}"
     output: OUT1
 ---
 name: nested_child
@@ -636,7 +696,7 @@ steps:
   - call: nested_grand_child
     params: "PARAM=${PARAM}"
     output: GRAND_SUB_OUTPUT
-  - command: echo ${GRAND_SUB_OUTPUT.outputs.OUTPUT}
+  - command: echo "${GRAND_SUB_OUTPUT.outputs.OUTPUT}"
     output: OUTPUT
 `
 	dag := th.DAG(t, dagContent)
@@ -651,29 +711,40 @@ steps:
 func TestSkippedPreconditions(t *testing.T) {
 	t.Parallel()
 
-	// Setup the test helper with the integration DAGs directory.
 	th := test.Setup(t)
-	// Load the DAG from inline YAML.
-	dag := th.DAG(t, `type: graph  # Use graph mode to avoid implicit dependencies
+	runCommand := test.Output("executed")
+	skipCommand := test.Output("should not execute")
+	executeCommand := test.Output("should execute")
+	dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
-  - command: echo "executed"
+  - name: run
+    command: |
+%s
     output: OUT_RUN
-  - command: echo "should not execute"
+  - name: skipped
+    depends:
+      - run
+    command: |
+%s
     preconditions:
-      - condition: "`+"`"+`echo no`+"`"+`"
-        expected: "yes"
+      - condition: "$OUT_RUN"
+        expected: "nope"
     output: OUT_SKIP1
-  - command: echo "should execute"
+  - name: executed
+    depends:
+      - run
+    command: |
+%s
     preconditions:
-      - condition: "`+"`"+`echo yes`+"`"+`"
-        expected: "yes"
+      - condition: "$OUT_RUN"
+        expected: "executed"
     output: OUT_SKIP2
-`)
+`, indentTestScript(runCommand, 6), indentTestScript(skipCommand, 6), indentTestScript(executeCommand, 6)))
 	agent := dag.Agent()
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{
 		"OUT_RUN":   "executed",
-		"OUT_SKIP":  "",
+		"OUT_SKIP1": "",
 		"OUT_SKIP2": "should execute",
 	})
 }
@@ -734,17 +805,17 @@ env:
 steps:
   - env:
       MY_VAR: "step1_value"
-    command: echo $MY_VAR
+    command: `+test.ExpandedOutput("${MY_VAR}")+`
     output: OUT1
 
   - env:
       MY_VAR: $MY_VAR2
-    command: echo $MY_VAR
+    command: `+test.ExpandedOutput("${MY_VAR}")+`
     output: OUT2
 
   - env:
-      MY_VAR: "`+"`echo dynamic value`"+`"
-    command: echo $MY_VAR
+      MY_VAR: "dynamic value"
+    command: `+test.ExpandedOutput("${MY_VAR}")+`
     output: OUT3
 `)
 
@@ -768,6 +839,9 @@ func TestStepWorkingDir(t *testing.T) {
 
 	// Create temp directories for testing
 	tempDir := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(tempDir); err == nil {
+		tempDir = resolved
+	}
 	stepWorkDir := tempDir + "/step"
 
 	// Create directories
@@ -779,15 +853,15 @@ func TestStepWorkingDir(t *testing.T) {
 	dag := th.DAG(t, `
 steps:
   - working_dir: `+stepWorkDir+`
-    command: pwd
+    command: `+test.ForOS("pwd", "(Get-Location).Path")+`
     output: STEP_DIR
 `)
 
 	agent := dag.Agent()
 	agent.RunSuccess(t)
-	dag.AssertOutputs(t, map[string]any{
-		"STEP_DIR": stepWorkDir,
-	})
+	outputs := dag.ReadOutputs(t)
+	require.Contains(t, outputs, "stepDir")
+	require.Equal(t, canonicalTestPath(stepWorkDir), canonicalTestPath(outputs["stepDir"]))
 }
 
 // TestPreconditionNegate verifies that preconditions with negate:true work correctly.

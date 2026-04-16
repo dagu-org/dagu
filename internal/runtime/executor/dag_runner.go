@@ -640,6 +640,9 @@ func (e *SubDAGExecutor) waitForCancellation(ctx context.Context, dagRunID strin
 			logger.Warn(waitCtx, "Failed to get sub DAG run status during cancellation wait",
 				tag.Error(err),
 			)
+			if shouldAbortCancellationWait(err) {
+				return nil, errors.Join(errSubDAGCancelled, err)
+			}
 		}
 		lastStatus = status
 
@@ -665,6 +668,18 @@ func (e *SubDAGExecutor) waitForCancellation(ctx context.Context, dagRunID strin
 			)
 		}
 	}
+}
+
+func shouldAbortCancellationWait(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+
+	return strings.Contains(msg, "no coordinators available") ||
+		strings.Contains(msg, "no coordinator client configured") ||
+		strings.Contains(msg, "no available workers")
 }
 
 // getSubDAGRunStatus retrieves the status of a sub-DAG run.

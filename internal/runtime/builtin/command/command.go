@@ -48,7 +48,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	e.mu.Lock()
 
 	if e.config.Script != "" {
-		scriptFile, err := setupScript(e.config.Dir, e.config.Script, e.config.Shell)
+		scriptFile, err := setupScript(e.config.Dir, e.config.Script, e.config.Command, e.config.Shell)
 		if err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to setup script: %w", err)
@@ -145,7 +145,7 @@ func (e *commandExecutor) annotateStderrTail(tail string) string {
 	if e.config.Script == "" || e.scriptFile == "" {
 		return tail
 	}
-	offset := scriptLineOffset(e.config.Shell)
+	offset := scriptLineOffset(e.scriptFile)
 	errorLines := extractErrorLines(tail, e.scriptFile)
 
 	// Strip temp script path from stderr for clean display.
@@ -242,7 +242,8 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.
 		}
 		if shebang != "" {
 			// Use the shebang interpreter to run the script
-			cmd = exec.CommandContext(cfg.Ctx, shebang, append(shebangArgs, scriptFile)...) // nolint: gosec
+			cmd = exec.CommandContext(cfg.Ctx, cmdutil.ResolveExecutable(shebang), append(shebangArgs, scriptFile)...) // nolint: gosec
+			cmdutil.SetupCommand(cmd)
 			break
 		}
 		// Use shell command builder to properly execute the script file

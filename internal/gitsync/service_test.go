@@ -64,12 +64,12 @@ func TestService_PathHelpers(t *testing.T) {
 	}
 
 	// Test filePathToDAGID
-	dagID := s.filePathToDAGID("subdir/my_dag.yaml")
+	dagID := s.filePathToDAGID(filepath.Join("subdir", "my_dag.yaml"))
 	require.Equal(t, "my_dag", dagID)
 
 	// Test dagIDToFilePath
 	dagPath := s.dagIDToFilePath("my_dag")
-	require.Equal(t, "/dags/my_dag.yaml", dagPath)
+	require.Equal(t, filepath.Join("/dags", "my_dag.yaml"), dagPath)
 
 	// Test dagIDToRepoPath
 	repoPath := s.dagIDToRepoPath("my_dag")
@@ -101,7 +101,7 @@ func TestDagIDToFilePath_MemoryFiles(t *testing.T) {
 	}
 
 	// Regular DAG
-	assert.Equal(t, "/dags/my-dag.yaml", s.dagIDToFilePath("my-dag"))
+	assert.Equal(t, filepath.Join("/dags", "my-dag.yaml"), s.dagIDToFilePath("my-dag"))
 
 	// Memory file
 	assert.Equal(t,
@@ -127,7 +127,7 @@ func TestDagIDToRepoPath_MemoryFiles(t *testing.T) {
 
 	// Memory file
 	assert.Equal(t,
-		filepath.Join("subdir", "memory", "MEMORY.md"),
+		"subdir/memory/MEMORY.md",
 		s.dagIDToRepoPath("memory/MEMORY"),
 	)
 }
@@ -152,13 +152,13 @@ func TestScanMemoryFiles(t *testing.T) {
 	s.scanMemoryFiles(state)
 
 	// Should find global memory
-	globalID := filepath.Join("memory", "MEMORY")
+	globalID := "memory/MEMORY"
 	assert.Contains(t, state.DAGs, globalID)
 	assert.Equal(t, StatusUntracked, state.DAGs[globalID].Status)
 	assert.Equal(t, DAGKindMemory, state.DAGs[globalID].Kind)
 
 	// Should find per-DAG memory
-	dagID := filepath.Join("memory", "dags", "my-dag", "MEMORY")
+	dagID := "memory/dags/my-dag/MEMORY"
 	assert.Contains(t, state.DAGs, dagID)
 	assert.Equal(t, StatusUntracked, state.DAGs[dagID].Status)
 	assert.Equal(t, DAGKindMemory, state.DAGs[dagID].Kind)
@@ -357,13 +357,19 @@ func TestSafeDAGIDPathValidation(t *testing.T) {
 	t.Run("valid regular DAG path", func(t *testing.T) {
 		path, err := s.safeDAGIDToFilePath("my-dag")
 		require.NoError(t, err)
-		assert.Equal(t, "/dags/my-dag.yaml", path)
+		assert.Equal(t, filepath.Join("/dags", "my-dag.yaml"), path)
 	})
 
 	t.Run("valid memory path", func(t *testing.T) {
 		path, err := s.safeDAGIDToRepoPath("memory/MEMORY")
 		require.NoError(t, err)
-		assert.Equal(t, filepath.Join("subdir", "memory", "MEMORY.md"), path)
+		assert.Equal(t, "subdir/memory/MEMORY.md", path)
+	})
+
+	t.Run("normalizes backslash separators", func(t *testing.T) {
+		path, err := s.safeDAGIDToRepoPath(`memory\MEMORY`)
+		require.NoError(t, err)
+		assert.Equal(t, "subdir/memory/MEMORY.md", path)
 	})
 
 	t.Run("rejects traversal DAG ID", func(t *testing.T) {

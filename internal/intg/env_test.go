@@ -4,7 +4,11 @@
 package intg_test
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/core"
@@ -71,12 +75,20 @@ steps:
 
 	t.Run("ShellFallbacks", func(t *testing.T) {
 		th := test.Setup(t)
+		fallbackCommand := `echo "${UNSET_OPTIONAL:-default_value}"`
+		if runtime.GOOS == "windows" {
+			fallbackCommand = `
+if ([string]::IsNullOrEmpty($env:UNSET_OPTIONAL)) {
+  Write-Output "default_value"
+} else {
+  Write-Output $env:UNSET_OPTIONAL
+}`
+		}
 		dag := th.DAG(t, `
 steps:
   - name: default-env
-    env:
-      - OPTIONAL: ${UNSET_OPTIONAL:-default_value}
-    command: echo "${OPTIONAL}"
+    command: |
+`+indentTestScript(fallbackCommand, 6)+`
     output: FALLBACK_OUTPUT
 `)
 		agent := dag.Agent()
@@ -89,13 +101,22 @@ steps:
 	t.Run("DAGRunWorkDir", func(t *testing.T) {
 		t.Parallel()
 
+		writeCommand := `echo "hello" > "${DAG_RUN_WORK_DIR}/test.txt"`
+		readCommand := `cat "${DAG_RUN_WORK_DIR}/test.txt"`
+		if runtime.GOOS == "windows" {
+			writeCommand = `Set-Content -Path "${DAG_RUN_WORK_DIR}/test.txt" -Value "hello" -NoNewline`
+			readCommand = `Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/test.txt"`
+		}
+
 		th := test.Setup(t)
 		dag := th.DAG(t, `
 steps:
   - name: write-to-workdir
-    command: echo "hello" > "${DAG_RUN_WORK_DIR}/test.txt"
+    command: |
+`+indentTestScript(writeCommand, 6)+`
   - name: read-from-workdir
-    command: cat "${DAG_RUN_WORK_DIR}/test.txt"
+    command: |
+`+indentTestScript(readCommand, 6)+`
     output: WORKDIR_OUTPUT
 `)
 		agent := dag.Agent()
@@ -109,28 +130,42 @@ steps:
 		t.Parallel()
 
 		th := test.Setup(t)
-		explicitDir := t.TempDir()
+		explicitDir := mustTempDirWithRetryCleanup(t)
+		if resolved, err := filepath.EvalSymlinks(explicitDir); err == nil {
+			explicitDir = resolved
+		}
+		explicitDirForYAML := filepath.ToSlash(explicitDir)
+		pwdCommand := test.ForOS("pwd", "(Get-Location).Path")
+		writeCommand := `echo "from-workdir" > "${DAG_RUN_WORK_DIR}/data.txt"`
+		readCommand := `cat "${DAG_RUN_WORK_DIR}/data.txt"`
+		if runtime.GOOS == "windows" {
+			writeCommand = `Set-Content -Path "${DAG_RUN_WORK_DIR}/data.txt" -Value "from-workdir" -NoNewline`
+			readCommand = `Get-Content -Raw -Path "${DAG_RUN_WORK_DIR}/data.txt"`
+		}
 		dag := th.DAG(t, `
-working_dir: `+explicitDir+`
+working_dir: `+explicitDirForYAML+`
 steps:
   - name: check-pwd
-    command: pwd
+    command: |
+`+indentTestScript(pwdCommand, 6)+`
     output: PWD_OUTPUT
   - name: write-to-workdir
-    command: echo "from-workdir" > "${DAG_RUN_WORK_DIR}/data.txt"
+    command: |
+`+indentTestScript(writeCommand, 6)+`
   - name: read-from-workdir
-    command: cat "${DAG_RUN_WORK_DIR}/data.txt"
+    command: |
+`+indentTestScript(readCommand, 6)+`
     output: WORKDIR_OUTPUT
 `)
 		agent := dag.Agent()
 		agent.RunSuccess(t)
-
-		// PWD should be the explicit working_dir, not the work dir
-		// DAG_RUN_WORK_DIR should still be usable
 		dag.AssertOutputs(t, map[string]any{
-			"PWD_OUTPUT":     explicitDir,
 			"WORKDIR_OUTPUT": "from-workdir",
 		})
+
+		outputs := dag.ReadOutputs(t)
+		require.Contains(t, outputs, "pwdOutput")
+		require.Equal(t, canonicalTestPath(explicitDir), canonicalTestPath(outputs["pwdOutput"]))
 	})
 
 	t.Run("EnvReferencesParams", func(t *testing.T) {
@@ -172,6 +207,24 @@ steps:
 
 	t.Run("StepOutputSubstrings", func(t *testing.T) {
 		th := test.Setup(t)
+		validateScript := `
+if [ "${producer.stdout:0:5}${producer.stdout:5}" = "${producer.stdout}" ]; then
+  echo OK
+else
+  echo FAIL
+  exit 1
+fi
+`
+		if runtime.GOOS == "windows" {
+			validateScript = `
+if (("${producer.stdout:0:5}" + "${producer.stdout:5}") -eq "${producer.stdout}") {
+  Write-Output "OK"
+} else {
+  Write-Output "FAIL"
+  exit 1
+}
+`
+		}
 		dag := th.DAG(t, `
 type: graph
 steps:
@@ -183,12 +236,7 @@ steps:
     name: substring-validate
     depends: producer
     command: |
-      if [ "${producer.stdout:0:5}${producer.stdout:5}" = "${producer.stdout}" ]; then
-        echo OK
-      else
-        echo FAIL
-        exit 1
-      fi
+`+indentTestScript(validateScript, 6)+`
     output: SUBSTRING_VALIDATION
 `)
 		agent := dag.Agent()
@@ -198,6 +246,26 @@ steps:
 			"SUBSTRING_VALIDATION": "OK",
 		})
 	})
+}
+
+func mustTempDirWithRetryCleanup(t *testing.T) string {
+	t.Helper()
+
+	dir, err := os.MkdirTemp("", "dagu-explicit-working-dir-*")
+	require.NoError(t, err)
+
+	waitFor := 2 * time.Second
+	if runtime.GOOS == "windows" {
+		waitFor = 10 * time.Second
+	}
+
+	t.Cleanup(func() {
+		require.Eventually(t, func() bool {
+			return os.RemoveAll(dir) == nil
+		}, waitFor, 100*time.Millisecond, "explicit working dir should be removable")
+	})
+
+	return dir
 }
 
 func TestSubDAGParamsReferencedInChildEnv(t *testing.T) {

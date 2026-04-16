@@ -55,6 +55,11 @@ const artifactImagePreviewMaxBytes int64 = 5 * 1024 * 1024
 
 var errArtifactUnavailable = errors.New("artifact directory not found")
 
+const (
+	manualStepSettleTimeout      = 5 * time.Second
+	manualStepSettlePollInterval = 50 * time.Millisecond
+)
+
 type dagRunReadRequestInfo struct {
 	endpoint    string
 	dagName     string
@@ -1102,6 +1107,17 @@ func (a *API) ApproveDAGRunStep(ctx context.Context, request api.ApproveDAGRunSt
 			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return &api.ApproveDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+		}, nil
+	}
+	dagStatus, err = a.waitForManualStepMutationReady(ctx, attempt, dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for dag-run to settle: %w", err)
+	}
 
 	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
 	if stepIdx < 0 {
@@ -1170,6 +1186,17 @@ func (a *API) ApproveSubDAGRunStep(ctx context.Context, request api.ApproveSubDA
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
 		}, nil
+	}
+	attempt, err := a.dagRunStore.FindSubAttempt(ctx, rootRef, request.SubDAGRunId)
+	if err != nil {
+		return &api.ApproveSubDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
+		}, nil
+	}
+	dagStatus, err = a.waitForManualStepMutationReady(ctx, attempt, dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for sub DAG-run to settle: %w", err)
 	}
 
 	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
@@ -1320,6 +1347,17 @@ func (a *API) RejectDAGRunStep(ctx context.Context, request api.RejectDAGRunStep
 			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
 	}
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return &api.RejectDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+		}, nil
+	}
+	dagStatus, err = a.waitForManualStepMutationReady(ctx, attempt, dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for dag-run to settle: %w", err)
+	}
 
 	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
 	if stepIdx < 0 {
@@ -1376,6 +1414,17 @@ func (a *API) RejectSubDAGRunStep(ctx context.Context, request api.RejectSubDAGR
 			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
 		}, nil
 	}
+	attempt, err := a.dagRunStore.FindSubAttempt(ctx, rootRef, request.SubDAGRunId)
+	if err != nil {
+		return &api.RejectSubDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
+		}, nil
+	}
+	dagStatus, err = a.waitForManualStepMutationReady(ctx, attempt, dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for sub DAG-run to settle: %w", err)
+	}
 
 	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
 	if stepIdx < 0 {
@@ -1431,6 +1480,17 @@ func (a *API) PushBackDAGRunStep(ctx context.Context, request api.PushBackDAGRun
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
 		}, nil
+	}
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return &api.PushBackDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("dag-run ID %s not found for DAG %s", request.DagRunId, request.Name),
+		}, nil
+	}
+	dagStatus, err = a.waitForManualStepMutationReady(ctx, attempt, dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for dag-run to settle: %w", err)
 	}
 
 	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
@@ -1519,6 +1579,17 @@ func (a *API) PushBackSubDAGRunStep(ctx context.Context, request api.PushBackSub
 			Code:    api.ErrorCodeNotFound,
 			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
 		}, nil
+	}
+	attempt, err := a.dagRunStore.FindSubAttempt(ctx, rootRef, request.SubDAGRunId)
+	if err != nil {
+		return &api.PushBackSubDAGRunStep404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("sub DAG-run ID %s not found", request.SubDAGRunId),
+		}, nil
+	}
+	dagStatus, err = a.waitForManualStepMutationReady(ctx, attempt, dagStatus)
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for sub DAG-run to settle: %w", err)
 	}
 
 	stepIdx := findStepByName(dagStatus.Nodes, request.StepName)
@@ -2725,6 +2796,54 @@ func (a *API) getSubDAGRunDetail(ctx context.Context, parentRef exec.DAGRunRef, 
 	}
 
 	return detail, nil
+}
+
+func (a *API) waitForManualStepMutationReady(
+	ctx context.Context,
+	attempt exec.DAGRunAttempt,
+	status *exec.DAGRunStatus,
+) (*exec.DAGRunStatus, error) {
+	if status == nil || attempt == nil || a.procStore == nil {
+		return status, nil
+	}
+	if status.Status != core.Waiting || !isLocalManualStepWorker(status.WorkerID) || status.AttemptID == "" {
+		return status, nil
+	}
+
+	dag, err := attempt.ReadDAG(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to read DAG while waiting for manual step mutation readiness", tag.Error(err))
+		return status, nil
+	}
+
+	deadline := time.Now().Add(manualStepSettleTimeout)
+	for time.Now().Before(deadline) {
+		alive, err := a.procStore.IsAttemptAlive(ctx, dag.ProcGroup(), status.DAGRun(), status.AttemptID)
+		if err != nil {
+			logger.Warn(ctx, "Failed to check manual step attempt liveness", tag.Error(err))
+			break
+		}
+		if !alive {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(manualStepSettlePollInterval):
+		}
+	}
+
+	latest, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		logger.Warn(ctx, "Failed to reload status after waiting for manual step mutation readiness", tag.Error(err))
+		return status, nil
+	}
+	return latest, nil
+}
+
+func isLocalManualStepWorker(workerID string) bool {
+	return workerID == "" || workerID == "local"
 }
 
 func applyApproval(ctx context.Context, node *exec.Node, body *api.ApproveStepRequest) {

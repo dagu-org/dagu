@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -25,6 +26,13 @@ const (
 	apiTestProcHeartbeatInterval = 150 * time.Millisecond
 	apiTestProcStaleThreshold    = time.Second
 )
+
+func apiProcEventuallyTimeout(base time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return base * 6
+	}
+	return base
+}
 
 func TestServerProcHeartbeat_StartAPI(t *testing.T) {
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
@@ -60,12 +68,12 @@ steps:
 		var details api.GetDAGDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &details)
 		return details.DagRun.Status == api.Status(core.Running)
-	}, 5*time.Second, 50*time.Millisecond)
+	}, apiProcEventuallyTimeout(5*time.Second), 50*time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		alive, err := server.ProcStore.IsRunAlive(server.Context, dagName, ref)
 		return err == nil && alive
-	}, 10*time.Second, 50*time.Millisecond)
+	}, apiProcEventuallyTimeout(10*time.Second), 50*time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		statusResp := server.Client().Get(fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", dagName, execResp.DagRunId)).
@@ -74,7 +82,7 @@ steps:
 		var details api.GetDAGDAGRunDetails200JSONResponse
 		statusResp.Unmarshal(t, &details)
 		return details.DagRun.Status == api.Status(core.Succeeded)
-	}, 15*time.Second, 50*time.Millisecond)
+	}, apiProcEventuallyTimeout(15*time.Second), 50*time.Millisecond)
 }
 
 func TestServerRepairsStaleLocalRunOnRead(t *testing.T) {

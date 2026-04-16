@@ -45,13 +45,14 @@ func TestTemplateExecutor(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		outFile := filepath.Join(tmpDir, "report.md")
+		outFileForYAML := filepath.ToSlash(outFile)
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
     config:
-      output: "`+outFile+`"
+      output: "`+outFileForYAML+`"
       data:
         title: Test Report
     script: |
@@ -72,12 +73,13 @@ func TestTemplateExecutor(t *testing.T) {
 		t.Parallel()
 
 		tmpDir := t.TempDir()
+		tmpDirForYAML := filepath.ToSlash(tmpDir)
 
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    working_dir: "`+tmpDir+`"
+    working_dir: "`+tmpDirForYAML+`"
     config:
       output: "subdir/output.txt"
       data:

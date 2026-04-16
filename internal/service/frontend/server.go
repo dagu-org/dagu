@@ -43,6 +43,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	cmnschema "github.com/dagucloud/dagu/internal/cmn/schema"
+	"github.com/dagucloud/dagu/internal/cmn/signalctx"
 	"github.com/dagucloud/dagu/internal/cmn/telemetry"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/gitsync"
@@ -1545,14 +1546,20 @@ func runShutdownSequence(shutdownCtx context.Context, actions shutdownActions) e
 }
 
 func (srv *Server) setupGracefulShutdown(ctx context.Context) {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	select {
-	case <-ctx.Done():
+	if signalctx.OSSignalsDisabled(ctx) {
+		<-ctx.Done()
 		logger.Info(ctx, "Context done, shutting down server")
-	case sig := <-quit:
-		logger.Info(ctx, "Received shutdown signal", slog.String("signal", sig.String()))
+	} else {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(quit)
+
+		select {
+		case <-ctx.Done():
+			logger.Info(ctx, "Context done, shutting down server")
+		case sig := <-quit:
+			logger.Info(ctx, "Received shutdown signal", slog.String("signal", sig.String()))
+		}
 	}
 
 	shutdownCtx, cancel := newGracefulShutdownContext(ctx)

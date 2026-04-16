@@ -70,7 +70,7 @@ func (s *WorkerHeartbeatStore) DeleteStale(_ context.Context, before time.Time) 
 		if record.LastHeartbeatTime().After(before) {
 			continue
 		}
-		if err := os.Remove(s.recordPath(record.WorkerID)); err != nil && !os.IsNotExist(err) {
+		if err := removeFile(s.recordPath(record.WorkerID)); err != nil && !os.IsNotExist(err) {
 			return removed, err
 		}
 		removed++

@@ -27,6 +27,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/cmn/logpath"
+	"github.com/dagucloud/dagu/internal/cmn/signalctx"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/cmn/telemetry"
 	"github.com/dagucloud/dagu/internal/core"
@@ -897,14 +898,19 @@ type signalListener interface {
 	Signal(context.Context, os.Signal)
 }
 
-// signalChan is a buffered channel to receive OS signals.
-var signalChan = make(chan os.Signal, 100)
-
 // listenSignals subscribes to SIGINT and SIGTERM signals and forwards them to the provided listener.
 // It also listens for context cancellation and signals the listener with an os.Interrupt.
 func listenSignals(ctx context.Context, listener signalListener) {
 	go func() {
+		if signalctx.OSSignalsDisabled(ctx) {
+			<-ctx.Done()
+			listener.Signal(ctx, os.Interrupt)
+			return
+		}
+
+		signalChan := make(chan os.Signal, 1)
 		signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(signalChan)
 
 		select {
 		// If context is cancelled, signal with os.Interrupt.

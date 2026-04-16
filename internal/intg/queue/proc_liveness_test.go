@@ -4,6 +4,7 @@
 package queue_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -22,12 +23,12 @@ const (
 )
 
 func TestSchedulerProcHeartbeat_QueuedRun(t *testing.T) {
-	f := newFixture(t, `
+	f := newFixture(t, fmt.Sprintf(`
 name: queued-proc-heartbeat
 steps:
   - name: sleep
-    command: sleep 6
-`, WithProcConfig(queueTestProcHeartbeatInterval, queueTestProcHeartbeatInterval, queueTestProcStaleThreshold)).
+    command: %s
+`, test.ShellQuote(test.Sleep(6*time.Second))), WithProcConfig(queueTestProcHeartbeatInterval, queueTestProcHeartbeatInterval, queueTestProcStaleThreshold)).
 		Enqueue(1).
 		StartScheduler(30 * time.Second)
 	defer f.Stop()
@@ -119,11 +120,11 @@ steps:
 		time.Second,
 	)
 
-	f.StartScheduler(20 * time.Second)
-	f.WaitForStatus(f.runIDs[0], core.Succeeded, 10*time.Second)
+	f.StartScheduler(30 * time.Second)
+	f.WaitForStatus(f.runIDs[0], core.Succeeded, 20*time.Second)
 
 	require.Eventually(t, func() bool {
 		_, err := os.Stat(procFile)
 		return os.IsNotExist(err)
-	}, 5*time.Second, 50*time.Millisecond)
+	}, 15*time.Second, 100*time.Millisecond)
 }

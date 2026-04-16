@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -109,7 +110,9 @@ func TestUpdateSpec(t *testing.T) {
 
 		info, err := os.Stat(filePath)
 		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+		if testutil.SupportsPOSIXPermissionBits() {
+			assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+		}
 	})
 }
 

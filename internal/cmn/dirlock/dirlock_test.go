@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -93,6 +94,28 @@ func TestTryLock(t *testing.T) {
 		// Cleanup
 		err = lock.Unlock()
 		require.NoError(t, err)
+	})
+
+	t.Run("PermissionErrorsAreNotTreatedAsConflictsOutsideWindows", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows uses retryable sharing violation handling")
+		}
+
+		parentDir := filepath.Join(tmpDir, "permission-blocked")
+		require.NoError(t, os.Mkdir(parentDir, 0o700))
+
+		targetDir := filepath.Join(parentDir, "target")
+		require.NoError(t, os.Mkdir(targetDir, 0o700))
+		require.NoError(t, os.Chmod(parentDir, 0o600))
+		t.Cleanup(func() {
+			_ = os.Chmod(parentDir, 0o700)
+		})
+
+		lock := New(targetDir, nil)
+		err := lock.TryLock()
+		require.Error(t, err)
+		require.ErrorIs(t, err, os.ErrPermission)
+		require.NotErrorIs(t, err, ErrLockConflict)
 	})
 }
 

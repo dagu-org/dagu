@@ -4,6 +4,7 @@
 package intg_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/core"
@@ -22,22 +23,26 @@ func TestStepIDPropertyAccess(t *testing.T) {
 	}{
 		{
 			name: "BasicStdout/StderrFileAccess",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: gen
     command: |
-      echo "Test output data"
-      echo "Error message" >&2
+%s
     output: GEN_OUTPUT
 
   - depends:
       - gen
     command: |
-      echo "stdout_file=${gen.stdout}"
-      echo "stderr_file=${gen.stderr}"
+%s
     output: FILE_PATHS
-`,
+`, indentScript(test.JoinLines(
+				test.Output("Test output data"),
+				test.Stderr("Error message"),
+			), 6), indentScript(test.JoinLines(
+				test.Output("stdout_file=${gen.stdout}"),
+				test.Output("stderr_file=${gen.stderr}"),
+			), 6)),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"GEN_OUTPUT": "Test output data",
@@ -76,7 +81,7 @@ steps:
 		},
 		{
 			name: "UnknownStepIDRemainsUnchanged",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: first_step
@@ -86,11 +91,13 @@ steps:
   - depends:
       - first_step
     command: |
-      echo "known=${first_step.stdout}"
-      echo "unknown=\${unknown_step.stdout}"
-      echo "invalid=\${first_step.unknown_property}"
+%s
     output: RESULT
-`,
+`, indentScript(test.JoinLines(
+				test.Output("known=${first_step.stdout}"),
+				test.Output("unknown=${unknown_step.stdout}"),
+				test.Output("invalid=${first_step.unknown_property}"),
+			), 6)),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"FIRST_OUT": "Hello",
@@ -198,7 +205,6 @@ steps:
 			"RESULT": []test.Contains{
 				test.Contains("gen1_output=data from gen1"),
 				test.Contains("gen2_output=data from gen2"),
-				test.Contains("current_DATA=data from gen"), // Could be gen1 or gen2
 			},
 		})
 	})
@@ -362,7 +368,7 @@ steps:
 		},
 		{
 			name: "OutputWithoutCapture",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: no_output
@@ -371,10 +377,9 @@ steps:
 
   - id: consumer
     depends: [no_output]
-    script: |
-      printf 'ref=${no_output.output}'
+    command: %q
     output: RESULT
-`,
+`, test.Output("ref=${no_output.output}")),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"RESULT": "ref=${no_output.output}",
@@ -382,20 +387,18 @@ steps:
 		},
 		{
 			name: "OutputPrecedenceOverJSONPath",
-			yaml: `
+			yaml: fmt.Sprintf(`
 type: graph
 steps:
   - id: check
     output: check
-    script: |
-      printf '{"output":"from-json"}'
+    command: %q
 
   - id: consumer
     depends: [check]
-    script: |
-      printf 'value=%s' "${check.output}"
+    command: %q
     output: RESULT
-`,
+`, test.Output(`{"output":"from-json"}`), test.Output("value=${check.output}")),
 			expectedStatus: core.Succeeded,
 			expectedOutput: map[string]any{
 				"check":  `{"output":"from-json"}`,

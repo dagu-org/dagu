@@ -10,9 +10,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/runtime/agent"
@@ -21,28 +23,92 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func agentCommandEntry(command string) core.CommandEntry {
+	cmd, args, err := cmdutil.SplitCommand(command)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse command %q: %w", command, err))
+	}
+	return core.CommandEntry{
+		Command:     cmd,
+		Args:        args,
+		CmdWithArgs: command,
+	}
+}
+
+func setAllAgentStepCommands(dag *core.DAG, command string) {
+	entry := agentCommandEntry(command)
+	for i := range dag.Steps {
+		dag.Steps[i].Commands = []core.CommandEntry{entry}
+	}
+}
+
+func waitForFileScript(path string, pollInterval time.Duration) string {
+	if runtime.GOOS == "windows" {
+		millis := pollInterval.Milliseconds()
+		if millis <= 0 {
+			millis = 1
+		}
+		return fmt.Sprintf(`
+while (-not (Test-Path %s)) {
+  Start-Sleep -Milliseconds %d
+}
+`, test.PowerShellQuote(path), millis)
+	}
+	return fmt.Sprintf(`
+while [ ! -f %s ]; do
+  %s
+done
+`, test.PosixQuote(path), test.Sleep(pollInterval))
+}
+
+func writeFileCommand(path, content string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("Set-Content -Path %s -Value %s -NoNewline", test.PowerShellQuote(path), test.PowerShellQuote(content))
+	}
+	return fmt.Sprintf("printf '%%s' %s > %s", test.PosixQuote(content), test.PosixQuote(path))
+}
+
+func pwdCommand() string {
+	return test.ForOS("pwd", "(Get-Location).Path")
+}
+
 func TestAgent_Run(t *testing.T) {
-	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
 
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
-  - "sleep 1"
+  - "exit 0"
 `)
 		dagAgent := dag.Agent()
 
 		dag.AssertLatestStatus(t, core.NotStarted)
 
+		runDone := make(chan error, 1)
 		go func() {
-			dagAgent.RunSuccess(t)
+			runDone <- dagAgent.Run(th.Context)
 		}()
+
+		runTimeout := 10 * time.Second
+		if runtime.GOOS == "windows" {
+			runTimeout = 3 * time.Minute
+		}
+
+		select {
+		case err := <-runDone:
+			require.NoError(t, err)
+		case <-time.After(runTimeout):
+			t.Fatalf("timed out waiting for DAG run to finish after %s", runTimeout)
+		}
 
 		dag.AssertLatestStatus(t, core.Succeeded)
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, `steps:
-  - "sleep 1"
+  - "exit 0"
 `)
 		dagAgent := dag.Agent()
 
@@ -63,10 +129,10 @@ func TestAgent_Run(t *testing.T) {
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
 		releaseFile := filepath.Join(t.TempDir(), "release")
-		dag := th.DAG(t, `steps:
+		dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: wait-until-released
-    command: "while [ ! -f '`+releaseFile+`' ]; do sleep 0.05; done"
-`)
+    command: %q
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		done := make(chan struct{})
 
@@ -91,14 +157,14 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `steps:
-  - "true"
-  - "true"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+  - %q
+`, "exit 0", "exit 0"))
 
 		// Set a precondition that always fails
 		dag.Preconditions = []*core.Condition{
-			{Condition: "`echo 1`", Expected: "0"},
+			{Condition: "`" + test.Output("1") + "`", Expected: "0"},
 		}
 
 		dagAgent := dag.Agent()
@@ -112,9 +178,9 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
-		errDAG := th.DAG(t, `steps:
-  - "false"
-`)
+		errDAG := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, "exit 1"))
 		dagAgent := errDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -145,10 +211,10 @@ steps:
 		marker := filepath.Join(t.TempDir(), "failure-marker")
 		dag := th.DAG(t, fmt.Sprintf(`handler_on:
   failure:
-    command: "printf failed > '%s'"
+    command: %q
 steps:
-  - "false"
-`, marker))
+  - %q
+`, writeFileCommand(marker, "failed"), "exit 1"))
 		dagAgent := dag.Agent()
 		dagAgent.RunError(t)
 
@@ -165,11 +231,11 @@ steps:
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
-		timeoutDAG := th.DAG(t, `timeout_sec: 2
+		timeoutDAG := th.DAG(t, fmt.Sprintf(`timeout_sec: 2
 steps:
-  - "sleep 1"
-  - "sleep 2"
-`)
+  - %q
+  - %q
+`, test.Sleep(time.Second), test.Sleep(2*time.Second)))
 		dagAgent := timeoutDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -178,10 +244,15 @@ steps:
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `steps:
-  - "sleep 3"
-`)
-		dagAgent := dag.Agent()
+		releaseFile := filepath.Join(t.TempDir(), "release")
+		dagRunID := "test-dag-run-receive-signal"
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
+		dagAgent := dag.Agent(test.WithDAGRunID(dagRunID))
 		done := make(chan struct{})
 
 		go func() {
@@ -189,26 +260,35 @@ steps:
 			close(done)
 		}()
 
-		// wait for the DAG to start
-		dag.AssertLatestStatus(t, core.Running)
+		require.Eventually(t, func() bool {
+			status, err := th.DAGRunMgr.GetCurrentStatus(context.Background(), dag.DAG, dagRunID)
+			if err != nil || status == nil || status.Status != core.Running {
+				return false
+			}
+			return th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, dagRunID)
+		}, 2*time.Minute, 250*time.Millisecond, "expected DAG to reach running state before abort")
 
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
 
-		<-done
+		select {
+		case <-done:
+		case <-time.After(30 * time.Second):
+			t.Fatal("timed out waiting for DAG cancellation")
+		}
 
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `handler_on:
+		dag := th.DAG(t, fmt.Sprintf(`handler_on:
   exit:
-    command: "true"
+    command: %q
 steps:
-  - "true"
-  - "true"
-`)
+  - %q
+  - %q
+`, "exit 0", "exit 0", "exit 0"))
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
 
@@ -235,7 +315,7 @@ func TestAgent_WorkingDirExpansion(t *testing.T) {
 		dag := th.DAG(t, `working_dir: $TEST_WORK_DIR
 steps:
   - name: check-pwd
-    command: pwd
+    command: `+pwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -248,6 +328,11 @@ steps:
 	t.Run("WorkingDirWithDAGEnvVar", func(t *testing.T) {
 		th := test.Setup(t)
 		tempDir := t.TempDir()
+		origWD, err := os.Getwd()
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = os.Chdir(origWD)
+		})
 
 		// Create DAG with WorkingDir using DAG-defined env var
 		dag := th.DAG(t, `env:
@@ -255,7 +340,7 @@ steps:
 working_dir: $CUSTOM_DIR
 steps:
   - name: check-pwd
-    command: pwd
+    command: `+pwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -272,7 +357,7 @@ steps:
 		dag := th.DAG(t, `working_dir: ~
 steps:
   - name: check-pwd
-    command: pwd
+    command: `+pwdCommand()+`
 `)
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
@@ -287,9 +372,9 @@ func TestAgent_DryRun(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dag := th.DAG(t, `steps:
-  - "true"
-`)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, "exit 0"))
 		dagAgent := dag.Agent(test.WithAgentOptions(agent.Options{Dry: true}))
 
 		dagAgent.RunSuccess(t)
@@ -308,33 +393,33 @@ func TestAgent_Retry(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
 		th := test.Setup(t)
 		// retry DAG that fails
-		dag := th.DAG(t, `type: graph
+		dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
   - name: "1"
-    command: "true"
+    command: %q
   - name: "2"
-    command: "false"
+    command: %q
     continue_on:
       failure: true
     depends: ["1"]
   - name: "3"
-    command: "true"
+    command: %q
     depends: ["2"]
   - name: "4"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
     continue_on:
       skipped: true
   - name: "5"
-    command: "false"
+    command: %q
     depends: ["4"]
   - name: "6"
-    command: "true"
+    command: %q
     depends: ["5"]
   - name: "7"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
@@ -342,13 +427,13 @@ steps:
     continue_on:
       skipped: true
   - name: "8"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
   - name: "9"
-    command: "false"
-`)
+    command: %q
+`, "exit 0", "exit 1", "exit 0", "exit 0", "exit 1", "exit 0", "exit 0", "exit 0", "exit 1"))
 		dagAgent := dag.Agent()
 
 		dagAgent.RunError(t)
@@ -356,9 +441,7 @@ steps:
 
 		// Modify the DAG to make it successful
 		dagRunStatus := dagAgent.Status(th.Context)
-		for i := range dag.Steps {
-			dag.Steps[i].Commands = []core.CommandEntry{{Command: "true", CmdWithArgs: "true"}}
-		}
+		setAllAgentStepCommands(dag.DAG, "exit 0")
 
 		// Retry the DAG and check if it is successful
 		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
@@ -377,33 +460,33 @@ steps:
 
 	t.Run("StepRetry", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.DAG(t, `type: graph
+		dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
   - name: "1"
-    command: "true"
+    command: %q
   - name: "2"
-    command: "false"
+    command: %q
     continue_on:
       failure: true
     depends: ["1"]
   - name: "3"
-    command: "true"
+    command: %q
     depends: ["2"]
   - name: "4"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
     continue_on:
       skipped: true
   - name: "5"
-    command: "false"
+    command: %q
     depends: ["4"]
   - name: "6"
-    command: "true"
+    command: %q
     depends: ["5"]
   - name: "7"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
@@ -411,13 +494,13 @@ steps:
     continue_on:
       skipped: true
   - name: "8"
-    command: "true"
+    command: %q
     preconditions:
       - condition: "`+"`"+`echo 0`+"`"+`"
         expected: "1"
   - name: "9"
-    command: "false"
-`)
+    command: %q
+`, "exit 0", "exit 1", "exit 0", "exit 0", "exit 1", "exit 0", "exit 0", "exit 0", "exit 1"))
 		dagAgent := dag.Agent()
 
 		// Run the DAG to get a failed status
@@ -431,9 +514,7 @@ steps:
 		}
 
 		// Modify the DAG to make all steps successful
-		for i := range dag.Steps {
-			dag.Steps[i].Commands = []core.CommandEntry{{Command: "true", CmdWithArgs: "true"}}
-		}
+		setAllAgentStepCommands(dag.DAG, "exit 0")
 
 		// Wait until the current time (RFC3339, second precision) differs
 		// from the previous FinishedAt timestamps so that retried steps
@@ -496,10 +577,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
-		// Start a long-running DAG
-		dag := th.DAG(t, `steps:
-  - "sleep 10"
-`)
+		releaseFile := filepath.Join(t.TempDir(), "http-valid.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 		ctx := th.Context
 		go func() {
@@ -530,10 +614,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
-		// Start a long-running DAG
-		dag := th.DAG(t, `steps:
-  - "sleep 10"
-`)
+		releaseFile := filepath.Join(t.TempDir(), "http-invalid.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 
 		go func() {
@@ -560,10 +647,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
 
-		// Start a long-running DAG
-		dag := th.DAG(t, `steps:
-  - "sleep 10"
-`)
+		releaseFile := filepath.Join(t.TempDir(), "http-cancel.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
+		dag := th.DAG(t, fmt.Sprintf(`steps:
+  - %q
+`, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 
 		done := make(chan struct{})
@@ -688,9 +778,9 @@ steps:
 		},
 		{
 			name: "NoOutputs",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - name: step1
-    command: "true"`,
+    command: %q`, "exit 0"),
 			expected: map[string]string{},
 		},
 	}
@@ -741,27 +831,32 @@ func TestAgent_SubDAGRunVisibleWhileRunning(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
+	releaseFile := filepath.Join(t.TempDir(), "release-child")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("done"), 0600)
+	})
 
-	// Create a child DAG that sleeps long enough for the parent to be observed mid-run
-	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", []byte(`
+	// Hold the child open until the test explicitly releases it so Windows can
+	// observe persisted SubRuns without racing the child completion.
+	th.CreateDAGFile(t, th.Config.Paths.DAGsDir, "child-slow", fmt.Appendf(nil, `
 steps:
   - name: slow-step
-    command: "sleep 3"
-`))
+    command: %q
+`, waitForFileScript(releaseFile, 100*time.Millisecond)))
 
 	// The preceding step must run long enough for the one-shot 100ms status timer
 	// to fire (and exhaust itself) BEFORE run-child starts. This replicates the
 	// production scenario where the bug manifests.
-	parent := th.DAG(t, `
+	parent := th.DAG(t, fmt.Sprintf(`
 type: graph
 steps:
   - name: pre-step
-    command: "sleep 0.3"
+    command: %q
   - name: run-child
     call: child-slow
     depends:
       - pre-step
-`)
+`, test.Sleep(time.Second)))
 
 	a := parent.Agent()
 	runErr := make(chan error, 1)
@@ -786,8 +881,16 @@ steps:
 			}
 		}
 		return false
-	}, 10*time.Second, 100*time.Millisecond,
+	}, subDAGVisibleTimeout(), 100*time.Millisecond,
 		"SubRuns must be present in stored status while subDAG step is running")
 
+	require.NoError(t, os.WriteFile(releaseFile, []byte("done"), 0600))
 	require.NoError(t, <-runErr)
+}
+
+func subDAGVisibleTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 90 * time.Second
+	}
+	return 10 * time.Second
 }

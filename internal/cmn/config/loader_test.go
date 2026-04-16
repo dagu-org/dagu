@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,6 +68,14 @@ func envKeyCount(env []string, key string) int {
 		}
 	}
 	return count
+}
+
+func resolvedTestPath(t *testing.T, path string) string {
+	t.Helper()
+
+	resolved, err := fileutil.ResolvePath(path)
+	require.NoError(t, err)
+	return resolved
 }
 
 func TestLoad_Env(t *testing.T) {
@@ -684,27 +693,27 @@ scheduler:
 			RetentionDays: 1,
 		},
 		Paths: PathsConfig{
-			DAGsDir:            "/var/dagu/dags",
-			DocsDir:            "/var/dagu/dags/docs",
-			LogDir:             "/var/dagu/logs",
-			DataDir:            "/var/dagu/data",
+			DAGsDir:            resolvedTestPath(t, "/var/dagu/dags"),
+			DocsDir:            resolvedTestPath(t, "/var/dagu/dags/docs"),
+			LogDir:             resolvedTestPath(t, "/var/dagu/logs"),
+			DataDir:            resolvedTestPath(t, "/var/dagu/data"),
 			ArtifactDir:        cfg.Paths.ArtifactDir,
-			SuspendFlagsDir:    "/var/dagu/suspend",
-			AdminLogsDir:       "/var/dagu/adminlogs",
+			SuspendFlagsDir:    resolvedTestPath(t, "/var/dagu/suspend"),
+			AdminLogsDir:       resolvedTestPath(t, "/var/dagu/adminlogs"),
 			EventStoreDir:      cfg.Paths.EventStoreDir,
-			BaseConfig:         "/var/dagu/base.yaml",
-			Executable:         "/usr/local/bin/dagu",
-			DAGRunsDir:         "/var/dagu/data/dag-runs",
-			ProcDir:            "/var/dagu/data/proc",
-			QueueDir:           "/var/dagu/data/queue",
-			ServiceRegistryDir: "/var/dagu/data/service-registry",
-			UsersDir:           "/var/dagu/data/users",
-			APIKeysDir:         "/var/dagu/data/apikeys",
-			WebhooksDir:        "/var/dagu/data/webhooks",
-			SessionsDir:        "/var/dagu/data/agent/sessions",
-			ContextsDir:        "/var/dagu/data/contexts",
-			RemoteNodesDir:     "/var/dagu/data/remote-nodes",
-			WorkspacesDir:      "/var/dagu/data/workspaces",
+			BaseConfig:         resolvedTestPath(t, "/var/dagu/base.yaml"),
+			Executable:         resolvedTestPath(t, "/usr/local/bin/dagu"),
+			DAGRunsDir:         resolvedTestPath(t, "/var/dagu/data/dag-runs"),
+			ProcDir:            resolvedTestPath(t, "/var/dagu/data/proc"),
+			QueueDir:           resolvedTestPath(t, "/var/dagu/data/queue"),
+			ServiceRegistryDir: resolvedTestPath(t, "/var/dagu/data/service-registry"),
+			UsersDir:           resolvedTestPath(t, "/var/dagu/data/users"),
+			APIKeysDir:         resolvedTestPath(t, "/var/dagu/data/apikeys"),
+			WebhooksDir:        resolvedTestPath(t, "/var/dagu/data/webhooks"),
+			SessionsDir:        resolvedTestPath(t, "/var/dagu/data/agent/sessions"),
+			ContextsDir:        resolvedTestPath(t, "/var/dagu/data/contexts"),
+			RemoteNodesDir:     resolvedTestPath(t, "/var/dagu/data/remote-nodes"),
+			WorkspacesDir:      resolvedTestPath(t, "/var/dagu/data/workspaces"),
 		},
 		UI: UI{
 			LogEncodingCharset:    "iso-8859-1",
@@ -827,14 +836,15 @@ func TestLoad_EdgeCases_DerivedPaths(t *testing.T) {
 paths:
   data_dir: "/custom/data"
 `)
-	assert.Equal(t, "/custom/data", cfg.Paths.DataDir)
-	assert.Equal(t, "/custom/data/dag-runs", cfg.Paths.DAGRunsDir)
-	assert.Equal(t, "/custom/data/proc", cfg.Paths.ProcDir)
-	assert.Equal(t, "/custom/data/queue", cfg.Paths.QueueDir)
-	assert.Equal(t, "/custom/data/service-registry", cfg.Paths.ServiceRegistryDir)
-	assert.Equal(t, "/custom/data/users", cfg.Paths.UsersDir)
-	assert.Equal(t, "/custom/data/agent/sessions", cfg.Paths.SessionsDir)
-	assert.Equal(t, "/custom/data/contexts", cfg.Paths.ContextsDir)
+	dataDir := resolvedTestPath(t, "/custom/data")
+	assert.Equal(t, dataDir, cfg.Paths.DataDir)
+	assert.Equal(t, filepath.Join(dataDir, "dag-runs"), cfg.Paths.DAGRunsDir)
+	assert.Equal(t, filepath.Join(dataDir, "proc"), cfg.Paths.ProcDir)
+	assert.Equal(t, filepath.Join(dataDir, "queue"), cfg.Paths.QueueDir)
+	assert.Equal(t, filepath.Join(dataDir, "service-registry"), cfg.Paths.ServiceRegistryDir)
+	assert.Equal(t, filepath.Join(dataDir, "users"), cfg.Paths.UsersDir)
+	assert.Equal(t, filepath.Join(dataDir, "agent", "sessions"), cfg.Paths.SessionsDir)
+	assert.Equal(t, filepath.Join(dataDir, "contexts"), cfg.Paths.ContextsDir)
 }
 
 func TestLoad_EdgeCases_ContextsDirFromEnv(t *testing.T) {
@@ -842,7 +852,7 @@ func TestLoad_EdgeCases_ContextsDirFromEnv(t *testing.T) {
 		"DAGU_CONTEXTS_DIR": "/tmp/custom-contexts",
 	})
 
-	assert.Equal(t, "/tmp/custom-contexts", cfg.Paths.ContextsDir)
+	assert.Equal(t, resolvedTestPath(t, "/tmp/custom-contexts"), cfg.Paths.ContextsDir)
 }
 
 func TestLoad_ArtifactDirFromConfig(t *testing.T) {
@@ -851,7 +861,7 @@ paths:
   artifact_dir: "/custom/artifacts"
 `)
 
-	assert.Equal(t, "/custom/artifacts", cfg.Paths.ArtifactDir)
+	assert.Equal(t, resolvedTestPath(t, "/custom/artifacts"), cfg.Paths.ArtifactDir)
 }
 
 func TestLoad_ArtifactDirFromEnv(t *testing.T) {
@@ -859,7 +869,7 @@ func TestLoad_ArtifactDirFromEnv(t *testing.T) {
 		"DAGU_ARTIFACT_DIR": "/env/artifacts",
 	})
 
-	assert.Equal(t, "/env/artifacts", cfg.Paths.ArtifactDir)
+	assert.Equal(t, resolvedTestPath(t, "/env/artifacts"), cfg.Paths.ArtifactDir)
 }
 
 func TestLoad_EdgeCases_Errors(t *testing.T) {

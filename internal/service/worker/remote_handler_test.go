@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -226,6 +227,60 @@ func (m *mockStreamArtifactsClient) CloseSend() error {
 
 func (m *mockStreamArtifactsClient) Context() context.Context {
 	return m.ctx
+}
+
+func artifactUploadTestDAGContent(name, stepName string, fail bool) string {
+	if runtime.GOOS == "windows" {
+		if fail {
+			return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: powershell
+    command: |
+      if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }
+      New-Item -ItemType Directory -Path $env:DAG_RUN_ARTIFACTS_DIR -Force | Out-Null
+      [System.IO.File]::WriteAllText((Join-Path $env:DAG_RUN_ARTIFACTS_DIR 'out.txt'), 'artifact')
+      exit 1
+`, name, stepName)
+		}
+
+		return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: powershell
+    command: |
+      if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }
+      New-Item -ItemType Directory -Path $env:DAG_RUN_ARTIFACTS_DIR -Force | Out-Null
+      [System.IO.File]::WriteAllText((Join-Path $env:DAG_RUN_ARTIFACTS_DIR 'out.txt'), 'artifact')
+`, name, stepName)
+	}
+
+	if fail {
+		return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: /bin/sh
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+      exit 1
+`, name, stepName)
+	}
+
+	return fmt.Sprintf(`name: %s
+artifacts:
+  enabled: true
+steps:
+  - name: %s
+    shell: /bin/sh
+    command: |
+      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
+`, name, stepName)
 }
 
 func (m *mockStreamArtifactsClient) SendMsg(any) error {
@@ -1238,12 +1293,17 @@ steps:
       interval_sec: 30
 `)
 
-	var reported []*exec.DAGRunStatus
+	var (
+		mu       sync.Mutex
+		reported []*exec.DAGRunStatus
+	)
 	client := newMockRemoteCoordinatorClient()
 	client.ReportStatusFunc = func(_ context.Context, req *coordinatorv1.ReportStatusRequest) (*coordinatorv1.ReportStatusResponse, error) {
 		status, err := convert.ProtoToDAGRunStatus(req.Status)
 		require.NoError(t, err)
+		mu.Lock()
 		reported = append(reported, status)
+		mu.Unlock()
 		return &coordinatorv1.ReportStatusResponse{Accepted: true}, nil
 	}
 
@@ -1271,9 +1331,11 @@ steps:
 	err := handler.handleStart(th.Context, task, false)
 	require.NoError(t, err)
 	require.Less(t, time.Since(started), 5*time.Second)
+	mu.Lock()
 	require.NotEmpty(t, reported)
 
 	final := reported[len(reported)-1]
+	mu.Unlock()
 	require.Equal(t, core.Queued, final.Status)
 	require.Equal(t, []exec.PendingStepRetry{
 		{StepName: "flaky", Interval: 30 * time.Second},
@@ -1807,15 +1869,7 @@ func TestExecuteDAGRun_FailedExecutionStillUploadsArtifacts(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dagContent := `name: remote-handler-failure-artifacts
-artifacts:
-  enabled: true
-steps:
-  - name: fail-step
-    command: |
-      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
-      exit 1
-`
+	dagContent := artifactUploadTestDAGContent("remote-handler-failure-artifacts", "fail-step", true)
 	dag := th.DAG(t, dagContent)
 
 	stream := newMockStreamArtifactsClient()
@@ -1865,14 +1919,7 @@ func TestExecuteDAGRun_ArtifactUploadFailureMarksRunFailed(t *testing.T) {
 
 	th := test.Setup(t)
 
-	dagContent := `name: remote-handler-upload-failure
-artifacts:
-  enabled: true
-steps:
-  - name: write-artifact
-    command: |
-      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
-`
+	dagContent := artifactUploadTestDAGContent("remote-handler-upload-failure", "write-artifact", false)
 	dag := th.DAG(t, dagContent)
 
 	stream := newMockStreamArtifactsClient()
@@ -1928,15 +1975,7 @@ func TestExecuteDAGRun_FailedExecutionWithArtifactUploadFailurePreservesFailedSt
 
 	th := test.Setup(t)
 
-	dagContent := `name: remote-handler-failure-upload-failure
-artifacts:
-  enabled: true
-steps:
-  - name: fail-step
-    command: |
-      printf "artifact" > "$DAG_RUN_ARTIFACTS_DIR/out.txt"
-      exit 1
-`
+	dagContent := artifactUploadTestDAGContent("remote-handler-failure-upload-failure", "fail-step", true)
 	dag := th.DAG(t, dagContent)
 
 	stream := newMockStreamArtifactsClient()

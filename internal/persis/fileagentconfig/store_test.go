@@ -13,6 +13,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -275,9 +276,8 @@ func TestStore_Save_WriteError(t *testing.T) {
 	store, dataDir := setupTestStore(t)
 	agentDir := filepath.Join(dataDir, agentDirName)
 
-	// Make directory read-only to cause write failure
-	require.NoError(t, os.Chmod(agentDir, 0500))
-	defer func() { _ = os.Chmod(agentDir, 0750) }()
+	require.NoError(t, os.RemoveAll(agentDir))
+	testutil.BlockPathWithFile(t, agentDir)
 
 	cfg := newTestConfig(true, "")
 	err := store.Save(context.Background(), cfg)
@@ -290,8 +290,8 @@ func TestStore_Load_ReadPermissionError(t *testing.T) {
 	writeConfig(t, dataDir, newTestConfig(true, ""))
 
 	configPath := filepath.Join(dataDir, agentDirName, configFileName)
-	require.NoError(t, os.Chmod(configPath, 0000))
-	defer func() { _ = os.Chmod(configPath, 0600) }()
+	require.NoError(t, os.Remove(configPath))
+	testutil.BlockPathWithDirectory(t, configPath)
 
 	cfg, err := store.Load(context.Background())
 	require.Error(t, err)

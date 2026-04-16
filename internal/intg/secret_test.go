@@ -156,18 +156,18 @@ steps:
 
 		dag := th.DAG(t, `
 secrets:
-  - name: SECRET1
+  - name: FIRST_SECRET
     provider: file
     key: `+secretFile1+`
-  - name: SECRET2
+  - name: SECOND_SECRET
     provider: file
     key: `+secretFile2+`
 
 steps:
   - name: echo-both
     command: |
-      echo "First: ${SECRET1}"
-      echo "Second: ${SECRET2}"
+      `+test.LabeledExpandedOutput("First: ", "${FIRST_SECRET}")+`
+      `+test.LabeledExpandedOutput("Second: ", "${SECOND_SECRET}")+`
     output: RESULT
 `)
 		agent := dag.Agent()
@@ -266,8 +266,10 @@ steps:
 
 		th := test.Setup(t)
 
-		// Create a custom working directory
-		workDir := t.TempDir()
+		// Keep the working dir under the helper temp root so Windows cleanup
+		// does not fail while the runtime is still releasing file handles.
+		workDir := filepath.Join(th.Config.Paths.DataDir, "relative-secret-working-dir")
+		require.NoError(t, os.MkdirAll(workDir, 0750))
 		secretValue := "relative-path-secret-999"
 
 		// Create secret file directly in the working directory
@@ -354,8 +356,10 @@ steps:
 
 		th := test.Setup(t)
 
-		// Create a working directory that's different from where the DAG file is
-		workDir := t.TempDir()
+		// Keep the working dir under the helper temp root so Windows cleanup
+		// does not fail while the runtime is still releasing file handles.
+		workDir := filepath.Join(th.Config.Paths.DataDir, "dag-location-secret-working-dir")
+		require.NoError(t, os.MkdirAll(workDir, 0750))
 
 		secretValue := "dag-location-secret-123"
 
@@ -429,9 +433,9 @@ secrets:
 steps:
   - name: use-secrets-in-env
     command: |
-      echo "Auth header: $AUTH_HEADER"
-      echo "DB pass: $DB_PASS"
-      echo "Strict mode: $STRICT_MODE"
+      `+test.LabeledExpandedOutput("Auth header: ", "${AUTH_HEADER}")+`
+      `+test.LabeledExpandedOutput("DB pass: ", "${DB_PASS}")+`
+      `+test.LabeledExpandedOutput("Strict mode: ", "${STRICT_MODE}")+`
     env:
       AUTH_HEADER: "Bearer ${API_TOKEN}"
       DB_PASS: "${DB_PASSWORD}"

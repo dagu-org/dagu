@@ -54,10 +54,10 @@ steps:
 	require.Eventually(t, func() bool {
 		status, ok := readStatusIfPresent(th, ref)
 		return ok && status.Status == core.Running
-	}, 5*time.Second, 50*time.Millisecond)
+	}, intgTestTimeout(5*time.Second), 50*time.Millisecond)
 
-	procFile := test.WaitForProcFile(t, th.Config.Paths.ProcDir, dag.ProcGroup(), ref, 2*time.Second)
-	test.RequireHeartbeatAdvance(t, procFile, 3*time.Second)
+	procFile := test.WaitForProcFile(t, th.Config.Paths.ProcDir, dag.ProcGroup(), ref, intgTestTimeout(2*time.Second))
+	test.RequireHeartbeatAdvance(t, procFile, intgTestTimeout(3*time.Second))
 
 	require.NoError(t, <-errCh)
 
@@ -95,10 +95,10 @@ steps:
 	require.Eventually(t, func() bool {
 		status, ok := readStatusIfPresent(th, ref)
 		return ok && status.Status == core.Running
-	}, 5*time.Second, 50*time.Millisecond)
+	}, intgTestTimeout(5*time.Second), 50*time.Millisecond)
 
-	procFile := test.WaitForProcFile(t, th.Config.Paths.ProcDir, dag.ProcGroup(), ref, 2*time.Second)
-	test.RequireHeartbeatAdvance(t, procFile, 3*time.Second)
+	procFile := test.WaitForProcFile(t, th.Config.Paths.ProcDir, dag.ProcGroup(), ref, intgTestTimeout(2*time.Second))
+	test.RequireHeartbeatAdvance(t, procFile, intgTestTimeout(3*time.Second))
 
 	require.NoError(t, <-errCh)
 

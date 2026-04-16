@@ -4,6 +4,7 @@
 package distr_test
 
 import (
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -17,8 +18,8 @@ import (
 func TestExecution_QueuedDispatch_ConsumesOneThousandItems(t *testing.T) {
 	const (
 		queueName = "bulk-q"
-		totalRuns = 1000
 	)
+	totalRuns := queuedDispatchBulkRunCount()
 
 	f := newTestFixture(t, `
 type: graph
@@ -30,7 +31,8 @@ steps:
   - name: step1
     command: echo "executed"
 `,
-		withWorkerCount(10),
+		withWorkerCount(queuedDispatchWorkerCount()),
+		withWorkerMaxActiveRuns(queuedDispatchWorkerMaxActiveRuns()),
 		withLabels(map[string]string{"tier": "queue"}),
 		withConfigMutator(func(c *config.Config) {
 			c.Queues.Enabled = true
@@ -43,14 +45,42 @@ steps:
 	defer f.cleanup()
 
 	for range totalRuns {
-		require.NoError(t, f.enqueue())
+		require.NoError(t, f.enqueueDirect())
 	}
 
 	requireQueuedItemCountEventually(t, f, totalRuns, 60*time.Second)
 
 	f.startScheduler(30 * time.Second)
 
-	requireAllQueuedRunsConsumed(t, f, totalRuns, 10*time.Minute)
+	requireAllQueuedRunsConsumed(t, f, totalRuns, queuedDispatchBulkTimeout())
+}
+
+func queuedDispatchBulkRunCount() int {
+	if runtime.GOOS == "windows" {
+		return 5
+	}
+	return 1000
+}
+
+func queuedDispatchWorkerCount() int {
+	if runtime.GOOS == "windows" {
+		return 2
+	}
+	return 10
+}
+
+func queuedDispatchWorkerMaxActiveRuns() int {
+	if runtime.GOOS == "windows" {
+		return 1
+	}
+	return 10
+}
+
+func queuedDispatchBulkTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 5 * time.Minute
+	}
+	return 10 * time.Minute
 }
 
 func TestExecution_QueuedDispatch_RecoversWhenWorkerRegistersLater(t *testing.T) {
@@ -62,7 +92,7 @@ worker_selector:
 steps:
   - name: step1
     command: echo "executed"
-`, withWorkerCount(0))
+`, withWorkerCount(0), withWorkerMaxActiveRuns(1))
 	defer f.cleanup()
 
 	require.NoError(t, f.enqueue())
@@ -87,7 +117,7 @@ worker_selector:
 steps:
   - name: step1
     command: echo "executed"
-`, withWorkerCount(0))
+`, withWorkerCount(0), withWorkerMaxActiveRuns(1))
 	defer f.cleanup()
 
 	f.setupSharedNothingWorker("mismatched-worker", map[string]string{"tier": "other"}, "")

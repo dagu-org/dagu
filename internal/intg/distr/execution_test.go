@@ -4,18 +4,94 @@
 package distr_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/test"
 	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func directStartStatusTimeout() time.Duration {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return 45 * time.Second
+	case runtime.GOOS == "windows":
+		return 30 * time.Second
+	default:
+		return 20 * time.Second
+	}
+}
+
+func executionStatusTimeout() time.Duration {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return 45 * time.Second
+	case runtime.GOOS == "windows":
+		return 30 * time.Second
+	default:
+		return 20 * time.Second
+	}
+}
+
+func artifactStepShellYAML() string {
+	if runtime.GOOS == "windows" {
+		return "    shell: powershell\n"
+	}
+	return "    shell: /bin/sh\n"
+}
+
+func indentYAMLBlock(s string, spaces int) string {
+	prefix := strings.Repeat(" ", spaces)
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = prefix + line
+	}
+	return strings.Join(lines, "\n")
+}
+
+func artifactWriteCommand(content string, fail bool) string {
+	var commands []string
+	if runtime.GOOS == "windows" {
+		commands = append(commands,
+			"if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }",
+			"$reportsDir = Join-Path $env:DAG_RUN_ARTIFACTS_DIR 'reports'",
+			"New-Item -ItemType Directory -Path $reportsDir -Force | Out-Null",
+			fmt.Sprintf("[System.IO.File]::WriteAllText((Join-Path $reportsDir 'summary.md'), %s)", test.PowerShellQuote(content)),
+		)
+	} else {
+		commands = append(commands,
+			`test -n "${DAG_RUN_ARTIFACTS_DIR}"`,
+			`mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"`,
+			fmt.Sprintf(`printf '%%s\n' %s > "$DAG_RUN_ARTIFACTS_DIR/reports/summary.md"`, test.PosixQuote(content)),
+		)
+	}
+	if fail {
+		commands = append(commands, "exit 1")
+	}
+	return test.JoinLines(commands...)
+}
+
+func artifactNoWriteCommand() string {
+	if runtime.GOOS == "windows" {
+		return test.JoinLines(
+			"if (-not $env:DAG_RUN_ARTIFACTS_DIR) { throw 'DAG_RUN_ARTIFACTS_DIR not set' }",
+			"Write-Output 'no artifacts written'",
+		)
+	}
+	return test.JoinLines(
+		`test -n "${DAG_RUN_ARTIFACTS_DIR}"`,
+		`echo "no artifacts written"`,
+	)
+}
 
 func TestExecution_StatusPushing(t *testing.T) {
 	t.Run("statusUpdatesPersistedToCoordinatorStore", func(t *testing.T) {
@@ -37,7 +113,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -63,7 +139,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		assertLogContains(t, f.logDir(), f.dagWrapper.Name, status.DAGRunID, "echo-step", expectedOutput)
@@ -72,6 +148,15 @@ steps:
 
 func TestExecution_LargeOutput(t *testing.T) {
 	t.Run("largeOutputStreamedCorrectly", func(t *testing.T) {
+		command := `      for i in $(seq 1 2000); do
+        echo "Line $i: This is a test line to generate large output that exceeds the 64KB buffer size used in log streaming"
+      done`
+		if runtime.GOOS == "windows" {
+			command = `      1..2000 | ForEach-Object {
+        Write-Output ("Line {0}: This is a test line to generate large output that exceeds the 64KB buffer size used in log streaming" -f $_)
+      }`
+		}
+
 		f := newTestFixture(t, `
 name: large-output-test
 worker_selector:
@@ -79,9 +164,7 @@ worker_selector:
 steps:
   - name: big-output
     command: |
-      for i in $(seq 1 2000); do
-        echo "Line $i: This is a test line to generate large output that exceeds the 64KB buffer size used in log streaming"
-      done
+`+command+`
 `, withLogPersistence())
 		defer f.cleanup()
 
@@ -118,10 +201,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from shared-nothing worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from shared-nothing worker", false), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 
@@ -147,11 +228,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts-and-fail
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from failed shared-nothing worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
-      exit 1
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from failed shared-nothing worker", true), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 
@@ -177,9 +255,8 @@ artifacts:
   enabled: true
 steps:
   - name: no-artifacts-written
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      echo "no artifacts written"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactNoWriteCommand(), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 
@@ -208,10 +285,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from shared filesystem worker\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from shared filesystem worker", false), 6)+`
 `, withWorkerMode(sharedFSMode))
 		defer f.cleanup()
 
@@ -237,10 +312,8 @@ artifacts:
   enabled: true
 steps:
   - name: write-artifacts
-    command: |
-      test -n "${DAG_RUN_ARTIFACTS_DIR}"
-      mkdir -p "${DAG_RUN_ARTIFACTS_DIR}/reports"
-      printf "artifact from latest attempt\n" > "${DAG_RUN_ARTIFACTS_DIR}/reports/summary.md"
+`+artifactStepShellYAML()+`    command: |
+`+indentYAMLBlock(artifactWriteCommand("artifact from latest attempt", false), 6)+`
 `, withArtifactPersistence())
 		defer f.cleanup()
 
@@ -293,7 +366,7 @@ steps:
 
 		require.NoError(t, f.start())
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, directStartStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -318,7 +391,7 @@ steps:
 
 		require.NoError(t, f.start())
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, directStartStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -393,7 +466,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, directStartStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 2)
@@ -425,6 +498,21 @@ steps:
 	})
 
 	t.Run("subprocessExecutesDAGCorrectly", func(t *testing.T) {
+		opts := []fixtureOption{
+			withWorkerMode(sharedFSMode),
+			withLabels(map[string]string{"env": "test"}),
+		}
+		waitTimeout := 25 * time.Second
+		if runtime.GOOS == "windows" && raceEnabled() {
+			// The shared-fs subprocess path is vulnerable to false zombie detection
+			// on Windows while the built helper process is still initializing.
+			opts = append(opts,
+				withZombieDetectionInterval(2*time.Minute),
+				withStaleThresholds(5*time.Minute, 5*time.Minute),
+			)
+			waitTimeout = 45 * time.Second
+		}
+
 		f := newTestFixture(t, `
 type: graph
 name: sharedfs-subprocess-test
@@ -439,14 +527,27 @@ steps:
   - name: task3
     command: echo "subprocess task3"
     depends: [task2]
-`, withWorkerMode(sharedFSMode), withLabels(map[string]string{"env": "test"}))
+`, opts...)
 		defer f.cleanup()
 
 		require.NoError(t, f.enqueue())
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 25*time.Second)
+		status := f.waitForStatus(core.Succeeded, waitTimeout)
+		require.Eventually(t, func() bool {
+			latest, err := f.latestStoredStatus()
+			if err != nil || latest.Status != core.Succeeded || len(latest.Nodes) != 3 {
+				return false
+			}
+			for _, node := range latest.Nodes {
+				if node.StartedAt == "" || node.StartedAt == "-" || node.FinishedAt == "" || node.FinishedAt == "-" {
+					return false
+				}
+			}
+			status = latest
+			return true
+		}, waitTimeout, 100*time.Millisecond, "shared-fs subprocess run should persist per-node timestamps before assertions")
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.Len(t, status.Nodes, 3)
@@ -468,7 +569,7 @@ steps:
   - name: step1
     command: echo "direct start"
   - name: step2
-    command: sleep 0.1
+    command: echo "done"
     depends: [step1]
 `, withWorkerMode(sharedFSMode))
 		defer f.cleanup()
@@ -491,7 +592,7 @@ steps:
   - name: step1
     command: echo "no name field"
   - name: step2
-    command: sleep 0.1
+    command: echo "done"
     depends: [step1]
 `, withWorkerMode(sharedFSMode))
 		defer f.cleanup()
@@ -583,7 +684,7 @@ steps:
 
 			items, err := f.coord.QueueStore.ListByDAGName(f.coord.Context, f.dagWrapper.ProcGroup(), f.dagWrapper.Name)
 			return err == nil && len(items) == 0
-		}, 25*time.Second, 200*time.Millisecond, "Queue should be empty after success")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Queue should be empty after success")
 	})
 
 	t.Run("queuedStatusBeforeSchedulerStarts", func(t *testing.T) {

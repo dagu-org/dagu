@@ -397,8 +397,22 @@ func TestValidateParams(t *testing.T) {
 }
 
 // Helper function to create an executor via the registry
-func newSQLiteExecutor(ctx context.Context, step core.Step) (executor.Executor, error) {
-	return executor.NewExecutor(ctx, step)
+func newSQLiteExecutor(t *testing.T, ctx context.Context, step core.Step) (executor.Executor, error) {
+	t.Helper()
+
+	exec, err := executor.NewExecutor(ctx, step)
+	if err == nil {
+		attachExecutorCleanup(t, exec)
+	}
+	return exec, err
+}
+
+func attachExecutorCleanup(t *testing.T, exec executor.Executor) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		require.NoError(t, executor.CloseExecutor(exec))
+	})
 }
 
 func TestSQLiteExecutor_InMemory(t *testing.T) {
@@ -422,7 +436,7 @@ func TestSQLiteExecutor_InMemory(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -461,7 +475,7 @@ func TestSQLiteExecutor_FileDB(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -501,7 +515,7 @@ func TestSQLiteExecutor_Transaction(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -568,7 +582,7 @@ func TestSQLiteExecutor_OutputFormats(t *testing.T) {
 				`,
 			}
 
-			exec, err := newSQLiteExecutor(ctx, step)
+			exec, err := newSQLiteExecutor(t, ctx, step)
 			require.NoError(t, err)
 
 			var stdout bytes.Buffer
@@ -609,7 +623,7 @@ func TestSQLiteExecutor_MaxRows(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -899,7 +913,7 @@ func TestSQLiteExecutor_ImportCSV(t *testing.T) {
 		Script: "CREATE TABLE users (name TEXT, age INTEGER, city TEXT);",
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -920,7 +934,7 @@ func TestSQLiteExecutor_ImportCSV(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 
 	var stderr bytes.Buffer
@@ -946,7 +960,7 @@ func TestSQLiteExecutor_ImportCSV(t *testing.T) {
 		Script: "SELECT * FROM users ORDER BY name;",
 	}
 
-	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	verifyExec, err := newSQLiteExecutor(t, ctx, verifyStep)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -984,7 +998,7 @@ func TestSQLiteExecutor_ImportCSV_NoHeader(t *testing.T) {
 		Script: "CREATE TABLE users (name TEXT, age INTEGER, city TEXT);",
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -1005,7 +1019,7 @@ func TestSQLiteExecutor_ImportCSV_NoHeader(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 
 	var stderr bytes.Buffer
@@ -1042,7 +1056,7 @@ func TestSQLiteExecutor_ImportJSONL(t *testing.T) {
 		Script: "CREATE TABLE users (name TEXT, age INTEGER, city TEXT);",
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -1062,7 +1076,7 @@ func TestSQLiteExecutor_ImportJSONL(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 
 	var stderr bytes.Buffer
@@ -1097,7 +1111,7 @@ func TestSQLiteExecutor_ImportWithTransaction(t *testing.T) {
 		Script: "CREATE TABLE numbers (value INTEGER);",
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -1118,7 +1132,7 @@ func TestSQLiteExecutor_ImportWithTransaction(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 
 	var stderr bytes.Buffer
@@ -1153,7 +1167,7 @@ func TestSQLiteExecutor_ImportDryRun(t *testing.T) {
 		Script: "CREATE TABLE users (name TEXT);",
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -1174,7 +1188,7 @@ func TestSQLiteExecutor_ImportDryRun(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 
 	var stderr bytes.Buffer
@@ -1196,7 +1210,7 @@ func TestSQLiteExecutor_ImportDryRun(t *testing.T) {
 		Script: "SELECT COUNT(*) as cnt FROM users;",
 	}
 
-	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	verifyExec, err := newSQLiteExecutor(t, ctx, verifyStep)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1230,7 +1244,7 @@ func TestSQLiteExecutor_ImportIgnoreConflict(t *testing.T) {
 		`,
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -1256,7 +1270,7 @@ func TestSQLiteExecutor_ImportIgnoreConflict(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 	require.NoError(t, importExec.Run(ctx))
 
@@ -1272,7 +1286,7 @@ func TestSQLiteExecutor_ImportIgnoreConflict(t *testing.T) {
 		Script: "SELECT * FROM users ORDER BY id;",
 	}
 
-	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	verifyExec, err := newSQLiteExecutor(t, ctx, verifyStep)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1309,7 +1323,7 @@ func TestSQLiteExecutor_ImportMaxRows(t *testing.T) {
 		Script: "CREATE TABLE numbers (value INTEGER);",
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -1330,7 +1344,7 @@ func TestSQLiteExecutor_ImportMaxRows(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 
 	var stderr bytes.Buffer
@@ -1366,7 +1380,7 @@ func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
 		Script: "CREATE TABLE users (name TEXT);",
 	}
 
-	setupExec, err := newSQLiteExecutor(ctx, setupStep)
+	setupExec, err := newSQLiteExecutor(t, ctx, setupStep)
 	require.NoError(t, err)
 	require.NoError(t, setupExec.Run(ctx))
 
@@ -1387,7 +1401,7 @@ func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
 		},
 	}
 
-	importExec, err := newSQLiteExecutor(ctx, importStep)
+	importExec, err := newSQLiteExecutor(t, ctx, importStep)
 	require.NoError(t, err)
 
 	var stderr bytes.Buffer
@@ -1410,7 +1424,7 @@ func TestSQLiteExecutor_ImportSkipRows(t *testing.T) {
 		Script: "SELECT * FROM users ORDER BY name;",
 	}
 
-	verifyExec, err := newSQLiteExecutor(ctx, verifyStep)
+	verifyExec, err := newSQLiteExecutor(t, ctx, verifyStep)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1532,7 +1546,7 @@ func TestSQLiteExecutor_NamedParams(t *testing.T) {
 		},
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1564,7 +1578,7 @@ func TestSQLiteExecutor_Command(t *testing.T) {
 		},
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1601,7 +1615,7 @@ func TestSQLiteExecutor_NullHandling(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1634,7 +1648,7 @@ func TestSQLiteExecutor_Timeout(t *testing.T) {
 		Script: "SELECT 1 as result;",
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1663,7 +1677,7 @@ func TestSQLiteExecutor_Pragma(t *testing.T) {
 		Script: "PRAGMA table_info('sqlite_master');",
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1696,7 +1710,7 @@ func TestSQLiteExecutor_EmptyResult(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -1730,7 +1744,7 @@ func TestSQLiteExecutor_InsertReturnsAffected(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -2381,7 +2395,7 @@ func TestSQLiteExecutor_StreamingOutput(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -2427,7 +2441,7 @@ func TestSQLiteExecutor_StreamingOutputCSV(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	err = exec.Run(ctx)
@@ -2465,7 +2479,7 @@ func TestSQLiteExecutor_StreamingOutputSubdir(t *testing.T) {
 		Script: `SELECT 1 as value;`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	err = exec.Run(ctx)
@@ -2500,7 +2514,7 @@ func TestSQLiteExecutor_FileLock(t *testing.T) {
 		`,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer
@@ -2540,7 +2554,7 @@ func TestSQLiteExecutor_SharedMemory(t *testing.T) {
 		`, tableName, tableName, tableName),
 	}
 
-	exec1, err := newSQLiteExecutor(ctx, step1)
+	exec1, err := newSQLiteExecutor(t, ctx, step1)
 	require.NoError(t, err)
 
 	err = exec1.Run(ctx)
@@ -2579,7 +2593,7 @@ func TestSQLiteExecutor_ScriptFile(t *testing.T) {
 		Script: "file://" + scriptFile,
 	}
 
-	exec, err := newSQLiteExecutor(ctx, step)
+	exec, err := newSQLiteExecutor(t, ctx, step)
 	require.NoError(t, err)
 
 	var stdout bytes.Buffer

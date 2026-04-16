@@ -444,6 +444,38 @@ func TestHTTPExecutor_CmdWithArgsExpansion(t *testing.T) {
 		err = httpExec.Run(context.Background())
 		assert.NoError(t, err)
 	})
+
+	t.Run("FallbackToLegacyStepFields", func(t *testing.T) {
+		server := httptest.NewServer(nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+			assert.Equal(t, "GET", r.Method)
+			w.WriteHeader(nethttp.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		}))
+		defer server.Close()
+
+		step := core.Step{
+			Command: "GET",
+			Args:    []string{server.URL},
+			ExecutorConfig: core.ExecutorConfig{
+				Type:   "http",
+				Config: map[string]any{"silent": true},
+			},
+		}
+
+		exec, err := newHTTP(context.Background(), step)
+		require.NoError(t, err)
+
+		httpExec, ok := exec.(*http)
+		require.True(t, ok)
+		assert.Equal(t, "GET", httpExec.method)
+		assert.Equal(t, server.URL, httpExec.url)
+
+		httpExec.SetStdout(&testWriter{})
+		httpExec.SetStderr(&testWriter{})
+
+		err = httpExec.Run(context.Background())
+		assert.NoError(t, err)
+	})
 }
 
 type testWriter struct {

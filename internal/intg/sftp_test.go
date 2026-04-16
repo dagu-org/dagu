@@ -20,6 +20,7 @@ func TestSFTPExecutorIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
+	requireLinuxContainerRuntime(t)
 
 	th := test.Setup(t)
 

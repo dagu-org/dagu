@@ -31,6 +31,7 @@ params:
 
 steps:
   - name: process-webhook
+    shell: bash
     command: echo "$WEBHOOK_PAYLOAD"
     output: PAYLOAD_OUTPUT
 `)
@@ -56,6 +57,7 @@ params:
 
 steps:
   - name: check-payload-contains-event
+    shell: bash
     command: |
       if echo "$WEBHOOK_PAYLOAD" | grep -q "event"; then
         echo "found"

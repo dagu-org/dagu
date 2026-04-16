@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/core"
@@ -19,10 +20,12 @@ import (
 // back to the system temp directory. The file extension is chosen based on the shell.
 // Returns the created file path or an error if file creation, writing, syncing, or
 // permission setting fails.
-func setupScript(workDir, script string, shell []string) (string, error) {
-	// Determine file extension based on shell
+func setupScript(workDir, script, command string, shell []string) (string, error) {
+	// Determine file extension based on the actual execution path. Scripts that
+	// are passed to an explicit command or start with a shebang should preserve
+	// their original first line so the intended interpreter can handle them.
 	shellCmd := ""
-	if len(shell) > 0 {
+	if command == "" && !hasShebang(script) && len(shell) > 0 {
 		shellCmd = shell[0]
 	}
 	ext := cmdutil.GetScriptExtension(shellCmd)
@@ -62,16 +65,42 @@ func setupScript(workDir, script string, shell []string) (string, error) {
 	return file.Name(), nil
 }
 
+func hasShebang(script string) bool {
+	return strings.HasPrefix(script, "#!")
+}
+
+var powerShellPreambleStatements = []string{
+	"$ErrorActionPreference = 'Stop'",
+	"$PSNativeCommandUseErrorActionPreference = $true",
+	"$utf8NoBom = [System.Text.UTF8Encoding]::new($false)",
+	"[Console]::InputEncoding = $utf8NoBom",
+	"[Console]::OutputEncoding = $utf8NoBom",
+	"$OutputEncoding = $utf8NoBom",
+	"$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'",
+}
+
+func powerShellPreamble() string {
+	return strings.Join(powerShellPreambleStatements, "\n")
+}
+
+func powerShellInlineCommand(command string) string {
+	parts := append([]string{}, powerShellPreambleStatements...)
+	command = strings.TrimSpace(command)
+	if command != "" {
+		parts = append(parts, command)
+	}
+	return strings.Join(parts, "; ")
+}
+
 // scriptLineOffset returns the number of lines prepended by preprocessScript
 // for the given shell. This is needed to map error line numbers back to the
 // user's original script content.
-func scriptLineOffset(shell []string) int {
-	if len(shell) == 0 {
+func scriptLineOffset(scriptFile string) int {
+	if scriptFile == "" {
 		return 0
 	}
-	ext := cmdutil.GetScriptExtension(shell[0])
-	if ext == ".ps1" {
-		return 2 // preprocessScript prepends 2 lines for PowerShell
+	if cmdutil.GetScriptExtension(scriptFile) == ".ps1" {
+		return len(powerShellPreambleStatements)
 	}
 	return 0
 }
@@ -81,10 +110,7 @@ func scriptLineOffset(shell []string) int {
 func preprocessScript(script, ext string) string {
 	switch ext {
 	case ".ps1":
-		// For PowerShell scripts, prepend error handling settings:
-		// $ErrorActionPreference = 'Stop' - stops on cmdlet errors
-		// $PSNativeCommandUseErrorActionPreference = $true - stops on non-zero exit codes (PowerShell 7.4+)
-		return "$ErrorActionPreference = 'Stop'\n$PSNativeCommandUseErrorActionPreference = $true\n" + script
+		return powerShellPreamble() + "\n" + script
 	default:
 		return script
 	}
@@ -98,7 +124,9 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 	if scriptFile != "" {
 		clonedArgs = append(clonedArgs, scriptFile)
 	}
-	return exec.CommandContext(ctx, cmd, clonedArgs...) // nolint: gosec
+	command := exec.CommandContext(ctx, cmdutil.ResolveExecutable(cmd), clonedArgs...) // nolint: gosec
+	cmdutil.SetupCommand(command)
+	return command
 }
 
 // validateCommandStep checks that a Step has a valid command configuration.

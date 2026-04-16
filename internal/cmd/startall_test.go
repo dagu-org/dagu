@@ -5,9 +5,7 @@ package cmd_test
 
 import (
 	"fmt"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/test"
@@ -16,17 +14,7 @@ import (
 func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAll", func(t *testing.T) {
 		th := test.SetupCommand(t, test.WithCoordinatorEnabled())
-		go func() {
-			for {
-				out := th.LoggingOutput.String()
-				if strings.Contains(out, "Scheduler initialization") &&
-					strings.Contains(out, "Coordinator initialization") {
-					th.Cancel()
-					return
-				}
-				time.Sleep(50 * time.Millisecond)
-			}
-		}()
+		cancelWhenLogContains(t, th, "Scheduler initialization", "Coordinator initialization")
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{
 				"start-all",
@@ -40,16 +28,7 @@ func TestStartAllCommand(t *testing.T) {
 	})
 	t.Run("StartAllWithConfig", func(t *testing.T) {
 		th := test.SetupCommand(t)
-		go func() {
-			for {
-				out := th.LoggingOutput.String()
-				if strings.Contains(out, "Coordinator initialization") {
-					th.Cancel()
-					return
-				}
-				time.Sleep(50 * time.Millisecond)
-			}
-		}()
+		cancelWhenLogContains(t, th, "Coordinator initialization")
 		th.RunCommand(t, cmd.StartAll(), test.CmdTest{
 			Args: []string{
 				"start-all",
