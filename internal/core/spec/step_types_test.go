@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,6 +57,81 @@ steps:
 	assert.Equal(t, []string{"hello", "3"}, step.Commands[0].Args)
 	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
 	assert.Equal(t, "Send a greeting", step.Description)
+}
+
+func TestCustomStepTypes_RuntimeVariableInputsDeferSchemaValidation(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-runtime-inputs
+step_types:
+  run_with_inputs:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message, count, enabled, mode]
+      properties:
+        message:
+          type: string
+        count:
+          type: integer
+          minimum: 1
+        enabled:
+          type: boolean
+        mode:
+          enum: [fast, slow]
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+          - {$input: count}
+          - {$input: enabled}
+          - {$input: mode}
+steps:
+  - type: run_with_inputs
+    config:
+      message: hello-${SUFFIX}
+      count: ${COUNT}
+      enabled: ${ENABLED}
+      mode: ${MODE}
+`), WithoutEval())
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"hello-${SUFFIX}", "${COUNT}", "${ENABLED}", "${MODE}"}, step.Commands[0].Args)
+}
+
+func TestCustomStepTypes_RuntimeVariableInputMustBeWholeValueForNonStringTypes(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-runtime-input-invalid
+step_types:
+  repeat:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [count]
+      properties:
+        count:
+          type: integer
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: count}
+steps:
+  - type: repeat
+    config:
+      count: count-${COUNT}
+`), WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `invalid "repeat" input`)
 }
 
 func TestCustomStepTypes_CommandTargetInheritsDAGLevelContainer(t *testing.T) {
@@ -662,4 +738,173 @@ steps:
 `))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exec cannot be used together with command")
+}
+
+func TestValidateCustomStepInput_DefersRuntimeExpressionLeaves(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		schema    map[string]any
+		input     map[string]any
+		assertErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "IntegerWholeRuntimeExpression",
+			schema: objectInputSchema(map[string]any{
+				"count": map[string]any{"type": "integer"},
+			}, "count"),
+			input:     map[string]any{"count": "${COUNT}"},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "BooleanWholeRuntimeExpression",
+			schema: objectInputSchema(map[string]any{
+				"enabled": map[string]any{"type": "boolean"},
+			}, "enabled"),
+			input:     map[string]any{"enabled": "$ENABLED"},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "EnumWholeRuntimeExpression",
+			schema: objectInputSchema(map[string]any{
+				"mode": map[string]any{"enum": []any{"fast", "slow"}},
+			}, "mode"),
+			input:     map[string]any{"mode": "${MODE}"},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "StringEnumEmbeddedRuntimeExpressionRejected",
+			schema: objectInputSchema(map[string]any{
+				"mode": map[string]any{"enum": []any{"fast", "slow"}},
+			}, "mode"),
+			input:     map[string]any{"mode": "fast-${MODE}"},
+			assertErr: assert.Error,
+		},
+		{
+			name: "StringEmbeddedRuntimeExpression",
+			schema: objectInputSchema(map[string]any{
+				"message": map[string]any{"type": "string"},
+			}, "message"),
+			input:     map[string]any{"message": "hello-${NAME}"},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "NestedIntegerRuntimeExpression",
+			schema: objectInputSchema(map[string]any{
+				"limits": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"count": map[string]any{"type": "integer"},
+					},
+					"required": []any{"count"},
+				},
+			}, "limits"),
+			input:     map[string]any{"limits": map[string]any{"count": "${COUNT}"}},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "ArrayIntegerRuntimeExpression",
+			schema: objectInputSchema(map[string]any{
+				"counts": map[string]any{
+					"type":  "array",
+					"items": map[string]any{"type": "integer"},
+				},
+			}, "counts"),
+			input:     map[string]any{"counts": []any{"${COUNT}"}},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "ArrayRuntimeExpressionDoesNotHideInvalidSibling",
+			schema: objectInputSchema(map[string]any{
+				"counts": map[string]any{
+					"type":  "array",
+					"items": map[string]any{"type": "integer"},
+				},
+			}, "counts"),
+			input:     map[string]any{"counts": []any{"${COUNT}", "abc"}},
+			assertErr: assert.Error,
+		},
+		{
+			name: "AdditionalPropertiesRuntimeExpression",
+			schema: map[string]any{
+				"type":                 "object",
+				"additionalProperties": map[string]any{"type": "integer"},
+			},
+			input:     map[string]any{"us": "${US_COUNT}"},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "AdditionalPropertiesRuntimeExpressionDoesNotHideInvalidSibling",
+			schema: map[string]any{
+				"type":                 "object",
+				"additionalProperties": map[string]any{"type": "integer"},
+			},
+			input:     map[string]any{"us": "${US_COUNT}", "eu": "abc"},
+			assertErr: assert.Error,
+		},
+		{
+			name: "RefRuntimeExpression",
+			schema: map[string]any{
+				"$defs": map[string]any{
+					"count": map[string]any{"type": "integer", "minimum": 1},
+				},
+				"type":                 "object",
+				"additionalProperties": false,
+				"required":             []any{"count"},
+				"properties": map[string]any{
+					"count": map[string]any{"$ref": "#/$defs/count"},
+				},
+			},
+			input:     map[string]any{"count": "${COUNT}"},
+			assertErr: assert.NoError,
+		},
+		{
+			name: "IntegerEmbeddedRuntimeExpressionRejected",
+			schema: objectInputSchema(map[string]any{
+				"count": map[string]any{"type": "integer"},
+			}, "count"),
+			input:     map[string]any{"count": "count-${COUNT}"},
+			assertErr: assert.Error,
+		},
+		{
+			name: "NonRuntimeInvalidStillRejected",
+			schema: objectInputSchema(map[string]any{
+				"count": map[string]any{"type": "integer"},
+			}, "count"),
+			input:     map[string]any{"count": "abc"},
+			assertErr: assert.Error,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			schema := mustResolveCustomStepInputSchema(t, tt.schema)
+			_, err := validateCustomStepInput("test", schema, tt.input)
+			tt.assertErr(t, err)
+		})
+	}
+}
+
+func objectInputSchema(properties map[string]any, required ...string) map[string]any {
+	requiredValues := make([]any, 0, len(required))
+	for _, name := range required {
+		requiredValues = append(requiredValues, name)
+	}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             requiredValues,
+		"properties":           properties,
+	}
+}
+
+func mustResolveCustomStepInputSchema(t *testing.T, schema map[string]any) *jsonschema.Resolved {
+	t.Helper()
+
+	resolved, err := resolveCustomStepTypeInputSchema("test", schema)
+	require.NoError(t, err)
+	return resolved
 }
