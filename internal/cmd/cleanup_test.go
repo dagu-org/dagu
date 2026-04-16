@@ -19,6 +19,8 @@ import (
 
 func TestCleanupCommand(t *testing.T) {
 	t.Run("DeletesAllHistoryWithRetentionZero", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		// Create a DAG and run it to generate history
@@ -47,6 +49,8 @@ func TestCleanupCommand(t *testing.T) {
 	})
 
 	t.Run("PreservesRecentHistoryWithRetentionDays", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		// Create a DAG and run it
@@ -75,6 +79,8 @@ func TestCleanupCommand(t *testing.T) {
 	})
 
 	t.Run("DryRunDoesNotDelete", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		// Create a DAG and run it
@@ -103,6 +109,8 @@ func TestCleanupCommand(t *testing.T) {
 	})
 
 	t.Run("PreservesActiveRuns", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		// Create a DAG that runs for a while
@@ -140,6 +148,8 @@ func TestCleanupCommand(t *testing.T) {
 	})
 
 	t.Run("RejectsNegativeRetentionDays", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `steps:
@@ -156,6 +166,8 @@ func TestCleanupCommand(t *testing.T) {
 	})
 
 	t.Run("RejectsInvalidRetentionDays", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `steps:
@@ -172,6 +184,8 @@ func TestCleanupCommand(t *testing.T) {
 	})
 
 	t.Run("RequiresDAGNameArgument", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		err := th.RunCommandWithError(t, cmd.Cleanup(), test.CmdTest{
@@ -183,6 +197,8 @@ func TestCleanupCommand(t *testing.T) {
 	})
 
 	t.Run("SucceedsForNonExistentDAG", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		// Cleanup for a DAG that doesn't exist should succeed silently
@@ -193,8 +209,12 @@ func TestCleanupCommand(t *testing.T) {
 }
 
 func TestCleanupCommandDirectStore(t *testing.T) {
+	t.Parallel()
+
 	// Test cleanup using the DAGRunStore directly to verify underlying behavior
 	t.Run("RemoveOldDAGRunsWithStore", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.Setup(t)
 
 		dagName := "test-cleanup-dag"

@@ -256,14 +256,14 @@ func (d *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	env := GetEnv(ctx)
 
 	// Evaluate the stdout field
-	stdout, err := env.EvalString(ctx, d.inner.Step.Stdout)
+	stdout, err := env.EvalString(ctx, d.inner.Step.Stdout, eval.WithoutDollarEscape())
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)
 	}
 	d.inner.Step.Stdout = stdout
 
 	// Evaluate the stderr field
-	stderr, err := env.EvalString(ctx, d.inner.Step.Stderr)
+	stderr, err := env.EvalString(ctx, d.inner.Step.Stderr, eval.WithoutDollarEscape())
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stderr field: %w", err)
 	}

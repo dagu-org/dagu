@@ -66,7 +66,7 @@ func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
 	c.lru.Add(fileName, entry[T]{
 		data:         data,
 		size:         fi.Size(),
-		lastModified: fi.ModTime().Unix(),
+		lastModified: fi.ModTime().UnixNano(),
 	})
 }
 
@@ -128,6 +128,6 @@ func (c *Cache[T]) isStale(fileName string) (bool, os.FileInfo, error) {
 	if !ok {
 		return true, fi, nil
 	}
-	t := fi.ModTime().Unix()
+	t := fi.ModTime().UnixNano()
 	return e.lastModified < t || e.size != fi.Size(), fi, nil
 }

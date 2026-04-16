@@ -257,7 +257,7 @@ steps:
 }
 
 func TestGenerateFilePathPreventsTraversal(t *testing.T) {
-	baseDir := "/base/dir"
+	baseDir := filepath.FromSlash("/base/dir")
 	store := New(baseDir, WithSkipExamples(true)).(*Storage)
 
 	tests := []struct {
@@ -276,7 +276,7 @@ func TestGenerateFilePathPreventsTraversal(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := store.generateFilePath(tc.input)
-			assert.Equal(t, baseDir, filepath.Dir(result),
+			assert.Equal(t, filepath.Clean(baseDir), filepath.Dir(result),
 				"generated path must be directly inside baseDir")
 		})
 	}

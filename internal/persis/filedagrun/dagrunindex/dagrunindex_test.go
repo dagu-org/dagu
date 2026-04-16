@@ -13,6 +13,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	indexv1 "github.com/dagucloud/dagu/proto/index/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -433,11 +434,7 @@ func TestRebuildForDay_WriteFailure(t *testing.T) {
 	dayDir := t.TempDir()
 	createDayDir(t, dayDir, 12, core.Succeeded)
 
-	// Make dayDir read-only so writeIndex fails.
-	require.NoError(t, os.Chmod(dayDir, 0555))
-	t.Cleanup(func() {
-		_ = os.Chmod(dayDir, 0755)
-	})
+	require.NoError(t, os.MkdirAll(filepath.Join(dayDir, IndexFileName), 0750))
 
 	entries, fromIndex, err := RebuildForDay(dayDir, readDayDir(t, dayDir))
 	require.NoError(t, err)
@@ -448,18 +445,13 @@ func TestRebuildForDay_WriteFailure(t *testing.T) {
 func TestRebuildForDay_UnreadableStatus(t *testing.T) {
 	dayDir := t.TempDir()
 
-	// Create a run with an unreadable status file.
 	runName := "dag-run_20240115_120000Z_badstatus"
 	runDir := filepath.Join(dayDir, runName)
 	attemptDir := filepath.Join(runDir, "attempt_20240115_120000_001Z_abc123")
 	require.NoError(t, os.MkdirAll(attemptDir, 0750))
 
 	statusPath := filepath.Join(attemptDir, "status.jsonl")
-	require.NoError(t, os.WriteFile(statusPath, []byte(`{"status":4}`+"\n"), 0600))
-	require.NoError(t, os.Chmod(statusPath, 0000))
-	t.Cleanup(func() {
-		_ = os.Chmod(statusPath, 0644)
-	})
+	require.NoError(t, os.MkdirAll(statusPath, 0750))
 
 	entries, fromIndex, err := RebuildForDay(dayDir, readDayDir(t, dayDir))
 	require.NoError(t, err)
@@ -470,16 +462,14 @@ func TestRebuildForDay_UnreadableStatus(t *testing.T) {
 func TestRebuildForDay_AttemptReadError(t *testing.T) {
 	dayDir := t.TempDir()
 
-	// Create a run dir that can't be listed.
 	runName := "dag-run_20240115_120000Z_noperm"
 	runDir := filepath.Join(dayDir, runName)
 	require.NoError(t, os.MkdirAll(runDir, 0750))
-	require.NoError(t, os.Chmod(runDir, 0000))
-	t.Cleanup(func() {
-		_ = os.Chmod(runDir, 0755)
-	})
+	entries := readDayDir(t, dayDir)
+	require.NoError(t, os.RemoveAll(runDir))
+	testutil.BlockPathWithFile(t, runDir)
 
-	_, _, err := RebuildForDay(dayDir, readDayDir(t, dayDir))
+	_, _, err := RebuildForDay(dayDir, entries)
 	require.Error(t, err, "should return error when findLatestAttempt fails")
 }
 

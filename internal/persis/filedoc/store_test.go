@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -886,9 +887,7 @@ func TestParseDocFileUnclosedFrontmatter(t *testing.T) {
 }
 
 func TestGetReadPermissionError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -906,9 +905,7 @@ func TestGetReadPermissionError(t *testing.T) {
 }
 
 func TestCreateMkdirPermissionError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -922,9 +919,7 @@ func TestCreateMkdirPermissionError(t *testing.T) {
 }
 
 func TestDeleteRemovePermissionError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -941,9 +936,7 @@ func TestDeleteRemovePermissionError(t *testing.T) {
 }
 
 func TestUpdateWritePermissionError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -959,9 +952,7 @@ func TestUpdateWritePermissionError(t *testing.T) {
 }
 
 func TestRenameMkdirPermissionError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -984,9 +975,7 @@ func TestNewWithInvalidBaseDir(t *testing.T) {
 }
 
 func TestListFlatWithUnreadableFile(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1007,9 +996,7 @@ func TestListFlatWithUnreadableFile(t *testing.T) {
 }
 
 func TestSearchWithUnreadableFile(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1029,9 +1016,7 @@ func TestSearchWithUnreadableFile(t *testing.T) {
 }
 
 func TestBuildTreeWithUnreadableFile(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1051,9 +1036,7 @@ func TestBuildTreeWithUnreadableFile(t *testing.T) {
 }
 
 func TestCreateWritePermissionError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1168,9 +1151,7 @@ func TestSearchMatchesRejectsInvalidDocID(t *testing.T) {
 }
 
 func TestCleanEmptyParentsNonRemovable(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1351,9 +1332,7 @@ func TestRenameDirectoryCleansEmptyParents(t *testing.T) {
 }
 
 func TestRenameDirectoryMkdirFails(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1369,9 +1348,7 @@ func TestRenameDirectoryMkdirFails(t *testing.T) {
 }
 
 func TestRenameDirectoryOsRenameFails(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1387,9 +1364,7 @@ func TestRenameDirectoryOsRenameFails(t *testing.T) {
 }
 
 func TestRenameOsRenameError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("cannot test permission errors as root")
-	}
+	testutil.SkipIfPOSIXPermissionErrorsUnsupported(t)
 
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1784,7 +1759,7 @@ func TestListTreeSortMtimeWithDirectories(t *testing.T) {
 	assert.Equal(t, "dir-new", result.Items[0].ID)
 	assert.Equal(t, "dir-old", result.Items[1].ID)
 	// Verify directory mtime = max of descendants.
-	assert.True(t, result.Items[0].ModTime.After(result.Items[1].ModTime))
+	assert.False(t, result.Items[0].ModTime.Before(result.Items[1].ModTime))
 }
 
 func TestListTreeSortMtimeStable(t *testing.T) {

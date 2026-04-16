@@ -9,7 +9,8 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+-*"
     paths:
       - "api/**"
-      - "**.go"
+      - "*.go"
+      - "**/*.go"
       - "cmd/**"
       - "go.mod"
       - "go.sum"
@@ -28,7 +29,8 @@ on:
       - ready_for_review # PR is ready for review
     paths:
       - "api/**"
-      - "**.go"
+      - "*.go"
+      - "**/*.go"
       - "cmd/**"
       - "go.mod"
       - "go.sum"
@@ -141,18 +143,23 @@ jobs:
           version: v2.9.0
           args: --timeout=10m
 
-  # Test Go code on multiple platforms
-  test:
-    name: Test on ${{ matrix.os }}
+  test-ubuntu:
+    name: Test on ubuntu-latest (${{ matrix.suite_index }}/${{ matrix.suite_total }})
     needs: changes
     if: needs.changes.outputs.go == 'true'
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          # - windows-latest
+        include:
+          - suite: unit
+            suite_index: 1
+            suite_total: 2
+            codecov_name: ubuntu-unit
+          - suite: intg
+            suite_index: 2
+            suite_total: 2
+            codecov_name: ubuntu-intg
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -162,44 +169,69 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Resolve test packages
+        id: test-packages
+        shell: bash
+        run: |
+          suite="${{ matrix.suite }}"
+          module_path="$(go list -m)"
+          case "${suite}" in
+            unit)
+              packages="$(
+                go list ./... | awk -v prefix="${module_path}/internal/intg" '$0 != prefix && index($0, prefix "/") != 1' | xargs
+              )"
+              ;;
+            intg)
+              packages="$(go list ./internal/intg/... | xargs)"
+              ;;
+            *)
+              echo "unknown test suite: ${suite}" >&2
+              exit 1
+              ;;
+          esac
+          if [[ -z "${packages}" ]]; then
+            echo "failed to resolve packages for ${suite}" >&2
+            exit 1
+          fi
+          echo "packages=${packages}" >> "${GITHUB_OUTPUT}"
+
       - name: Build
-        if: runner.os != 'Windows'
         run: |
           make bin
 
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          go build -o .\.local\bin\dagu.exe .\cmd
-
       - name: Test
-        if: runner.os != 'Windows'
         run: |
-          make test-coverage
-
-      - name: Test (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          go test -v -race .\...
+          make test-coverage TEST_TARGET="${{ steps.test-packages.outputs.packages }}"
 
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
         with:
           files: ./coverage.out
+          flags: ${{ matrix.codecov_name }}
+          name: ${{ matrix.codecov_name }}
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   e2e:
-    name: E2E
+    name: E2E (${{ matrix.shard }}/${{ matrix.shard_total }})
     needs:
       - changes
       - golint
     if: needs.changes.outputs.e2e == 'true' && (needs.golint.result == 'success' || needs.golint.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            shard_total: 3
+          - shard: 2
+            shard_total: 3
+          - shard: 3
+            shard_total: 3
     concurrency:
-      group: ci-e2e-${{ github.event.pull_request.number || github.ref }}
+      group: ci-e2e-${{ github.event.pull_request.number || github.ref }}-shard-${{ matrix.shard }}
       cancel-in-progress: true
     steps:
       - name: Check out code
@@ -234,22 +266,81 @@ jobs:
         env:
           CI: "true"
           DAGU_LICENSE_PRIVKEY_B64: ${{ secrets.DAGU_LICENSE_PRIVKEY_B64 }}
-        run: make test-e2e
-
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: playwright-report
-          path: ui/playwright-report
-          if-no-files-found: ignore
-          retention-days: 7
+          PLAYWRIGHT_FULLY_PARALLEL: "true"
+          PLAYWRIGHT_TEST_ARGS: --shard=${{ matrix.shard }}/${{ matrix.shard_total }}
+        run: |
+          make test-e2e-build
+          make test-e2e-run
 
       - name: Upload Playwright test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-test-results
+          name: playwright-test-results-shard-${{ matrix.shard }}
           path: ui/test-results
           if-no-files-found: ignore
           retention-days: 7
+
+  test-windows:
+    name: Test on windows-latest (${{ matrix.suite_index }}/${{ matrix.suite_total }})
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: unit
+            suite_index: 1
+            suite_total: 2
+          - suite: intg
+            suite_index: 2
+            suite_total: 2
+    steps:
+      - name: Check out code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Resolve test packages
+        id: test-packages
+        shell: bash
+        run: |
+          suite="${{ matrix.suite }}"
+          module_path="$(go list -m)"
+          case "${suite}" in
+            unit)
+              packages="$(
+                go list ./... | awk -v prefix="${module_path}/internal/intg" '$0 != prefix && index($0, prefix "/") != 1' | xargs
+              )"
+              ;;
+            intg)
+              packages="$(go list ./internal/intg/... | xargs)"
+              ;;
+            *)
+              echo "unknown test suite: ${suite}" >&2
+              exit 1
+              ;;
+          esac
+          if [[ -z "${packages}" ]]; then
+            echo "failed to resolve packages for ${suite}" >&2
+            exit 1
+          fi
+          echo "packages=${packages}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build (Windows)
+        shell: bash
+        run: |
+          mkdir -p ./.local/bin
+          go build -o ./.local/bin/dagu.exe ./cmd
+
+      - name: Test (Windows)
+        shell: bash
+        run: |
+          go test \
+            -timeout=20m \
+            -ldflags=-extldflags=-Wl \
+            ${{ steps.test-packages.outputs.packages }}

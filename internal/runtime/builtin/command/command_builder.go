@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 )
 
 // shellCommandBuilder holds the configuration for building shell commands.
@@ -28,6 +30,10 @@ func (b *shellCommandBuilder) Build(ctx context.Context) (*exec.Cmd, error) {
 		return nil, fmt.Errorf("shell command is required")
 	}
 
-	shell := findShell(b.Shell[0])
-	return shell.Build(ctx, b)
+	builder := *b
+	builder.Shell = cloneArgs(b.Shell)
+	builder.Shell[0] = cmdutil.ResolveExecutable(builder.Shell[0])
+
+	shell := findShell(builder.Shell[0])
+	return shell.Build(ctx, &builder)
 }

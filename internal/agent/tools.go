@@ -46,8 +46,18 @@ func toolError(format string, args ...any) ToolOut {
 
 // resolvePath joins path with workingDir if path is relative and workingDir is set.
 func resolvePath(path, workingDir string) string {
-	if !filepath.IsAbs(path) && workingDir != "" {
+	if !filepath.IsAbs(path) && !isRootedPath(path) && workingDir != "" {
 		return filepath.Join(workingDir, path)
 	}
+	if filepath.IsAbs(path) || isRootedPath(path) {
+		return filepath.Clean(path)
+	}
 	return path
+}
+
+func isRootedPath(path string) bool {
+	if len(path) == 0 {
+		return false
+	}
+	return path[0] == '/' || path[0] == '\\'
 }

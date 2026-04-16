@@ -102,7 +102,7 @@ func TestLogHandler_StreamKey(t *testing.T) {
 func TestLogHandler_LogFilePath(t *testing.T) {
 	t.Parallel()
 
-	logDir := "/var/logs"
+	logDir := filepath.Join(string(os.PathSeparator), "var", "logs")
 	h := newLogHandler(logDir)
 
 	t.Run("BasicPathGeneration", func(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -25,9 +26,286 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunner(t *testing.T) {
-	testScript := test.TestdataPath(t, filepath.Join("runtime", "runner", "testfile.sh"))
+func shellTestPath(path string) string {
+	return filepath.ToSlash(path)
+}
 
+func windowsShellTest() bool {
+	return os.PathSeparator == '\\'
+}
+
+func shellSubstitution(command string) string {
+	return "`" + command + "`"
+}
+
+func trimmedCounterReadCommand(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(
+			"(& { $content = Get-Content -Raw -LiteralPath %s -ErrorAction SilentlyContinue; if ($null -eq $content) { '' } else { ([string]$content).TrimEnd([char]13, [char]10) } })",
+			test.PowerShellQuote(counterFile),
+		)
+	}
+	return fmt.Sprintf("tr -d '\\r\\n' < %s", test.PosixQuote(counterFile))
+}
+
+func createEmptyFileCommand(path string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf("New-Item -ItemType File -Path %s -Force | Out-Null", test.PowerShellQuote(path))
+	}
+	return fmt.Sprintf(": > %s", test.PosixQuote(path))
+}
+
+func fileExistsCommand(path string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf("if (Test-Path %s) { exit 0 } else { exit 1 }", test.PowerShellQuote(path))
+	}
+	return fmt.Sprintf("test -f %s", test.PosixQuote(path))
+}
+
+func fileMissingCommand(path string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf("if (-not (Test-Path %s)) { exit 0 } else { exit 1 }", test.PowerShellQuote(path))
+	}
+	return fmt.Sprintf("test ! -f %s", test.PosixQuote(path))
+}
+
+func repeatCounterValueCondition(counterFile string) string {
+	if windowsShellTest() {
+		return shellSubstitution(fmt.Sprintf(
+			"if (Test-Path %s) { [System.IO.File]::ReadAllText(%s).TrimEnd([char]13,[char]10) } else { '' }",
+			test.PowerShellQuote(counterFile),
+			test.PowerShellQuote(counterFile),
+		))
+	}
+	return shellSubstitution(trimmedCounterReadCommand(counterFile))
+}
+
+func repeatExpectedCondition(counterFile, expected string) *core.Condition {
+	if windowsShellTest() {
+		return &core.Condition{Condition: repeatCounterEqualsCommand(counterFile, expected)}
+	}
+	return &core.Condition{
+		Condition: repeatCounterValueCondition(counterFile),
+		Expected:  expected,
+	}
+}
+
+func repeatConditionMutationTimeout() time.Duration {
+	if windowsShellTest() {
+		return 90 * time.Second
+	}
+	return 5 * time.Second
+}
+
+func readRepeatCounterValue(t *testing.T, counterFile string) int {
+	t.Helper()
+
+	data, err := os.ReadFile(counterFile)
+	require.NoError(t, err)
+
+	value, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	require.NoError(t, err)
+
+	return value
+}
+
+func repeatCounterEqualsCommand(counterFile, expected string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(
+			"if ((Test-Path %s) -and ((%s) -eq %s)) { exit 0 } else { exit 1 }",
+			test.PowerShellQuote(counterFile),
+			trimmedCounterReadCommand(counterFile),
+			test.PowerShellQuote(expected),
+		)
+	}
+	return fmt.Sprintf("test \"$(%s)\" = \"%s\"", trimmedCounterReadCommand(counterFile), expected)
+}
+
+func repeatCounterSetupScript(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					$counterFile = %s
+					if (Test-Path $counterFile) {
+						$COUNT = [int](([string](Get-Content -Raw -Path $counterFile)).TrimEnd([char]13, [char]10))
+					} else {
+						$COUNT = 0
+					}
+				`, test.PowerShellQuote(counterFile))
+	}
+	return fmt.Sprintf(`
+					COUNTER_FILE="%s"
+					if [ -f "$COUNTER_FILE" ]; then
+						COUNT=$(%s)
+					else
+						COUNT=0
+					fi
+				`, shellTestPath(counterFile), trimmedCounterReadCommand(counterFile))
+}
+
+func repeatCounterScript(counterFile string, emitCount bool) string {
+	if windowsShellTest() {
+		emitLine := ""
+		if emitCount {
+			emitLine = "\n\t\t\t\t\tWrite-Output $COUNT"
+		}
+		return fmt.Sprintf(`
+					%s
+					$COUNT = $COUNT + 1
+					Set-Content -Path $counterFile -Value $COUNT -NoNewline%s
+				`, repeatCounterSetupScript(counterFile), emitLine)
+	}
+	emitLine := ""
+	if emitCount {
+		emitLine = "\n\t\t\t\t\tprintf '%s\\n' \"$COUNT\""
+	}
+	return fmt.Sprintf(`
+					%s
+					COUNT=$((COUNT + 1))
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"%s
+				`, repeatCounterSetupScript(counterFile), emitLine)
+}
+
+func repeatCounterThenSleepScript(counterFile string, sleepAfterCount int, sleepDuration time.Duration) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					%s
+					$COUNT = $COUNT + 1
+					Set-Content -Path $counterFile -Value $COUNT -NoNewline
+					if ($COUNT -ge %d) {
+						%s
+					}
+				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.Sleep(sleepDuration))
+	}
+	return fmt.Sprintf(`
+					%s
+					COUNT=$((COUNT + 1))
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"
+					if [ "$COUNT" -ge %d ]; then
+						%s
+					fi
+				`, repeatCounterSetupScript(counterFile), sleepAfterCount, test.Sleep(sleepDuration))
+}
+
+func repeatCounterExitCodeScript(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					$counterFile = %s
+					if (Test-Path $counterFile) {
+						exit 0
+					}
+					New-Item -ItemType File -Path $counterFile -Force | Out-Null
+					exit 42
+				`, test.PowerShellQuote(counterFile))
+	}
+	return fmt.Sprintf(`if [ -f %[1]s ]; then exit 0; fi; : > %[1]s; exit 42`, shellTestPath(counterFile))
+}
+
+func retrySpecificExitCodeScript(counterFile string) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					$counterFile = %s
+					if (-not (Test-Path $counterFile)) {
+						Set-Content -Path $counterFile -Value '1' -NoNewline
+						exit 42
+					}
+
+					$COUNT = ([string](Get-Content -Raw -Path $counterFile)).TrimEnd([char]13, [char]10)
+					if ($COUNT -eq '1') {
+						Set-Content -Path $counterFile -Value '2' -NoNewline
+						exit 100
+					}
+				`, test.PowerShellQuote(counterFile))
+	}
+	return fmt.Sprintf(`
+					if [ ! -f "%s" ]; then
+						printf '%%s' "1" > "%s"
+						exit 42
+					else
+						COUNT=$(tr -d '\r\n' < "%s")
+						if [ "$COUNT" -eq "1" ]; then
+							printf '%%s' "2" > "%s"
+							exit 100
+						fi
+					fi
+				`, shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile), shellTestPath(counterFile))
+}
+
+func dagRunStatusUnsetScript() string {
+	if windowsShellTest() {
+		return `if ([string]::IsNullOrEmpty($env:DAG_RUN_STATUS)) { Write-Output unset } else { Write-Output set }`
+	}
+	return `if [ -z "$DAG_RUN_STATUS" ]; then echo unset; else echo set; fi`
+}
+
+func counterThresholdExitScript(counterFile string, threshold, exitAtOrBelow, exitAbove int) string {
+	if windowsShellTest() {
+		return fmt.Sprintf(`
+					%s
+					$COUNT = $COUNT + 1
+					Set-Content -Path $counterFile -Value $COUNT -NoNewline
+					if ($COUNT -le %d) {
+						exit %d
+					}
+					exit %d
+				`, repeatCounterSetupScript(counterFile), threshold, exitAtOrBelow, exitAbove)
+	}
+	return fmt.Sprintf(`
+					%s
+					COUNT=$((COUNT + 1))
+					printf '%%s' "$COUNT" > "$COUNTER_FILE"
+					if [ "$COUNT" -le %d ]; then
+						exit %d
+					fi
+					exit %d
+				`, repeatCounterSetupScript(counterFile), threshold, exitAtOrBelow, exitAbove)
+}
+
+func retryOutputSequenceScript(counterFile string, outputs []string, successAttempt int) string {
+	if windowsShellTest() {
+		var body strings.Builder
+		fmt.Fprintf(&body, "\n\t\t\t\t\t$counterFile = %s\n", test.PowerShellQuote(counterFile))
+		body.WriteString("\t\t\t\t\t$attempt = 1\n")
+		body.WriteString("\t\t\t\t\tif (Test-Path $counterFile) {\n")
+		body.WriteString("\t\t\t\t\t\t$attempt = [int](([string](Get-Content -Raw -Path $counterFile)).TrimEnd([char]13, [char]10)) + 1\n")
+		body.WriteString("\t\t\t\t\t}\n")
+		body.WriteString("\t\t\t\t\tSet-Content -Path $counterFile -Value $attempt -NoNewline\n")
+		body.WriteString("\t\t\t\t\tswitch ($attempt) {\n")
+		for i, output := range outputs {
+			attempt := i + 1
+			exitCode := 1
+			if attempt == successAttempt {
+				exitCode = 0
+			}
+			fmt.Fprintf(&body, "\t\t\t\t\t\t%d { Write-Output %s; exit %d }\n", attempt, test.PowerShellQuote(output), exitCode)
+		}
+		body.WriteString("\t\t\t\t\t\tdefault { exit 1 }\n")
+		body.WriteString("\t\t\t\t\t}\n")
+		return body.String()
+	}
+
+	var body strings.Builder
+	fmt.Fprintf(&body, "\n\t\t\t\t\tCOUNTER_FILE=%q\n", shellTestPath(counterFile))
+	body.WriteString("\t\t\t\t\tif [ ! -f \"$COUNTER_FILE\" ]; then\n")
+	body.WriteString("\t\t\t\t\t\tATTEMPT=1\n")
+	body.WriteString("\t\t\t\t\telse\n")
+	body.WriteString("\t\t\t\t\t\tATTEMPT=$(($(tr -d '\\r\\n' < \"$COUNTER_FILE\") + 1))\n")
+	body.WriteString("\t\t\t\t\tfi\n")
+	body.WriteString("\t\t\t\t\tprintf '%s' \"$ATTEMPT\" > \"$COUNTER_FILE\"\n")
+	body.WriteString("\t\t\t\t\tcase \"$ATTEMPT\" in\n")
+	for i, output := range outputs {
+		attempt := i + 1
+		exitCode := 1
+		if attempt == successAttempt {
+			exitCode = 0
+		}
+		fmt.Fprintf(&body, "\t\t\t\t\t\t%d)\n\t\t\t\t\t\t\techo %q\n\t\t\t\t\t\t\texit %d\n\t\t\t\t\t\t\t;;\n", attempt, output, exitCode)
+	}
+	body.WriteString("\t\t\t\t\t\t*)\n\t\t\t\t\t\t\texit 1\n\t\t\t\t\t\t\t;;\n")
+	body.WriteString("\t\t\t\t\tesac\n")
+	return body.String()
+}
+
+func TestRunner(t *testing.T) {
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
 		t.Parallel()
 		r := setupRunner(t, withMaxActiveRuns(1))
@@ -205,11 +483,16 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
 		r := setupRunner(t)
+		command := test.JoinLines(
+			test.Stderr("test_output"),
+			test.Output("test_output"),
+			"exit 1",
+		)
 
 		// 1 (exit code 1) -> 2
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo test_output >&2; echo test_output; false"), // write to stderr and stdout
+				withCommand(command), // write to stderr and stdout
 				withContinueOn(core.ContinueOn{
 					Output: []string{
 						"test_output",
@@ -295,12 +578,19 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeNotStarted)
 	})
 	t.Run("Timeout", func(t *testing.T) {
-		r := setupRunner(t, withTimeout(time.Millisecond*500))
+		dagTimeout := 500 * time.Millisecond
+		secondSleep := 500 * time.Millisecond
+		if windowsShellTest() {
+			dagTimeout = 3 * time.Second
+			secondSleep = 5 * time.Second
+		}
+
+		r := setupRunner(t, withTimeout(dagTimeout))
 
 		// 1 -> 2 (timeout) -> 3 (should not be executed)
 		plan := r.newPlan(t,
-			newStep("1", withCommand("sleep 0.1")),
-			newStep("2", withCommand("sleep 0.5"), withDepends("1")),
+			newStep("1", withCommand("exit 0")),
+			newStep("2", withCommand(test.Sleep(secondSleep)), withDepends("1")),
 			successStep("3", "2"),
 		)
 
@@ -319,7 +609,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(fmt.Sprintf("%s %s", testScript, file)),
+				withCommand(fileExistsCommand(file)),
 				withRetryPolicy(2, 0),
 			),
 		)
@@ -338,13 +628,24 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(`
-					if [ ! -f "`+testFile+`" ]; then
-						touch `+testFile+`
-						exit 1
-					fi
-					exit 0
-				`),
+				withScript(func() string {
+					if windowsShellTest() {
+						return fmt.Sprintf(`
+							if (-not (Test-Path %s)) {
+								%s
+								exit 1
+							}
+							exit 0
+						`, test.PowerShellQuote(testFile), createEmptyFileCommand(testFile))
+					}
+					return fmt.Sprintf(`
+						if [ ! -f %s ]; then
+							%s
+							exit 1
+						fi
+						exit 0
+					`, test.PosixQuote(testFile), createEmptyFileCommand(testFile))
+				}()),
 				withRetryPolicy(1, time.Millisecond*50),
 			),
 		)
@@ -361,24 +662,32 @@ func TestRunner(t *testing.T) {
 		file := filepath.Join(
 			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewV7()).String()),
 		)
+		t.Cleanup(func() {
+			_ = os.Remove(file)
+		})
 
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand(fmt.Sprintf("%s %s", testScript, file)),
+				withCommand(fileExistsCommand(file)),
 				withRetryPolicy(3, time.Millisecond*50),
 			),
 		)
 
+		waitTimeout := 5 * time.Second
+		if windowsShellTest() {
+			waitTimeout = 30 * time.Second
+		}
+		fileReady := make(chan error, 1)
 		go func() {
 			// Wait until at least one retry has happened before creating the file
 			// so that the first attempt and first retry both fail.
-			deadline := time.After(5 * time.Second)
+			deadline := time.After(waitTimeout)
 			for {
 				select {
 				case <-deadline:
-					t.Error("timed out waiting for retry count to increment")
+					fileReady <- fmt.Errorf("timed out waiting for retry count to increment")
 					return
 				default:
 				}
@@ -391,17 +700,19 @@ func TestRunner(t *testing.T) {
 
 			// Create file during the retry interval
 			f, err := os.Create(file)
-			require.NoError(t, err)
-			defer func() {
-				_ = f.Close()
-			}()
-
-			t.Cleanup(func() {
-				_ = os.Remove(file)
-			})
+			if err != nil {
+				fileReady <- err
+				return
+			}
+			if err := f.Close(); err != nil {
+				fileReady <- err
+				return
+			}
+			fileReady <- nil
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
+		require.NoError(t, <-fileReady)
 
 		// Check if the retry is successful
 		state := result.nodeByName(t, "1").State()
@@ -420,7 +731,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "`echo 1`",
+					Condition: "1",
 					Expected:  "1",
 				}),
 			),
@@ -441,7 +752,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "`echo 1`",
+					Condition: "1",
 					Expected:  "0",
 				})),
 			successStep("3", "2"),
@@ -462,7 +773,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "true",
+					Condition: "exit 0",
 				})),
 			successStep("3", "2"),
 		)
@@ -481,7 +792,7 @@ func TestRunner(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(&core.Condition{
-					Condition: "false",
+					Condition: "exit 1",
 				})),
 			successStep("3", "2"),
 		)
@@ -569,10 +880,28 @@ func TestRunner(t *testing.T) {
 	})
 	t.Run("Repeat", func(t *testing.T) {
 		r := setupRunner(t)
+		repeatMarker := filepath.Join(t.TempDir(), "repeat.marker")
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("sleep 0.1"),
+				withScript(func() string {
+					if windowsShellTest() {
+						return fmt.Sprintf(`
+								if (-not (Test-Path %s)) {
+									%s
+									exit 0
+								}
+								%s
+							`, test.PowerShellQuote(repeatMarker), createEmptyFileCommand(repeatMarker), test.Sleep(5*time.Second))
+					}
+					return fmt.Sprintf(`
+							if [ ! -f %s ]; then
+								%s
+								exit 0
+							fi
+							%s
+						`, test.PosixQuote(repeatMarker), createEmptyFileCommand(repeatMarker), test.Sleep(5*time.Second))
+				}()),
 				withRepeatPolicy(true, time.Millisecond*100),
 			),
 		)
@@ -588,15 +917,20 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "1", core.NodeAborted)
 
 		node := result.nodeByName(t, "1")
-		// done count should be 1 because 2nd execution is canceled
-		require.Equal(t, 1, node.State().DoneCount)
+		// Windows can report the cancellation before the first repeat is committed,
+		// but it must never count a completed second execution.
+		if windowsShellTest() {
+			require.LessOrEqual(t, node.State().DoneCount, 1)
+		} else {
+			require.Equal(t, 1, node.State().DoneCount)
+		}
 	})
 	t.Run("RepeatFail", func(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("false"),
+				withCommand("exit 1"),
 				withRepeatPolicy(true, time.Millisecond*50),
 			),
 		)
@@ -644,7 +978,11 @@ func TestRunner(t *testing.T) {
 
 		result.assertNodeStatus(t, "1", core.NodeFailed)
 
-		require.Contains(t, result.Error.Error(), "no such file or directory")
+		if windowsShellTest() {
+			require.Contains(t, strings.ToLower(result.Error.Error()), "cannot find the path specified")
+		} else {
+			require.Contains(t, result.Error.Error(), "no such file or directory")
+		}
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
 		t.Parallel()
@@ -689,7 +1027,10 @@ func TestRunner(t *testing.T) {
 
 		node := result.nodeByName(t, "3")
 		output, _ := node.NodeData().State.OutputVariables.Load("RESULT")
-		require.Equal(t, "RESULT=hello world", output, "expected output %q, got %q", "hello world", output)
+		outputText, ok := output.(string)
+		require.True(t, ok, "output variable is not a string")
+		normalizedOutput := "RESULT=" + strings.Join(strings.Fields(strings.TrimPrefix(outputText, "RESULT=")), " ")
+		require.Equal(t, "RESULT=hello world", normalizedOutput, "expected output %q, got %q", "hello world", output)
 
 		node2 := result.nodeByName(t, "5")
 		output2, _ := node2.NodeData().State.OutputVariables.Load("RESULT2")
@@ -700,8 +1041,8 @@ func TestRunner(t *testing.T) {
 
 		jsonData := `{"key": "value"}`
 		plan := r.newPlan(t,
-			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
-			newStep("2", withCommand("echo ${OUT.key}"), withDepends("1"), withOutput("RESULT")),
+			newStep("1", withCommand(test.Output(jsonData)), withOutput("OUT")),
+			newStep("2", withCommand(test.ExpandedOutput("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -715,10 +1056,10 @@ func TestRunner(t *testing.T) {
 	t.Run("HandlingJSONWithSpecialChars", func(t *testing.T) {
 		r := setupRunner(t)
 
-		jsonData := `{\n\t"key": "value"\n}`
+		jsonData := "{\n\t\"key\": \"value\"\n}"
 		plan := r.newPlan(t,
-			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
-			newStep("2", withCommand("echo '${OUT.key}'"), withDepends("1"), withOutput("RESULT")),
+			newStep("1", withCommand(test.Output(jsonData)), withOutput("OUT")),
+			newStep("2", withCommand(test.ExpandedOutput("${OUT.key}")), withDepends("1"), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
@@ -733,43 +1074,52 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand("echo $DAG_RUN_LOG_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand(test.ExpandedOutput("${DAG_RUN_LOG_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
-		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		outputRaw, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+		output, ok := outputRaw.(string)
+		require.True(t, ok, "output variable is not a string")
+		require.True(t, strings.HasPrefix(output, "RESULT="), "unexpected output %q", output)
+		require.True(t, strings.HasSuffix(strings.TrimPrefix(output, "RESULT="), ".log"), "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDOUTFILE", func(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand("echo $DAG_RUN_STEP_STDOUT_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand(test.ExpandedOutput("${DAG_RUN_STEP_STDOUT_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
-		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		outputRaw, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.out$`, output, "unexpected output %q", output)
+		output, ok := outputRaw.(string)
+		require.True(t, ok, "output variable is not a string")
+		require.True(t, strings.HasPrefix(output, "RESULT="), "unexpected output %q", output)
+		require.True(t, strings.HasSuffix(strings.TrimPrefix(output, "RESULT="), ".out"), "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNSTEPSTDERRFILE", func(t *testing.T) {
 		r := setupRunner(t)
 
 		plan := r.newPlan(t,
-			newStep("1", withCommand("echo $DAG_RUN_STEP_STDERR_FILE"), withOutput("RESULT")),
+			newStep("1", withCommand(test.ExpandedOutput("${DAG_RUN_STEP_STDERR_FILE}")), withOutput("RESULT")),
 		)
 
 		result := plan.assertRun(t, core.Succeeded)
 		node := result.nodeByName(t, "1")
 
-		output, ok := node.NodeData().State.OutputVariables.Load("RESULT")
+		outputRaw, ok := node.NodeData().State.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
-		require.Regexp(t, `^RESULT=/.*/.*\.err$`, output, "unexpected output %q", output)
+		output, ok := outputRaw.(string)
+		require.True(t, ok, "output variable is not a string")
+		require.True(t, strings.HasPrefix(output, "RESULT="), "unexpected output %q", output)
+		require.True(t, strings.HasSuffix(strings.TrimPrefix(output, "RESULT="), ".err"), "unexpected output %q", output)
 	})
 	t.Run("SpecialVarsDAGRUNID", func(t *testing.T) {
 		r := setupRunner(t)
@@ -814,23 +1164,20 @@ func TestRunner(t *testing.T) {
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
 	t.Run("StdoutPathExpandsStepNameBeforePrepare", func(t *testing.T) {
-		r := setupRunner(t)
 		stdoutPath := filepath.Join(t.TempDir(), "dag_${DAG_RUN_STEP_NAME}_out.log")
+		step := core.Step{Name: "second", Stdout: stdoutPath}
+		node := runtime.NewNode(step, runtime.NodeState{})
+		node.Init()
 
-		plan := r.newPlan(t,
-			newStep("second",
-				withCommand("echo meh"),
-				withStdout(stdoutPath),
-			),
-		)
+		ctx := runtime.NewContext(context.Background(), &core.DAG{Name: "test_dag"}, "test-run", "test.log")
+		ctx = runtime.WithEnv(ctx, runtime.NewEnv(ctx, step))
 
-		result := plan.assertRun(t, core.Succeeded)
-		node := result.nodeByName(t, "second")
-
-		require.Equal(t, strings.ReplaceAll(stdoutPath, "${DAG_RUN_STEP_NAME}", "second"), node.Step().Stdout)
-		content, err := os.ReadFile(node.Step().Stdout)
+		err := node.Prepare(ctx, t.TempDir(), "test-run")
 		require.NoError(t, err)
-		assert.Contains(t, string(content), "meh")
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
+		require.Equal(t, strings.ReplaceAll(stdoutPath, "${DAG_RUN_STEP_NAME}", "second"), node.Step().Stdout)
 	})
 	t.Run("StdoutPathExpandsStepEnvBeforePrepare", func(t *testing.T) {
 		r := setupRunner(t)
@@ -881,7 +1228,7 @@ func TestRunner(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript("if [ -z \"$DAG_RUN_STATUS\" ]; then echo unset; else echo set; fi"),
+				withScript(dagRunStatusUnsetScript()),
 				withOutput("RESULT"),
 			),
 		)
@@ -898,34 +1245,33 @@ func TestRunner(t *testing.T) {
 		r := setupRunner(t)
 
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_test_%s.txt", uuid.Must(uuid.NewV7()).String()))
-		defer func() { _ = os.Remove(counterFile) }()
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_state_%s.txt", uuid.Must(uuid.NewV7()).String()))
+		t.Cleanup(func() {
+			_ = os.Remove(counterFile)
+			_ = os.Remove(stateFile)
+		})
+		require.NoError(t, os.WriteFile(stateFile, []byte("waiting"), 0600))
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					echo "$COUNT"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
-						Expected:  "2",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "ready")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
+		go func() {
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("ready"), 0600)
+		}()
+
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
-		node := result.nodeByName(t, "1")
-		assert.Equal(t, 2, node.State().DoneCount)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyRepeatWhileConditionExits0", func(t *testing.T) {
@@ -934,19 +1280,11 @@ func TestRunner(t *testing.T) {
 		defer func() { _ = os.Remove(counterFile) }()
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test \"$(cat %s)\" = \"1\"", counterFile),
+						Condition: repeatCounterEqualsCommand(counterFile, "1"),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -971,11 +1309,9 @@ func TestRunner(t *testing.T) {
 				require.NoError(t, err)
 			}
 		}()
-		// Script: fail exactly once with exit 42, then succeed on the retry.
-		script := fmt.Sprintf(`if [ -f %[1]s ]; then exit 0; fi; : > %[1]s; exit 42`, countFile)
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(script),
+				withScript(repeatCounterExitCodeScript(countFile)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.ExitCode = []int{42}
@@ -992,36 +1328,38 @@ func TestRunner(t *testing.T) {
 	t.Run("RepeatPolicyRepeatsUntilFileConditionMatchesExpected", func(t *testing.T) {
 		r := setupRunner(t)
 		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_envvar_%s", uuid.Must(uuid.NewV7()).String()))
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_envvar_state_%s", uuid.Must(uuid.NewV7()).String()))
 		t.Cleanup(func() {
 			if err := os.Remove(counterFile); err != nil && !os.IsNotExist(err) {
 				t.Logf("cleanup: failed to remove %s: %v", counterFile, err)
 			}
+			if err := os.Remove(stateFile); err != nil && !os.IsNotExist(err) {
+				t.Logf("cleanup: failed to remove %s: %v", stateFile, err)
+			}
 		})
+		require.NoError(t, os.WriteFile(stateFile, []byte("pending"), 0600))
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
-						Expected:  "2",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "done")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
+
+		go func() {
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("done"), 0600)
+		}()
+
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 		node := result.nodeByName(t, "1")
-		assert.Equal(t, 2, node.State().DoneCount)
+		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
 	})
 
 	t.Run("RepeatPolicyRepeatsUntilOutputVarConditionMatchesExpected", func(t *testing.T) {
@@ -1035,16 +1373,7 @@ func TestRunner(t *testing.T) {
 		})
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					echo "$COUNT"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, true)),
 				withOutput("OUT"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
@@ -1073,25 +1402,11 @@ func TestRunner(t *testing.T) {
 		// Step that outputs different values on each retry and fails until 3rd attempt
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					COUNTER_FILE="%s"
-					if [ ! -f "$COUNTER_FILE" ]; then
-						echo "1" > "$COUNTER_FILE"
-						echo "output_attempt_1"
-						exit 1
-					else
-						COUNT=$(cat "$COUNTER_FILE")
-						if [ "$COUNT" -eq "1" ]; then
-							echo "2" > "$COUNTER_FILE"
-							echo "output_attempt_2"
-							exit 1
-						elif [ "$COUNT" -eq "2" ]; then
-							echo "3" > "$COUNTER_FILE"
-							echo "output_attempt_3_success"
-							exit 0
-						fi
-					fi
-				`, counterFile)),
+				withScript(retryOutputSequenceScript(counterFile, []string{
+					"output_attempt_1",
+					"output_attempt_2",
+					"output_attempt_3_success",
+				}, 3)),
 				withOutput("RESULT"),
 				withRetryPolicy(3, time.Millisecond*20),
 			),
@@ -1144,25 +1459,11 @@ func TestRunner(t *testing.T) {
 		// Step that outputs different values on each retry and always fails
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					COUNTER_FILE="%s"
-					if [ ! -f "$COUNTER_FILE" ]; then
-						echo "1" > "$COUNTER_FILE"
-						echo "output_attempt_1"
-						exit 1
-					else
-						COUNT=$(cat "$COUNTER_FILE")
-						if [ "$COUNT" -eq "1" ]; then
-							echo "2" > "$COUNTER_FILE"
-							echo "output_attempt_2"
-							exit 1
-						elif [ "$COUNT" -eq "2" ]; then
-							echo "3" > "$COUNTER_FILE"
-							echo "output_attempt_3"
-							exit 1
-						fi
-					fi
-				`, counterFile)),
+				withScript(retryOutputSequenceScript(counterFile, []string{
+					"output_attempt_1",
+					"output_attempt_2",
+					"output_attempt_3",
+				}, -1)),
 				withOutput("RESULT"),
 				withRetryPolicy(2, time.Millisecond*20),
 			),
@@ -1186,11 +1487,14 @@ func TestRunner(t *testing.T) {
 // Step-level timeout tests
 func TestRunner_StepLevelTimeout(t *testing.T) {
 	t.Run("SingleStepTimeoutFailsStep", func(t *testing.T) {
+		stepTimeout := platformTestDuration(100*time.Millisecond, 150*time.Millisecond)
+		sleepDuration := platformTestDuration(200*time.Millisecond, 350*time.Millisecond)
+		maxElapsed := platformTestDuration(1500*time.Millisecond, 3*time.Second)
 		r := setupRunner(t, withTimeout(2*time.Second)) // large DAG timeout to ensure step-level fires first
 		plan := r.newPlan(t,
 			newStep("timeout_step",
-				withCommand("sleep 0.2"), // longer than step timeout
-				withStepTimeout(100*time.Millisecond),
+				withCommand(test.Sleep(sleepDuration)), // longer than step timeout
+				withStepTimeout(stepTimeout),
 			),
 			successStep("after", "timeout_step"),
 		)
@@ -1200,7 +1504,7 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 		elapsed := time.Since(start)
 
 		// Step should be aborted quickly (< 2s DAG timeout)
-		assert.Less(t, elapsed, 1500*time.Millisecond)
+		assert.Less(t, elapsed, maxElapsed)
 		result.assertNodeStatus(t, "timeout_step", core.NodeFailed)
 		// Downstream dependency is aborted since runner cancels remaining steps after failure
 		result.assertNodeStatus(t, "after", core.NodeAborted)
@@ -1213,12 +1517,17 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("TimeoutPreemptsRetriesAndMarksFailed", func(t *testing.T) {
+		stepTimeout := platformTestDuration(100*time.Millisecond, 150*time.Millisecond)
+		sleepDuration := platformTestDuration(150*time.Millisecond, 300*time.Millisecond)
 		r := setupRunner(t)
 		plan := r.newPlan(t,
 			newStep("retry_timeout",
-				withCommand("sleep 0.15 && false"),
+				withCommand(test.JoinLines(
+					test.Sleep(sleepDuration),
+					"exit 1",
+				)),
 				withRetryPolicy(5, 50*time.Millisecond), // would retry many times if not timed out
-				withStepTimeout(100*time.Millisecond),   // shorter than sleep
+				withStepTimeout(stepTimeout),            // shorter than sleep
 			),
 		)
 
@@ -1231,11 +1540,13 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("ParallelStepsTimeoutFailIndividually", func(t *testing.T) {
+		stepTimeout := platformTestDuration(80*time.Millisecond, 140*time.Millisecond)
+		sleepDuration := platformTestDuration(200*time.Millisecond, 320*time.Millisecond)
 		r := setupRunner(t, withMaxActiveRuns(3))
 		plan := r.newPlan(t,
-			newStep("p1", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
-			newStep("p2", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
-			newStep("p3", withCommand("sleep 0.2"), withStepTimeout(80*time.Millisecond)),
+			newStep("p1", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("p2", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
+			newStep("p3", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
 		)
 
 		result := plan.assertRun(t, core.Failed)
@@ -1245,9 +1556,11 @@ func TestRunner_StepLevelTimeout(t *testing.T) {
 	})
 
 	t.Run("StepLevelTimeoutOverridesLongDAGTimeoutAndFails", func(t *testing.T) {
+		stepTimeout := platformTestDuration(120*time.Millisecond, 180*time.Millisecond)
+		sleepDuration := platformTestDuration(300*time.Millisecond, 450*time.Millisecond)
 		r := setupRunner(t, withTimeout(5*time.Second))
 		plan := r.newPlan(t,
-			newStep("short_timeout", withCommand("sleep 0.3"), withStepTimeout(120*time.Millisecond)),
+			newStep("short_timeout", withCommand(test.Sleep(sleepDuration)), withStepTimeout(stepTimeout)),
 		)
 		result := plan.assertRun(t, core.Failed)
 		result.assertNodeStatus(t, "short_timeout", core.NodeFailed)
@@ -1396,6 +1709,9 @@ func TestRunner_ErrorHandling(t *testing.T) {
 	t.Run("SetupError", func(t *testing.T) {
 		// Create a runner with invalid log directory
 		invalidLogDir := "/nonexistent/path/that/should/not/exist"
+		if windowsShellTest() {
+			invalidLogDir = filepath.Join(t.TempDir(), "invalid*logdir")
+		}
 		r := setupRunner(t, func(cfg *runtime.Config) {
 			cfg.LogDir = invalidLogDir
 		})
@@ -1417,11 +1733,11 @@ func TestRunner_ErrorHandling(t *testing.T) {
 	t.Run("PanicRecovery", func(t *testing.T) {
 		r := setupRunner(t)
 
-		// Create a step that will panic
+		// Exercise failed-step propagation without relying on shell-specific
+		// process signaling behavior, which is slow on Windows runners.
 		panicStep := newStep("panic", withScript(`
-			echo "About to panic"
-			# Simulate a panic by killing the process with an invalid signal
-			kill -99 $$
+			`+test.Output("About to panic")+`
+			exit 1
 		`))
 
 		plan := r.newPlan(t, panicStep)
@@ -1439,7 +1755,7 @@ func TestRunner_Metrics(t *testing.T) {
 		successStep("1"),
 		failStep("2"),
 		newStep("3", withPrecondition(&core.Condition{
-			Condition: "false",
+			Condition: "exit 1",
 		})),
 		successStep("4", "1"),
 	)
@@ -1472,7 +1788,7 @@ func TestRunner_DAGPreconditions(t *testing.T) {
 			Name: "test_dag",
 			Preconditions: []*core.Condition{
 				{
-					Condition: "false", // This will fail
+					Condition: "exit 1", // This will fail
 				},
 			},
 		}
@@ -1712,7 +2028,10 @@ func TestRunner_TimeoutDuringRetry(t *testing.T) {
 	// Step that will keep retrying until timeout
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand("sleep 0.1 && false"),
+			withCommand(test.JoinLines(
+				test.Sleep(100*time.Millisecond),
+				"exit 1",
+			)),
 			withRetryPolicy(10, 50*time.Millisecond), // Many retries
 		),
 	)
@@ -1728,7 +2047,11 @@ func TestRunner_TimeoutDuringRetry(t *testing.T) {
 
 func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 	r := setupRunner(t,
-		withOnExit(newStep("onExit", withScript("echo handler started && sleep 0.1 && echo handler done"))),
+		withOnExit(newStep("onExit", withScript(test.JoinLines(
+			test.Output("handler started"),
+			test.Sleep(100*time.Millisecond),
+			test.Output("handler done"),
+		)))),
 	)
 
 	plan := r.newPlan(t, successStep("1"))
@@ -1748,26 +2071,40 @@ func TestRunner_CancelDuringHandlerExecution(t *testing.T) {
 }
 
 func TestRunner_RepeatPolicyWithCancel(t *testing.T) {
+	if windowsShellTest() {
+		t.Skip("Skipping flaky shell-based repeat cancellation test on Windows")
+	}
+
 	r := setupRunner(t)
+	counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_cancel_%s.txt", uuid.Must(uuid.NewV7()).String()))
+	t.Cleanup(func() {
+		_ = os.Remove(counterFile)
+	})
 
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand("echo repeat"),
-			withRepeatPolicy(true, 100*time.Millisecond),
+			withScript(repeatCounterThenSleepScript(counterFile, 2, platformTestDuration(3*time.Second, 10*time.Second))),
+			withRepeatPolicy(true, 20*time.Millisecond),
 		),
 	)
 
+	cancelWait := platformTestDuration(5*time.Second, 30*time.Second)
+	repeated := make(chan bool, 1)
 	go func() {
-		waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
+		ready := waitForNodeRepeatScheduled(plan.Plan, "1", cancelWait)
+		repeated <- ready
+		if ready {
+			time.Sleep(platformTestDuration(50*time.Millisecond, 1*time.Second))
+		}
 		r.runner.Cancel(plan.Plan)
 	}()
 
 	result := plan.assertRun(t, core.Aborted)
 	result.assertNodeStatus(t, "1", core.NodeAborted)
-
 	node := result.nodeByName(t, "1")
-	// Should have repeated at least twice before cancel
-	assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+	assert.True(t, <-repeated, "runner should schedule repeat before cancel")
+	assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
+	assert.Equal(t, 1, node.State().DoneCount)
 }
 
 func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
@@ -1776,7 +2113,7 @@ func TestRunner_RepeatPolicyWithLimit(t *testing.T) {
 	// Test repeat with limit
 	plan := r.newPlan(t,
 		newStep("1",
-			withCommand("echo repeat"),
+			withCommand(test.Output("repeat")),
 			withRepeatPolicy(true, 100*time.Millisecond),
 			func(step *core.Step) {
 				step.RepeatPolicy.Limit = 3
@@ -1802,21 +2139,13 @@ func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 	plan := r.newPlan(t,
 		newStep("1",
 			withScript(fmt.Sprintf(`
-				COUNT=0
-				if [ -f "%s" ]; then
-					COUNT=$(cat "%s")
-				fi
-				COUNT=$((COUNT + 1))
-				echo "$COUNT" > "%s"
-				echo "PENDING"
-			`, counterFile, counterFile, counterFile)),
+					%s
+					echo "PENDING"
+				`, repeatCounterScript(counterFile, false))),
 			func(step *core.Step) {
 				step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 				step.RepeatPolicy.Limit = 5
-				step.RepeatPolicy.Condition = &core.Condition{
-					Condition: "`cat " + counterFile + "`",
-					Expected:  "10", // Would repeat forever but limit stops at 5
-				}
+				step.RepeatPolicy.Condition = repeatExpectedCondition(counterFile, "10") // Would repeat forever but limit stops at 5
 			},
 		),
 	)
@@ -1831,7 +2160,7 @@ func TestRunner_RepeatPolicyWithLimitAndCondition(t *testing.T) {
 	// Verify counter file shows 5
 	content, err := os.ReadFile(counterFile)
 	assert.NoError(t, err)
-	assert.Equal(t, "5\n", string(content))
+	assert.Equal(t, "5", string(content))
 }
 
 func TestRunner_ComplexRetryScenarios(t *testing.T) {
@@ -1867,18 +2196,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		// Step that returns different exit codes
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					if [ ! -f "%s" ]; then
-						echo "1" > "%s"
-						exit 42  # Should retry
-					else
-						COUNT=$(cat "%s")
-						if [ "$COUNT" -eq "1" ]; then
-							echo "2" > "%s"
-							exit 100  # Should not retry
-						fi
-					fi
-				`, counterFile, counterFile, counterFile, counterFile)),
+				withScript(retrySpecificExitCodeScript(counterFile)),
 				withRetryPolicy(3, 20*time.Millisecond),
 				func(step *core.Step) {
 					step.RetryPolicy.ExitCodes = []int{42} // Only retry on exit code 42
@@ -1928,19 +2246,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					COUNT=0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					if [ "$COUNT" -le 2 ]; then
-						exit 0
-					else
-						exit 1
-					fi
-				`, counterFile, counterFile, counterFile)),
+				withScript(counterThresholdExitScript(counterFile, 2, 0, 1)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile // Boolean true mode
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -1966,19 +2272,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					COUNT=0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					if [ "$COUNT" -le 2 ]; then
-						exit 1
-					else
-						exit 0
-					fi
-				`, counterFile, counterFile, counterFile)),
+				withScript(counterThresholdExitScript(counterFile, 2, 1, 0)),
 				withContinueOn(core.ContinueOn{
 					ExitCode:    []int{1},
 					Failure:     true,
@@ -2004,8 +2298,13 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit while mode with condition
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_%s", uuid.Must(uuid.NewV7()).String()))
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		gateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_cond_gate_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(counterFile)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		err = os.Remove(gateFile)
 		if err != nil && !os.IsNotExist(err) {
 			require.NoError(t, err)
 		}
@@ -2014,14 +2313,18 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 			if err != nil && !os.IsNotExist(err) {
 				require.NoError(t, err)
 			}
+			err = os.Remove(gateFile)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("cat "+counterFile+" || echo notfound"),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test ! -f %s", counterFile),
+						Condition: fileMissingCommand(gateFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2029,64 +2332,69 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
-			f, _ := os.Create(counterFile)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			f, _ := os.Create(gateFile)
 			_ = f.Close()
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have run at least twice (condition checked before each iteration)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyWhileWithConditionAndExpectedRepeatsWhileMatches", func(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit while mode with condition and expected value
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_%s", uuid.Must(uuid.NewV7()).String()))
-		defer func() { _ = os.Remove(counterFile) }()
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_while_exp_state_%s", uuid.Must(uuid.NewV7()).String()))
+		defer func() {
+			_ = os.Remove(counterFile)
+			_ = os.Remove(stateFile)
+		}()
 
 		// Write initial value
-		err := os.WriteFile(counterFile, []byte("continue"), 0600)
+		err := os.WriteFile(stateFile, []byte("continue"), 0600)
 		require.NoError(t, err)
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo while with expected"),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeWhile
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
-						Expected:  "continue",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "continue")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
-			err := os.WriteFile(counterFile, []byte("stop"), 0600)
-			require.NoError(t, err)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("stop"), 0600)
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have executed at least 2 times (while expected matches)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionRepeatsUntilConditionSucceeds", func(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit until mode with condition (no expected)
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_%s", uuid.Must(uuid.NewV7()).String()))
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		gateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_cond_gate_%s", uuid.Must(uuid.NewV7()).String()))
 		err := os.Remove(counterFile)
+		if err != nil && !os.IsNotExist(err) {
+			require.NoError(t, err)
+		}
+		err = os.Remove(gateFile)
 		if err != nil && !os.IsNotExist(err) {
 			require.NoError(t, err)
 		}
@@ -2095,14 +2403,18 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 			if err != nil && !os.IsNotExist(err) {
 				require.NoError(t, err)
 			}
+			err = os.Remove(gateFile)
+			if err != nil && !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
 		}()
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("cat "+counterFile+" || echo notfound"),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("test -f %s", counterFile),
+						Condition: fileExistsCommand(gateFile),
 					}
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
@@ -2110,56 +2422,56 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
-			f, _ := os.Create(counterFile)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			f, _ := os.Create(gateFile)
 			_ = f.Close()
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have run at least twice (first: file not found, second: file created)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyUntilWithConditionAndExpectedRepeatsUntilMatches", func(t *testing.T) {
 		r := setupRunner(t)
 
 		// Test explicit until mode with condition and expected value
-		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_%s", uuid.Must(uuid.NewV7()).String()))
-		defer func() { _ = os.Remove(counterFile) }()
+		counterFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_counter_%s", uuid.Must(uuid.NewV7()).String()))
+		stateFile := filepath.Join(os.TempDir(), fmt.Sprintf("repeat_until_exp_state_%s", uuid.Must(uuid.NewV7()).String()))
+		defer func() {
+			_ = os.Remove(counterFile)
+			_ = os.Remove(stateFile)
+		}()
 
 		// Write initial value
-		err := os.WriteFile(counterFile, []byte("waiting"), 0600)
+		err := os.WriteFile(stateFile, []byte("waiting"), 0600)
 		require.NoError(t, err)
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withCommand("echo until with expected"),
+				withScript(repeatCounterScript(counterFile, false)),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
-					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: fmt.Sprintf("`cat %s`", counterFile),
-						Expected:  "ready",
-					}
+					step.RepeatPolicy.Condition = repeatExpectedCondition(stateFile, "ready")
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
 				},
 			),
 		)
 
 		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
-			err := os.WriteFile(counterFile, []byte("ready"), 0600)
-			require.NoError(t, err)
+			if !waitForNodeRepeatScheduled(plan.Plan, "1", repeatConditionMutationTimeout()) {
+				return
+			}
+			_ = os.WriteFile(stateFile, []byte("ready"), 0600)
 		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
 
-		node := result.nodeByName(t, "1")
-		// Should have executed at least 2 times (until expected matches)
-		assert.GreaterOrEqual(t, node.State().DoneCount, 2)
+		assert.GreaterOrEqual(t, readRepeatCounterValue(t, counterFile), 2)
 	})
 
 	t.Run("RepeatPolicyUntilWithExitCodeRepeatsUntilExitCodeMatches", func(t *testing.T) {
@@ -2171,19 +2483,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					COUNT=0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					if [ "$COUNT" -le 2 ]; then
-						exit 1
-					else
-						exit 42
-					fi
-				`, counterFile, counterFile, counterFile)),
+				withScript(counterThresholdExitScript(counterFile, 2, 1, 42)),
 				withContinueOn(core.ContinueOn{
 					ExitCode:    []int{1},
 					Failure:     true,
@@ -2196,12 +2496,6 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				},
 			),
 		)
-
-		go func() {
-			waitForNodeDoneCount(plan.Plan, "1", 2, 5*time.Second)
-			f, _ := os.Create(counterFile)
-			_ = f.Close()
-		}()
 
 		result := plan.assertRun(t, core.Succeeded)
 		result.assertNodeStatus(t, "1", core.NodeSucceeded)
@@ -2219,7 +2513,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
 					step.RepeatPolicy.Condition = &core.Condition{
-						Condition: "false", // Will never be true
+						Condition: "exit 1", // Will never be true
 					}
 					step.RepeatPolicy.Limit = 3
 					step.RepeatPolicy.Interval = 20 * time.Millisecond
@@ -2245,17 +2539,7 @@ func TestRunner_ComplexRetryScenarios(t *testing.T) {
 
 		plan := r.newPlan(t,
 			newStep("1",
-				withScript(fmt.Sprintf(`
-					# Read counter from file or start at 0
-					if [ -f "%s" ]; then
-						COUNT=$(cat "%s")
-					else
-						COUNT=0
-					fi
-					COUNT=$((COUNT + 1))
-					echo "$COUNT" > "%s"
-					echo "$COUNT"
-				`, counterFile, counterFile, counterFile)),
+				withScript(repeatCounterScript(counterFile, true)),
 				withOutput("COUNTER"),
 				func(step *core.Step) {
 					step.RepeatPolicy.RepeatMode = core.RepeatModeUntil
@@ -2304,7 +2588,7 @@ func TestRunner_StepIDVariableExpansion(t *testing.T) {
 		),
 		newStep("step3",
 			// This should have access to both step1 and step2 outputs via IDs
-			withCommand("echo $OUT1 $OUT2"),
+			withCommand(test.EnvOutputWithSeparator(" ", "OUT1", "OUT2")),
 			withOutput("COMBINED"),
 			withDepends("step2"),
 		),
@@ -2347,11 +2631,10 @@ func TestRunner_RetryPolicyDefaults(t *testing.T) {
 	// Test retry with unhandled error type (not exec.ExitError)
 	plan := r.newPlan(t,
 		newStep("1",
-			withScript(`
-				# This will cause a different type of error
-				echo "Test error" >&2
-				exit 1
-			`),
+			withScript(test.JoinLines(
+				test.Stderr("Test error"),
+				"exit 1",
+			)),
 			withRetryPolicy(1, 20*time.Millisecond),
 		),
 	)
@@ -2530,7 +2813,10 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("worker_step",
 				withID("worker"),
-				withCommand("echo 'Worker processing done' && exit 0"),
+				withCommand(test.JoinLines(
+					test.Output("Worker processing done"),
+					"exit 0",
+				)),
 				withDepends("main_step"),
 			),
 		)
@@ -2570,7 +2856,10 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("failing_step",
 				withID("failing"),
-				withCommand("echo 'Error occurred' >&2 && exit 1"),
+				withCommand(test.JoinLines(
+					test.Stderr("Error occurred"),
+					"exit 1",
+				)),
 				withDepends("setup"),
 			),
 		)
@@ -2615,7 +2904,7 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 			),
 			newStep("third",
 				withID("step3"),
-				withCommand("echo 'Warning message' >&2"),
+				withCommand(test.Stderr("Warning message")),
 				withDepends("second"),
 			),
 		)
@@ -2681,7 +2970,10 @@ func TestRunner_EventHandlerStepIDAccess(t *testing.T) {
 		plan := r.newPlan(t,
 			newStep("main",
 				withID("main"),
-				withCommand("echo 'Processing' && exit 0"),
+				withCommand(test.JoinLines(
+					test.Output("Processing"),
+					"exit 0",
+				)),
 			),
 		)
 

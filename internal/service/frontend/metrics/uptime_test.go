@@ -13,7 +13,7 @@ import (
 func TestStartUptime(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Reset package variables before test
-		startTime = time.Time{}
+		startUnixNano.Store(0)
 		uptime.Store(0)
 
 		// Create a context with cancel to stop the goroutine
@@ -23,9 +23,9 @@ func TestStartUptime(t *testing.T) {
 		// Start uptime tracking
 		StartUptime(ctx)
 
-		// Verify that startTime was set
-		if startTime.IsZero() {
-			t.Error("startTime was not initialized")
+		// Verify that the start time was set.
+		if startUnixNano.Load() == 0 {
+			t.Error("start time was not initialized")
 		}
 
 		// Advance fake time by 2 seconds (synctest makes time.Sleep instant).
@@ -58,7 +58,7 @@ func TestStartUptime(t *testing.T) {
 
 func TestGetUptime(t *testing.T) {
 	// Reset package variables
-	startTime = time.Time{}
+	startUnixNano.Store(0)
 	uptime.Store(42)
 
 	// Test getting the stored value
@@ -70,7 +70,7 @@ func TestGetUptime(t *testing.T) {
 func TestUptimeAccuracy(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Reset package variables
-		startTime = time.Time{}
+		startUnixNano.Store(0)
 		uptime.Store(0)
 
 		ctx, cancel := context.WithCancel(context.Background())

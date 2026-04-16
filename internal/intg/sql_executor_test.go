@@ -18,6 +18,7 @@ func TestSQLExecutor_SQLite_BasicQuery(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 	dbPath := filepath.Join(t.TempDir(), "test.db")
+	dbPathForYAML := filepath.ToSlash(dbPath)
 
 	dag := th.DAG(t, fmt.Sprintf(`
 type: graph
@@ -39,7 +40,7 @@ steps:
     command: "SELECT id, name FROM users ORDER BY id"
     output: USERS
     depends: [init-db]
-`, dbPath, dbPath))
+`, dbPathForYAML, dbPathForYAML))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
@@ -60,6 +61,7 @@ func TestSQLExecutor_SQLite_Transaction(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 	dbPath := filepath.Join(t.TempDir(), "test.db")
+	dbPathForYAML := filepath.ToSlash(dbPath)
 
 	dag := th.DAG(t, fmt.Sprintf(`
 type: graph
@@ -90,7 +92,7 @@ steps:
     command: "SELECT id, balance FROM accounts ORDER BY id"
     output: BALANCES
     depends: [transfer]
-`, dbPath, dbPath, dbPath))
+`, dbPathForYAML, dbPathForYAML, dbPathForYAML))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
@@ -112,6 +114,7 @@ func TestSQLExecutor_SQLite_TransactionRollback(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 	dbPath := filepath.Join(t.TempDir(), "test.db")
+	dbPathForYAML := filepath.ToSlash(dbPath)
 
 	dag := th.DAG(t, fmt.Sprintf(`
 type: graph
@@ -144,7 +147,7 @@ steps:
     command: "SELECT value FROM rollback_test WHERE id = 1"
     output: VALUE_AFTER_ROLLBACK
     depends: [failed-transaction]
-`, dbPath, dbPath, dbPath))
+`, dbPathForYAML, dbPathForYAML, dbPathForYAML))
 
 	// Run the DAG - it will have an error because one step fails
 	ag := dag.Agent()
@@ -304,6 +307,7 @@ func TestSQLExecutor_SQLite_NamedParams(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 	dbPath := filepath.Join(t.TempDir(), "test.db")
+	dbPathForYAML := filepath.ToSlash(dbPath)
 
 	dag := th.DAG(t, fmt.Sprintf(`
 type: graph
@@ -326,7 +330,7 @@ steps:
     command: "SELECT name, price FROM products WHERE price >= :min_price ORDER BY name"
     output: FILTERED_PRODUCTS
     depends: [setup]
-`, dbPath, dbPath))
+`, dbPathForYAML, dbPathForYAML))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)
@@ -351,6 +355,7 @@ func TestSQLExecutor_SQLite_MultiStatement(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
 	dbPath := filepath.Join(t.TempDir(), "test.db")
+	dbPathForYAML := filepath.ToSlash(dbPath)
 
 	dag := th.DAG(t, fmt.Sprintf(`
 type: graph
@@ -373,7 +378,7 @@ steps:
     command: "SELECT status FROM orders"
     output: ORDER_STATUS
     depends: [multi-statement]
-`, dbPath, dbPath))
+`, dbPathForYAML, dbPathForYAML))
 
 	dag.Agent().RunSuccess(t)
 	dag.AssertLatestStatus(t, core.Succeeded)

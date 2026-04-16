@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,9 @@ func TestStore(t *testing.T) {
 		path := filepath.Join(authDir, "token_secret")
 		info, err := os.Stat(path)
 		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+		if testutil.SupportsPOSIXPermissionBits() {
+			assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+		}
 
 		// Generated secret should be 43 chars (32 bytes base64url, no padding).
 		data, err := os.ReadFile(path)
@@ -99,7 +102,9 @@ func TestStore(t *testing.T) {
 
 		info, err := os.Stat(authDir)
 		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+		if testutil.SupportsPOSIXPermissionBits() {
+			assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+		}
 	})
 
 	t.Run("concurrent resolve converges to same secret", func(t *testing.T) {

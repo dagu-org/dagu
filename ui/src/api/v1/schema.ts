@@ -3656,6 +3656,8 @@ export interface components {
         };
         /** @description Configuration for DAG run artifact storage */
         DAGArtifactsConfig: {
+            /** @description Base directory for storing artifacts for this DAG when explicitly configured */
+            dir?: string;
             /** @description Whether artifact storage is enabled for this DAG */
             enabled: boolean;
         };

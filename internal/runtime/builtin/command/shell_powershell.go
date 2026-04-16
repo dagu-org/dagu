@@ -7,12 +7,57 @@ import (
 	"context"
 	"os/exec"
 	"slices"
+	"strings"
 )
 
 // powerShell handles both Windows PowerShell and PowerShell Core (pwsh).
 type powerShell struct{}
 
 var _ Shell = (*powerShell)(nil)
+
+func appendPowerShellStartupArgs(args []string) []string {
+	startupArgs := make([]string, 0, 2)
+	if !containsPowerShellArg(args, "-NoProfile") {
+		startupArgs = append(startupArgs, "-NoProfile")
+	}
+	if !containsPowerShellArg(args, "-NonInteractive") {
+		startupArgs = append(startupArgs, "-NonInteractive")
+	}
+	if len(startupArgs) == 0 {
+		return args
+	}
+
+	insertAt := len(args)
+	if idx := indexOfPowerShellArg(args, "-Command", "-C", "-File", "-F"); idx >= 0 {
+		insertAt = idx
+	}
+
+	result := make([]string, 0, len(args)+len(startupArgs))
+	result = append(result, args[:insertAt]...)
+	result = append(result, startupArgs...)
+	result = append(result, args[insertAt:]...)
+	return result
+}
+
+func containsPowerShellArg(args []string, target string) bool {
+	for _, arg := range args {
+		if strings.EqualFold(arg, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func indexOfPowerShellArg(args []string, targets ...string) int {
+	for i, arg := range args {
+		for _, target := range targets {
+			if strings.EqualFold(arg, target) {
+				return i
+			}
+		}
+	}
+	return -1
+}
 
 func (s *powerShell) Match(name string) bool {
 	switch name {
@@ -37,12 +82,12 @@ func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.C
 	// When running just a script file with PowerShell (no explicit command)
 	// e.g., powershell -ExecutionPolicy Bypass -File script.ps1
 	if b.Script != "" {
-		args := []string{"-ExecutionPolicy", "Bypass", "-File", b.Script}
+		args := appendPowerShellStartupArgs([]string{"-ExecutionPolicy", "Bypass", "-File", b.Script})
 		return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec
 	}
 
 	// Running a command string via PowerShell
-	args := cloneArgs(b.Shell[1:])
+	args := appendPowerShellStartupArgs(cloneArgs(b.Shell[1:]))
 
 	// PowerShell uses -Command instead of -c
 	if !slices.Contains(args, "-Command") && !slices.Contains(args, "-C") {
@@ -50,7 +95,9 @@ func (s *powerShell) Build(ctx context.Context, b *shellCommandBuilder) (*exec.C
 	}
 
 	if scriptPath := b.normalizeScriptPath(); scriptPath != "" {
-		args = append(args, scriptPath)
+		args = append(args, powerShellInlineCommand(scriptPath))
+	} else {
+		args = append(args, powerShellInlineCommand(""))
 	}
 
 	return exec.CommandContext(ctx, cmd, args...), nil // nolint: gosec

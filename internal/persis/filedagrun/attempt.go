@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -247,6 +248,11 @@ func (att *Attempt) Close(ctx context.Context) error {
 	w := att.writer
 	att.writer = nil
 
+	// Close the writer before compaction so Windows can replace the file.
+	if closeErr := w.Close(ctx); closeErr != nil {
+		return fmt.Errorf("failed to close writer: %w", closeErr)
+	}
+
 	// Attempt to compact the file
 	if compactErr := att.compactLocked(ctx); compactErr != nil {
 		logger.Warn(ctx, "Failed to compact file during close",
@@ -257,11 +263,6 @@ func (att *Attempt) Close(ctx context.Context) error {
 	// Invalidate the cache
 	if att.cache != nil {
 		att.cache.Invalidate(att.file)
-	}
-
-	// Close the writer
-	if closeErr := w.Close(ctx); closeErr != nil {
-		return fmt.Errorf("failed to close writer: %w", closeErr)
 	}
 
 	return nil
@@ -281,7 +282,28 @@ func (att *Attempt) Compact(ctx context.Context) error {
 }
 
 // compactLocked performs actual compaction with the lock already held
-func (att *Attempt) compactLocked(ctx context.Context) error {
+func (att *Attempt) compactLocked(ctx context.Context) (retErr error) {
+	reopenWriter := att.writer
+	if reopenWriter != nil {
+		att.writer = nil
+		if err := reopenWriter.close(); err != nil {
+			att.writer = reopenWriter
+			return fmt.Errorf("failed to close writer before compaction: %w", err)
+		}
+		defer func() {
+			if err := reopenWriter.Open(); err != nil {
+				reopenErr := fmt.Errorf("failed to reopen writer after compaction: %w", err)
+				if retErr != nil {
+					retErr = errors.Join(retErr, reopenErr)
+					return
+				}
+				retErr = reopenErr
+				return
+			}
+			att.writer = reopenWriter
+		}()
+	}
+
 	status, err := att.parseLocked(ctx)
 	if err == io.EOF {
 		return nil // Empty file, nothing to compact
@@ -346,14 +368,13 @@ func (att *Attempt) compactLocked(ctx context.Context) error {
 // safeRename safely replaces the target file with the source file,
 // handling platform-specific differences
 func safeRename(source, target string) error {
-	// On Windows, we need to remove the target file first
-	if _, err := os.Stat(target); err == nil {
-		if err := os.Remove(target); err != nil {
+	if err := fileutil.ReplaceFileWithRetry(source, target); err != nil {
+		if _, statErr := os.Stat(target); statErr == nil {
 			return fmt.Errorf("failed to remove target file: %w", err)
 		}
+		return err
 	}
-
-	return os.Rename(source, target)
+	return nil
 }
 
 // ReadStatus reads the latest status from the file, using cache if available.
@@ -429,7 +450,7 @@ func ParseStatusFile(file string) (*exec.DAGRunStatus, error) {
 }
 
 func parseStatusFileWithContext(ctx context.Context, file string) (*exec.DAGRunStatus, error) {
-	f, err := os.Open(file) //nolint:gosec
+	f, err := openStatusFileWithRetry(file)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrReadFailed, err)
 	}
@@ -465,6 +486,59 @@ func parseStatusFileWithContext(ctx context.Context, file string) (*exec.DAGRunS
 			}
 		}
 	}
+}
+
+func openStatusFileWithRetry(path string) (*os.File, error) {
+	var file *os.File
+	err := retryTransientStatusRead(func() error {
+		opened, err := os.Open(path) //nolint:gosec
+		if err != nil {
+			return err
+		}
+		file = opened
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+func retryTransientStatusRead(op func() error) error {
+	err := op()
+	if err == nil || !isTransientStatusReadError(err) {
+		return err
+	}
+
+	wait := 10 * time.Millisecond
+	for range 12 {
+		time.Sleep(wait)
+		err = op()
+		if err == nil || !isTransientStatusReadError(err) {
+			return err
+		}
+		wait *= 2
+		if wait > 100*time.Millisecond {
+			wait = 100 * time.Millisecond
+		}
+	}
+
+	return err
+}
+
+func isTransientStatusReadError(err error) bool {
+	if runtime.GOOS != "windows" || err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "used by another process") ||
+		strings.Contains(msg, "cannot access the file") ||
+		strings.Contains(msg, "access is denied") ||
+		strings.Contains(msg, "sharing violation")
 }
 
 // Abort implements models.DAGRunAttempt.

@@ -55,6 +55,7 @@ func TestRace_ConcurrentExecutors(t *testing.T) {
 
 			exec, err := executor.NewExecutor(ctx, step)
 			require.NoError(t, err)
+			attachExecutorCleanup(t, exec)
 
 			var stdout bytes.Buffer
 			exec.SetStdout(&stdout)
@@ -297,6 +298,7 @@ func TestRace_ExecutorKill(t *testing.T) {
 
 		exec, err := executor.NewExecutor(ctx, step)
 		require.NoError(t, err)
+		attachExecutorCleanup(t, exec)
 
 		var stdout bytes.Buffer
 		exec.SetStdout(&stdout)

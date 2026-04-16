@@ -7,10 +7,14 @@ package dirlock
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -162,6 +166,9 @@ func (l *dirLock) TryLock() error {
 			// loss on the next Heartbeat/IsHeldByMe check and self-fence safely.
 			// Remove stale lock
 			if err := os.RemoveAll(l.lockPath); err != nil && !os.IsNotExist(err) {
+				if isRetryableLockStateError(err) {
+					return ErrLockConflict
+				}
 				return fmt.Errorf("failed to remove stale lock: %w", err)
 			}
 		} else {
@@ -169,6 +176,9 @@ func (l *dirLock) TryLock() error {
 			return ErrLockConflict
 		}
 	} else if !os.IsNotExist(err) {
+		if isRetryableLockStateError(err) {
+			return ErrLockConflict
+		}
 		return fmt.Errorf("failed to check lock status: %w", err)
 	}
 
@@ -180,7 +190,7 @@ func (l *dirLock) TryLock() error {
 	// Try to create the lock directory
 	err = os.Mkdir(l.lockPath, 0700)
 	if err != nil {
-		if os.IsExist(err) {
+		if os.IsExist(err) || isRetryableLockStateError(err) {
 			return ErrLockConflict
 		}
 		return fmt.Errorf("failed to create lock directory: %w", err)
@@ -191,7 +201,7 @@ func (l *dirLock) TryLock() error {
 	if err != nil || hostname == "" {
 		hostname = "unknown-host"
 	}
-	token := fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().UnixNano())
+	token := newFenceToken(hostname)
 	tokenPath := filepath.Join(l.lockPath, "owner")
 	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
 		_ = os.RemoveAll(l.lockPath)
@@ -200,6 +210,16 @@ func (l *dirLock) TryLock() error {
 	l.fenceToken = token
 	l.isHeld = true
 	return nil
+}
+
+func isRetryableLockStateError(err error) bool {
+	if err == nil || runtime.GOOS != "windows" {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "cannot access the file") ||
+		strings.Contains(msg, "sharing violation") ||
+		strings.Contains(msg, "used by another process")
 }
 
 // Lock acquires lock, blocking until available or context is cancelled
@@ -327,4 +347,13 @@ func ForceUnlock(directory string) error {
 func (l *dirLock) isStaleInfo(info os.FileInfo) bool {
 	age := time.Since(info.ModTime())
 	return age > l.opts.StaleThreshold
+}
+
+func newFenceToken(hostname string) string {
+	var suffix [16]byte
+	if _, err := rand.Read(suffix[:]); err == nil {
+		return fmt.Sprintf("%s-%d-%s", hostname, os.Getpid(), hex.EncodeToString(suffix[:]))
+	}
+
+	return fmt.Sprintf("%s-%d-%d", hostname, os.Getpid(), time.Now().UnixNano())
 }

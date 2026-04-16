@@ -5,6 +5,7 @@ package command
 
 import (
 	"context"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmn/eval"
@@ -39,9 +40,9 @@ func TestCommandExecutor_GetEvalOptions(t *testing.T) {
 		wantEscape    bool
 	}{
 		{
-			name:          "EmptyShellDefaultsToUnix",
+			name:          "EmptyShellUsesRuntimeDefault",
 			shell:         "",
-			wantExpandEnv: false,
+			wantExpandEnv: goruntime.GOOS == "windows",
 			wantExpandOS:  false,
 			wantEscape:    false,
 		},

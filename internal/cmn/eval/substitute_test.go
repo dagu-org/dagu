@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -283,4 +284,25 @@ func TestRunCommandWithContext_WithScope(t *testing.T) {
 	result, err := runCommandWithContext(ctx, "echo hello")
 	require.NoError(t, err)
 	assert.Equal(t, "hello", result)
+}
+
+func TestShellCommandFromContext(t *testing.T) {
+	t.Run("PrefersConfigDefaultShell", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).WithEntry("SHELL", "/usr/bin/bash", EnvSourceOS)
+		ctx := WithEnvScope(context.Background(), scope)
+		ctx = config.WithConfig(ctx, &config.Config{
+			Core: config.Core{
+				DefaultShell: "powershell",
+			},
+		})
+
+		assert.Equal(t, "powershell", shellCommandFromContext(ctx))
+	})
+
+	t.Run("FallsBackToScopeShell", func(t *testing.T) {
+		scope := NewEnvScope(nil, false).WithEntry("SHELL", "/usr/bin/bash", EnvSourceOS)
+		ctx := WithEnvScope(context.Background(), scope)
+
+		assert.Equal(t, "/usr/bin/bash", shellCommandFromContext(ctx))
+	})
 }

@@ -30,6 +30,7 @@ func TestDialFail(t *testing.T) {
 func TestDialTimeout(t *testing.T) {
 	f, err := os.CreateTemp("", "sock_client_test")
 	require.NoError(t, err)
+	require.NoError(t, f.Close())
 	defer func() {
 		_ = os.Remove(f.Name())
 	}()

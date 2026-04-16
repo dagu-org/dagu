@@ -357,11 +357,20 @@ test-e2e:
 	@cd ui; pnpm install --frozen-lockfile
 	@printf '%b\n' "${COLOR_GREEN}Installing Playwright browser...${COLOR_RESET}"
 	@cd ui; pnpm test:e2e:install
-	@printf '%b\n' "${COLOR_GREEN}Running browser E2E tests...${COLOR_RESET}"
+	@$(MAKE) test-e2e-build
+	@$(MAKE) test-e2e-run
+
+.PHONY: test-e2e-build
+test-e2e-build:
+	@printf '%b\n' "${COLOR_GREEN}Building browser E2E assets...${COLOR_RESET}"
 	@cd ui; NODE_OPTIONS="--max-old-space-size=8192" pnpm build
 	@$(MAKE) cp-assets
 	@$(MAKE) bin-e2e
-	@cd ui; pnpm test:e2e
+
+.PHONY: test-e2e-run
+test-e2e-run:
+	@printf '%b\n' "${COLOR_GREEN}Running browser E2E tests...${COLOR_RESET}"
+	@cd ui; pnpm test:e2e $(PLAYWRIGHT_TEST_ARGS)
 
 # build-ui builds the frontend codes.
 .PHONY: build-ui

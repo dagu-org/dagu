@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"testing"
 
@@ -18,6 +19,27 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func testAbsoluteVolumePath(unixPath string, windowsPath string) string {
+	if runtime.GOOS == "windows" {
+		return windowsPath
+	}
+	return unixPath
+}
+
+func invalidVolumeTooManyPartsSpec() string {
+	if runtime.GOOS == "windows" {
+		return "C:/host:/container:ro:extra"
+	}
+	return "/host:/container:ro:extra"
+}
+
+func invalidVolumeTooManyPartsError(spec string) string {
+	if runtime.GOOS == "windows" {
+		return "invalid mode ro:extra in " + spec
+	}
+	return "invalid volume format: " + spec
+}
 
 func mustPort(s string) network.Port {
 	return network.MustParsePort(s)
@@ -735,6 +757,10 @@ func TestLoadConfigFromMap(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
+	hostDataPath := testAbsoluteVolumePath("/host/data", "C:/host/data")
+	hostPath := testAbsoluteVolumePath("/host/path", "C:/host/path")
+	invalidVolumeSpec := invalidVolumeTooManyPartsSpec()
+
 	tests := []struct {
 		name        string
 		input       core.Container
@@ -773,7 +799,7 @@ func TestLoadConfig(t *testing.T) {
 				Image:         "ubuntu:20.04",
 				PullPolicy:    core.PullPolicyAlways,
 				Env:           []string{"FOO=bar", "BAZ=qux"},
-				Volumes:       []string{"/host/data:/data:ro", "myvolume:/app"},
+				Volumes:       []string{hostDataPath + ":/data:ro", "myvolume:/app"},
 				User:          "1000:1000",
 				WorkingDir:    "/workspace",
 				Platform:      "linux/arm64",
@@ -797,7 +823,7 @@ func TestLoadConfig(t *testing.T) {
 					},
 				},
 				Host: &container.HostConfig{
-					Binds: []string{"/host/data:/data:ro"},
+					Binds: []string{hostDataPath + ":/data:ro"},
 					Mounts: []mount.Mount{
 						{
 							Type:     mount.TypeVolume,
@@ -866,7 +892,7 @@ func TestLoadConfig(t *testing.T) {
 			name: "BindMountWithDefaultRwMode",
 			input: core.Container{
 				Image:   "alpine",
-				Volumes: []string{"/host/path:/container/path"},
+				Volumes: []string{hostPath + ":/container/path"},
 			},
 			expected: &Config{
 				Image:      "alpine",
@@ -875,7 +901,7 @@ func TestLoadConfig(t *testing.T) {
 					Image: "alpine",
 				},
 				Host: &container.HostConfig{
-					Binds: []string{"/host/path:/container/path:rw"},
+					Binds: []string{hostPath + ":/container/path:rw"},
 				},
 				Network:     &network.NetworkingConfig{},
 				ExecOptions: &client.ExecCreateOptions{},
@@ -1000,10 +1026,10 @@ func TestLoadConfig(t *testing.T) {
 			name: "InvalidVolumeFormatTooManyParts",
 			input: core.Container{
 				Image:   "alpine",
-				Volumes: []string{"/host:/container:ro:extra"},
+				Volumes: []string{invalidVolumeSpec},
 			},
 			expectError: true,
-			errorMsg:    "invalid volume format: /host:/container:ro:extra",
+			errorMsg:    invalidVolumeTooManyPartsError(invalidVolumeSpec),
 		},
 		{
 			name: "InvalidVolumeMode",

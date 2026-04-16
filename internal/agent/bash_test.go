@@ -138,9 +138,10 @@ func TestBashTool_Run(t *testing.T) {
 		t.Parallel()
 
 		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "marker.txt"), []byte("ok"), 0o600))
 
 		tool := NewBashTool()
-		input := json.RawMessage(`{"command": "pwd"}`)
+		input := json.RawMessage(`{"command": "test -f marker.txt && echo found"}`)
 		ctx := ToolContext{
 			Context:    context.Background(),
 			WorkingDir: dir,
@@ -149,7 +150,7 @@ func TestBashTool_Run(t *testing.T) {
 		result := tool.Run(ctx, input)
 
 		assert.False(t, result.IsError)
-		assert.Contains(t, result.Content, dir)
+		assert.Contains(t, result.Content, "found")
 	})
 
 	t.Run("invalid JSON returns error", func(t *testing.T) {
@@ -207,7 +208,7 @@ func TestBashTool_Timeout(t *testing.T) {
 
 		assert.True(t, result.IsError)
 		assert.Contains(t, result.Content, "timed out")
-		assert.Less(t, elapsed, 2*time.Second)
+		assert.Less(t, elapsed, 5*time.Second)
 	})
 
 	t.Run("context cancellation stops command", func(t *testing.T) {

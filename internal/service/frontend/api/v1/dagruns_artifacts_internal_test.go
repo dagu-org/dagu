@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 
 	openapiv1 "github.com/dagucloud/dagu/api/v1"
@@ -134,7 +133,7 @@ func TestArtifactPreviewAndDownloadRejectNamedPipes(t *testing.T) {
 
 	archiveDir := t.TempDir()
 	pipePath := filepath.Join(archiveDir, "artifact.pipe")
-	require.NoError(t, syscall.Mkfifo(pipePath, 0o600))
+	require.NoError(t, makeNamedPipe(pipePath))
 
 	_, previewErr := buildArtifactPreview(archiveDir, "artifact.pipe")
 	require.ErrorIs(t, previewErr, os.ErrNotExist)

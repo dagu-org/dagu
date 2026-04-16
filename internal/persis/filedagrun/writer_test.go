@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/dagucloud/dagu/internal/runtime/transform"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +72,10 @@ func TestWriterErrorHandling(t *testing.T) {
 	th := setupTestStore(t)
 
 	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
-		writer := NewWriter("/nonexistent/dir/file.dat")
+		blocker := filepath.Join(t.TempDir(), "blocked")
+		testutil.BlockPathWithFile(t, blocker)
+
+		writer := NewWriter(filepath.Join(blocker, "file.dat"))
 		err := writer.Open()
 		assert.Error(t, err)
 	})

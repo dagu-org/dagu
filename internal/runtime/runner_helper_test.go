@@ -23,15 +23,15 @@ import (
 )
 
 func successStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withCommand("true"))
+	return newStep(name, withDepends(depends...), withCommand("exit 0"))
 }
 
 func failStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withCommand("false"))
+	return newStep(name, withDepends(depends...), withCommand("exit 1"))
 }
 
 func waitStep(name string, depends ...string) core.Step {
-	return newStep(name, withDepends(depends...), withCommand("true"), withApproval(&core.ApprovalConfig{}))
+	return newStep(name, withDepends(depends...), withCommand("exit 0"), withApproval(&core.ApprovalConfig{}))
 }
 
 type stepOption func(*core.Step)
@@ -220,10 +220,17 @@ func setupRunner(t *testing.T, opts ...runnerOption) testHelper {
 	r := runtime.New(cfg)
 
 	return testHelper{
-		Helper: test.Setup(t),
+		Helper: th,
 		runner: r,
 		cfg:    cfg,
 	}
+}
+
+func platformTestDuration(nonWindows, windows time.Duration) time.Duration {
+	if windowsShellTest() {
+		return windows
+	}
+	return nonWindows
 }
 
 func (th testHelper) newPlan(t *testing.T, steps ...core.Step) planHelper {
@@ -429,14 +436,32 @@ func waitForNodeStatus(plan *runtime.Plan, name string, status core.NodeStatus, 
 // waitForNodeDoneCount polls until the named node's DoneCount reaches at
 // least the given value or the timeout expires.
 func waitForNodeDoneCount(plan *runtime.Plan, name string, minCount int, timeout time.Duration) {
+	_ = waitForNodeDoneCountAtLeast(plan, name, minCount, timeout)
+}
+
+func waitForNodeDoneCountAtLeast(plan *runtime.Plan, name string, minCount int, timeout time.Duration) bool {
 	deadline := time.After(timeout)
 	for {
 		if node := plan.GetNodeByName(name); node != nil && node.State().DoneCount >= minCount {
-			return
+			return true
 		}
 		select {
 		case <-deadline:
-			return
+			return false
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+}
+
+func waitForNodeRepeatScheduled(plan *runtime.Plan, name string, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	for {
+		if node := plan.GetNodeByName(name); node != nil && node.State().DoneCount >= 1 && node.State().Repeated {
+			return true
+		}
+		select {
+		case <-deadline:
+			return false
 		case <-time.After(5 * time.Millisecond):
 		}
 	}

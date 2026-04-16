@@ -115,7 +115,7 @@ steps:
 		}
 		oneOff, ok := entry.OneOffs[fingerprint]
 		return ok && oneOff.Status == scheduler.OneOffStatusConsumed
-	}, 5*time.Second, 50*time.Millisecond)
+	}, intgTestTimeout(5*time.Second), 50*time.Millisecond)
 
 	assert.Equal(t, int32(0), dispatchCount.Load())
 	assert.Len(t, th.DAGRunStore.RecentAttempts(th.Context, dag.Name, 10), 1)
@@ -129,7 +129,7 @@ steps:
 			err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
 			"unexpected scheduler shutdown error: %v", err,
 		)
-	case <-time.After(5 * time.Second):
+	case <-time.After(intgTestTimeout(5 * time.Second)):
 		t.Fatal("scheduler did not stop within 5 seconds")
 	}
 }

@@ -522,12 +522,12 @@ func TestRunningTaskTracking(t *testing.T) {
 		// Release all held tasks so pollers become free
 		close(releaseTasks)
 
-		// Wait for at least one task to complete
+		// Wait for released tasks to drain before dispatching more work.
 		require.Eventually(t, func() bool {
 			activeTasksMu.Lock()
 			defer activeTasksMu.Unlock()
-			return len(activeTasks) < 3
-		}, 5*time.Second, 10*time.Millisecond, "No tasks completed")
+			return len(activeTasks) == 0
+		}, 5*time.Second, 10*time.Millisecond, "Released tasks did not finish")
 
 		// Dispatch 2 more tasks
 		for i := 3; i < 5; i++ {

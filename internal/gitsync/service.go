@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -497,30 +498,31 @@ func (s *serviceImpl) scanLocalDAGs(state *State) error {
 func (s *serviceImpl) scanMemoryFiles(state *State) {
 	memDir := filepath.Join(s.dagsDir, agentMemoryDir)
 
-	_ = filepath.WalkDir(memDir, func(path string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(memDir, func(filePath string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil // skip errors
 		}
 		if d.IsDir() {
 			return nil
 		}
-		if filepath.Ext(path) != ".md" {
+		if filepath.Ext(filePath) != ".md" {
 			return nil
 		}
 
 		// Compute dagID relative to dagsDir, without extension
-		relPath, err := filepath.Rel(s.dagsDir, path)
+		relPath, err := filepath.Rel(s.dagsDir, filePath)
 		if err != nil {
 			return nil
 		}
-		dagID := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+		relPath = filepath.ToSlash(relPath)
+		dagID := strings.TrimSuffix(relPath, path.Ext(relPath))
 
 		// Skip if already tracked
 		if _, exists := state.DAGs[dagID]; exists {
 			return nil
 		}
 
-		content, err := os.ReadFile(path) //nolint:gosec // path constructed from internal dagsDir
+		content, err := os.ReadFile(filePath) //nolint:gosec // path constructed from internal dagsDir
 		if err != nil {
 			return nil
 		}
@@ -532,7 +534,7 @@ func (s *serviceImpl) scanMemoryFiles(state *State) {
 			LocalHash:  ComputeContentHash(content),
 			ModifiedAt: &now,
 		}
-		if fi, err := os.Stat(path); err == nil {
+		if fi, err := os.Stat(filePath); err == nil {
 			updateStatCache(ds, fi)
 		}
 		state.DAGs[dagID] = ds
@@ -560,7 +562,7 @@ func (s *serviceImpl) scanSkillFiles(state *State) {
 			continue
 		}
 
-		dagID := filepath.Join(agentSkillsDir, entry.Name(), "SKILL")
+		dagID := path.Join(agentSkillsDir, entry.Name(), "SKILL")
 		if _, exists := state.DAGs[dagID]; exists {
 			continue
 		}
@@ -599,7 +601,7 @@ func (s *serviceImpl) scanSoulFiles(state *State) {
 			continue
 		}
 
-		dagID := filepath.Join(agentSoulsDir, strings.TrimSuffix(entry.Name(), ".md"))
+		dagID := path.Join(agentSoulsDir, strings.TrimSuffix(entry.Name(), ".md"))
 		if _, exists := state.DAGs[dagID]; exists {
 			continue
 		}
@@ -622,30 +624,31 @@ func (s *serviceImpl) scanSoulFiles(state *State) {
 func (s *serviceImpl) scanDocFiles(state *State) {
 	docDir := filepath.Join(s.dagsDir, agentDocsDir)
 
-	_ = filepath.WalkDir(docDir, func(path string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(docDir, func(filePath string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil // skip errors
 		}
 		if d.IsDir() {
 			return nil
 		}
-		if filepath.Ext(path) != ".md" {
+		if filepath.Ext(filePath) != ".md" {
 			return nil
 		}
 
 		// Compute dagID relative to dagsDir, without extension
-		relPath, err := filepath.Rel(s.dagsDir, path)
+		relPath, err := filepath.Rel(s.dagsDir, filePath)
 		if err != nil {
 			return nil
 		}
-		dagID := strings.TrimSuffix(relPath, filepath.Ext(relPath))
+		relPath = filepath.ToSlash(relPath)
+		dagID := strings.TrimSuffix(relPath, path.Ext(relPath))
 
 		// Skip if already tracked
 		if _, exists := state.DAGs[dagID]; exists {
 			return nil
 		}
 
-		content, err := os.ReadFile(path) //nolint:gosec // path constructed from internal dagsDir
+		content, err := os.ReadFile(filePath) //nolint:gosec // path constructed from internal dagsDir
 		if err != nil {
 			return nil
 		}
@@ -657,7 +660,7 @@ func (s *serviceImpl) scanDocFiles(state *State) {
 			LocalHash:  ComputeContentHash(content),
 			ModifiedAt: &now,
 		}
-		if fi, err := os.Stat(path); err == nil {
+		if fi, err := os.Stat(filePath); err == nil {
 			updateStatCache(ds, fi)
 		}
 		state.DAGs[dagID] = ds
@@ -1885,12 +1888,14 @@ func (s *serviceImpl) updateLastSyncError(err error) {
 }
 
 func (s *serviceImpl) filePathToDAGID(filePath string) string {
+	filePath = filepath.ToSlash(filePath)
 	// Remove path prefix if configured
 	if s.cfg.Path != "" {
-		filePath = strings.TrimPrefix(filePath, s.cfg.Path+"/")
+		prefix := strings.TrimSuffix(filepath.ToSlash(s.cfg.Path), "/") + "/"
+		filePath = strings.TrimPrefix(filePath, prefix)
 	}
 	// Remove extension
-	ext := filepath.Ext(filePath)
+	ext := path.Ext(filePath)
 	dagID := strings.TrimSuffix(filePath, ext)
 	return dagID
 }
@@ -1981,8 +1986,9 @@ func (s *serviceImpl) dagIDToFilePath(dagID string) string {
 	if err == nil {
 		dagID = decoded
 	}
+	dagID = normalizeDAGIDSeparators(dagID)
 	ext := fileExtensionForID(dagID)
-	return filepath.Join(s.dagsDir, dagID+ext)
+	return filepath.Join(s.dagsDir, filepath.FromSlash(dagID+ext))
 }
 
 func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
@@ -1991,11 +1997,13 @@ func (s *serviceImpl) dagIDToRepoPath(dagID string) string {
 	if err == nil {
 		dagID = decoded
 	}
+	dagID = normalizeDAGIDSeparators(dagID)
 	ext := fileExtensionForID(dagID)
+	repoPath := dagID + ext
 	if s.cfg.Path != "" {
-		return filepath.Join(s.cfg.Path, dagID+ext)
+		return path.Join(filepath.ToSlash(s.cfg.Path), repoPath)
 	}
-	return dagID + ext
+	return repoPath
 }
 
 func decodeDAGID(dagID string) (string, error) {
@@ -2017,19 +2025,31 @@ func normalizeDAGID(dagID string) (string, error) {
 	if decoded == "" {
 		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "cannot be empty"}
 	}
-	if filepath.IsAbs(decoded) {
+
+	normalized := normalizeDAGIDSeparators(decoded)
+	if path.IsAbs(normalized) || looksLikeWindowsAbsolutePath(normalized) {
 		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "absolute paths are not allowed"}
 	}
 
-	clean := filepath.Clean(decoded)
+	clean := path.Clean(normalized)
 	if clean == "." || clean == ".." {
 		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "must point to a DAG ID, not current/parent directory"}
 	}
-	if strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+	if strings.HasPrefix(clean, "../") {
 		return "", &InvalidDAGIDError{DAGID: dagID, Reason: "path traversal is not allowed"}
 	}
 
 	return clean, nil
+}
+
+func looksLikeWindowsAbsolutePath(p string) bool {
+	if len(p) >= 2 && p[1] == ':' {
+		c := p[0]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			return true
+		}
+	}
+	return strings.HasPrefix(p, "//")
 }
 
 func safeJoinWithinBase(baseDir, relativePath string) (string, error) {
@@ -2078,7 +2098,7 @@ func (s *serviceImpl) safeDAGIDToFilePath(dagID string) (string, error) {
 		return "", err
 	}
 	ext := fileExtensionForID(normalized)
-	return safeJoinWithinBase(s.dagsDir, normalized+ext)
+	return safeJoinWithinBase(s.dagsDir, filepath.FromSlash(normalized+ext))
 }
 
 func (s *serviceImpl) safeDAGIDToRepoPath(dagID string) (string, error) {
@@ -2090,10 +2110,10 @@ func (s *serviceImpl) safeDAGIDToRepoPath(dagID string) (string, error) {
 	ext := fileExtensionForID(normalized)
 	repoPath := normalized + ext
 	if s.cfg.Path != "" {
-		repoPath = filepath.Join(s.cfg.Path, repoPath)
+		repoPath = path.Join(filepath.ToSlash(s.cfg.Path), repoPath)
 	}
 
-	safePath, err := safeJoinWithinBase(s.gitClient.repoPath, repoPath)
+	safePath, err := safeJoinWithinBase(s.gitClient.repoPath, filepath.FromSlash(repoPath))
 	if err != nil {
 		return "", err
 	}
@@ -2104,7 +2124,7 @@ func (s *serviceImpl) safeDAGIDToRepoPath(dagID string) (string, error) {
 			Reason: "cannot resolve repository path",
 		}
 	}
-	return relPath, nil
+	return filepath.ToSlash(relPath), nil
 }
 
 func (s *serviceImpl) ensureDir(dir string) error {

@@ -1547,6 +1547,9 @@ type DAG struct {
 
 // DAGArtifactsConfig Configuration for DAG run artifact storage
 type DAGArtifactsConfig struct {
+	// Dir Base directory for storing artifacts for this DAG when explicitly configured
+	Dir *string `json:"dir,omitempty"`
+
 	// Enabled Whether artifact storage is enabled for this DAG
 	Enabled bool `json:"enabled"`
 }

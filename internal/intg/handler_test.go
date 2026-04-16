@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -16,6 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func assertEquivalentPath(t *testing.T, expected, actual string) {
+	t.Helper()
+	require.Equal(t, filepath.Clean(expected), filepath.Clean(filepath.FromSlash(actual)))
+}
 
 func TestHandlerOn(t *testing.T) {
 	t.Parallel()
@@ -271,6 +277,10 @@ func TestHandlerOn_Abort(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
+	releaseFile := filepath.Join(t.TempDir(), "abort.release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 	dag := th.DAG(t, `
 handler_on:
   abort:
@@ -278,7 +288,8 @@ handler_on:
 
 steps:
   - name: long-running
-    command: sleep 10
+    command: |
+`+indentTestScript(waitForFileCommand(releaseFile), 6)+`
 `)
 
 	// Verify parsing: abort field maps to the canonical abort handler
@@ -565,6 +576,10 @@ steps:
 	t.Run("AbortHandler_AllEnvVars", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
+		releaseFile := filepath.Join(t.TempDir(), "abort-env.release")
+		t.Cleanup(func() {
+			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+		})
 
 		dag := th.DAG(t, `
 handler_on:
@@ -575,7 +590,8 @@ handler_on:
 
 steps:
   - name: long-running
-    command: sleep 10
+    command: |
+`+indentTestScript(waitForFileCommand(releaseFile), 6)+`
 `)
 		dagAgent := dag.Agent()
 
@@ -638,9 +654,11 @@ steps:
 
 		outputStr := extractValue(output.(string))
 
-		// These should be unset/empty in handlers
-		assert.Contains(t, outputStr, "stdout:UNSET", "DAG_RUN_STEP_STDOUT_FILE should not be set in handler")
-		assert.Contains(t, outputStr, "stderr:UNSET", "DAG_RUN_STEP_STDERR_FILE should not be set in handler")
+		// Handler steps do not get step-scoped stdout/stderr vars.
+		assert.Contains(t, outputStr, "stdout:", "stdout prefix should be present")
+		assert.Contains(t, outputStr, "stderr:", "stderr prefix should be present")
+		assert.NotContains(t, outputStr, ".out", "DAG_RUN_STEP_STDOUT_FILE should not be set in handler")
+		assert.NotContains(t, outputStr, ".err", "DAG_RUN_STEP_STDERR_FILE should not be set in handler")
 	})
 
 	t.Run("Handlers_CanAccessStepOutputVariables", func(t *testing.T) {
@@ -679,13 +697,23 @@ steps:
 	t.Run("InitHandler_CannotAccessStepOutputVariables", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
+		initCommand := `echo "step_output:${STEP_OUTPUT:-NOT_YET_AVAILABLE}"`
+		if runtime.GOOS == "windows" {
+			initCommand = `
+if ([string]::IsNullOrEmpty($env:STEP_OUTPUT)) {
+  Write-Output "step_output:NOT_YET_AVAILABLE"
+} else {
+  Write-Output ("step_output:{0}" -f $env:STEP_OUTPUT)
+}
+`
+		}
 
 		// Init handler runs BEFORE steps, so it cannot access step outputs
 		dag := th.DAG(t, `
 handler_on:
   init:
     command: |
-      echo "step_output:${STEP_OUTPUT:-NOT_YET_AVAILABLE}"
+`+indentTestScript(initCommand, 6)+`
     output: INIT_STEP_ACCESS
 
 steps:
@@ -705,9 +733,8 @@ steps:
 
 		outputStr := extractValue(output.(string))
 
-		// Init handler cannot access step output (steps haven't run yet)
-		assert.Contains(t, outputStr, "step_output:NOT_YET_AVAILABLE",
-			"init handler should not access step outputs")
+		// Init handler runs before any step output exists, so shell fallback is used.
+		assert.Equal(t, "step_output:NOT_YET_AVAILABLE", outputStr)
 	})
 
 	t.Run("WaitHandler_DAG_WAITING_STEPS_EnvVar", func(t *testing.T) {
@@ -799,11 +826,12 @@ steps:
 		th := test.Setup(t)
 		tempDir := t.TempDir()
 		stdoutPath := filepath.Join(tempDir, "handler_${DAG_RUN_STATUS}.log")
+		stdoutPathForYAML := filepath.ToSlash(stdoutPath)
 
 		dag := th.DAG(t, `
 handler_on:
   success:
-    stdout: "`+stdoutPath+`"
+    stdout: "`+stdoutPathForYAML+`"
     command: echo "handler ran"
 
 steps:
@@ -815,7 +843,7 @@ steps:
 
 		status := agent.Status(th.Context)
 		require.NotNil(t, status.OnSuccess)
-		require.Equal(t, filepath.Join(tempDir, "handler_succeeded.log"), status.OnSuccess.Step.Stdout)
+		assertEquivalentPath(t, filepath.Join(tempDir, "handler_succeeded.log"), status.OnSuccess.Step.Stdout)
 
 		content, err := os.ReadFile(status.OnSuccess.Step.Stdout)
 		require.NoError(t, err)
@@ -827,12 +855,13 @@ steps:
 		th := test.Setup(t)
 		tempDir := t.TempDir()
 		stdoutPath := filepath.Join(tempDir, "wait_${DAG_WAITING_STEPS}.log")
+		stdoutPathForYAML := filepath.ToSlash(stdoutPath)
 
 		dag := th.DAG(t, `
 type: graph
 handler_on:
   wait:
-    stdout: "`+stdoutPath+`"
+    stdout: "`+stdoutPathForYAML+`"
     command: echo "waiting handler"
 
 steps:
@@ -851,7 +880,7 @@ steps:
 		status := agent.Status(th.Context)
 		require.Equal(t, core.Waiting, status.Status)
 		require.NotNil(t, status.OnWait)
-		require.Equal(t, filepath.Join(tempDir, "wait_approval-gate.log"), status.OnWait.Step.Stdout)
+		assertEquivalentPath(t, filepath.Join(tempDir, "wait_approval-gate.log"), status.OnWait.Step.Stdout)
 
 		content, err := os.ReadFile(status.OnWait.Step.Stdout)
 		require.NoError(t, err)

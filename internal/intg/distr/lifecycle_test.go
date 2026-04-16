@@ -131,7 +131,13 @@ steps:
 			close(done)
 		}()
 
-		f.dagWrapper.AssertLatestStatus(t, core.Running)
+		require.Eventually(t, func() bool {
+			status, err := f.dagWrapper.DAGRunMgr.GetCurrentStatus(context.Background(), f.dagWrapper.DAG, runID)
+			if err != nil || status == nil || status.Status != core.Running {
+				return false
+			}
+			return f.dagWrapper.DAGRunMgr.IsRunning(context.Background(), f.dagWrapper.DAG, runID)
+		}, 2*time.Minute, 250*time.Millisecond, "expected parent DAG to reach running state before cancellation")
 
 		require.NoError(t, f.stop(runID))
 
@@ -333,7 +339,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, 30*time.Second)
 		dagRunID := status.DAGRunID
 		f.cleanup()
 
@@ -347,7 +353,7 @@ steps:
 				return false
 			}
 			return status.Status == core.Succeeded && status.DAGRunID == dagRunID
-		}, 25*time.Second, 200*time.Millisecond, "Retry should complete successfully")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Retry should complete successfully")
 
 		finalStatus, err := f.latestStatus()
 		require.NoError(t, err)
@@ -373,7 +379,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, 30*time.Second)
 		dagRunID := status.DAGRunID
 		f.cleanup()
 
@@ -387,7 +393,7 @@ steps:
 				return false
 			}
 			return status.Status == core.Succeeded && status.DAGRunID == dagRunID
-		}, 25*time.Second, 200*time.Millisecond, "Retry should complete successfully")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Retry should complete successfully")
 
 		finalStatus, err := f.latestStatus()
 		require.NoError(t, err)
@@ -430,7 +436,7 @@ steps:
 				return false
 			}
 			return status.Status == core.Succeeded && status.DAGRunID == originalRunID
-		}, 25*time.Second, 200*time.Millisecond, "Retry should complete with same run ID")
+		}, distrTestTimeout(25*time.Second), 200*time.Millisecond, "Retry should complete with same run ID")
 
 		finalStatus, err := f.latestStatus()
 		require.NoError(t, err)

@@ -9016,6 +9016,9 @@ components:
         enabled:
           type: boolean
           description: "Whether artifact storage is enabled for this DAG"
+        dir:
+          type: string
+          description: "Base directory for storing artifacts for this DAG when explicitly configured"
       required:
         - enabled
 
