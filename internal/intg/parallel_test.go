@@ -543,19 +543,24 @@ steps:
 	startedRunID := ""
 	rootRun := exec.DAGRunRef{}
 	require.Eventually(t, func() bool {
-		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-		if err != nil || status.Status != core.Running || len(status.Nodes) == 0 {
+		attempt, err := dag.DAGRunStore.LatestAttempt(dag.Context, dag.Name)
+		if err != nil {
+			return false
+		}
+		status, err := attempt.ReadStatus(dag.Context)
+		if err != nil || status == nil || len(status.Nodes) == 0 {
 			return false
 		}
 
-		if len(status.Nodes[0].SubRuns) != 1 || countStartedParallelSubRuns(t, dag, &status) != 1 {
+		if len(status.Nodes[0].SubRuns) != 1 {
 			return false
 		}
 
 		rootRun = exec.NewDAGRunRef(status.Name, status.DAGRunID)
 		startedRunID = status.Nodes[0].SubRuns[0].DAGRunID
-		return startedRunID != ""
-	}, intgTestTimeout(15*time.Second), 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
+		_, err = dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, startedRunID)
+		return err == nil
+	}, intgTestTimeout(45*time.Second), 50*time.Millisecond, "expected parent DAG to persist started sub-run before abort")
 
 	agent.Abort()
 

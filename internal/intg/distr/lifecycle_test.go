@@ -132,12 +132,18 @@ steps:
 			errCh <- agent.Run(agent.Context)
 		}()
 
+		rootRef := exec.NewDAGRunRef(f.dagWrapper.Name, runID)
 		var subRunID string
 		require.Eventually(t, func() bool {
-			status := agent.Status(context.Background())
-			if status.DAGRunID != runID || status.Status != core.Running {
+			attempt, err := f.dagWrapper.DAGRunStore.FindAttempt(context.Background(), rootRef)
+			if err != nil {
 				return false
 			}
+			status, err := attempt.ReadStatus(context.Background())
+			if err != nil || status == nil || status.Status != core.Running {
+				return false
+			}
+
 			for _, node := range status.Nodes {
 				if node.Step.Name != "run-local-on-worker" || node.Status != core.NodeRunning || len(node.SubRuns) == 0 {
 					continue
@@ -148,7 +154,6 @@ steps:
 			return false
 		}, 30*time.Second, 100*time.Millisecond, "expected parent DAG to start sub DAG before cancellation")
 
-		rootRef := exec.NewDAGRunRef(f.dagWrapper.Name, runID)
 		require.Eventually(t, func() bool {
 			status, err := f.dagWrapper.DAGRunMgr.FindSubDAGRunStatus(context.Background(), rootRef, subRunID)
 			return err == nil && status != nil && status.Status == core.Running
