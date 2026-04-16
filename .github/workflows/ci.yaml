@@ -155,12 +155,10 @@ jobs:
           - suite: unit
             suite_index: 1
             suite_total: 2
-            packages_cmd: go list ./... | grep -Ev '^github.com/dagucloud/dagu/internal/intg(/|$)'
             codecov_name: ubuntu-unit
           - suite: intg
             suite_index: 2
             suite_total: 2
-            packages_cmd: go list ./internal/intg/...
             codecov_name: ubuntu-intg
     steps:
       - name: Check out code
@@ -175,11 +173,24 @@ jobs:
         id: test-packages
         shell: bash
         run: |
-          packages="$(
-            ${{ matrix.packages_cmd }} | xargs
-          )"
+          suite="${{ matrix.suite }}"
+          module_path="$(go list -m)"
+          case "${suite}" in
+            unit)
+              packages="$(
+                go list ./... | awk -v prefix="${module_path}/internal/intg" '$0 != prefix && index($0, prefix "/") != 1' | xargs
+              )"
+              ;;
+            intg)
+              packages="$(go list ./internal/intg/... | xargs)"
+              ;;
+            *)
+              echo "unknown test suite: ${suite}" >&2
+              exit 1
+              ;;
+          esac
           if [[ -z "${packages}" ]]; then
-            echo "failed to resolve packages for ${{ matrix.suite }}" >&2
+            echo "failed to resolve packages for ${suite}" >&2
             exit 1
           fi
           echo "packages=${packages}" >> "${GITHUB_OUTPUT}"
@@ -282,11 +293,9 @@ jobs:
           - suite: unit
             suite_index: 1
             suite_total: 2
-            packages_cmd: go list ./... | grep -Ev '^github.com/dagucloud/dagu/internal/intg(/|$)'
           - suite: intg
             suite_index: 2
             suite_total: 2
-            packages_cmd: go list ./internal/intg/...
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -300,11 +309,24 @@ jobs:
         id: test-packages
         shell: bash
         run: |
-          packages="$(
-            ${{ matrix.packages_cmd }} | xargs
-          )"
+          suite="${{ matrix.suite }}"
+          module_path="$(go list -m)"
+          case "${suite}" in
+            unit)
+              packages="$(
+                go list ./... | awk -v prefix="${module_path}/internal/intg" '$0 != prefix && index($0, prefix "/") != 1' | xargs
+              )"
+              ;;
+            intg)
+              packages="$(go list ./internal/intg/... | xargs)"
+              ;;
+            *)
+              echo "unknown test suite: ${suite}" >&2
+              exit 1
+              ;;
+          esac
           if [[ -z "${packages}" ]]; then
-            echo "failed to resolve packages for ${{ matrix.suite }}" >&2
+            echo "failed to resolve packages for ${suite}" >&2
             exit 1
           fi
           echo "packages=${packages}" >> "${GITHUB_OUTPUT}"
