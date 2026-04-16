@@ -55,6 +55,52 @@ steps:
 	})
 }
 
+func TestCustomStepTypes_RuntimeVariableInputExpandsAtExecution(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("direct exec integration uses /bin/echo")
+	}
+	t.Parallel()
+
+	th := test.Setup(t)
+
+	dag := th.DAG(t, `
+name: custom-step-runtime-variable-input
+type: graph
+step_types:
+  repeat:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [count]
+      properties:
+        count:
+          type: integer
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: count}
+steps:
+  - id: produce
+    exec:
+      command: /bin/echo
+      args: [3]
+    output: COUNT
+  - id: consume
+    depends: [produce]
+    type: repeat
+    config:
+      count: ${COUNT}
+    output: OUT
+`)
+	dag.Agent().RunSuccess(t)
+
+	dag.AssertOutputs(t, map[string]any{
+		"OUT": "3",
+	})
+}
+
 func TestCustomStepTypes_DAGLocalScriptShebang(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("script shebang integration uses /bin/sh and /bin/bash")

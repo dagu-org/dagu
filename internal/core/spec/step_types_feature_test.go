@@ -58,6 +58,81 @@ steps:
 	assert.Equal(t, "Send a greeting", step.Description)
 }
 
+func TestCustomStepTypes_RuntimeVariableInputsDeferSchemaValidation(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-runtime-inputs
+step_types:
+  run_with_inputs:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message, count, enabled, mode]
+      properties:
+        message:
+          type: string
+        count:
+          type: integer
+          minimum: 1
+        enabled:
+          type: boolean
+        mode:
+          enum: [fast, slow]
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+          - {$input: count}
+          - {$input: enabled}
+          - {$input: mode}
+steps:
+  - type: run_with_inputs
+    config:
+      message: hello-${SUFFIX}
+      count: ${COUNT}
+      enabled: ${ENABLED}
+      mode: ${MODE}
+`), WithoutEval())
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"hello-${SUFFIX}", "${COUNT}", "${ENABLED}", "${MODE}"}, step.Commands[0].Args)
+}
+
+func TestCustomStepTypes_RuntimeVariableInputMustBeWholeValueForNonStringTypes(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-runtime-input-invalid
+step_types:
+  repeat:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [count]
+      properties:
+        count:
+          type: integer
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: count}
+steps:
+  - type: repeat
+    config:
+      count: count-${COUNT}
+`), WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `invalid "repeat" input`)
+}
+
 func TestCustomStepTypes_CommandTargetInheritsDAGLevelContainer(t *testing.T) {
 	t.Parallel()
 
