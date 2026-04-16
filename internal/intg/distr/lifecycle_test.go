@@ -126,20 +126,21 @@ steps:
 
 		runID := uuid.New().String()
 		agent := f.dagWrapper.Agent(test.WithDAGRunID(runID))
+		ctx := agent.Context
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- agent.Run(agent.Context)
+			errCh <- agent.Run(ctx)
 		}()
 
 		rootRef := exec.NewDAGRunRef(f.dagWrapper.Name, runID)
 		var subRunID string
 		require.Eventually(t, func() bool {
-			attempt, err := f.dagWrapper.DAGRunStore.FindAttempt(context.Background(), rootRef)
+			attempt, err := f.dagWrapper.DAGRunStore.FindAttempt(ctx, rootRef)
 			if err != nil {
 				return false
 			}
-			status, err := attempt.ReadStatus(context.Background())
+			status, err := attempt.ReadStatus(ctx)
 			if err != nil || status == nil || status.Status != core.Running {
 				return false
 			}
@@ -155,7 +156,7 @@ steps:
 		}, 30*time.Second, 100*time.Millisecond, "expected parent DAG to start sub DAG before cancellation")
 
 		require.Eventually(t, func() bool {
-			status, err := f.dagWrapper.DAGRunMgr.FindSubDAGRunStatus(context.Background(), rootRef, subRunID)
+			status, err := f.dagWrapper.DAGRunMgr.FindSubDAGRunStatus(ctx, rootRef, subRunID)
 			return err == nil && status != nil && status.Status == core.Running
 		}, 30*time.Second, 100*time.Millisecond, "expected sub DAG to reach running state before cancellation")
 
@@ -170,9 +171,10 @@ steps:
 			t.Fatal("timed out waiting for parent DAG cancellation")
 		}
 
-		subStatus, err := f.dagWrapper.DAGRunMgr.FindSubDAGRunStatus(context.Background(), rootRef, subRunID)
-		require.NoError(t, err)
-		require.Equal(t, core.Aborted, subStatus.Status)
+		require.Eventually(t, func() bool {
+			subStatus, err := f.dagWrapper.DAGRunMgr.FindSubDAGRunStatus(ctx, rootRef, subRunID)
+			return err == nil && subStatus != nil && subStatus.Status == core.Aborted
+		}, 30*time.Second, 100*time.Millisecond, "expected sub DAG to become aborted after parent cancellation")
 	})
 }
 
