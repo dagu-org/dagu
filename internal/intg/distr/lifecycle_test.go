@@ -5,6 +5,7 @@ package distr_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"syscall"
 	"testing"
@@ -19,14 +20,14 @@ import (
 
 func TestCancellation_SingleTask(t *testing.T) {
 	t.Run("cancellationPropagatesToRemoteWorker", func(t *testing.T) {
-		f := newTestFixture(t, `
+		f := newTestFixture(t, fmt.Sprintf(`
 name: cancel-test
 worker_selector:
   test: "true"
 steps:
   - name: long-task
-    command: sleep 60
-`)
+    command: %s
+`, test.ShellQuote(test.Sleep(60*time.Second))))
 		defer f.cleanup()
 
 		require.NoError(t, f.enqueue())
@@ -59,7 +60,7 @@ steps:
 
 func TestCancellation_SubDAG(t *testing.T) {
 	t.Run("parentCancelPropagatesToChildOnWorker", func(t *testing.T) {
-		f := newTestFixture(t, `
+		f := newTestFixture(t, fmt.Sprintf(`
 steps:
   - call: dotest
 params:
@@ -70,8 +71,8 @@ worker_selector:
   foo: bar
 steps:
   - name: long-sleep
-    command: sleep 30
-`, withLabels(map[string]string{"foo": "bar"}))
+    command: %s
+`, test.ShellQuote(test.Sleep(30*time.Second))), withLabels(map[string]string{"foo": "bar"}))
 		defer f.cleanup()
 
 		require.NoError(t, f.start())
@@ -106,7 +107,7 @@ steps:
 	})
 
 	t.Run("cancelPropagatesToSubDAGOnWorker", func(t *testing.T) {
-		f := newTestFixture(t, `
+		f := newTestFixture(t, fmt.Sprintf(`
 steps:
   - name: run-local-on-worker
     call: local-sub
@@ -118,9 +119,9 @@ worker_selector:
   type: test-worker
 steps:
   - name: worker-task
-    command: sleep 1000
+    command: %s
     output: MESSAGE
-`, withLabels(map[string]string{"type": "test-worker"}))
+`, test.ShellQuote(test.Sleep(1000*time.Second))), withLabels(map[string]string{"type": "test-worker"}))
 
 		runID := uuid.New().String()
 		agent := f.dagWrapper.Agent(test.WithDAGRunID(runID))
@@ -150,7 +151,7 @@ steps:
 func TestCancellation_ConcurrentWorkers(t *testing.T) {
 	t.Run("cancellationWithHighConcurrency", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		f := newTestFixture(t, `
+		f := newTestFixture(t, fmt.Sprintf(`
 steps:
   - name: high-concurrency
     call: child-task
@@ -170,11 +171,8 @@ worker_selector:
   type: test-worker
 steps:
   - name: process
-    command: |
-      echo "Starting task $1"
-      sleep 0.3
-      echo "Completed task $1"
-`, withWorkerCount(3), withLabels(map[string]string{"type": "test-worker"}),
+    command: %s
+`, test.ShellQuote(test.Sleep(30*time.Second))), withWorkerCount(3), withLabels(map[string]string{"type": "test-worker"}),
 			withDAGsDir(tmpDir), withLogPersistence())
 
 		agent := f.dagWrapper.Agent()
@@ -213,18 +211,18 @@ steps:
 
 func TestCancellation_GracefulShutdown(t *testing.T) {
 	t.Run("gracefulShutdownOnSIGTERM", func(t *testing.T) {
-		f := newTestFixture(t, `
+		f := newTestFixture(t, fmt.Sprintf(`
 type: graph
 name: graceful-cancel-test
 worker_selector:
   test: "true"
 steps:
   - name: task1
-    command: sleep 30
+    command: %s
   - name: task2
     command: echo "should not run"
     depends: [task1]
-`)
+`, test.ShellQuote(test.Sleep(30*time.Second))))
 		defer f.cleanup()
 
 		require.NoError(t, f.enqueue())
@@ -250,7 +248,7 @@ steps:
 func TestCancellation_ParallelItems(t *testing.T) {
 	t.Run("cancelParallelExecutionOnWorkers", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		f := newTestFixture(t, `
+		f := newTestFixture(t, fmt.Sprintf(`
 steps:
   - name: process-items
     call: child-sleep
@@ -268,8 +266,8 @@ worker_selector:
   type: test-worker
 steps:
   - name: sleep
-    command: sleep $1
-`, withWorkerCount(2), withLabels(map[string]string{"type": "test-worker"}),
+    command: %s
+`, test.ShellQuote(test.Sleep(100*time.Second))), withWorkerCount(2), withLabels(map[string]string{"type": "test-worker"}),
 			withDAGsDir(tmpDir), withLogPersistence())
 
 		agent := f.dagWrapper.Agent()

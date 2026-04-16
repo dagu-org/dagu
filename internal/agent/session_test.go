@@ -1213,7 +1213,7 @@ func TestSessionManager_CreateWaitUserResponseFunc(t *testing.T) {
 			Question:   "Need more details?",
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
 		resultCh := make(chan waitResult, 1)
