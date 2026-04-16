@@ -210,7 +210,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
@@ -237,7 +237,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Failed, 20*time.Second)
+		status := f.waitForStatus(core.Failed, executionStatusTimeout())
 
 		require.Equal(t, core.Failed, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
@@ -264,7 +264,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
@@ -294,7 +294,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 
 		require.Equal(t, core.Succeeded, status.Status)
 		require.NotEmpty(t, status.ArchiveDir)
@@ -321,7 +321,7 @@ steps:
 		f.waitForQueued()
 		f.startScheduler(30 * time.Second)
 
-		status := f.waitForStatus(core.Succeeded, 20*time.Second)
+		status := f.waitForStatus(core.Succeeded, executionStatusTimeout())
 		require.Equal(t, core.Succeeded, status.Status)
 
 		stream, err := f.coordinatorClient.StreamArtifacts(f.coord.Context)

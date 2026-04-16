@@ -508,6 +508,7 @@ steps:
 
 	opts := []fixtureOption{
 		withWorkerCount(0),
+		withWorkerMaxActiveRuns(1),
 		withStaleThresholds(testStaleHeartbeatThreshold, testStaleLeaseThreshold),
 		withZombieDetectionInterval(testZombieDetectorInterval),
 	}
@@ -519,20 +520,14 @@ steps:
 	defer f.cleanup()
 
 	release := make(chan struct{})
-	var blockOnce sync.Once
 	afterAckHook := func(ctx context.Context, _ *coordinatorv1.Task) bool {
-		shouldBlock := false
-		blockOnce.Do(func() {
-			shouldBlock = true
-		})
-		if !shouldBlock {
-			return false
-		}
+		// Keep duplicate claims stalled too; Windows can observe a retry after
+		// the first claim was already picked up.
 		select {
 		case <-release:
 			return false
 		case <-ctx.Done():
-			return false
+			return true
 		}
 	}
 
