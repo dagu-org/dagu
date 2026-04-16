@@ -1774,23 +1774,6 @@ func collectOutputs(entries []map[string]any, key string) []string {
 	return out
 }
 
-func countStartedParallelSubRuns(t *testing.T, dag test.DAG, status *exec.DAGRunStatus) int {
-	t.Helper()
-
-	if len(status.Nodes) == 0 {
-		return 0
-	}
-
-	rootRun := exec.NewDAGRunRef(status.Name, status.DAGRunID)
-	started := 0
-	for _, subRun := range status.Nodes[0].SubRuns {
-		if _, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); err == nil {
-			started++
-		}
-	}
-	return started
-}
-
 func markParallelItemStartedAndWaitCommand(startedDir, releaseFile string) string {
 	return test.ForOS(
 		fmt.Sprintf(`: > %s/"started-$$"
