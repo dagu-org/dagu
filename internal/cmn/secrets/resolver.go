@@ -14,7 +14,7 @@ import (
 // Resolver fetches secret values from a specific backend.
 // Implementations must be thread-safe as they may be called concurrently.
 type Resolver interface {
-	// Name returns the provider identifier (e.g., "env", "file", "gcp-secrets").
+	// Name returns the provider identifier (e.g., "env", "file", "vault").
 	Name() string
 
 	// Resolve fetches the secret value for the given reference.

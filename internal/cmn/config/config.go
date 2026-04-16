@@ -369,13 +369,21 @@ type PathsConfig struct {
 
 // SecretsConfig holds global defaults for external secret providers.
 type SecretsConfig struct {
-	Vault VaultSecretsConfig
+	Vault      VaultSecretsConfig
+	Kubernetes KubernetesSecretsConfig
 }
 
 // VaultSecretsConfig holds shared HashiCorp Vault client defaults.
 type VaultSecretsConfig struct {
 	Address string
 	Token   string
+}
+
+// KubernetesSecretsConfig holds shared Kubernetes client defaults.
+type KubernetesSecretsConfig struct {
+	Namespace  string
+	Kubeconfig string
+	Context    string
 }
 
 // UI holds user interface configuration.

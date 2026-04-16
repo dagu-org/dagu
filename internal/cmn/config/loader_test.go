@@ -97,9 +97,12 @@ func TestLoad_Env(t *testing.T) {
 		"DAGU_HEADLESS":      "true",
 		"DAGU_CHECK_UPDATES": "false",
 
-		"DAGU_DEFAULT_SHELL":         "/bin/zsh",
-		"DAGU_SECRETS_VAULT_ADDRESS": "https://vault.example.com",
-		"DAGU_SECRETS_VAULT_TOKEN":   "vault-token",
+		"DAGU_DEFAULT_SHELL":                 "/bin/zsh",
+		"DAGU_SECRETS_VAULT_ADDRESS":         "https://vault.example.com",
+		"DAGU_SECRETS_VAULT_TOKEN":           "vault-token",
+		"DAGU_SECRETS_KUBERNETES_NAMESPACE":  "secret-ns",
+		"DAGU_SECRETS_KUBERNETES_KUBECONFIG": filepath.Join(testPaths, "kubeconfig"),
+		"DAGU_SECRETS_KUBERNETES_CONTEXT":    "secret-context",
 
 		"DAGU_UI_MAX_DASHBOARD_PAGE_LIMIT": "250",
 		"DAGU_UI_LOG_ENCODING_CHARSET":     "iso-8859-1",
@@ -269,6 +272,11 @@ func TestLoad_Env(t *testing.T) {
 			Vault: VaultSecretsConfig{
 				Address: "https://vault.example.com",
 				Token:   "vault-token",
+			},
+			Kubernetes: KubernetesSecretsConfig{
+				Namespace:  "secret-ns",
+				Kubeconfig: filepath.Join(testPaths, "kubeconfig"),
+				Context:    "secret-context",
 			},
 		},
 		UI: UI{
@@ -1317,27 +1325,41 @@ monitoring:
 	})
 }
 
-func TestLoad_SecretsVaultConfig(t *testing.T) {
+func TestLoad_SecretsConfig(t *testing.T) {
 	t.Run("FromYAML", func(t *testing.T) {
 		cfg := loadFromYAML(t, `
 secrets:
   vault:
     address: "https://vault.example.com"
     token: "yaml-token"
+  kubernetes:
+    namespace: "secret-ns"
+    kubeconfig: "relative/kubeconfig"
+    context: "prod"
 `)
 
 		assert.Equal(t, "https://vault.example.com", cfg.Secrets.Vault.Address)
 		assert.Equal(t, "yaml-token", cfg.Secrets.Vault.Token)
+		assert.Equal(t, "secret-ns", cfg.Secrets.Kubernetes.Namespace)
+		assert.Equal(t, resolvedTestPath(t, "relative/kubeconfig"), cfg.Secrets.Kubernetes.Kubeconfig)
+		assert.Equal(t, "prod", cfg.Secrets.Kubernetes.Context)
 	})
 
 	t.Run("FromEnv", func(t *testing.T) {
+		kubeconfig := filepath.Join(t.TempDir(), "kubeconfig")
 		cfg := loadWithEnv(t, "# empty", map[string]string{
-			"DAGU_SECRETS_VAULT_ADDRESS": "https://vault.example.com",
-			"DAGU_SECRETS_VAULT_TOKEN":   "env-token",
+			"DAGU_SECRETS_VAULT_ADDRESS":         "https://vault.example.com",
+			"DAGU_SECRETS_VAULT_TOKEN":           "env-token",
+			"DAGU_SECRETS_KUBERNETES_NAMESPACE":  "env-ns",
+			"DAGU_SECRETS_KUBERNETES_KUBECONFIG": kubeconfig,
+			"DAGU_SECRETS_KUBERNETES_CONTEXT":    "env-context",
 		})
 
 		assert.Equal(t, "https://vault.example.com", cfg.Secrets.Vault.Address)
 		assert.Equal(t, "env-token", cfg.Secrets.Vault.Token)
+		assert.Equal(t, "env-ns", cfg.Secrets.Kubernetes.Namespace)
+		assert.Equal(t, kubeconfig, cfg.Secrets.Kubernetes.Kubeconfig)
+		assert.Equal(t, "env-context", cfg.Secrets.Kubernetes.Context)
 	})
 
 	t.Run("OldEnvNamesIgnored", func(t *testing.T) {
@@ -1370,6 +1392,10 @@ secrets:
   vault:
     address: "https://vault.example.com"
     token: "scoped-token"
+  kubernetes:
+    namespace: "scoped-ns"
+    kubeconfig: "relative/scoped-kubeconfig"
+    context: "scoped-context"
 `), 0600)
 				require.NoError(t, err)
 
@@ -1377,6 +1403,9 @@ secrets:
 
 				assert.Equal(t, "https://vault.example.com", cfg.Secrets.Vault.Address)
 				assert.Equal(t, "scoped-token", cfg.Secrets.Vault.Token)
+				assert.Equal(t, "scoped-ns", cfg.Secrets.Kubernetes.Namespace)
+				assert.Equal(t, resolvedTestPath(t, "relative/scoped-kubeconfig"), cfg.Secrets.Kubernetes.Kubeconfig)
+				assert.Equal(t, "scoped-context", cfg.Secrets.Kubernetes.Context)
 			})
 		}
 	})

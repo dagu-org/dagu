@@ -407,13 +407,31 @@ func (l *ConfigLoader) loadPathsConfig(cfg *Config, def Definition) error {
 }
 
 func (l *ConfigLoader) loadSecretsConfig(cfg *Config, def Definition) {
-	if def.Secrets == nil || def.Secrets.Vault == nil {
+	if def.Secrets == nil {
 		return
 	}
 
-	cfg.Secrets.Vault = VaultSecretsConfig{
-		Address: def.Secrets.Vault.Address,
-		Token:   def.Secrets.Vault.Token,
+	if def.Secrets.Vault != nil {
+		cfg.Secrets.Vault = VaultSecretsConfig{
+			Address: def.Secrets.Vault.Address,
+			Token:   def.Secrets.Vault.Token,
+		}
+	}
+
+	if def.Secrets.Kubernetes != nil {
+		kubeconfig := def.Secrets.Kubernetes.Kubeconfig
+		resolved, err := l.resolvePath("secrets.kubernetes.kubeconfig", kubeconfig)
+		if err != nil {
+			l.warnings = append(l.warnings, err.Error())
+		} else {
+			kubeconfig = resolved
+		}
+
+		cfg.Secrets.Kubernetes = KubernetesSecretsConfig{
+			Namespace:  def.Secrets.Kubernetes.Namespace,
+			Kubeconfig: kubeconfig,
+			Context:    def.Secrets.Kubernetes.Context,
+		}
 	}
 }
 
@@ -1643,6 +1661,9 @@ var envBindings = []envBinding{
 	// Secrets
 	{key: "secrets.vault.address", env: "SECRETS_VAULT_ADDRESS"},
 	{key: "secrets.vault.token", env: "SECRETS_VAULT_TOKEN"},
+	{key: "secrets.kubernetes.namespace", env: "SECRETS_KUBERNETES_NAMESPACE"},
+	{key: "secrets.kubernetes.kubeconfig", env: "SECRETS_KUBERNETES_KUBECONFIG", isPath: true},
+	{key: "secrets.kubernetes.context", env: "SECRETS_KUBERNETES_CONTEXT"},
 
 	// Scheduler
 	{key: "scheduler.port", env: "SCHEDULER_PORT"},

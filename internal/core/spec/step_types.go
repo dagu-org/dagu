@@ -48,6 +48,10 @@ func (r *customStepTypeRegistry) Lookup(name string) (*customStepType, bool) {
 
 var customStepTypeNameRegexp = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 
+var customStepRuntimeExpressionRegexp = regexp.MustCompile("`[^`]+`|\\$\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_]*")
+
+var customStepWholeRuntimeExpressionRegexp = regexp.MustCompile("^\\s*(?:`[^`]+`|\\$\\{[^}]+\\}|\\$[A-Za-z_][A-Za-z0-9_]*)\\s*$")
+
 var builtinStepTypeNames = map[string]struct{}{
 	"agent":         {},
 	"archive":       {},
@@ -280,6 +284,11 @@ func validateCustomStepInput(stepTypeName string, schema *jsonschema.Resolved, i
 		)
 	}
 	if err := schema.Validate(working); err != nil {
+		if runtimeInput, ok := customStepRuntimeValidationInput(schema.Schema(), working); ok {
+			if runtimeErr := schema.Validate(runtimeInput); runtimeErr == nil {
+				return working, nil
+			}
+		}
 		return nil, core.NewValidationError(
 			"config",
 			input,
@@ -287,6 +296,219 @@ func validateCustomStepInput(stepTypeName string, schema *jsonschema.Resolved, i
 		)
 	}
 	return working, nil
+}
+
+func customStepRuntimeValidationInput(root *jsonschema.Schema, input map[string]any) (map[string]any, bool) {
+	value, ok := customStepRuntimeValidationValue(root, root, input)
+	if !ok {
+		return nil, false
+	}
+	typed, ok := value.(map[string]any)
+	return typed, ok
+}
+
+func customStepRuntimeValidationValue(root, schema *jsonschema.Schema, value any) (any, bool) {
+	schema = customStepRuntimeSchema(root, schema)
+	if schema == nil {
+		return nil, false
+	}
+
+	switch typed := value.(type) {
+	case string:
+		return customStepRuntimePlaceholder(schema, typed)
+	case map[string]any:
+		return customStepRuntimeValidationObject(root, schema, typed)
+	case []any:
+		return customStepRuntimeValidationArray(root, schema, typed)
+	default:
+		return nil, false
+	}
+}
+
+func customStepRuntimeValidationObject(root, schema *jsonschema.Schema, value map[string]any) (map[string]any, bool) {
+	var output map[string]any
+	for key, item := range value {
+		propertySchema := customStepObjectPropertySchema(schema, key)
+		next, ok := customStepRuntimeValidationValue(root, propertySchema, item)
+		if !ok {
+			continue
+		}
+		if output == nil {
+			output = make(map[string]any, len(value))
+			maps.Copy(output, value)
+		}
+		output[key] = next
+	}
+	return output, output != nil
+}
+
+func customStepRuntimeValidationArray(root, schema *jsonschema.Schema, value []any) ([]any, bool) {
+	var output []any
+	for idx, item := range value {
+		itemSchema := customStepArrayItemSchema(schema, idx)
+		next, ok := customStepRuntimeValidationValue(root, itemSchema, item)
+		if !ok {
+			continue
+		}
+		if output == nil {
+			output = append([]any(nil), value...)
+		}
+		output[idx] = next
+	}
+	return output, output != nil
+}
+
+func customStepObjectPropertySchema(schema *jsonschema.Schema, key string) *jsonschema.Schema {
+	if schema == nil {
+		return nil
+	}
+	if propertySchema, ok := schema.Properties[key]; ok {
+		return propertySchema
+	}
+	return schema.AdditionalProperties
+}
+
+func customStepArrayItemSchema(schema *jsonschema.Schema, idx int) *jsonschema.Schema {
+	if schema == nil {
+		return nil
+	}
+	switch {
+	case idx < len(schema.PrefixItems):
+		return schema.PrefixItems[idx]
+	case idx < len(schema.ItemsArray):
+		return schema.ItemsArray[idx]
+	case schema.Items != nil:
+		return schema.Items
+	default:
+		return schema.AdditionalItems
+	}
+}
+
+func customStepRuntimePlaceholder(schema *jsonschema.Schema, value string) (any, bool) {
+	if !customStepRuntimeExpressionRegexp.MatchString(value) {
+		return nil, false
+	}
+
+	schemaType, ok := schemaScalarType(schema)
+	if !ok && schema.Const != nil {
+		schemaType, ok = inferScalarType(*schema.Const)
+	}
+	if !ok {
+		return nil, false
+	}
+
+	wholeExpression := customStepWholeRuntimeExpressionRegexp.MatchString(value)
+	if schemaType != core.ParamDefTypeString || len(schema.Enum) > 0 || schema.Const != nil {
+		if !wholeExpression {
+			return nil, false
+		}
+	}
+
+	return customStepPlaceholderForSchema(schema, schemaType)
+}
+
+func customStepPlaceholderForSchema(schema *jsonschema.Schema, schemaType string) (any, bool) {
+	if schema.Const != nil {
+		return cloneAny(*schema.Const), true
+	}
+	if len(schema.Enum) > 0 {
+		return cloneAny(schema.Enum[0]), true
+	}
+
+	switch schemaType {
+	case core.ParamDefTypeString:
+		return customStepStringPlaceholder(schema), true
+	case core.ParamDefTypeInteger:
+		return customStepIntegerPlaceholder(schema), true
+	case core.ParamDefTypeNumber:
+		return customStepNumberPlaceholder(schema), true
+	case core.ParamDefTypeBoolean:
+		return false, true
+	default:
+		return nil, false
+	}
+}
+
+func customStepStringPlaceholder(schema *jsonschema.Schema) string {
+	length := 1
+	if schema.MaxLength != nil && *schema.MaxLength == 0 {
+		length = 0
+	}
+	if schema.MinLength != nil && *schema.MinLength > length {
+		length = *schema.MinLength
+	}
+	if schema.MaxLength != nil && length > *schema.MaxLength {
+		length = *schema.MaxLength
+	}
+	return strings.Repeat("x", length)
+}
+
+func customStepIntegerPlaceholder(schema *jsonschema.Schema) int {
+	value := 0
+	if schema.Minimum != nil && float64(value) < *schema.Minimum {
+		value = ceilInt(*schema.Minimum)
+	}
+	if schema.ExclusiveMinimum != nil && float64(value) <= *schema.ExclusiveMinimum {
+		value = floorInt(*schema.ExclusiveMinimum) + 1
+	}
+	if schema.Maximum != nil && float64(value) > *schema.Maximum {
+		value = floorInt(*schema.Maximum)
+	}
+	if schema.ExclusiveMaximum != nil && float64(value) >= *schema.ExclusiveMaximum {
+		value = ceilInt(*schema.ExclusiveMaximum) - 1
+	}
+	return value
+}
+
+func customStepNumberPlaceholder(schema *jsonschema.Schema) float64 {
+	value := 0.0
+	if schema.Minimum != nil && value < *schema.Minimum {
+		value = *schema.Minimum
+	}
+	if schema.ExclusiveMinimum != nil && value <= *schema.ExclusiveMinimum {
+		value = *schema.ExclusiveMinimum + 1
+	}
+	if schema.Maximum != nil && value > *schema.Maximum {
+		value = *schema.Maximum
+	}
+	if schema.ExclusiveMaximum != nil && value >= *schema.ExclusiveMaximum {
+		value = *schema.ExclusiveMaximum - 1
+	}
+	return value
+}
+
+func customStepRuntimeSchema(root, schema *jsonschema.Schema) *jsonschema.Schema {
+	if schema == nil || schema.Ref == "" {
+		return schema
+	}
+	if name, ok := strings.CutPrefix(schema.Ref, "#/$defs/"); ok && root != nil {
+		return root.Defs[unescapeJSONPointerSegment(name)]
+	}
+	if name, ok := strings.CutPrefix(schema.Ref, "#/definitions/"); ok && root != nil {
+		return root.Definitions[unescapeJSONPointerSegment(name)]
+	}
+	return schema
+}
+
+func unescapeJSONPointerSegment(segment string) string {
+	segment = strings.ReplaceAll(segment, "~1", "/")
+	return strings.ReplaceAll(segment, "~0", "~")
+}
+
+func ceilInt(value float64) int {
+	result := int(value)
+	if float64(result) < value {
+		result++
+	}
+	return result
+}
+
+func floorInt(value float64) int {
+	result := int(value)
+	if float64(result) > value {
+		result--
+	}
+	return result
 }
 
 func renderCustomStepTemplate(stepTypeName string, template map[string]any, input map[string]any) (map[string]any, error) {

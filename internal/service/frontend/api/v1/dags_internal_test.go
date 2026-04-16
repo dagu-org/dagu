@@ -135,6 +135,75 @@ func TestGetDAGDetails_InvalidYAML_Returns200WithErrors(t *testing.T) {
 	require.NotEmpty(t, *resp.FilePath)
 }
 
+func TestUpdateDAGSpec_AllowsCustomStepTypeRuntimeVariableInput(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "custom-step-runtime-save", []byte(`
+name: custom-step-runtime-save
+steps:
+  - command: echo original
+`))
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	specText := `
+name: custom-step-runtime-save
+type: graph
+step_types:
+  repeat:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message, count]
+      properties:
+        message:
+          type: string
+        count:
+          type: integer
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+          - {$input: count}
+steps:
+  - id: produce
+    command: echo 3
+    output: COUNT
+  - id: consume
+    depends: [produce]
+    type: repeat
+    config:
+      message: runtime value
+      count: ${COUNT}
+`
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "custom-step-runtime-save",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: specText,
+		},
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.UpdateDAGSpec200JSONResponse)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+	require.Empty(t, resp.Errors)
+}
+
 func TestGetDAGDetails_EditorHintsIncludeInheritedCustomStepTypes(t *testing.T) {
 	t.Parallel()
 
