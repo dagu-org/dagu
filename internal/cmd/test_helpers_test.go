@@ -4,6 +4,9 @@
 package cmd_test
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -49,4 +52,52 @@ func commandLogWaitTimeout() time.Duration {
 		return 30 * time.Second
 	}
 	return 10 * time.Second
+}
+
+func newHoldFile(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(path, []byte("release"), 0o600)
+	})
+	return path
+}
+
+func releaseHoldFile(t *testing.T, path string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(path, []byte("release"), 0o600))
+}
+
+func holdUntilFileExistsCommand(path string) string {
+	iterations := int(commandLogWaitTimeout() / (50 * time.Millisecond))
+	return test.ForOS(
+		fmt.Sprintf("for i in $(seq 1 %d); do [ -f %s ] && exit 0; sleep 0.05; done; exit 124", iterations, test.PosixQuote(path)),
+		fmt.Sprintf("for ($i = 0; $i -lt %d; $i++) { if (Test-Path %s) { exit 0 }; Start-Sleep -Milliseconds 50 }; exit 124", iterations, test.PowerShellQuote(path)),
+	)
+}
+
+func releaseHoldFileWhenRecentStatusCountAtLeast(
+	t *testing.T,
+	th test.Command,
+	dagName string,
+	count int,
+	path string,
+) <-chan error {
+	t.Helper()
+
+	done := make(chan error, 1)
+	go func() {
+		deadline := time.Now().Add(commandLogWaitTimeout())
+		for time.Now().Before(deadline) {
+			if len(th.DAGRunMgr.ListRecentStatus(th.Context, dagName, count)) >= count {
+				done <- os.WriteFile(path, []byte("release"), 0o600)
+				return
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		_ = os.WriteFile(path, []byte("release"), 0o600)
+		done <- fmt.Errorf("timed out waiting for %d recent statuses for %s", count, dagName)
+	}()
+	return done
 }
