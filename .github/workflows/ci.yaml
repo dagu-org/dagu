@@ -272,15 +272,6 @@ jobs:
           make test-e2e-build
           make test-e2e-run
 
-      - name: Upload Playwright test results
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: playwright-test-results-shard-${{ matrix.shard }}
-          path: ui/test-results
-          if-no-files-found: ignore
-          retention-days: 7
-
   test-windows:
     name: Test on windows-latest (${{ matrix.suite_index }}/${{ matrix.suite_total }})
     needs: changes
