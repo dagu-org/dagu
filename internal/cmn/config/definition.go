@@ -206,13 +206,21 @@ type PathsDef struct {
 
 // SecretsDef configures shared defaults for secret providers.
 type SecretsDef struct {
-	Vault *VaultSecretsDef `mapstructure:"vault"`
+	Vault      *VaultSecretsDef      `mapstructure:"vault"`
+	Kubernetes *KubernetesSecretsDef `mapstructure:"kubernetes"`
 }
 
 // VaultSecretsDef configures global HashiCorp Vault client defaults.
 type VaultSecretsDef struct {
 	Address string `mapstructure:"address"`
 	Token   string `mapstructure:"token"`
+}
+
+// KubernetesSecretsDef configures global Kubernetes client defaults.
+type KubernetesSecretsDef struct {
+	Namespace  string `mapstructure:"namespace"`
+	Kubeconfig string `mapstructure:"kubeconfig"`
+	Context    string `mapstructure:"context"`
 }
 
 // -----------------------------------------------------------------------------

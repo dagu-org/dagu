@@ -1103,9 +1103,12 @@ func (sm *SessionManager) startPromptWaitHeartbeat(ctx context.Context) func() {
 	}
 
 	done := make(chan struct{})
+	stopped := make(chan struct{})
 	var once sync.Once
 
 	go func() {
+		defer close(stopped)
+
 		ticker := time.NewTicker(sm.promptWaitInterval)
 		defer ticker.Stop()
 
@@ -1124,6 +1127,7 @@ func (sm *SessionManager) startPromptWaitHeartbeat(ctx context.Context) func() {
 	return func() {
 		once.Do(func() {
 			close(done)
+			<-stopped
 		})
 	}
 }

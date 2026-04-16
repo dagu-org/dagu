@@ -296,7 +296,7 @@ type DAGRetryPolicy struct {
 type SecretRef struct {
 	// Name is the environment variable name to set (required).
 	Name string `json:"name"`
-	// Provider specifies the secret backend (e.g., "env", "file", "vault") (required).
+	// Provider specifies the secret backend (e.g., "env", "file", "vault", "kubernetes") (required).
 	Provider string `json:"provider"`
 	// Key is the provider-specific identifier for the secret (required).
 	Key string `json:"key"`
