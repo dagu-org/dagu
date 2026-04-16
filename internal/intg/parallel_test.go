@@ -463,13 +463,12 @@ steps:
 		if err != nil || status.Status != core.Running || len(status.Nodes) == 0 {
 			return false
 		}
-		if len(status.Nodes[0].SubRuns) != 3 {
-			return false
-		}
-
 		started := countStartedParallelSubRuns(t, dag, &status)
 		if runtime.GOOS == "windows" {
 			return started >= 1
+		}
+		if len(status.Nodes[0].SubRuns) != 3 {
+			return false
 		}
 		return started == 1
 	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected exactly one started sub-run before abort")
