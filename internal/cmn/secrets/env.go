@@ -29,8 +29,6 @@ func init() {
 //   - Local development
 //   - CI/CD environments where secrets are injected at runtime
 //   - Testing
-//
-// For production, prefer external providers like GCP Secret Manager.
 type envResolver struct{}
 
 // Name returns the provider identifier.

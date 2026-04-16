@@ -111,14 +111,28 @@ steps:
 
 	fakeRunID := uuid.Must(uuid.NewV7()).String()
 	fakeRef := exec.NewDAGRunRef(f.dag.Name, fakeRunID)
+	staleStartedAt := time.Now().Add(-30 * time.Second)
 	procFile := test.CreateStaleProcFile(
 		t,
 		f.th.Config.Paths.ProcDir,
 		f.dag.ProcGroup(),
 		fakeRef,
-		time.Now().Add(-2*time.Second),
-		time.Second,
+		staleStartedAt,
+		30*time.Second,
 	)
+
+	require.Eventually(t, func() bool {
+		entries, err := f.th.ProcStore.ListEntries(f.th.Context, f.dag.ProcGroup())
+		if err != nil {
+			return false
+		}
+		for _, entry := range entries {
+			if entry.Meta.DAGRunID == fakeRunID {
+				return !entry.Fresh
+			}
+		}
+		return false
+	}, 5*time.Second, 50*time.Millisecond, "stale proc file should be visible before scheduler starts")
 
 	f.StartScheduler(30 * time.Second)
 	f.WaitForStatus(f.runIDs[0], core.Succeeded, 20*time.Second)

@@ -6,7 +6,9 @@ package distr_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -209,6 +211,8 @@ steps:
 func TestParallel_MixedLocalAndDistributed(t *testing.T) {
 	t.Run("mixedLocalAndDistributedExecution", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		releaseFile := filepath.Join(t.TempDir(), "release")
+		waitForReleaseFile := strings.ReplaceAll(waitForReleaseFileScript(releaseFile), "\n", "\n      ")
 		f := newTestFixture(t, `
 type: graph
 steps:
@@ -228,16 +232,18 @@ steps:
 ---
 name: child-local
 steps:
-  - name: sleep
-    command: sleep $1
+  - name: wait
+    command: |
+      `+waitForReleaseFile+`
 
 ---
 name: child-distributed
 worker_selector:
   type: test-worker
 steps:
-  - name: sleep
-    command: sleep $1
+  - name: wait
+    command: |
+      `+waitForReleaseFile+`
 `, withLabels(map[string]string{"type": "test-worker"}), withDAGsDir(tmpDir), withLogPersistence())
 
 		agent := f.dagWrapper.Agent()
@@ -247,6 +253,14 @@ steps:
 			agent.Context = f.coord.Context
 			_ = agent.Run(agent.Context)
 			close(done)
+		}()
+		defer func() {
+			_ = os.WriteFile(releaseFile, []byte("release"), 0o644)
+			select {
+			case <-done:
+			case <-time.After(distrTestTimeout(5 * time.Second)):
+				t.Log("agent did not stop during cleanup")
+			}
 		}()
 
 		require.Eventually(t, func() bool {
@@ -264,11 +278,16 @@ steps:
 				}
 			}
 			return started == 2
-		}, 5*time.Second, 100*time.Millisecond)
+		}, distrTestTimeout(5*time.Second), 100*time.Millisecond)
 
 		agent.Signal(f.coord.Context, os.Signal(syscall.SIGTERM))
 
-		<-done
+		select {
+		case <-done:
+		case <-time.After(distrTestTimeout(5 * time.Second)):
+			_ = os.WriteFile(releaseFile, []byte("release"), 0o644)
+			t.Fatal("agent did not stop within timeout")
+		}
 
 		st := agent.Status(f.coord.Context)
 

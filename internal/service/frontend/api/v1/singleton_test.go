@@ -11,6 +11,7 @@ import (
 
 	"github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -19,11 +20,12 @@ func TestSingleton(t *testing.T) {
 	server := test.SetupServer(t)
 
 	t.Run("ExecuteDAGConflict", func(t *testing.T) {
-		spec := `
+		release := newHoldFile(t)
+		spec := fmt.Sprintf(`
 steps:
   - name: sleep
-    command: sleep 10
-`
+    command: |
+%s`, indentCommandBlock(holdUntilFileExistsCommand(release), 6))
 		// Create a new DAG
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 			Name: "singleton_exec_dag",
@@ -54,16 +56,22 @@ steps:
 			Singleton: &singleton,
 		}).ExpectStatus(http.StatusConflict).Send(t)
 
+		releaseHoldFile(t, release)
+		waitForDAGRunStatus(t, server, "singleton_exec_dag", execResp.DagRunId, 5*time.Second, func(status *exec.DAGRunStatus) bool {
+			return status.Status == core.Succeeded
+		})
+
 		// Clean up (deleting the DAG will eventually stop the run)
 		_ = server.Client().Delete("/api/v1/dags/singleton_exec_dag").ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
 	t.Run("EnqueueDAGConflict_Running", func(t *testing.T) {
-		spec := `
+		release := newHoldFile(t)
+		spec := fmt.Sprintf(`
 steps:
   - name: sleep
-    command: sleep 10
-`
+    command: |
+%s`, indentCommandBlock(holdUntilFileExistsCommand(release), 6))
 		// Create a new DAG
 		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 			Name: "singleton_enq_run_dag",
@@ -91,6 +99,11 @@ steps:
 		server.Client().Post("/api/v1/dags/singleton_enq_run_dag/enqueue", api.EnqueueDAGDAGRunJSONRequestBody{
 			Singleton: &singleton,
 		}).ExpectStatus(http.StatusConflict).Send(t)
+
+		releaseHoldFile(t, release)
+		waitForDAGRunStatus(t, server, "singleton_enq_run_dag", execResp.DagRunId, 5*time.Second, func(status *exec.DAGRunStatus) bool {
+			return status.Status == core.Succeeded
+		})
 
 		// Clean up
 		_ = server.Client().Delete("/api/v1/dags/singleton_enq_run_dag").ExpectStatus(http.StatusNoContent).Send(t)

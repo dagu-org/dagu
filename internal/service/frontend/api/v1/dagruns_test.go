@@ -47,6 +47,21 @@ func holdUntilFileExistsCommand(path string) string {
 	)
 }
 
+func newHoldFile(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "release")
+	t.Cleanup(func() {
+		_ = os.WriteFile(path, []byte("release"), 0o600)
+	})
+	return path
+}
+
+func releaseHoldFile(t *testing.T, path string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(path, []byte("release"), 0o600))
+}
+
 func waitForDAGRunStatus(
 	t *testing.T,
 	server test.Server,

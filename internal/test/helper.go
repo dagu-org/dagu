@@ -641,7 +641,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected core.Status) {
 		}
 		t.Logf("current status=%s errors=%v", curr.Status.String(), curr.Errors())
 		return curr.Status == expected
-	}, time.Second*5, time.Second)
+	}, latestStatusAssertTimeout, latestStatusAssertInterval)
 }
 
 // AssertOutputs checks the given outputs against the actual outputs of the DAG

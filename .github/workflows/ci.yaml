@@ -169,6 +169,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Login to Docker Hub
+        if: ${{ matrix.suite == 'intg' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Resolve test packages
         id: test-packages
         shell: bash
@@ -217,7 +224,14 @@ jobs:
     needs:
       - changes
       - golint
-    if: needs.changes.outputs.e2e == 'true' && (needs.golint.result == 'success' || needs.golint.result == 'skipped')
+      - test-ubuntu
+      - test-windows
+    if: >-
+      always() &&
+      needs.changes.outputs.e2e == 'true' &&
+      (needs.golint.result == 'success' || needs.golint.result == 'skipped') &&
+      (needs.test-ubuntu.result == 'success' || needs.test-ubuntu.result == 'skipped') &&
+      (needs.test-windows.result == 'success' || needs.test-windows.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     strategy:
@@ -271,15 +285,6 @@ jobs:
         run: |
           make test-e2e-build
           make test-e2e-run
-
-      - name: Upload Playwright test results
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: playwright-test-results-shard-${{ matrix.shard }}
-          path: ui/test-results
-          if-no-files-found: ignore
-          retention-days: 7
 
   test-windows:
     name: Test on windows-latest (${{ matrix.suite_index }}/${{ matrix.suite_total }})

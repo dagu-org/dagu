@@ -4,6 +4,7 @@
 package cmd_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -18,12 +19,14 @@ import (
 
 func TestStopCommand(t *testing.T) {
 	t.Run("StopDAGRun", func(t *testing.T) {
+		t.Parallel()
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    script: "sleep 10"
-`)
+    script: %q
+`, holdUntilFileExistsCommand(release)))
 
 		done := make(chan struct{})
 		go func() {
@@ -46,12 +49,14 @@ func TestStopCommand(t *testing.T) {
 		<-done
 	})
 	t.Run("StopDAGRunWithRunID", func(t *testing.T) {
+		t.Parallel()
 		th := test.SetupCommand(t)
 
-		dag := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    script: "sleep 10"
-`)
+    script: %q
+`, holdUntilFileExistsCommand(release)))
 
 		done := make(chan struct{})
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -75,6 +80,7 @@ func TestStopCommand(t *testing.T) {
 		<-done
 	})
 	t.Run("CancelFailedAutoRetryPendingDAGRunWithRunID", func(t *testing.T) {
+		t.Parallel()
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `name: cancel-stop-retry
@@ -97,6 +103,7 @@ steps:
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("StopWithoutRunIDDoesNotCancelFailedAutoRetryPendingDAGRun", func(t *testing.T) {
+		t.Parallel()
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `name: stop-running-only

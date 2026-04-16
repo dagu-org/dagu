@@ -48,10 +48,12 @@ func TestManager(t *testing.T) {
 			},
 		)
 
+		listen := make(chan error, 1)
 		go func() {
-			_ = socketServer.Serve(ctx, nil)
+			_ = socketServer.Serve(ctx, listen)
 			_ = socketServer.Shutdown(ctx)
 		}()
+		require.NoError(t, <-listen)
 
 		dag.AssertCurrentStatus(t, core.Running)
 
