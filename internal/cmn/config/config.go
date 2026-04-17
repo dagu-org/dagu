@@ -393,12 +393,18 @@ type UI struct {
 	NavbarTitle           string
 	MaxDashboardPageLimit int
 	DAGs                  DAGsConfig
+	Automata              AutomataUIConfig
 }
 
 // DAGsConfig holds DAG list page configuration.
 type DAGsConfig struct {
 	SortField string
 	SortOrder string
+}
+
+// AutomataUIConfig holds Automata UI feature visibility settings.
+type AutomataUIConfig struct {
+	Enabled bool
 }
 
 // RemoteNode represents a remote node configuration.

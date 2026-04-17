@@ -520,7 +520,7 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {config.agentEnabled && (
+            {config.agentEnabled && config.automataEnabled && (
               <NavItem
                 to="/automata"
                 text="Automata"

@@ -229,17 +229,23 @@ type KubernetesSecretsDef struct {
 
 // UIDef configures the user interface.
 type UIDef struct {
-	LogEncodingCharset    string      `mapstructure:"log_encoding_charset"`
-	NavbarColor           string      `mapstructure:"navbar_color"`
-	NavbarTitle           string      `mapstructure:"navbar_title"`
-	MaxDashboardPageLimit int         `mapstructure:"max_dashboard_page_limit"`
-	DAGs                  *DAGListDef `mapstructure:"dags"`
+	LogEncodingCharset    string         `mapstructure:"log_encoding_charset"`
+	NavbarColor           string         `mapstructure:"navbar_color"`
+	NavbarTitle           string         `mapstructure:"navbar_title"`
+	MaxDashboardPageLimit int            `mapstructure:"max_dashboard_page_limit"`
+	DAGs                  *DAGListDef    `mapstructure:"dags"`
+	Automata              *AutomataUIDef `mapstructure:"automata"`
 }
 
 // DAGListDef configures the DAGs list page.
 type DAGListDef struct {
 	SortField string `mapstructure:"sort_field"`
 	SortOrder string `mapstructure:"sort_order"`
+}
+
+// AutomataUIDef configures the Automata UI surface.
+type AutomataUIDef struct {
+	Enabled *bool `mapstructure:"enabled"`
 }
 
 // -----------------------------------------------------------------------------

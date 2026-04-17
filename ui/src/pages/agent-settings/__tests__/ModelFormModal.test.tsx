@@ -35,6 +35,7 @@ const config: Config = {
   oidcButtonLabel: '',
   terminalEnabled: false,
   gitSyncEnabled: false,
+  automataEnabled: false,
   agentEnabled: true,
   updateAvailable: false,
   latestVersion: '',

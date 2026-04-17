@@ -211,7 +211,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     document.documentElement.style.backgroundColor = 'var(--background)';
   }, [theme]);
 
-  const automataRouteElement = config.agentEnabled
+  const automataFeatureEnabled = config.agentEnabled && config.automataEnabled;
+  const automataRouteElement = automataFeatureEnabled
     ? <AutomataPage />
     : <Navigate to="/dags" replace />;
 

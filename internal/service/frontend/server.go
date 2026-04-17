@@ -453,6 +453,7 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 			OIDCEnabled:           oidcEnabled,
 			OIDCButtonLabel:       oidcButtonLabel,
 			TerminalEnabled:       cfg.Server.Terminal.Enabled && authSvc != nil,
+			AutomataEnabled:       cfg.UI.Automata.Enabled,
 			GitSyncEnabled:        cfg.GitSync.Enabled,
 			WorkspaceStore:        wsStore,
 			SetupRequiredChecker:  &setupChecker{authSvc: authSvc, fallback: setupRequired},

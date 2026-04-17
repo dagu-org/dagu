@@ -15,6 +15,7 @@ type CockpitMode = 'runs' | 'automata';
 export default function CockpitPage(): React.ReactElement {
   const { setTitle } = React.useContext(AppBarContext);
   const config = useConfig();
+  const automataFeatureEnabled = config.agentEnabled && config.automataEnabled;
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
   const [mode, setMode] = useState<CockpitMode>(() => {
     const stored = localStorage.getItem(COCKPIT_MODE_STORAGE_KEY);
@@ -35,17 +36,17 @@ export default function CockpitPage(): React.ReactElement {
   }, [setTitle]);
 
   useEffect(() => {
-    if (!config.agentEnabled && mode !== 'runs') {
+    if (!automataFeatureEnabled && mode !== 'runs') {
       setMode('runs');
       localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, 'runs');
     }
-  }, [config.agentEnabled, mode]);
+  }, [automataFeatureEnabled, mode]);
 
   const effectiveMode: CockpitMode =
-    config.agentEnabled && mode === 'automata' ? 'automata' : 'runs';
+    automataFeatureEnabled && mode === 'automata' ? 'automata' : 'runs';
 
   const handleModeChange = (nextMode: CockpitMode) => {
-    const resolvedMode = config.agentEnabled ? nextMode : 'runs';
+    const resolvedMode = automataFeatureEnabled ? nextMode : 'runs';
     setMode(resolvedMode);
     localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, resolvedMode);
     if (resolvedMode !== 'runs') {
@@ -68,7 +69,7 @@ export default function CockpitPage(): React.ReactElement {
               : 'Monitor Automata lifecycle and workspace activity.'}
           </div>
         </div>
-        {config.agentEnabled ? (
+        {automataFeatureEnabled ? (
           <ToggleGroup aria-label="Cockpit mode">
             <ToggleButton
               value="runs"

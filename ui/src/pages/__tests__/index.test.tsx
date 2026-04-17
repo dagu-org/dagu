@@ -50,6 +50,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     oidcButtonLabel: '',
     terminalEnabled: false,
     gitSyncEnabled: false,
+    automataEnabled: false,
     agentEnabled: false,
     updateAvailable: false,
     latestVersion: '',
