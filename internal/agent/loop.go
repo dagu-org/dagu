@@ -200,12 +200,16 @@ func (l *Loop) UpdateRuntime(
 	tools []*AgentTool,
 	systemPrompt string,
 	automataRuntime AutomataRuntime,
+	workingDir string,
 ) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.tools = tools
 	l.systemPrompt = systemPrompt
 	l.automataRuntime = automataRuntime
+	if workingDir != "" {
+		l.workingDir = workingDir
+	}
 }
 
 // SetSafeMode updates the safe mode setting for this loop.

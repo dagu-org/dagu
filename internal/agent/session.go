@@ -887,6 +887,10 @@ func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
 	sm.allowedTools = append([]string(nil), opts.AllowedTools...)
 	sm.systemPromptExtra = opts.SystemPromptExtra
 	sm.automataRuntime = opts.AutomataRuntime
+	if opts.WorkingDir != "" {
+		sm.workingDir = opts.WorkingDir
+		sm.environment.WorkingDir = opts.WorkingDir
+	}
 	if opts.AutomataName != "" {
 		sm.automataName = opts.AutomataName
 	}
@@ -898,7 +902,7 @@ func (sm *SessionManager) ApplyRuntimeOptions(opts *SessionRuntimeOptions) {
 
 	if loop != nil {
 		tools, systemPrompt := sm.buildRuntimeArtifacts()
-		loop.UpdateRuntime(tools, systemPrompt, sm.automataRuntime)
+		loop.UpdateRuntime(tools, systemPrompt, sm.automataRuntime, sm.workingDir)
 	}
 }
 

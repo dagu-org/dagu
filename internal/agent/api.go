@@ -131,6 +131,7 @@ type sessionRuntimeConfig struct {
 	modelID         string
 	resolvedModel   string
 	modelCfg        *ModelConfig
+	workingDir      string
 	dagName         string
 	automataName    string
 	title           string
@@ -151,6 +152,7 @@ type SessionRuntimeOptions struct {
 	Soul              *Soul
 	AllowClearSoul    bool
 	AutomataName      string
+	WorkingDir        string
 	AutomataRuntime   AutomataRuntime
 }
 
@@ -550,6 +552,7 @@ func (a *API) defaultSessionRuntime(ctx context.Context, dagName string, safeMod
 		modelID:         modelID,
 		resolvedModel:   modelCfg.Model,
 		modelCfg:        modelCfg,
+		workingDir:      runtimeWorkingDir(a.workingDir, runtimeOpts),
 		dagName:         dagName,
 		automataName:    "",
 		safeMode:        safeMode,
@@ -574,6 +577,7 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 		modelID:         modelID,
 		resolvedModel:   modelCfg.Model,
 		modelCfg:        modelCfg,
+		workingDir:      mgr.workingDir,
 		dagName:         cmp.Or(overrideDAGName, mgr.dagName),
 		automataName:    mgr.automataName,
 		title:           mgr.title,
@@ -587,15 +591,20 @@ func (a *API) runtimeConfigForSession(ctx context.Context, mgr *SessionManager, 
 }
 
 func (a *API) buildSessionManagerConfig(id string, user UserIdentity, cfg sessionRuntimeConfig) SessionManagerConfig {
+	environment := a.environment
+	workingDir := cmp.Or(cfg.workingDir, a.workingDir)
+	if workingDir != "" {
+		environment.WorkingDir = workingDir
+	}
 	return SessionManagerConfig{
 		ID:                    id,
 		User:                  user,
 		Model:                 cfg.modelID,
 		Logger:                a.logger,
-		WorkingDir:            a.workingDir,
+		WorkingDir:            workingDir,
 		Title:                 cfg.title,
 		OnMessage:             a.createMessageCallback(id),
-		Environment:           a.environment,
+		Environment:           environment,
 		SafeMode:              cfg.safeMode,
 		Hooks:                 a.hooks,
 		InputCostPer1M:        cfg.inputCostPer1M,
@@ -609,6 +618,16 @@ func (a *API) buildSessionManagerConfig(id string, user UserIdentity, cfg sessio
 		ThinkingEffort:        cfg.thinkingEffort,
 		RemoteContextResolver: a.remoteContextResolver,
 	}
+}
+
+func runtimeWorkingDir(defaultWorkingDir string, opts *SessionRuntimeOptions) string {
+	if opts == nil {
+		return defaultWorkingDir
+	}
+	if workingDir := strings.TrimSpace(opts.WorkingDir); workingDir != "" {
+		return workingDir
+	}
+	return defaultWorkingDir
 }
 
 func (a *API) newManagedSession(ctx context.Context, id string, user UserIdentity, cfg sessionRuntimeConfig, now time.Time) *SessionManager {
@@ -969,9 +988,10 @@ func (a *API) reactivateSession(ctx context.Context, id string, user UserIdentit
 	}
 
 	cfg := a.buildSessionManagerConfig(id, user, sessionRuntimeConfig{
-		modelID: modelID,
-		title:   sess.Title,
-		dagName: sess.DAGName,
+		modelID:    modelID,
+		workingDir: runtimeWorkingDir(a.workingDir, runtimeOpts),
+		title:      sess.Title,
+		dagName:    sess.DAGName,
 		automataName: cmp.Or(func() string {
 			if runtimeOpts == nil {
 				return ""
@@ -1236,6 +1256,9 @@ func (a *API) CreateEmptySessionWithRuntime(
 	if runtimeOpts != nil {
 		if runtimeOpts.Soul != nil || runtimeOpts.AllowClearSoul {
 			cfg.soul = runtimeOpts.Soul
+		}
+		if strings.TrimSpace(runtimeOpts.WorkingDir) != "" {
+			cfg.workingDir = strings.TrimSpace(runtimeOpts.WorkingDir)
 		}
 		if runtimeOpts.AutomataName != "" {
 			cfg.automataName = runtimeOpts.AutomataName

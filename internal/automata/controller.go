@@ -367,6 +367,10 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 	if err != nil {
 		return nil, err
 	}
+	workingDir, err := s.ensureAutomataWorkingDir(def.Name)
+	if err != nil {
+		return nil, err
+	}
 	var soul *agent.Soul
 	if def.Agent.Soul != "" && s.soulStore != nil {
 		loaded, err := s.soulStore.GetByID(ctx, def.Agent.Soul)
@@ -396,6 +400,7 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 		Soul:              soul,
 		AllowClearSoul:    def.Agent.Soul == "" && soul == nil,
 		AutomataName:      def.Name,
+		WorkingDir:        workingDir,
 		AutomataRuntime: &controllerRuntime{
 			service: s,
 			def:     def,
@@ -604,6 +609,10 @@ func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.Autom
 	if err != nil {
 		return agent.AutomataRunDAGResult{}, err
 	}
+	defaultWorkingDir, err := r.defaultWorkingDirForDAGRun(dag)
+	if err != nil {
+		return agent.AutomataRunDAGResult{}, err
+	}
 	if r.state.CurrentCycleID == "" {
 		r.state.CurrentCycleID = nextCycleID()
 	}
@@ -617,11 +626,12 @@ func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.Autom
 	}
 	tagText := strings.Join(tags, ",")
 	spec := r.service.subCmdBuilder.Enqueue(dag, runtime.EnqueueOptions{
-		Quiet:       true,
-		DAGRunID:    runID,
-		Params:      input.Params,
-		TriggerType: core.TriggerTypeAutomata.String(),
-		Tags:        tagText,
+		Quiet:             true,
+		DAGRunID:          runID,
+		Params:            input.Params,
+		TriggerType:       core.TriggerTypeAutomata.String(),
+		Tags:              tagText,
+		DefaultWorkingDir: defaultWorkingDir,
 	})
 	if err := runtime.Run(ctx, spec); err != nil {
 		return agent.AutomataRunDAGResult{}, err
@@ -634,6 +644,16 @@ func (r *controllerRuntime) RunAllowedDAG(ctx context.Context, input agent.Autom
 		return agent.AutomataRunDAGResult{}, err
 	}
 	return agent.AutomataRunDAGResult{DAGName: dag.Name, DAGRunID: runID}, nil
+}
+
+func (r *controllerRuntime) defaultWorkingDirForDAGRun(dag *core.DAG) (string, error) {
+	if dag == nil || dag.WorkingDirExplicit {
+		return "", nil
+	}
+	if core.ShouldDispatchToCoordinator(dag, r.service.coordinatorCli != nil, r.service.cfg.DefaultExecMode) {
+		return "", nil
+	}
+	return r.service.ensureAutomataWorkingDir(r.def.Name)
 }
 
 func (r *controllerRuntime) RetryCurrentRun(ctx context.Context) (agent.AutomataRunDAGResult, error) {

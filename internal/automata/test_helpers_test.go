@@ -262,6 +262,7 @@ tags:
   - dev
 steps:
   - name: echo
+    type: command
     command: echo hello
 `
 }

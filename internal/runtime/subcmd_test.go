@@ -367,6 +367,16 @@ func TestStart(t *testing.T) {
 		assert.Contains(t, spec.Args, "--run-id=test-run-id")
 	})
 
+	t.Run("StartWithDefaultWorkingDir", func(t *testing.T) {
+		t.Parallel()
+		opts := runtime.StartOptions{
+			DefaultWorkingDir: "/automata/workspace",
+		}
+		spec := builder.Start(dag, opts)
+
+		assert.Contains(t, spec.Args, "--default-working-dir=/automata/workspace")
+	})
+
 	t.Run("StartWithAllOptions", func(t *testing.T) {
 		t.Parallel()
 		opts := runtime.StartOptions{
@@ -471,6 +481,16 @@ func TestEnqueue(t *testing.T) {
 
 		assert.Contains(t, spec.Args, "--queue")
 		assert.Contains(t, spec.Args, "custom-queue")
+	})
+
+	t.Run("EnqueueWithDefaultWorkingDir", func(t *testing.T) {
+		t.Parallel()
+		opts := runtime.EnqueueOptions{
+			DefaultWorkingDir: "/automata/workspace",
+		}
+		spec := builder.Enqueue(dag, opts)
+
+		assert.Contains(t, spec.Args, "--default-working-dir=/automata/workspace")
 	})
 
 	t.Run("EnqueueWithAllOptions", func(t *testing.T) {

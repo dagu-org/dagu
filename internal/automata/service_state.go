@@ -22,6 +22,24 @@ func (s *Service) statePath(name string) string {
 	return filepath.Join(s.stateDir, name, "state.json")
 }
 
+func (s *Service) automataWorkingDir(name string) (string, error) {
+	if err := validateName(name); err != nil {
+		return "", err
+	}
+	return filepath.Join(s.stateDir, name, "workspace"), nil
+}
+
+func (s *Service) ensureAutomataWorkingDir(name string) (string, error) {
+	dir, err := s.automataWorkingDir(name)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
+		return "", fmt.Errorf("create automata workspace: %w", err)
+	}
+	return dir, nil
+}
+
 func (s *Service) loadState(_ context.Context, name string) (*State, error) {
 	if err := validateName(name); err != nil {
 		return nil, err

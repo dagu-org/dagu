@@ -1095,6 +1095,27 @@ func TestAPI_CreateEmptySessionWithRuntime_UsesRuntimeModel(t *testing.T) {
 	assert.Equal(t, "runtime-model", mgr.GetModel())
 }
 
+func TestAPI_CreateEmptySessionWithRuntime_UsesRuntimeWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	model := testModelConfig("default-model")
+	api, _ := testAPIWithModels(t, model)
+	runtimeWorkingDir := t.TempDir()
+
+	sessionID, err := api.CreateEmptySessionWithRuntime(context.Background(), UserIdentity{
+		UserID:   defaultUserID,
+		Username: defaultUserID,
+		Role:     defaultUserRole,
+	}, "", false, &SessionRuntimeOptions{WorkingDir: runtimeWorkingDir})
+	require.NoError(t, err)
+
+	mgrVal, ok := api.sessions.Load(sessionID)
+	require.True(t, ok)
+	mgr := mgrVal.(*SessionManager)
+	assert.Equal(t, runtimeWorkingDir, mgr.workingDir)
+	assert.Equal(t, runtimeWorkingDir, mgr.environment.WorkingDir)
+}
+
 func TestAPI_SendMessage_UpdatesPricing(t *testing.T) {
 	t.Parallel()
 

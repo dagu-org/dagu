@@ -5,6 +5,7 @@ package automata
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,6 +15,12 @@ import (
 	"github.com/dagucloud/dagu/internal/service/eventstore"
 	"github.com/stretchr/testify/require"
 )
+
+type testCoordinatorCanceler struct{}
+
+func (*testCoordinatorCanceler) RequestCancel(context.Context, string, string, *exec.DAGRunRef) error {
+	return nil
+}
 
 type testAgentConfigStore struct {
 	cfg *agent.Config
@@ -1196,6 +1203,43 @@ agent:
 	opts, err := svc.runtimeOptions(ctx, def, state)
 	require.NoError(t, err)
 	require.Equal(t, "claude-sonnet-4-6", opts.Model)
+	require.Equal(t, filepath.Join(svc.stateDir, "software_dev", "workspace"), opts.WorkingDir)
+	require.DirExists(t, opts.WorkingDir)
+}
+
+func TestControllerRuntimeDefaultWorkingDirForDAGRun(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	dag, err := svc.dagStore.GetDetails(ctx, "build-app")
+	require.NoError(t, err)
+	require.False(t, dag.WorkingDirExplicit)
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	dir, err := rt.defaultWorkingDirForDAGRun(dag)
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(svc.stateDir, "software_dev", "workspace"), dir)
+	require.DirExists(t, dir)
+
+	explicitDAG := *dag
+	explicitDAG.WorkingDirExplicit = true
+	dir, err = rt.defaultWorkingDirForDAGRun(&explicitDAG)
+	require.NoError(t, err)
+	require.Empty(t, dir)
+
+	distributedDAG := *dag
+	distributedDAG.WorkerSelector = map[string]string{"role": "worker"}
+	svc.coordinatorCli = &testCoordinatorCanceler{}
+	dir, err = rt.defaultWorkingDirForDAGRun(&distributedDAG)
+	require.NoError(t, err)
+	require.Empty(t, dir)
 }
 
 func TestControllerRuntimeSetTaskDonePersists(t *testing.T) {
