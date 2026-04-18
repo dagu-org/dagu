@@ -6,7 +6,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { DAGRunSelectionItem } from './useBulkDAGRunSelection';
 
-export type BatchActionType = 'retry' | 'reschedule';
+export type BatchActionType = 'retry' | 'reschedule' | 'delete';
 export type BatchActionPhase = 'confirm' | 'running' | 'complete';
 
 type ActiveBatch = {
@@ -67,6 +67,10 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+const assertUnreachable = (value: never): never => {
+  throw new Error(`Unsupported DAG-run batch action: ${String(value)}`);
+};
+
 export function useDAGRunBatchSubmission({
   onActionComplete,
   onReplaceSelection,
@@ -117,80 +121,117 @@ export function useDAGRunBatchSubmission({
       const fallback = `Failed to ${action} DAG run`;
 
       try {
-        if (action === 'retry') {
-          const { error } = await client.POST(
-            '/dag-runs/{name}/{dagRunId}/retry',
-            {
-              params: {
-                path: {
-                  name: dagRun.name,
+        switch (action) {
+          case 'retry': {
+            const { error } = await client.POST(
+              '/dag-runs/{name}/{dagRunId}/retry',
+              {
+                params: {
+                  path: {
+                    name: dagRun.name,
+                    dagRunId: dagRun.dagRunId,
+                  },
+                  query: {
+                    remoteNode,
+                  },
+                },
+                body: {
                   dagRunId: dagRun.dagRunId,
                 },
-                query: {
-                  remoteNode,
-                },
-              },
-              body: {
-                dagRunId: dagRun.dagRunId,
-              },
-            }
-          );
+              }
+            );
 
-          if (error) {
+            if (error) {
+              return {
+                ...dagRun,
+                ok: false,
+                error: error.message || fallback,
+              };
+            }
+
             return {
               ...dagRun,
-              ok: false,
-              error: error.message || fallback,
+              ok: true,
             };
           }
 
-          return {
-            ...dagRun,
-            ok: true,
-          };
-        }
+          case 'delete': {
+            const { error } = await client.DELETE(
+              '/dag-runs/{name}/{dagRunId}',
+              {
+                params: {
+                  path: {
+                    name: dagRun.name,
+                    dagRunId: dagRun.dagRunId,
+                  },
+                  query: {
+                    remoteNode,
+                  },
+                },
+              }
+            );
 
-        const { data, error } = await client.POST(
-          '/dag-runs/{name}/{dagRunId}/reschedule',
-          {
-            params: {
-              path: {
-                name: dagRun.name,
-                dagRunId: dagRun.dagRunId,
-              },
-              query: {
-                remoteNode,
-              },
-            },
-            body: {
-              dagRunId: undefined,
-              useCurrentDagFile: options?.useCurrentDagFile,
-            },
+            if (error) {
+              return {
+                ...dagRun,
+                ok: false,
+                error: error.message || fallback,
+              };
+            }
+
+            return {
+              ...dagRun,
+              ok: true,
+            };
           }
-        );
 
-        if (error) {
-          return {
-            ...dagRun,
-            ok: false,
-            error: error.message || fallback,
-          };
+          case 'reschedule': {
+            const { data, error } = await client.POST(
+              '/dag-runs/{name}/{dagRunId}/reschedule',
+              {
+                params: {
+                  path: {
+                    name: dagRun.name,
+                    dagRunId: dagRun.dagRunId,
+                  },
+                  query: {
+                    remoteNode,
+                  },
+                },
+                body: {
+                  dagRunId: undefined,
+                  useCurrentDagFile: options?.useCurrentDagFile,
+                },
+              }
+            );
+
+            if (error) {
+              return {
+                ...dagRun,
+                ok: false,
+                error: error.message || fallback,
+              };
+            }
+
+            if (!data?.dagRunId) {
+              return {
+                ...dagRun,
+                ok: false,
+                error: 'Reschedule request did not return a new DAG run ID.',
+              };
+            }
+
+            return {
+              ...dagRun,
+              ok: true,
+              newDagRunId: data.dagRunId,
+              queued: data?.queued,
+            };
+          }
+
+          default:
+            return assertUnreachable(action);
         }
-
-        if (!data?.dagRunId) {
-          return {
-            ...dagRun,
-            ok: false,
-            error: 'Reschedule request did not return a new DAG run ID.',
-          };
-        }
-
-        return {
-          ...dagRun,
-          ok: true,
-          newDagRunId: data.dagRunId,
-          queued: data?.queued,
-        };
       } catch (error) {
         return {
           ...dagRun,

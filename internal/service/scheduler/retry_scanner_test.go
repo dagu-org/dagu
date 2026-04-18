@@ -721,7 +721,9 @@ func (s *retryScannerStore) RemoveOldDAGRuns(context.Context, string, int, ...ex
 }
 
 func (s *retryScannerStore) RenameDAGRuns(context.Context, string, string) error { return nil }
-func (s *retryScannerStore) RemoveDAGRun(context.Context, exec.DAGRunRef) error  { return nil }
+func (s *retryScannerStore) RemoveDAGRun(context.Context, exec.DAGRunRef, ...exec.RemoveDAGRunOption) error {
+	return nil
+}
 
 func (s *retryScannerStore) mustStatus(ref exec.DAGRunRef) *exec.DAGRunStatus {
 	attempt, ok := s.attempts[ref.String()]

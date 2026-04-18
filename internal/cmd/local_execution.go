@@ -73,7 +73,7 @@ func prepareLocalExecution(
 	})
 	if err != nil {
 		_ = recordPreparedAttemptFailure(ctx, attempt, dag, dagRunID, root, parent, triggerType, scheduleTime, err)
-		return nil, fmt.Errorf("failed to acquire process handle: %w", errProcAcquisitionFailed)
+		return nil, fmt.Errorf("%w: %w", errProcAcquisitionFailed, err)
 	}
 
 	return &localExecutionPreparation{

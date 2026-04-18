@@ -16,6 +16,7 @@ import DAGRunBatchActions from '../DAGRunBatchActions';
 
 const postMock = vi.fn();
 const getMock = vi.fn();
+const deleteMock = vi.fn();
 
 vi.mock('@/hooks/api', () => ({
   useClient: vi.fn(),
@@ -43,7 +44,9 @@ describe('DAGRunBatchActions', () => {
   beforeEach(() => {
     postMock.mockReset();
     getMock.mockReset();
+    deleteMock.mockReset();
     useClientMock.mockReturnValue({
+      DELETE: deleteMock,
       GET: getMock,
       POST: postMock,
     } as never);
@@ -106,9 +109,7 @@ describe('DAGRunBatchActions', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Reschedule selected' })
     );
-    expect(
-      await screen.findByLabelText('Use original DAG file')
-    ).toBeChecked();
+    expect(await screen.findByLabelText('Use original DAG file')).toBeChecked();
     fireEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', {
         name: 'Reschedule 2 Runs',
@@ -235,6 +236,55 @@ describe('DAGRunBatchActions', () => {
       },
       body: {
         dagRunId: 'run-1',
+      },
+    });
+    expect(onReplaceSelection).toHaveBeenCalledWith([]);
+  });
+
+  it('uses the delete endpoint and shows destructive confirmation details', async () => {
+    deleteMock.mockResolvedValueOnce({});
+    const onReplaceSelection = vi.fn();
+
+    render(
+      <AppBarContext.Provider value={appBarContextValue}>
+        <DAGRunBatchActions
+          selectedRuns={[{ name: 'alpha', dagRunId: 'run-1' }]}
+          loadedCount={1}
+          onSelectAllLoaded={vi.fn()}
+          onClearSelection={vi.fn()}
+          onReplaceSelection={onReplaceSelection}
+          onActionComplete={vi.fn().mockResolvedValue(undefined)}
+        />
+      </AppBarContext.Provider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        'This permanently removes run records, logs, artifacts, and related run data.'
+      )
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: 'Delete 1 Run',
+      })
+    );
+
+    expect(
+      await screen.findByText('Delete request accepted')
+    ).toBeInTheDocument();
+    expect(deleteMock).toHaveBeenCalledWith('/dag-runs/{name}/{dagRunId}', {
+      params: {
+        path: {
+          name: 'alpha',
+          dagRunId: 'run-1',
+        },
+        query: {
+          remoteNode: 'local',
+        },
       },
     });
     expect(onReplaceSelection).toHaveBeenCalledWith([]);

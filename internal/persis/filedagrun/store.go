@@ -529,17 +529,17 @@ func (store *Store) RemoveOldDAGRuns(ctx context.Context, dagName string, retent
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (store *Store) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef) error {
+func (store *Store) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef, opts ...exec.RemoveDAGRunOption) error {
 	if dagRun.ID == "" {
 		return ErrDAGRunIDEmpty
 	}
 
-	root := NewDataRootWithArtifactDir(store.baseDir, dagRun.Name, store.artifactDir)
-	run, err := root.FindByDAGRunID(ctx, dagRun.ID)
-	if err != nil {
-		return fmt.Errorf("failed to find dag-run %s: %w", dagRun.ID, err)
+	var options exec.RemoveDAGRunOptions
+	for _, opt := range opts {
+		opt(&options)
 	}
 
+	root := NewDataRootWithArtifactDir(store.baseDir, dagRun.Name, store.artifactDir)
 	if err := root.Lock(ctx); err != nil {
 		return fmt.Errorf("failed to acquire lock for dag-run %s: %w", dagRun.ID, err)
 	}
@@ -549,6 +549,28 @@ func (store *Store) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef) err
 			logger.Error(ctx, "Failed to unlock dag-run", tag.RunID(dagRun.ID), tag.Error(err))
 		}
 	}()
+
+	run, err := root.FindByDAGRunID(ctx, dagRun.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find dag-run %s: %w", dagRun.ID, err)
+	}
+
+	if options.RejectActive {
+		attempt, err := run.LatestAttempt(ctx, store.cache)
+		if err != nil {
+			return fmt.Errorf("failed to find latest attempt for dag-run %s: %w", dagRun.ID, err)
+		}
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to read dag-run %s status: %w", dagRun.ID, err)
+		}
+		if status == nil {
+			return fmt.Errorf("failed to read dag-run %s status: %w", dagRun.ID, exec.ErrNoStatusData)
+		}
+		if status.Status.IsActive() {
+			return fmt.Errorf("%w: %s", exec.ErrDAGRunActive, status.Status.String())
+		}
+	}
 
 	if err := run.Remove(ctx); err != nil {
 		return fmt.Errorf("failed to remove dag-run %s: %w", dagRun.ID, err)

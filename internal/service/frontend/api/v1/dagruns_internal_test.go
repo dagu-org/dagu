@@ -230,7 +230,7 @@ func (blockingDAGRunStore) RenameDAGRuns(context.Context, string, string) error 
 	panic("not implemented")
 }
 
-func (blockingDAGRunStore) RemoveDAGRun(context.Context, exec.DAGRunRef) error {
+func (blockingDAGRunStore) RemoveDAGRun(context.Context, exec.DAGRunRef, ...exec.RemoveDAGRunOption) error {
 	panic("not implemented")
 }
 
