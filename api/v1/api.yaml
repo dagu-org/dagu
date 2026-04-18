@@ -5864,22 +5864,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /automata/{name}/memory:
+  /automata/{name}/documents/{document}:
     get:
-      summary: "Get automata memory"
-      description: "Returns the Automata-specific MEMORY.md content and resolved path."
-      operationId: "getAutomataMemory"
+      summary: "Get automata document"
+      description: "Returns an Automata-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "getAutomataDocument"
       tags:
         - "automata"
       parameters:
         - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutomataDocument"
       responses:
         "200":
-          description: "Automata memory"
+          description: "Automata document"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataMemoryResponse"
+                $ref: "#/components/schemas/AutomataDocumentResponse"
         "401":
           description: "Not authenticated"
           content:
@@ -5899,13 +5900,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     put:
-      summary: "Update automata memory"
-      description: "Creates or updates the Automata-specific MEMORY.md content."
-      operationId: "updateAutomataMemory"
+      summary: "Update automata document"
+      description: "Creates or updates an Automata-specific document. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "updateAutomataDocument"
       tags:
         - "automata"
       parameters:
         - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutomataDocument"
       requestBody:
         required: true
         content:
@@ -5914,11 +5916,11 @@ paths:
               $ref: "#/components/schemas/UpdateAgentMemoryRequest"
       responses:
         "200":
-          description: "Automata memory saved"
+          description: "Automata document saved"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AutomataMemoryResponse"
+                $ref: "#/components/schemas/AutomataDocumentResponse"
         "400":
           description: "Invalid request"
           content:
@@ -5950,16 +5952,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
     delete:
-      summary: "Clear automata memory"
-      description: "Deletes the Automata-specific MEMORY.md file."
-      operationId: "deleteAutomataMemory"
+      summary: "Clear automata document"
+      description: "Deletes an Automata-specific document. Supported documents are MEMORY.md and SOUL.md."
+      operationId: "deleteAutomataDocument"
       tags:
         - "automata"
       parameters:
         - $ref: "#/components/parameters/AutomataName"
+        - $ref: "#/components/parameters/AutomataDocument"
       responses:
         "204":
-          description: "Automata memory cleared"
+          description: "Automata document cleared"
         "401":
           description: "Not authenticated"
           content:
@@ -7887,6 +7890,14 @@ components:
       schema:
         type: string
         minLength: 1
+
+    AutomataDocument:
+      name: document
+      in: path
+      required: true
+      description: "Automata document file name"
+      schema:
+        $ref: "#/components/schemas/AutomataDocument"
 
   schemas:
     Tags:
@@ -11402,16 +11413,26 @@ components:
         content:
           type: string
 
-    AutomataMemoryResponse:
+    AutomataDocument:
+      type: string
+      description: "Automata document file name"
+      enum:
+        - MEMORY.md
+        - SOUL.md
+
+    AutomataDocumentResponse:
       type: object
       required:
         - name
+        - document
         - content
         - path
-      description: "Automata-specific memory content"
+      description: "Automata-specific document content"
       properties:
         name:
           type: string
+        document:
+          $ref: "#/components/schemas/AutomataDocument"
         content:
           type: string
         path:

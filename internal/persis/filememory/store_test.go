@@ -278,6 +278,35 @@ func TestSaveAutomataMemory(t *testing.T) {
 	})
 }
 
+func TestAutomataDocuments(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("saves and loads soul document", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		content := "# Soul\n\nBe precise."
+		require.NoError(t, store.SaveAutomataDocument(ctx, "queue_worker", soulFileName, content))
+
+		loaded, err := store.LoadAutomataDocument(ctx, "queue_worker", soulFileName)
+		require.NoError(t, err)
+		assert.Equal(t, content, loaded)
+
+		path, err := store.AutomataDocumentPath("queue_worker", soulFileName)
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(store.baseDir, automataSubDir, "queue_worker", soulFileName), path)
+	})
+
+	t.Run("rejects unsupported document", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+
+		err := store.SaveAutomataDocument(ctx, "queue_worker", "PROMPT.md", "bad")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid automata document")
+	})
+}
+
 func TestMemoryDir(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -348,6 +377,23 @@ func TestDeleteAutomataMemory(t *testing.T) {
 
 		_, err := os.Stat(filepath.Join(store.baseDir, automataSubDir, "queue_worker"))
 		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("keeps soul document", func(t *testing.T) {
+		t.Parallel()
+		store := newTestStore(t)
+		require.NoError(t, store.SaveAutomataMemory(ctx, "queue_worker", "remember this"))
+		require.NoError(t, store.SaveAutomataDocument(ctx, "queue_worker", soulFileName, "be precise"))
+
+		require.NoError(t, store.DeleteAutomataMemory(ctx, "queue_worker"))
+
+		memory, err := store.LoadAutomataMemory(ctx, "queue_worker")
+		require.NoError(t, err)
+		assert.Empty(t, memory)
+
+		soul, err := store.LoadAutomataDocument(ctx, "queue_worker", soulFileName)
+		require.NoError(t, err)
+		assert.Equal(t, "be precise", soul)
 	})
 }
 

@@ -2402,7 +2402,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/automata/{name}/memory": {
+    "/automata/{name}/documents/{document}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2410,21 +2410,21 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get automata memory
-         * @description Returns the Automata-specific MEMORY.md content and resolved path.
+         * Get automata document
+         * @description Returns an Automata-specific document content and resolved path. Supported documents are MEMORY.md and SOUL.md.
          */
-        get: operations["getAutomataMemory"];
+        get: operations["getAutomataDocument"];
         /**
-         * Update automata memory
-         * @description Creates or updates the Automata-specific MEMORY.md content.
+         * Update automata document
+         * @description Creates or updates an Automata-specific document. Supported documents are MEMORY.md and SOUL.md.
          */
-        put: operations["updateAutomataMemory"];
+        put: operations["updateAutomataDocument"];
         post?: never;
         /**
-         * Clear automata memory
-         * @description Deletes the Automata-specific MEMORY.md file.
+         * Clear automata document
+         * @description Deletes an Automata-specific document. Supported documents are MEMORY.md and SOUL.md.
          */
-        delete: operations["deleteAutomataMemory"];
+        delete: operations["deleteAutomataDocument"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3656,10 +3656,10 @@ export interface components {
         };
         /** @description Configuration for DAG run artifact storage */
         DAGArtifactsConfig: {
-            /** @description Base directory for storing artifacts for this DAG when explicitly configured */
-            dir?: string;
             /** @description Whether artifact storage is enabled for this DAG */
             enabled: boolean;
+            /** @description Base directory for storing artifacts for this DAG when explicitly configured */
+            dir?: string;
         };
         LocalDag: {
             /** @description Name of the local DAG */
@@ -4866,9 +4866,15 @@ export interface components {
             dagName: components["schemas"]["DAGName"];
             content: string;
         };
-        /** @description Automata-specific memory content */
-        AutomataMemoryResponse: {
+        /**
+         * @description Automata document file name
+         * @enum {string}
+         */
+        AutomataDocument: AutomataDocument;
+        /** @description Automata-specific document content */
+        AutomataDocumentResponse: {
             name: string;
+            document: components["schemas"]["AutomataDocument"];
             content: string;
             path: string;
         };
@@ -5447,6 +5453,8 @@ export interface components {
         RemoteNodeId: string;
         /** @description The Automata name */
         AutomataName: string;
+        /** @description Automata document file name */
+        AutomataDocument: components["schemas"]["AutomataDocument"];
     };
     requestBodies: never;
     headers: never;
@@ -12866,25 +12874,27 @@ export interface operations {
             };
         };
     };
-    getAutomataMemory: {
+    getAutomataDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Automata name */
                 name: components["parameters"]["AutomataName"];
+                /** @description Automata document file name */
+                document: components["parameters"]["AutomataDocument"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata memory */
+            /** @description Automata document */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataMemoryResponse"];
+                    "application/json": components["schemas"]["AutomataDocumentResponse"];
                 };
             };
             /** @description Not authenticated */
@@ -12916,13 +12926,15 @@ export interface operations {
             };
         };
     };
-    updateAutomataMemory: {
+    updateAutomataDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Automata name */
                 name: components["parameters"]["AutomataName"];
+                /** @description Automata document file name */
+                document: components["parameters"]["AutomataDocument"];
             };
             cookie?: never;
         };
@@ -12932,13 +12944,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Automata memory saved */
+            /** @description Automata document saved */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomataMemoryResponse"];
+                    "application/json": components["schemas"]["AutomataDocumentResponse"];
                 };
             };
             /** @description Invalid request */
@@ -12988,19 +13000,21 @@ export interface operations {
             };
         };
     };
-    deleteAutomataMemory: {
+    deleteAutomataDocument: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description The Automata name */
                 name: components["parameters"]["AutomataName"];
+                /** @description Automata document file name */
+                document: components["parameters"]["AutomataDocument"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Automata memory cleared */
+            /** @description Automata document cleared */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -15389,6 +15403,10 @@ export enum ModelPresetThinkingEffort {
     medium = "medium",
     high = "high",
     xhigh = "xhigh"
+}
+export enum AutomataDocument {
+    MEMORY_md = "MEMORY.md",
+    SOUL_md = "SOUL.md"
 }
 export enum AgentUserPromptPromptType {
     general = "general",

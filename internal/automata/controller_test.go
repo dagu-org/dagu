@@ -73,3 +73,26 @@ agent:
 	require.Len(t, store.events, 1)
 	require.Equal(t, eventstore.TypeAutomataError, store.events[0].Type)
 }
+
+func TestRuntimeOptionsUsesAutomataSoulDocument(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, _ := newTestService(t)
+
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
+	_, err := svc.SaveDocument(ctx, "software_dev", DocumentSoul, "# Soul\n\nBe precise.")
+	require.NoError(t, err)
+
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+
+	opts, err := svc.runtimeOptions(ctx, def, state)
+	require.NoError(t, err)
+	require.NotNil(t, opts.Soul)
+	require.Equal(t, "automata:software_dev", opts.Soul.ID)
+	require.Contains(t, opts.Soul.Content, "Be precise.")
+	require.False(t, opts.AllowClearSoul)
+}

@@ -18,19 +18,28 @@ import (
 )
 
 // Verify Store implements agent.MemoryStore at compile time.
-var _ agent.MemoryStore = (*Store)(nil)
+var (
+	_ agent.MemoryStore           = (*Store)(nil)
+	_ agent.AutomataDocumentStore = (*Store)(nil)
+)
 
 const (
 	agentMemoryDir  = "memory"
 	dagSubDir       = "dags"
 	automataSubDir  = "automata"
 	memoryFileName  = "MEMORY.md"
+	soulFileName    = "SOUL.md"
 	maxLines        = 200
 	dirPermissions  = 0750
 	filePermissions = 0600
 )
 
 var automataNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_]*$`)
+
+var automataDocumentNames = map[string]struct{}{
+	memoryFileName: {},
+	soulFileName:   {},
+}
 
 // Store implements a file-based memory store for the agent.
 // Memory files are stored under {dagsDir}/memory/.
@@ -102,15 +111,21 @@ func (s *Store) LoadDAGMemory(_ context.Context, dagName string) (string, error)
 
 // LoadAutomataMemory reads the MEMORY.md for a specific Automata, truncated to maxLines.
 // Returns empty string if the file does not exist.
-func (s *Store) LoadAutomataMemory(_ context.Context, automataName string) (string, error) {
-	if err := s.validateAutomataName(automataName); err != nil {
+func (s *Store) LoadAutomataMemory(ctx context.Context, automataName string) (string, error) {
+	return s.LoadAutomataDocument(ctx, automataName, memoryFileName)
+}
+
+// LoadAutomataDocument reads an allowed Automata document, truncated to maxLines.
+// Returns empty string if the file does not exist.
+func (s *Store) LoadAutomataDocument(_ context.Context, automataName, document string) (string, error) {
+	path, err := s.AutomataDocumentPath(automataName, document)
+	if err != nil {
 		return "", err
 	}
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	path := s.automataMemoryPath(automataName)
 	if s.fileCache != nil {
 		return s.loadMemoryWithCache(path)
 	}
@@ -157,20 +172,24 @@ func (s *Store) SaveDAGMemory(_ context.Context, dagName string, content string)
 }
 
 // SaveAutomataMemory writes content to an Automata-specific MEMORY.md atomically.
-func (s *Store) SaveAutomataMemory(_ context.Context, automataName string, content string) error {
-	if err := s.validateAutomataName(automataName); err != nil {
+func (s *Store) SaveAutomataMemory(ctx context.Context, automataName string, content string) error {
+	return s.SaveAutomataDocument(ctx, automataName, memoryFileName, content)
+}
+
+// SaveAutomataDocument writes an allowed Automata document atomically.
+func (s *Store) SaveAutomataDocument(_ context.Context, automataName, document, content string) error {
+	path, err := s.AutomataDocumentPath(automataName, document)
+	if err != nil {
 		return err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	automataDir := filepath.Join(s.baseDir, automataSubDir, automataName)
-	if err := os.MkdirAll(automataDir, dirPermissions); err != nil {
-		return fmt.Errorf("filememory: failed to create automata memory directory: %w", err)
+	if err := os.MkdirAll(filepath.Dir(path), dirPermissions); err != nil {
+		return fmt.Errorf("filememory: failed to create automata document directory: %w", err)
 	}
 
-	path := s.automataMemoryPath(automataName)
 	if err := fileutil.WriteFileAtomic(path, []byte(content), filePermissions); err != nil {
 		return err
 	}
@@ -187,10 +206,18 @@ func (s *Store) MemoryDir() string {
 
 // AutomataMemoryPath returns the resolved path to an Automata-specific MEMORY.md.
 func (s *Store) AutomataMemoryPath(automataName string) (string, error) {
+	return s.AutomataDocumentPath(automataName, memoryFileName)
+}
+
+// AutomataDocumentPath returns the resolved path to an allowed Automata document.
+func (s *Store) AutomataDocumentPath(automataName, document string) (string, error) {
 	if err := s.validateAutomataName(automataName); err != nil {
 		return "", err
 	}
-	return s.automataMemoryPath(automataName), nil
+	if err := validateAutomataDocumentName(document); err != nil {
+		return "", err
+	}
+	return s.automataDocumentPath(automataName, document), nil
 }
 
 // ListDAGMemories returns the names of all DAGs that have memory files.
@@ -258,23 +285,31 @@ func (s *Store) DeleteDAGMemory(_ context.Context, dagName string) error {
 	return nil
 }
 
-// DeleteAutomataMemory removes an Automata-specific MEMORY.md file and its directory.
-func (s *Store) DeleteAutomataMemory(_ context.Context, automataName string) error {
-	if err := s.validateAutomataName(automataName); err != nil {
+// DeleteAutomataMemory removes an Automata-specific MEMORY.md file.
+func (s *Store) DeleteAutomataMemory(ctx context.Context, automataName string) error {
+	return s.DeleteAutomataDocument(ctx, automataName, memoryFileName)
+}
+
+// DeleteAutomataDocument removes an allowed Automata document and removes the
+// containing Automata document directory when it becomes empty.
+func (s *Store) DeleteAutomataDocument(_ context.Context, automataName, document string) error {
+	path, err := s.AutomataDocumentPath(automataName, document)
+	if err != nil {
 		return err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	automataDir := filepath.Join(s.baseDir, automataSubDir, automataName)
-	memPath := s.automataMemoryPath(automataName)
-	err := os.RemoveAll(automataDir)
-	if err != nil {
-		return fmt.Errorf("filememory: failed to delete automata memory directory: %w", err)
+	err = os.Remove(path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("filememory: failed to delete automata document: %w", err)
 	}
 	if s.fileCache != nil {
-		s.fileCache.Invalidate(memPath)
+		s.fileCache.Invalidate(path)
+	}
+	if err := removeEmptyDir(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("filememory: failed to remove empty automata document directory: %w", err)
 	}
 	return nil
 }
@@ -329,7 +364,11 @@ func (s *Store) dagMemoryPath(dagName string) string {
 
 // automataMemoryPath returns the path to an Automata-specific MEMORY.md.
 func (s *Store) automataMemoryPath(automataName string) string {
-	return filepath.Join(s.baseDir, automataSubDir, automataName, memoryFileName)
+	return s.automataDocumentPath(automataName, memoryFileName)
+}
+
+func (s *Store) automataDocumentPath(automataName, document string) string {
+	return filepath.Join(s.baseDir, automataSubDir, automataName, document)
 }
 
 // validateDAGName checks that the DAG name is safe and doesn't escape the base directory.
@@ -360,4 +399,25 @@ func (s *Store) validateAutomataName(automataName string) error {
 		return fmt.Errorf("filememory: invalid automataName %q", automataName)
 	}
 	return nil
+}
+
+func validateAutomataDocumentName(document string) error {
+	if _, ok := automataDocumentNames[document]; ok {
+		return nil
+	}
+	return fmt.Errorf("filememory: invalid automata document %q", document)
+}
+
+func removeEmptyDir(path string) error {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if len(entries) > 0 {
+		return nil
+	}
+	return os.Remove(path)
 }

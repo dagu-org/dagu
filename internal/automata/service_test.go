@@ -752,6 +752,8 @@ func TestServiceResetStatePreservesMemory(t *testing.T) {
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
 	require.NoError(t, err)
+	_, err = svc.SaveDocument(ctx, "software_dev", DocumentSoul, "# Soul\n\nBe precise.")
+	require.NoError(t, err)
 	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
 	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
 		RequestedBy: "tester",
@@ -763,6 +765,9 @@ func TestServiceResetStatePreservesMemory(t *testing.T) {
 	memory, err := svc.GetMemory(ctx, "software_dev")
 	require.NoError(t, err)
 	require.Contains(t, memory.Content, "Remember the standing approach.")
+	soul, err := svc.GetDocument(ctx, "software_dev", DocumentSoul)
+	require.NoError(t, err)
+	require.Contains(t, soul.Content, "Be precise.")
 }
 
 func TestServiceRenameMovesMemory(t *testing.T) {
@@ -773,6 +778,8 @@ func TestServiceRenameMovesMemory(t *testing.T) {
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
+	require.NoError(t, err)
+	_, err = svc.SaveDocument(ctx, "software_dev", DocumentSoul, "# Soul\n\nBe precise.")
 	require.NoError(t, err)
 
 	err = svc.Rename(ctx, "software_dev", RenameRequest{NewName: "software_ops"})
@@ -785,6 +792,10 @@ func TestServiceRenameMovesMemory(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, memory.Content, "Remember the standing approach.")
 	require.Contains(t, memory.Path, "/automata/software_ops/MEMORY.md")
+	soul, err := svc.GetDocument(ctx, "software_ops", DocumentSoul)
+	require.NoError(t, err)
+	require.Contains(t, soul.Content, "Be precise.")
+	require.Contains(t, soul.Path, "/automata/software_ops/SOUL.md")
 }
 
 func TestServiceDuplicateCopiesMemory(t *testing.T) {
@@ -796,6 +807,8 @@ func TestServiceDuplicateCopiesMemory(t *testing.T) {
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
 	require.NoError(t, err)
+	_, err = svc.SaveDocument(ctx, "software_dev", DocumentSoul, "# Soul\n\nBe precise.")
+	require.NoError(t, err)
 
 	err = svc.Duplicate(ctx, "software_dev", DuplicateRequest{NewName: "software_ops"})
 	require.NoError(t, err)
@@ -805,6 +818,11 @@ func TestServiceDuplicateCopiesMemory(t *testing.T) {
 	duplicate, err := svc.GetMemory(ctx, "software_ops")
 	require.NoError(t, err)
 	require.Equal(t, original.Content, duplicate.Content)
+	originalSoul, err := svc.GetDocument(ctx, "software_dev", DocumentSoul)
+	require.NoError(t, err)
+	duplicateSoul, err := svc.GetDocument(ctx, "software_ops", DocumentSoul)
+	require.NoError(t, err)
+	require.Equal(t, originalSoul.Content, duplicateSoul.Content)
 }
 
 func TestServiceDeleteRemovesMemory(t *testing.T) {
@@ -816,6 +834,8 @@ func TestServiceDeleteRemovesMemory(t *testing.T) {
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", automataSpec("build-app")))
 	_, err := svc.SaveMemory(ctx, "software_dev", "# Memory\n\nRemember the standing approach.")
 	require.NoError(t, err)
+	_, err = svc.SaveDocument(ctx, "software_dev", DocumentSoul, "# Soul\n\nBe precise.")
+	require.NoError(t, err)
 
 	err = svc.Delete(ctx, "software_dev")
 	require.NoError(t, err)
@@ -824,6 +844,11 @@ func TestServiceDeleteRemovesMemory(t *testing.T) {
 		content, loadErr := svc.memoryStore.LoadAutomataMemory(ctx, "software_dev")
 		require.NoError(t, loadErr)
 		require.Empty(t, content)
+		store, ok := svc.memoryStore.(agent.AutomataDocumentStore)
+		require.True(t, ok)
+		soul, loadErr := store.LoadAutomataDocument(ctx, "software_dev", DocumentSoul)
+		require.NoError(t, loadErr)
+		require.Empty(t, soul)
 	}
 }
 

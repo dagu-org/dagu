@@ -255,11 +255,14 @@ type Detail struct {
 	Messages      []agent.Message  `json:"messages,omitempty"`
 }
 
-type Memory struct {
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	Path    string `json:"path"`
+type Document struct {
+	Name     string `json:"name"`
+	Document string `json:"document"`
+	Content  string `json:"content"`
+	Path     string `json:"path"`
 }
+
+type Memory = Document
 
 type StartRequest struct {
 	RequestedBy string `json:"requestedBy,omitempty"`

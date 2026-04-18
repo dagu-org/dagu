@@ -374,13 +374,27 @@ func (s *Service) runtimeOptions(ctx context.Context, def *Definition, state *St
 			return nil, err
 		}
 		soul = loaded
+	} else if def.Agent.Soul == "" {
+		if store, ok := s.memoryStore.(agent.AutomataDocumentStore); ok {
+			content, err := store.LoadAutomataDocument(ctx, def.Name, DocumentSoul)
+			if err != nil {
+				return nil, err
+			}
+			if content != "" {
+				soul = &agent.Soul{
+					ID:      "automata:" + def.Name,
+					Name:    def.Name,
+					Content: content,
+				}
+			}
+		}
 	}
 	return &agent.SessionRuntimeOptions{
 		Model:             def.Agent.Model,
 		AllowedTools:      allowedToolsForDefinition(def),
 		SystemPromptExtra: s.buildSystemPromptExtra(def, state, allowedDAGs),
 		Soul:              soul,
-		AllowClearSoul:    def.Agent.Soul == "",
+		AllowClearSoul:    def.Agent.Soul == "" && soul == nil,
 		AutomataName:      def.Name,
 		AutomataRuntime: &controllerRuntime{
 			service: s,

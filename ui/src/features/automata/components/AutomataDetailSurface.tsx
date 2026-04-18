@@ -4,6 +4,7 @@
 import React from 'react';
 
 import {
+  AutomataDocument,
   AgentMessageType,
   type components,
 } from '@/api/v1/schema';
@@ -14,7 +15,7 @@ import { Tab, Tabs } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
-import { AutomataMemorySection } from '@/features/automata/components/AutomataMemorySection';
+import { AutomataDocumentSection } from '@/features/automata/components/AutomataMemorySection';
 import type { AutomataDetailController } from '@/features/automata/hooks/useAutomataDetail';
 import {
   agentMessageLabel,
@@ -1002,7 +1003,16 @@ function ConfigTab({
         disabled={!!controller.busyAction}
       />
 
-      <AutomataMemorySection automataName={controller.detail?.definition.name || ''} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AutomataDocumentSection
+          automataName={controller.detail?.definition.name || ''}
+          document={AutomataDocument.MEMORY_md}
+        />
+        <AutomataDocumentSection
+          automataName={controller.detail?.definition.name || ''}
+          document={AutomataDocument.SOUL_md}
+        />
+      </div>
 
       <div className="min-w-0 rounded-lg border p-4">
         <div className="mb-3 flex items-center justify-between gap-2">

@@ -1,29 +1,78 @@
 import React from 'react';
-import { Brain, Loader2, Save, Trash2 } from 'lucide-react';
+import { Brain, Loader2, Save, Sparkles, Trash2 } from 'lucide-react';
 
+import { AutomataDocument, type components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useClient } from '@/hooks/api';
 import ConfirmModal from '@/ui/ConfirmModal';
 
-type AutomataMemoryResponse = {
-  name: string;
-  content: string;
-  path: string;
-};
+type AutomataDocumentResponse =
+  components['schemas']['AutomataDocumentResponse'];
 
-type AutomataMemorySectionProps = {
+type AutomataDocumentSectionProps = {
   automataName: string;
-  title?: string;
+  document: AutomataDocument;
 };
 
-export function AutomataMemorySection({
+const documentCopy: Record<
+  AutomataDocument,
+  {
+    title: string;
+    description: string;
+    placeholder: string;
+    loading: string;
+    saved: string;
+    cleared: string;
+    loadError: string;
+    saveError: string;
+    clearError: string;
+    clearTitle: string;
+    clearMessage: (automataName: string) => string;
+  }
+> = {
+  [AutomataDocument.MEMORY_md]: {
+    title: 'Memory',
+    description: 'Long-lived notes and reusable lessons for this automata.',
+    placeholder:
+      'No automata memory yet. Save operating rules, durable context, or learned procedures here.',
+    loading: 'Loading memory...',
+    saved: 'Automata memory saved',
+    cleared: 'Automata memory cleared',
+    loadError: 'Failed to load automata memory',
+    saveError: 'Failed to save automata memory',
+    clearError: 'Failed to clear automata memory',
+    clearTitle: 'Clear Automata Memory',
+    clearMessage: (automataName) =>
+      `Are you sure you want to clear the memory for "${automataName}"? This action cannot be undone.`,
+  },
+  [AutomataDocument.SOUL_md]: {
+    title: 'Soul',
+    description:
+      'Identity, priorities, and communication style for this automata.',
+    placeholder:
+      'No automata soul yet. Define how this automata should think, speak, and prioritize work.',
+    loading: 'Loading soul...',
+    saved: 'Automata soul saved',
+    cleared: 'Automata soul cleared',
+    loadError: 'Failed to load automata soul',
+    saveError: 'Failed to save automata soul',
+    clearError: 'Failed to clear automata soul',
+    clearTitle: 'Clear Automata Soul',
+    clearMessage: (automataName) =>
+      `Are you sure you want to clear the soul for "${automataName}"? This action cannot be undone.`,
+  },
+};
+
+export function AutomataDocumentSection({
   automataName,
-  title = 'Memory',
-}: AutomataMemorySectionProps): React.ReactElement {
+  document,
+}: AutomataDocumentSectionProps): React.ReactElement {
   const client = useClient();
   const canWrite = useCanWrite();
+  const copy = documentCopy[document];
+  const Icon = document === AutomataDocument.SOUL_md ? Sparkles : Brain;
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -32,50 +81,56 @@ export function AutomataMemorySection({
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
   const [content, setContent] = React.useState('');
-  const [memoryPath, setMemoryPath] = React.useState('');
+  const [documentPath, setDocumentPath] = React.useState('');
 
-  const loadMemory = React.useCallback(async () => {
+  const loadDocument = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const { data, error: apiError } = await client.GET('/automata/{name}/memory', {
-        params: { path: { name: automataName } },
-      });
+      const { data, error: apiError } = await client.GET(
+        '/automata/{name}/documents/{document}',
+        {
+          params: { path: { name: automataName, document } },
+        }
+      );
       if (apiError) {
-        throw new Error(apiError.message || 'Failed to load automata memory');
+        throw new Error(apiError.message || copy.loadError);
       }
-      const memory = data as AutomataMemoryResponse;
-      setContent(memory.content ?? '');
-      setMemoryPath(memory.path ?? '');
+      const item = data as AutomataDocumentResponse;
+      setContent(item.content ?? '');
+      setDocumentPath(item.path ?? '');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load automata memory');
+      setError(err instanceof Error ? err.message : copy.loadError);
     } finally {
       setIsLoading(false);
     }
-  }, [automataName, client]);
+  }, [automataName, client, copy.loadError, document]);
 
   React.useEffect(() => {
-    void loadMemory();
-  }, [loadMemory]);
+    void loadDocument();
+  }, [loadDocument]);
 
   async function handleSave(): Promise<void> {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
     try {
-      const { data, error: apiError } = await client.PUT('/automata/{name}/memory', {
-        params: { path: { name: automataName } },
-        body: { content },
-      });
+      const { data, error: apiError } = await client.PUT(
+        '/automata/{name}/documents/{document}',
+        {
+          params: { path: { name: automataName, document } },
+          body: { content },
+        }
+      );
       if (apiError) {
-        throw new Error(apiError.message || 'Failed to save automata memory');
+        throw new Error(apiError.message || copy.saveError);
       }
-      const memory = data as AutomataMemoryResponse;
-      setContent(memory.content ?? '');
-      setMemoryPath(memory.path ?? memoryPath);
-      setSuccess('Automata memory saved');
+      const item = data as AutomataDocumentResponse;
+      setContent(item.content ?? '');
+      setDocumentPath(item.path ?? documentPath);
+      setSuccess(copy.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save automata memory');
+      setError(err instanceof Error ? err.message : copy.saveError);
     } finally {
       setIsSaving(false);
     }
@@ -86,17 +141,20 @@ export function AutomataMemorySection({
     setError(null);
     setSuccess(null);
     try {
-      const { error: apiError } = await client.DELETE('/automata/{name}/memory', {
-        params: { path: { name: automataName } },
-      });
+      const { error: apiError } = await client.DELETE(
+        '/automata/{name}/documents/{document}',
+        {
+          params: { path: { name: automataName, document } },
+        }
+      );
       if (apiError) {
-        throw new Error(apiError.message || 'Failed to clear automata memory');
+        throw new Error(apiError.message || copy.clearError);
       }
       setContent('');
       setShowDeleteConfirm(false);
-      setSuccess('Automata memory cleared');
+      setSuccess(copy.cleared);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to clear automata memory');
+      setError(err instanceof Error ? err.message : copy.clearError);
     } finally {
       setIsDeleting(false);
     }
@@ -110,19 +168,21 @@ export function AutomataMemorySection({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <Brain className="h-4 w-4 text-muted-foreground" />
-              {title}
+              <Icon className="h-4 w-4 text-muted-foreground" />
+              {copy.title}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Long-lived notes and reusable lessons for this automata.
+              {copy.description}
             </p>
-            {memoryPath ? (
+            {documentPath ? (
               <p className="mt-1 break-all font-mono text-[11px] text-muted-foreground">
-                {memoryPath}
+                {documentPath}
               </p>
             ) : null}
           </div>
-          <span className="text-xs text-muted-foreground">{lineCount}/200 lines</span>
+          <span className="text-xs text-muted-foreground">
+            {lineCount}/200 lines
+          </span>
         </div>
 
         {error ? (
@@ -140,7 +200,7 @@ export function AutomataMemorySection({
         {isLoading ? (
           <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading memory...
+            {copy.loading}
           </div>
         ) : (
           <div className="space-y-3">
@@ -149,11 +209,15 @@ export function AutomataMemorySection({
               onChange={(e) => setContent(e.target.value)}
               readOnly={!canWrite}
               className="min-h-56 font-mono text-sm"
-              placeholder="No automata memory yet. Save operating rules, durable context, or learned procedures here."
+              placeholder={copy.placeholder}
             />
             {canWrite ? (
               <div className="flex gap-2">
-                <Button onClick={() => void handleSave()} disabled={isSaving} size="sm">
+                <Button
+                  onClick={() => void handleSave()}
+                  disabled={isSaving}
+                  size="sm"
+                >
                   {isSaving ? (
                     <>
                       <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -182,16 +246,13 @@ export function AutomataMemorySection({
       </div>
 
       <ConfirmModal
-        title="Clear Automata Memory"
+        title={copy.clearTitle}
         buttonText="Clear"
         visible={showDeleteConfirm}
         dismissModal={() => setShowDeleteConfirm(false)}
         onSubmit={handleDelete}
       >
-        <p>
-          Are you sure you want to clear the memory for &quot;{automataName}&quot;? This
-          action cannot be undone.
-        </p>
+        <p>{copy.clearMessage(automataName)}</p>
       </ConfirmModal>
     </>
   );

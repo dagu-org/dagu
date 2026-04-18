@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	auditActionAutomataMemoryUpdate = "memory_update"
-	auditActionAutomataMemoryDelete = "memory_delete"
+	auditActionAutomataDocumentUpdate = "document_update"
+	auditActionAutomataDocumentDelete = "document_delete"
 )
 
 func (a *API) ListAutomata(ctx context.Context, _ api.ListAutomataRequestObject) (api.ListAutomataResponseObject, error) {
@@ -65,25 +65,25 @@ func (a *API) GetAutomataSpec(ctx context.Context, request api.GetAutomataSpecRe
 	return api.GetAutomataSpec200JSONResponse{Spec: spec}, nil
 }
 
-func (a *API) GetAutomataMemory(ctx context.Context, request api.GetAutomataMemoryRequestObject) (api.GetAutomataMemoryResponseObject, error) {
+func (a *API) GetAutomataDocument(ctx context.Context, request api.GetAutomataDocumentRequestObject) (api.GetAutomataDocumentResponseObject, error) {
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireAutomataMemoryStore(); err != nil {
+	if err := a.requireAutomataDocumentStore(); err != nil {
 		return nil, err
 	}
-	item, err := a.automataService.GetMemory(ctx, string(request.Name))
+	item, err := a.automataService.GetDocument(ctx, string(request.Name), string(request.Document))
 	if err != nil {
 		return nil, toAutomataAPIError(err)
 	}
-	return api.GetAutomataMemory200JSONResponse(toAPIAutomataMemory(item)), nil
+	return api.GetAutomataDocument200JSONResponse(toAPIAutomataDocument(item)), nil
 }
 
-func (a *API) UpdateAutomataMemory(ctx context.Context, request api.UpdateAutomataMemoryRequestObject) (api.UpdateAutomataMemoryResponseObject, error) {
+func (a *API) UpdateAutomataDocument(ctx context.Context, request api.UpdateAutomataDocumentRequestObject) (api.UpdateAutomataDocumentResponseObject, error) {
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireAutomataMemoryStore(); err != nil {
+	if err := a.requireAutomataDocumentStore(); err != nil {
 		return nil, err
 	}
 	if err := a.requireDAGWrite(ctx); err != nil {
@@ -93,34 +93,38 @@ func (a *API) UpdateAutomataMemory(ctx context.Context, request api.UpdateAutoma
 		return nil, ErrInvalidRequestBody
 	}
 	name := string(request.Name)
-	item, err := a.automataService.SaveMemory(ctx, name, request.Body.Content)
+	document := string(request.Document)
+	item, err := a.automataService.SaveDocument(ctx, name, document, request.Body.Content)
 	if err != nil {
 		return nil, toAutomataAPIError(err)
 	}
-	a.logAudit(ctx, audit.CategoryAutomata, auditActionAutomataMemoryUpdate, map[string]any{
-		"name": name,
+	a.logAudit(ctx, audit.CategoryAutomata, auditActionAutomataDocumentUpdate, map[string]any{
+		"name":     name,
+		"document": document,
 	})
-	return api.UpdateAutomataMemory200JSONResponse(toAPIAutomataMemory(item)), nil
+	return api.UpdateAutomataDocument200JSONResponse(toAPIAutomataDocument(item)), nil
 }
 
-func (a *API) DeleteAutomataMemory(ctx context.Context, request api.DeleteAutomataMemoryRequestObject) (api.DeleteAutomataMemoryResponseObject, error) {
+func (a *API) DeleteAutomataDocument(ctx context.Context, request api.DeleteAutomataDocumentRequestObject) (api.DeleteAutomataDocumentResponseObject, error) {
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireAutomataMemoryStore(); err != nil {
+	if err := a.requireAutomataDocumentStore(); err != nil {
 		return nil, err
 	}
 	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
 	name := string(request.Name)
-	if err := a.automataService.DeleteMemory(ctx, name); err != nil {
+	document := string(request.Document)
+	if err := a.automataService.DeleteDocument(ctx, name, document); err != nil {
 		return nil, toAutomataAPIError(err)
 	}
-	a.logAudit(ctx, audit.CategoryAutomata, auditActionAutomataMemoryDelete, map[string]any{
-		"name": name,
+	a.logAudit(ctx, audit.CategoryAutomata, auditActionAutomataDocumentDelete, map[string]any{
+		"name":     name,
+		"document": document,
 	})
-	return api.DeleteAutomataMemory204Response{}, nil
+	return api.DeleteAutomataDocument204Response{}, nil
 }
 
 func (a *API) PutAutomataSpec(ctx context.Context, request api.PutAutomataSpecRequestObject) (api.PutAutomataSpecResponseObject, error) {
@@ -457,11 +461,11 @@ func (a *API) requireReadyAutomataController(ctx context.Context) error {
 	}
 }
 
-func (a *API) requireAutomataMemoryStore() error {
-	if a.agentMemoryStore == nil {
+func (a *API) requireAutomataDocumentStore() error {
+	if _, ok := a.agentMemoryStore.(agent.AutomataDocumentStore); !ok {
 		return &Error{
 			Code:       api.ErrorCodeForbidden,
-			Message:    "Automata memory management is not available",
+			Message:    "Automata document management is not available",
 			HTTPStatus: http.StatusForbidden,
 		}
 	}
@@ -605,14 +609,15 @@ func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 	}
 }
 
-func toAPIAutomataMemory(item *automata.Memory) api.AutomataMemoryResponse {
+func toAPIAutomataDocument(item *automata.Document) api.AutomataDocumentResponse {
 	if item == nil {
-		return api.AutomataMemoryResponse{}
+		return api.AutomataDocumentResponse{}
 	}
-	return api.AutomataMemoryResponse{
-		Content: item.Content,
-		Name:    item.Name,
-		Path:    item.Path,
+	return api.AutomataDocumentResponse{
+		Content:  item.Content,
+		Document: api.AutomataDocument(item.Document),
+		Name:     item.Name,
+		Path:     item.Path,
 	}
 }
 

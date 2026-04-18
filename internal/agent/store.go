@@ -78,6 +78,14 @@ type MemoryStore interface {
 	DeleteAutomataMemory(ctx context.Context, automataName string) error
 }
 
+// AutomataDocumentStore provides access to per-Automata document files.
+type AutomataDocumentStore interface {
+	LoadAutomataDocument(ctx context.Context, automataName, document string) (string, error)
+	SaveAutomataDocument(ctx context.Context, automataName, document, content string) error
+	DeleteAutomataDocument(ctx context.Context, automataName, document string) error
+	AutomataDocumentPath(automataName, document string) (string, error)
+}
+
 // DAGMetadataStore resolves DAG metadata used by the agent API.
 type DAGMetadataStore interface {
 	GetMetadata(ctx context.Context, fileName string) (*core.DAG, error)

@@ -78,7 +78,7 @@ func newAutomataMemoryAPI(t *testing.T) (*API, *automata.Service, *filememory.St
 	return api, automataService, memoryStore
 }
 
-func TestAutomataMemoryEndpoints(t *testing.T) {
+func TestAutomataDocumentEndpoints(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -86,47 +86,76 @@ func TestAutomataMemoryEndpoints(t *testing.T) {
 
 	require.NoError(t, svc.PutSpec(ctx, "software_dev", "goal: Complete the assigned software work\nallowed_dags:\n  names:\n    - build-app\n"))
 
-	getResp, err := api.GetAutomataMemory(ctx, openapi.GetAutomataMemoryRequestObject{
-		Name: "software_dev",
+	getResp, err := api.GetAutomataDocument(ctx, openapi.GetAutomataDocumentRequestObject{
+		Name:     "software_dev",
+		Document: openapi.AutomataDocumentMEMORYMd,
 	})
 	require.NoError(t, err)
-	getOK, ok := getResp.(openapi.GetAutomataMemory200JSONResponse)
+	getOK, ok := getResp.(openapi.GetAutomataDocument200JSONResponse)
 	require.True(t, ok)
 	require.Equal(t, "software_dev", getOK.Name)
+	require.Equal(t, openapi.AutomataDocumentMEMORYMd, getOK.Document)
 	require.Empty(t, getOK.Content)
 	require.Contains(t, getOK.Path, "/memory/automata/software_dev/MEMORY.md")
 
-	updateResp, err := api.UpdateAutomataMemory(ctx, openapi.UpdateAutomataMemoryRequestObject{
-		Name: "software_dev",
+	updateResp, err := api.UpdateAutomataDocument(ctx, openapi.UpdateAutomataDocumentRequestObject{
+		Name:     "software_dev",
+		Document: openapi.AutomataDocumentMEMORYMd,
 		Body: &openapi.UpdateAgentMemoryRequest{
 			Content: "# Memory\n\nRemember the operating rules.",
 		},
 	})
 	require.NoError(t, err)
-	updateOK, ok := updateResp.(openapi.UpdateAutomataMemory200JSONResponse)
+	updateOK, ok := updateResp.(openapi.UpdateAutomataDocument200JSONResponse)
 	require.True(t, ok)
 	require.Contains(t, updateOK.Content, "Remember the operating rules.")
 
-	getResp, err = api.GetAutomataMemory(ctx, openapi.GetAutomataMemoryRequestObject{
-		Name: "software_dev",
+	soulResp, err := api.UpdateAutomataDocument(ctx, openapi.UpdateAutomataDocumentRequestObject{
+		Name:     "software_dev",
+		Document: openapi.AutomataDocumentSOULMd,
+		Body: &openapi.UpdateAgentMemoryRequest{
+			Content: "# Soul\n\nBe precise.",
+		},
 	})
 	require.NoError(t, err)
-	getOK, ok = getResp.(openapi.GetAutomataMemory200JSONResponse)
+	soulOK, ok := soulResp.(openapi.UpdateAutomataDocument200JSONResponse)
+	require.True(t, ok)
+	require.Equal(t, openapi.AutomataDocumentSOULMd, soulOK.Document)
+	require.Contains(t, soulOK.Path, "/memory/automata/software_dev/SOUL.md")
+	require.Contains(t, soulOK.Content, "Be precise.")
+
+	getResp, err = api.GetAutomataDocument(ctx, openapi.GetAutomataDocumentRequestObject{
+		Name:     "software_dev",
+		Document: openapi.AutomataDocumentMEMORYMd,
+	})
+	require.NoError(t, err)
+	getOK, ok = getResp.(openapi.GetAutomataDocument200JSONResponse)
 	require.True(t, ok)
 	require.Contains(t, getOK.Content, "Remember the operating rules.")
 
-	deleteResp, err := api.DeleteAutomataMemory(ctx, openapi.DeleteAutomataMemoryRequestObject{
-		Name: "software_dev",
+	deleteResp, err := api.DeleteAutomataDocument(ctx, openapi.DeleteAutomataDocumentRequestObject{
+		Name:     "software_dev",
+		Document: openapi.AutomataDocumentMEMORYMd,
 	})
 	require.NoError(t, err)
-	_, ok = deleteResp.(openapi.DeleteAutomataMemory204Response)
+	_, ok = deleteResp.(openapi.DeleteAutomataDocument204Response)
 	require.True(t, ok)
 
-	getResp, err = api.GetAutomataMemory(ctx, openapi.GetAutomataMemoryRequestObject{
-		Name: "software_dev",
+	getResp, err = api.GetAutomataDocument(ctx, openapi.GetAutomataDocumentRequestObject{
+		Name:     "software_dev",
+		Document: openapi.AutomataDocumentMEMORYMd,
 	})
 	require.NoError(t, err)
-	getOK, ok = getResp.(openapi.GetAutomataMemory200JSONResponse)
+	getOK, ok = getResp.(openapi.GetAutomataDocument200JSONResponse)
 	require.True(t, ok)
 	require.Empty(t, getOK.Content)
+
+	soulGetResp, err := api.GetAutomataDocument(ctx, openapi.GetAutomataDocumentRequestObject{
+		Name:     "software_dev",
+		Document: openapi.AutomataDocumentSOULMd,
+	})
+	require.NoError(t, err)
+	soulGetOK, ok := soulGetResp.(openapi.GetAutomataDocument200JSONResponse)
+	require.True(t, ok)
+	require.Contains(t, soulGetOK.Content, "Be precise.")
 }
