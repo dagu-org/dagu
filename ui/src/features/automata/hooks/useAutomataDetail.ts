@@ -111,10 +111,7 @@ export function useAutomataDetailController({
   const [isSavingSpec, setIsSavingSpec] = React.useState(false);
 
   React.useEffect(() => {
-    setInstructionDraft(detail?.state?.instruction || '');
-  }, [detail?.state?.instruction, name]);
-
-  React.useEffect(() => {
+    setInstructionDraft('');
     setOperatorMessageDraft('');
     setNewTaskDescription('');
     setActionError('');
@@ -298,6 +295,7 @@ export function useAutomataDetailController({
       if (apiError) {
         throw new Error(apiError.message || 'Failed to start automata');
       }
+      setInstructionDraft('');
       await refreshAfterAction();
     } catch (err) {
       setActionError(

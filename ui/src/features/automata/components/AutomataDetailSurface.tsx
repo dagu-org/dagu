@@ -22,7 +22,6 @@ import {
   dagRunStatusToStatus,
   displayStatusClass,
   formatAbsoluteTime,
-  formatRelativeTime,
   type AutomataRunSummary,
   type AutomataTask,
   type AutomataTaskTemplate,
@@ -434,27 +433,43 @@ function StatusTab({
   active: boolean;
   onOpenRun: (run: AutomataRunSummary) => void;
 }): React.ReactElement {
-  const instructionTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const conversationTextareaRef = React.useRef<HTMLTextAreaElement | null>(
+    null
+  );
   const hasTaskTemplates = (controller.detail?.taskTemplates?.length || 0) > 0;
-  const hasStandingInstruction = !!controller.detail?.definition?.standingInstruction?.trim();
+  const hasStandingInstruction =
+    !!controller.detail?.definition?.standingInstruction?.trim();
+  const workflowStartMode =
+    !controller.serviceKind &&
+    (controller.lifecycleState === 'idle' ||
+      controller.lifecycleState === 'finished');
+  const serviceActivationMode =
+    controller.serviceKind && !controller.serviceActivated;
+  const conversationDraft = workflowStartMode
+    ? controller.instructionDraft
+    : controller.operatorMessageDraft;
   const canActivateService =
     controller.canStartTask && hasTaskTemplates && hasStandingInstruction;
   const canStartWorkflow =
     controller.canStartTask &&
     hasTaskTemplates &&
     !!controller.instructionDraft.trim();
+  const canSubmitConversation = serviceActivationMode
+    ? canActivateService
+    : workflowStartMode
+      ? canStartWorkflow
+      : !!controller.operatorMessageDraft.trim() &&
+        controller.canSendOperatorMessage &&
+        !controller.busyAction;
 
   React.useEffect(() => {
-    if (controller.serviceKind) {
-      return;
-    }
-    const node = instructionTextareaRef.current;
+    const node = conversationTextareaRef.current;
     if (!node) {
       return;
     }
     node.style.height = '0px';
     node.style.height = `${node.scrollHeight}px`;
-  }, [controller.instructionDraft]);
+  }, [conversationDraft]);
 
   return (
     <div className="space-y-4">
@@ -591,140 +606,116 @@ function StatusTab({
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="min-w-0 rounded-lg border p-4">
-          <h2 className="mb-3 text-sm font-semibold">
-            {controller.serviceKind
-              ? 'Activate Service'
-              : controller.lifecycleState === 'finished'
-                ? 'Start New Task'
-              : 'Start Instruction'}
-          </h2>
-          <div className="space-y-3">
-            {controller.serviceKind ? (
-              <div className="space-y-3 rounded-md border bg-muted/20 p-3">
-                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Standing Instruction
-                </div>
-                {hasStandingInstruction ? (
-                  <div className="whitespace-pre-wrap break-words text-sm">
-                    {controller.detail?.definition?.standingInstruction}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    No standing instruction is configured yet. Add one in the
-                    Config tab before activating this service or relying on
-                    schedule ticks.
-                  </div>
-                )}
+      <div className="min-w-0 rounded-lg border p-4">
+        <h2 className="mb-3 text-sm font-semibold">Conversation</h2>
+        <div className="space-y-3">
+          {controller.serviceKind ? (
+            <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Standing Instruction
               </div>
-            ) : (
-              <Textarea
-                ref={instructionTextareaRef}
-                value={controller.instructionDraft}
-                onChange={(event) =>
-                  controller.setInstructionDraft(event.target.value)
+              {hasStandingInstruction ? (
+                <div className="whitespace-pre-wrap break-words text-sm">
+                  {controller.detail?.definition?.standingInstruction}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  No standing instruction is configured yet. Add one in the
+                  Config tab before activating this service or relying on
+                  schedule ticks.
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {serviceActivationMode ? null : (
+            <Textarea
+              ref={conversationTextareaRef}
+              value={conversationDraft}
+              onChange={(event) => {
+                if (workflowStartMode) {
+                  controller.setInstructionDraft(event.target.value);
+                  return;
                 }
-                className="min-h-24 overflow-hidden resize-none"
-                placeholder="Tell this Automata what task to work on before starting it."
-                disabled={!controller.canStartTask || !!controller.busyAction}
-              />
-            )}
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-muted-foreground">
-                {controller.serviceKind
-                  ? !hasStandingInstruction
-                    ? 'Standing Instruction is required for service activation and scheduled cycles.'
-                    : !hasTaskTemplates
-                      ? 'Add at least one task template in Config before activating this service.'
-                      : controller.canStartTask
-                        ? controller.scheduleConfigured
-                          ? 'Activating starts a fresh cycle immediately. Future due schedule ticks can also start fresh cycles automatically from the saved task template.'
-                          : 'Activating starts a fresh cycle immediately. Without a schedule, future cycles start only from operator messages.'
-                        : controller.lifecycleState === 'paused'
-                          ? 'This service is paused. Resume it to put it back on standby.'
-                          : controller.serviceActivated
-                            ? 'This service is already live. Use operator messages or schedule ticks to start the next cycle.'
-                            : 'This service cannot be activated from the current lifecycle state.'
-                  : controller.canStartTask
+                controller.setOperatorMessageDraft(event.target.value);
+              }}
+              className="min-h-24 overflow-hidden resize-none"
+              placeholder={
+                workflowStartMode
+                  ? 'Tell this Automata what task to work on.'
+                  : controller.serviceKind
+                    ? 'Add context, request work, or clarify what this service should handle.'
+                    : 'Add context, change priority, or clarify the current task.'
+              }
+              disabled={
+                workflowStartMode
+                  ? !controller.canStartTask || !!controller.busyAction
+                  : !controller.canSendOperatorMessage ||
+                    !!controller.busyAction
+              }
+            />
+          )}
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground">
+              {serviceActivationMode
+                ? !hasStandingInstruction
+                  ? 'Standing Instruction is required for service activation and scheduled cycles.'
+                  : !hasTaskTemplates
+                    ? 'Add at least one task template in Config before activating this service.'
+                    : controller.canStartTask
+                      ? controller.scheduleConfigured
+                        ? 'Activating starts a fresh cycle immediately. Future due schedule ticks can also start fresh cycles automatically from the saved task template.'
+                        : 'Activating starts a fresh cycle immediately. Without a schedule, future cycles start only from operator messages.'
+                      : controller.lifecycleState === 'paused'
+                        ? 'This service is paused. Resume it to put it back on standby.'
+                        : 'This service cannot be activated from the current lifecycle state.'
+                : workflowStartMode
+                  ? controller.canStartTask
                     ? hasTaskTemplates
                       ? 'Starting creates a fresh workflow cycle from the Config task template.'
                       : 'Add at least one task template in Config before starting.'
-                    : controller.lifecycleState === 'paused'
-                      ? 'This Automata is paused. Resume it to continue the current task.'
-                      : 'This Automata already has an active task. Use an operator message to steer it.'}
-              </div>
-              <Button
-                onClick={() => void controller.onStart()}
-                disabled={
-                  controller.serviceKind
-                    ? !canActivateService
-                    : !canStartWorkflow
+                    : 'Starting is gated by scheduler controller readiness.'
+                  : controller.detail?.state.pendingPrompt
+                    ? 'Respond to the pending prompt before sending a general operator message.'
+                    : controller.canSendOperatorMessage
+                      ? controller.serviceKind
+                        ? controller.detail?.state.currentRunRef
+                          ? 'This records your message now and the service will pick it up after the current child DAG changes state.'
+                          : controller.detail?.state.busy
+                            ? 'This queues a user message into the active service turn.'
+                            : 'This wakes the service with a new operator message.'
+                        : controller.detail?.state.state === 'paused'
+                          ? 'This records your message now, but the Automata will stay paused until you resume it.'
+                          : controller.detail?.state.currentRunRef
+                            ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
+                            : 'This queues a user message into the active Automata task.'
+                      : controller.serviceKind
+                        ? controller.serviceActivated
+                          ? 'This service is paused. Resume it before sending a message.'
+                          : 'Activate this service before sending operator messages.'
+                        : 'Operator messages are only accepted while the Automata has an active task.'}
+            </div>
+            <Button
+              onClick={() => {
+                if (serviceActivationMode || workflowStartMode) {
+                  void controller.onStart();
+                  return;
                 }
-              >
-                {controller.serviceKind
-                  ? 'Activate'
-                  : controller.lifecycleState === 'finished'
+                void controller.onSendOperatorMessage();
+              }}
+              disabled={!canSubmitConversation || !!controller.busyAction}
+            >
+              {serviceActivationMode
+                ? 'Activate'
+                : workflowStartMode
+                  ? controller.lifecycleState === 'finished'
                     ? 'Start New Task'
-                    : 'Start'}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="min-w-0 rounded-lg border p-4">
-          <h2 className="mb-3 text-sm font-semibold">Operator Message</h2>
-          <div className="space-y-3">
-            <Textarea
-              value={controller.operatorMessageDraft}
-              onChange={(event) =>
-                controller.setOperatorMessageDraft(event.target.value)
-              }
-              placeholder={
-                controller.serviceKind
-                  ? 'Add context, request work, or clarify what this service should handle.'
-                  : 'Add context, change priority, or clarify the current task.'
-              }
-              disabled={
-                !controller.canSendOperatorMessage || !!controller.busyAction
-              }
-            />
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-muted-foreground">
-                {controller.detail?.state.pendingPrompt
-                  ? 'Respond to the pending prompt before sending a general operator message.'
-                  : controller.canSendOperatorMessage
-                    ? controller.serviceKind
-                      ? controller.detail?.state.currentRunRef
-                        ? 'This records your message now and the service will pick it up after the current child DAG changes state.'
-                        : controller.detail?.state.busy
-                          ? 'This queues a user message into the active service turn.'
-                          : 'This wakes the service with a new operator message.'
-                      : controller.detail?.state.state === 'paused'
-                        ? 'This records your message now, but the Automata will stay paused until you resume it.'
-                        : controller.detail?.state.currentRunRef
-                          ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
-                          : 'This queues a user message into the active Automata task.'
-                    : controller.serviceKind
-                      ? controller.serviceActivated
-                        ? 'This service is paused. Resume it before sending a message.'
-                        : 'Activate this service before sending operator messages.'
-                      : 'Operator messages are only accepted while the Automata has an active task.'}
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => void controller.onSendOperatorMessage()}
-                disabled={
-                  !controller.operatorMessageDraft.trim() ||
-                  !controller.canSendOperatorMessage ||
-                  !!controller.busyAction
-                }
-              >
-                {controller.busyAction === 'message'
-                  ? 'Sending...'
-                  : 'Send Message'}
-              </Button>
-            </div>
+                    : 'Start'
+                  : controller.busyAction === 'message'
+                    ? 'Sending...'
+                    : 'Send Message'}
+            </Button>
           </div>
         </div>
       </div>
