@@ -4843,8 +4843,8 @@ export interface components {
         LogOffset: number;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
         DAGRunId: components["schemas"]["DAGRunId"];
-        /** @description ID of the DAG-run */
-        DAGRunConcreteId: string;
+        /** @description ID of the DAG-run; must not be the special 'latest' alias */
+        DAGRunConcreteId: string & unknown;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
         DAGRunIdSearch: components["schemas"]["DAGRunId"];
         /** @description name of the DAG-run */
@@ -7252,7 +7252,7 @@ export interface operations {
             path: {
                 /** @description name of the DAG */
                 name: components["parameters"]["DAGName"];
-                /** @description ID of the DAG-run */
+                /** @description ID of the DAG-run; must not be the special 'latest' alias */
                 dagRunId: components["parameters"]["DAGRunConcreteId"];
             };
             cookie?: never;

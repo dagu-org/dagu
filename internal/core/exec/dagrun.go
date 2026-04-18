@@ -20,6 +20,7 @@ import (
 var (
 	ErrDAGRunIDNotFound    = errors.New("dag-run ID not found")
 	ErrDAGRunAlreadyExists = errors.New("dag-run already exists")
+	ErrDAGRunActive        = errors.New("dag-run is active")
 	ErrNoStatusData        = errors.New("no status data")
 	ErrCorruptedStatusFile = errors.New("corrupted status file") // Status file exists but contains no valid data or is corrupted
 )
@@ -90,7 +91,7 @@ type DAGRunStore interface {
 	// with the new DAG name.
 	RenameDAGRuns(ctx context.Context, oldName, newName string) error
 	// RemoveDAGRun removes a dag-run record by its reference.
-	RemoveDAGRun(ctx context.Context, dagRun DAGRunRef) error
+	RemoveDAGRun(ctx context.Context, dagRun DAGRunRef, opts ...RemoveDAGRunOption) error
 }
 
 // ListDAGRunStatusesOptions contains options for listing runs
@@ -194,6 +195,22 @@ func WithAllHistory() ListDAGRunStatusesOption {
 type DAGRunStatusPage struct {
 	Items      []*DAGRunStatus
 	NextCursor string
+}
+
+// RemoveDAGRunOptions contains options for removing a dag-run.
+type RemoveDAGRunOptions struct {
+	// RejectActive if true, refuses to remove dag-runs with an active status.
+	RejectActive bool
+}
+
+// RemoveDAGRunOption is a functional option for configuring RemoveDAGRunOptions.
+type RemoveDAGRunOption func(*RemoveDAGRunOptions)
+
+// WithRejectActiveDAGRun refuses to remove dag-runs that are still active.
+func WithRejectActiveDAGRun() RemoveDAGRunOption {
+	return func(o *RemoveDAGRunOptions) {
+		o.RejectActive = true
+	}
 }
 
 // RemoveOldDAGRunsOptions contains options for removing old dag-runs

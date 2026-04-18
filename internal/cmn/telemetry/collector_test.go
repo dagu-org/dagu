@@ -127,7 +127,7 @@ type mockDAGRunStore struct {
 var _ exec.DAGRunStore = (*mockDAGRunStore)(nil)
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef, _ ...exec.RemoveDAGRunOption) error {
 	panic("unimplemented")
 }
 

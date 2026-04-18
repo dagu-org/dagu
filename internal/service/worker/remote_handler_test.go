@@ -673,7 +673,7 @@ func (m *mockRemoteDAGRunStore) RenameDAGRuns(_ context.Context, _, _ string) er
 	return nil
 }
 
-func (m *mockRemoteDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) error {
+func (m *mockRemoteDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef, _ ...exec.RemoveDAGRunOption) error {
 	return nil
 }
 

@@ -211,7 +211,7 @@ func (m *mockDAGRunStore) RemoveOldDAGRuns(_ context.Context, _ string, _ int, _
 	return nil, nil
 }
 func (m *mockDAGRunStore) RenameDAGRuns(_ context.Context, _, _ string) error { return nil }
-func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(_ context.Context, _ exec.DAGRunRef, _ ...exec.RemoveDAGRunOption) error {
 	return nil
 }
 

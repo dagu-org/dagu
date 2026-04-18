@@ -6936,13 +6936,17 @@ components:
     DAGRunConcreteId:
       name: dagRunId
       in: path
-      description: ID of the DAG-run
+      description: ID of the DAG-run; must not be the special 'latest' alias
       required: true
       schema:
-        type: string
-        description: "Unique identifier for the DAG-run."
-        example: "20240101_120000"
-        pattern: "^[a-zA-Z0-9_-]+$"
+        allOf:
+          - type: string
+            description: "Unique identifier for the DAG-run."
+            example: "20240101_120000"
+            pattern: "^[a-zA-Z0-9_-]+$"
+          - not:
+              enum:
+                - latest
 
     DAGRunIdSearch:
       name: dagRunId

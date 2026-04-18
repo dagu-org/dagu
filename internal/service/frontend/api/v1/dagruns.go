@@ -1707,43 +1707,24 @@ func (a *API) DeleteDAGRun(ctx context.Context, request api.DeleteDAGRunRequestO
 	}
 
 	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
-	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
-	if err != nil {
+	if err := a.dagRunStore.RemoveDAGRun(ctx, ref, exec.WithRejectActiveDAGRun()); err != nil {
 		if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
 			return api.DeleteDAGRun404JSONResponse{
 				Code:    api.ErrorCodeNotFound,
 				Message: fmt.Sprintf("DAG run %s not found", request.DagRunId),
 			}, nil
 		}
-		return nil, fmt.Errorf("error finding DAG run: %w", err)
-	}
-
-	status, err := attempt.ReadStatus(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error reading DAG run status: %w", err)
-	}
-	if status == nil {
-		return api.DeleteDAGRun404JSONResponse{
-			Code:    api.ErrorCodeNotFound,
-			Message: fmt.Sprintf("DAG run %s status is unavailable", request.DagRunId),
-		}, nil
-	}
-	if status.Status.IsActive() {
-		return api.DeleteDAGRun400JSONResponse{
-			Code: api.ErrorCodeBadRequest,
-			Message: fmt.Sprintf(
-				"DAG run %s is %s; stop or dequeue it before deleting",
-				request.DagRunId,
-				status.Status.String(),
-			),
-		}, nil
-	}
-
-	if err := a.dagRunStore.RemoveDAGRun(ctx, ref); err != nil {
-		if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
-			return api.DeleteDAGRun404JSONResponse{
-				Code:    api.ErrorCodeNotFound,
-				Message: fmt.Sprintf("DAG run %s not found", request.DagRunId),
+		if errors.Is(err, exec.ErrDAGRunActive) {
+			status := strings.TrimPrefix(err.Error(), exec.ErrDAGRunActive.Error()+": ")
+			if status == err.Error() {
+				return api.DeleteDAGRun400JSONResponse{
+					Code:    api.ErrorCodeBadRequest,
+					Message: fmt.Sprintf("DAG run %s is active; stop or dequeue it before deleting", request.DagRunId),
+				}, nil
+			}
+			return api.DeleteDAGRun400JSONResponse{
+				Code:    api.ErrorCodeBadRequest,
+				Message: fmt.Sprintf("DAG run %s is %s; stop or dequeue it before deleting", request.DagRunId, status),
 			}, nil
 		}
 		return nil, fmt.Errorf("error deleting DAG run: %w", err)

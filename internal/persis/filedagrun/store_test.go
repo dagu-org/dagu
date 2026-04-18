@@ -140,6 +140,29 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "dagrun-id-1", dagRunStatus.DAGRunID)
 		assert.Equal(t, core.Running, dagRunStatus.Status)
 	})
+	t.Run("RemoveDAGRunRejectsActiveWhenRequested", func(t *testing.T) {
+		th := setupTestStore(t)
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		ref := exec.NewDAGRunRef("test_DAG", "active-id")
+
+		th.CreateAttempt(t, ts, ref.ID, core.Running)
+
+		err := th.Store.RemoveDAGRun(th.Context, ref, exec.WithRejectActiveDAGRun())
+		require.ErrorIs(t, err, exec.ErrDAGRunActive)
+
+		attempt, err := th.Store.FindAttempt(th.Context, ref)
+		require.NoError(t, err)
+		status, err := attempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.NotNil(t, status)
+		assert.Equal(t, core.Running, status.Status)
+
+		err = th.Store.RemoveDAGRun(th.Context, ref)
+		require.NoError(t, err)
+
+		_, err = th.Store.FindAttempt(th.Context, ref)
+		assert.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
+	})
 	t.Run("RemoveDAGRunRemovesArtifactDirsIncludingSubDAGRuns", func(t *testing.T) {
 		th := setupTestStore(t)
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
