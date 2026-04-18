@@ -32,17 +32,25 @@ For a quick look at how workflows are defined, see the [examples](https://docs.d
 
 **Try it live:** [Live Demo](https://demo-instance.dagu.sh/) (credentials: `demouser` / `demouser`)
 
-## Use Cases
+## Real-World Use Cases
 
-**Data pipeline orchestration.** Define ETL/ELT workflows as DAGs with parallel and sequential steps. Use the built-in SQL executor to query PostgreSQL or SQLite, the S3 executor to move files to/from object storage, the `jq` executor for JSON transformation, and sub-DAG composition to break large pipelines into reusable stages. Steps can pass outputs to downstream steps.
+Dagu is useful when scripts, containers, server jobs, or data tasks need visible dependencies, schedules, logs, retries, and a simple way to operate them.
 
-**Infrastructure automation.** Run commands on remote machines via the SSH executor with key-based authentication. Execute containers via the Docker or Kubernetes executor. Automate file archiving, deployment scripts, and maintenance tasks. Use preconditions to gate steps on environment checks, and lifecycle hooks (`onSuccess`, `onFailure`, `onExit`) to handle cleanup or notifications.
+**Cron and legacy script management.** Run existing shell scripts, Python scripts, HTTP calls, and scheduled jobs without rewriting them. Dependencies, run status, logs, retries, and history become visible in the Web UI instead of being hidden across crontabs and server log files.
 
-**Scheduled job management.** Replace fragile crontab setups with DAGs that have cron scheduling, timezone support, retry policies, overlap control (`skip`, `all`, `latest`), and a web UI showing execution history, logs, and real-time status. Zombie detection automatically identifies and handles stalled runs.
+**ETL and data operations.** Run PostgreSQL or SQLite queries, S3 transfers, `jq` transforms, validation steps, and reusable sub-workflows. Daily data workflows stay declarative, observable, and easy to retry when one step fails.
 
-**Batch processing.** Run compute-heavy workloads across a pool of workers using the coordinator/worker architecture. Workers connect to a coordinator over gRPC, pull tasks from a queue, and report status back. Workers support label-based routing (e.g., `gpu=true`) so DAGs can target specific machine capabilities.
+**Media conversion.** Run `ffmpeg`, thumbnail extraction, audio normalization, image processing, and other compute-heavy jobs. Conversion work can run across distributed workers while status, history, logs, and artifacts stay in one persistence layer for monitoring, debugging, and retries.
 
-**Legacy script orchestration.** Wrap existing shell scripts, Python scripts, HTTP calls, or any executable into workflow steps without modifying them. Dagu orchestrates execution order, captures stdout/stderr, and handles retries and error propagation around your existing code.
+**Infrastructure and server automation.** Coordinate SSH backups, cleanup jobs, deploy scripts, patch windows, precondition checks, and lifecycle hooks. Remote operations get schedules, retries, notifications, and per-step logs without requiring operators to SSH into servers for every recovery.
+
+**Container and Kubernetes workflows.** Compose workflows where each step can run a Docker image, Kubernetes Job, shell command, or validation step. Image-based tasks can be routed to the right workers without building a custom control plane around containers.
+
+**Customer support automation.** Run diagnostics, account repair jobs, data checks, and approval-gated support actions from a simple Web UI. Non-engineers can run reviewed workflows while engineers keep commands, logs, and results traceable.
+
+**IoT and edge workflows.** Run sensor polling, local cleanup, offline sync, health checks, and device maintenance jobs on small devices. The single binary and file-backed state work well on edge devices while still providing visibility through the Web UI.
+
+**AI agent automation.** Use AI agents to write, update, debug, and repair workflows because the operational contract is plain YAML. Agent-generated changes stay reviewable and observable in the same workflow system humans already operate.
 
 ## Why Dagu?
 
