@@ -1693,6 +1693,70 @@ func (a *API) GetDAGRunDetails(ctx context.Context, request api.GetDAGRunDetails
 	return &resp, nil
 }
 
+// DeleteDAGRun implements api.StrictServerInterface.
+func (a *API) DeleteDAGRun(ctx context.Context, request api.DeleteDAGRunRequestObject) (api.DeleteDAGRunResponseObject, error) {
+	if err := a.requireDeveloperOrAbove(ctx); err != nil {
+		return nil, err
+	}
+
+	if request.DagRunId == "latest" {
+		return api.DeleteDAGRun400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: "latest cannot be used when deleting a DAG-run; select a concrete dag-run ID",
+		}, nil
+	}
+
+	ref := exec.NewDAGRunRef(request.Name, request.DagRunId)
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
+			return api.DeleteDAGRun404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("DAG run %s not found", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("error finding DAG run: %w", err)
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error reading DAG run status: %w", err)
+	}
+	if status == nil {
+		return api.DeleteDAGRun404JSONResponse{
+			Code:    api.ErrorCodeNotFound,
+			Message: fmt.Sprintf("DAG run %s status is unavailable", request.DagRunId),
+		}, nil
+	}
+	if status.Status.IsActive() {
+		return api.DeleteDAGRun400JSONResponse{
+			Code: api.ErrorCodeBadRequest,
+			Message: fmt.Sprintf(
+				"DAG run %s is %s; stop or dequeue it before deleting",
+				request.DagRunId,
+				status.Status.String(),
+			),
+		}, nil
+	}
+
+	if err := a.dagRunStore.RemoveDAGRun(ctx, ref); err != nil {
+		if errors.Is(err, exec.ErrDAGRunIDNotFound) || errors.Is(err, exec.ErrNoStatusData) {
+			return api.DeleteDAGRun404JSONResponse{
+				Code:    api.ErrorCodeNotFound,
+				Message: fmt.Sprintf("DAG run %s not found", request.DagRunId),
+			}, nil
+		}
+		return nil, fmt.Errorf("error deleting DAG run: %w", err)
+	}
+
+	a.logAudit(ctx, audit.CategoryDAG, "dag_run_delete", map[string]any{
+		"dag_name":   request.Name,
+		"dag_run_id": request.DagRunId,
+	})
+
+	return api.DeleteDAGRun204Response{}, nil
+}
+
 // getDAGRunDetailsData returns DAG run details data. Used by both HTTP handler and SSE fetcher.
 func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string) (api.GetDAGRunDetails200JSONResponse, error) {
 	if dagRunId == "latest" {

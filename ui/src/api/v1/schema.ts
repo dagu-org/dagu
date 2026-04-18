@@ -735,7 +735,11 @@ export interface paths {
         get: operations["getDAGRunDetails"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a DAG-run
+         * @description Permanently removes a DAG-run record and its associated run data. Developer, manager, or admin only.
+         */
+        delete: operations["deleteDAGRun"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3321,10 +3325,10 @@ export interface components {
         };
         /** @description Configuration for DAG run artifact storage */
         DAGArtifactsConfig: {
-            /** @description Base directory for storing artifacts for this DAG when explicitly configured */
-            dir?: string;
             /** @description Whether artifact storage is enabled for this DAG */
             enabled: boolean;
+            /** @description Base directory for storing artifacts for this DAG when explicitly configured */
+            dir?: string;
         };
         LocalDag: {
             /** @description Name of the local DAG */
@@ -4839,6 +4843,8 @@ export interface components {
         LogOffset: number;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
         DAGRunId: components["schemas"]["DAGRunId"];
+        /** @description ID of the DAG-run */
+        DAGRunConcreteId: string;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
         DAGRunIdSearch: components["schemas"]["DAGRunId"];
         /** @description name of the DAG-run */
@@ -7217,6 +7223,59 @@ export interface operations {
                 };
             };
             /** @description DAGRun not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteDAGRun: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run */
+                dagRunId: components["parameters"]["DAGRunConcreteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG-run successfully deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAG-run cannot be deleted */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG-run not found */
             404: {
                 headers: {
                     [name: string]: unknown;

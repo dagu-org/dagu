@@ -1998,6 +1998,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+    delete:
+      summary: "Delete a DAG-run"
+      description: "Permanently removes a DAG-run record and its associated run data. Developer, manager, or admin only."
+      operationId: "deleteDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunConcreteId"
+      responses:
+        "204":
+          description: "DAG-run successfully deleted"
+        "400":
+          description: "DAG-run cannot be deleted"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG-run not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/spec:
     get:
       summary: "Retrieve DAG specification for a DAG-run"
@@ -6900,6 +6932,17 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/DAGRunId"
+
+    DAGRunConcreteId:
+      name: dagRunId
+      in: path
+      description: ID of the DAG-run
+      required: true
+      schema:
+        type: string
+        description: "Unique identifier for the DAG-run."
+        example: "20240101_120000"
+        pattern: "^[a-zA-Z0-9_-]+$"
 
     DAGRunIdSearch:
       name: dagRunId

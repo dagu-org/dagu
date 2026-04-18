@@ -6,7 +6,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { DAGRunSelectionItem } from './useBulkDAGRunSelection';
 
-export type BatchActionType = 'retry' | 'reschedule';
+export type BatchActionType = 'retry' | 'reschedule' | 'delete';
 export type BatchActionPhase = 'confirm' | 'running' | 'complete';
 
 type ActiveBatch = {
@@ -135,6 +135,33 @@ export function useDAGRunBatchSubmission({
               },
             }
           );
+
+          if (error) {
+            return {
+              ...dagRun,
+              ok: false,
+              error: error.message || fallback,
+            };
+          }
+
+          return {
+            ...dagRun,
+            ok: true,
+          };
+        }
+
+        if (action === 'delete') {
+          const { error } = await client.DELETE('/dag-runs/{name}/{dagRunId}', {
+            params: {
+              path: {
+                name: dagRun.name,
+                dagRunId: dagRun.dagRunId,
+              },
+              query: {
+                remoteNode,
+              },
+            },
+          });
 
           if (error) {
             return {

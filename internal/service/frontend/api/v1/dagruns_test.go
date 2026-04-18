@@ -1345,6 +1345,68 @@ func seedLatestDAGRunStatus(
 	return ref
 }
 
+func TestDeleteDAGRun(t *testing.T) {
+	server := test.SetupServer(t)
+	dag := &core.DAG{Name: "delete_run_dag"}
+	ref := seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		"delete-run-1",
+		core.Succeeded,
+		seedDAGRunStatusOptions{},
+	)
+
+	server.Client().Delete(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", ref.Name, ref.ID),
+	).ExpectStatus(http.StatusNoContent).Send(t)
+
+	_, err := server.DAGRunStore.FindAttempt(server.Context, ref)
+	require.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
+
+	server.Client().Get(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", ref.Name, ref.ID),
+	).ExpectStatus(http.StatusNotFound).Send(t)
+}
+
+func TestDeleteDAGRunRejectsLatestAlias(t *testing.T) {
+	server := test.SetupServer(t)
+
+	resp := server.Client().Delete(
+		"/api/v1/dag-runs/delete_run_dag/latest",
+	).ExpectStatus(http.StatusBadRequest).Send(t)
+
+	var body api.Error
+	resp.Unmarshal(t, &body)
+	require.Equal(t, api.ErrorCodeBadRequest, body.Code)
+	require.Contains(t, body.Message, "latest cannot be used")
+}
+
+func TestDeleteDAGRunRejectsActiveRun(t *testing.T) {
+	server := test.SetupServer(t)
+	dag := &core.DAG{Name: "delete_active_run_dag"}
+	ref := seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		"active-run-1",
+		core.Running,
+		seedDAGRunStatusOptions{},
+	)
+
+	resp := server.Client().Delete(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", ref.Name, ref.ID),
+	).ExpectStatus(http.StatusBadRequest).Send(t)
+
+	var body api.Error
+	resp.Unmarshal(t, &body)
+	require.Equal(t, api.ErrorCodeBadRequest, body.Code)
+	require.Contains(t, body.Message, "stop or dequeue it before deleting")
+
+	_, err := server.DAGRunStore.FindAttempt(server.Context, ref)
+	require.NoError(t, err)
+}
+
 func indentCommandBlock(command string, spaces int) string {
 	trimmed := strings.Trim(command, "\n")
 	if trimmed == "" {
