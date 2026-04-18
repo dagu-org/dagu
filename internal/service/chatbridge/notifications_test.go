@@ -129,25 +129,35 @@ func TestNotificationBatcher_DrainAndStopReturnsPendingBatchesOrderedAndStopsFlu
 	t.Parallel()
 
 	batcher := NewNotificationBatcher(80*time.Millisecond, 120*time.Millisecond)
+	baseTime := time.Now().UTC()
 
-	require.True(t, batcher.Enqueue("success-dest", testNotificationEvent(&exec.DAGRunStatus{
+	successEvent := testNotificationEvent(&exec.DAGRunStatus{
 		Name:      "briefing",
 		DAGRunID:  "run-1",
 		AttemptID: "a1",
 		Status:    core.Succeeded,
-	})))
-	require.True(t, batcher.Enqueue("urgent-old", testNotificationEvent(&exec.DAGRunStatus{
+	})
+	successEvent.ObservedAt = baseTime.Add(2 * time.Millisecond)
+
+	urgentOldEvent := testNotificationEvent(&exec.DAGRunStatus{
 		Name:      "sync",
 		DAGRunID:  "run-2",
 		AttemptID: "a2",
 		Status:    core.Failed,
-	})))
-	require.True(t, batcher.Enqueue("urgent-new", testNotificationEvent(&exec.DAGRunStatus{
+	})
+	urgentOldEvent.ObservedAt = baseTime
+
+	urgentNewEvent := testNotificationEvent(&exec.DAGRunStatus{
 		Name:      "sync",
 		DAGRunID:  "run-3",
 		AttemptID: "a3",
 		Status:    core.Waiting,
-	})))
+	})
+	urgentNewEvent.ObservedAt = baseTime.Add(time.Millisecond)
+
+	require.True(t, batcher.Enqueue("success-dest", successEvent))
+	require.True(t, batcher.Enqueue("urgent-old", urgentOldEvent))
+	require.True(t, batcher.Enqueue("urgent-new", urgentNewEvent))
 
 	drained := batcher.DrainAndStop()
 	require.Len(t, drained, 3)

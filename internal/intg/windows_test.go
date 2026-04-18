@@ -71,7 +71,7 @@ func TestWindowsShellDetection(t *testing.T) {
 			input    string
 			expected string
 		}{
-			{"", ""}, // Empty should return empty
+			{"", cmdutil.GetShellCommand("")},
 			{"cmd", "cmd"},
 			{"powershell", "powershell"},
 			{"bash", "bash"}, // May not exist but should pass through

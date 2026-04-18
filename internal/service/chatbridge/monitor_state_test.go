@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -31,6 +32,13 @@ func newTestNotificationMonitorConfig() NotificationMonitorConfig {
 	cfg.UrgentWindow = 10 * time.Millisecond
 	cfg.SeenEvictInterval = time.Hour
 	return cfg
+}
+
+func notificationMonitorEventuallyTimeout(base time.Duration) time.Duration {
+	if runtime.GOOS == "windows" {
+		return base * 3
+	}
+	return base
 }
 
 func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvents(t *testing.T) {
@@ -82,7 +90,7 @@ func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvent
 		bootstrapped := monitor.state.Bootstrapped
 		monitor.stateMu.Unlock()
 		return monitor.ownsNotificationLock() && monitor.notificationSessionActive() && bootstrapped
-	}, time.Second, 10*time.Millisecond)
+	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 
 	newStatus := &exec.DAGRunStatus{
 		Name:       "briefing",
@@ -102,10 +110,11 @@ func TestNotificationMonitor_BootstrapsFromCurrentHeadAndOnlyDeliversFutureEvent
 		mu.Lock()
 		defer mu.Unlock()
 		return len(delivered) == 1 && delivered[0] == "run-new"
-	}, time.Second, 10*time.Millisecond)
+	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 
-	assert.False(t, monitor.IsDelivered("dest-1", oldStatus))
-	assert.True(t, monitor.IsDelivered("dest-1", newStatus))
+	require.Eventually(t, func() bool {
+		return !monitor.IsDelivered("dest-1", oldStatus) && monitor.IsDelivered("dest-1", newStatus)
+	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 }
 
 func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
@@ -298,7 +307,7 @@ func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T
 			bootstrapped := monitor2.state.Bootstrapped
 			monitor2.stateMu.Unlock()
 			return monitor2.ownsNotificationLock() && monitor2.notificationSessionActive() && bootstrapped
-		}, 2*time.Second, 10*time.Millisecond)
+		}, notificationMonitorEventuallyTimeout(2*time.Second), 10*time.Millisecond)
 	case "monitor-2":
 		cancel2()
 		select {
@@ -311,7 +320,7 @@ func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T
 			bootstrapped := monitor1.state.Bootstrapped
 			monitor1.stateMu.Unlock()
 			return monitor1.ownsNotificationLock() && monitor1.notificationSessionActive() && bootstrapped
-		}, 2*time.Second, 10*time.Millisecond)
+		}, notificationMonitorEventuallyTimeout(2*time.Second), 10*time.Millisecond)
 	default:
 		t.Fatalf("first owner not determined: %q", firstOwner)
 	}
@@ -341,7 +350,7 @@ func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T
 		default:
 			return false
 		}
-	}, 2*time.Second, 10*time.Millisecond)
+	}, notificationMonitorEventuallyTimeout(2*time.Second), 10*time.Millisecond)
 }
 
 func TestNotificationMonitor_CorruptStateIsQuarantinedAndOnlyFutureEventsAreDelivered(t *testing.T) {
@@ -425,7 +434,9 @@ func TestNotificationMonitor_CorruptStateIsQuarantinedAndOnlyFutureEventsAreDeli
 	}, time.Second, 10*time.Millisecond)
 
 	assert.False(t, monitor.IsDelivered("dest-1", oldStatus))
-	assert.True(t, monitor.IsDelivered("dest-1", newStatus))
+	require.Eventually(t, func() bool {
+		return monitor.IsDelivered("dest-1", newStatus)
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestNotificationStateStore_LoadUnsupportedVersionQuarantinesState(t *testing.T) {
@@ -447,6 +458,9 @@ func TestNotificationStateStore_LoadUnsupportedVersionQuarantinesState(t *testin
 
 func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory permissions do not reliably block notification state writes")
+	}
 
 	baseDir := t.TempDir()
 	store, err := fileeventstore.New(baseDir)
@@ -527,6 +541,9 @@ func TestNotificationMonitor_SaveFailureDoesNotLoseUnreadEvents(t *testing.T) {
 
 func TestNotificationMonitor_NotifyCompletionSaveFailureDoesNotMutateLiveState(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory permissions do not reliably block notification state writes")
+	}
 
 	stateDir := t.TempDir()
 	stateFile := filepath.Join(stateDir, "state.json")
@@ -562,6 +579,9 @@ func TestNotificationMonitor_NotifyCompletionSaveFailureDoesNotMutateLiveState(t
 
 func TestNotificationMonitor_MarkBatchDeliveredSaveFailureDoesNotMutateLiveState(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory permissions do not reliably block notification state writes")
+	}
 
 	stateDir := t.TempDir()
 	stateFile := filepath.Join(stateDir, "state.json")

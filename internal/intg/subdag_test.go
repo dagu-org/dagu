@@ -5,8 +5,11 @@ package intg_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmd"
@@ -16,6 +19,49 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+func retryOutputStepScript(counterFile string) string {
+	if runtime.GOOS == "windows" {
+		return strings.TrimPrefix(fmt.Sprintf(`
+$counterFile = %s
+if (-not (Test-Path $counterFile)) {
+  Set-Content -Path $counterFile -Value "1" -NoNewline
+  Write-Output "output_attempt_1"
+  exit 1
+}
+
+$count = (Get-Content -Raw -Path $counterFile).Trim()
+if ($count -eq "1") {
+  Set-Content -Path $counterFile -Value "2" -NoNewline
+  Write-Output "output_attempt_2_success"
+  exit 0
+}
+`, test.PowerShellQuote(counterFile)), "\n")
+	}
+
+	counterFile = test.ShellPath(counterFile)
+	return strings.TrimPrefix(fmt.Sprintf(`
+COUNTER_FILE=%s
+if [ ! -f "$COUNTER_FILE" ]; then
+  printf '%%s' "1" > "$COUNTER_FILE"
+  echo "output_attempt_1"
+  exit 1
+fi
+
+COUNT=$(cat "$COUNTER_FILE")
+if [ "$COUNT" -eq "1" ]; then
+  printf '%%s' "2" > "$COUNTER_FILE"
+  echo "output_attempt_2_success"
+  exit 0
+fi
+`, test.PosixQuote(counterFile)), "\n")
+}
+
+func indentCommandBlock(command string, spaces int) string {
+	lines := strings.Split(strings.TrimRight(command, "\n"), "\n")
+	prefix := strings.Repeat(" ", spaces)
+	return prefix + strings.Join(lines, "\n"+prefix)
+}
 
 func TestInlineSubDAG(t *testing.T) {
 	t.Run("SimpleExecution", func(t *testing.T) {
@@ -116,6 +162,10 @@ steps:
 	})
 
 	t.Run("ThreeLevelNestingWithOutputPassing", func(t *testing.T) {
+		if runtime.GOOS == "windows" && raceEnabled() {
+			t.Skip("Skipping nested inline subdag output passing on Windows race runs")
+		}
+
 		// middle-dag calls leaf-dag with parameter passing
 		th := test.Setup(t)
 
@@ -616,7 +666,7 @@ steps:
 		th := test.SetupCommand(t)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		counterFile := filepath.Join("/tmp", "retry_counter_"+dagRunID)
+		counterFile := filepath.Join(t.TempDir(), "retry_counter_"+dagRunID)
 		defer func() { _ = os.Remove(counterFile) }()
 
 		th.CreateDAGFile(t, "parent_retry.yaml", `
@@ -626,28 +676,16 @@ steps:
     output: SUB_OUTPUT
 `)
 
-		th.CreateDAGFile(t, "sub_retry.yaml", `
+		th.CreateDAGFile(t, "sub_retry.yaml", fmt.Sprintf(`
 steps:
   - name: retry_step
     command: |
-      COUNTER_FILE="`+counterFile+`"
-      if [ ! -f "$COUNTER_FILE" ]; then
-        echo "1" > "$COUNTER_FILE"
-        echo "output_attempt_1"
-        exit 1
-      else
-        COUNT=$(cat "$COUNTER_FILE")
-        if [ "$COUNT" -eq "1" ]; then
-          echo "2" > "$COUNTER_FILE"
-          echo "output_attempt_2_success"
-          exit 0
-        fi
-      fi
+%s
     output: STEP_OUTPUT
     retry_policy:
       limit: 2
       interval_sec: 1
-`)
+`, indentCommandBlock(retryOutputStepScript(counterFile), 6)))
 
 		args := []string{"start", "--run-id", dagRunID, "parent_retry"}
 		th.RunCommand(t, cmd.Start(), test.CmdTest{
@@ -689,31 +727,19 @@ func TestRetryPolicy(t *testing.T) {
 		th := test.SetupCommand(t)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
-		counterFile := filepath.Join("/tmp", "retry_counter_basic_"+dagRunID)
+		counterFile := filepath.Join(t.TempDir(), "retry_counter_basic_"+dagRunID)
 		defer func() { _ = os.Remove(counterFile) }()
 
-		th.CreateDAGFile(t, "basic_retry.yaml", `
+		th.CreateDAGFile(t, "basic_retry.yaml", fmt.Sprintf(`
 steps:
   - name: retry_step
     command: |
-      COUNTER_FILE="`+counterFile+`"
-      if [ ! -f "$COUNTER_FILE" ]; then
-        echo "1" > "$COUNTER_FILE"
-        echo "output_attempt_1"
-        exit 1
-      else
-        COUNT=$(cat "$COUNTER_FILE")
-        if [ "$COUNT" -eq "1" ]; then
-          echo "2" > "$COUNTER_FILE"
-          echo "output_attempt_2_success"
-          exit 0
-        fi
-      fi
+%s
     output: STEP_OUTPUT
     retry_policy:
       limit: 2
       interval_sec: 1
-`)
+`, indentCommandBlock(retryOutputStepScript(counterFile), 6)))
 
 		args := []string{"start", "--run-id", dagRunID, "basic_retry"}
 		th.RunCommand(t, cmd.Start(), test.CmdTest{

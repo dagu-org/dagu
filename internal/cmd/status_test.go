@@ -5,6 +5,9 @@ package cmd_test
 
 import (
 	"context"
+	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,20 +46,16 @@ func waitForDAGRunning(t *testing.T, th test.Command, dagLocation string) {
 	}, time.Second*3, time.Millisecond*50)
 }
 
-// stopDAGAndWait stops a DAG and waits for the goroutine to complete.
-func stopDAGAndWait(t *testing.T, th test.Command, dagLocation string, done <-chan struct{}) {
-	t.Helper()
-	th.RunCommand(t, cmd.Stop(), test.CmdTest{Args: []string{"stop", dagLocation}})
-	<-done
-}
-
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAGRunning", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dagFile := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    command: sleep 10
-`)
+    command: %q
+`, holdUntilFileExistsCommand(release)))
 		done := make(chan struct{})
 		go func() {
 			th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dagFile.Location}})
@@ -68,10 +67,13 @@ func TestStatusCommand(t *testing.T) {
 		err := executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		stopDAGAndWait(t, th, dagFile.Location, done)
+		releaseHoldFile(t, release)
+		<-done
 	})
 
 	t.Run("StatusDAGSuccess", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -87,6 +89,8 @@ func TestStatusCommand(t *testing.T) {
 	})
 
 	t.Run("StatusDAGError", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "error"
@@ -128,6 +132,8 @@ func TestStatusCommand(t *testing.T) {
 	})
 
 	t.Run("StatusDAGWithParams", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `params:
   - param1
@@ -146,6 +152,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithSpecificRunID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -163,6 +171,8 @@ steps:
 	})
 
 	t.Run("StatusDAGMultipleRuns", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -186,6 +196,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithSkippedSteps", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "check"
@@ -242,11 +254,14 @@ steps:
 	})
 
 	t.Run("StatusDAGCancel", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dagFile := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    command: sleep 10
-`)
+    command: %q
+`, holdUntilFileExistsCommand(release)))
 		done := make(chan struct{})
 		go func() {
 			th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dagFile.Location}})
@@ -263,29 +278,20 @@ steps:
 	})
 
 	t.Run("StatusDAGWithManySteps", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
-  - name: "step1"
-    command: "echo 'Step 1'"
-  - name: "step2"
-    command: "echo 'Step 2'"
-  - name: "step3"
-    command: "echo 'Step 3'"
-  - name: "step4"
-    command: "echo 'Step 4'"
-  - name: "step5"
-    command: "echo 'Step 5'"
-  - name: "step6"
-    command: "echo 'Step 6'"
-  - name: "step7"
-    command: "echo 'Step 7'"
-  - name: "step8"
-    command: "echo 'Step 8'"
-  - name: "step9"
-    command: "echo 'Step 9'"
-  - name: "step10"
-    command: "echo 'Step 10'"
-`)
+		stepCount := 10
+		if runtime.GOOS == "windows" {
+			// The status renderer behavior is the same with fewer steps, and
+			// Windows CI pays a large per-step shell startup cost.
+			stepCount = 4
+		}
+		var dagContent strings.Builder
+		for i := range stepCount {
+			fmt.Fprintf(&dagContent, "  - name: \"step%d\"\n    command: \"echo 'Step %d'\"\n", i+1, i+1)
+		}
+		dagFile := th.DAG(t, "steps:\n"+dagContent.String())
 		err := executeCommand(th.Context, cmd.Start(), []string{dagFile.Location})
 		require.NoError(t, err)
 
@@ -296,6 +302,8 @@ steps:
 	})
 
 	t.Run("StatusDAGByName", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -311,11 +319,14 @@ steps:
 	})
 
 	t.Run("StatusDAGWithPID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
-		dagFile := th.DAG(t, `steps:
+		release := newHoldFile(t)
+		dagFile := th.DAG(t, fmt.Sprintf(`steps:
   - name: "1"
-    command: sleep 10
-`)
+    command: %q
+`, holdUntilFileExistsCommand(release)))
 		done := make(chan struct{})
 		go func() {
 			th.RunCommand(t, cmd.Start(), test.CmdTest{Args: []string{"start", dagFile.Location}})
@@ -327,10 +338,13 @@ steps:
 		err := executeCommand(th.Context, cmd.Status(), []string{dagFile.Location})
 		require.NoError(t, err)
 
-		stopDAGAndWait(t, th, dagFile.Location, done)
+		releaseHoldFile(t, release)
+		<-done
 	})
 
 	t.Run("StatusDAGWithAttemptID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -354,6 +368,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithLogPaths", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -369,6 +385,8 @@ steps:
 	})
 
 	t.Run("StatusDAGWithBinaryLogContent", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -412,6 +430,8 @@ steps:
 	})
 
 	t.Run("StatusSubDAGRun", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t, test.WithBuiltExecutable())
 		dagFile := th.DAG(t, `steps:
   - name: run-child
@@ -463,6 +483,8 @@ steps:
 	})
 
 	t.Run("StatusSubDAGRunMissingParentRunID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"
@@ -474,6 +496,8 @@ steps:
 	})
 
 	t.Run("StatusSubDAGRunNotFound", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 		dagFile := th.DAG(t, `steps:
   - name: "success"

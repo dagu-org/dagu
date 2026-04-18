@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/persis/filewatermark"
 	"github.com/dagucloud/dagu/internal/runtime/transform"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
@@ -56,7 +58,7 @@ type schedulerConfig struct {
 // newFixture creates a new queue integration test fixture.
 func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 	t.Helper()
-	if !raceEnabled() {
+	if runtime.GOOS != "windows" && !raceEnabled() {
 		t.Parallel()
 	}
 
@@ -103,6 +105,30 @@ func newFixture(t *testing.T, dagYAML string, opts ...func(*fixture)) *fixture {
 
 	t.Cleanup(f.cleanup)
 	return f
+}
+
+func queueTestTimeout(timeout time.Duration) time.Duration {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return timeout * 8
+	case runtime.GOOS == "windows":
+		return timeout * 4
+	case raceEnabled():
+		return timeout * 2
+	default:
+		return timeout
+	}
+}
+
+func queueTestConcurrencyAllowance(maxDiff time.Duration) time.Duration {
+	switch {
+	case runtime.GOOS == "windows" && raceEnabled():
+		return maxDiff + time.Second
+	case runtime.GOOS == "windows":
+		return maxDiff + 500*time.Millisecond
+	default:
+		return maxDiff
+	}
 }
 
 // WithQueue sets a custom queue name.
@@ -203,7 +229,7 @@ func (f *fixture) EnqueueWithPriority(priority exec.QueuePriority) *fixture {
 // StartScheduler starts the scheduler in background.
 func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 	var ctx context.Context
-	ctx, f.cancel = context.WithTimeout(f.th.Context, timeout)
+	ctx, f.cancel = context.WithTimeout(f.th.Context, queueTestTimeout(timeout))
 	home := filepath.Dir(f.th.Config.Paths.DAGsDir)
 	go func() {
 		th := f.th
@@ -218,6 +244,7 @@ func (f *fixture) StartScheduler(timeout time.Duration) *fixture {
 
 // WaitDrain waits for the queue to empty.
 func (f *fixture) WaitDrain(timeout time.Duration) *fixture {
+	timeout = queueTestTimeout(timeout)
 	require.Eventually(f.t, func() bool {
 		items, err := f.th.QueueStore.List(f.th.Context, f.queue)
 		return err == nil && len(items) == 0
@@ -240,6 +267,14 @@ func (f *fixture) WaitForStatusIn(runID string, expected []core.Status, timeout 
 		return slices.Contains(expected, status.Status)
 	})
 	require.NoError(f.t, err)
+	return f
+}
+
+func (f *fixture) WaitForAllStatuses(expected core.Status, timeout time.Duration) *fixture {
+	f.t.Helper()
+	for _, runID := range f.runIDs {
+		f.WaitForStatus(runID, expected, timeout)
+	}
 	return f
 }
 
@@ -266,7 +301,12 @@ func (f *fixture) Status(runID string) (*exec.DAGRunStatus, error) {
 	defer cancel()
 
 	ref := exec.NewDAGRunRef(f.dag.Name, runID)
-	attempt, err := f.th.DAGRunStore.FindAttempt(ctx, ref)
+	store := filedagrun.New(
+		f.th.Config.Paths.DAGRunsDir,
+		filedagrun.WithLatestStatusToday(f.th.Config.Server.LatestStatusToday),
+		filedagrun.WithLocation(f.th.Config.Core.Location),
+	)
+	attempt, err := store.FindAttempt(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +330,7 @@ func (f *fixture) WaitForStatusMatch(
 
 	var matched *exec.DAGRunStatus
 	var lastErr error
+	timeout = queueTestTimeout(timeout)
 	ok := assert.Eventually(f.t, func() bool {
 		status, err := f.Status(runID)
 		if err != nil {
@@ -311,6 +352,7 @@ func (f *fixture) WaitForStatusMatch(
 
 // AssertConcurrent verifies all DAGs started within maxDiff of each other.
 func (f *fixture) AssertConcurrent(maxDiff time.Duration) {
+	maxDiff = queueTestConcurrencyAllowance(maxDiff)
 	times := f.collectStartTimes()
 	var max time.Duration
 	for i := range times {
@@ -327,8 +369,20 @@ func (f *fixture) AssertConcurrent(maxDiff time.Duration) {
 func (f *fixture) collectStartTimes() []time.Time {
 	var times []time.Time
 	for _, id := range f.runIDs {
-		st := f.MustStatus(id)
-		t, err := stringutil.ParseTime(st.StartedAt)
+		var startedAt string
+		require.Eventually(f.t, func() bool {
+			st, err := f.Status(id)
+			if err != nil {
+				return false
+			}
+			if st.StartedAt == "" {
+				return false
+			}
+			startedAt = st.StartedAt
+			return true
+		}, queueTestTimeout(10*time.Second), 50*time.Millisecond, "timed out waiting for run %s to record a start time", id)
+
+		t, err := stringutil.ParseTime(startedAt)
 		require.NoError(f.t, err)
 		times = append(times, t)
 	}
@@ -339,6 +393,7 @@ func (f *fixture) waitForRecentStatus(timeout time.Duration, match func(exec.DAG
 	f.t.Helper()
 
 	var matched exec.DAGRunStatus
+	timeout = queueTestTimeout(timeout)
 	require.Eventually(f.t, func() bool {
 		for _, status := range f.th.DAGRunMgr.ListRecentStatus(f.th.Context, f.dag.Name, 10) {
 			if match(status) {

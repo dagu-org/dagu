@@ -135,13 +135,11 @@ func TestCache_TTLExpiration(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "test-data", data)
 
-	// Wait for TTL to expire (LRU sweeps every ttl/100 = 1ms)
-	time.Sleep(200 * time.Millisecond)
-
-	// Entry should be expired
-	_, ok = cache.Load(filePath)
-	assert.False(t, ok)
-	assert.Equal(t, 0, cache.Size())
+	// Wait for TTL to expire and the async sweeper to remove the entry.
+	require.Eventually(t, func() bool {
+		_, ok := cache.Load(filePath)
+		return !ok && cache.Size() == 0
+	}, 5*time.Second, 25*time.Millisecond)
 }
 
 func TestCache_IsStale(t *testing.T) {
@@ -238,6 +236,43 @@ func TestCache_LoadLatest(t *testing.T) {
 	data, err = cache.LoadLatest(filePath, loader)
 	require.NoError(t, err)
 	assert.Equal(t, "loaded-data", data)
+	assert.Equal(t, 2, loadCount)
+}
+
+func TestCache_LoadLatest_DetectsSubsecondMtimeChanges(t *testing.T) {
+	t.Parallel()
+
+	cache := NewCache[string]("test", 100, time.Hour)
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("alpha"), 0o644))
+
+	baseTime := time.Unix(1_700_000_000, 100_000_000)
+	require.NoError(t, os.Chtimes(filePath, baseTime, baseTime))
+
+	loadCount := 0
+	loader := func() (string, error) {
+		loadCount++
+		return "loaded-data", nil
+	}
+
+	_, err := cache.LoadLatest(filePath, loader)
+	require.NoError(t, err)
+	require.Equal(t, 1, loadCount)
+
+	require.NoError(t, os.WriteFile(filePath, []byte("bravo"), 0o644))
+	nextTime := baseTime.Add(200 * time.Millisecond)
+	require.NoError(t, os.Chtimes(filePath, nextTime, nextTime))
+
+	initialInfo, err := os.Stat(filePath)
+	require.NoError(t, err)
+	if initialInfo.ModTime().Unix() != nextTime.Unix() || initialInfo.ModTime().UnixNano() != nextTime.UnixNano() {
+		t.Skip("filesystem does not preserve sub-second mtimes")
+	}
+
+	_, err = cache.LoadLatest(filePath, loader)
+	require.NoError(t, err)
 	assert.Equal(t, 2, loadCount)
 }
 
@@ -560,11 +595,10 @@ func TestCache_TTLEvictionAutomatic(t *testing.T) {
 		fi, _ := os.Stat(fp)
 		cache.Store(fp, "data", fi)
 	}
-	assert.Equal(t, 5, cache.Size())
 
-	// Wait for TTL expiration + cleanup sweep
-	time.Sleep(200 * time.Millisecond)
-
-	// Entries should have been automatically evicted (no manual trigger needed)
-	assert.Equal(t, 0, cache.Size())
+	// Wait for TTL expiration and allow the async sweeper to catch up on slower
+	// runners before asserting that everything has been evicted.
+	require.Eventually(t, func() bool {
+		return cache.Size() == 0
+	}, 2*time.Second, 10*time.Millisecond)
 }

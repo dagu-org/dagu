@@ -295,7 +295,7 @@ retry_policy:
 
 # -- External Secrets --
 # Resolve secrets from external providers at runtime. Each entry sets an env var.
-# Providers: "env", "file", "gcp-secrets", etc.
+# Providers: "env", "file", "vault".
 # secrets:
 #   - name: DB_PASSWORD
 #     provider: env

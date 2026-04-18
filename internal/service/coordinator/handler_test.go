@@ -278,7 +278,12 @@ func (m *mockDAGRunAttempt) ReadStatus(_ context.Context) (*exec.DAGRunStatus, e
 }
 func (m *mockDAGRunAttempt) ReadDAG(_ context.Context) (*core.DAG, error) { return m.dag, nil }
 func (m *mockDAGRunAttempt) SetDAG(_ *core.DAG)                           {}
-func (m *mockDAGRunAttempt) Abort(_ context.Context) error                { return nil }
+func (m *mockDAGRunAttempt) Abort(_ context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.aborting = true
+	return nil
+}
 func (m *mockDAGRunAttempt) IsAborting(_ context.Context) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -3066,6 +3071,80 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 		result := h.getCancelledRunsForWorker(ctx, stats)
 		require.Len(t, result, 1)
 		assert.Equal(t, "attempt-key-1", result[0].AttemptKey)
+	})
+}
+
+func TestHandler_RequestCancel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("FinalizesNotStartedSubAttempt", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
+		ctx := context.Background()
+
+		rootRef := exec.DAGRunRef{Name: "parent-dag", ID: "root-run"}
+		attempt := store.addSubAttempt(rootRef, "child-run", &exec.DAGRunStatus{
+			Name:      "child-dag",
+			DAGRunID:  "child-run",
+			AttemptID: "attempt-1",
+			Status:    core.NotStarted,
+		})
+
+		resp, err := h.RequestCancel(ctx, &coordinatorv1.RequestCancelRequest{
+			DagName:        "child-dag",
+			DagRunId:       "child-run",
+			RootDagRunName: rootRef.Name,
+			RootDagRunId:   rootRef.ID,
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Accepted)
+
+		attempt.mu.Lock()
+		defer attempt.mu.Unlock()
+		require.True(t, attempt.aborting)
+		require.True(t, attempt.opened)
+		require.True(t, attempt.closed)
+		require.True(t, attempt.written)
+		require.NotNil(t, attempt.status)
+		require.Equal(t, core.Aborted, attempt.status.Status)
+		require.NotEmpty(t, attempt.status.FinishedAt)
+		require.Equal(t, context.Canceled.Error(), attempt.status.Error)
+	})
+
+	t.Run("LeavesActiveSubAttemptForWorkerShutdown", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
+		ctx := context.Background()
+
+		rootRef := exec.DAGRunRef{Name: "parent-dag", ID: "root-run"}
+		attempt := store.addSubAttempt(rootRef, "child-run", &exec.DAGRunStatus{
+			Name:      "child-dag",
+			DAGRunID:  "child-run",
+			AttemptID: "attempt-1",
+			Status:    core.Running,
+		})
+
+		resp, err := h.RequestCancel(ctx, &coordinatorv1.RequestCancelRequest{
+			DagName:        "child-dag",
+			DagRunId:       "child-run",
+			RootDagRunName: rootRef.Name,
+			RootDagRunId:   rootRef.ID,
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Accepted)
+
+		attempt.mu.Lock()
+		defer attempt.mu.Unlock()
+		require.True(t, attempt.aborting)
+		require.False(t, attempt.opened)
+		require.False(t, attempt.closed)
+		require.False(t, attempt.written)
+		require.NotNil(t, attempt.status)
+		require.Equal(t, core.Running, attempt.status.Status)
 	})
 }
 

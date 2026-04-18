@@ -105,6 +105,9 @@ func parseEnvSlice(envSlice []string) map[string]string {
 	for _, kv := range envSlice {
 		key, value, found := strings.Cut(kv, "=")
 		if found {
+			if runtime.GOOS == "windows" {
+				key = strings.ToUpper(key)
+			}
 			envMap[key] = value
 		}
 	}

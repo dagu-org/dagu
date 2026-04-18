@@ -4,15 +4,48 @@
 package intg_test
 
 import (
+	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/test"
 )
 
+func powerShellEnvOrLiteral(value string) string {
+	if strings.HasPrefix(value, "${") && strings.HasSuffix(value, "}") && len(value) > 3 {
+		return "$env:" + value[2:len(value)-1]
+	}
+	return fmt.Sprintf("%q", value)
+}
+
+func numericPreconditionCommand(left, operator, right string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(
+			"if ([int](%s) %s [int](%s)) { exit 0 } else { exit 1 }",
+			powerShellEnvOrLiteral(left),
+			operator,
+			powerShellEnvOrLiteral(right),
+		)
+	}
+	return fmt.Sprintf("test %s %s %s", left, operator, right)
+}
+
+func stringPreconditionCommand(left, right string) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(
+			"if (([string](%s)) -eq ([string](%s))) { exit 0 } else { exit 1 }",
+			powerShellEnvOrLiteral(left),
+			powerShellEnvOrLiteral(right),
+		)
+	}
+	return fmt.Sprintf("test %s = %s", left, right)
+}
+
 func TestPreconditionWithDAGEnvVars(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	dag := th.DAG(t, `
+	dag := th.DAG(t, fmt.Sprintf(`
 env:
   - DEV_PCENT: "90"
   - DEV_ALERT: "80"
@@ -21,8 +54,8 @@ steps:
     command: echo "alert triggered"
     output: RESULT
     preconditions:
-      - condition: "test ${DEV_PCENT} -ge ${DEV_ALERT}"
-`)
+      - condition: %q
+`, numericPreconditionCommand("${DEV_PCENT}", "-ge", "${DEV_ALERT}")))
 	agent := dag.Agent()
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{
@@ -33,7 +66,7 @@ steps:
 func TestPreconditionWithDAGEnvVarsNotMet(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	dag := th.DAG(t, `
+	dag := th.DAG(t, fmt.Sprintf(`
 type: graph
 env:
   - DEV_PCENT: "50"
@@ -43,8 +76,8 @@ steps:
     command: echo "alert triggered"
     output: RESULT
     preconditions:
-      - condition: "test ${DEV_PCENT} -ge ${DEV_ALERT}"
-`)
+      - condition: %q
+`, numericPreconditionCommand("${DEV_PCENT}", "-ge", "${DEV_ALERT}")))
 	agent := dag.Agent()
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{
@@ -55,16 +88,16 @@ steps:
 func TestDAGLevelPreconditionWithEnvVars(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	dag := th.DAG(t, `
+	dag := th.DAG(t, fmt.Sprintf(`
 env:
   - ENABLED: "yes"
 preconditions:
-  - condition: "test ${ENABLED} = yes"
+  - condition: %q
 steps:
   - name: run
     command: echo "executed"
     output: RESULT
-`)
+`, stringPreconditionCommand("${ENABLED}", "yes")))
 	agent := dag.Agent()
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{
@@ -75,7 +108,7 @@ steps:
 func TestPreconditionWithStepOutput(t *testing.T) {
 	t.Parallel()
 	th := test.Setup(t)
-	dag := th.DAG(t, `
+	dag := th.DAG(t, fmt.Sprintf(`
 type: graph
 steps:
   - name: produce
@@ -85,9 +118,9 @@ steps:
     command: echo "ran"
     output: FINAL
     preconditions:
-      - condition: "test ${STEP_RESULT} = go"
+      - condition: %q
     depends: produce
-`)
+`, stringPreconditionCommand("${STEP_RESULT}", "go")))
 	agent := dag.Agent()
 	agent.RunSuccess(t)
 	dag.AssertOutputs(t, map[string]any{

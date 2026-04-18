@@ -83,7 +83,7 @@ func (s *DAGRunLeaseStore) Touch(ctx context.Context, attemptKey string, observe
 
 func (s *DAGRunLeaseStore) Delete(ctx context.Context, attemptKey string) error {
 	return s.withLeaseLock(ctx, attemptKey, func() error {
-		err := os.Remove(s.leasePath(attemptKey))
+		err := removeFile(s.leasePath(attemptKey))
 		if err == nil || os.IsNotExist(err) {
 			return nil
 		}

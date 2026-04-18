@@ -5,6 +5,7 @@ package intg_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -19,17 +20,15 @@ func TestRetryPolicy_WithExponentialBackoff(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with retry backoff
-	dag := th.DAG(t, `steps:
+	dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: failing-step
-    command: |
-      echo "Attempt at $(date +%s.%N)"
-      exit 1
+    %s
     retry_policy:
       limit: 3
       interval_sec: 1
       backoff: 2.0
       exit_code: [1]
-`)
+`, portableDirectFailureStepYAML(t)))
 	agent := dag.Agent()
 
 	// Record start time
@@ -66,17 +65,15 @@ func TestRetryPolicy_WithBackoffBoolean(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with boolean backoff
-	dag := th.DAG(t, `steps:
+	dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: failing-step
-    command: |
-      echo "Attempt at $(date +%s.%N)"
-      exit 1
+    %s
     retry_policy:
       limit: 3
       interval_sec: 1
       backoff: true  # Should use default 2.0 multiplier
       exit_code: [1]
-`)
+`, portableDirectFailureStepYAML(t)))
 	agent := dag.Agent()
 
 	// Record start time
@@ -110,18 +107,16 @@ func TestRepeatPolicy_WithExponentialBackoff(t *testing.T) {
 	th := test.Setup(t)
 
 	// Load DAG with repeat backoff
-	dag := th.DAG(t, `steps:
+	dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: repeat-step
-    command: |
-      echo "Execution at $(date +%s.%N)"
-      exit 0
+    %s
     repeat_policy:
       repeat: while
       limit: 4
       interval_sec: 1
       backoff: 2.0
       exit_code: [0]  # Repeat while exit code is 0
-`)
+`, portableDirectSuccessStepYAML(t)))
 	agent := dag.Agent()
 
 	// Record start time

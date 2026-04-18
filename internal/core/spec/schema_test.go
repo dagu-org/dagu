@@ -630,13 +630,14 @@ func TestBuildParamsWithLocalSchemaReference(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, tmpFile.Close())
 
+	schemaPath := filepath.ToSlash(tmpFile.Name())
 	data := fmt.Appendf(nil, `
 params:
   schema: "%s"
   values:
     batch_size: 25
     environment: "staging"
-`, tmpFile.Name())
+`, schemaPath)
 
 	dag, err := LoadYAML(context.Background(), data)
 	require.NoError(t, err)
@@ -757,13 +758,14 @@ func TestBuildParamsSchemaResolution(t *testing.T) {
 			}
 		})
 
+		workingDir := filepath.ToSlash(wd)
 		data := fmt.Appendf(nil, `
-working_dir: %s
+working_dir: "%s"
 params:
   schema: "schema.json"
   values:
     environment: "dev"
-`, wd)
+`, workingDir)
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -824,13 +826,14 @@ params:
 		require.NoError(t, os.Chdir(cwd))
 		defer func() { _ = os.Chdir(orig) }()
 
+		workingDir := filepath.ToSlash(wd)
 		data := fmt.Appendf(nil, `
-working_dir: %s
+working_dir: "%s"
 params:
   schema: "schema.json"
   values:
     environment: "dev"
-`, wd)
+`, workingDir)
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -890,10 +893,11 @@ params:
 		require.NoError(t, err)
 		require.NoError(t, tmpFile.Close())
 
+		schemaPath := filepath.ToSlash(tmpFile.Name())
 		data := fmt.Appendf(nil, `
 params:
   schema: "%s"
-`, tmpFile.Name())
+`, schemaPath)
 
 		cliParams := "batch_size=100 environment=prod"
 		_, err = LoadYAML(context.Background(), data, WithParams(cliParams))
@@ -933,12 +937,13 @@ params:
 		require.NoError(t, err)
 		require.NoError(t, tmpFile.Close())
 
+		schemaPath := filepath.ToSlash(tmpFile.Name())
 		data := fmt.Appendf(nil, `
 params:
   schema: "%s"
   values:
     batch_size: 75
-`, tmpFile.Name())
+`, schemaPath)
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)
@@ -984,6 +989,7 @@ params:
 		require.NoError(t, err)
 		require.NoError(t, tmpFile.Close())
 
+		schemaPath := filepath.ToSlash(tmpFile.Name())
 		data := fmt.Appendf(nil, `
 params:
   schema: "%s"
@@ -992,7 +998,7 @@ params:
     environment: "production"
     debug: false
     timeout: 600
-`, tmpFile.Name())
+`, schemaPath)
 
 		dag, err := LoadYAML(context.Background(), data)
 		require.NoError(t, err)

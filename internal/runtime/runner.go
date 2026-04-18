@@ -816,7 +816,7 @@ func (r *Runner) Signal(
 
 	if done != nil && isTermination {
 		defer func() {
-			for plan.IsRunning() {
+			for plan.HasActiveNodes() {
 				time.Sleep(r.pause)
 			}
 			done <- true

@@ -5,12 +5,22 @@ package eval
 
 import (
 	"context"
+	"runtime"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func commandSubstitutionTestContext() context.Context {
+	ctx := context.Background()
+	if runtime.GOOS == "windows" {
+		scope := NewEnvScope(nil, true).WithEntry("SHELL", "cmd", EnvSourceOS)
+		ctx = WithEnvScope(ctx, scope)
+	}
+	return ctx
+}
 
 func TestExpandQuotedRefs_SimpleVariable(t *testing.T) {
 	ctx := context.Background()
@@ -295,7 +305,7 @@ func TestString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := commandSubstitutionTestContext()
 			got, err := String(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -359,7 +369,7 @@ func TestIntString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := commandSubstitutionTestContext()
 			got, err := IntString(ctx, tt.input, tt.opts...)
 			if tt.wantErr {
 				require.Error(t, err)

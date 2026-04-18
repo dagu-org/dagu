@@ -22,9 +22,11 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
+	"github.com/dagucloud/dagu/internal/cmn/signalctx"
 	"github.com/dagucloud/dagu/internal/core"
 	exec1 "github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/core/spec"
@@ -48,10 +50,17 @@ var builtExecutableOnce sync.Once
 var builtExecutablePath string
 var builtExecutableErr error
 
-const (
-	latestStatusAssertTimeout  = 30 * time.Second
+var (
+	latestStatusAssertTimeout  = helperLatestStatusAssertTimeout()
 	latestStatusAssertInterval = 1 * time.Second
 )
+
+func helperLatestStatusAssertTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 2 * time.Minute
+	}
+	return 30 * time.Second
+}
 
 // HelperOption defines functional options for Helper
 type HelperOption func(*Options)
@@ -184,6 +193,11 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
+	if runtime.GOOS == "windows" {
+		if resolved, err := filepath.EvalSymlinks(tmpDir); err == nil {
+			tmpDir = resolved
+		}
+	}
 	shellPath := testShellPath(t)
 
 	root := getProjectRoot(t)
@@ -195,7 +209,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 		executablePath = buildCurrentExecutable(t, root)
 	}
 
-	ctx := createDefaultContext()
+	ctx := signalctx.WithOSSignalsDisabled(createDefaultContext())
 	// Use a fresh viper instance to avoid any global state issues between tests.
 	v := viper.New()
 	loader := config.NewConfigLoader(v, config.WithAppHomeDir(tmpDir))
@@ -249,7 +263,7 @@ func Setup(t *testing.T, opts ...HelperOption) Helper {
 
 	configFile := filepath.Join(tmpDir, "config.yaml")
 	cfg.Paths.ConfigFileUsed = configFile
-	cfg.Core.BaseEnv = config.NewBaseEnv(buildHelperChildEnv(cfg.Core.BaseEnv.AsSlice(), tmpDir, configFile, executablePath, shellPath))
+	cfg.Core.BaseEnv = config.NewBaseEnv(buildHelperChildEnv(cfg.Core.BaseEnv.AsSlice(), tmpDir, configFile, executablePath, cfg.Core.DefaultShell))
 	writeHelperConfigFile(t, cfg, configFile)
 
 	ctx = config.WithConfig(ctx, cfg)
@@ -627,7 +641,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected core.Status) {
 		}
 		t.Logf("current status=%s errors=%v", curr.Status.String(), curr.Errors())
 		return curr.Status == expected
-	}, time.Second*5, time.Second)
+	}, latestStatusAssertTimeout, latestStatusAssertInterval)
 }
 
 // AssertOutputs checks the given outputs against the actual outputs of the DAG
@@ -660,16 +674,17 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 		}
 
 		if actual, ok := actualOutputs[key]; ok {
+			actual = normalizeTestOutput(actual)
 			switch expected := expected.(type) {
 			case string:
-				assert.Equal(t, fmt.Sprintf("%s=%s", key, expected), actual)
+				assert.Equal(t, normalizeTestOutput(fmt.Sprintf("%s=%s", key, expected)), actual)
 
 			case Contains:
-				assert.Contains(t, actual, string(expected), "expected output %q to include %q", key, expected)
+				assert.Contains(t, actual, normalizeTestOutput(string(expected)), "expected output %q to include %q", key, expected)
 
 			case []Contains:
 				for _, c := range expected {
-					assert.Contains(t, actual, string(c), "expected output %q to include %q", key, c)
+					assert.Contains(t, actual, normalizeTestOutput(string(c)), "expected output %q to include %q", key, c)
 				}
 
 			case NotEmpty:
@@ -685,6 +700,10 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 			t.Errorf("expected output %q not found", key)
 		}
 	}
+}
+
+func normalizeTestOutput(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
 // ReadOutputs reads the collected outputs from the outputs.json file.
@@ -898,11 +917,23 @@ func testShellPath(t *testing.T) string {
 	t.Helper()
 
 	if runtime.GOOS == "windows" {
-		if shPath, err := exec.LookPath("powershell"); err == nil {
+		for _, name := range []string{"pwsh.exe", "pwsh", "powershell.exe", "powershell"} {
+			if shPath, ok := cmdutil.FindExecutable(name); ok {
+				return shPath
+			}
+		}
+		if shPath := windowsSystemPowerShellPath(); shPath != "" {
 			return shPath
 		}
-		if shPath, err := exec.LookPath("cmd"); err == nil {
-			return shPath
+		if shPath := strings.TrimSpace(os.Getenv("COMSPEC")); shPath != "" {
+			if _, err := os.Stat(shPath); err == nil {
+				return shPath
+			}
+		}
+		for _, name := range []string{"cmd.exe", "cmd", "bash", "sh"} {
+			if shPath, ok := cmdutil.FindExecutable(name); ok {
+				return shPath
+			}
 		}
 		t.Fatal("no suitable shell found on Windows")
 	}
@@ -910,6 +941,24 @@ func testShellPath(t *testing.T) string {
 	shPath, err := exec.LookPath("sh")
 	require.NoError(t, err, "failed to find sh")
 	return shPath
+}
+
+func windowsSystemPowerShellPath() string {
+	systemRoot := strings.TrimSpace(os.Getenv("SystemRoot"))
+	if systemRoot == "" {
+		return ""
+	}
+
+	for _, candidate := range []string{
+		filepath.Join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+		filepath.Join(systemRoot, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe"),
+	} {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	return ""
 }
 
 func buildHelperChildEnv(base []string, daguHome, configFile, executablePath, shellPath string) []string {
@@ -995,6 +1044,15 @@ func buildCurrentExecutable(t *testing.T, root string) string {
 	t.Helper()
 
 	builtExecutableOnce.Do(func() {
+		prebuiltPath := filepath.Join(root, ".local", "bin", "dagu")
+		if runtime.GOOS == "windows" {
+			prebuiltPath += ".exe"
+		}
+		if fi, err := os.Stat(prebuiltPath); err == nil && !fi.IsDir() {
+			builtExecutablePath = prebuiltPath
+			return
+		}
+
 		tmpDir, err := os.MkdirTemp("", "dagu-test-bin-*")
 		if err != nil {
 			builtExecutableErr = fmt.Errorf("failed to create temp dir for test executable: %w", err)

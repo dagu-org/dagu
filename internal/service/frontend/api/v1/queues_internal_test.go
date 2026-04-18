@@ -30,15 +30,15 @@ func TestGetQueueFiltersDistributedRunsByLeaseFreshness(t *testing.T) {
 	leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
 	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 
-	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "fresh-run", "lease-q", time.Now().Add(-time.Second))
-	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "stale-run", "lease-q", time.Now().Add(-10*time.Second))
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "fresh-run", "lease-q", time.Now())
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "lease-q", "stale-run", "lease-q", time.Now().Add(-2*time.Minute))
 
 	a := &API{
 		dagRunStore:         dagRunStore,
 		dagRunLeaseStore:    leaseStore,
 		procStore:           procStore,
 		config:              &config.Config{},
-		leaseStaleThreshold: 5 * time.Second,
+		leaseStaleThreshold: time.Minute,
 	}
 
 	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{
@@ -62,14 +62,14 @@ func TestGetQueueFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing.T) {
 	leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
 	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 
-	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "fallback-q", "fresh-run", "", time.Now().Add(-time.Second))
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "fallback-q", "fresh-run", "", time.Now())
 
 	a := &API{
 		dagRunStore:         dagRunStore,
 		dagRunLeaseStore:    leaseStore,
 		procStore:           procStore,
 		config:              &config.Config{},
-		leaseStaleThreshold: 5 * time.Second,
+		leaseStaleThreshold: time.Minute,
 	}
 
 	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{
@@ -93,7 +93,7 @@ func TestGetQueueCountsQueuedItemsSeparatelyFromRunningItems(t *testing.T) {
 	queueStore := filequeue.New(filepath.Join(tmpDir, "queue"))
 	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
 
-	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "mixed-q", "running-run", "mixed-q", time.Now().Add(-time.Second))
+	createDistributedQueueRun(t, ctx, dagRunStore, leaseStore, "mixed-q", "running-run", "mixed-q", time.Now())
 	createQueuedQueueRun(t, ctx, dagRunStore, queueStore, "mixed-q", "queued-run", core.Queued)
 
 	a := &API{
@@ -102,7 +102,7 @@ func TestGetQueueCountsQueuedItemsSeparatelyFromRunningItems(t *testing.T) {
 		queueStore:          queueStore,
 		procStore:           procStore,
 		config:              &config.Config{},
-		leaseStaleThreshold: 5 * time.Second,
+		leaseStaleThreshold: time.Minute,
 	}
 
 	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{

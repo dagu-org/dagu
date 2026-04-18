@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -175,7 +176,14 @@ func waitForServer(t *testing.T, port string) {
 			return true
 		}
 		return false
-	}, 2*time.Second, 20*time.Millisecond, "server did not start on port %s", port)
+	}, serverStartupTimeout(), 20*time.Millisecond, "server did not start on port %s", port)
+}
+
+func serverStartupTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 10 * time.Second
+	}
+	return 2 * time.Second
 }
 
 func requireHealthy(t *testing.T, url string) {

@@ -522,12 +522,12 @@ func TestRunningTaskTracking(t *testing.T) {
 		// Release all held tasks so pollers become free
 		close(releaseTasks)
 
-		// Wait for at least one task to complete
+		// Wait for released tasks to drain before dispatching more work.
 		require.Eventually(t, func() bool {
 			activeTasksMu.Lock()
 			defer activeTasksMu.Unlock()
-			return len(activeTasks) < 3
-		}, 5*time.Second, 10*time.Millisecond, "No tasks completed")
+			return len(activeTasks) == 0
+		}, 5*time.Second, 10*time.Millisecond, "Released tasks did not finish")
 
 		// Dispatch 2 more tasks
 		for i := 3; i < 5; i++ {
@@ -566,22 +566,33 @@ func TestWorkerConnectionFailure(t *testing.T) {
 		w := worker.NewWorker("test-worker", 1, mockCoordinatorCli, labels, &config.Config{})
 		w.SetHandler(&mockHandler{})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// Start worker
+		done := make(chan struct{})
 		go func() {
 			_ = w.Start(ctx)
+			close(done)
 		}()
 
-		// Wait for context timeout
-		<-ctx.Done()
+		require.Eventually(t, func() bool {
+			return pollCount.Load() > 1
+		}, 2*time.Second, 10*time.Millisecond, "Should retry on connection failures")
 
 		// Should have attempted multiple polls despite failures
 		assert.Greater(t, pollCount.Load(), int32(1), "Should retry on connection failures")
 
 		// Stop worker
-		_ = w.Stop(context.Background())
+		cancel()
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stopCancel()
+		require.NoError(t, w.Stop(stopCtx))
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Worker did not stop within timeout")
+		}
 
 		// Verify coordinator client is in failed state
 		metrics := mockCoordinatorCli.Metrics()

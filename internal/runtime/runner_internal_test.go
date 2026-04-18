@@ -47,7 +47,7 @@ func TestRunNodeExecution_ExternalStepRetrySkipsRepeatBookkeeping(t *testing.T) 
 	step := core.Step{
 		Name: "retrying-step",
 		Commands: []core.CommandEntry{
-			{Command: "false", CmdWithArgs: "false"},
+			{Command: "exit", Args: []string{"1"}, CmdWithArgs: "exit 1"},
 		},
 		RetryPolicy: core.RetryPolicy{
 			Limit:    1,
@@ -79,6 +79,7 @@ func TestRunNodeExecution_ExternalStepRetrySkipsRepeatBookkeeping(t *testing.T) 
 	require.NoError(t, node.Prepare(ctx, logDir, "run-1"))
 
 	runner.runNodeExecution(ctx, plan, node, nil)
+	require.NoError(t, node.Teardown())
 
 	assert.Equal(t, core.NodeRetrying, node.State().Status)
 	assert.Equal(t, 0, node.State().DoneCount)

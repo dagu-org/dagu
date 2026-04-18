@@ -2594,6 +2594,47 @@ func (h *Handler) RequestCancel(ctx context.Context, req *coordinatorv1.RequestC
 		}, nil
 	}
 
+	if err := finalizeNotStartedCancellation(ctx, attempt); err != nil {
+		logger.Warn(ctx, "Failed to finalize pending cancelled DAG run", tag.Error(err))
+		return &coordinatorv1.RequestCancelResponse{
+			Accepted: false,
+			Error:    fmt.Sprintf("failed to finalize cancellation: %v", err),
+		}, nil
+	}
+
 	logger.Info(ctx, "DAG run cancellation requested successfully")
 	return &coordinatorv1.RequestCancelResponse{Accepted: true}, nil
+}
+
+func finalizeNotStartedCancellation(ctx context.Context, attempt exec.DAGRunAttempt) error {
+	if attempt == nil {
+		return nil
+	}
+
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("read attempt status: %w", err)
+	}
+	if status == nil || status.Status != core.NotStarted {
+		return nil
+	}
+
+	finishedAt := stringutil.FormatTime(time.Now().UTC())
+	status.Status = core.Aborted
+	status.FinishedAt = finishedAt
+	status.Error = context.Canceled.Error()
+	status.WorkerID = ""
+	status.PID = 0
+	status.LeaseAt = 0
+
+	if err := attempt.Open(ctx); err != nil {
+		return fmt.Errorf("open attempt for cancellation finalization: %w", err)
+	}
+	defer func() { _ = attempt.Close(ctx) }()
+
+	if err := attempt.Write(ctx, *status); err != nil {
+		return fmt.Errorf("write cancelled attempt status: %w", err)
+	}
+
+	return nil
 }

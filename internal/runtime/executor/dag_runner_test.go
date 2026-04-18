@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/dagucloud/dagu/internal/cmn/config"
@@ -533,9 +534,12 @@ func TestSubDAGExecutor_Kill_MixedProcesses(t *testing.T) {
 	// Call Kill
 	err := executor.Kill(os.Interrupt)
 
-	// Verify no error (killProcessGroup will fail for fake PIDs but that's expected)
-	// We're mainly testing that both distributed and local processes are handled
-	assert.Error(t, err) // Expected error from trying to kill fake processes
+	// Windows killProcessTree returns nil for nonexistent fake PIDs; Unix returns an error.
+	if runtime.GOOS == "windows" {
+		assert.NoError(t, err)
+	} else {
+		assert.Error(t, err)
+	}
 
 	// Verify RequestChildCancel was called for both distributed runs
 	mockDB.AssertExpectations(t)
@@ -617,8 +621,11 @@ func TestSubDAGExecutor_Kill_OnlyLocal(t *testing.T) {
 	// Call Kill
 	err := executor.Kill(os.Interrupt)
 
-	// Verify error (from trying to kill fake process)
-	assert.Error(t, err)
+	if runtime.GOOS == "windows" {
+		assert.NoError(t, err)
+	} else {
+		assert.Error(t, err)
+	}
 
 	// Verify RequestChildCancel was NOT called
 	mockDB.AssertNotCalled(t, "RequestChildCancel")

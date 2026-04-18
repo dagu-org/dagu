@@ -7,28 +7,117 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 
-	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
 	"github.com/dagucloud/dagu/internal/cmn/eval"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/runtime"
+	runtimeexec "github.com/dagucloud/dagu/internal/runtime/executor"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNode(t *testing.T) {
-	t.Parallel()
+const nodeSignalExecutorType = "test-node-signal"
 
+var (
+	registerNodeSignalExecutorOnce sync.Once
+	nodeSignalExecutorFactoryMu    sync.Mutex
+	nodeSignalExecutorFactory      func() *blockingSignalExecutor
+)
+
+type blockingSignalExecutor struct {
+	ready  chan struct{}
+	killed chan os.Signal
+	stdout io.Writer
+	stderr io.Writer
+}
+
+func newBlockingSignalExecutor() *blockingSignalExecutor {
+	return &blockingSignalExecutor{
+		ready:  make(chan struct{}),
+		killed: make(chan os.Signal, 1),
+	}
+}
+
+func (e *blockingSignalExecutor) SetStdout(out io.Writer) { e.stdout = out }
+
+func (e *blockingSignalExecutor) SetStderr(out io.Writer) { e.stderr = out }
+
+func (e *blockingSignalExecutor) Run(ctx context.Context) error {
+	close(e.ready)
+
+	select {
+	case sig := <-e.killed:
+		return fmt.Errorf("signal: %s", sig.String())
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (e *blockingSignalExecutor) Kill(sig os.Signal) error {
+	select {
+	case e.killed <- sig:
+	default:
+	}
+	return nil
+}
+
+func registerNodeSignalExecutor(t *testing.T) {
+	t.Helper()
+
+	registerNodeSignalExecutorOnce.Do(func() {
+		runtimeexec.RegisterExecutor(
+			nodeSignalExecutorType,
+			func(context.Context, core.Step) (runtimeexec.Executor, error) {
+				nodeSignalExecutorFactoryMu.Lock()
+				factory := nodeSignalExecutorFactory
+				nodeSignalExecutorFactoryMu.Unlock()
+				if factory == nil {
+					return nil, fmt.Errorf("node signal executor factory not configured")
+				}
+				return factory(), nil
+			},
+			nil,
+			core.ExecutorCapabilities{},
+		)
+	})
+}
+
+func withNodeSignalExecutor(t *testing.T) (<-chan *blockingSignalExecutor, func()) {
+	t.Helper()
+
+	registerNodeSignalExecutor(t)
+
+	execCh := make(chan *blockingSignalExecutor, 1)
+
+	nodeSignalExecutorFactoryMu.Lock()
+	prev := nodeSignalExecutorFactory
+	nodeSignalExecutorFactory = func() *blockingSignalExecutor {
+		exec := newBlockingSignalExecutor()
+		execCh <- exec
+		return exec
+	}
+	nodeSignalExecutorFactoryMu.Unlock()
+
+	return execCh, func() {
+		nodeSignalExecutorFactoryMu.Lock()
+		nodeSignalExecutorFactory = prev
+		nodeSignalExecutorFactoryMu.Unlock()
+	}
+}
+
+func TestNode(t *testing.T) {
 	t.Run("Execute", func(t *testing.T) {
 		t.Parallel()
 
@@ -42,15 +131,13 @@ func TestNode(t *testing.T) {
 		node.ExecuteFail(t, "exit status 1")
 	})
 	t.Run("Signal", func(t *testing.T) {
-		t.Parallel()
+		execCh, restore := withNodeSignalExecutor(t)
+		defer restore()
 
-		readyFile := filepath.Join(t.TempDir(), "ready")
-		node := setupNode(t, withNodeCommand(fmt.Sprintf("sh -c 'touch %s; sleep 30'", readyFile)))
+		node := setupNode(t, withNodeExecutorType(nodeSignalExecutorType))
 		go func() {
-			require.Eventually(t, func() bool {
-				_, err := os.Stat(readyFile)
-				return err == nil
-			}, 5*time.Second, 5*time.Millisecond)
+			exec := <-execCh
+			<-exec.ready
 			node.Signal(node.Context, syscall.SIGTERM, false)
 		}()
 
@@ -63,15 +150,13 @@ func TestNode(t *testing.T) {
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 	})
 	t.Run("SignalOnStop", func(t *testing.T) {
-		t.Parallel()
+		execCh, restore := withNodeSignalExecutor(t)
+		defer restore()
 
-		readyFile := filepath.Join(t.TempDir(), "ready")
-		node := setupNode(t, withNodeCommand(fmt.Sprintf("sh -c 'touch %s; sleep 30'", readyFile)), withNodeSignalOnStop("SIGINT"))
+		node := setupNode(t, withNodeExecutorType(nodeSignalExecutorType), withNodeSignalOnStop("SIGINT"))
 		go func() {
-			require.Eventually(t, func() bool {
-				_, err := os.Stat(readyFile)
-				return err == nil
-			}, 5*time.Second, 5*time.Millisecond)
+			exec := <-execCh
+			<-exec.ready
 			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
 		}()
 
@@ -103,7 +188,7 @@ func TestNode(t *testing.T) {
 
 		file := node.NodeData().Step.Stdout
 		dat, _ := os.ReadFile(file)
-		require.Equalf(t, "hello\n", string(dat), "unexpected stdout content: %s", string(dat))
+		require.Equalf(t, "hello\n", strings.ReplaceAll(string(dat), "\r\n", "\n"), "unexpected stdout content: %s", string(dat))
 	})
 	t.Run("Stderr", func(t *testing.T) {
 		t.Parallel()
@@ -127,84 +212,84 @@ func TestNode(t *testing.T) {
 	t.Run("Output", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, "echo hello"), withNodeOutput("OUTPUT_TEST"))
+		node := setupNode(t, withNodeCommand(test.Output("hello")), withNodeOutput("OUTPUT_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_TEST", "hello")
 	})
 	t.Run("OutputJSON", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo '{"key": "value"}'`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node := setupNode(t, withNodeCommand(test.Output(`{"key": "value"}`)), withNodeOutput("OUTPUT_JSON_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key": "value"}`)
 	})
 	t.Run("OutputJSONUnescaped", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node := setupNode(t, withNodeCommand(test.Output(`{"key":"value"}`)), withNodeOutput("OUTPUT_JSON_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key":"value"}`)
 	})
 	t.Run("OutputTabWithDoubleQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo "hello\tworld"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output("hello\tworld")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", "hello\tworld")
 	})
 	t.Run("OutputTabWithMixedQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello"\t"world`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output("hello\tworld")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", "hello\tworld") // This behavior is aligned with bash
+		node.AssertOutput(t, "OUTPUT", "hello\tworld")
 	})
 	t.Run("OutputTabWithoutQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello\tworld`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output(`hello\tworld`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hellotworld`) // This behavior is aligned with bash
+		node.AssertOutput(t, "OUTPUT", `hello\tworld`)
 	})
 	t.Run("OutputNewlineCharacter", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello\nworld`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output("hello\nworld")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hellonworld`) // This behavior is aligned with bash
+		node.AssertOutput(t, "OUTPUT", "hello\nworld")
 	})
 	t.Run("OutputEscapedJSONWithoutQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output(`{"key":"value"}`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
 	})
 	t.Run("OutputEscapedJSONWithQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo "{\"key\":\"value\"}"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output(`{"key":"value"}`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
 	})
 	t.Run("OutputSingleQuotedString", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo 'hello world'`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output("hello world")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello world`)
 	})
 	t.Run("OutputMixedQuotesWithSpace", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo hello "world"`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output("hello world")), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello world`)
 	})
 	t.Run("OutputNestedQuotes", func(t *testing.T) {
 		t.Parallel()
 
-		node := setupNode(t, withNodeCmdArgs(t, `echo 'hello "world"'`), withNodeOutput("OUTPUT"))
+		node := setupNode(t, withNodeCommand(test.Output(`hello "world"`)), withNodeOutput("OUTPUT"))
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello "world"`)
 	})
@@ -361,6 +446,9 @@ Line 5: Process completed
 			node := runtime.NewNode(step, runtime.NodeState{})
 			err := node.Prepare(ctx, tempDir, "test-run")
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				require.NoError(t, node.Teardown())
+			})
 
 			// For non-existent log file test, we skip the log file write
 			if tt.name != "non-existent log file" && logFile != "" {
@@ -1050,6 +1138,9 @@ func TestNodeShouldContinue(t *testing.T) {
 			if tt.setupOutput != nil {
 				tt.setupOutput(t, node)
 			}
+			t.Cleanup(func() {
+				require.NoError(t, node.Teardown())
+			})
 
 			// Now we can test the public method directly
 			node.SetStatus(tt.nodeStatus)
@@ -1068,21 +1159,6 @@ type nodeHelper struct {
 
 type nodeOption func(*runtime.NodeData)
 
-func withNodeCmdArgs(t *testing.T, cmdWithArgs string) nodeOption {
-	t.Helper()
-	cmd, args, err := cmdutil.SplitCommand(cmdWithArgs)
-	if err != nil {
-		t.Fatalf("failed to parse command %q: %v", cmdWithArgs, err)
-	}
-	return func(data *runtime.NodeData) {
-		data.Step.Commands = []core.CommandEntry{{
-			Command:     cmd,
-			Args:        args,
-			CmdWithArgs: cmdWithArgs,
-		}}
-	}
-}
-
 func withNodeCommand(command string) nodeOption {
 	return func(data *runtime.NodeData) {
 		data.Step.Commands = []core.CommandEntry{{
@@ -1095,6 +1171,12 @@ func withNodeCommand(command string) nodeOption {
 func withNodeSignalOnStop(signal string) nodeOption {
 	return func(data *runtime.NodeData) {
 		data.Step.SignalOnStop = signal
+	}
+}
+
+func withNodeExecutorType(executorType string) nodeOption {
+	return func(data *runtime.NodeData) {
+		data.Step.ExecutorConfig.Type = executorType
 	}
 }
 
@@ -1220,6 +1302,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created at absolute path
 		content, err := os.ReadFile(stdoutPath)
@@ -1262,6 +1347,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created in working directory
 		expectedPath := filepath.Join(workDir, stdoutPath)
@@ -1309,6 +1397,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created in working directory
 		expectedPath := filepath.Join(workDir, stderrPath)
@@ -1357,6 +1448,9 @@ func TestNodeOutputRedirectWithWorkingDir(t *testing.T) {
 
 		err = node.Execute(ctx)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, node.Teardown())
+		})
 
 		// Verify file was created in correct nested path
 		expectedPath := filepath.Join(workDir, stdoutPath)

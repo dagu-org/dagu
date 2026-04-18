@@ -4,6 +4,7 @@
 package cmd_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -16,15 +17,18 @@ import (
 )
 
 func TestRestartCommand(t *testing.T) {
+	t.Parallel()
+
 	th := test.SetupCommand(t)
 
-	dag := th.DAG(t, `params: "p1"
+	release := newHoldFile(t)
+	dag := th.DAG(t, fmt.Sprintf(`params: "p1"
 steps:
   - name: "1"
     script: "echo $1"
   - name: "2"
-    script: "sleep 5"
-`)
+    script: %q
+`, holdUntilFileExistsCommand(release)))
 
 	// Start the DAG to restart.
 	done1 := make(chan struct{})
@@ -44,8 +48,10 @@ steps:
 		th.RunCommand(t, cmd.Restart(), test.CmdTest{Args: args})
 		close(done2)
 	}()
+	releaseDone := releaseHoldFileWhenRecentStatusCountAtLeast(t, th, dag.Name, 2, release)
 
 	// Wait for both executions to complete.
+	require.NoError(t, <-releaseDone)
 	<-done1
 	<-done2
 
@@ -65,16 +71,17 @@ func TestRestartCommand_BuiltExecutableRestoresExplicitEnv(t *testing.T) {
 	th := test.SetupCommand(t, test.WithBuiltExecutable())
 	t.Setenv("CMD_RESTART_EXPLICIT_ENV", "from-host")
 
-	dag := th.DAG(t, `name: built-restart-explicit-env
+	release := newHoldFile(t)
+	dag := th.DAG(t, fmt.Sprintf(`name: built-restart-explicit-env
 env:
   - EXPORTED_SECRET: ${CMD_RESTART_EXPLICIT_ENV}
 steps:
   - name: "hold"
-    command: sleep 5
+    command: %q
   - name: "capture"
-    command: printf '%s|%s' "$EXPORTED_SECRET" "${CMD_RESTART_EXPLICIT_ENV:-}"
+    command: printf '%%s|%%s' "$EXPORTED_SECRET" "${CMD_RESTART_EXPLICIT_ENV:-}"
     output: RESULT
-`)
+`, holdUntilFileExistsCommand(release)))
 
 	startDone := make(chan error, 1)
 	go func() {
@@ -88,7 +95,9 @@ steps:
 		return err == nil && status != nil && status.Status == core.Running
 	}, 10*time.Second, 100*time.Millisecond)
 
+	releaseDone := releaseHoldFileWhenRecentStatusCountAtLeast(t, th, dag.Name, 2, release)
 	test.RunBuiltCLI(t, th.Helper, []string{"CMD_RESTART_EXPLICIT_ENV=from-host"}, "restart", dag.Name)
+	require.NoError(t, <-releaseDone)
 
 	require.NoError(t, <-startDone)
 

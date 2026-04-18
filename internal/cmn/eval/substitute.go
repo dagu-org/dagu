@@ -11,13 +11,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/cmdutil"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 )
 
-const substituteCommandTimeout = 2 * time.Second
+func substituteCommandTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 10 * time.Second
+	}
+	return 2 * time.Second
+}
 
 // buildShellCommand creates an exec.Cmd with appropriate arguments for the shell type.
 func buildShellCommand(shell, cmdStr string) *exec.Cmd {
@@ -42,10 +49,10 @@ func buildShellCommandContext(ctx context.Context, shell, cmdStr string) *exec.C
 // runCommandWithContext executes cmdStr in a shell using the EnvScope from context,
 // falling back to os.Environ() when no scope is present.
 func runCommandWithContext(ctx context.Context, cmdStr string) (string, error) {
-	commandCtx, cancel, timeout := withCommandTimeout(ctx, substituteCommandTimeout)
+	commandCtx, cancel, timeout := withCommandTimeout(ctx, substituteCommandTimeout())
 	defer cancel()
 
-	cmd := buildShellCommandContext(commandCtx, cmdutil.GetShellCommand(""), cmdStr)
+	cmd := buildShellCommandContext(commandCtx, shellCommandFromContext(ctx), cmdStr)
 
 	if scope := GetEnvScope(ctx); scope != nil {
 		cmd.Env = scope.ToSlice()
@@ -70,6 +77,20 @@ func runCommandWithContext(ctx context.Context, cmdStr string) (string, error) {
 		)
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+func shellCommandFromContext(ctx context.Context) string {
+	if cfg := config.GetConfig(ctx); cfg != nil && cfg.Core.DefaultShell != "" {
+		return cmdutil.GetShellCommand(cfg.Core.DefaultShell)
+	}
+
+	if scope := GetEnvScope(ctx); scope != nil {
+		if shell, ok := scope.Get("SHELL"); ok && strings.TrimSpace(shell) != "" {
+			return shell
+		}
+	}
+
+	return cmdutil.GetShellCommand("")
 }
 
 func withCommandTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, time.Duration) {

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -138,7 +139,7 @@ func (q *QueueFile) Push(ctx context.Context, dagRun exec.DAGRunRef) (string, er
 	}
 
 	// Rename the temporary file to the final name (this is atomic)
-	if err := os.Rename(tmpFile.Name(), fullPath); err != nil {
+	if err := fileutil.RenameWithRetry(tmpFile.Name(), fullPath); err != nil {
 		logger.Error(ctx, "Failed to rename queue file",
 			tag.File(tmpFile.Name()),
 			tag.Error(err),
@@ -192,7 +193,7 @@ func (q *QueueFile) PopByDAGRunID(ctx context.Context, dagRun exec.DAGRunRef) ([
 				continue
 			}
 
-			if err := os.Remove(item.file); err != nil {
+			if err := fileutil.RemoveWithRetry(item.file); err != nil {
 				// Log the error but continue processing other items
 				logger.Warn(ctx, "Failed to remove queue file",
 					tag.File(item.data.FileName),
@@ -268,7 +269,7 @@ func (q *QueueFile) Pop(ctx context.Context) (exec.QueuedItemData, error) {
 	// Delete the file
 	// Currently, we don't need the content of the file, so we just remove it
 
-	if err := os.Remove(filepath.Join(q.baseDir, item.data.FileName)); err != nil {
+	if err := fileutil.RemoveWithRetry(filepath.Join(q.baseDir, item.data.FileName)); err != nil {
 		logger.Error(ctx, "Failed to remove queue file",
 			tag.File(item.data.FileName),
 			tag.Error(err),

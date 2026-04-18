@@ -34,13 +34,14 @@ function resolveE2EEndpoint(): { baseURL: string; serverPort: string } {
 const { baseURL, serverPort } = resolveE2EEndpoint();
 const stateDir = process.env.DAGU_E2E_STATE_DIR ?? defaultStateDir;
 const e2eBinPath = process.env.DAGU_E2E_BIN ?? defaultBinPath;
+const fullyParallel = process.env.PLAYWRIGHT_FULLY_PARALLEL === 'true';
 
 process.env.DAGU_E2E_STATE_DIR = stateDir;
 process.env.DAGU_E2E_BIN = e2eBinPath;
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: false,
+  fullyParallel,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: 1,

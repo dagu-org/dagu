@@ -28,6 +28,18 @@ func readInput(path string) json.RawMessage {
 	return b
 }
 
+func readInputWithOptions(path string, offset, limit int) json.RawMessage {
+	input := map[string]any{"path": path}
+	if offset > 0 {
+		input["offset"] = offset
+	}
+	if limit > 0 {
+		input["limit"] = limit
+	}
+	b, _ := json.Marshal(input)
+	return b
+}
+
 func TestReadTool_Run(t *testing.T) {
 	t.Parallel()
 	tool := NewReadTool()
@@ -95,7 +107,7 @@ func TestReadTool_Run(t *testing.T) {
 	t.Run("respects offset parameter", func(t *testing.T) {
 		t.Parallel()
 		filePath := createTestFile(t, "line1\nline2\nline3\nline4\nline5")
-		input := json.RawMessage(`{"path": "` + filePath + `", "offset": 3}`)
+		input := readInputWithOptions(filePath, 3, 0)
 
 		result := tool.Run(ToolContext{}, input)
 
@@ -108,7 +120,7 @@ func TestReadTool_Run(t *testing.T) {
 	t.Run("respects limit parameter", func(t *testing.T) {
 		t.Parallel()
 		filePath := createTestFile(t, "line1\nline2\nline3\nline4\nline5")
-		input := json.RawMessage(`{"path": "` + filePath + `", "limit": 2}`)
+		input := readInputWithOptions(filePath, 0, 2)
 
 		result := tool.Run(ToolContext{}, input)
 
@@ -119,7 +131,7 @@ func TestReadTool_Run(t *testing.T) {
 	t.Run("offset beyond file length returns error", func(t *testing.T) {
 		t.Parallel()
 		filePath := createTestFile(t, "short")
-		input := json.RawMessage(`{"path": "` + filePath + `", "offset": 100}`)
+		input := readInputWithOptions(filePath, 100, 0)
 
 		result := tool.Run(ToolContext{}, input)
 

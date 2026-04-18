@@ -445,6 +445,13 @@ func (p *Plan) IsRunning() bool {
 	return p.isRunningLocked()
 }
 
+// HasActiveNodes checks if any node is actively executing or waiting for a retry.
+func (p *Plan) HasActiveNodes() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.hasActiveNodesLocked()
+}
+
 // isRunningLocked is the lock-free implementation for internal use.
 func (p *Plan) isRunningLocked() bool {
 	for _, node := range p.nodes {
@@ -453,6 +460,16 @@ func (p *Plan) isRunningLocked() bool {
 			return true
 		}
 		if s == core.NodeNotStarted && p.finishedAt.IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *Plan) hasActiveNodesLocked() bool {
+	for _, node := range p.nodes {
+		s := node.State().Status
+		if s == core.NodeRunning || s == core.NodeRetrying {
 			return true
 		}
 	}

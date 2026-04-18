@@ -8,6 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -22,9 +26,15 @@ import (
 func TestSockAddr(t *testing.T) {
 	t.Parallel()
 
+	socketDir := "/tmp"
+	if runtime.GOOS == "windows" {
+		socketDir = os.TempDir()
+	}
+
 	t.Run("Location", func(t *testing.T) {
 		dag := &core.DAG{Location: "testdata/testDag.yml"}
-		require.Regexp(t, `^/tmp/@dagu_testdata_testDag_yml_[0-9a-f]+\.sock$`, dag.SockAddr(""))
+		pattern := "^" + regexp.QuoteMeta(filepath.Join(socketDir, "@dagu_testdata_testDag_yml_")) + `[0-9a-f]+\.sock$`
+		require.Regexp(t, pattern, dag.SockAddr(""))
 	})
 	t.Run("MaxUnixSocketLength", func(t *testing.T) {
 		dag := &core.DAG{
@@ -32,10 +42,10 @@ func TestSockAddr(t *testing.T) {
 		}
 		// 50 is an application-imposed limit to keep socket names short and portable
 		// (the system limit UNIX_PATH_MAX is typically 108 bytes on Linux)
-		require.LessOrEqual(t, 50, len(dag.SockAddr("")))
+		require.LessOrEqual(t, 50, len(filepath.Base(dag.SockAddr(""))))
 		require.Equal(
 			t,
-			"/tmp/@dagu_testdata_testDagVeryLongNameThat_b92b71.sock",
+			filepath.Join(socketDir, "@dagu_testdata_testDagVeryLongNameThat_b92b71.sock"),
 			dag.SockAddr(""),
 		)
 	})
@@ -44,12 +54,12 @@ func TestSockAddr(t *testing.T) {
 
 		addr := core.SockAddr("mydag", "run123")
 
-		require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
+		require.True(t, strings.HasPrefix(addr, filepath.Join(socketDir, "@dagu_")))
 		require.True(t, strings.HasSuffix(addr, ".sock"))
-		require.Contains(t, addr, "mydag")
+		require.Contains(t, filepath.Base(addr), "mydag")
 
 		// Verify 6-character hash
-		parts := strings.Split(addr, "_")
+		parts := strings.Split(filepath.Base(addr), "_")
 		lastPart := parts[len(parts)-1]
 		hashPart := strings.TrimSuffix(lastPart, ".sock")
 		require.Len(t, hashPart, 6)
@@ -73,7 +83,7 @@ func TestSockAddr(t *testing.T) {
 		t.Parallel()
 
 		addr := core.SockAddr("my/dag\\with:special*chars", "run|with<>chars")
-		socketName := strings.TrimPrefix(addr, "/tmp/")
+		socketName := filepath.Base(addr)
 
 		// Verify unsafe characters are sanitized
 		for _, char := range []string{"/", "\\", ":", "*", "|", "<", ">"} {
@@ -85,7 +95,7 @@ func TestSockAddr(t *testing.T) {
 		t.Parallel()
 
 		addr := core.SockAddr(strings.Repeat("a", 100), "run123")
-		socketName := strings.TrimPrefix(addr, "/tmp/")
+		socketName := filepath.Base(addr)
 
 		require.LessOrEqual(t, len(socketName), 50)
 		require.True(t, strings.HasPrefix(socketName, "@dagu_"))
@@ -100,8 +110,8 @@ func TestSockAddr(t *testing.T) {
 		name32 := strings.Repeat("x", 32)
 		name33 := strings.Repeat("x", 33)
 
-		socketName32 := strings.TrimPrefix(core.SockAddr(name32, "run123"), "/tmp/")
-		socketName33 := strings.TrimPrefix(core.SockAddr(name33, "run123"), "/tmp/")
+		socketName32 := filepath.Base(core.SockAddr(name32, "run123"))
+		socketName33 := filepath.Base(core.SockAddr(name33, "run123"))
 
 		require.LessOrEqual(t, len(socketName32), 50)
 		require.LessOrEqual(t, len(socketName33), 50)
@@ -119,7 +129,7 @@ func TestSockAddr(t *testing.T) {
 		}
 
 		for _, addr := range addrs {
-			require.True(t, strings.HasPrefix(addr, "/tmp/@dagu_"))
+			require.True(t, strings.HasPrefix(addr, filepath.Join(socketDir, "@dagu_")))
 			require.True(t, strings.HasSuffix(addr, ".sock"))
 		}
 	})
@@ -130,7 +140,7 @@ func TestSockAddr(t *testing.T) {
 		name, runID := "testdag", "testrun"
 		addr := core.SockAddr(name, runID)
 
-		parts := strings.Split(addr, "_")
+		parts := strings.Split(filepath.Base(addr), "_")
 		hash := strings.TrimSuffix(parts[len(parts)-1], ".sock")
 		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte(name+runID)))[:6]
 

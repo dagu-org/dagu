@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -172,7 +174,7 @@ func (pg *ProcGroup) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) er
 	pg.mu.Lock()
 	defer pg.mu.Unlock()
 
-	current, err := readProcEntry(entry.FilePath, pg.groupName, pg.staleTime, time.Now())
+	current, err := readProcEntryWithRetry(entry.FilePath, pg.groupName, pg.staleTime, time.Now())
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
@@ -182,12 +184,52 @@ func (pg *ProcGroup) RemoveIfStale(ctx context.Context, entry exec.ProcEntry) er
 	if current.Fresh || !sameProcEntry(current, entry) {
 		return nil
 	}
-	if err := os.Remove(entry.FilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := removeProcFileWithRetry(entry.FilePath); err != nil {
 		return err
 	}
 	_ = os.Remove(filepath.Dir(entry.FilePath))
 	logger.Info(ctx, "Removed stale proc file", tag.File(entry.FilePath))
 	return nil
+}
+
+func removeProcFileWithRetry(path string) error {
+	var lastErr error
+	for attempt := range 12 {
+		err := os.Remove(path)
+		if err == nil || errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if !isRetryableProcFileError(err) {
+			return err
+		}
+		lastErr = err
+		time.Sleep(time.Duration(attempt+1) * 25 * time.Millisecond)
+	}
+	return lastErr
+}
+
+func readProcEntryWithRetry(path, groupName string, staleTime time.Duration, now time.Time) (exec.ProcEntry, error) {
+	var lastErr error
+	for attempt := range 12 {
+		entry, err := readProcEntry(path, groupName, staleTime, now)
+		if err == nil || errors.Is(err, os.ErrNotExist) {
+			return entry, err
+		}
+		if !isRetryableProcFileError(err) {
+			return exec.ProcEntry{}, err
+		}
+		lastErr = err
+		time.Sleep(time.Duration(attempt+1) * 25 * time.Millisecond)
+	}
+	return exec.ProcEntry{}, lastErr
+}
+
+func isRetryableProcFileError(err error) bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "used by another process") || strings.Contains(msg, "access is denied")
 }
 
 func (pg *ProcGroup) listEntriesLocked(_ context.Context) ([]exec.ProcEntry, error) {
@@ -229,7 +271,7 @@ func (pg *ProcGroup) listEntriesLocked(_ context.Context) ([]exec.ProcEntry, err
 	now := time.Now()
 	entries := make([]exec.ProcEntry, 0, len(files))
 	for _, file := range files {
-		entry, err := readProcEntry(file, pg.groupName, pg.staleTime, now)
+		entry, err := readProcEntryWithRetry(file, pg.groupName, pg.staleTime, now)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				continue

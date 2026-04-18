@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/backoff"
@@ -17,6 +18,8 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/core/exec"
 )
+
+var quarantineSeq uint64
 
 const (
 	quarantineMarker    = ".gc"
@@ -177,7 +180,7 @@ func (q *quarantine) shouldQuarantine(ctx context.Context, path string, observed
 
 // generateQuarantinePath creates a unique quarantine path for a file
 func (q *quarantine) generateQuarantinePath(path string) string {
-	return fmt.Sprintf("%s%s.%d.%d", path, quarantineMarker, os.Getpid(), time.Now().UnixNano())
+	return fmt.Sprintf("%s%s.%d.%d.%d", path, quarantineMarker, os.Getpid(), time.Now().UnixNano(), atomic.AddUint64(&quarantineSeq, 1))
 }
 
 // isQuarantinedFile checks if a filename indicates it's quarantined

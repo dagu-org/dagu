@@ -17,6 +17,8 @@ import (
 
 func TestRecordEarlyFailure(t *testing.T) {
 	t.Run("RecordsFailureForNewDAGRun", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `
@@ -52,6 +54,8 @@ steps:
 	})
 
 	t.Run("RecordsFailureForExistingAttempt", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `
@@ -95,6 +99,8 @@ steps:
 	})
 
 	t.Run("ReturnsErrorForNilDAG", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		ctx := &cmd.Context{
@@ -109,6 +115,8 @@ steps:
 	})
 
 	t.Run("ReturnsErrorForEmptyDAGRunID", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `
@@ -129,6 +137,8 @@ steps:
 	})
 
 	t.Run("CanRetryEarlyFailureRecord", func(t *testing.T) {
+		t.Parallel()
+
 		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, `

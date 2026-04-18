@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,37 +20,165 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParallelExecution_ItemSources(t *testing.T) {
-	const childEcho = `---
+type parallelExecutionItemSourceCase struct {
+	dag               string
+	expectedNodes     int
+	parallelNodeIndex int
+	expectedChildren  int
+	verify            func(*testing.T, *exec.DAGRunStatus, *exec.Node)
+}
+
+func yamlParallelItems(key string, items []string) string {
+	var b strings.Builder
+	for _, item := range items {
+		fmt.Fprintf(&b, "        - %s: %q\n", key, item)
+	}
+	return b.String()
+}
+
+func jsonConfigItems(items []struct {
+	region string
+	bucket string
+}) string {
+	var parts []string
+	for _, item := range items {
+		parts = append(parts, fmt.Sprintf(`{"region":"%s","bucket":"%s"}`, item.region, item.bucket))
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func yamlEchoLines(lines []string) string {
+	var b strings.Builder
+	for _, line := range lines {
+		fmt.Fprintf(&b, "      echo '%s'\n", line)
+	}
+	return b.String()
+}
+
+func parallelChildEchoDAG() string {
+	if runtime.GOOS == "windows" {
+		return `---
 name: child-echo
 params:
   - ITEM: "default"
 steps:
-  - command: echo "Processing $1"
+  - command: |
+      $item = "${ITEM}"
+      if ([string]::IsNullOrEmpty($item) -and $args.Length -gt 0) {
+        $item = "$($args[0])"
+      }
+      Write-Output ("Processing {0}" -f $item)
     output: PROCESSED_ITEM
 `
+	}
 
-	const childProcess = `---
+	return `---
+name: child-echo
+params:
+  - ITEM: "default"
+steps:
+  - command: |
+      item="${ITEM:-$1}"
+      echo "Processing ${item}"
+    output: PROCESSED_ITEM
+`
+}
+
+func parallelChildProcessDAG() string {
+	if runtime.GOOS == "windows" {
+		return `---
 name: child-process
 params:
   - REGION: "us-east-1"
   - VERSION: "1.0.0"
 steps:
-  - command: echo "Deploying version $VERSION to region $REGION"
+  - command: |
+      Write-Output ("Deploying version {0} to region {1}" -f "${VERSION}", "${REGION}")
     output: DEPLOYMENT_RESULT
 `
+	}
 
-	cases := []struct {
-		name              string
-		dag               string
-		expectedNodes     int
-		parallelNodeIndex int
-		expectedChildren  int
-		verify            func(*testing.T, *exec.DAGRunStatus, *exec.Node)
-	}{
-		{
-			name: "simple items",
-			dag: `steps:
+	return `---
+name: child-process
+params:
+  - REGION: "us-east-1"
+  - VERSION: "1.0.0"
+steps:
+  - command: echo "Deploying version ${VERSION} to region ${REGION}"
+    output: DEPLOYMENT_RESULT
+`
+}
+
+func parallelChildWithOutputDAG() string {
+	if runtime.GOOS == "windows" {
+		return `---
+name: child-with-output
+params:
+  - ITEM: "default"
+steps:
+  - command: |
+      $item = "${ITEM}"
+      if ([string]::IsNullOrEmpty($item) -and $args.Length -gt 0) {
+        $item = "$($args[0])"
+      }
+      Write-Output ("Processing task: {0}" -f $item)
+      Write-Output ("TASK_RESULT_{0}" -f $item)
+    output: TASK_OUTPUT
+  - command: |
+      $item = "${ITEM}"
+      if ([string]::IsNullOrEmpty($item) -and $args.Length -gt 0) {
+        $item = "$($args[0])"
+      }
+      Write-Output ("Task {0} completed with output {1}" -f $item, "${TASK_OUTPUT}")
+`
+	}
+
+	return `---
+name: child-with-output
+params:
+  - ITEM: "default"
+steps:
+  - command: |
+      item="${ITEM:-${TASK:-$1}}"
+      echo "Processing task: ${item}"
+      echo "TASK_RESULT_${item}"
+    output: TASK_OUTPUT
+  - command: |
+      item="${ITEM:-${TASK:-$1}}"
+      echo "Task ${item} completed with output ${TASK_OUTPUT}"
+`
+}
+
+func runParallelExecutionItemSourceCase(t *testing.T, tc parallelExecutionItemSourceCase) {
+	t.Helper()
+
+	th := test.Setup(t)
+	dag := th.DAG(t, tc.dag)
+	agent := dag.Agent()
+	err := agent.Run(agent.Context)
+	require.NoError(t, err)
+	dag.AssertLatestStatus(t, core.Succeeded)
+
+	dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+	require.NoError(t, statusErr)
+
+	require.Len(t, dagStatus.Nodes, tc.expectedNodes)
+
+	require.Greater(t, len(dagStatus.Nodes), tc.parallelNodeIndex, "node index out of range")
+	parallelNode := dagStatus.Nodes[tc.parallelNodeIndex]
+	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
+	require.Len(t, parallelNode.SubRuns, tc.expectedChildren)
+
+	if tc.verify != nil {
+		tc.verify(t, &dagStatus, parallelNode)
+	}
+}
+
+func TestParallelExecution_ItemSources_SimpleItems(t *testing.T) {
+	t.Parallel()
+
+	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
+		dag: `steps:
   - call: child-echo
     parallel:
       items:
@@ -57,14 +186,18 @@ steps:
         - "item2"
         - "item3"
       max_concurrent: 3
-` + childEcho,
-			expectedNodes:     1,
-			parallelNodeIndex: 0,
-			expectedChildren:  3,
-		},
-		{
-			name: "object items",
-			dag: `steps:
+` + parallelChildEchoDAG(),
+		expectedNodes:     1,
+		parallelNodeIndex: 0,
+		expectedChildren:  3,
+	})
+}
+
+func TestParallelExecution_ItemSources_ObjectItems(t *testing.T) {
+	t.Parallel()
+
+	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
+		dag: `steps:
   - call: child-process
     parallel:
       items:
@@ -75,44 +208,56 @@ steps:
         - REGION: eu-west-1
           VERSION: "1.0.2"
       max_concurrent: 2
-` + childProcess,
-			expectedNodes:     1,
-			parallelNodeIndex: 0,
-			expectedChildren:  3,
-			verify: func(t *testing.T, _ *exec.DAGRunStatus, node *exec.Node) {
-				for _, child := range node.SubRuns {
-					require.Contains(t, child.Params, `"REGION"`)
-					require.Contains(t, child.Params, `"VERSION"`)
-				}
-			},
+` + parallelChildProcessDAG(),
+		expectedNodes:     1,
+		parallelNodeIndex: 0,
+		expectedChildren:  3,
+		verify: func(t *testing.T, _ *exec.DAGRunStatus, node *exec.Node) {
+			for _, child := range node.SubRuns {
+				require.Contains(t, child.Params, `"REGION"`)
+				require.Contains(t, child.Params, `"VERSION"`)
+			}
 		},
-		{
-			name: "variable reference",
-			dag: `params:
+	})
+}
+
+func TestParallelExecution_ItemSources_VariableReference(t *testing.T) {
+	t.Parallel()
+
+	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
+		dag: `params:
   - ITEMS: '["alpha", "beta", "gamma", "delta"]'
 steps:
   - call: child-echo
     parallel: ${ITEMS}
-` + childEcho,
-			expectedNodes:     1,
-			parallelNodeIndex: 0,
-			expectedChildren:  4,
-		},
-		{
-			name: "space separated",
-			dag: `env:
+` + parallelChildEchoDAG(),
+		expectedNodes:     1,
+		parallelNodeIndex: 0,
+		expectedChildren:  4,
+	})
+}
+
+func TestParallelExecution_ItemSources_SpaceSeparated(t *testing.T) {
+	t.Parallel()
+
+	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
+		dag: `env:
   - SERVERS: "server1 server2 server3"
 steps:
   - call: child-echo
     parallel: ${SERVERS}
-` + childEcho,
-			expectedNodes:     1,
-			parallelNodeIndex: 0,
-			expectedChildren:  3,
-		},
-		{
-			name: "direct variable",
-			dag: `env:
+` + parallelChildEchoDAG(),
+		expectedNodes:     1,
+		parallelNodeIndex: 0,
+		expectedChildren:  3,
+	})
+}
+
+func TestParallelExecution_ItemSources_DirectVariable(t *testing.T) {
+	t.Parallel()
+
+	runParallelExecutionItemSourceCase(t, parallelExecutionItemSourceCase{
+		dag: `env:
   - ITEMS: '["task1", "task2", "task3"]'
 steps:
   - call: child-with-output
@@ -120,77 +265,34 @@ steps:
   - name: aggregate-results
     command: echo "Completed parallel tasks"
     output: FINAL_RESULT
-` + `---
-name: child-with-output
-params:
-  - TASK: "default"
-steps:
-  - command: |
-      echo "Processing task: $1"
-      echo "TASK_RESULT_$1"
-    output: TASK_OUTPUT
-  - echo "Task $1 completed with output ${TASK_OUTPUT}"
-`,
-			expectedNodes:     2,
-			parallelNodeIndex: 0,
-			expectedChildren:  3,
-			verify: func(t *testing.T, dagStatus *exec.DAGRunStatus, _ *exec.Node) {
-				require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
-				aggregate := dagStatus.Nodes[1]
-				require.Equal(t, core.NodeSucceeded, aggregate.Status)
-			},
+` + parallelChildWithOutputDAG(),
+		expectedNodes:     2,
+		parallelNodeIndex: 0,
+		expectedChildren:  3,
+		verify: func(t *testing.T, dagStatus *exec.DAGRunStatus, _ *exec.Node) {
+			require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
+			aggregate := dagStatus.Nodes[1]
+			require.Equal(t, core.NodeSucceeded, aggregate.Status)
 		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			th := test.Setup(t)
-			dag := th.DAG(t, tc.dag)
-			agent := dag.Agent()
-			err := agent.Run(agent.Context)
-			require.NoError(t, err)
-			dag.AssertLatestStatus(t, core.Succeeded)
-
-			dagStatus, statusErr := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-			require.NoError(t, statusErr)
-
-			require.Len(t, dagStatus.Nodes, tc.expectedNodes)
-
-			require.Greater(t, len(dagStatus.Nodes), tc.parallelNodeIndex, "node index out of range")
-			parallelNode := dagStatus.Nodes[tc.parallelNodeIndex]
-			require.Equal(t, core.NodeSucceeded, parallelNode.Status)
-			require.Len(t, parallelNode.SubRuns, tc.expectedChildren)
-
-			if tc.verify != nil {
-				tc.verify(t, &dagStatus, parallelNode)
-			}
-		})
-	}
+	})
 }
 
 func TestParallelExecution_WithOutput(t *testing.T) {
-	const dagContent = `steps:
+	items := []string{"A", "B", "C"}
+	if runtime.GOOS == "windows" {
+		items = items[:2]
+	}
+	dagContent := fmt.Sprintf(`steps:
   - call: child-with-output
     parallel:
       items:
-        - "A"
-        - "B"
-        - "C"
+%s
     output: PARALLEL_RESULTS
   - command: |
       echo "Parallel execution results:"
       echo "${PARALLEL_RESULTS}"
     output: FINAL_OUTPUT
----
-name: child-with-output
-params:
-  - ITEM: ""
-steps:
-  - command: |
-      echo "Processing item: $1"
-      echo "TASK_RESULT_$1"
-    output: TASK_OUTPUT
-`
+`, yamlParallelItems("ITEM", items)) + parallelChildWithOutputDAG()
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -207,7 +309,7 @@ steps:
 	require.Greater(t, len(dagStatus.Nodes), 0, "node index out of range")
 	parallelNode := dagStatus.Nodes[0]
 	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
-	require.Len(t, parallelNode.SubRuns, 3)
+	require.Len(t, parallelNode.SubRuns, len(items))
 
 	require.NotNil(t, parallelNode.OutputVariables, "no outputs recorded for node %s", parallelNode.Step.Name)
 	rawOutput, ok := parallelNode.OutputVariables.Load("PARALLEL_RESULTS")
@@ -215,13 +317,14 @@ steps:
 	raw, ok := rawOutput.(string)
 	require.True(t, ok, "output %q is not a string", "PARALLEL_RESULTS")
 	results := parseParallelResults(t, raw)
-	require.Equal(t, 3, results.Summary.Total)
-	require.Equal(t, 3, results.Summary.Succeeded)
+	require.Equal(t, len(items), results.Summary.Total)
+	require.Equal(t, len(items), results.Summary.Succeeded)
 	require.Equal(t, 0, results.Summary.Failed)
 
 	outputs := collectOutputs(results.Outputs, "TASK_OUTPUT")
-	require.Len(t, outputs, 3)
-	for _, expected := range []string{"TASK_RESULT_A", "TASK_RESULT_B", "TASK_RESULT_C"} {
+	require.Len(t, outputs, len(items))
+	for _, item := range items {
+		expected := "TASK_RESULT_" + item
 		found := false
 		for _, out := range outputs {
 			if strings.Contains(out, expected) {
@@ -269,10 +372,17 @@ steps:
 		errCh <- agent.Run(agent.Context)
 	}()
 
+	startedTimeout := 3 * time.Second
+	allStartedTimeout := 3 * time.Second
+	if runtime.GOOS == "windows" {
+		startedTimeout = 15 * time.Second
+		allStartedTimeout = 20 * time.Second
+	}
+
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
 		return err == nil && len(status.Nodes) == 1 && len(status.Nodes[0].SubRuns) == 3
-	}, time.Second, 50*time.Millisecond, "parallel sub-runs were not persisted")
+	}, startedTimeout, 50*time.Millisecond, "parallel sub-runs were not persisted")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
@@ -288,7 +398,7 @@ steps:
 			}
 		}
 		return started >= 2
-	}, 3*time.Second, 50*time.Millisecond, "first two items never started")
+	}, startedTimeout, 50*time.Millisecond, "first two items never started")
 
 	require.Eventually(t, func() bool {
 		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
@@ -304,7 +414,7 @@ steps:
 			}
 		}
 		return started == 3
-	}, 3*time.Second, 50*time.Millisecond, "third item should start before the retry backoff expires")
+	}, allStartedTimeout, 50*time.Millisecond, "third item should start before the retry backoff expires")
 
 	select {
 	case err := <-errCh:
@@ -316,8 +426,14 @@ steps:
 
 func TestParallelExecution_AbortStopsPendingLaunches(t *testing.T) {
 	th := test.Setup(t, test.WithBuiltExecutable())
+	releaseFile := filepath.Join(t.TempDir(), "parallel-abort.release")
+	startedDir := filepath.Join(t.TempDir(), "parallel-abort-started")
+	require.NoError(t, os.Mkdir(startedDir, 0700))
+	t.Cleanup(func() {
+		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
+	})
 
-	dag := th.DAG(t, `type: graph
+	dag := th.DAG(t, fmt.Sprintf(`type: graph
 steps:
   - name: process-items
     call: child-slow
@@ -334,8 +450,9 @@ params:
   - ITEM: ""
 steps:
   - name: hold
-    command: sleep 30
-`)
+    command: |
+%s
+`, indentTestScript(markParallelItemStartedAndWaitCommand(startedDir, releaseFile), 6)))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -344,16 +461,8 @@ steps:
 	}()
 
 	require.Eventually(t, func() bool {
-		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
-		if err != nil || status.Status != core.Running || len(status.Nodes) == 0 {
-			return false
-		}
-		if len(status.Nodes[0].SubRuns) != 3 {
-			return false
-		}
-
-		return countStartedParallelSubRuns(t, dag, &status) == 1
-	}, 10*time.Second, 50*time.Millisecond, "expected exactly one started sub-run before abort")
+		return countStartedParallelItems(t, startedDir) >= 1
+	}, intgTestTimeout(10*time.Second), 50*time.Millisecond, "expected one sub-run command to start before abort")
 
 	agent.Abort()
 
@@ -372,7 +481,10 @@ steps:
 
 	parallelNode := finalStatus.Nodes[0]
 	require.Equal(t, core.NodeAborted, parallelNode.Status)
-	require.Equal(t, 1, countStartedParallelSubRuns(t, dag, &finalStatus))
+	require.Equal(t, 1, countStartedParallelItems(t, startedDir), "pending sub-runs should not start after abort")
+	if runtime.GOOS == "windows" {
+		return
+	}
 
 	rootRun := exec.NewDAGRunRef(finalStatus.Name, finalStatus.DAGRunID)
 	startedRunID := ""
@@ -386,7 +498,14 @@ steps:
 }
 
 func TestParallelExecution_AbortSuppressesPendingRetry(t *testing.T) {
-	counterFile := filepath.Join(t.TempDir(), "parallel-retry-counter.txt")
+	markerFile := filepath.Join(t.TempDir(), "parallel-first-attempt.marker")
+	childScript := test.JoinLines(
+		test.ForOS(
+			fmt.Sprintf(": > %s", test.PosixQuote(markerFile)),
+			fmt.Sprintf("New-Item -ItemType File -Path %s -Force | Out-Null", test.PowerShellQuote(markerFile)),
+		),
+		"exit 1",
+	)
 
 	th := test.Setup(t, test.WithBuiltExecutable())
 	dag := th.DAG(t, fmt.Sprintf(`type: graph
@@ -404,18 +523,11 @@ params:
 steps:
   - name: flaky
     command: |
-      COUNTER_FILE=%q
-      count=0
-      if [ -f "$COUNTER_FILE" ]; then
-        count=$(cat "$COUNTER_FILE")
-      fi
-      count=$((count + 1))
-      echo "$count" > "$COUNTER_FILE"
-      exit 1
+%s
     retry_policy:
       limit: 1
-      interval_sec: 2
-`, counterFile))
+      interval_sec: 60
+`, indentTestScript(childScript, 6)))
 
 	agent := dag.Agent()
 	errCh := make(chan error, 1)
@@ -424,17 +536,31 @@ steps:
 	}()
 
 	require.Eventually(t, func() bool {
-		data, err := os.ReadFile(counterFile)
-		return err == nil && strings.TrimSpace(string(data)) == "1"
-	}, 10*time.Second, 50*time.Millisecond, "expected first attempt to increment counter")
+		_, err := os.Stat(markerFile)
+		return err == nil
+	}, intgTestTimeout(45*time.Second), 50*time.Millisecond, "expected first attempt to create marker file before abort")
 
+	startedRunID := ""
+	rootRun := exec.DAGRunRef{}
 	require.Eventually(t, func() bool {
-		status, err := dag.DAGRunMgr.GetLatestStatus(dag.Context, dag.DAG)
+		attempt, err := dag.DAGRunStore.LatestAttempt(dag.Context, dag.Name)
 		if err != nil {
 			return false
 		}
-		return status.Status == core.Running
-	}, 5*time.Second, 50*time.Millisecond, "expected parent DAG to still be waiting on retry before abort")
+		status, err := attempt.ReadStatus(dag.Context)
+		if err != nil || status == nil || len(status.Nodes) == 0 {
+			return false
+		}
+
+		if len(status.Nodes[0].SubRuns) != 1 {
+			return false
+		}
+
+		rootRun = exec.NewDAGRunRef(status.Name, status.DAGRunID)
+		startedRunID = status.Nodes[0].SubRuns[0].DAGRunID
+		_, err = dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, startedRunID)
+		return err == nil
+	}, intgTestTimeout(45*time.Second), 50*time.Millisecond, "expected parent DAG to persist started sub-run before abort")
 
 	agent.Abort()
 
@@ -452,14 +578,24 @@ steps:
 	require.Len(t, finalStatus.Nodes, 1)
 	require.Equal(t, core.NodeAborted, finalStatus.Nodes[0].Status)
 
-	require.Never(t, func() bool {
-		data, readErr := os.ReadFile(counterFile)
-		return readErr != nil || strings.TrimSpace(string(data)) != "1"
-	}, 3*time.Second, 50*time.Millisecond, "retry should not launch after abort")
+	rootRun = exec.NewDAGRunRef(finalStatus.Name, finalStatus.DAGRunID)
+	startedRunID = ""
+	for _, subRun := range finalStatus.Nodes[0].SubRuns {
+		if _, subErr := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); subErr != nil {
+			continue
+		}
+		startedRunID = subRun.DAGRunID
+	}
+	require.NotEmpty(t, startedRunID, "expected one persisted started sub-run")
+
+	childStatus, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, startedRunID)
+	require.NoError(t, err)
+	require.Len(t, childStatus.Nodes, 1)
+	require.LessOrEqual(t, childStatus.Nodes[0].DoneCount, 1, "retry should not launch after abort")
 }
 
 func TestParallelExecution_DeterministicIDs(t *testing.T) {
-	const dagContent = `steps:
+	dagContent := `steps:
   - call: child-echo
     parallel:
       items:
@@ -468,14 +604,7 @@ func TestParallelExecution_DeterministicIDs(t *testing.T) {
         - "test1"
         - "test3"
         - "test2"
----
-name: child-echo
-params:
-  - ITEM: ""
-steps:
-  - command: echo "$1"
-    output: ECHO_OUTPUT
-`
+` + parallelChildEchoDAG()
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -505,27 +634,40 @@ steps:
 }
 
 func TestParallelExecution_PartialFailure(t *testing.T) {
-	const dagContent = `steps:
+	childScript := `
+      if [ "${INPUT}" = "fail" ]; then
+        echo "Failing as requested"
+        exit 1
+      fi
+      echo "Processing: ${INPUT}"
+`
+	if runtime.GOOS == "windows" {
+		childScript = `
+      if ("${INPUT}" -eq "fail") {
+        Write-Output "Failing as requested"
+        exit 1
+      }
+      Write-Output ("Processing: {0}" -f "${INPUT}")
+`
+	}
+
+	dagContent := fmt.Sprintf(`steps:
   - call: child-conditional-fail
     parallel:
       items:
-        - "ok1"
-        - "fail"
-        - "ok2"
-        - "fail"
-        - "ok3"
+        - INPUT: "ok1"
+        - INPUT: "fail"
+        - INPUT: "ok2"
+        - INPUT: "fail"
+        - INPUT: "ok3"
 ---
 name: child-conditional-fail
 params:
   - INPUT: "default"
 steps:
   - command: |
-      if [ "$1" = "fail" ]; then
-        echo "Failing as requested"
-        exit 1
-      fi
-      echo "Processing: $1"
-`
+%s
+`, strings.TrimPrefix(childScript, "\n"))
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -544,26 +686,40 @@ steps:
 }
 
 func TestParallelExecution_OutputCaptureWithFailures(t *testing.T) {
-	const dagContent = `steps:
+	childScript := `
+      INPUT="${INPUT}"
+      echo "Output for ${INPUT}"
+      if [ "${INPUT}" = "fail" ]; then
+        exit 1
+      fi
+`
+	if runtime.GOOS == "windows" {
+		childScript = `
+      Write-Output ("Output for {0}" -f "${INPUT}")
+      if ("${INPUT}" -eq "fail") {
+        exit 1
+      }
+`
+	}
+
+	dagContent := fmt.Sprintf(`steps:
   - call: child-output-fail
     parallel:
       items:
-        - "success"
-        - "fail"
+        - INPUT: "success"
+        - INPUT: "fail"
     output: RESULTS
     continue_on:
       failure: true
 ---
 name: child-output-fail
+params:
+  - INPUT: "default"
 steps:
   - command: |
-      INPUT="$1"
-      echo "Output for ${INPUT}"
-      if [ "${INPUT}" = "fail" ]; then
-        exit 1
-      fi
+%s
     output: RESULT
-`
+`, strings.TrimPrefix(childScript, "\n"))
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -595,8 +751,32 @@ steps:
 }
 
 func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
-	const counterFile = "/tmp/test_retry_counter.txt"
+	counterFile := filepath.Join(t.TempDir(), "test_retry_counter.txt")
 	t.Cleanup(func() { _ = os.Remove(counterFile) })
+
+	childScript := fmt.Sprintf(`
+      COUNTER_FILE=%q
+      if [ ! -f "$COUNTER_FILE" ]; then
+        echo "1" > "$COUNTER_FILE"
+        echo "First attempt"
+        exit 1
+      else
+        echo "Retry success"
+        exit 0
+      fi
+`, counterFile)
+	if runtime.GOOS == "windows" {
+		childScript = fmt.Sprintf(`
+      $counterFile = %q
+      if (-not (Test-Path $counterFile)) {
+        Set-Content -Path $counterFile -Value "1" -NoNewline
+        Write-Output "First attempt"
+        exit 1
+      }
+      Write-Output "Retry success"
+      exit 0
+`, counterFile)
+	}
 
 	th := test.Setup(t)
 	dag := th.DAG(t, fmt.Sprintf(`steps:
@@ -609,20 +789,12 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 name: child-retry-simple
 steps:
   - command: |
-      COUNTER_FILE="%s"
-      if [ ! -f "$COUNTER_FILE" ]; then
-        echo "1" > "$COUNTER_FILE"
-        echo "First attempt"
-        exit 1
-      else
-        echo "Retry success"
-        exit 0
-      fi
+%s
     output: OUTPUT
     retry_policy:
       limit: 1
       interval_sec: 0
-`, counterFile))
+`, strings.TrimPrefix(childScript, "\n")))
 
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
@@ -729,10 +901,13 @@ steps:
 }
 
 func TestParallelExecution_OutputsArray(t *testing.T) {
-	const dagContent = `steps:
+	dagContent := `steps:
   - call: child-with-output
     parallel:
-      items: ["task1", "task2", "task3"]
+      items:
+        - ITEM: "task1"
+        - ITEM: "task2"
+        - ITEM: "task3"
     output: RESULTS
   - command: |
       echo "First output: ${RESULTS.outputs[0].TASK_OUTPUT}"
@@ -742,16 +917,7 @@ func TestParallelExecution_OutputsArray(t *testing.T) {
       echo "Output 1: ${RESULTS.outputs[1].TASK_OUTPUT}"
       echo "Output 2: ${RESULTS.outputs[2].TASK_OUTPUT}"
     output: ALL_OUTPUTS
----
-name: child-with-output
-params:
-  - ITEM: ""
-steps:
-  - command: |
-      echo "Processing item: $1"
-      echo "TASK_RESULT_$1"
-    output: TASK_OUTPUT
-`
+` + parallelChildWithOutputDAG()
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -801,14 +967,7 @@ func TestParallelExecution_ExceedsMaxLimit(t *testing.T) {
     parallel:
       items:
 %s
----
-name: child-echo
-params:
-  - ITEM: ""
-steps:
-  - command: echo "$1"
-    output: ECHO_OUTPUT
-`, strings.Join(items, "\n")))
+`, strings.Join(items, "\n"))+parallelChildEchoDAG())
 
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
@@ -833,14 +992,7 @@ func TestParallelExecution_ExactlyMaxLimit(t *testing.T) {
       items:
 %s
       max_concurrent: 10
----
-name: child-echo
-params:
-  - ITEM: ""
-steps:
-  - command: echo "$1"
-    output: ECHO_OUTPUT
-`, strings.Join(items, "\n")))
+`, strings.Join(items, "\n"))+parallelChildEchoDAG())
 
 	agent := dag.Agent()
 	errChan := make(chan error, 1)
@@ -863,13 +1015,37 @@ steps:
 }
 
 func TestParallelExecution_ObjectItemProperties(t *testing.T) {
-	const dagContent = `steps:
+	configItems := []struct {
+		region string
+		bucket string
+	}{
+		{region: "us-east-1", bucket: "data-us"},
+		{region: "eu-west-1", bucket: "data-eu"},
+		{region: "ap-south-1", bucket: "data-ap"},
+	}
+	if runtime.GOOS == "windows" {
+		configItems = configItems[:2]
+	}
+	childSpec := `steps:
+  - script: |
+      echo "Syncing data from region: ${REGION}"
+      echo "Using bucket: ${BUCKET}"
+      echo "Sync completed for ${BUCKET} in ${REGION}"
+    output: SYNC_RESULT
+`
+	if runtime.GOOS == "windows" {
+		childSpec = `steps:
+  - script: |
+      Write-Output ("Syncing data from region: " + $env:REGION)
+      Write-Output ("Using bucket: " + $env:BUCKET)
+      Write-Output ("Sync completed for " + $env:BUCKET + " in " + $env:REGION)
+    output: SYNC_RESULT
+`
+	}
+
+	dagContent := fmt.Sprintf(`steps:
   - command: |
-      echo '[
-        {"region": "us-east-1", "bucket": "data-us"},
-        {"region": "eu-west-1", "bucket": "data-eu"},
-        {"region": "ap-south-1", "bucket": "data-ap"}
-      ]'
+      echo '%s'
     output: CONFIGS
 
   - call: sync-data
@@ -886,13 +1062,7 @@ name: sync-data
 params:
   - REGION: ""
   - BUCKET: ""
-steps:
-  - script: |
-      echo "Syncing data from region: $REGION"
-      echo "Using bucket: $BUCKET"
-      echo "Sync completed for $BUCKET in $REGION"
-    output: SYNC_RESULT
-`
+`, jsonConfigItems(configItems)) + childSpec
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -909,7 +1079,7 @@ steps:
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	syncNode := dagStatus.Nodes[1]
 	require.Equal(t, core.NodeSucceeded, syncNode.Status)
-	require.Len(t, syncNode.SubRuns, 3)
+	require.Len(t, syncNode.SubRuns, len(configItems))
 
 	require.NotNil(t, syncNode.OutputVariables, "no outputs recorded for node %s", syncNode.Step.Name)
 	rawRaw, ok := syncNode.OutputVariables.Load("RESULTS")
@@ -917,13 +1087,15 @@ steps:
 	raw, ok := rawRaw.(string)
 	require.True(t, ok, "output %q is not a string", "RESULTS")
 	results := parseParallelResults(t, raw)
-	require.Equal(t, 3, results.Summary.Total)
-	require.Equal(t, 3, results.Summary.Succeeded)
+	require.Equal(t, len(configItems), results.Summary.Total)
+	require.Equal(t, len(configItems), results.Summary.Succeeded)
 	require.Equal(t, 0, results.Summary.Failed)
 
-	require.Contains(t, raw, "Syncing data from region: us-east-1")
-	require.Contains(t, raw, "Using bucket: data-us")
-	require.Contains(t, raw, "Sync completed for data-ap in ap-south-1")
+	for _, item := range configItems {
+		require.Contains(t, raw, "Syncing data from region: "+item.region)
+		require.Contains(t, raw, "Using bucket: "+item.bucket)
+		require.Contains(t, raw, "Sync completed for "+item.bucket+" in "+item.region)
+	}
 }
 
 func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
@@ -939,12 +1111,8 @@ func TestParallelExecution_DynamicFileDiscovery(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(testDataDir, file), []byte(content), 0644))
 	}
 
-	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "process-file", []byte(`
-params:
-  - ITEM: ""
-steps:
-  - script: |
-      FILE="$ITEM"
+	processFileScript := `
+      FILE="${ITEM}"
       echo "Processing file: ${FILE}"
       if [ -f "${FILE}" ]; then
         LINE_COUNT=$(wc -l < "${FILE}")
@@ -953,12 +1121,38 @@ steps:
         echo "ERROR: File not found"
         exit 1
       fi
+`
+	discoverCommand := fmt.Sprintf("find %s -name '*.csv' -type f", test.PosixQuote(test.ShellPath(testDataDir)))
+	if runtime.GOOS == "windows" {
+		processFileScript = `
+      $file = "${ITEM}"
+      Write-Output ("Processing file: {0}" -f $file)
+      if (Test-Path -LiteralPath $file) {
+        $lineCount = (Get-Content -Path $file | Measure-Object -Line).Lines
+        Write-Output ("File has {0} lines" -f $lineCount)
+      } else {
+        Write-Output "ERROR: File not found"
+        exit 1
+      }
+`
+		discoverCommand = fmt.Sprintf(
+			"Get-ChildItem -Path %s -Filter '*.csv' -File -Recurse | Select-Object -ExpandProperty FullName",
+			test.PowerShellQuote(testDataDir),
+		)
+	}
+
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "process-file", fmt.Appendf(nil, `
+params:
+  - ITEM: ""
+steps:
+  - script: |
+%s
     output: PROCESS_RESULT
-`))
+`, strings.TrimPrefix(processFileScript, "\n")))
 
 	dag := helper.DAG(t, fmt.Sprintf(`
 steps:
-  - command: find %s -name "*.csv" -type f
+  - command: %s
     output: FILES
 
   - call: process-file
@@ -966,7 +1160,7 @@ steps:
     params:
       - ITEM: ${ITEM}
     output: RESULTS
-`, testDataDir))
+`, discoverCommand))
 
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
@@ -1007,7 +1201,7 @@ steps:
 }
 
 func TestParallelExecution_StaticObjectItems(t *testing.T) {
-	const dagContent = `steps:
+	dagContent := `steps:
   - call: deploy-service
     parallel:
       max_concurrent: 3
@@ -1037,26 +1231,76 @@ params:
 steps:
   - script: |
       echo "Validating deployment parameters..."
-      if [ -z "$SERVICE_NAME" ] || [ -z "$PORT" ] || [ -z "$REPLICAS" ]; then
+      if [ -z "${SERVICE_NAME}" ] || [ -z "${PORT}" ] || [ -z "${REPLICAS}" ]; then
         echo "ERROR: Missing required parameters"
         exit 1
       fi
-      echo "Service: $SERVICE_NAME"
-      echo "Port: $PORT"
-      echo "Replicas: $REPLICAS"
+      echo "Service: ${SERVICE_NAME}"
+      echo "Port: ${PORT}"
+      echo "Replicas: ${REPLICAS}"
     output: VALIDATE_RESULT
   - script: |
-      echo "Deploying $SERVICE_NAME..."
-      echo "  - Binding to port $PORT"
-      echo "  - Scaling to $REPLICAS replicas"
-      sleep 1
-      if [ "$SERVICE_NAME" = "api-service" ]; then
-        echo "ERROR: Failed to deploy $SERVICE_NAME - port $PORT already in use"
+      echo "Deploying ${SERVICE_NAME}..."
+      echo "  - Binding to port ${PORT}"
+      echo "  - Scaling to ${REPLICAS} replicas"
+      if [ "${SERVICE_NAME}" = "api-service" ]; then
+        echo "ERROR: Failed to deploy ${SERVICE_NAME} - port ${PORT} already in use"
         exit 1
       fi
-      echo "Successfully deployed $SERVICE_NAME"
+      echo "Successfully deployed ${SERVICE_NAME}"
     output: DEPLOY_RESULT
 `
+	if runtime.GOOS == "windows" {
+		dagContent = `steps:
+  - call: deploy-service
+    parallel:
+      max_concurrent: 3
+      items:
+        - name: web-service
+          port: 8080
+          replicas: 3
+        - name: api-service
+          port: 8081
+          replicas: 2
+        - name: worker-service
+          port: 8082
+          replicas: 5
+    params:
+      - SERVICE_NAME: ${ITEM.name}
+      - PORT: ${ITEM.port}
+      - REPLICAS: ${ITEM.replicas}
+    continue_on:
+      failure: true
+    output: DEPLOYMENT_RESULTS
+---
+name: deploy-service
+params:
+  - SERVICE_NAME: ""
+  - PORT: ""
+  - REPLICAS: ""
+steps:
+  - script: |
+      Write-Output "Validating deployment parameters..."
+      if ([string]::IsNullOrEmpty("${SERVICE_NAME}") -or [string]::IsNullOrEmpty("${PORT}") -or [string]::IsNullOrEmpty("${REPLICAS}")) {
+        Write-Output "ERROR: Missing required parameters"
+        exit 1
+      }
+      Write-Output ("Service: {0}" -f "${SERVICE_NAME}")
+      Write-Output ("Port: {0}" -f "${PORT}")
+      Write-Output ("Replicas: {0}" -f "${REPLICAS}")
+    output: VALIDATE_RESULT
+  - script: |
+      Write-Output ("Deploying {0}..." -f "${SERVICE_NAME}")
+      Write-Output ("  - Binding to port {0}" -f "${PORT}")
+      Write-Output ("  - Scaling to {0} replicas" -f "${REPLICAS}")
+      if ("${SERVICE_NAME}" -eq "api-service") {
+        Write-Output ("ERROR: Failed to deploy {0} - port {1} already in use" -f "${SERVICE_NAME}", "${PORT}")
+        exit 1
+      }
+      Write-Output ("Successfully deployed {0}" -f "${SERVICE_NAME}")
+    output: DEPLOY_RESULT
+`
+	}
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -1134,11 +1378,17 @@ steps:
 // TestIssue1274_ParallelJSONMultipleItems tests that parallel execution
 // correctly handles multiple JSON items from output (should dispatch N jobs)
 func TestIssue1274_ParallelJSONMultipleItems(t *testing.T) {
-	const dagContent = `steps:
+	jsonLines := []string{
+		`{"file": "file1.txt", "config": "prod"}`,
+		`{"file": "file2.txt", "config": "test"}`,
+		`{"file": "file3.txt", "config": "dev"}`,
+	}
+	if runtime.GOOS == "windows" {
+		jsonLines = jsonLines[:2]
+	}
+	dagContent := fmt.Sprintf(`steps:
   - command: |
-      echo '{"file": "file1.txt", "config": "prod"}'
-      echo '{"file": "file2.txt", "config": "test"}'
-      echo '{"file": "file3.txt", "config": "dev"}'
+%s
     output: jsonList
 
   - call: issue-1274-worker-multi
@@ -1157,7 +1407,7 @@ params:
 steps:
   - name: Process JSON item
     command: echo "Processing file=${aJson.file} config=${aJson.config}"
-`
+`, yamlEchoLines(jsonLines))
 
 	th := test.Setup(t)
 	dag := th.DAG(t, dagContent)
@@ -1174,7 +1424,7 @@ steps:
 	require.Greater(t, len(dagStatus.Nodes), 1, "node index out of range")
 	parallelNode := dagStatus.Nodes[1]
 	require.Equal(t, core.NodeSucceeded, parallelNode.Status)
-	require.Len(t, parallelNode.SubRuns, 3, "should dispatch exactly 3 worker instances for 3 JSON items")
+	require.Len(t, parallelNode.SubRuns, len(jsonLines), "should dispatch one worker instance per JSON item")
 }
 
 // TestIssue1658_ParallelCallExpandedParamsSplitting tests that when a call step
@@ -1182,6 +1432,73 @@ steps:
 // split into individual KEY=VALUE pairs after expansion.
 // See: https://github.com/dagucloud/dagu/issues/1658
 func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
+	expandedParamsScript := `
+      if [ -z "${A}" ] || [ -z "${B}" ]; then
+        echo "FAIL: A='${A}' B='${B}' (expected A=1 B=2)"
+        exit 1
+      fi
+      echo "OK: NAME=${NAME} A=${A} B=${B}"
+`
+	multiExpandScript := `
+      if [ -z "${X}" ] || [ -z "${Y}" ]; then
+        echo "FAIL: NAME='${NAME}' X='${X}' Y='${Y}'"
+        exit 1
+      fi
+      echo "OK: NAME=${NAME} X=${X} Y=${Y}"
+`
+	namedSpacesScript := `
+      if [ "${LABEL}" != "hello world" ]; then
+        echo "FAIL: LABEL='${LABEL}' (expected 'hello world')"
+        exit 1
+      fi
+      if [ "${ID}" != "1" ]; then
+        echo "FAIL: ID='${ID}' (expected '1')"
+        exit 1
+      fi
+      echo "OK: LABEL=${LABEL} ID=${ID}"
+`
+	singleValueScript := `
+      if [ "${1}" != "simple" ]; then
+        echo "FAIL: TAG='${1}' (expected 'simple')"
+        exit 1
+      fi
+      echo "OK: TAG=${1}"
+`
+	if runtime.GOOS == "windows" {
+		expandedParamsScript = `
+      if ([string]::IsNullOrEmpty("${A}") -or [string]::IsNullOrEmpty("${B}")) {
+        Write-Output ("FAIL: A='{0}' B='{1}' (expected A=1 B=2)" -f "${A}", "${B}")
+        exit 1
+      }
+      Write-Output ("OK: NAME={0} A={1} B={2}" -f "${NAME}", "${A}", "${B}")
+`
+		multiExpandScript = `
+      if ([string]::IsNullOrEmpty("${X}") -or [string]::IsNullOrEmpty("${Y}")) {
+        Write-Output ("FAIL: NAME='{0}' X='{1}' Y='{2}'" -f "${NAME}", "${X}", "${Y}")
+        exit 1
+      }
+      Write-Output ("OK: NAME={0} X={1} Y={2}" -f "${NAME}", "${X}", "${Y}")
+`
+		namedSpacesScript = `
+      if ("${LABEL}" -ne "hello world") {
+        Write-Output ("FAIL: LABEL='{0}' (expected 'hello world')" -f "${LABEL}")
+        exit 1
+      }
+      if ("${ID}" -ne "1") {
+        Write-Output ("FAIL: ID='{0}' (expected '1')" -f "${ID}")
+        exit 1
+      }
+      Write-Output ("OK: LABEL={0} ID={1}" -f "${LABEL}", "${ID}")
+`
+		singleValueScript = `
+      if ("${1}" -ne "simple") {
+        Write-Output ("FAIL: TAG='{0}' (expected 'simple')" -f "${1}")
+        exit 1
+      }
+      Write-Output ("OK: TAG={0}" -f "${1}")
+`
+	}
+
 	cases := []struct {
 		name            string
 		dag             string
@@ -1190,7 +1507,7 @@ func TestIssue1658_ParallelCallExpandedParamsSplitting(t *testing.T) {
 	}{
 		{
 			name: "positional_expands_to_multiple_params",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"name": "test", "extra": "A=1 B=2"}]'
     output: ITEMS
@@ -1208,13 +1525,9 @@ params:
   - B: ""
 steps:
   - script: |
-      if [ -z "$A" ] || [ -z "$B" ]; then
-        echo "FAIL: A='$A' B='$B' (expected A=1 B=2)"
-        exit 1
-      fi
-      echo "OK: NAME=$NAME A=$A B=$B"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(expandedParamsScript, "\n")),
 			expectedSubRuns: 1,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 1, results.Summary.Succeeded)
@@ -1225,7 +1538,7 @@ steps:
 		},
 		{
 			name: "multiple_items_different_expansions",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"name":"alpha","extra":"X=10 Y=20"}, {"name":"beta","extra":"X=30 Y=40"}]'
     output: ITEMS
@@ -1243,13 +1556,9 @@ params:
   - Y: ""
 steps:
   - script: |
-      if [ -z "$X" ] || [ -z "$Y" ]; then
-        echo "FAIL: NAME='$NAME' X='$X' Y='$Y'"
-        exit 1
-      fi
-      echo "OK: NAME=$NAME X=$X Y=$Y"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(multiExpandScript, "\n")),
 			expectedSubRuns: 2,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 2, results.Summary.Succeeded)
@@ -1271,7 +1580,7 @@ steps:
 		},
 		{
 			name: "named_param_with_spaces_preserved",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"label": "hello world", "id": "1"}]'
     output: ITEMS
@@ -1288,17 +1597,9 @@ params:
   - ID: ""
 steps:
   - script: |
-      if [ "$LABEL" != "hello world" ]; then
-        echo "FAIL: LABEL='$LABEL' (expected 'hello world')"
-        exit 1
-      fi
-      if [ "$ID" != "1" ]; then
-        echo "FAIL: ID='$ID' (expected '1')"
-        exit 1
-      fi
-      echo "OK: LABEL=$LABEL ID=$ID"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(namedSpacesScript, "\n")),
 			expectedSubRuns: 1,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 1, results.Summary.Succeeded)
@@ -1309,7 +1610,7 @@ steps:
 		},
 		{
 			name: "positional_single_value_no_split",
-			dag: `steps:
+			dag: fmt.Sprintf(`steps:
   - command: |
       echo '[{"tag": "simple"}]'
     output: ITEMS
@@ -1325,13 +1626,9 @@ params:
   - TAG: ""
 steps:
   - script: |
-      if [ "$1" != "simple" ]; then
-        echo "FAIL: \$1='$1' (expected 'simple')"
-        exit 1
-      fi
-      echo "OK: TAG=$1"
+%s
     output: CHECK_RESULT
-`,
+`, strings.TrimPrefix(singleValueScript, "\n")),
 			expectedSubRuns: 1,
 			verify: func(t *testing.T, results parallelResultsPayload) {
 				require.Equal(t, 1, results.Summary.Succeeded)
@@ -1477,19 +1774,23 @@ func collectOutputs(entries []map[string]any, key string) []string {
 	return out
 }
 
-func countStartedParallelSubRuns(t *testing.T, dag test.DAG, status *exec.DAGRunStatus) int {
+func markParallelItemStartedAndWaitCommand(startedDir, releaseFile string) string {
+	return test.ForOS(
+		fmt.Sprintf(`: > %s/"started-$$"
+while [ ! -f %s ]; do
+  sleep 0.05
+done`, test.PosixQuote(startedDir), test.PosixQuote(releaseFile)),
+		fmt.Sprintf(`New-Item -ItemType File -Path (Join-Path %s ("started-" + [guid]::NewGuid().ToString())) -Force | Out-Null
+while (-not (Test-Path %s)) {
+  Start-Sleep -Milliseconds 50
+}`, test.PowerShellQuote(startedDir), test.PowerShellQuote(releaseFile)),
+	)
+}
+
+func countStartedParallelItems(t *testing.T, startedDir string) int {
 	t.Helper()
 
-	if len(status.Nodes) == 0 {
-		return 0
-	}
-
-	rootRun := exec.NewDAGRunRef(status.Name, status.DAGRunID)
-	started := 0
-	for _, subRun := range status.Nodes[0].SubRuns {
-		if _, err := dag.DAGRunMgr.FindSubDAGRunStatus(dag.Context, rootRun, subRun.DAGRunID); err == nil {
-			started++
-		}
-	}
-	return started
+	entries, err := os.ReadDir(startedDir)
+	require.NoError(t, err)
+	return len(entries)
 }

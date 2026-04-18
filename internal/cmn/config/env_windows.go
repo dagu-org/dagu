@@ -29,6 +29,7 @@ func init() {
 		"PATH",         // System path
 		"PSMODULEPATH", // PowerShell specific
 		"HOME",         // Used by Go, Git, and ported tools
+		"TZ",           // Timezone override
 
 		// User profile and per-user data directories used by Git, PowerShell,
 		// .NET tools, and credential helpers.

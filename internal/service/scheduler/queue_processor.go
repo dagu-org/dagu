@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	osexec "os/exec"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -43,11 +44,16 @@ type BackoffConfig struct {
 
 // DefaultBackoffConfig returns the default backoff configuration.
 func DefaultBackoffConfig() BackoffConfig {
+	startupGracePeriod := 100 * time.Millisecond
+	if runtime.GOOS == "windows" {
+		startupGracePeriod = time.Second
+	}
+
 	return BackoffConfig{
 		InitialInterval:    500 * time.Millisecond,
 		MaxInterval:        5 * time.Second,
 		MaxRetries:         8,
-		StartupGracePeriod: 100 * time.Millisecond,
+		StartupGracePeriod: startupGracePeriod,
 	}
 }
 

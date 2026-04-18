@@ -64,6 +64,7 @@ const (
 
 // KindForDAGID returns the DAG kind derived from a DAG ID.
 func KindForDAGID(id string) DAGKind {
+	id = normalizeDAGIDSeparators(id)
 	if strings.HasPrefix(id, agentMemoryDir+"/") {
 		return DAGKindMemory
 	}
@@ -77,6 +78,10 @@ func KindForDAGID(id string) DAGKind {
 		return DAGKindDoc
 	}
 	return DAGKindDAG
+}
+
+func normalizeDAGIDSeparators(id string) string {
+	return strings.ReplaceAll(id, "\\", "/")
 }
 
 // isMemoryFile returns true if the file ID belongs to the memory directory.

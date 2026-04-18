@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -26,6 +27,48 @@ import (
 )
 
 var _ CacheStore = (*mockCacheStore)(nil)
+
+func testBinaryName(base string) string {
+	if runtime.GOOS == "windows" {
+		return base + ".exe"
+	}
+	return base
+}
+
+func createVersionTestBinary(t testing.TB, dir, baseName, version string) string {
+	t.Helper()
+
+	if runtime.GOOS == "windows" {
+		scriptPath := filepath.Join(dir, baseName+".cmd")
+		require.NoError(t, os.WriteFile(
+			scriptPath,
+			fmt.Appendf(nil, "@echo off\r\necho dagu version %s\r\n", version),
+			0755,
+		))
+		return scriptPath
+	}
+
+	scriptPath := filepath.Join(dir, baseName)
+	require.NoError(t, os.WriteFile(
+		scriptPath,
+		fmt.Appendf(nil, "#!/bin/sh\necho 'dagu version %s'\n", version),
+		0755,
+	))
+	return scriptPath
+}
+
+func assertPermsIfSupported(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	if runtime.GOOS == "windows" {
+		return
+	}
+	if info.Mode().Perm() != want {
+		t.Errorf("%s permissions = %o, want %o", path, info.Mode().Perm(), want)
+	}
+}
 
 // mockCacheStore implements CacheStore for testing.
 type mockCacheStore struct {
@@ -904,7 +947,8 @@ func TestExtractArchiveWithSubdirectory(t *testing.T) {
 func TestInstall(t *testing.T) {
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "dagu_1.30.3_darwin_arm64.tar.gz")
-	targetPath := filepath.Join(tmpDir, "target", "dagu")
+	binaryName := testBinaryName("dagu")
+	targetPath := filepath.Join(tmpDir, "target", binaryName)
 
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		t.Fatalf("Failed to create target dir: %v", err)
@@ -914,7 +958,7 @@ func TestInstall(t *testing.T) {
 	}
 
 	createTestTarGz(t, archivePath, map[string]string{
-		"dagu": "#!/bin/sh\necho new",
+		binaryName: "#!/bin/sh\necho new",
 	})
 
 	ctx := context.Background()
@@ -949,10 +993,11 @@ func TestInstall(t *testing.T) {
 func TestInstallWithoutBackup(t *testing.T) {
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "test.tar.gz")
-	targetPath := filepath.Join(tmpDir, "dagu")
+	binaryName := testBinaryName("dagu")
+	targetPath := filepath.Join(tmpDir, binaryName)
 
 	createTestTarGz(t, archivePath, map[string]string{
-		"dagu": "#!/bin/sh\necho test",
+		binaryName: "#!/bin/sh\necho test",
 	})
 
 	ctx := context.Background()
@@ -1430,10 +1475,7 @@ func TestVerifyBinary(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	t.Run("successful verification", func(t *testing.T) {
-		scriptPath := filepath.Join(tmpDir, "dagu-test")
-		if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\necho 'dagu version 1.30.3'"), 0755); err != nil {
-			t.Fatalf("Failed to create test script: %v", err)
-		}
+		scriptPath := createVersionTestBinary(t, tmpDir, "dagu-test", "1.30.3")
 
 		if err := VerifyBinary(scriptPath, "v1.30.3"); err != nil {
 			t.Errorf("VerifyBinary() error: %v", err)
@@ -1441,10 +1483,7 @@ func TestVerifyBinary(t *testing.T) {
 	})
 
 	t.Run("version mismatch", func(t *testing.T) {
-		scriptPath := filepath.Join(tmpDir, "dagu-wrong")
-		if err := os.WriteFile(scriptPath, []byte("#!/bin/sh\necho 'dagu version 1.29.0'"), 0755); err != nil {
-			t.Fatalf("Failed to create test script: %v", err)
-		}
+		scriptPath := createVersionTestBinary(t, tmpDir, "dagu-wrong", "1.29.0")
 
 		if err := VerifyBinary(scriptPath, "v1.30.3"); err == nil {
 			t.Error("VerifyBinary() should error on version mismatch")
@@ -1495,13 +1534,7 @@ func TestReplaceUnixBinary(t *testing.T) {
 		t.Error("replaceUnixBinary() did not replace content")
 	}
 
-	info, err := os.Stat(targetPath)
-	if err != nil {
-		t.Fatalf("Failed to stat target: %v", err)
-	}
-	if info.Mode().Perm() != 0755 {
-		t.Errorf("replaceUnixBinary() permissions = %o, want 0755", info.Mode().Perm())
-	}
+	assertPermsIfSupported(t, targetPath, 0755)
 }
 
 func TestReplaceBinary(t *testing.T) {
@@ -1529,13 +1562,7 @@ func TestReplaceBinary(t *testing.T) {
 			t.Error("replaceBinary() did not replace content")
 		}
 
-		info, err := os.Stat(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to stat target: %v", err)
-		}
-		if info.Mode().Perm() != 0700 {
-			t.Errorf("replaceBinary() permissions = %o, want 0700", info.Mode().Perm())
-		}
+		assertPermsIfSupported(t, targetPath, 0700)
 	})
 
 	t.Run("new target", func(t *testing.T) {
@@ -1551,13 +1578,7 @@ func TestReplaceBinary(t *testing.T) {
 			t.Fatalf("replaceBinary() error: %v", err)
 		}
 
-		info, err := os.Stat(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to stat target: %v", err)
-		}
-		if info.Mode().Perm() != 0755 {
-			t.Errorf("replaceBinary() permissions = %o, want 0755", info.Mode().Perm())
-		}
+		assertPermsIfSupported(t, targetPath, 0755)
 	})
 }
 
@@ -1754,7 +1775,8 @@ func TestValidateVersionTag(t *testing.T) {
 func TestInstallBackupTimestamp(t *testing.T) {
 	tmpDir := t.TempDir()
 	archivePath := filepath.Join(tmpDir, "dagu_1.30.3_darwin_arm64.tar.gz")
-	targetPath := filepath.Join(tmpDir, "target", "dagu")
+	binaryName := testBinaryName("dagu")
+	targetPath := filepath.Join(tmpDir, "target", binaryName)
 
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		t.Fatalf("Failed to create target dir: %v", err)
@@ -1764,7 +1786,7 @@ func TestInstallBackupTimestamp(t *testing.T) {
 	}
 
 	createTestTarGz(t, archivePath, map[string]string{
-		"dagu": "#!/bin/sh\necho new",
+		binaryName: "#!/bin/sh\necho new",
 	})
 
 	// Create an existing .bak file
@@ -1830,13 +1852,7 @@ func TestReplaceWindowsBinary(t *testing.T) {
 		t.Error("replaceWindowsBinary() did not replace content")
 	}
 
-	info, err := os.Stat(targetPath)
-	if err != nil {
-		t.Fatalf("Failed to stat target: %v", err)
-	}
-	if info.Mode().Perm() != 0755 {
-		t.Errorf("replaceWindowsBinary() permissions = %o, want 0755", info.Mode().Perm())
-	}
+	assertPermsIfSupported(t, targetPath, 0755)
 
 	// .old should have been cleaned up
 	if _, err := os.Stat(targetPath + ".old"); !os.IsNotExist(err) {

@@ -6,6 +6,7 @@ package fileutil
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -33,7 +34,11 @@ func TestCreateFile(t *testing.T) {
 
 		info, err := file.Stat()
 		require.NoError(t, err)
-		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+		expectedPerm := os.FileMode(0600)
+		if runtime.GOOS == "windows" {
+			expectedPerm = 0666
+		}
+		assert.Equal(t, expectedPerm, info.Mode().Perm())
 	})
 
 	t.Run("InvalidPath", func(t *testing.T) {
@@ -49,25 +54,33 @@ func TestCreateFile(t *testing.T) {
 }
 
 func TestResolvePath(t *testing.T) {
-	// Save original environment to restore later
-	origHome := os.Getenv("HOME")
-	origTempDir := os.Getenv("TEMP_DIR")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-		_ = os.Setenv("TEMP_DIR", origTempDir)
-	}()
-
-	// Set up test environment variables
-	testHome := "/test/home"
-	testTempDir := "/test/temp"
-	_ = os.Setenv("HOME", testHome)
-	_ = os.Setenv("TEMP_DIR", testTempDir)
-
 	// Get current working directory for absolute path tests
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get current working directory: %v", err)
 	}
+
+	tmpRoot := t.TempDir()
+	testHome := filepath.Join(tmpRoot, "home")
+	testTempDir := filepath.Join("temp", "dir")
+
+	t.Setenv("HOME", testHome)
+	t.Setenv("TEMP_DIR", testTempDir)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", testHome)
+		volume := filepath.VolumeName(testHome)
+		if volume != "" {
+			t.Setenv("HOMEDRIVE", volume)
+			t.Setenv("HOMEPATH", strings.TrimPrefix(testHome, volume))
+		}
+	}
+
+	absolutePath, err := filepath.Abs("/usr/local/bin")
+	require.NoError(t, err)
+	pathWithDots, err := filepath.Abs("/usr/local/../bin/./app")
+	require.NoError(t, err)
+	redundantSlashesPath, err := filepath.Abs("/usr//local/bin")
+	require.NoError(t, err)
 
 	tests := []struct {
 		name        string
@@ -96,7 +109,7 @@ func TestResolvePath(t *testing.T) {
 		{
 			name:        "EnvironmentVariableExpansion",
 			path:        "$TEMP_DIR/logs",
-			expected:    filepath.Clean(filepath.Join(testTempDir, "logs")),
+			expected:    filepath.Clean(filepath.Join(cwd, testTempDir, "logs")),
 			expectError: false,
 		},
 		{
@@ -108,13 +121,13 @@ func TestResolvePath(t *testing.T) {
 		{
 			name:        "PathCleaningWithDots",
 			path:        "/usr/local/../bin/./app",
-			expected:    "/usr/bin/app",
+			expected:    filepath.Clean(pathWithDots),
 			expectError: false,
 		},
 		{
 			name:        "PathCleaningWithRedundantSlashes",
 			path:        "/usr//local/bin",
-			expected:    "/usr/local/bin",
+			expected:    filepath.Clean(redundantSlashesPath),
 			expectError: false,
 		},
 		{
@@ -126,7 +139,7 @@ func TestResolvePath(t *testing.T) {
 		{
 			name:        "AbsolutePath",
 			path:        "/usr/local/bin",
-			expected:    "/usr/local/bin",
+			expected:    filepath.Clean(absolutePath),
 			expectError: false,
 		},
 		{

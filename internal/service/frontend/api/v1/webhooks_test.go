@@ -6,6 +6,7 @@ package api_test
 import (
 	"context"
 	"net/http"
+	"runtime"
 	"testing"
 	"time"
 
@@ -18,6 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func webhookParallel(t *testing.T) {
+	t.Helper()
+
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+}
 
 func TestExtractWebhookToken(t *testing.T) {
 	t.Parallel()
@@ -158,7 +167,7 @@ func TestWebhooks_RequiresAuth(t *testing.T) {
 
 // TestWebhooks_RequiresDeveloperOrAbove tests that webhook management requires developer or above.
 func TestWebhooks_RequiresDeveloperOrAbove(t *testing.T) {
-	t.Parallel()
+	webhookParallel(t)
 	server := setupWebhookTestServer(t)
 	adminToken := getWebhookAdminToken(t, server)
 
@@ -516,7 +525,7 @@ func TestWebhooks_TriggerWithDagRunID(t *testing.T) {
 
 // TestWebhooks_TriggerInvalidToken tests webhook trigger with invalid tokens
 func TestWebhooks_TriggerInvalidToken(t *testing.T) {
-	t.Parallel()
+	webhookParallel(t)
 	server := setupWebhookTestServer(t)
 	token := getWebhookAdminToken(t, server)
 

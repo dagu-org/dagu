@@ -22,12 +22,12 @@ import (
 )
 
 func TestManager(t *testing.T) {
-	th := test.Setup(t)
+	th := test.Setup(t, test.WithBuiltExecutable())
 
 	t.Run("Valid", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 		ctx := th.Context
 
@@ -48,10 +48,12 @@ func TestManager(t *testing.T) {
 			},
 		)
 
+		listen := make(chan error, 1)
 		go func() {
-			_ = socketServer.Serve(ctx, nil)
+			_ = socketServer.Serve(ctx, listen)
 			_ = socketServer.Shutdown(ctx)
 		}()
+		require.NoError(t, <-listen)
 
 		dag.AssertCurrentStatus(t, core.Running)
 
@@ -62,7 +64,7 @@ func TestManager(t *testing.T) {
 	t.Run("UpdateStatus", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: "true"
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -112,7 +114,7 @@ steps:
 name: tree_child
 steps:
   - name: "1"
-    command: "true"
+    command: "exit 0"
 ---
 `)
 
@@ -120,13 +122,20 @@ steps:
 		err := runtime.Start(th.Context, spec)
 		require.NoError(t, err)
 
-		dag.AssertLatestStatus(t, core.Succeeded)
+		var status exec.DAGRunStatus
+		require.Eventually(t, func() bool {
+			latest, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
+			if err != nil {
+				return false
+			}
+			status = latest
+			t.Logf("latest status=%s errors=%v", latest.Status.String(), latest.Errors())
+			return latest.Status == core.Succeeded
+		}, platformTestDuration(30*time.Second, 4*time.Minute), time.Second)
 
 		// Get the sub dag-run status.
-		dagRunStatus, err := th.DAGRunMgr.GetLatestStatus(th.Context, dag.DAG)
-		require.NoError(t, err)
-		dagRunID := dagRunStatus.DAGRunID
-		subDAGRun := dagRunStatus.Nodes[0].SubRuns[0]
+		dagRunID := status.DAGRunID
+		subDAGRun := status.Nodes[0].SubRuns[0]
 
 		root := exec.NewDAGRunRef(dag.Name, dagRunID)
 		subDAGRunStatus, err := th.DAGRunMgr.FindSubDAGRunStatus(th.Context, root, subDAGRun.DAGRunID)
@@ -146,7 +155,7 @@ steps:
 	t.Run("InvalidUpdateStatusWithInvalidDAGRunID", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 		ctx := th.Context
 		cli := th.DAGRunMgr
@@ -162,7 +171,7 @@ steps:
 	t.Run("GetLatestStatusRepairsStaleRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -194,7 +203,7 @@ steps:
 	t.Run("GetSavedStatusRepairsStaleRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -222,7 +231,7 @@ steps:
 	t.Run("GetLatestStatusKeepsFreshRunDuringStartupGrace", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -250,7 +259,7 @@ steps:
 	t.Run("GetSavedStatusKeepsFreshRunDuringStartupGrace", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -274,7 +283,7 @@ steps:
 	t.Run("GetSavedStatusDoesNotRepairDistributedRunWhenLeaseMissing", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -303,7 +312,7 @@ steps:
 	t.Run("GetLatestStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -333,7 +342,7 @@ steps:
 	t.Run("GetCurrentStatusDoesNotReadLocalSocketForDistributedRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
@@ -363,7 +372,7 @@ steps:
 	t.Run("GetLatestStatusDoesNotRepairDistributedRunWhenLeaseMissing", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"
-    command: sleep 1
+    command: "exit 0"
 `)
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()

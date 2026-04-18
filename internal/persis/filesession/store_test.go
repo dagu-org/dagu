@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -964,10 +965,8 @@ func TestStore_WriteSessionToFile_Errors(t *testing.T) {
 		store, err := New(tmpDir)
 		require.NoError(t, err)
 
-		// Create a read-only subdirectory
 		readOnlyDir := filepath.Join(tmpDir, "readonly")
-		require.NoError(t, os.MkdirAll(readOnlyDir, 0500))
-		defer func() { _ = os.Chmod(readOnlyDir, 0750) }()
+		testutil.BlockPathWithFile(t, readOnlyDir)
 
 		sess := &SessionForStorage{ID: "test", UserID: "user1"}
 		filePath := filepath.Join(readOnlyDir, "test.json")
