@@ -21,6 +21,7 @@ type Props = {
   visible: boolean;
   dismissModal: () => void;
   onSubmit: () => void;
+  submitDisabled?: boolean;
   contentClassName?: string;
   bodyClassName?: string;
 };
@@ -32,6 +33,7 @@ function ConfirmModal({
   visible,
   dismissModal,
   onSubmit,
+  submitDisabled = false,
   contentClassName,
   bodyClassName,
 }: Props) {
@@ -80,6 +82,9 @@ function ConfirmModal({
         // If Submit button is focused, trigger submit
         if (activeElement === submitButtonRef.current) {
           e.preventDefault();
+          if (submitDisabled) {
+            return;
+          }
           onSubmit();
           return;
         }
@@ -91,6 +96,9 @@ function ConfirmModal({
 
         // If no specific element is focused, trigger the submit action as default
         e.preventDefault();
+        if (submitDisabled) {
+          return;
+        }
         onSubmit();
       }
     };
@@ -99,7 +107,7 @@ function ConfirmModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, onSubmit, dismissModal]);
+  }, [visible, onSubmit, dismissModal, submitDisabled]);
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
       <DialogContent className={cn('sm:max-w-[500px]', contentClassName)}>
@@ -120,6 +128,7 @@ function ConfirmModal({
           <Button
             ref={submitButtonRef}
             className="btn-3d-primary"
+            disabled={submitDisabled}
             onClick={onSubmit}
           >
             <Check className="h-4 w-4" />
