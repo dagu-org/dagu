@@ -364,14 +364,17 @@ func (e *Engine) runLocal(ctx context.Context, dag *core.DAG, runID string, opts
 	}
 
 	go func() {
+		var err error
 		defer func() {
 			_ = logFile.Close()
 			if prepared != nil && prepared.proc != nil {
 				_ = prepared.proc.Stop(context.Background())
 			}
+			run.setDoneError(err)
+			close(done)
 		}()
 		runCtx = logger.WithLogger(config.WithConfig(runCtx, e.cfg), e.logger)
-		err := agentInstance.Run(runCtx)
+		err = agentInstance.Run(runCtx)
 		if err != nil {
 			logger.Error(runCtx, "Embedded DAG run failed",
 				tag.DAG(dag.Name),
@@ -379,8 +382,6 @@ func (e *Engine) runLocal(ctx context.Context, dag *core.DAG, runID string, opts
 				tag.Error(err),
 			)
 		}
-		run.setDoneError(err)
-		close(done)
 	}()
 
 	return run, nil
