@@ -4,7 +4,14 @@
 import { Theme } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import React from 'react';
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
 import { SWRConfig, mutate as globalMutate } from 'swr';
 
 import { Shield } from 'lucide-react';
@@ -13,7 +20,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useCanWrite } from './contexts/AuthContext';
 import {
   Config,
   ConfigContext,
@@ -45,6 +52,7 @@ import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
 import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
+import WorkflowDesignPage from './pages/design';
 import DocsPage from './pages/docs';
 import EventLogsPage from './pages/event-logs';
 import GitSyncPage from './pages/git-sync';
@@ -108,6 +116,34 @@ function DeveloperElement({
   children: React.ReactElement;
 }): React.ReactElement {
   return <ProtectedRoute requiredRole="developer">{children}</ProtectedRoute>;
+}
+
+function WriteElement({
+  children,
+}: {
+  children: React.ReactElement;
+}): React.ReactElement {
+  const canWrite = useCanWrite();
+  const config = React.useContext(ConfigContext);
+  if (!canWrite || !config.agentEnabled) return <Navigate to="/" replace />;
+  return children;
+}
+
+function AgentChatModalHost({
+  enabled,
+}: {
+  enabled: boolean;
+}): React.ReactElement | null {
+  const location = useLocation();
+  const isDesignWorkspace =
+    location.pathname === '/design' ||
+    location.pathname.startsWith('/design/') ||
+    location.pathname === '/agent' ||
+    location.pathname.startsWith('/agent/');
+  if (!enabled || isDesignWorkspace) {
+    return null;
+  }
+  return <AgentChatModal />;
 }
 
 function LicensedRoute({
@@ -284,6 +320,18 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                             element={<DAGDetails />}
                                           />
                                           <Route
+                                            path="/design"
+                                            element={
+                                              <WriteElement>
+                                                <WorkflowDesignPage />
+                                              </WriteElement>
+                                            }
+                                          />
+                                          <Route
+                                            path="/agent"
+                                            element={<Navigate to="/design" replace />}
+                                          />
+                                          <Route
                                             path="/search/"
                                             element={<Search />}
                                           />
@@ -439,9 +487,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           />
                                         </Routes>
                                       </Layout>
-                                      {config.agentEnabled && (
-                                        <AgentChatModal />
-                                      )}
+                                      <AgentChatModalHost
+                                        enabled={config.agentEnabled}
+                                      />
                                     </PageContextProvider>
                                   </AgentChatProvider>
                                 </ProtectedRoute>

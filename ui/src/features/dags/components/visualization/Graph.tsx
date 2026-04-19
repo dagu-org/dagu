@@ -57,6 +57,8 @@ type Props = {
   steps?: Steps;
   /** Callback for node click events (double-click) */
   onClickNode?: onClickNode;
+  /** Whether a single click should invoke onClickNode */
+  selectOnClick?: boolean;
   /** Callback for node right-click events */
   onRightClickNode?: onRightClickNode;
   /** Whether to show status icons */
@@ -86,6 +88,7 @@ function Graph({
   onChangeFlowchart,
   type = 'status',
   onClickNode,
+  selectOnClick = false,
   onRightClickNode,
   showIcons = true,
   isExpandedView = false,
@@ -449,7 +452,7 @@ function Graph({
           style={mermaidStyle}
           def={graph}
           scale={scale}
-          onClick={onRightClickNode}
+          onClick={selectOnClick ? onClickNode : undefined}
           onDoubleClick={onClickNode}
           onRightClick={onRightClickNode}
         />
@@ -471,6 +474,7 @@ function Graph({
                 onChangeFlowchart={onChangeFlowchart}
                 type={type}
                 onClickNode={onClickNode}
+                selectOnClick={selectOnClick}
                 onRightClickNode={onRightClickNode}
                 showIcons={showIcons}
                 isExpandedView={true}

@@ -32,6 +32,10 @@ type ApiMessage = components['schemas']['AgentMessage'];
 type ApiSessionDetail = components['schemas']['AgentSessionDetailResponse'];
 const FALLBACK_POLL_INTERVAL_MS = 2000;
 
+type UseAgentChatOptions = {
+  active?: boolean;
+};
+
 function convertApiMessage(msg: ApiMessage): Message {
   return {
     id: msg.id,
@@ -190,7 +194,7 @@ function mergeMessages(current: Message[], incoming: Message[]): Message[] {
   return next.sort((left, right) => left.sequence_id - right.sequence_id);
 }
 
-export function useAgentChat() {
+export function useAgentChat(options: UseAgentChatOptions = {}) {
   const config = useConfig();
   const client = useClient();
   const navigate = useNavigate();
@@ -226,6 +230,7 @@ export function useAgentChat() {
 
   const apiURL = config.apiURL;
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const isActive = options.active ?? isChatOpen;
 
   const dm = useDelegateManager();
   const {
@@ -370,10 +375,10 @@ export function useAgentChat() {
   });
 
   useEffect(() => {
-    // Only poll when the chat modal is visible and a session is selected.
-    // Without the isChatOpen check, polling continues after the modal closes
-    // because sessionId stays set in the context, wasting connection slots.
-    if (!isChatOpen || !sessionId || sseStatus.isSessionLive) {
+    // Only poll while a chat surface is active and a session is selected.
+    // Without this check, polling continues after the modal closes because
+    // sessionId stays set in the context, wasting connection slots.
+    if (!isActive || !sessionId || sseStatus.isSessionLive) {
       return;
     }
 
@@ -425,7 +430,7 @@ export function useAgentChat() {
         clearTimeout(nextPollTimeout);
       }
     };
-  }, [isChatOpen, sessionId, sseStatus.isSessionLive, sortedOpenDelegateSessionIds]);
+  }, [isActive, sessionId, sseStatus.isSessionLive, sortedOpenDelegateSessionIds]);
 
   const fetchSessionsPage = useCallback(
     async (page: number): Promise<void> => {

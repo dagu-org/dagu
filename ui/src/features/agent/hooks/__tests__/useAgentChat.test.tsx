@@ -15,6 +15,10 @@ function useAgentChatWithOpen() {
   return { ...chat, openChat: ctx.openChat };
 }
 
+function useAgentChatAlwaysActive(): ReturnType<typeof useAgentChat> {
+  return useAgentChat({ active: true });
+}
+
 const getMock = vi.fn();
 const postMock = vi.fn();
 const navigateMock = vi.fn();
@@ -229,6 +233,48 @@ describe('useAgentChat fallback polling', () => {
     });
 
     expect(sessionFetchCount).toBe(callsAfterReconnect);
+  });
+
+  it('polls while explicitly active without opening the floating modal', async () => {
+    let sessionFetchCount = 0;
+    getMock.mockImplementation(
+      async (
+        _path: string,
+        request?: { params?: { path?: { sessionId?: string } } }
+      ) => {
+        if (request?.params?.path?.sessionId === 'sess-1') {
+          sessionFetchCount += 1;
+          return {
+            data: makeSessionDetailResponse({
+              messages: [
+                makeApiMessage(
+                  `msg-${sessionFetchCount}`,
+                  sessionFetchCount === 1 ? 'initial' : 'embedded poll'
+                ),
+              ],
+              working: sessionFetchCount > 1,
+            }),
+          };
+        }
+        throw new Error('unexpected request');
+      }
+    );
+
+    const { result } = renderHook(() => useAgentChatAlwaysActive(), {
+      wrapper: TestProviders,
+    });
+
+    await act(async () => {
+      await result.current.selectSession('sess-1');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(sessionFetchCount).toBe(2);
+    expect(result.current.messages[0]?.content).toBe('embedded poll');
+    expect(result.current.sessionState?.working).toBe(true);
   });
 
   it('polls open delegate panes while the root agent stream is offline and stops after reconnect', async () => {

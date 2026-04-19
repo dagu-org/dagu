@@ -6,6 +6,7 @@ import { getResponsiveTitleClass } from '@/lib/text-utils';
 import { Menu, Terminal, X } from 'lucide-react';
 import { useAgentChatContext } from '@/features/agent';
 import * as React from 'react';
+import { useLocation } from 'react-router-dom';
 import { mainListItems as MainListItems } from '../menu';
 
 /**
@@ -79,6 +80,7 @@ type LayoutProps = {
 function Content({ navbarColor, children }: LayoutProps) {
   const config = useConfig();
   const { toggleChat } = useAgentChatContext();
+  const location = useLocation();
 
   const hasCustomColor: boolean = Boolean(
     navbarColor && navbarColor.trim() !== ''
@@ -105,6 +107,20 @@ function Content({ navbarColor, children }: LayoutProps) {
   React.useEffect(() => {
     localStorage.setItem('sidebarExpanded', isSidebarExpanded.toString());
   }, [isSidebarExpanded]);
+
+  const isDesignWorkspace =
+    location.pathname === '/design' ||
+    location.pathname.startsWith('/design/') ||
+    location.pathname === '/agent' ||
+    location.pathname.startsWith('/agent/');
+
+  if (isDesignWorkspace) {
+    return (
+      <div className="h-screen w-full overflow-hidden bg-background">
+        {children}
+      </div>
+    );
+  }
 
   // Toggle sidebar function
   const toggleSidebar = () => {
