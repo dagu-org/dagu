@@ -50,6 +50,7 @@ func Example_distributed() {
 		DefaultMode: dagu.ExecutionModeDistributed,
 		Distributed: &dagu.DistributedOptions{
 			Coordinators: []string{"127.0.0.1:50055"},
+			TLS:          dagu.TLSOptions{Insecure: true},
 			WorkerSelector: map[string]string{
 				"pool": "default",
 			},
@@ -78,6 +79,9 @@ func Example_distributed() {
 			log.Print(err)
 		}
 	}()
+	if err := worker.WaitReady(ctx); err != nil {
+		log.Fatal(err)
+	}
 
 	run, err := engine.RunFile(ctx, "daily-report.yaml")
 	if err != nil {

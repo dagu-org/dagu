@@ -41,6 +41,7 @@ func main() {
 		DefaultMode: dagu.ExecutionModeDistributed,
 		Distributed: &dagu.DistributedOptions{
 			Coordinators:   coordinators,
+			TLS:            dagu.TLSOptions{Insecure: true},
 			PollInterval:   time.Second,
 			WorkerSelector: map[string]string{"pool": "embedded-example"},
 		},
@@ -70,6 +71,9 @@ func main() {
 			log.Printf("worker stopped: %v", err)
 		}
 	}()
+	if err := worker.WaitReady(ctx); err != nil {
+		log.Fatal(err)
+	}
 
 	run, err := engine.RunFile(ctx, examplePath("workflow.yaml"))
 	if err != nil {

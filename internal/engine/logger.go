@@ -26,12 +26,16 @@ func (l *slogAdapter) Debug(msg string, tags ...slog.Attr) { l.log(slog.LevelDeb
 func (l *slogAdapter) Info(msg string, tags ...slog.Attr)  { l.log(slog.LevelInfo, msg, tags...) }
 func (l *slogAdapter) Warn(msg string, tags ...slog.Attr)  { l.log(slog.LevelWarn, msg, tags...) }
 func (l *slogAdapter) Error(msg string, tags ...slog.Attr) { l.log(slog.LevelError, msg, tags...) }
+
+// Fatal logs without exiting so embedded engines cannot terminate the host process.
 func (l *slogAdapter) Fatal(msg string, tags ...slog.Attr) { l.log(slog.LevelError, msg, tags...) }
 
 func (l *slogAdapter) Debugf(format string, v ...any) { l.Debug(fmt.Sprintf(format, v...)) }
 func (l *slogAdapter) Infof(format string, v ...any)  { l.Info(fmt.Sprintf(format, v...)) }
 func (l *slogAdapter) Warnf(format string, v ...any)  { l.Warn(fmt.Sprintf(format, v...)) }
 func (l *slogAdapter) Errorf(format string, v ...any) { l.Error(fmt.Sprintf(format, v...)) }
+
+// Fatalf logs without exiting so embedded engines cannot terminate the host process.
 func (l *slogAdapter) Fatalf(format string, v ...any) { l.Fatal(fmt.Sprintf(format, v...)) }
 
 func (l *slogAdapter) Write(msg string) {
@@ -39,9 +43,9 @@ func (l *slogAdapter) Write(msg string) {
 }
 
 func (l *slogAdapter) With(attrs ...slog.Attr) logger.Logger {
-	args := make([]any, 0, len(attrs)*2)
-	for _, attr := range attrs {
-		args = append(args, attr.Key, attr.Value.Any())
+	args := make([]any, len(attrs))
+	for i, attr := range attrs {
+		args[i] = attr
 	}
 	return &slogAdapter{logger: l.logger.With(args...)}
 }
@@ -51,9 +55,9 @@ func (l *slogAdapter) WithGroup(name string) logger.Logger {
 }
 
 func (l *slogAdapter) log(level slog.Level, msg string, tags ...slog.Attr) {
-	args := make([]any, 0, len(tags)*2)
-	for _, attr := range tags {
-		args = append(args, attr.Key, attr.Value.Any())
+	args := make([]any, len(tags))
+	for i, attr := range tags {
+		args[i] = attr
 	}
 	l.logger.Log(context.Background(), level, msg, args...)
 }

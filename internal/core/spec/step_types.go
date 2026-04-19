@@ -83,18 +83,44 @@ var builtinStepTypeNames = map[string]struct{}{
 	"template":      {},
 }
 
+var registeredExecutorTypeNames = map[string]struct{}{}
+
 var stepTypeNamesMu sync.RWMutex
+
+// IsValidExecutorTypeName reports whether name is valid for an executor type.
+func IsValidExecutorTypeName(name string) bool {
+	return customStepTypeNameRegexp.MatchString(strings.TrimSpace(name))
+}
 
 // RegisterExecutorTypeName registers a runtime executor type name so DAG
 // loading accepts steps that use it directly in the type field.
 func RegisterExecutorTypeName(name string) {
+	name = strings.TrimSpace(name)
+	if !IsValidExecutorTypeName(name) {
+		return
+	}
+	stepTypeNamesMu.Lock()
+	defer stepTypeNamesMu.Unlock()
+	if _, builtin := builtinStepTypeNames[name]; !builtin {
+		registeredExecutorTypeNames[name] = struct{}{}
+	}
+	builtinStepTypeNames[name] = struct{}{}
+}
+
+// UnregisterExecutorTypeName removes a runtime executor type name that was
+// registered by RegisterExecutorTypeName. Built-in names are retained.
+func UnregisterExecutorTypeName(name string) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return
 	}
 	stepTypeNamesMu.Lock()
 	defer stepTypeNamesMu.Unlock()
-	builtinStepTypeNames[name] = struct{}{}
+	if _, registered := registeredExecutorTypeNames[name]; !registered {
+		return
+	}
+	delete(registeredExecutorTypeNames, name)
+	delete(builtinStepTypeNames, name)
 }
 
 var customStepForbiddenCallSiteFields = map[string]struct{}{

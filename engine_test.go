@@ -5,13 +5,16 @@ package dagu_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEngineRunFile(t *testing.T) {
@@ -20,40 +23,30 @@ func TestEngineRunFile(t *testing.T) {
 
 	home := t.TempDir()
 	dagFile := filepath.Join(home, "embedded-file.yaml")
-	writeDAG(t, dagFile, `
+	checkParamCommand := `test "$FOO" = "bar"`
+	if runtime.GOOS == "windows" {
+		checkParamCommand = `cmd /C if "%FOO%"=="bar" (exit /b 0) else (exit /b 1)`
+	}
+	writeDAG(t, dagFile, fmt.Sprintf(`
 name: embedded-file
 steps:
   - name: check-param
-    command: test "$FOO" = "bar"
-`)
+    command: %q
+`, checkParamCommand))
 
 	engine, err := dagu.New(ctx, dagu.Options{HomeDir: home})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
+	require.NoError(t, err, "New()")
 	defer func() {
-		if err := engine.Close(context.Background()); err != nil {
-			t.Fatalf("Close() error = %v", err)
-		}
+		require.NoError(t, engine.Close(context.Background()))
 	}()
 
 	run, err := engine.RunFile(ctx, dagFile, dagu.WithParams(map[string]string{"FOO": "bar"}))
-	if err != nil {
-		t.Fatalf("RunFile() error = %v", err)
-	}
+	require.NoError(t, err, "RunFile()")
 	status, err := run.Wait(ctx)
-	if err != nil {
-		t.Fatalf("Wait() error = %v", err)
-	}
-	if status.Status != "succeeded" {
-		t.Fatalf("status = %q, want succeeded", status.Status)
-	}
-	if status.Name != "embedded-file" {
-		t.Fatalf("name = %q, want embedded-file", status.Name)
-	}
-	if status.RunID == "" {
-		t.Fatal("run ID is empty")
-	}
+	require.NoError(t, err, "Wait()")
+	require.Equal(t, "succeeded", status.Status)
+	require.Equal(t, "embedded-file", status.Name)
+	require.NotEmpty(t, status.RunID)
 }
 
 func TestEngineRunYAML(t *testing.T) {
@@ -61,18 +54,12 @@ func TestEngineRunYAML(t *testing.T) {
 	defer cancel()
 
 	originalWorkingDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() error = %v", err)
-	}
+	require.NoError(t, err, "Getwd()")
 
 	engine, err := dagu.New(ctx, dagu.Options{HomeDir: t.TempDir()})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
+	require.NoError(t, err, "New()")
 	defer func() {
-		if err := engine.Close(context.Background()); err != nil {
-			t.Fatalf("Close() error = %v", err)
-		}
+		require.NoError(t, engine.Close(context.Background()))
 	}()
 
 	run, err := engine.RunYAML(ctx, []byte(`
@@ -81,26 +68,14 @@ steps:
   - name: hello
     command: echo hello
 `))
-	if err != nil {
-		t.Fatalf("RunYAML() error = %v", err)
-	}
+	require.NoError(t, err, "RunYAML()")
 	status, err := run.Wait(ctx)
-	if err != nil {
-		t.Fatalf("Wait() error = %v", err)
-	}
-	if status.Status != "succeeded" {
-		t.Fatalf("status = %q, want succeeded", status.Status)
-	}
-	if status.Name != "embedded-yaml" {
-		t.Fatalf("name = %q, want embedded-yaml", status.Name)
-	}
+	require.NoError(t, err, "Wait()")
+	require.Equal(t, "succeeded", status.Status)
+	require.Equal(t, "embedded-yaml", status.Name)
 	currentWorkingDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() after run error = %v", err)
-	}
-	if currentWorkingDir != originalWorkingDir {
-		t.Fatalf("working directory = %q, want %q", currentWorkingDir, originalWorkingDir)
-	}
+	require.NoError(t, err, "Getwd() after run")
+	require.Equal(t, originalWorkingDir, currentWorkingDir)
 }
 
 func TestEngineDistributedRequiresCoordinator(t *testing.T) {
@@ -108,13 +83,9 @@ func TestEngineDistributedRequiresCoordinator(t *testing.T) {
 	defer cancel()
 
 	engine, err := dagu.New(ctx, dagu.Options{HomeDir: t.TempDir()})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
+	require.NoError(t, err, "New()")
 	defer func() {
-		if err := engine.Close(context.Background()); err != nil {
-			t.Fatalf("Close() error = %v", err)
-		}
+		require.NoError(t, engine.Close(context.Background()))
 	}()
 
 	_, err = engine.RunYAML(ctx, []byte(`
@@ -123,12 +94,8 @@ steps:
   - name: hello
     command: echo hello
 `), dagu.WithMode(dagu.ExecutionModeDistributed))
-	if err == nil {
-		t.Fatal("RunYAML() error = nil, want coordinator error")
-	}
-	if !strings.Contains(err.Error(), "coordinator") {
-		t.Fatalf("RunYAML() error = %v, want coordinator error", err)
-	}
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "coordinator")
 }
 
 func writeDAG(t *testing.T, path, content string) {

@@ -431,7 +431,7 @@ func TestRegisterStepValidator(t *testing.T) {
 
 	t.Run("register validator for new type", func(t *testing.T) {
 		// Clean up after test
-		defer delete(stepValidators, "test-executor")
+		defer UnregisterStepValidator("test-executor")
 
 		validatorCalled := false
 		validator := func(_ Step) error {
@@ -457,7 +457,7 @@ func TestRegisterStepValidator(t *testing.T) {
 	})
 
 	t.Run("validator returning error propagates", func(t *testing.T) {
-		defer delete(stepValidators, "error-executor")
+		defer UnregisterStepValidator("error-executor")
 
 		expectedErr := errors.New("validation failed")
 		validator := func(_ Step) error {
@@ -481,7 +481,7 @@ func TestRegisterStepValidator(t *testing.T) {
 	})
 
 	t.Run("overwrite existing validator", func(t *testing.T) {
-		defer delete(stepValidators, "overwrite-executor")
+		defer UnregisterStepValidator("overwrite-executor")
 
 		firstCalled := false
 		secondCalled := false
@@ -682,8 +682,8 @@ func TestValidateStepWithValidator(t *testing.T) {
 	})
 
 	t.Run("nil validator returns nil", func(t *testing.T) {
-		defer delete(stepValidators, "nil-validator-type")
-		stepValidators["nil-validator-type"] = nil
+		defer UnregisterStepValidator("nil-validator-type")
+		RegisterStepValidator("nil-validator-type", nil)
 
 		step := Step{
 			Name:           "step1",
@@ -693,12 +693,12 @@ func TestValidateStepWithValidator(t *testing.T) {
 	})
 
 	t.Run("validator error is wrapped", func(t *testing.T) {
-		defer delete(stepValidators, "wrap-error-type")
+		defer UnregisterStepValidator("wrap-error-type")
 
 		customErr := errors.New("custom validation error")
-		stepValidators["wrap-error-type"] = func(_ Step) error {
+		RegisterStepValidator("wrap-error-type", func(_ Step) error {
 			return customErr
-		}
+		})
 
 		step := Step{
 			Name:           "step1",

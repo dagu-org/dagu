@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"slices"
 	"time"
 
 	iengine "github.com/dagucloud/dagu/internal/engine"
@@ -66,10 +67,15 @@ type DistributedOptions struct {
 
 // TLSOptions configures TLS for coordinator and worker peer clients.
 type TLSOptions struct {
-	Insecure      bool
-	CertFile      string
-	KeyFile       string
-	ClientCAFile  string
+	// Insecure explicitly allows plaintext coordinator connections.
+	Insecure bool
+	// CertFile is the client certificate file for TLS connections.
+	CertFile string
+	// KeyFile is the client private key file for TLS connections.
+	KeyFile string
+	// ClientCAFile is the CA file used to verify coordinator certificates.
+	ClientCAFile string
+	// SkipTLSVerify skips coordinator certificate verification.
 	SkipTLSVerify bool
 }
 
@@ -96,12 +102,21 @@ type Status struct {
 
 // WorkerOptions configures an embedded shared-nothing worker.
 type WorkerOptions struct {
-	ID            string
+	// ID is the worker identifier. A host and process based ID is generated when empty.
+	ID string
+	// MaxActiveRuns limits concurrent DAG runs. A default is used when zero or negative.
 	MaxActiveRuns int
-	Labels        map[string]string
-	Coordinators  []string
-	TLS           TLSOptions
-	HealthPort    int
+	// Labels are advertised to coordinators and matched by worker selectors.
+	Labels map[string]string
+	// Coordinators overrides DistributedOptions.Coordinators when non-empty.
+	// If empty, the worker falls back to the engine-level DistributedOptions.
+	// The resolved coordinator list must contain at least one non-empty address.
+	Coordinators []string
+	// TLS overrides DistributedOptions.TLS when non-zero. If zero, the worker
+	// falls back to the engine-level DistributedOptions TLS settings.
+	TLS TLSOptions
+	// HealthPort starts the worker health endpoint on the given port. Zero disables it.
+	HealthPort int
 }
 
 // Engine is an embedded Dagu engine backed by the configured file stores.
@@ -239,10 +254,7 @@ func (r *Run) Wait(ctx context.Context) (*Status, error) {
 		return nil, fmt.Errorf("run is not initialized")
 	}
 	status, err := r.inner.Wait(ctx)
-	if err != nil {
-		return publicStatus(status), err
-	}
-	return publicStatus(status), nil
+	return publicStatus(status), err
 }
 
 // Status returns the current run status.
@@ -251,10 +263,7 @@ func (r *Run) Status(ctx context.Context) (*Status, error) {
 		return nil, fmt.Errorf("run is not initialized")
 	}
 	status, err := r.inner.Status(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return publicStatus(status), nil
+	return publicStatus(status), err
 }
 
 // Stop requests cancellation for this run.
@@ -280,6 +289,14 @@ func (w *Worker) Stop(ctx context.Context) error {
 		return nil
 	}
 	return w.inner.Stop(ctx)
+}
+
+// WaitReady blocks until the worker has registered with a coordinator.
+func (w *Worker) WaitReady(ctx context.Context) error {
+	if w == nil || w.inner == nil {
+		return fmt.Errorf("worker is not initialized")
+	}
+	return w.inner.WaitReady(ctx)
 }
 
 func applyRunOptions(opts []RunOption) runOptions {
@@ -314,7 +331,7 @@ func WithParams(params map[string]string) RunOption {
 // WithParamsList sets DAG parameters from Dagu-style KEY=VALUE entries.
 func WithParamsList(params []string) RunOption {
 	return func(o *runOptions) {
-		o.paramsList = append([]string{}, params...)
+		o.paramsList = cloneSlice(params)
 	}
 }
 
@@ -342,7 +359,7 @@ func WithWorkerSelector(selector map[string]string) RunOption {
 // WithTags adds tags to one run.
 func WithTags(tags ...string) RunOption {
 	return func(o *runOptions) {
-		o.tags = append([]string{}, tags...)
+		o.tags = cloneSlice(tags)
 	}
 }
 
@@ -374,7 +391,7 @@ func internalOptions(opts Options) iengine.Options {
 
 func internalDistributedOptions(opts DistributedOptions) iengine.DistributedOptions {
 	return iengine.DistributedOptions{
-		Coordinators:    append([]string{}, opts.Coordinators...),
+		Coordinators:    cloneSlice(opts.Coordinators),
 		TLS:             internalTLSOptions(opts.TLS),
 		WorkerSelector:  cloneMap(opts.WorkerSelector),
 		PollInterval:    opts.PollInterval,
@@ -396,12 +413,12 @@ func internalRunOptions(opts runOptions) iengine.RunOptions {
 	return iengine.RunOptions{
 		RunID:             opts.runID,
 		Name:              opts.name,
-		Params:            cloneMap(opts.params),
-		ParamsList:        append([]string{}, opts.paramsList...),
+		Params:            opts.params,
+		ParamsList:        opts.paramsList,
 		DefaultWorkingDir: opts.defaultWorkingDir,
 		Mode:              iengine.ExecutionMode(opts.mode),
-		WorkerSelector:    cloneMap(opts.workerSelector),
-		Tags:              append([]string{}, opts.tags...),
+		WorkerSelector:    opts.workerSelector,
+		Tags:              opts.tags,
 		DryRun:            opts.dryRun,
 	}
 }
@@ -419,7 +436,7 @@ func internalWorkerOptions(opts WorkerOptions) iengine.WorkerOptions {
 		ID:            opts.ID,
 		MaxActiveRuns: opts.MaxActiveRuns,
 		Labels:        cloneMap(opts.Labels),
-		Coordinators:  append([]string{}, opts.Coordinators...),
+		Coordinators:  cloneSlice(opts.Coordinators),
 		TLS:           internalTLSOptions(opts.TLS),
 		HealthPort:    opts.HealthPort,
 	}
@@ -451,4 +468,11 @@ func cloneMap(values map[string]string) map[string]string {
 	out := make(map[string]string, len(values))
 	maps.Copy(out, values)
 	return out
+}
+
+func cloneSlice(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	return slices.Clone(values)
 }

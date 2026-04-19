@@ -92,6 +92,7 @@ type Run struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 
+	doneOnce  sync.Once
 	doneErrMu sync.RWMutex
 	doneErr   error
 

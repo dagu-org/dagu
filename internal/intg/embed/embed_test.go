@@ -71,6 +71,9 @@ func TestEmbeddedCustomExecutorRunYAML(t *testing.T) {
 		},
 		dagu.WithExecutorCapabilities(dagu.ExecutorCapabilities{Command: true}),
 	)
+	t.Cleanup(func() {
+		dagu.UnregisterExecutor(executorType)
+	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), embeddedTimeout(20*time.Second))
 	defer cancel()
@@ -108,6 +111,7 @@ func TestEmbeddedDistributedSharedNothingRunYAML(t *testing.T) {
 		DefaultMode: dagu.ExecutionModeDistributed,
 		Distributed: &dagu.DistributedOptions{
 			Coordinators:    []string{coord.Address()},
+			TLS:             dagu.TLSOptions{Insecure: true},
 			WorkerSelector:  map[string]string{"pool": "embedded-intg"},
 			PollInterval:    100 * time.Millisecond,
 			MaxStatusErrors: 20,
@@ -136,7 +140,7 @@ func TestEmbeddedDistributedSharedNothingRunYAML(t *testing.T) {
 		_ = worker.Stop(context.Background())
 	})
 
-	waitForWorker(t, coord, "embedded-intg-worker")
+	require.NoError(t, worker.WaitReady(ctx))
 
 	run, err := engine.RunYAML(ctx, []byte(`
 name: embedded-intg-distributed
@@ -189,26 +193,4 @@ func (e *echoExecutor) Run(context.Context) error {
 	}
 	_, err := fmt.Fprintf(out, "embedded executor ran %s: %s\n", e.step.Name, command)
 	return err
-}
-
-func waitForWorker(t *testing.T, coord *test.Coordinator, workerID string) {
-	t.Helper()
-
-	client := coord.GetCoordinatorClient(t)
-	t.Cleanup(func() {
-		_ = client.Cleanup(context.Background())
-	})
-
-	require.Eventually(t, func() bool {
-		workers, err := client.GetWorkers(context.Background())
-		if err != nil {
-			return false
-		}
-		for _, worker := range workers {
-			if worker.WorkerId == workerID {
-				return true
-			}
-		}
-		return false
-	}, embeddedTimeout(5*time.Second), 50*time.Millisecond, "worker %s should register", workerID)
 }

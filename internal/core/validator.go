@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // Constants for validation limits.
@@ -58,9 +59,20 @@ type StepValidator func(step Step) error
 // stepValidators holds registered validators for each executor type.
 var stepValidators = make(map[string]StepValidator)
 
+var stepValidatorsMu sync.RWMutex
+
 // RegisterStepValidator registers a validator for a specific executor type.
 func RegisterStepValidator(executorType string, validator StepValidator) {
+	stepValidatorsMu.Lock()
+	defer stepValidatorsMu.Unlock()
 	stepValidators[executorType] = validator
+}
+
+// UnregisterStepValidator removes a validator for a specific executor type.
+func UnregisterStepValidator(executorType string) {
+	stepValidatorsMu.Lock()
+	defer stepValidatorsMu.Unlock()
+	delete(stepValidators, executorType)
 }
 
 // ValidateSteps validates all steps in a DAG, collecting all validation errors.
@@ -213,7 +225,7 @@ func validateParallelConfig(step Step) ErrorList {
 }
 
 func validateStepWithValidator(step Step) error {
-	validator := stepValidators[step.ExecutorConfig.Type]
+	validator := stepValidator(step.ExecutorConfig.Type)
 	if validator == nil {
 		return nil
 	}
@@ -221,6 +233,12 @@ func validateStepWithValidator(step Step) error {
 		return NewValidationError("executor_config", step.ExecutorConfig, err)
 	}
 	return nil
+}
+
+func stepValidator(executorType string) StepValidator {
+	stepValidatorsMu.RLock()
+	defer stepValidatorsMu.RUnlock()
+	return stepValidators[executorType]
 }
 
 func isValidStepID(id string) bool {

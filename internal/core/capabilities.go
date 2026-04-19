@@ -52,6 +52,13 @@ func (r *executorCapabilitiesRegistry) Register(executorType string, caps Execut
 	r.caps[executorType] = caps
 }
 
+// Unregister removes capabilities for an executor type.
+func (r *executorCapabilitiesRegistry) Unregister(executorType string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.caps, executorType)
+}
+
 // Get returns capabilities for an executor type.
 // Returns an empty ExecutorCapabilities if not registered.
 func (r *executorCapabilitiesRegistry) Get(executorType string) ExecutorCapabilities {
@@ -67,6 +74,11 @@ func (r *executorCapabilitiesRegistry) Get(executorType string) ExecutorCapabili
 // RegisterExecutorCapabilities registers capabilities for an executor type.
 func RegisterExecutorCapabilities(executorType string, caps ExecutorCapabilities) {
 	executorCapabilities.Register(executorType, caps)
+}
+
+// UnregisterExecutorCapabilities removes capabilities for an executor type.
+func UnregisterExecutorCapabilities(executorType string) {
+	executorCapabilities.Unregister(executorType)
 }
 
 // SupportsCommand returns whether the executor type supports the command field.

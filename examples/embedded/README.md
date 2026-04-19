@@ -43,5 +43,5 @@ DAGU_COORDINATORS=127.0.0.1:50055 go run ./examples/embedded/distributed
 
 The example starts an embedded worker and dispatches a DAG through the
 coordinator. Set `DAGU_COORDINATORS` to a comma-separated list when using more
-than one coordinator.
-
+than one coordinator. The sample opts into plaintext coordinator transport for
+local development; production embedders should provide TLS files instead.

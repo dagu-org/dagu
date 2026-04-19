@@ -214,8 +214,9 @@ func (e *Engine) coordinatorClient(opts DistributedOptions) (coordinator.Client,
 	cfg.KeyFile = opts.TLS.KeyFile
 	cfg.SkipTLSVerify = opts.TLS.SkipTLSVerify
 	cfg.Insecure = opts.TLS.Insecure
-	if !cfg.Insecure && cfg.CAFile == "" && cfg.CertFile == "" && cfg.KeyFile == "" && !cfg.SkipTLSVerify {
-		cfg.Insecure = true
+	noTLSMaterial := cfg.CAFile == "" && cfg.CertFile == "" && cfg.KeyFile == ""
+	if !cfg.Insecure && !cfg.SkipTLSVerify && noTLSMaterial {
+		return nil, fmt.Errorf("coordinator TLS is not configured; provide TLS files or set TLS.Insecure=true for plaintext coordinator connections")
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

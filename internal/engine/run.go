@@ -10,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"syscall"
@@ -18,7 +19,9 @@ import (
 	agentstores "github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/agentoauth"
 	"github.com/dagucloud/dagu/internal/agentsnapshot"
+	"github.com/dagucloud/dagu/internal/clicontext"
 	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/cmn/crypto"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -135,7 +138,7 @@ func (r *Run) Stop(ctx context.Context) error {
 			r.cancel()
 		}
 		err := r.coordinator.RequestCancel(ctx, r.ref.Name, r.ref.ID, nil)
-		if cleanupErr := r.coordinator.Cleanup(context.Background()); err == nil && cleanupErr != nil {
+		if cleanupErr := r.cleanupCoordinator(context.Background()); err == nil && cleanupErr != nil {
 			err = cleanupErr
 		}
 		return err
@@ -153,7 +156,7 @@ func (r *Run) waitLocal(ctx context.Context) (*Status, error) {
 	select {
 	case <-r.done:
 		err := r.doneError()
-		status, statusErr := r.Status(context.Background())
+		status, statusErr := r.statusWithFinalTimeout()
 		if statusErr != nil && err == nil {
 			err = statusErr
 		}
@@ -165,14 +168,14 @@ func (r *Run) waitLocal(ctx context.Context) (*Status, error) {
 		}
 		return status, nil
 	case <-ctx.Done():
-		status, _ := r.Status(context.Background())
+		status, _ := r.statusWithFinalTimeout()
 		return status, ctx.Err()
 	}
 }
 
 func (r *Run) waitDistributed(ctx context.Context) (*Status, error) {
 	defer func() {
-		_ = r.coordinator.Cleanup(context.Background())
+		_ = r.cleanupCoordinator(context.Background())
 	}()
 	poll := r.engine.distributed.PollInterval
 	if poll <= 0 {
@@ -188,7 +191,7 @@ func (r *Run) waitDistributed(ctx context.Context) (*Status, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			status, _ := r.Status(context.Background())
+			status, _ := r.statusWithFinalTimeout()
 			return status, ctx.Err()
 		case <-ticker.C:
 			status, err := r.Status(ctx)
@@ -205,15 +208,26 @@ func (r *Run) waitDistributed(ctx context.Context) (*Status, error) {
 			}
 			if !isActiveStatus(status.Status) {
 				if isSuccess(status) {
+					r.markDone(nil)
 					return status, nil
 				}
 				if status.Error != "" {
-					return status, fmt.Errorf("DAG run failed with status %s: %s", status.Status, status.Error)
+					err := fmt.Errorf("DAG run failed with status %s: %s", status.Status, status.Error)
+					r.markDone(err)
+					return status, err
 				}
-				return status, fmt.Errorf("DAG run failed with status %s", status.Status)
+				err := fmt.Errorf("DAG run failed with status %s", status.Status)
+				r.markDone(err)
+				return status, err
 			}
 		}
 	}
+}
+
+func (r *Run) statusWithFinalTimeout() (*Status, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return r.Status(ctx)
 }
 
 func (e *Engine) loadFile(ctx context.Context, path string, opts RunOptions) (*core.DAG, error) {
@@ -259,11 +273,24 @@ func (e *Engine) loadOptions(opts RunOptions) []spec.LoadOption {
 }
 
 func applyRunOverrides(dag *core.DAG, opts RunOptions) {
+	// Name, DefaultWorkingDir, and params are handled during loading; only
+	// overrides that must mutate the loaded DAG belong here.
 	if len(opts.WorkerSelector) > 0 {
 		dag.WorkerSelector = cloneStringMap(opts.WorkerSelector)
 	}
 	if len(opts.Tags) > 0 {
-		dag.Tags = append(dag.Tags, core.NewTags(opts.Tags)...)
+		seen := make(map[string]struct{}, len(dag.Tags)+len(opts.Tags))
+		for _, existing := range dag.Tags {
+			seen[existing.String()] = struct{}{}
+		}
+		for _, candidate := range core.NewTags(opts.Tags) {
+			key := candidate.String()
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			dag.Tags = append(dag.Tags, candidate)
+		}
 	}
 }
 
@@ -370,8 +397,7 @@ func (e *Engine) runLocal(ctx context.Context, dag *core.DAG, runID string, opts
 			if prepared != nil && prepared.proc != nil {
 				_ = prepared.proc.Stop(context.Background())
 			}
-			run.setDoneError(err)
-			close(done)
+			run.markDone(err)
 		}()
 		runCtx = logger.WithLogger(config.WithConfig(runCtx, e.cfg), e.logger)
 		err = agentInstance.Run(runCtx)
@@ -428,14 +454,37 @@ func (e *Engine) runDistributed(ctx context.Context, dag *core.DAG, runID string
 		_ = client.Cleanup(ctx)
 		return nil, fmt.Errorf("dispatch DAG run: %w", err)
 	}
-	return &Run{
+	run := &Run{
 		engine:      e,
 		ref:         RunRef{Name: dag.Name, ID: runID},
 		mode:        ExecutionModeDistributed,
 		done:        make(chan struct{}),
 		dag:         dag,
 		coordinator: client,
-	}, nil
+	}
+	goruntime.SetFinalizer(run, func(r *Run) {
+		_ = r.cleanupCoordinator(context.Background())
+	})
+	return run, nil
+}
+
+func (r *Run) markDone(err error) {
+	r.setDoneError(err)
+	if r.done == nil {
+		return
+	}
+	r.doneOnce.Do(func() {
+		close(r.done)
+	})
+}
+
+func (r *Run) cleanupCoordinator(ctx context.Context) error {
+	if r == nil || r.coordinator == nil {
+		return nil
+	}
+	err := r.coordinator.Cleanup(ctx)
+	goruntime.SetFinalizer(r, nil)
+	return err
 }
 
 func (r *Run) setDoneError(err error) {
@@ -573,7 +622,28 @@ func (e *Engine) agentStores(ctx context.Context) agentStoresResult {
 	} else {
 		logger.Warn(ctx, "Failed to create agent OAuth manager", tag.Error(err))
 	}
+	if resolver, err := e.buildRemoteContextResolver(); err == nil {
+		result.ContextResolver = resolver
+	} else {
+		logger.Warn(ctx, "Failed to create agent remote context resolver", tag.Error(err))
+	}
 	return result
+}
+
+func (e *Engine) buildRemoteContextResolver() (agentstores.RemoteContextResolver, error) {
+	encKey, err := crypto.ResolveKey(e.cfg.Paths.DataDir)
+	if err != nil {
+		return nil, err
+	}
+	enc, err := crypto.NewEncryptor(encKey)
+	if err != nil {
+		return nil, err
+	}
+	store, err := clicontext.NewStore(e.cfg.Paths.ContextsDir, enc)
+	if err != nil {
+		return nil, err
+	}
+	return &agentstores.RemoteContextResolverAdapter{Store: store}, nil
 }
 
 func preparedAttempt(prepared *localPreparation) coreexec.DAGRunAttempt {

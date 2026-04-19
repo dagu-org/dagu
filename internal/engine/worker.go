@@ -80,3 +80,10 @@ func (w *Worker) Stop(ctx context.Context) error {
 	}
 	return w.inner.Stop(ctx)
 }
+
+func (w *Worker) WaitReady(ctx context.Context) error {
+	if w == nil || w.inner == nil {
+		return fmt.Errorf("worker is not initialized")
+	}
+	return w.inner.WaitReady(ctx)
+}
