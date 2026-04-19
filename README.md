@@ -222,7 +222,7 @@ fmt.Println(status.Status)
 
 The embedded API is experimental and may change before it is declared stable. It uses Dagu's YAML loader, built-in executors, and file-backed state. `RunFile` and `RunYAML` start runs asynchronously and return a run handle for `Wait`, `Status`, and `Stop`. Distributed embedded runs require an existing Dagu coordinator; embedded workers can be started with `NewWorker`.
 
-See the [embedded API documentation](https://docs.dagu.sh/getting-started/embedded) and [examples/embedded](./examples/embedded).
+See the [embedded API documentation](https://docs.dagu.sh/embedding/go-api) and [examples/embedded](./examples/embedded).
 
 ## Workflow Examples
 
@@ -638,4 +638,4 @@ We welcome contributions of all kinds. See our [Contribution Guide](./CONTRIBUTI
 
 ## License
 
-GNU GPLv3 - See [LICENSE](./LICENSE)
+GNU GPLv3 - See [LICENSE](./LICENSE). See [LICENSING.md](./LICENSING.md) for embedded API and commercial embedding notes.
