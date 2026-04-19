@@ -332,8 +332,8 @@ steps:
 	for _, status := range statuses {
 		names[status.Name] = true
 	}
-	assert.True(t, names[dag1.DAG.Name])
-	assert.False(t, names[dag2.DAG.Name])
+	assert.True(t, names[dag1.Name])
+	assert.False(t, names[dag2.Name])
 }
 
 func TestHistoryCommand_Limit(t *testing.T) {
