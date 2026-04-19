@@ -247,6 +247,33 @@ func (w *Worker) Stop(ctx context.Context) error {
 	return err
 }
 
+// WaitReady blocks until the worker appears in coordinator registration.
+func (w *Worker) WaitReady(ctx context.Context) error {
+	if w == nil {
+		return fmt.Errorf("worker is not initialized")
+	}
+	if w.coordinatorCli == nil {
+		return fmt.Errorf("worker coordinator client is not configured")
+	}
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		workers, err := w.coordinatorCli.GetWorkers(ctx)
+		if err == nil {
+			for _, item := range workers {
+				if item != nil && item.WorkerId == w.id {
+					return nil
+				}
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("wait for worker %q registration: %w", w.id, ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
 // trackingHandler wraps a TaskHandler to track running task state
 type trackingHandler struct {
 	worker      *Worker

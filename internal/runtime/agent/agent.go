@@ -640,11 +640,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		return initErr
 	}
 
-	// Move to the working directory
-	if err := os.Chdir(a.evaluatedWorkingDir); err != nil {
-		initErr = fmt.Errorf("failed to change working directory: %w", err)
-		return initErr
-	}
+	// Do not change the process working directory here. Agent runs can execute
+	// concurrently in the same process, so step executors receive WorkingDir
+	// through the runtime context and set per-command working directories.
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
