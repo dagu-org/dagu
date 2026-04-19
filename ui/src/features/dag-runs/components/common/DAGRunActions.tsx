@@ -65,6 +65,9 @@ type EditRetryPreview = {
   warnings: string[];
 };
 
+const asyncErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error && error.message ? error.message : fallback;
+
 /**
  * DAGRunActions component provides buttons to stop and retry DAGRun executions
  */
@@ -100,8 +103,7 @@ function DAGRunActions({
   const [editRetrySkipSteps, setEditRetrySkipSteps] = React.useState<string[]>(
     []
   );
-  const [editRetryPersistSpec, setEditRetryPersistSpec] =
-    React.useState(false);
+  const [editRetryPersistSpec, setEditRetryPersistSpec] = React.useState(false);
   const [editRetryLoading, setEditRetryLoading] = React.useState(false);
 
   const client = useClient();
@@ -153,7 +155,9 @@ function DAGRunActions({
             },
             body: {
               spec,
-              ...(dagNameOverride ? { dagName: dagNameOverride } : {}),
+              ...(!persistSpec && dagNameOverride
+                ? { dagName: dagNameOverride }
+                : {}),
               persistSpec,
             },
           }
@@ -169,6 +173,11 @@ function DAGRunActions({
           setEditRetryPreview(data);
           setEditRetrySkipSteps(data.skippedSteps ?? []);
         }
+      } catch (error) {
+        showError(
+          asyncErrorMessage(error, 'Failed to preview edited retry'),
+          'Check your connection and try previewing the edited DAG again.'
+        );
       } finally {
         setEditRetryLoading(false);
       }
@@ -215,6 +224,11 @@ function DAGRunActions({
       const spec = data?.spec ?? '';
       setEditRetrySpec(spec);
       await previewEditRetrySpec(spec, editRetryPersistSpec);
+    } catch (error) {
+      showError(
+        asyncErrorMessage(error, 'Failed to load DAG run spec'),
+        'The stored DAG-run snapshot may no longer be available.'
+      );
     } finally {
       setEditRetryLoading(false);
     }
@@ -489,7 +503,9 @@ function DAGRunActions({
                   body: {
                     spec: editRetrySpec,
                     dagRunId: newRunId || undefined,
-                    ...(dagNameOverride ? { dagName: dagNameOverride } : {}),
+                    ...(!editRetryPersistSpec && dagNameOverride
+                      ? { dagName: dagNameOverride }
+                      : {}),
                     persistSpec: editRetryPersistSpec,
                     skipSteps: editRetrySkipSteps,
                   },
@@ -742,6 +758,7 @@ function DAGRunActions({
                       id="edit-retry-dag-name"
                       placeholder={`Leave empty to use: ${dagRun?.name || 'original'}`}
                       value={dagNameOverride}
+                      disabled={editRetryPersistSpec}
                       onChange={(event) =>
                         setDagNameOverride(event.target.value)
                       }
@@ -754,9 +771,13 @@ function DAGRunActions({
                   <Checkbox
                     id="edit-retry-persist"
                     checked={editRetryPersistSpec}
-                    onCheckedChange={(checked) =>
-                      setEditRetryPersistSpec(checked as boolean)
-                    }
+                    onCheckedChange={(checked) => {
+                      const next = checked as boolean;
+                      setEditRetryPersistSpec(next);
+                      if (next) {
+                        setDagNameOverride('');
+                      }
+                    }}
                     className="border-border"
                   />
                   <Label

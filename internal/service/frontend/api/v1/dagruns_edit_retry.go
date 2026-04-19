@@ -141,14 +141,25 @@ func (a *API) EditRetryDAGRun(ctx context.Context, request api.EditRetryDAGRunRe
 		return nil, err
 	}
 
+	var rollbackPersistedSpec func() error
 	if opts.persistSpec {
-		if err := a.dagStore.UpdateSpec(ctx, request.Name, []byte(opts.specContent)); err != nil {
+		rollbackPersistedSpec, err = a.persistEditRetrySpec(ctx, request.Name, opts.specContent)
+		if err != nil {
 			return nil, err
 		}
 	}
 
 	queued, err := a.launchEditRetryDAGRun(ctx, plan)
 	if err != nil {
+		if rollbackPersistedSpec != nil {
+			if rollbackErr := rollbackPersistedSpec(); rollbackErr != nil {
+				logger.Error(ctx, "Failed to restore DAG spec after edit retry launch failure",
+					tag.DAG(request.Name),
+					tag.Error(rollbackErr),
+				)
+				return nil, fmt.Errorf("%w; failed to restore DAG spec after launch failure: %v", err, rollbackErr)
+			}
+		}
 		return nil, err
 	}
 
@@ -244,8 +255,10 @@ func (a *API) buildEditRetryPlan(
 	if opts.persistSpec && opts.nameOverride != "" {
 		validationErrors = append(validationErrors, "dagName cannot be used when persistSpec is true")
 	}
-	if err := validateDAGRunID(opts.newDAGRunID); err != nil {
-		validationErrors = append(validationErrors, err.Error())
+	if opts.newDAGRunID != "" {
+		if err := validateDAGRunID(opts.newDAGRunID); err != nil {
+			validationErrors = append(validationErrors, err.Error())
+		}
 	}
 	if len(validationErrors) > 0 {
 		return &editRetryPlan{
@@ -286,7 +299,7 @@ func (a *API) buildEditRetryPlan(
 	stepPlan := planEditRetrySteps(status, editedDAG, opts.skipSteps)
 	validationErrors = append(validationErrors, stepPlan.validationErrors...)
 
-	warnings := editRetryWarnings(stepPlan.skippedSteps, stepPlan.ineligible)
+	warnings := editRetryWarnings(stepPlan.skippedSteps, stepPlan.ineligible, stepPlan.successfulSourceSteps)
 	return &editRetryPlan{
 		sourceAttempt:  attempt,
 		sourceDAGRunID: sourceDAGRunID,
@@ -354,10 +367,11 @@ func (a *API) loadEditedRetryDAG(
 }
 
 type editRetryStepPlan struct {
-	skippedSteps     []string
-	runnableSteps    []string
-	ineligible       []editRetryIneligibleStep
-	validationErrors []string
+	skippedSteps          []string
+	runnableSteps         []string
+	ineligible            []editRetryIneligibleStep
+	validationErrors      []string
+	successfulSourceSteps int
 }
 
 func planEditRetrySteps(
@@ -384,6 +398,7 @@ func planEditRetrySteps(
 		if !node.Status.IsSuccess() {
 			continue
 		}
+		plan.successfulSourceSteps++
 		editedStep, ok := editedSteps[node.Step.Name]
 		if !ok {
 			reason := "step does not exist in the edited DAG"
@@ -535,6 +550,19 @@ func (a *API) markEditRetrySeedFailed(ctx context.Context, status *exec.DAGRunSt
 	}
 }
 
+func (a *API) persistEditRetrySpec(ctx context.Context, dagName string, specContent string) (func() error, error) {
+	previousSpec, err := a.dagStore.GetSpec(ctx, dagName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read current DAG spec before edit retry persistence: %w", err)
+	}
+	if err := a.dagStore.UpdateSpec(ctx, dagName, []byte(specContent)); err != nil {
+		return nil, err
+	}
+	return func() error {
+		return a.dagStore.UpdateSpec(ctx, dagName, []byte(previousSpec))
+	}, nil
+}
+
 func (a *API) seedEditRetryAttempt(
 	ctx context.Context,
 	dag *core.DAG,
@@ -547,6 +575,19 @@ func (a *API) seedEditRetryAttempt(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create edit retry attempt: %w", err)
 	}
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		if rmErr := a.dagRunStore.RemoveDAGRun(ctx, exec.NewDAGRunRef(dag.Name, dagRunID)); rmErr != nil {
+			logger.Error(ctx, "Failed to rollback edit retry attempt",
+				tag.DAG(dag.Name),
+				tag.RunID(dagRunID),
+				tag.Error(rmErr),
+			)
+		}
+	}()
 
 	logFile, err := logpath.Generate(ctx, a.config.Paths.LogDir, dag.LogDir, dag.Name, dagRunID)
 	if err != nil {
@@ -577,13 +618,15 @@ func (a *API) seedEditRetryAttempt(
 	if err := attempt.Open(ctx); err != nil {
 		return nil, fmt.Errorf("failed to open edit retry attempt: %w", err)
 	}
-	defer func() {
-		_ = attempt.Close(ctx)
-	}()
 
 	if err := attempt.Write(ctx, status); err != nil {
+		_ = attempt.Close(ctx)
 		return nil, fmt.Errorf("failed to save edit retry status: %w", err)
 	}
+	if err := attempt.Close(ctx); err != nil {
+		return nil, fmt.Errorf("failed to close edit retry attempt: %w", err)
+	}
+	committed = true
 
 	return &status, nil
 }
@@ -714,9 +757,9 @@ func editRetryArtifactDir(ctx context.Context, baseDir string, dag *core.DAG, da
 	return artifactDir, nil
 }
 
-func editRetryWarnings(skipped []string, ineligible []editRetryIneligibleStep) []string {
+func editRetryWarnings(skipped []string, ineligible []editRetryIneligibleStep, successfulSourceSteps int) []string {
 	var warnings []string
-	if len(skipped) == 0 {
+	if len(skipped) == 0 && successfulSourceSteps > 0 {
 		warnings = append(warnings, "no previously successful steps are eligible to skip")
 	}
 	if len(ineligible) > 0 {

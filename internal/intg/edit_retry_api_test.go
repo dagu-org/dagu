@@ -49,7 +49,7 @@ steps:
 	sourceRunID := "source-edit-retry"
 	startResp := server.Client().Post(
 		fmt.Sprintf("/api/v1/dags/%s/start", dagName),
-		api.ExecuteDAGJSONRequestBody{DagRunId: new(sourceRunID)},
+		api.ExecuteDAGJSONRequestBody{DagRunId: &sourceRunID},
 	).ExpectStatus(http.StatusOK).Send(t)
 
 	var startBody api.ExecuteDAG200JSONResponse
@@ -94,7 +94,7 @@ steps:
 	editResp := server.Client().Post(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/edit-retry", dagName, sourceRunID),
 		api.EditRetryDAGRunJSONRequestBody{
-			DagRunId: new(retryRunID),
+			DagRunId: &retryRunID,
 			Spec:     editedSpec,
 		},
 	).ExpectStatus(http.StatusOK).Send(t)
