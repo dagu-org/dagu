@@ -214,7 +214,7 @@ func (e *Engine) coordinatorClient(opts DistributedOptions) (coordinator.Client,
 	cfg.KeyFile = opts.TLS.KeyFile
 	cfg.SkipTLSVerify = opts.TLS.SkipTLSVerify
 	cfg.Insecure = opts.TLS.Insecure
-	if cfg.Insecure == false && cfg.CAFile == "" && cfg.CertFile == "" && cfg.KeyFile == "" && !cfg.SkipTLSVerify {
+	if !cfg.Insecure && cfg.CAFile == "" && cfg.CertFile == "" && cfg.KeyFile == "" && !cfg.SkipTLSVerify {
 		cfg.Insecure = true
 	}
 	if err := cfg.Validate(); err != nil {
