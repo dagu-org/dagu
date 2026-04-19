@@ -13,6 +13,7 @@ import BorderedBox from '@/ui/BorderedBox';
 import { AlertTriangle, MousePointerClick, Save, Undo2, X } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
+import { createPortal } from 'react-dom';
 import { components } from '../../../../api/v1/schema';
 import { Button } from '../../../../components/ui/button';
 import { useErrorModal } from '../../../../components/ui/error-modal';
@@ -620,21 +621,31 @@ function SpecStepDetailsDrawer({
   const [shouldRender, setShouldRender] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
   const [renderedStep, setRenderedStep] = React.useState(step);
+  const drawerRef = React.useRef<HTMLElement>(null);
+  const closeButtonRef = React.useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     let closeTimer: number | undefined;
     let animationFrame: number | undefined;
 
     if (isOpen && step) {
+      previouslyFocusedRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       setRenderedStep(step);
       setShouldRender(true);
       animationFrame = window.requestAnimationFrame(() => {
         setIsVisible(true);
+        closeButtonRef.current?.focus();
       });
     } else {
       setIsVisible(false);
       closeTimer = window.setTimeout(() => {
         setShouldRender(false);
+        previouslyFocusedRef.current?.focus();
+        previouslyFocusedRef.current = null;
       }, 180);
     }
 
@@ -656,6 +667,41 @@ function SpecStepDetailsDrawer({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
+        return;
+      }
+
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusableElements = drawerRef.current?.querySelectorAll<HTMLElement>(
+        [
+          'a[href]',
+          'button:not([disabled])',
+          'textarea:not([disabled])',
+          'input:not([disabled])',
+          'select:not([disabled])',
+          '[tabindex]:not([tabindex="-1"])',
+        ].join(',')
+      );
+      if (!focusableElements || focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements.item(0);
+      const lastElement = focusableElements.item(focusableElements.length - 1);
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
       }
     };
 
@@ -663,14 +709,36 @@ function SpecStepDetailsDrawer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  React.useEffect(() => {
+    if (!shouldRender) {
+      return;
+    }
+
+    const appRoot = document.getElementById('root');
+    const previousAriaHidden = appRoot?.getAttribute('aria-hidden') ?? null;
+    appRoot?.setAttribute('aria-hidden', 'true');
+
+    return () => {
+      if (!appRoot) {
+        return;
+      }
+      if (previousAriaHidden === null) {
+        appRoot.removeAttribute('aria-hidden');
+      } else {
+        appRoot.setAttribute('aria-hidden', previousAriaHidden);
+      }
+    };
+  }, [shouldRender]);
+
   if (!shouldRender || !renderedStep) {
     return null;
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex justify-end">
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Close step details"
         className={cn(
           'absolute inset-0 h-full w-full cursor-default bg-black/10 transition-opacity duration-200 ease-out dark:bg-black/20',
@@ -679,6 +747,7 @@ function SpecStepDetailsDrawer({
         onClick={onClose}
       />
       <aside
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="spec-step-details-title"
@@ -687,7 +756,7 @@ function SpecStepDetailsDrawer({
           isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         )}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
           <div className="min-w-0">
             <div className="text-xs font-medium uppercase text-muted-foreground">
               {dagName || 'DAG'}
@@ -703,6 +772,7 @@ function SpecStepDetailsDrawer({
             </p>
           </div>
           <Button
+            ref={closeButtonRef}
             type="button"
             variant="ghost"
             size="icon"
@@ -716,7 +786,8 @@ function SpecStepDetailsDrawer({
           <StepDetails step={renderedStep} />
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }
 

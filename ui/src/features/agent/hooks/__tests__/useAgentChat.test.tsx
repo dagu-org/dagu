@@ -15,7 +15,7 @@ function useAgentChatWithOpen() {
   return { ...chat, openChat: ctx.openChat };
 }
 
-function useAgentChatAlwaysActive() {
+function useAgentChatAlwaysActive(): ReturnType<typeof useAgentChat> {
   return useAgentChat({ active: true });
 }
 

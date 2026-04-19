@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -47,7 +50,6 @@ import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { validateDAGName } from '@/lib/dag-validation';
 import { cn, toMermaidNodeId } from '@/lib/utils';
-import LoadingIndicator from '@/ui/LoadingIndicator';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -252,15 +254,15 @@ function WorkflowDesignPage() {
     let cancelled = false;
     setIsValidating(true);
 
-    client
-      .POST('/dags/validate', {
-        params: { query: { remoteNode } },
-        body: {
-          spec: debouncedSpec,
-          name: validationName,
-        },
-      })
-      .then(({ data, error }) => {
+    async function validateSpec() {
+      try {
+        const { data, error } = await client.POST('/dags/validate', {
+          params: { query: { remoteNode } },
+          body: {
+            spec: debouncedSpec,
+            name: validationName,
+          },
+        });
         if (cancelled) return;
         if (error || !data) {
           setValidation({
@@ -274,8 +276,7 @@ function WorkflowDesignPage() {
           dag: data.dag,
           errors: data.errors || [],
         });
-      })
-      .catch((err) => {
+      } catch (err) {
         if (cancelled) return;
         setValidation({
           valid: false,
@@ -285,10 +286,12 @@ function WorkflowDesignPage() {
               : 'Failed to validate DAG specification',
           ],
         });
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsValidating(false);
-      });
+      }
+    }
+
+    void validateSpec();
 
     return () => {
       cancelled = true;
@@ -574,29 +577,31 @@ function WorkflowDesignPage() {
                 )}
 
                 <section className="min-h-[420px]">
-                  {selectedDagFile && isSpecLoading && currentValue == null ? (
-                    <LoadingIndicator />
-                  ) : (
-                    <DAGEditorWithDocs
-                      value={editorValue}
-                      onChange={handleEditorChange}
-                      readOnly={false}
-                      className="h-[56vh] min-h-[420px]"
-                      modelUri={editorModelUri}
-                      schema={editorSchema}
-                      headerActions={
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            <FileCode className="mr-1 h-3 w-3" />
-                            YAML
+                  <DAGEditorWithDocs
+                    value={editorValue}
+                    onChange={handleEditorChange}
+                    readOnly={false}
+                    className="h-[56vh] min-h-[420px]"
+                    modelUri={editorModelUri}
+                    schema={editorSchema}
+                    headerActions={
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">
+                          <FileCode className="mr-1 h-3 w-3" />
+                          YAML
+                        </Badge>
+                        {selectedDagFile && isSpecLoading && (
+                          <Badge variant="secondary">
+                            <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                            Loading
                           </Badge>
-                          {hasUnsavedChanges && (
-                            <Badge variant="secondary">Unsaved</Badge>
-                          )}
-                        </div>
-                      }
-                    />
-                  )}
+                        )}
+                        {hasUnsavedChanges && (
+                          <Badge variant="secondary">Unsaved</Badge>
+                        )}
+                      </div>
+                    }
+                  />
                 </section>
               </div>
             </div>
@@ -904,7 +909,7 @@ function DesignToolbar({
         <div className="min-w-0">
           <Label>Target DAG</Label>
           <Select value={selectedValue} onValueChange={onSelectDag}>
-            <SelectTrigger className="mt-2">
+            <SelectTrigger className="mt-1 h-7 px-2 py-1">
               <SelectValue placeholder="Select DAG" />
             </SelectTrigger>
             <SelectContent>
@@ -928,7 +933,7 @@ function DesignToolbar({
             onValueChange={onSelectStep}
             disabled={!steps.length}
           >
-            <SelectTrigger className="mt-2">
+            <SelectTrigger className="mt-1 h-7 px-2 py-1">
               <SelectValue placeholder="Select step" />
             </SelectTrigger>
             <SelectContent>
@@ -946,7 +951,7 @@ function DesignToolbar({
           <Label htmlFor="new-dag-name">New DAG Name</Label>
           <Input
             id="new-dag-name"
-            className="mt-2"
+            className="mt-1 h-7 px-2 py-1"
             value={newDagName}
             onChange={(event) => onNewDagNameChange(event.target.value)}
             disabled={!!selectedDagFile}

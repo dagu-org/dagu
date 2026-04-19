@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { describe, expect, it } from 'vitest';
 import { buildWorkflowDesignPrompt } from '../buildWorkflowDesignPrompt';
 
@@ -18,7 +21,7 @@ describe('buildWorkflowDesignPrompt', () => {
     expect(prompt).toContain('Retry this step twice');
     expect(prompt).toContain('timeout must be a duration');
     expect(prompt).toContain('Make the file changes directly');
-    expect(prompt).toContain('/design?dag=<dag-file>');
+    expect(prompt).toContain('/design?dag=daily-report');
   });
 
   it('builds a create prompt with the current draft YAML', () => {
@@ -34,6 +37,7 @@ describe('buildWorkflowDesignPrompt', () => {
     expect(prompt).toContain('Remote node: worker-a');
     expect(prompt).toContain('Target DAG: daily-report');
     expect(prompt).toContain('Current draft YAML');
+    expect(prompt).toContain('```yaml');
     expect(prompt).toContain('name: summarize');
   });
 });

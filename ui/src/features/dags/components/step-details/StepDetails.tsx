@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components } from '@/api/v1/schema';
 import { Badge } from '@/components/ui/badge';
 import BorderedBox from '@/ui/BorderedBox';
@@ -392,7 +395,7 @@ function getShellTokenClassName(token: string): string {
 function hasMeaningfulValue(value: unknown): boolean {
   if (value == null) return false;
   if (typeof value === 'string') return value.trim().length > 0;
-  if (typeof value === 'boolean') return value;
+  if (typeof value === 'boolean') return true;
   if (Array.isArray(value)) return value.some((item) => hasMeaningfulValue(item));
   if (isPlainObject(value)) {
     return Object.values(value).some((item) => hasMeaningfulValue(item));

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, X } from 'lucide-react';
@@ -219,6 +222,8 @@ export function AgentChatPanelView({
         <p className="text-xs text-destructive">{error}</p>
       </div>
       <button
+        type="button"
+        aria-label="Dismiss chat error"
         onClick={clearError}
         className="flex-shrink-0 text-destructive/60 hover:text-destructive"
       >

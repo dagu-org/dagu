@@ -37,14 +37,16 @@ export function AgentChatModalHeader({
   isMobile,
 }: Props): ReactElement {
   const { preferences, updatePreference } = useUserPreferences();
+  const activeDragHandlers =
+    dragHandlers && !isMobile ? dragHandlers : undefined;
 
   return (
     <div
       className={cn(
         'flex items-center justify-between px-3 py-2 border-b border-border bg-secondary dark:bg-surface',
-        dragHandlers && !isMobile && 'cursor-move'
+        activeDragHandlers && 'cursor-move'
       )}
-      {...(dragHandlers || {})}
+      {...(activeDragHandlers || {})}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <button
