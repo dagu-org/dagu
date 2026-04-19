@@ -506,6 +506,7 @@ export const mainListItems = React.forwardRef<
                     onValueChange={selectRemoteNode}
                   >
                     <SelectTrigger
+                      aria-label="Remote node"
                       className={cn(
                         'h-9 text-xs text-sidebar-foreground rounded-md',
                         isOpen

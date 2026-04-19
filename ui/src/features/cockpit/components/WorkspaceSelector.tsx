@@ -120,6 +120,7 @@ export function WorkspaceSelector({
           }}
         >
           <SelectTrigger
+            aria-label="Workspace"
             className={cn(
               'text-xs',
               variant === 'sidebar'
