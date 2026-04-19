@@ -78,12 +78,30 @@ type ValidationState = {
 };
 
 type LeftPanelTab = 'workflows' | 'agent';
+type DesignResizeSide = 'left' | 'right';
 
 const NEW_DAG_VALUE = '__new__';
 const DEFAULT_DRAFT_SPEC = `steps:
   - name: hello
     command: echo hello
 `;
+const DESIGN_LEFT_PANEL_STORAGE_KEY = 'workflowDesignLeftPanelWidth';
+const DESIGN_RIGHT_PANEL_STORAGE_KEY = 'workflowDesignRightPanelWidth';
+const DESIGN_RESIZE_HANDLE_WIDTH = 4;
+const DESIGN_PANEL_LIMITS = {
+  left: {
+    defaultWidth: 360,
+    minWidth: 280,
+    maxWidth: 560,
+  },
+  right: {
+    defaultWidth: 360,
+    minWidth: 280,
+    maxWidth: 720,
+  },
+  minMainWidth: 480,
+  minWorkspaceWidth: 360,
+};
 
 function WorkflowDesignPage() {
   const canWrite = useCanWrite();
@@ -99,6 +117,15 @@ function WorkflowDesignPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedDagFile = searchParams.get('dag') || '';
   const selectedStepName = searchParams.get('step') || '';
+  const {
+    contentRef,
+    draggingSide,
+    getSeparatorValue,
+    handleSeparatorKeyDown,
+    layoutStyle,
+    shellRef,
+    startResize,
+  } = useDesignPanelLayout();
 
   const agent = useAgentChat({ active: true });
   const [requestText, setRequestText] = React.useState('');
@@ -501,7 +528,11 @@ function WorkflowDesignPage() {
 
   return (
     <div className="h-full w-full overflow-hidden bg-background">
-      <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(320px,40vh)_minmax(0,1fr)] bg-background lg:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] lg:grid-rows-1">
+      <div
+        ref={shellRef}
+        className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(320px,40vh)_minmax(0,1fr)] bg-background lg:grid-cols-[var(--design-left-panel-width)_var(--design-resize-handle-width)_minmax(0,1fr)] lg:grid-rows-1"
+        style={layoutStyle}
+      >
         <DesignLeftPanel
           activeTab={leftPanelTab}
           agent={agent}
@@ -515,6 +546,17 @@ function WorkflowDesignPage() {
           onNewDagNameChange={setNewDagName}
           onSelectDag={handleSelectDag}
           onTabChange={setLeftPanelTab}
+        />
+
+        <DesignResizeHandle
+          className="hidden lg:flex"
+          isDragging={draggingSide === 'left'}
+          label="Resize workflow list panel"
+          max={DESIGN_PANEL_LIMITS.left.maxWidth}
+          min={DESIGN_PANEL_LIMITS.left.minWidth}
+          onKeyDown={(event) => handleSeparatorKeyDown(event, 'left')}
+          onMouseDown={startResize('left')}
+          value={getSeparatorValue('left')}
         />
 
         <div className="flex min-h-0 flex-col overflow-hidden">
@@ -537,7 +579,10 @@ function WorkflowDesignPage() {
             isRefreshing={isSpecLoading}
           />
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+          <div
+            ref={contentRef}
+            className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden xl:grid-cols-[minmax(0,1fr)_var(--design-resize-handle-width)_var(--design-right-panel-width)]"
+          >
             <div className="min-h-0 overflow-auto p-4">
               <div className="space-y-4">
                 <ValidationSummary
@@ -603,6 +648,17 @@ function WorkflowDesignPage() {
               </div>
             </div>
 
+            <DesignResizeHandle
+              className="hidden xl:flex"
+              isDragging={draggingSide === 'right'}
+              label="Resize step details panel"
+              max={DESIGN_PANEL_LIMITS.right.maxWidth}
+              min={DESIGN_PANEL_LIMITS.right.minWidth}
+              onKeyDown={(event) => handleSeparatorKeyDown(event, 'right')}
+              onMouseDown={startResize('right')}
+              value={getSeparatorValue('right')}
+            />
+
             <StepChangePanel
               agentEnabled={config.agentEnabled}
               canSubmit={canSubmitDesignRequest}
@@ -622,6 +678,282 @@ function WorkflowDesignPage() {
         visible={conflict.hasConflict}
         onDiscard={() => resolveConflict('discard')}
         onIgnore={() => resolveConflict('ignore')}
+      />
+    </div>
+  );
+}
+
+function useDesignPanelLayout() {
+  const shellRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  const dragStateRef = React.useRef<{
+    side: DesignResizeSide;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+
+  const [leftPanelWidth, setLeftPanelWidth] = React.useState(() =>
+    readStoredPanelWidth(
+      DESIGN_LEFT_PANEL_STORAGE_KEY,
+      DESIGN_PANEL_LIMITS.left
+    )
+  );
+  const [rightPanelWidth, setRightPanelWidth] = React.useState(() =>
+    readStoredPanelWidth(
+      DESIGN_RIGHT_PANEL_STORAGE_KEY,
+      DESIGN_PANEL_LIMITS.right
+    )
+  );
+  const [draggingSide, setDraggingSide] =
+    React.useState<DesignResizeSide | null>(null);
+
+  const clampLeftPanelWidth = React.useCallback((width: number) => {
+    const containerWidth = shellRef.current?.getBoundingClientRect().width;
+    const maxWidthFromLayout =
+      containerWidth == null
+        ? DESIGN_PANEL_LIMITS.left.maxWidth
+        : containerWidth -
+          DESIGN_RESIZE_HANDLE_WIDTH -
+          DESIGN_PANEL_LIMITS.minMainWidth;
+
+    return clamp(
+      width,
+      DESIGN_PANEL_LIMITS.left.minWidth,
+      Math.max(
+        DESIGN_PANEL_LIMITS.left.minWidth,
+        Math.min(DESIGN_PANEL_LIMITS.left.maxWidth, maxWidthFromLayout)
+      )
+    );
+  }, []);
+
+  const clampRightPanelWidth = React.useCallback((width: number) => {
+    const containerWidth = contentRef.current?.getBoundingClientRect().width;
+    const maxWidthFromLayout =
+      containerWidth == null
+        ? DESIGN_PANEL_LIMITS.right.maxWidth
+        : containerWidth -
+          DESIGN_RESIZE_HANDLE_WIDTH -
+          DESIGN_PANEL_LIMITS.minWorkspaceWidth;
+
+    return clamp(
+      width,
+      DESIGN_PANEL_LIMITS.right.minWidth,
+      Math.max(
+        DESIGN_PANEL_LIMITS.right.minWidth,
+        Math.min(DESIGN_PANEL_LIMITS.right.maxWidth, maxWidthFromLayout)
+      )
+    );
+  }, []);
+
+  React.useEffect(() => {
+    const clampPanelWidthsToLayout = () => {
+      setLeftPanelWidth((width) => clampLeftPanelWidth(width));
+      setRightPanelWidth((width) => clampRightPanelWidth(width));
+    };
+
+    clampPanelWidthsToLayout();
+    window.addEventListener('resize', clampPanelWidthsToLayout);
+
+    return () => {
+      window.removeEventListener('resize', clampPanelWidthsToLayout);
+    };
+  }, [clampLeftPanelWidth, clampRightPanelWidth]);
+
+  const setPanelWidth = React.useCallback(
+    (side: DesignResizeSide, nextWidth: number) => {
+      if (side === 'left') {
+        setLeftPanelWidth(clampLeftPanelWidth(nextWidth));
+        return;
+      }
+      setRightPanelWidth(clampRightPanelWidth(nextWidth));
+    },
+    [clampLeftPanelWidth, clampRightPanelWidth]
+  );
+
+  React.useEffect(() => {
+    writeStoredPanelWidth(DESIGN_LEFT_PANEL_STORAGE_KEY, leftPanelWidth);
+  }, [leftPanelWidth]);
+
+  React.useEffect(() => {
+    writeStoredPanelWidth(DESIGN_RIGHT_PANEL_STORAGE_KEY, rightPanelWidth);
+  }, [rightPanelWidth]);
+
+  const handleMouseMove = React.useCallback(
+    (event: MouseEvent) => {
+      const dragState = dragStateRef.current;
+      if (!dragState) return;
+
+      const delta = event.clientX - dragState.startX;
+      const nextWidth =
+        dragState.side === 'left'
+          ? dragState.startWidth + delta
+          : dragState.startWidth - delta;
+      setPanelWidth(dragState.side, nextWidth);
+    },
+    [setPanelWidth]
+  );
+
+  const stopResize = React.useCallback(() => {
+    dragStateRef.current = null;
+    setDraggingSide(null);
+  }, []);
+
+  React.useEffect(() => {
+    if (!draggingSide) return;
+
+    const originalCursor = document.body.style.cursor;
+    const originalUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', stopResize);
+
+    return () => {
+      document.body.style.cursor = originalCursor;
+      document.body.style.userSelect = originalUserSelect;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', stopResize);
+    };
+  }, [draggingSide, handleMouseMove, stopResize]);
+
+  const startResize = React.useCallback(
+    (side: DesignResizeSide) => (event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      dragStateRef.current = {
+        side,
+        startX: event.clientX,
+        startWidth: side === 'left' ? leftPanelWidth : rightPanelWidth,
+      };
+      setDraggingSide(side);
+    },
+    [leftPanelWidth, rightPanelWidth]
+  );
+
+  const handleSeparatorKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>, side: DesignResizeSide) => {
+      const resizeStep = event.shiftKey ? 40 : 16;
+      const currentWidth = side === 'left' ? leftPanelWidth : rightPanelWidth;
+      let nextWidth: number | null = null;
+
+      if (event.key === 'ArrowLeft') {
+        nextWidth =
+          side === 'left' ? currentWidth - resizeStep : currentWidth + resizeStep;
+      } else if (event.key === 'ArrowRight') {
+        nextWidth =
+          side === 'left' ? currentWidth + resizeStep : currentWidth - resizeStep;
+      } else if (event.key === 'Home') {
+        nextWidth = DESIGN_PANEL_LIMITS[side].minWidth;
+      } else if (event.key === 'End') {
+        nextWidth = DESIGN_PANEL_LIMITS[side].maxWidth;
+      }
+
+      if (nextWidth == null) return;
+      event.preventDefault();
+      setPanelWidth(side, nextWidth);
+    },
+    [leftPanelWidth, rightPanelWidth, setPanelWidth]
+  );
+
+  const getSeparatorValue = React.useCallback(
+    (side: DesignResizeSide) =>
+      side === 'left' ? leftPanelWidth : rightPanelWidth,
+    [leftPanelWidth, rightPanelWidth]
+  );
+
+  const layoutStyle = React.useMemo(
+    () =>
+      ({
+        '--design-left-panel-width': `${leftPanelWidth}px`,
+        '--design-right-panel-width': `${rightPanelWidth}px`,
+        '--design-resize-handle-width': `${DESIGN_RESIZE_HANDLE_WIDTH}px`,
+      }) as React.CSSProperties,
+    [leftPanelWidth, rightPanelWidth]
+  );
+
+  return {
+    contentRef,
+    draggingSide,
+    getSeparatorValue,
+    handleSeparatorKeyDown,
+    layoutStyle,
+    shellRef,
+    startResize,
+  };
+}
+
+function readStoredPanelWidth(
+  storageKey: string,
+  limits: {
+    defaultWidth: number;
+    minWidth: number;
+    maxWidth: number;
+  }
+) {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    const parsed = saved == null ? NaN : Number(saved);
+    if (!Number.isNaN(parsed)) {
+      return clamp(parsed, limits.minWidth, limits.maxWidth);
+    }
+  } catch {
+    // Ignore storage access errors.
+  }
+  return limits.defaultWidth;
+}
+
+function writeStoredPanelWidth(storageKey: string, width: number) {
+  try {
+    localStorage.setItem(storageKey, String(width));
+  } catch {
+    // Ignore storage access errors.
+  }
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function DesignResizeHandle({
+  className,
+  isDragging,
+  label,
+  max,
+  min,
+  onKeyDown,
+  onMouseDown,
+  value,
+}: {
+  className?: string;
+  isDragging: boolean;
+  label: string;
+  max: number;
+  min: number;
+  onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
+  value: number;
+}) {
+  return (
+    <div
+      role="separator"
+      aria-label={label}
+      aria-orientation="vertical"
+      aria-valuemax={max}
+      aria-valuemin={min}
+      aria-valuenow={Math.round(value)}
+      tabIndex={0}
+      className={cn(
+        'group z-30 h-full cursor-col-resize items-center justify-center bg-border/40 outline-none transition-colors duration-200 hover:bg-primary/50 focus-visible:bg-primary/50',
+        isDragging && 'bg-primary',
+        className
+      )}
+      onKeyDown={onKeyDown}
+      onMouseDown={onMouseDown}
+    >
+      <div
+        className={cn(
+          'h-8 w-1 rounded-full bg-muted-foreground/30 transition-all duration-200 group-hover:bg-primary group-focus-visible:bg-primary',
+          isDragging && 'scale-110 bg-primary shadow-[0_0_10px_var(--color-primary)]'
+        )}
       />
     </div>
   );
@@ -677,7 +1009,7 @@ function DesignLeftPanel({
   }, [dagFiles, normalizedSearch]);
 
   return (
-    <div className="flex min-h-0 flex-col border-b border-border bg-card lg:border-b-0 lg:border-r">
+    <div className="flex min-h-0 flex-col border-b border-border bg-card lg:border-b-0">
       <div className="border-b border-border">
         <Tabs className="flex w-full">
           <Tab
@@ -1082,7 +1414,7 @@ function StepChangePanel({
       : 'Click a node in the graph to target a step';
 
   return (
-    <aside className="flex min-h-[420px] flex-col border-t border-border bg-card xl:min-h-0 xl:border-l xl:border-t-0">
+    <aside className="flex min-h-[420px] flex-col border-t border-border bg-card xl:min-h-0 xl:border-t-0">
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

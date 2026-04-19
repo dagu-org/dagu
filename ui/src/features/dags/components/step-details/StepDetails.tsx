@@ -235,17 +235,17 @@ function ShellCodeBlock({ value }: { value: string }) {
   const lines = value.split('\n');
 
   return (
-    <BorderedBox className="max-h-72 overflow-auto bg-muted/20 p-0">
-      <pre className="m-0 min-w-max text-xs leading-5">
+    <BorderedBox className="max-h-72 overflow-auto !border-slate-700 !bg-slate-950 p-0">
+      <pre className="m-0 min-w-max text-xs leading-5 text-slate-100 selection:bg-sky-500/40 selection:text-white">
         {lines.map((line, index) => (
           <div
             key={`${index}-${line}`}
-            className="grid grid-cols-[3rem_minmax(0,1fr)] border-b border-border/40 last:border-b-0"
+            className="grid grid-cols-[3rem_minmax(0,1fr)] border-b border-slate-800 last:border-b-0"
           >
-            <span className="select-none bg-muted/30 px-2 py-0.5 text-right text-muted-foreground">
+            <span className="select-none bg-slate-900 px-2 py-0.5 text-right text-slate-500">
               {index + 1}
             </span>
-            <code className="whitespace-pre px-3 py-0.5 font-mono text-foreground">
+            <code className="whitespace-pre px-3 py-0.5 font-mono text-slate-100 selection:bg-sky-500/40 selection:text-white">
               {line ? highlightShellLine(line) : '\u00a0'}
             </code>
           </div>
@@ -283,7 +283,7 @@ function highlightShellLine(line: string): React.ReactNode[] {
       return (
         <span
           key={`${segmentIndex}-comment`}
-          className="text-muted-foreground"
+          className="text-slate-500"
         >
           {segment.text}
         </span>
@@ -292,7 +292,7 @@ function highlightShellLine(line: string): React.ReactNode[] {
 
     if (segment.type === 'string') {
       return (
-        <span key={`${segmentIndex}-string`} className="text-emerald-500">
+        <span key={`${segmentIndex}-string`} className="text-emerald-300">
           {segment.text}
         </span>
       );
@@ -384,12 +384,12 @@ function highlightShellPlainSegment(
 }
 
 function getShellTokenClassName(token: string): string {
-  if (token.startsWith('$')) return 'text-cyan-500';
-  if (SHELL_KEYWORDS.has(token)) return 'font-medium text-purple-500';
-  if (/^--?/.test(token)) return 'text-blue-500';
-  if (/^[|&;()<>]/.test(token)) return 'text-orange-500';
-  if (/^\d+$/.test(token)) return 'text-amber-500';
-  return 'text-foreground';
+  if (token.startsWith('$')) return 'text-cyan-300';
+  if (SHELL_KEYWORDS.has(token)) return 'font-medium text-purple-300';
+  if (/^--?/.test(token)) return 'text-sky-300';
+  if (/^[|&;()<>]/.test(token)) return 'text-orange-300';
+  if (/^\d+$/.test(token)) return 'text-amber-300';
+  return 'text-slate-100';
 }
 
 function hasMeaningfulValue(value: unknown): boolean {
