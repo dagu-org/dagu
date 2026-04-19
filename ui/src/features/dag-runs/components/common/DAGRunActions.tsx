@@ -33,8 +33,11 @@ import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
 import StatusChip from '../../../../ui/StatusChip';
-import DAGEditorWithDocs from '../../../dags/components/dag-editor/DAGEditorWithDocs';
 import { getDAGRunTerminateActionDetails } from './terminateAction';
+
+const DAGEditorWithDocs = React.lazy(
+  () => import('../../../dags/components/dag-editor/DAGEditorWithDocs')
+);
 
 /**
  * Props for the DAGRunActions component
@@ -817,15 +820,25 @@ function DAGRunActions({
 
                 <div className="space-y-1.5">
                   <Label className="text-sm">Edited DAG Spec</Label>
-                  <DAGEditorWithDocs
-                    value={editRetrySpec}
-                    onChange={(value) => setEditRetrySpec(value ?? '')}
-                    readOnly={false}
-                    className="h-[56vh] min-h-[360px]"
-                    modelUri={`inmemory://dagu/edit-retry/${encodeURIComponent(
-                      name
-                    )}/${encodeURIComponent(dagRun?.dagRunId ?? 'latest')}.yaml`}
-                  />
+                  <React.Suspense
+                    fallback={
+                      <div className="flex h-[56vh] min-h-[360px] items-center justify-center rounded-lg border text-sm text-muted-foreground">
+                        Loading editor...
+                      </div>
+                    }
+                  >
+                    <DAGEditorWithDocs
+                      value={editRetrySpec}
+                      onChange={(value) => setEditRetrySpec(value ?? '')}
+                      readOnly={false}
+                      className="h-[56vh] min-h-[360px]"
+                      modelUri={`inmemory://dagu/edit-retry/${encodeURIComponent(
+                        name
+                      )}/${encodeURIComponent(
+                        dagRun?.dagRunId ?? 'latest'
+                      )}.yaml`}
+                    />
+                  </React.Suspense>
                 </div>
 
                 <div className="flex items-center gap-2">
