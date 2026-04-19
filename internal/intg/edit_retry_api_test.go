@@ -6,7 +6,6 @@ package intg_test
 import (
 	"fmt"
 	"net/http"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -141,22 +140,13 @@ func indentStepField(value string) string {
 }
 
 func editRetryEchoResultCommand() string {
-	if runtime.GOOS == "windows" {
-		return "echo from-source"
-	}
 	return `echo "from-source"`
 }
 
 func editRetryEchoConsumedCommand() string {
-	if runtime.GOOS == "windows" {
-		return "echo %RESULT%"
-	}
-	return `echo "$RESULT"`
+	return `echo "${RESULT}"`
 }
 
 func editRetryEchoDoneCommand() string {
-	if runtime.GOOS == "windows" {
-		return "echo done"
-	}
 	return `echo done`
 }
