@@ -60,6 +60,11 @@ func TestEngineRunYAML(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	originalWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+
 	engine, err := dagu.New(ctx, dagu.Options{HomeDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -88,6 +93,13 @@ steps:
 	}
 	if status.Name != "embedded-yaml" {
 		t.Fatalf("name = %q, want embedded-yaml", status.Name)
+	}
+	currentWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() after run error = %v", err)
+	}
+	if currentWorkingDir != originalWorkingDir {
+		t.Fatalf("working directory = %q, want %q", currentWorkingDir, originalWorkingDir)
 	}
 }
 
