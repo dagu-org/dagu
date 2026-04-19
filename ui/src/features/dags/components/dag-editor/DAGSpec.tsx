@@ -7,10 +7,13 @@
  * @module features/dags/components/dag-editor
  */
 import { useCanWrite } from '@/contexts/AuthContext';
+import { StepDetails } from '@/features/dags/components/step-details';
+import { cn, toMermaidNodeId } from '@/lib/utils';
 import BorderedBox from '@/ui/BorderedBox';
-import { AlertTriangle, Save, Undo2 } from 'lucide-react';
+import { AlertTriangle, MousePointerClick, Save, Undo2, X } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
+import { createPortal } from 'react-dom';
 import { components } from '../../../../api/v1/schema';
 import { Button } from '../../../../components/ui/button';
 import { useErrorModal } from '../../../../components/ui/error-modal';
@@ -69,6 +72,24 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
 
   const [scrollPosition, setScrollPosition] = React.useState(0);
   const [activeTab, setActiveTab] = React.useState('parent');
+  const [selectedSpecStepName, setSelectedSpecStepName] = React.useState<
+    string | null
+  >(null);
+  const [isSpecStepDetailsOpen, setIsSpecStepDetailsOpen] =
+    React.useState(false);
+
+  const closeSpecStepDetails = React.useCallback(() => {
+    setIsSpecStepDetailsOpen(false);
+  }, []);
+
+  const handleActiveTabChange = React.useCallback(
+    (tab: string) => {
+      setActiveTab(tab);
+      setSelectedSpecStepName(null);
+      closeSpecStepDetails();
+    },
+    [closeSpecStepDetails]
+  );
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
@@ -342,62 +363,92 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
   const renderDAGContent = (
     dag: components['schemas']['DAGDetails'],
     errors?: string[]
-  ) => (
-    <div className="space-y-6">
-      {errors?.length ? (
-        <div className="space-y-3">
-          {errors.map((e, i) => (
-            <div
-              key={i}
-              className="p-3 bg-danger-highlight rounded-md text-danger font-mono text-sm break-words flex items-start gap-2"
-            >
-              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              {e}
+  ) => {
+    const selectedStep = selectedSpecStepName
+      ? dag.steps?.find((step) => step.name === selectedSpecStepName)
+      : undefined;
+
+    const handleGraphNodeSelect = (nodeId: string) => {
+      const step = dag.steps?.find(
+        (item) => toMermaidNodeId(item.name) === nodeId
+      );
+      if (!step) {
+        return;
+      }
+      setSelectedSpecStepName(step.name);
+      setIsSpecStepDetailsOpen(true);
+    };
+
+    return (
+      <div className="space-y-6">
+        {errors?.length ? (
+          <div className="space-y-3">
+            {errors.map((e, i) => (
+              <div
+                key={i}
+                className="p-3 bg-danger-highlight rounded-md text-danger font-mono text-sm break-words flex items-start gap-2"
+              >
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                {e}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {errors?.length || !dag.steps || dag.steps.length === 0 ? (
+          <div className="py-8 px-4 text-center">
+            <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
+            <p className="text-muted-foreground mb-2">
+              Cannot render graph due to configuration errors
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Please fix the errors above and save the configuration to view the
+              graph
+            </p>
+          </div>
+        ) : (
+          <div>
+            <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
+              <Graph
+                steps={dag.steps}
+                type="config"
+                flowchart={flowchart}
+                onChangeFlowchart={onChangeFlowchart}
+                onClickNode={handleGraphNodeSelect}
+                selectOnClick
+                showIcons={false}
+              />
+            </BorderedBox>
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <MousePointerClick className="h-3.5 w-3.5" />
+              Select a graph node to inspect its step details.
             </div>
-          ))}
-        </div>
-      ) : null}
+          </div>
+        )}
 
-      {errors?.length || !dag.steps || dag.steps.length === 0 ? (
-        <div className="py-8 px-4 text-center">
-          <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
-          <p className="text-muted-foreground mb-2">
-            Cannot render graph due to configuration errors
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Please fix the errors above and save the configuration to view the
-            graph
-          </p>
-        </div>
-      ) : (
-        <div>
-          <BorderedBox className="py-4 px-4 flex flex-col overflow-x-auto">
-            <Graph
-              steps={dag.steps}
-              type="config"
-              flowchart={flowchart}
-              onChangeFlowchart={onChangeFlowchart}
-              showIcons={false}
-            />
-          </BorderedBox>
-        </div>
-      )}
+        <DAGAttributes dag={dag} />
 
-      <DAGAttributes dag={dag} />
+        {dag.steps ? (
+          <div className="overflow-hidden">
+            <DAGStepTable steps={dag.steps} />
+          </div>
+        ) : null}
 
-      {dag.steps ? (
-        <div className="overflow-hidden">
-          <DAGStepTable steps={dag.steps} />
-        </div>
-      ) : null}
+        {getHandlers(dag)?.length ? (
+          <div className="overflow-hidden">
+            <DAGStepTable steps={getHandlers(dag)} />
+          </div>
+        ) : null}
 
-      {getHandlers(dag)?.length ? (
-        <div className="overflow-hidden">
-          <DAGStepTable steps={getHandlers(dag)} />
-        </div>
-      ) : null}
-    </div>
-  );
+        <SpecStepDetailsDrawer
+          dagName={dag.name}
+          isOpen={isSpecStepDetailsOpen}
+          step={selectedStep}
+          onClose={closeSpecStepDetails}
+        />
+      </div>
+    );
+  };
 
   return (
     <DAGContext.Consumer>
@@ -425,7 +476,7 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                       <Tabs className="w-max min-w-full">
                         <Tab
                           isActive={activeTab === 'parent'}
-                          onClick={() => setActiveTab('parent')}
+                          onClick={() => handleActiveTabChange('parent')}
                           className="cursor-pointer whitespace-nowrap"
                         >
                           {data?.dag?.name} (Parent)
@@ -435,7 +486,9 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
                             <Tab
                               key={localDag.name}
                               isActive={activeTab === localDag.name}
-                              onClick={() => setActiveTab(localDag.name)}
+                              onClick={() =>
+                                handleActiveTabChange(localDag.name)
+                              }
                               className="cursor-pointer whitespace-nowrap"
                             >
                               {localDag.name}
@@ -552,6 +605,190 @@ function getHandlers(
     steps.push(h?.exit);
   }
   return steps;
+}
+
+function SpecStepDetailsDrawer({
+  dagName,
+  isOpen,
+  onClose,
+  step,
+}: {
+  dagName?: string;
+  isOpen: boolean;
+  onClose: () => void;
+  step?: components['schemas']['Step'];
+}) {
+  const [shouldRender, setShouldRender] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [renderedStep, setRenderedStep] = React.useState(step);
+  const drawerRef = React.useRef<HTMLElement>(null);
+  const closeButtonRef = React.useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    let closeTimer: number | undefined;
+    let animationFrame: number | undefined;
+
+    if (isOpen && step) {
+      previouslyFocusedRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      setRenderedStep(step);
+      setShouldRender(true);
+      animationFrame = window.requestAnimationFrame(() => {
+        setIsVisible(true);
+        closeButtonRef.current?.focus();
+      });
+    } else {
+      setIsVisible(false);
+      closeTimer = window.setTimeout(() => {
+        setShouldRender(false);
+        previouslyFocusedRef.current?.focus();
+        previouslyFocusedRef.current = null;
+      }, 180);
+    }
+
+    return () => {
+      if (animationFrame !== undefined) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      if (closeTimer !== undefined) {
+        window.clearTimeout(closeTimer);
+      }
+    };
+  }, [isOpen, step]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusableElements = drawerRef.current?.querySelectorAll<HTMLElement>(
+        [
+          'a[href]',
+          'button:not([disabled])',
+          'textarea:not([disabled])',
+          'input:not([disabled])',
+          'select:not([disabled])',
+          '[tabindex]:not([tabindex="-1"])',
+        ].join(',')
+      );
+      if (!focusableElements || focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements.item(0);
+      const lastElement = focusableElements.item(focusableElements.length - 1);
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  React.useEffect(() => {
+    if (!shouldRender) {
+      return;
+    }
+
+    const appRoot = document.getElementById('root');
+    const previousAriaHidden = appRoot?.getAttribute('aria-hidden') ?? null;
+    appRoot?.setAttribute('aria-hidden', 'true');
+
+    return () => {
+      if (!appRoot) {
+        return;
+      }
+      if (previousAriaHidden === null) {
+        appRoot.removeAttribute('aria-hidden');
+      } else {
+        appRoot.setAttribute('aria-hidden', previousAriaHidden);
+      }
+    };
+  }, [shouldRender]);
+
+  if (!shouldRender || !renderedStep) {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex justify-end">
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close step details"
+        className={cn(
+          'absolute inset-0 h-full w-full cursor-default bg-black/10 transition-opacity duration-200 ease-out dark:bg-black/20',
+          isVisible ? 'opacity-100' : 'opacity-0'
+        )}
+        onClick={onClose}
+      />
+      <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="spec-step-details-title"
+        className={cn(
+          'relative z-10 flex h-full w-full max-w-[520px] flex-col border-l border-border bg-background shadow-xl transition-all duration-200 ease-out will-change-transform',
+          isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        )}
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-xs font-medium uppercase text-muted-foreground">
+              {dagName || 'DAG'}
+            </div>
+            <h2
+              id="spec-step-details-title"
+              className="mt-1 truncate text-base font-semibold text-foreground"
+            >
+              {renderedStep.name}
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Selected graph node
+            </p>
+          </div>
+          <Button
+            ref={closeButtonRef}
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            title="Close step details"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-auto p-5">
+          <StepDetails step={renderedStep} />
+        </div>
+      </aside>
+    </div>,
+    document.body
+  );
 }
 
 export default DAGSpec;

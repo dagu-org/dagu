@@ -42,6 +42,7 @@ import {
   Sun,
   Terminal,
   Users,
+  Wand2,
   Webhook,
 } from 'lucide-react';
 import * as React from 'react';
@@ -492,6 +493,14 @@ export const mainListItems = React.forwardRef<
               customColor={customColor}
             />
             <NavItem
+              to="/queues"
+              text="Queues"
+              icon={<Inbox size={18} />}
+              isOpen={isOpen}
+              onClick={onNavItemClick}
+              customColor={customColor}
+            />
+            <NavItem
               to="/docs"
               text="Docs"
               icon={<FileText size={18} />}
@@ -519,18 +528,20 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
+            {canWrite && config.agentEnabled && (
+              <NavItem
+                to="/design"
+                text="Design"
+                icon={<Wand2 size={18} />}
+                isOpen={isOpen}
+                onClick={onNavItemClick}
+                customColor={customColor}
+              />
+            )}
             <NavItem
               to="/dag-runs"
               text="Runs"
               icon={<History size={18} />}
-              isOpen={isOpen}
-              onClick={onNavItemClick}
-              customColor={customColor}
-            />
-            <NavItem
-              to="/queues"
-              text="Queues"
-              icon={<Inbox size={18} />}
               isOpen={isOpen}
               onClick={onNavItemClick}
               customColor={customColor}
