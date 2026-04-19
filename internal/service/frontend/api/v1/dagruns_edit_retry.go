@@ -6,8 +6,12 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
+	"io/fs"
 	"maps"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -521,7 +525,7 @@ func (a *API) launchEditRetryDAGRun(ctx context.Context, plan *editRetryPlan) (q
 	}
 
 	nodes := editRetrySeedNodes(plan.editedDAG, plan.sourceStatus, plan.skippedSteps)
-	seedStatus, err := a.seedEditRetryAttempt(ctx, plan.editedDAG, plan.newDAGRunID, plan.params, nodes)
+	seedStatus, err := a.seedEditRetryAttempt(ctx, plan.editedDAG, plan.newDAGRunID, plan.params, nodes, plan.sourceAttempt.WorkDir())
 	if err != nil {
 		return false, err
 	}
@@ -605,6 +609,7 @@ func (a *API) seedEditRetryAttempt(
 	dagRunID string,
 	params string,
 	nodes []runtime.NodeData,
+	sourceWorkDir string,
 ) (*exec.DAGRunStatus, error) {
 	now := time.Now()
 	attempt, err := a.dagRunStore.CreateAttempt(ctx, dag, now, dagRunID, exec.NewDAGRunAttemptOptions{})
@@ -654,6 +659,14 @@ func (a *API) seedEditRetryAttempt(
 	if err := attempt.Open(ctx); err != nil {
 		return nil, fmt.Errorf("failed to open edit retry attempt: %w", err)
 	}
+	if hasSkippedEditRetryNode(nodes) && sourceWorkDir != "" {
+		newWorkDir := attempt.WorkDir()
+		if err := copyEditRetryWorkDir(sourceWorkDir, newWorkDir); err != nil {
+			_ = attempt.Close(ctx)
+			return nil, fmt.Errorf("failed to copy edit retry work directory: %w", err)
+		}
+		remapEditRetryWorkDirOutputs(status.Nodes, sourceWorkDir, newWorkDir)
+	}
 
 	if err := attempt.Write(ctx, status); err != nil {
 		_ = attempt.Close(ctx)
@@ -665,6 +678,146 @@ func (a *API) seedEditRetryAttempt(
 	committed = true
 
 	return &status, nil
+}
+
+func hasSkippedEditRetryNode(nodes []runtime.NodeData) bool {
+	for _, node := range nodes {
+		if node.State.SkippedByRetry {
+			return true
+		}
+	}
+	return false
+}
+
+func copyEditRetryWorkDir(sourceWorkDir, targetWorkDir string) error {
+	sourceWorkDir = cleanEditRetryWorkDir(sourceWorkDir)
+	targetWorkDir = cleanEditRetryWorkDir(targetWorkDir)
+	if sourceWorkDir == "" || targetWorkDir == "" || sourceWorkDir == targetWorkDir {
+		return nil
+	}
+
+	info, err := os.Stat(sourceWorkDir)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory", sourceWorkDir)
+	}
+	if err := os.MkdirAll(targetWorkDir, 0o750); err != nil {
+		return err
+	}
+
+	return filepath.WalkDir(sourceWorkDir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(sourceWorkDir, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+
+		targetPath := filepath.Join(targetWorkDir, rel)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		mode := info.Mode()
+		switch {
+		case entry.IsDir():
+			return os.MkdirAll(targetPath, mode.Perm())
+		case mode.Type()&os.ModeSymlink != 0:
+			linkTarget, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0o750); err != nil {
+				return err
+			}
+			if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			return os.Symlink(linkTarget, targetPath)
+		case mode.IsRegular():
+			return copyEditRetryFile(path, targetPath, mode)
+		default:
+			return nil
+		}
+	})
+}
+
+func copyEditRetryFile(sourcePath, targetPath string, mode fs.FileMode) error {
+	source, err := os.Open(sourcePath) //nolint:gosec
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = source.Close()
+	}()
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o750); err != nil {
+		return err
+	}
+	target, err := os.OpenFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode.Perm()) //nolint:gosec
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = target.Close()
+	}()
+
+	if _, err := io.Copy(target, source); err != nil {
+		return err
+	}
+	return target.Chmod(mode.Perm())
+}
+
+func remapEditRetryWorkDirOutputs(nodes []*exec.Node, sourceWorkDir, targetWorkDir string) {
+	sourceWorkDir = cleanEditRetryWorkDir(sourceWorkDir)
+	targetWorkDir = cleanEditRetryWorkDir(targetWorkDir)
+	if sourceWorkDir == "" || targetWorkDir == "" || sourceWorkDir == targetWorkDir {
+		return
+	}
+
+	replacements := [][2]string{{sourceWorkDir, targetWorkDir}}
+	sourceSlash := filepath.ToSlash(sourceWorkDir)
+	targetSlash := filepath.ToSlash(targetWorkDir)
+	if sourceSlash != sourceWorkDir || targetSlash != targetWorkDir {
+		replacements = append(replacements, [2]string{sourceSlash, targetSlash})
+	}
+
+	for _, node := range nodes {
+		if node == nil || !node.SkippedByRetry || node.OutputVariables == nil {
+			continue
+		}
+		node.OutputVariables.Range(func(key, value any) bool {
+			text, ok := value.(string)
+			if !ok {
+				return true
+			}
+			rewritten := text
+			for _, replacement := range replacements {
+				rewritten = strings.ReplaceAll(rewritten, replacement[0], replacement[1])
+			}
+			if rewritten != text {
+				node.OutputVariables.Store(key, rewritten)
+			}
+			return true
+		})
+	}
+}
+
+func cleanEditRetryWorkDir(dir string) string {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return ""
+	}
+	if abs, err := filepath.Abs(dir); err == nil {
+		return filepath.Clean(abs)
+	}
+	return filepath.Clean(dir)
 }
 
 func (a *API) dispatchEditRetry(ctx context.Context, dag *core.DAG, status *exec.DAGRunStatus) error {

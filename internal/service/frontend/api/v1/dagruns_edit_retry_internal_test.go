@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -158,6 +159,69 @@ func TestEditRetryDAGRun_DispatchesSeededRetryWithSkippedOutputs(t *testing.T) {
 	require.True(t, previousStatus.Nodes[0].SkippedByRetry)
 }
 
+func TestEditRetryDAGRun_CopiesWorkDirAndRewritesSkippedOutputs(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAML())
+
+	attempt, err := api.dagRunStore.CreateAttempt(ctx, dag, time.Now().Add(-2*time.Minute), "source-run", exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+	sourceWorkDir := attempt.WorkDir()
+	sourceOutputPath := filepath.Join(sourceWorkDir, "result.txt")
+
+	status := transform.NewStatusBuilder(dag).Create(
+		"source-run",
+		core.Failed,
+		0,
+		time.Now().Add(-2*time.Minute),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithFinishedAt(time.Now().Add(-time.Minute)),
+		transform.WithError("consume failed"),
+	)
+	require.Len(t, status.Nodes, 2)
+	status.Nodes[0].Status = core.NodeSucceeded
+	status.Nodes[0].OutputVariables = &collections.SyncMap{}
+	status.Nodes[0].OutputVariables.Store("RESULT", "RESULT="+sourceOutputPath)
+	status.Nodes[1].Status = core.NodeFailed
+	status.Nodes[1].Error = "consume failed"
+
+	require.NoError(t, attempt.Open(ctx))
+	require.NoError(t, os.WriteFile(sourceOutputPath, []byte("from-source-work-dir"), 0o600))
+	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, attempt.Close(ctx))
+
+	recorder := &retryCoordinatorRecorder{}
+	api.coordinatorCli = recorder
+	resp, err := api.EditRetryDAGRun(ctx, openapiv1.EditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.EditRetryDAGRunJSONRequestBody{
+			DagRunId: ptrOf("edit-run"),
+			Spec:     editRetryEditedYAMLWithWorkerSelector(),
+		},
+	})
+	require.NoError(t, err)
+	_, ok := resp.(openapiv1.EditRetryDAGRun200JSONResponse)
+	require.True(t, ok)
+
+	newAttempt, err := api.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, "edit-run"))
+	require.NoError(t, err)
+	newWorkDir := newAttempt.WorkDir()
+	require.NotEqual(t, sourceWorkDir, newWorkDir)
+
+	newStatus, err := newAttempt.ReadStatus(ctx)
+	require.NoError(t, err)
+	raw, ok := newStatus.Nodes[0].OutputVariables.Load("RESULT")
+	require.True(t, ok)
+	newOutputPath := filepath.Join(newWorkDir, "result.txt")
+	require.Equal(t, "RESULT="+newOutputPath, raw)
+
+	content, err := os.ReadFile(newOutputPath) //nolint:gosec
+	require.NoError(t, err)
+	require.Equal(t, "from-source-work-dir", string(content))
+	require.Len(t, recorder.dispatched, 1)
+}
+
 func TestEditRetryDAGRun_ExplicitEmptySkipStepsRunsAllSteps(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
@@ -214,6 +278,31 @@ func TestEditRetryDAGRun_RejectsIneligibleRequestedSkipStep(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	require.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 	require.Contains(t, apiErr.Message, `skipSteps contains ineligible step "consume"`)
+}
+
+func TestLoadInlineDAGDoesNotFreezeProcessWorkingDir(t *testing.T) {
+	ctx := context.Background()
+	previousWD, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWD)
+	})
+
+	oldRunWorkDir := t.TempDir()
+	require.NoError(t, os.Chdir(oldRunWorkDir))
+
+	api := &API{}
+	dag, cleanup, err := api.loadInlineDAG(ctx, `
+name: inline_workdir_test
+steps:
+  - name: run
+    command: pwd
+`, ptrOf("inline_workdir_test"), "new-run")
+	require.NoError(t, err)
+	defer cleanup()
+
+	require.False(t, dag.WorkingDirExplicit)
+	require.Empty(t, dag.WorkingDir)
 }
 
 func setupEditRetryAPI(t *testing.T, tmpDir string, yamlContent string) (*API, *core.DAG) {
