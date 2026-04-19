@@ -17,14 +17,3 @@ Commercial embedding rights are not granted by this repository, this document, o
 Under the public GPL license, users may use, modify, and distribute Dagu under the GPL terms. The GPL permits commercial activity, including selling copies or services, but distribution must comply with GPL obligations.
 
 Using the Dagu CLI or server as a separate program is different from importing the embedded Go API into another distributed binary. Projects embedding Dagu should review their distribution model and license obligations.
-
-## Commercial License Boundary
-
-The commercial embedding boundary has not been finalized in source form. Before any broader relicensing or public dual-license grant, the project should complete:
-
-- an import-graph audit for the embedded API;
-- a contributor-rights review for files in that import graph;
-- a third-party dependency license review;
-- a written definition of what commercial embedding rights include.
-
-Future source-code license changes should not be inferred from this document.
