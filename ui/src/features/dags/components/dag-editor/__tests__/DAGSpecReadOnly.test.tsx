@@ -163,6 +163,10 @@ describe('DAGSpecReadOnly', () => {
       })
     );
     expect(await screen.findByText('Step review')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('w-screen');
+    expect(dialog).toHaveClass('sm:max-w-none');
+    expect(dialog).not.toHaveClass('sm:max-w-[500px]');
     expect(screen.getByTestId('preview-graph')).toHaveTextContent('extract:4');
     expect(screen.getByTestId('preview-graph')).toHaveTextContent('load:0');
     expect(screen.getAllByText('Reuse previous output').length).toBeGreaterThan(

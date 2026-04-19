@@ -460,38 +460,41 @@ function DAGSpecReadOnly({
         submitDisabled={
           retrySubmitting || !retryPreview || retryPreview.errors.length > 0
         }
-        contentClassName="w-[96vw] max-w-[96vw] h-[92vh] max-h-[92vh] grid grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
-        bodyClassName="min-h-0 overflow-hidden py-2"
+        fullscreen
+        contentClassName="left-0 right-0 top-0 bottom-0 h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none sm:rounded-none"
+        headerClassName="border-b px-4 py-3 pr-12 text-left sm:px-6 sm:pr-12"
+        bodyClassName="min-h-0 overflow-hidden p-0"
+        footerClassName="gap-2 border-t px-4 py-3 sm:gap-0 sm:px-6 [&>button]:w-full sm:[&>button]:w-auto"
       >
         {retryPreview && (
-          <div className="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(280px,45fr)_minmax(240px,55fr)] gap-3 p-3 sm:p-4 xl:grid-cols-[minmax(0,1fr)_420px] xl:grid-rows-1">
             <div className="flex min-h-0 flex-col rounded-md border bg-surface">
-              <div className="flex flex-wrap items-center gap-4 border-b px-3 py-2 text-sm">
-                <div>
+              <div className="grid grid-cols-2 gap-3 border-b px-3 py-2 text-xs sm:grid-cols-4">
+                <div className="min-w-0">
                   <div className="text-xs uppercase text-muted-foreground">
                     Target DAG
                   </div>
-                  <div className="font-mono text-xs">
+                  <div className="truncate font-mono text-xs">
                     {retryPreview.dagName}
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs uppercase text-muted-foreground">
                     Reuse previous output
                   </div>
                   <div>{selectedSkipSteps.length}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs uppercase text-muted-foreground">
                     Run again
                   </div>
                   <div>{retryStepCount}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs uppercase text-muted-foreground">
                     Source DAG-run ID
                   </div>
-                  <div className="font-mono text-xs">{dagRunId}</div>
+                  <div className="truncate font-mono text-xs">{dagRunId}</div>
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-hidden p-2">

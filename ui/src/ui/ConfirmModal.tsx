@@ -22,8 +22,11 @@ type Props = {
   dismissModal: () => void;
   onSubmit: () => void;
   submitDisabled?: boolean;
+  fullscreen?: boolean;
   contentClassName?: string;
+  headerClassName?: string;
   bodyClassName?: string;
+  footerClassName?: string;
 };
 
 function ConfirmModal({
@@ -34,8 +37,11 @@ function ConfirmModal({
   dismissModal,
   onSubmit,
   submitDisabled = false,
+  fullscreen = false,
   contentClassName,
+  headerClassName,
   bodyClassName,
+  footerClassName,
 }: Props) {
   // Create refs for the buttons
   const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -110,8 +116,10 @@ function ConfirmModal({
   }, [visible, onSubmit, dismissModal, submitDisabled]);
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
-      <DialogContent className={cn('sm:max-w-[500px]', contentClassName)}>
-        <DialogHeader>
+      <DialogContent
+        className={cn(!fullscreen && 'sm:max-w-[500px]', contentClassName)}
+      >
+        <DialogHeader className={headerClassName}>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">
             Confirm the requested action.
@@ -120,7 +128,7 @@ function ConfirmModal({
 
         <div className={cn('py-4', bodyClassName)}>{children}</div>
 
-        <DialogFooter>
+        <DialogFooter className={footerClassName}>
           <Button ref={cancelButtonRef} variant="ghost" onClick={dismissModal}>
             <X className="h-4 w-4" />
             Cancel
