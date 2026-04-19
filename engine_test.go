@@ -24,15 +24,18 @@ func TestEngineRunFile(t *testing.T) {
 	home := t.TempDir()
 	dagFile := filepath.Join(home, "embedded-file.yaml")
 	checkParamCommand := `test "$FOO" = "bar"`
+	checkParamShell := ""
 	if runtime.GOOS == "windows" {
-		checkParamCommand = `cmd /C if "%FOO%"=="bar" (exit /b 0) else (exit /b 1)`
+		checkParamCommand = `if ($env:FOO -ne "bar") { exit 1 }`
+		checkParamShell = `
+    shell: powershell`
 	}
 	writeDAG(t, dagFile, fmt.Sprintf(`
 name: embedded-file
 steps:
   - name: check-param
-    command: %q
-`, checkParamCommand))
+    command: %q%s
+`, checkParamCommand, checkParamShell))
 
 	engine, err := dagu.New(ctx, dagu.Options{HomeDir: home})
 	require.NoError(t, err, "New()")
