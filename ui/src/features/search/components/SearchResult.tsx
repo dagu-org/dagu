@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
+import { workspaceLabel } from '@/lib/workspace';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
@@ -164,6 +165,9 @@ function SearchResult(props: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const workspaceQuery = appBarContext.selectedWorkspace || undefined;
+  const workspaceLabelQuery = workspaceQuery
+    ? workspaceLabel(workspaceQuery)
+    : undefined;
 
   const items =
     type === 'dag'
@@ -184,6 +188,7 @@ function SearchResult(props: Props) {
                   query: {
                     remoteNode,
                     q: query,
+                    labels: workspaceLabelQuery,
                     cursor,
                   },
                 },

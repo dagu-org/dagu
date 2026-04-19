@@ -130,6 +130,16 @@ func TestNewContext_DAGDocsDir(t *testing.T) {
 			expectSet: true,
 		},
 		{
+			name:    "InvalidWorkspaceLabelUsesLegacyDocsDir",
+			docsDir: "/var/dagu/docs",
+			dagName: "my-workflow",
+			labels: core.Labels{
+				{Key: "workspace", Value: "../shared"},
+			},
+			expected:  filepath.Join("/var/dagu/docs", "my-workflow"),
+			expectSet: true,
+		},
+		{
 			name:      "DocsDirEmpty",
 			docsDir:   "",
 			dagName:   "my-workflow",

@@ -54,7 +54,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
 
-  const docSSE = useDocSSE(docPath, !!docPath, workspaceQuery);
+  const docSSE = useDocSSE(docPath, !!docPath, workspaceQuery, remoteNode);
 
   // Fetch doc — SWR is the single source of truth, refreshed by live invalidations
   const { data: doc, mutate: mutateDoc } = useQuery(
@@ -83,7 +83,11 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     markAsSaved,
     discardChanges,
   } = useContentEditor({
-    key: `${docPath}:${remoteNode}:${selectedWorkspace || '__all__'}`,
+    key: JSON.stringify({
+      docPath,
+      remoteNode,
+      workspace: selectedWorkspace || null,
+    }),
     serverContent,
   });
 

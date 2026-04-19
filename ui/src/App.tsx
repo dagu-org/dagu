@@ -39,6 +39,7 @@ import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
 import { getAuthHeaders } from './lib/authHeaders';
 import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
+import { useClient } from './hooks/api';
 import {
   getStoredWorkspaceName,
   persistWorkspaceName,
@@ -180,6 +181,7 @@ function LicensedRoute({
 }
 
 function AppInner({ config: initialConfig }: Props): React.ReactElement {
+  const client = useClient();
   const [config, setConfig] = React.useState(initialConfig);
   const initialWorkspacesRef = React.useRef(initialConfig.initialWorkspaces);
   const updateConfig = React.useCallback((patch: Partial<Config>) => {
@@ -207,6 +209,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const [selectedWorkspace, setSelectedWorkspace] = React.useState<string>(() =>
     getStoredWorkspaceName()
   );
+  const workspaceFetchSeqRef = React.useRef(0);
 
   const applyWorkspaces = React.useCallback(
     (next: Config['initialWorkspaces']) => {
@@ -242,22 +245,24 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   );
 
   const fetchWorkspaces = React.useCallback(async () => {
+    const requestSeq = workspaceFetchSeqRef.current + 1;
+    workspaceFetchSeqRef.current = requestSeq;
     setWorkspaceError(null);
     try {
-      const response = await fetchWithTimeout(
-        `${config.apiURL}/workspaces?remoteNode=${encodeURIComponent(
-          selectedRemoteNode
-        )}`,
-        {
-          headers: getAuthHeaders({ Accept: 'application/json' }),
-        }
-      );
-      if (!response.ok) {
-        throw new Error('Failed to load workspaces');
+      const response = await client.GET('/workspaces', {
+        params: { query: { remoteNode: selectedRemoteNode } },
+      });
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
       }
-      const data = await response.json();
-      applyWorkspaces(data.workspaces || []);
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to load workspaces');
+      }
+      applyWorkspaces(response.data?.workspaces || []);
     } catch (error) {
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
       const nextError =
         error instanceof Error ? error : new Error('Failed to load workspaces');
       setWorkspaceError(nextError);
@@ -265,46 +270,38 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
         applyWorkspaces(initialWorkspacesRef.current ?? []);
       }
     } finally {
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
       setWorkspacesLoaded(true);
     }
-  }, [applyWorkspaces, config.apiURL, selectedRemoteNode]);
+  }, [applyWorkspaces, client, selectedRemoteNode]);
 
   const handleCreateWorkspace = React.useCallback(
     async (name: string) => {
       const sanitized = sanitizeWorkspaceName(name);
       if (!sanitized) return;
       setWorkspaceError(null);
-      const response = await fetchWithTimeout(
-        `${config.apiURL}/workspaces?remoteNode=${encodeURIComponent(
-          selectedRemoteNode
-        )}`,
-        {
-          method: 'POST',
-          headers: getAuthHeaders({
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          }),
-          body: JSON.stringify({ name: sanitized }),
-        }
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
+      const response = await client.POST('/workspaces', {
+        params: { query: { remoteNode: selectedRemoteNode } },
+        body: { name: sanitized },
+      });
+      if (response.error || !response.data) {
         const nextError = new Error(
-          data?.message || 'Failed to create workspace'
+          response.error?.message || 'Failed to create workspace'
         );
         setWorkspaceError(nextError);
         throw nextError;
       }
-      const data = await response.json();
       applyWorkspaces([
-        ...workspaces.filter((workspace) => workspace.id !== data.id),
-        data,
+        ...workspaces.filter((workspace) => workspace.id !== response.data.id),
+        response.data,
       ]);
-      handleSelectWorkspace(data.name);
+      handleSelectWorkspace(response.data.name);
     },
     [
       applyWorkspaces,
-      config.apiURL,
+      client,
       handleSelectWorkspace,
       selectedRemoteNode,
       workspaces,
@@ -314,19 +311,15 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const handleDeleteWorkspace = React.useCallback(
     async (id: string) => {
       setWorkspaceError(null);
-      const response = await fetchWithTimeout(
-        `${config.apiURL}/workspaces/${encodeURIComponent(
-          id
-        )}?remoteNode=${encodeURIComponent(selectedRemoteNode)}`,
-        {
-          method: 'DELETE',
-          headers: getAuthHeaders({ Accept: 'application/json' }),
-        }
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
+      const response = await client.DELETE('/workspaces/{workspaceId}', {
+        params: {
+          path: { workspaceId: id },
+          query: { remoteNode: selectedRemoteNode },
+        },
+      });
+      if (response.error) {
         const nextError = new Error(
-          data?.message || 'Failed to delete workspace'
+          response.error.message || 'Failed to delete workspace'
         );
         setWorkspaceError(nextError);
         throw nextError;
@@ -342,7 +335,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     },
     [
       applyWorkspaces,
-      config.apiURL,
+      client,
       handleSelectWorkspace,
       selectedRemoteNode,
       selectedWorkspace,

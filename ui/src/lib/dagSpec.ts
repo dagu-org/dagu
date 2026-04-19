@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
-import { withWorkspaceLabel, workspaceLabel } from './workspace';
-
-function prependWorkspaceLabel(spec: string, label: string): string {
-  return `labels:\n  - ${label}\n${spec}`;
-}
+import {
+  withWorkspaceLabel,
+  WORKSPACE_LABEL_KEY,
+  workspaceLabel,
+} from './workspace';
 
 function labelsFromNode(node: unknown): string[] {
   if (isSeq(node)) {
@@ -37,14 +37,19 @@ export function ensureWorkspaceLabelInDAGSpec(
   try {
     const doc = parseDocument(spec);
     if (doc.errors.length > 0 || !isMap(doc.contents)) {
-      return prependWorkspaceLabel(spec, label);
+      return spec;
     }
 
-    const labels = labelsFromNode(doc.contents.get('labels', true));
-    doc.set('labels', withWorkspaceLabel(labels, workspaceName));
+    const labelsNode = doc.contents.get('labels', true);
+    if (isMap(labelsNode)) {
+      labelsNode.set(WORKSPACE_LABEL_KEY, workspaceName);
+    } else {
+      const labels = labelsFromNode(labelsNode);
+      doc.set('labels', withWorkspaceLabel(labels, workspaceName));
+    }
     return doc.toString();
   } catch {
-    return prependWorkspaceLabel(spec, label);
+    return spec;
   }
 }
 

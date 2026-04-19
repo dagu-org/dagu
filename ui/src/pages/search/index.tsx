@@ -374,8 +374,10 @@ function Search() {
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
   const selectedWorkspace = appBarContext.selectedWorkspace || '';
-  const workspaceScopeKey = selectedWorkspace || '__all__';
-  const searchStateScope = `${remoteKey}:${workspaceScopeKey}`;
+  const searchStateScope = JSON.stringify({
+    remoteNode: remoteKey,
+    workspace: selectedWorkspace || null,
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const hydratedScopeRef = useRef<string | null>(null);
 

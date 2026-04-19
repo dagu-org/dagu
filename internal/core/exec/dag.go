@@ -85,6 +85,7 @@ type SearchDAGMatchesOptions struct {
 	Cursor string
 	Limit  int
 	Query  string
+	Labels []string
 }
 
 // GrepDAGsResult represents the result of a pattern search within a DAG definition

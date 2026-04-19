@@ -66,8 +66,10 @@ function DAGsContent() {
   const searchState = useSearchState();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const selectedWorkspace = appBarContext.selectedWorkspace || '';
-  const workspaceScopeKey = selectedWorkspace || '__all__';
-  const searchStateScope = `${remoteNode}:${workspaceScopeKey}`;
+  const searchStateScope = JSON.stringify({
+    remoteNode,
+    workspace: selectedWorkspace || null,
+  });
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();

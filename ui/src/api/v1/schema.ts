@@ -6913,6 +6913,8 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description A search query string */
                 q: string;
+                /** @description Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels. */
+                labels?: string;
                 /** @description Opaque cursor returned by the previous search response */
                 cursor?: components["parameters"]["SearchCursor"];
                 /** @description Number of search match snippets to return (default 5, max 50) */
@@ -13486,6 +13488,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceListResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

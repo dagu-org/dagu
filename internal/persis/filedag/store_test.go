@@ -335,6 +335,60 @@ steps:
 	assert.Equal(t, "ops-dag", result.Items[0].FileName)
 }
 
+func TestSearchMatchesFiltersByLabels(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-search-matches-labels")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "ops-dag", []byte(`name: ops-dag
+labels:
+  - workspace=ops
+steps:
+  - name: step1
+    command: echo needle
+  - name: step2
+    command: echo needle
+`)))
+
+	result, err := store.SearchMatches(ctx, "ops-dag", exec.SearchDAGMatchesOptions{
+		Query:  "needle",
+		Limit:  1,
+		Labels: []string{"workspace=ops"},
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	require.True(t, result.HasMore)
+
+	next, err := store.SearchMatches(ctx, "ops-dag", exec.SearchDAGMatchesOptions{
+		Query:  "needle",
+		Limit:  1,
+		Labels: []string{"workspace=ops"},
+		Cursor: result.NextCursor,
+	})
+	require.NoError(t, err)
+	require.Len(t, next.Items, 1)
+
+	filtered, err := store.SearchMatches(ctx, "ops-dag", exec.SearchDAGMatchesOptions{
+		Query:  "needle",
+		Limit:  1,
+		Labels: []string{"workspace=prod"},
+	})
+	require.NoError(t, err)
+	require.Empty(t, filtered.Items)
+
+	_, err = store.SearchMatches(ctx, "ops-dag", exec.SearchDAGMatchesOptions{
+		Query:  "needle",
+		Limit:  1,
+		Labels: []string{"workspace=prod"},
+		Cursor: result.NextCursor,
+	})
+	assert.ErrorIs(t, err, exec.ErrInvalidCursor)
+}
+
 func TestUpdateSpec(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-update-spec")
 	defer func() {

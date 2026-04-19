@@ -9,7 +9,8 @@ export const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export function sanitizeWorkspaceName(name: string): string {
-  return name.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  const trimmed = name.trim();
+  return isValidWorkspaceName(trimmed) ? trimmed : '';
 }
 
 export function isValidWorkspaceName(name: string): boolean {
@@ -45,15 +46,21 @@ export function getStoredWorkspaceName(): string {
   try {
     const stored = localStorage.getItem(WORKSPACE_STORAGE_KEY);
     if (stored !== null) {
-      return stored;
+      const sanitized = sanitizeWorkspaceName(stored);
+      if (sanitized) {
+        return sanitized;
+      }
+      localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+      return '';
     }
     const legacy = localStorage.getItem(LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY);
     if (legacy !== null) {
-      if (legacy) {
-        localStorage.setItem(WORKSPACE_STORAGE_KEY, legacy);
+      const sanitized = sanitizeWorkspaceName(legacy);
+      if (sanitized) {
+        localStorage.setItem(WORKSPACE_STORAGE_KEY, sanitized);
       }
       localStorage.removeItem(LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY);
-      return legacy;
+      return sanitized;
     }
   } catch {
     // Ignore storage access errors.
@@ -63,8 +70,9 @@ export function getStoredWorkspaceName(): string {
 
 export function persistWorkspaceName(name: string): void {
   try {
-    if (name) {
-      localStorage.setItem(WORKSPACE_STORAGE_KEY, name);
+    const sanitized = sanitizeWorkspaceName(name);
+    if (sanitized) {
+      localStorage.setItem(WORKSPACE_STORAGE_KEY, sanitized);
     } else {
       localStorage.removeItem(WORKSPACE_STORAGE_KEY);
     }

@@ -125,7 +125,7 @@ func (a *API) UpdateWorkspace(ctx context.Context, request api.UpdateWorkspaceRe
 	}
 
 	body := request.Body
-	if body.Name != nil && *body.Name != "" {
+	if body.Name != nil {
 		if err := workspace.ValidateName(*body.Name); err != nil {
 			return nil, &Error{
 				Code:       api.ErrorCodeBadRequest,

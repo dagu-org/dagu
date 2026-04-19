@@ -1659,6 +1659,12 @@ paths:
           schema:
             type: "string"
           description: "A search query string"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels."
         - $ref: "#/components/parameters/SearchCursor"
         - $ref: "#/components/parameters/SearchMatchLimit"
       responses:
@@ -6791,6 +6797,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceListResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       summary: "Create a workspace"
       operationId: "createWorkspace"

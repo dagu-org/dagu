@@ -18,6 +18,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/workspace"
 	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
 )
 
@@ -294,6 +295,9 @@ func workspaceForDAGDocs(labels core.Labels) (string, bool) {
 		key, value, hasValue := strings.Cut(label.String(), "=")
 		if key != "workspace" || !hasValue || value == "" {
 			continue
+		}
+		if err := workspace.ValidateName(value); err != nil {
+			return "", false
 		}
 		if workspaceName != "" && workspaceName != value {
 			return "", false

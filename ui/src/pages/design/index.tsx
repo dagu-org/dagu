@@ -184,7 +184,11 @@ function WorkflowDesignPage() {
     markAsSaved,
     discardChanges,
   } = useContentEditor({
-    key: `${remoteNode}:${selectedWorkspace || '__all__'}:${selectedDagFile || NEW_DAG_VALUE}`,
+    key: JSON.stringify({
+      remoteNode,
+      workspace: selectedWorkspace || null,
+      dag: selectedDagFile || NEW_DAG_VALUE,
+    }),
     serverContent: serverSpec,
   });
 
@@ -239,10 +243,14 @@ function WorkflowDesignPage() {
   }, [baseSchema, inheritedCustomStepTypes, effectiveLocalStepTypes]);
 
   const editorModelUri = React.useMemo(
-    () =>
-      selectedDagFile
-        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${encodeURIComponent(selectedWorkspace || '__all__')}/design/${encodeURIComponent(selectedDagFile)}.yaml`
-        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${encodeURIComponent(selectedWorkspace || '__all__')}/design/new.yaml`,
+    () => {
+      const workspaceSegment = encodeURIComponent(
+        JSON.stringify({ workspace: selectedWorkspace || null })
+      );
+      return selectedDagFile
+        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/${encodeURIComponent(selectedDagFile)}.yaml`
+        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/new.yaml`;
+    },
     [remoteNode, selectedDagFile, selectedWorkspace]
   );
 

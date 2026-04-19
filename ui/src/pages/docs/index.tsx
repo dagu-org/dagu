@@ -683,8 +683,10 @@ function DocsContent() {
 function DocsPage() {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const workspaceScope = appBarContext.selectedWorkspace || '__all__';
-  const docTabStorageKey = `dagu_doc_tabs:${remoteNode}:${workspaceScope}`;
+  const docTabStorageKey = `dagu_doc_tabs:${JSON.stringify({
+    remoteNode,
+    workspace: appBarContext.selectedWorkspace || null,
+  })}`;
 
   return (
     <UnsavedChangesProvider>

@@ -199,11 +199,13 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 	if err != nil {
 		return nil, err
 	}
+	labels := parseCommaSeparatedLabels(request.Params.Labels)
 
 	result, err := a.dagStore.SearchMatches(ctx, request.FileName, exec.SearchDAGMatchesOptions{
 		Cursor: valueOf(request.Params.Cursor),
 		Limit:  normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
 		Query:  query,
+		Labels: labels,
 	})
 	if err != nil {
 		switch {
