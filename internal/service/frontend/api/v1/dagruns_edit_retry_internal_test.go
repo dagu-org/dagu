@@ -282,13 +282,18 @@ func TestEditRetryDAGRun_RejectsIneligibleRequestedSkipStep(t *testing.T) {
 
 func TestLoadInlineDAGDoesNotFreezeProcessWorkingDir(t *testing.T) {
 	ctx := context.Background()
+	oldRunWorkDir, err := os.MkdirTemp("", "dagu-inline-old-workdir-*")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(oldRunWorkDir)
+	})
+
 	previousWD, err := os.Getwd()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.Chdir(previousWD)
 	})
 
-	oldRunWorkDir := t.TempDir()
 	require.NoError(t, os.Chdir(oldRunWorkDir))
 
 	api := &API{}

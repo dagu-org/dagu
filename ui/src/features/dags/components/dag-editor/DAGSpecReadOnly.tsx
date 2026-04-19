@@ -461,7 +461,7 @@ function DAGSpecReadOnly({
           retrySubmitting || !retryPreview || retryPreview.errors.length > 0
         }
         fullscreen
-        contentClassName="left-0 right-0 top-0 bottom-0 h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none sm:rounded-none"
+        contentClassName="grid-rows-[auto_minmax(0,1fr)_auto] rounded-none border-0 sm:rounded-none"
         headerClassName="border-b px-4 py-3 pr-12 text-left sm:px-6 sm:pr-12"
         bodyClassName="min-h-0 overflow-hidden p-0"
         footerClassName="gap-2 border-t px-4 py-3 sm:gap-0 sm:px-6 [&>button]:w-full sm:[&>button]:w-auto"

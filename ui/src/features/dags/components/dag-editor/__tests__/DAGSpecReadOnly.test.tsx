@@ -164,9 +164,13 @@ describe('DAGSpecReadOnly', () => {
     );
     expect(await screen.findByText('Step review')).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('inset-0');
     expect(dialog).toHaveClass('w-screen');
-    expect(dialog).toHaveClass('sm:max-w-none');
+    expect(dialog).toHaveClass('max-w-none');
+    expect(dialog).not.toHaveClass('left-[50%]');
+    expect(dialog).not.toHaveClass('max-w-lg');
     expect(dialog).not.toHaveClass('sm:max-w-[500px]');
+    expect(dialog).not.toHaveClass('translate-x-[-50%]');
     expect(screen.getByTestId('preview-graph')).toHaveTextContent('extract:4');
     expect(screen.getByTestId('preview-graph')).toHaveTextContent('load:0');
     expect(screen.getAllByText('Reuse previous output').length).toBeGreaterThan(

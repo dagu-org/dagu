@@ -117,6 +117,7 @@ function ConfirmModal({
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
       <DialogContent
+        fullscreen={fullscreen}
         className={cn(!fullscreen && 'sm:max-w-[500px]', contentClassName)}
       >
         <DialogHeader className={headerClassName}>
