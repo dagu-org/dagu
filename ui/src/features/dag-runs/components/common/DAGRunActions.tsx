@@ -8,6 +8,7 @@ import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
@@ -23,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/CustomDialog';
-import { Ban, RefreshCw, Square, X } from 'lucide-react';
+import { Ban, FilePenLine, RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { components, NodeStatus, Status } from '../../../../api/v1/schema';
@@ -55,6 +56,15 @@ type Props = {
   isRootLevel?: boolean;
 };
 
+type EditRetryPreview = {
+  dagName: string;
+  skippedSteps: string[];
+  runnableSteps: string[];
+  ineligibleSteps: { stepName: string; reason: string }[];
+  errors: string[];
+  warnings: string[];
+};
+
 /**
  * DAGRunActions component provides buttons to stop and retry DAGRun executions
  */
@@ -83,6 +93,16 @@ function DAGRunActions({
   const [useCurrentDagFile, setUseCurrentDagFile] = React.useState(false);
   const [rescheduleSourceLoading, setRescheduleSourceLoading] =
     React.useState(false);
+  const [editRetry, setEditRetry] = React.useState(false);
+  const [editRetrySpec, setEditRetrySpec] = React.useState('');
+  const [editRetryPreview, setEditRetryPreview] =
+    React.useState<EditRetryPreview | null>(null);
+  const [editRetrySkipSteps, setEditRetrySkipSteps] = React.useState<string[]>(
+    []
+  );
+  const [editRetryPersistSpec, setEditRetryPersistSpec] =
+    React.useState(false);
+  const [editRetryLoading, setEditRetryLoading] = React.useState(false);
 
   const client = useClient();
 
@@ -94,6 +114,119 @@ function DAGRunActions({
       refresh();
     }
   };
+
+  const resetRetryModalState = React.useCallback(() => {
+    setRetryAsNew(false);
+    setNewRunId('');
+    setDagNameOverride('');
+    setSpecFromFile(false);
+    setUseCurrentDagFile(false);
+    setEditRetry(false);
+    setEditRetrySpec('');
+    setEditRetryPreview(null);
+    setEditRetrySkipSteps([]);
+    setEditRetryPersistSpec(false);
+    setEditRetryLoading(false);
+  }, []);
+
+  const previewEditRetrySpec = React.useCallback(
+    async (spec: string, persistSpec = editRetryPersistSpec) => {
+      if (!dagRun?.dagRunId || !spec.trim()) {
+        setEditRetryPreview(null);
+        setEditRetrySkipSteps([]);
+        return;
+      }
+
+      setEditRetryLoading(true);
+      try {
+        const { data, error } = await client.POST(
+          '/dag-runs/{name}/{dagRunId}/edit-retry/preview',
+          {
+            params: {
+              path: {
+                name,
+                dagRunId: dagRun.dagRunId,
+              },
+              query: {
+                remoteNode: appBarContext.selectedRemoteNode || 'local',
+              },
+            },
+            body: {
+              spec,
+              ...(dagNameOverride ? { dagName: dagNameOverride } : {}),
+              persistSpec,
+            },
+          }
+        );
+        if (error) {
+          showError(
+            error.message || 'Failed to preview edited retry',
+            'Check if the DAG run is available and the YAML can be loaded.'
+          );
+          return;
+        }
+        if (data) {
+          setEditRetryPreview(data);
+          setEditRetrySkipSteps(data.skippedSteps ?? []);
+        }
+      } finally {
+        setEditRetryLoading(false);
+      }
+    },
+    [
+      appBarContext.selectedRemoteNode,
+      client,
+      dagNameOverride,
+      dagRun?.dagRunId,
+      editRetryPersistSpec,
+      name,
+      showError,
+    ]
+  );
+
+  const loadEditRetrySpec = React.useCallback(async () => {
+    if (!dagRun?.dagRunId) {
+      return;
+    }
+
+    setEditRetryLoading(true);
+    try {
+      const { data, error } = await client.GET(
+        '/dag-runs/{name}/{dagRunId}/spec',
+        {
+          params: {
+            path: {
+              name,
+              dagRunId: dagRun.dagRunId,
+            },
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+          },
+        }
+      );
+      if (error) {
+        showError(
+          error.message || 'Failed to load DAG run spec',
+          'The stored DAG-run snapshot may no longer be available.'
+        );
+        return;
+      }
+      const spec = data?.spec ?? '';
+      setEditRetrySpec(spec);
+      await previewEditRetrySpec(spec, editRetryPersistSpec);
+    } finally {
+      setEditRetryLoading(false);
+    }
+  }, [
+    appBarContext.selectedRemoteNode,
+    client,
+    dagRun?.dagRunId,
+    editRetryPersistSpec,
+    name,
+    previewEditRetrySpec,
+    showError,
+  ]);
 
   React.useEffect(() => {
     if (!isRetryModal || !dagRun?.dagRunId) {
@@ -314,21 +447,67 @@ function DAGRunActions({
 
         {/* Retry Confirmation Modal */}
         <ConfirmModal
-          title={retryAsNew ? 'Reschedule DAG Run' : 'Confirmation'}
-          buttonText={retryAsNew ? 'Reschedule' : 'Retry'}
+          title={
+            editRetry
+              ? 'Edit & Retry DAG Run'
+              : retryAsNew
+                ? 'Reschedule DAG Run'
+                : 'Confirmation'
+          }
+          buttonText={
+            editRetry ? 'Edit & Retry' : retryAsNew ? 'Reschedule' : 'Retry'
+          }
           visible={isRetryModal}
           dismissModal={() => {
             setIsRetryModal(false);
-            setRetryAsNew(false);
-            setNewRunId('');
-            setDagNameOverride('');
-            setSpecFromFile(false);
-            setUseCurrentDagFile(false);
+            resetRetryModalState();
           }}
           onSubmit={async () => {
             setIsRetryModal(false);
 
-            if (retryAsNew) {
+            if (editRetry) {
+              if (!editRetrySpec.trim()) {
+                showError(
+                  'Edited DAG spec is required',
+                  'Load or enter a DAG specification before retrying.'
+                );
+                setIsRetryModal(true);
+                return;
+              }
+              const { error, data } = await client.POST(
+                '/dag-runs/{name}/{dagRunId}/edit-retry',
+                {
+                  params: {
+                    path: {
+                      name: name,
+                      dagRunId: dagRun.dagRunId,
+                    },
+                    query: {
+                      remoteNode: appBarContext.selectedRemoteNode || 'local',
+                    },
+                  },
+                  body: {
+                    spec: editRetrySpec,
+                    dagRunId: newRunId || undefined,
+                    ...(dagNameOverride ? { dagName: dagNameOverride } : {}),
+                    persistSpec: editRetryPersistSpec,
+                    skipSteps: editRetrySkipSteps,
+                  },
+                }
+              );
+              if (error) {
+                showError(
+                  error.message || 'Failed to edit and retry DAG run',
+                  'Check the edited YAML and selected skipped steps.'
+                );
+                setIsRetryModal(true);
+                return;
+              }
+              if (data?.dagRunId) {
+                showToast(`Edited retry created: ${data.dagRunId}`);
+              }
+              resetRetryModalState();
+            } else if (retryAsNew) {
               // Use reschedule endpoint for retry-as-new
               const { error, data } = await client.POST(
                 '/dag-runs/{name}/{dagRunId}/reschedule',
@@ -354,24 +533,14 @@ function DAGRunActions({
                   error.message || 'Failed to reschedule DAG run',
                   'Check if the worker is running and the DAG definition is valid.'
                 );
-                // Reset state on error
-                setRetryAsNew(false);
-                setNewRunId('');
-                setDagNameOverride('');
-                setSpecFromFile(false);
-                setUseCurrentDagFile(false);
+                resetRetryModalState();
                 return;
               }
               // Show success message with new run ID
               if (data?.dagRunId) {
                 showToast(`New DAG run created: ${data.dagRunId}`);
               }
-              // Reset state after success
-              setRetryAsNew(false);
-              setNewRunId('');
-              setDagNameOverride('');
-              setSpecFromFile(false);
-              setUseCurrentDagFile(false);
+              resetRetryModalState();
             } else {
               // Use retry endpoint for regular retry
               const { error } = await client.POST(
@@ -435,11 +604,41 @@ function DAGRunActions({
               <Checkbox
                 id="reschedule"
                 checked={retryAsNew}
-                onCheckedChange={(checked) => setRetryAsNew(checked as boolean)}
+                onCheckedChange={(checked) => {
+                  const next = checked as boolean;
+                  setRetryAsNew(next);
+                  if (next) {
+                    setEditRetry(false);
+                  }
+                }}
                 className="border-border"
               />
               <Label htmlFor="reschedule" className="cursor-pointer text-sm">
                 Reschedule with new DAG-run
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit-retry"
+                checked={editRetry}
+                onCheckedChange={(checked) => {
+                  const next = checked as boolean;
+                  setEditRetry(next);
+                  if (next) {
+                    setRetryAsNew(false);
+                    void loadEditRetrySpec();
+                  } else {
+                    setEditRetrySpec('');
+                    setEditRetryPreview(null);
+                    setEditRetrySkipSteps([]);
+                    setEditRetryPersistSpec(false);
+                  }
+                }}
+                className="border-border"
+              />
+              <Label htmlFor="edit-retry" className="cursor-pointer text-sm">
+                Edit DAG and retry as new run
               </Label>
             </div>
 
@@ -517,6 +716,153 @@ function DAGRunActions({
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {editRetry && (
+              <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-retry-run-id" className="text-sm">
+                      New DAG-Run ID (optional)
+                    </Label>
+                    <Input
+                      id="edit-retry-run-id"
+                      placeholder="Auto-generated if empty"
+                      value={newRunId}
+                      onChange={(event) => setNewRunId(event.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-retry-dag-name" className="text-sm">
+                      DAG Name Override (optional)
+                    </Label>
+                    <Input
+                      id="edit-retry-dag-name"
+                      placeholder={`Leave empty to use: ${dagRun?.name || 'original'}`}
+                      value={dagNameOverride}
+                      onChange={(event) =>
+                        setDagNameOverride(event.target.value)
+                      }
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="edit-retry-persist"
+                    checked={editRetryPersistSpec}
+                    onCheckedChange={(checked) =>
+                      setEditRetryPersistSpec(checked as boolean)
+                    }
+                    className="border-border"
+                  />
+                  <Label
+                    htmlFor="edit-retry-persist"
+                    className="cursor-pointer text-sm"
+                  >
+                    Save edited spec to DAG file
+                  </Label>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-retry-spec" className="text-sm">
+                    Edited DAG Spec
+                  </Label>
+                  <Textarea
+                    id="edit-retry-spec"
+                    value={editRetrySpec}
+                    onChange={(event) => setEditRetrySpec(event.target.value)}
+                    className="min-h-56 resize-y font-mono text-xs"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      void previewEditRetrySpec(
+                        editRetrySpec,
+                        editRetryPersistSpec
+                      )
+                    }
+                    disabled={editRetryLoading || !editRetrySpec.trim()}
+                  >
+                    <FilePenLine className="h-4 w-4" /> Preview
+                  </Button>
+                  {editRetryLoading && (
+                    <span className="text-xs text-muted-foreground">
+                      Loading...
+                    </span>
+                  )}
+                </div>
+
+                {editRetryPreview && (
+                  <div className="space-y-2 rounded-md border p-3 text-sm">
+                    {editRetryPreview.errors.length > 0 && (
+                      <div className="space-y-1 text-destructive">
+                        {editRetryPreview.errors.map((error) => (
+                          <div key={error}>{error}</div>
+                        ))}
+                      </div>
+                    )}
+                    {editRetryPreview.warnings.length > 0 && (
+                      <div className="space-y-1 text-muted-foreground">
+                        {editRetryPreview.warnings.map((warning) => (
+                          <div key={warning}>{warning}</div>
+                        ))}
+                      </div>
+                    )}
+                    {editRetryPreview.skippedSteps.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium uppercase text-muted-foreground">
+                          Skip completed steps
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {editRetryPreview.skippedSteps.map((stepName) => (
+                            <label
+                              key={stepName}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <Checkbox
+                                checked={editRetrySkipSteps.includes(stepName)}
+                                onCheckedChange={(checked) => {
+                                  setEditRetrySkipSteps((current) =>
+                                    checked
+                                      ? Array.from(
+                                          new Set([...current, stepName])
+                                        )
+                                      : current.filter(
+                                          (value) => value !== stepName
+                                        )
+                                  );
+                                }}
+                                className="border-border"
+                              />
+                              <span className="font-mono text-xs">
+                                {stepName}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {editRetryPreview.ineligibleSteps.length > 0 && (
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        {editRetryPreview.ineligibleSteps.map((step) => (
+                          <div key={step.stepName}>
+                            <span className="font-mono">{step.stepName}</span>:{' '}
+                            {step.reason}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

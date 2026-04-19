@@ -1,0 +1,270 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package api
+
+import (
+	"context"
+	"net/http"
+	"path/filepath"
+	"testing"
+	"time"
+
+	openapiv1 "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/collections"
+	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/spec"
+	"github.com/dagucloud/dagu/internal/persis/filedagrun"
+	"github.com/dagucloud/dagu/internal/proto/convert"
+	"github.com/dagucloud/dagu/internal/runtime/transform"
+	coordinatorv1 "github.com/dagucloud/dagu/proto/coordinator/v1"
+	"github.com/stretchr/testify/require"
+)
+
+func TestPreviewEditRetryDAGRun_SelectsCompletedOutputSteps(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAML())
+	seedEditRetrySourceAttempt(t, ctx, api.dagRunStore, dag, "source-run")
+
+	resp, err := api.PreviewEditRetryDAGRun(ctx, openapiv1.PreviewEditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.PreviewEditRetryDAGRunJSONRequestBody{
+			Spec: editRetryEditedYAML(),
+		},
+	})
+	require.NoError(t, err)
+
+	body, ok := resp.(openapiv1.PreviewEditRetryDAGRun200JSONResponse)
+	require.True(t, ok)
+	require.Empty(t, body.Errors)
+	require.Equal(t, dag.Name, body.DagName)
+	require.Equal(t, []string{"build"}, body.SkippedSteps)
+	require.Equal(t, []string{"consume", "notify"}, body.RunnableSteps)
+	require.Empty(t, body.IneligibleSteps)
+}
+
+func TestEditRetryDAGRun_DispatchesSeededRetryWithSkippedOutputs(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAML())
+	seedEditRetrySourceAttempt(t, ctx, api.dagRunStore, dag, "source-run")
+	recorder := &retryCoordinatorRecorder{}
+	api.coordinatorCli = recorder
+
+	resp, err := api.EditRetryDAGRun(ctx, openapiv1.EditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.EditRetryDAGRunJSONRequestBody{
+			DagRunId: ptrOf("edit-run"),
+			Spec:     editRetryEditedYAMLWithWorkerSelector(),
+		},
+	})
+	require.NoError(t, err)
+
+	body, ok := resp.(openapiv1.EditRetryDAGRun200JSONResponse)
+	require.True(t, ok)
+	require.Equal(t, openapiv1.DAGRunId("edit-run"), body.DagRunId)
+	require.False(t, body.Queued)
+	require.Equal(t, []string{"build"}, body.SkippedSteps)
+	require.Equal(t, []string{"consume", "notify"}, body.StartedSteps)
+
+	attempt, err := api.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, "edit-run"))
+	require.NoError(t, err)
+	status, err := attempt.ReadStatus(ctx)
+	require.NoError(t, err)
+	require.Equal(t, core.Queued, status.Status)
+	require.Len(t, status.Nodes, 3)
+	require.Equal(t, core.NodeSkipped, status.Nodes[0].Status)
+	require.True(t, status.Nodes[0].SkippedByRetry)
+	require.NotNil(t, status.Nodes[0].OutputVariables)
+	raw, ok := status.Nodes[0].OutputVariables.Load("RESULT")
+	require.True(t, ok)
+	require.Equal(t, "RESULT=from-source", raw)
+	require.Equal(t, core.NodeNotStarted, status.Nodes[1].Status)
+
+	require.Len(t, recorder.dispatched, 1)
+	task := recorder.dispatched[0]
+	require.Equal(t, coordinatorv1.Operation_OPERATION_RETRY, task.Operation)
+	require.Equal(t, "edit-run", task.DagRunId)
+	require.NotNil(t, task.PreviousStatus)
+	previousStatus, err := convert.ProtoToDAGRunStatus(task.PreviousStatus)
+	require.NoError(t, err)
+	require.Equal(t, core.Queued, previousStatus.Status)
+	require.True(t, previousStatus.Nodes[0].SkippedByRetry)
+}
+
+func TestEditRetryDAGRun_ExplicitEmptySkipStepsRunsAllSteps(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAML())
+	seedEditRetrySourceAttempt(t, ctx, api.dagRunStore, dag, "source-run")
+	recorder := &retryCoordinatorRecorder{}
+	api.coordinatorCli = recorder
+
+	resp, err := api.EditRetryDAGRun(ctx, openapiv1.EditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.EditRetryDAGRunJSONRequestBody{
+			DagRunId:  ptrOf("edit-run"),
+			SkipSteps: ptrOf([]string{}),
+			Spec:      editRetryEditedYAMLWithWorkerSelector(),
+		},
+	})
+	require.NoError(t, err)
+
+	body, ok := resp.(openapiv1.EditRetryDAGRun200JSONResponse)
+	require.True(t, ok)
+	require.Empty(t, body.SkippedSteps)
+	require.Equal(t, []string{"build", "consume", "notify"}, body.StartedSteps)
+
+	require.Len(t, recorder.dispatched, 1)
+	previousStatus, err := convert.ProtoToDAGRunStatus(recorder.dispatched[0].PreviousStatus)
+	require.NoError(t, err)
+	require.Len(t, previousStatus.Nodes, 3)
+	require.Equal(t, core.NodeNotStarted, previousStatus.Nodes[0].Status)
+	require.False(t, previousStatus.Nodes[0].SkippedByRetry)
+}
+
+func TestEditRetryDAGRun_RejectsIneligibleRequestedSkipStep(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAML())
+	seedEditRetrySourceAttempt(t, ctx, api.dagRunStore, dag, "source-run")
+
+	resp, err := api.EditRetryDAGRun(ctx, openapiv1.EditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.EditRetryDAGRunJSONRequestBody{
+			DagRunId:  ptrOf("edit-run"),
+			SkipSteps: ptrOf([]string{"consume"}),
+			Spec:      editRetryEditedYAML(),
+		},
+	})
+	require.Nil(t, resp)
+
+	var apiErr *Error
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
+	require.Contains(t, apiErr.Message, `skipSteps contains ineligible step "consume"`)
+}
+
+func setupEditRetryAPI(t *testing.T, tmpDir string, yamlContent string) (*API, *core.DAG) {
+	t.Helper()
+
+	dag, err := spec.LoadYAML(context.Background(), []byte(yamlContent))
+	require.NoError(t, err)
+
+	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
+	api := &API{
+		dagRunStore: dagRunStore,
+		config: &config.Config{
+			Paths: config.PathsConfig{
+				LogDir:      filepath.Join(tmpDir, "logs"),
+				ArtifactDir: filepath.Join(tmpDir, "artifacts"),
+			},
+			Server: config.Server{
+				Permissions: map[config.Permission]bool{
+					config.PermissionRunDAGs: true,
+				},
+			},
+		},
+		defaultExecMode: config.ExecutionModeLocal,
+	}
+	return api, dag
+}
+
+func seedEditRetrySourceAttempt(
+	t *testing.T,
+	ctx context.Context,
+	store exec.DAGRunStore,
+	dag *core.DAG,
+	dagRunID string,
+) {
+	t.Helper()
+
+	attempt, err := store.CreateAttempt(ctx, dag, time.Now().Add(-2*time.Minute), dagRunID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	status := transform.NewStatusBuilder(dag).Create(
+		dagRunID,
+		core.Failed,
+		0,
+		time.Now().Add(-2*time.Minute),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithFinishedAt(time.Now().Add(-time.Minute)),
+		transform.WithError("consume failed"),
+	)
+	require.Len(t, status.Nodes, 2)
+	status.Nodes[0].Status = core.NodeSucceeded
+	status.Nodes[0].StartedAt = exec.FormatTime(time.Now().Add(-2 * time.Minute))
+	status.Nodes[0].FinishedAt = exec.FormatTime(time.Now().Add(-90 * time.Second))
+	status.Nodes[0].OutputVariables = &collections.SyncMap{}
+	status.Nodes[0].OutputVariables.Store("RESULT", "RESULT=from-source")
+	status.Nodes[1].Status = core.NodeFailed
+	status.Nodes[1].StartedAt = exec.FormatTime(time.Now().Add(-80 * time.Second))
+	status.Nodes[1].FinishedAt = exec.FormatTime(time.Now().Add(-70 * time.Second))
+	status.Nodes[1].Error = "consume failed"
+
+	require.NoError(t, attempt.Open(ctx))
+	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, attempt.Close(ctx))
+}
+
+func editRetrySourceYAML() string {
+	return `
+name: edit_retry_test
+type: graph
+steps:
+  - name: build
+    command: echo "RESULT=from-source"
+    output: RESULT
+  - name: consume
+    command: exit 1
+    depends:
+      - build
+`
+}
+
+func editRetryEditedYAML() string {
+	return `
+name: edit_retry_test
+type: graph
+steps:
+  - name: build
+    command: exit 99
+    output: RESULT
+  - name: consume
+    command: echo "$RESULT"
+    depends:
+      - build
+  - name: notify
+    command: echo done
+    depends:
+      - consume
+`
+}
+
+func editRetryEditedYAMLWithWorkerSelector() string {
+	return `
+name: edit_retry_test
+type: graph
+worker_selector:
+  region: apac
+steps:
+  - name: build
+    command: exit 99
+    output: RESULT
+  - name: consume
+    command: echo "$RESULT"
+    depends:
+      - build
+  - name: notify
+    command: echo done
+    depends:
+      - consume
+`
+}

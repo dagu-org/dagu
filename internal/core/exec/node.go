@@ -20,6 +20,7 @@ type Node struct {
 	RetryCount      int                  `json:"retryCount,omitempty"`
 	DoneCount       int                  `json:"doneCount,omitempty"`
 	Repeated        bool                 `json:"repeated,omitempty"` // indicates if the node has been repeated
+	SkippedByRetry  bool                 `json:"skippedByRetry,omitempty"`
 	Error           string               `json:"error,omitempty"`
 	SubRuns         []SubDAGRun          `json:"children,omitempty"`
 	SubRunsRepeated []SubDAGRun          `json:"childrenRepeated,omitempty"` // repeated sub DAG runs

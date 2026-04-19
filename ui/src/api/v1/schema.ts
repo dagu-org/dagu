@@ -785,6 +785,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dag-runs/{name}/{dagRunId}/edit-retry/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview edited DAG-run retry
+         * @description Validates an edited DAG definition against a previous DAG-run and returns the default step skip selection.
+         */
+        post: operations["previewEditRetryDAGRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/edit-retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run edited DAG retry
+         * @description Creates a new DAG-run from an edited DAG definition while preserving outputs from selected skipped steps.
+         */
+        post: operations["editRetryDAGRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dag-runs/{name}/{dagRunId}/sub-dag-runs": {
         parameters: {
             query?: never;
@@ -7409,6 +7449,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    previewEditRetryDAGRun: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Edited DAG specification in YAML format. */
+                    spec: string;
+                    /** @description Optional DAG name override for the edited retry run. */
+                    dagName?: string;
+                    /** @description Whether the final edit-retry operation should save this specification to the DAG file before retrying. */
+                    persistSpec?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Successfully previewed the edited retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Resolved DAG name for the edited retry. */
+                        dagName: string;
+                        /** @description Default steps selected to be skipped. */
+                        skippedSteps: string[];
+                        /** @description Steps that will be started if not skipped. */
+                        runnableSteps: string[];
+                        /** @description Previous completed steps that cannot be skipped with the edited specification. */
+                        ineligibleSteps: {
+                            stepName: string;
+                            reason: string;
+                        }[];
+                        /** @description Validation errors that must be fixed before launching. */
+                        errors: string[];
+                        /** @description Non-blocking warnings for the edited retry. */
+                        warnings: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    editRetryDAGRun: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Edited DAG specification in YAML format. */
+                    spec: string;
+                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
+                    /** @description Optional DAG name override for the edited retry run. */
+                    dagName?: string;
+                    /** @description When true, save the edited spec to the DAG file before launching the retry. */
+                    persistSpec?: boolean;
+                    /** @description Steps to mark skipped while preserving their previous output variables. */
+                    skipSteps?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Successfully launched edited retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dagRunId: components["schemas"]["DAGRunId"];
+                        /** @description Indicates whether the run was queued instead of starting immediately. */
+                        queued: boolean;
+                        skippedSteps: string[];
+                        startedSteps: string[];
+                        /** @description Whether the edited specification was saved to the DAG file. */
+                        persisted: boolean;
+                    };
                 };
             };
             /** @description Generic error response */
