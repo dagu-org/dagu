@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	gotemplate "text/template"
 
 	"github.com/dagucloud/dagu/internal/core"
@@ -80,6 +81,20 @@ var builtinStepTypeNames = map[string]struct{}{
 	"ssh":           {},
 	"subworkflow":   {},
 	"template":      {},
+}
+
+var stepTypeNamesMu sync.RWMutex
+
+// RegisterExecutorTypeName registers a runtime executor type name so DAG
+// loading accepts steps that use it directly in the type field.
+func RegisterExecutorTypeName(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	stepTypeNamesMu.Lock()
+	defer stepTypeNamesMu.Unlock()
+	builtinStepTypeNames[name] = struct{}{}
 }
 
 var customStepForbiddenCallSiteFields = map[string]struct{}{
@@ -270,6 +285,8 @@ func schemaDeclaresObject(root *jsonschema.Schema) bool {
 }
 
 func isBuiltinStepTypeName(name string) bool {
+	stepTypeNamesMu.RLock()
+	defer stepTypeNamesMu.RUnlock()
 	_, ok := builtinStepTypeNames[strings.TrimSpace(name)]
 	return ok
 }

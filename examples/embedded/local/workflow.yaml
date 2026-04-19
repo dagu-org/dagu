@@ -1,0 +1,9 @@
+name: embedded-local-example
+type: graph
+steps:
+  - name: greet
+    command: echo "hello ${TARGET}"
+  - name: finish
+    command: echo "local embedded run complete"
+    depends: [greet]
+

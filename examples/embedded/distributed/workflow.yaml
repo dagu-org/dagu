@@ -1,0 +1,9 @@
+name: embedded-distributed-example
+type: graph
+steps:
+  - name: worker-host
+    command: hostname
+  - name: finish
+    command: echo "distributed embedded run complete"
+    depends: [worker-host]
+
