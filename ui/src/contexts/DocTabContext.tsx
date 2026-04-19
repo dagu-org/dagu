@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react';
 import { useUnsavedChanges } from './UnsavedChangesContext';
 
 export interface DocTab {
@@ -16,7 +23,10 @@ interface DocTabContextType {
   closeOtherTabs: (keepTabId: string) => void;
   setActiveTab: (tabId: string) => void;
   getActiveDocPath: () => string | null;
-  updateTab: (tabId: string, updates: Partial<Pick<DocTab, 'docPath' | 'title'>>) => void;
+  updateTab: (
+    tabId: string,
+    updates: Partial<Pick<DocTab, 'docPath' | 'title'>>
+  ) => void;
 
   // Draft content persistence
   drafts: ReadonlyMap<string, string>;
@@ -52,33 +62,40 @@ function generateTabId(): string {
   return `doc-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
-export function DocTabProvider({ children }: { children: React.ReactNode }) {
+function readStoredTabState(storageKey: string): StoredTabState | null {
+  try {
+    const stored =
+      localStorage.getItem(storageKey) ||
+      (storageKey !== STORAGE_KEY ? localStorage.getItem(STORAGE_KEY) : null);
+    if (stored) {
+      return JSON.parse(stored) as StoredTabState;
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+export function DocTabProvider({
+  children,
+  storageKey = STORAGE_KEY,
+}: {
+  children: React.ReactNode;
+  storageKey?: string;
+}) {
   const { setHasUnsavedChanges } = useUnsavedChanges();
 
   const [tabs, setTabs] = useState<DocTab[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: StoredTabState = JSON.parse(stored);
-        return parsed.tabs || [];
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return [];
+    return readStoredTabState(storageKey)?.tabs || [];
   });
 
   const [activeTabId, setActiveTabId] = useState<string | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: StoredTabState = JSON.parse(stored);
-        if (parsed.activeTabId && parsed.tabs?.some(t => t.id === parsed.activeTabId)) {
-          return parsed.activeTabId;
-        }
-      }
-    } catch {
-      // Ignore parse errors
+    const parsed = readStoredTabState(storageKey);
+    if (
+      parsed?.activeTabId &&
+      parsed.tabs?.some((t) => t.id === parsed.activeTabId)
+    ) {
+      return parsed.activeTabId;
     }
     return null;
   });
@@ -96,11 +113,11 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const state: StoredTabState = { tabs, activeTabId };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(storageKey, JSON.stringify(state));
     } catch {
       // Ignore persistence errors (quota/private mode)
     }
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, storageKey]);
 
   // Sync unsavedTabIds to UnsavedChangesContext
   useEffect(() => {
@@ -112,7 +129,7 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
 
   const openDoc = useCallback((docPath: string, title: string) => {
     // Check if already open
-    const existingTab = tabsRef.current.find(t => t.docPath === docPath);
+    const existingTab = tabsRef.current.find((t) => t.docPath === docPath);
     if (existingTab) {
       setActiveTabId(existingTab.id);
       return;
@@ -124,16 +141,16 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
       docPath,
       title,
     };
-    setTabs(prev => [...prev, newTab]);
+    setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTab.id);
   }, []);
 
   const closeTab = useCallback((tabId: string) => {
-    setTabs(prev => {
-      const newTabs = prev.filter(t => t.id !== tabId);
+    setTabs((prev) => {
+      const newTabs = prev.filter((t) => t.id !== tabId);
 
       if (activeTabIdRef.current === tabId && newTabs.length > 0) {
-        const closedIndex = prev.findIndex(t => t.id === tabId);
+        const closedIndex = prev.findIndex((t) => t.id === tabId);
         const newActiveIndex = Math.min(closedIndex, newTabs.length - 1);
         setActiveTabId(newTabs[newActiveIndex]?.id || null);
       } else if (newTabs.length === 0) {
@@ -144,12 +161,12 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Clear draft and unsaved state for closed tab
-    setDrafts(prev => {
+    setDrafts((prev) => {
       const next = new Map(prev);
       next.delete(tabId);
       return next;
     });
-    setUnsavedTabIds(prev => {
+    setUnsavedTabIds((prev) => {
       const next = new Set(prev);
       next.delete(tabId);
       return next;
@@ -164,15 +181,15 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const closeOtherTabs = useCallback((keepTabId: string) => {
-    setTabs(prev => prev.filter(t => t.id === keepTabId));
+    setTabs((prev) => prev.filter((t) => t.id === keepTabId));
     setActiveTabId(keepTabId);
-    setDrafts(prev => {
+    setDrafts((prev) => {
       const draft = prev.get(keepTabId);
       const next = new Map<string, string>();
       if (draft !== undefined) next.set(keepTabId, draft);
       return next;
     });
-    setUnsavedTabIds(prev => {
+    setUnsavedTabIds((prev) => {
       const next = new Set<string>();
       if (prev.has(keepTabId)) next.add(keepTabId);
       return next;
@@ -185,18 +202,23 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
 
   const getActiveDocPath = useCallback(() => {
     if (!activeTabIdRef.current) return null;
-    const activeTab = tabsRef.current.find(t => t.id === activeTabIdRef.current);
+    const activeTab = tabsRef.current.find(
+      (t) => t.id === activeTabIdRef.current
+    );
     return activeTab?.docPath || null;
   }, []);
 
-  const updateTab = useCallback((tabId: string, updates: Partial<Pick<DocTab, 'docPath' | 'title'>>) => {
-    setTabs(prev => prev.map(t =>
-      t.id === tabId ? { ...t, ...updates } : t
-    ));
-  }, []);
+  const updateTab = useCallback(
+    (tabId: string, updates: Partial<Pick<DocTab, 'docPath' | 'title'>>) => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
+      );
+    },
+    []
+  );
 
   const setDraft = useCallback((tabId: string, content: string) => {
-    setDrafts(prev => {
+    setDrafts((prev) => {
       const next = new Map(prev);
       next.set(tabId, content);
       return next;
@@ -204,19 +226,22 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearDraft = useCallback((tabId: string) => {
-    setDrafts(prev => {
+    setDrafts((prev) => {
       const next = new Map(prev);
       next.delete(tabId);
       return next;
     });
   }, []);
 
-  const getDraft = useCallback((tabId: string) => {
-    return drafts.get(tabId);
-  }, [drafts]);
+  const getDraft = useCallback(
+    (tabId: string) => {
+      return drafts.get(tabId);
+    },
+    [drafts]
+  );
 
   const markTabUnsaved = useCallback((tabId: string) => {
-    setUnsavedTabIds(prev => {
+    setUnsavedTabIds((prev) => {
       if (prev.has(tabId)) return prev;
       const next = new Set(prev);
       next.add(tabId);
@@ -225,7 +250,7 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markTabSaved = useCallback((tabId: string) => {
-    setUnsavedTabIds(prev => {
+    setUnsavedTabIds((prev) => {
       if (!prev.has(tabId)) return prev;
       const next = new Set(prev);
       next.delete(tabId);
@@ -233,9 +258,12 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const isTabUnsaved = useCallback((tabId: string) => {
-    return unsavedTabIds.has(tabId);
-  }, [unsavedTabIds]);
+  const isTabUnsaved = useCallback(
+    (tabId: string) => {
+      return unsavedTabIds.has(tabId);
+    },
+    [unsavedTabIds]
+  );
 
   const value: DocTabContextType = {
     tabs,
@@ -258,8 +286,6 @@ export function DocTabProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <DocTabContext.Provider value={value}>
-      {children}
-    </DocTabContext.Provider>
+    <DocTabContext.Provider value={value}>{children}</DocTabContext.Provider>
   );
 }

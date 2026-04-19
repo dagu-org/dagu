@@ -137,12 +137,14 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 	if err != nil {
 		return nil, err
 	}
+	labels := parseCommaSeparatedLabels(request.Params.Labels)
 
 	result, errs, err := a.dagStore.SearchCursor(ctx, exec.SearchDAGsOptions{
 		Cursor:     valueOf(request.Params.Cursor),
 		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
 		Query:      query,
 		MatchLimit: searchPreviewMatchesLimit,
+		Labels:     labels,
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {
@@ -168,12 +170,17 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 	if err != nil {
 		return nil, err
 	}
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := a.docStore.SearchCursor(ctx, agent.SearchDocsOptions{
 		Cursor:     valueOf(request.Params.Cursor),
 		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
 		Query:      query,
 		MatchLimit: searchPreviewMatchesLimit,
+		PathPrefix: workspaceName,
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {
@@ -225,6 +232,10 @@ func (a *API) SearchDocMatches(ctx context.Context, request api.SearchDocMatches
 	if err := validateDocPath(request.Params.Path); err != nil {
 		return nil, err
 	}
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	query, err := validateSearchQuery(request.Params.Q)
 	if err != nil {
@@ -232,9 +243,10 @@ func (a *API) SearchDocMatches(ctx context.Context, request api.SearchDocMatches
 	}
 
 	result, err := a.docStore.SearchMatches(ctx, request.Params.Path, agent.SearchDocMatchesOptions{
-		Cursor: valueOf(request.Params.Cursor),
-		Limit:  normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
-		Query:  query,
+		Cursor:     valueOf(request.Params.Cursor),
+		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
+		Query:      query,
+		PathPrefix: workspaceName,
 	})
 	if err != nil {
 		switch {

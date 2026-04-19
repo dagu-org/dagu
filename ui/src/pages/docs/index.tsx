@@ -36,6 +36,17 @@ function titleFromPath(docPath: string): string {
   return segments[segments.length - 1] || docPath;
 }
 
+function normalizeDocPathForWorkspace(
+  docPath: string,
+  workspaceName: string
+): string {
+  if (!workspaceName) {
+    return docPath;
+  }
+  const prefix = `${workspaceName}/`;
+  return docPath.startsWith(prefix) ? docPath.slice(prefix.length) : docPath;
+}
+
 function DocsContent() {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -45,15 +56,9 @@ function DocsContent() {
   const { showToast } = useSimpleToast();
   const isMobile = useIsMobile();
 
-  const {
-    workspaces,
-    selectedWorkspace,
-    selectedTemplate,
-    selectWorkspace,
-    selectTemplate,
-    createWorkspace,
-    deleteWorkspace,
-  } = useCockpitState();
+  const { selectedTemplate, selectTemplate } = useCockpitState();
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceQuery = selectedWorkspace || undefined;
 
   const { setContext } = usePageContext();
   const {
@@ -102,7 +107,12 @@ function DocsContent() {
   const sort = docSortField as PathsDocsGetParametersQuerySort;
   const order = docSortOrder as PathsDocsGetParametersQueryOrder;
 
-  const docTreeSSE = useDocTreeSSE({ sort, order, remoteNode });
+  const docTreeSSE = useDocTreeSSE({
+    sort,
+    order,
+    remoteNode,
+    workspace: workspaceQuery,
+  });
 
   const {
     data: treeData,
@@ -113,7 +123,13 @@ function DocsContent() {
     '/docs',
     {
       params: {
-        query: { remoteNode, perPage: 200, sort, order },
+        query: {
+          remoteNode,
+          workspace: workspaceQuery,
+          perPage: 200,
+          sort,
+          order,
+        },
       },
     },
     {
@@ -157,12 +173,13 @@ function DocsContent() {
     if (isNavigatingRef.current) return;
     const docPath = location.pathname.replace(/^\/docs\/?/, '');
     if (docPath) {
-      openDoc(
+      const decodedPath = normalizeDocPathForWorkspace(
         decodeURIComponent(docPath),
-        titleFromPath(decodeURIComponent(docPath))
+        selectedWorkspace
       );
+      openDoc(decodedPath, titleFromPath(decodedPath));
     }
-  }, [location.pathname, openDoc]);
+  }, [location.pathname, openDoc, selectedWorkspace]);
 
   // Tab → URL (skip on initial mount — URL takes precedence)
   useEffect(() => {
@@ -241,7 +258,7 @@ function DocsContent() {
       setCreateError(null);
       try {
         const { error } = await client.POST('/docs', {
-          params: { query: { remoteNode } },
+          params: { query: { remoteNode, workspace: workspaceQuery } },
           body: { id: path, content: '' },
         });
         if (error) {
@@ -258,7 +275,7 @@ function DocsContent() {
         setCreateLoading(false);
       }
     },
-    [client, remoteNode, mutate, openDoc, showToast]
+    [client, remoteNode, workspaceQuery, mutate, openDoc, showToast]
   );
 
   // Rename handler (from modal)
@@ -268,7 +285,13 @@ function DocsContent() {
       setRenameError(null);
       try {
         const { error } = await client.POST('/docs/doc/rename', {
-          params: { query: { remoteNode, path: renameDocPath } },
+          params: {
+            query: {
+              remoteNode,
+              workspace: workspaceQuery,
+              path: renameDocPath,
+            },
+          },
           body: { newPath },
         });
         if (error) {
@@ -298,7 +321,16 @@ function DocsContent() {
         setRenameLoading(false);
       }
     },
-    [client, remoteNode, renameDocPath, mutate, tabs, updateTab, showToast]
+    [
+      client,
+      remoteNode,
+      workspaceQuery,
+      renameDocPath,
+      mutate,
+      tabs,
+      updateTab,
+      showToast,
+    ]
   );
 
   // Shared path-change handler for rename and move
@@ -306,7 +338,9 @@ function DocsContent() {
     async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
       try {
         const { error } = await client.POST('/docs/doc/rename', {
-          params: { query: { remoteNode, path: oldPath } },
+          params: {
+            query: { remoteNode, workspace: workspaceQuery, path: oldPath },
+          },
           body: { newPath },
         });
         if (error) {
@@ -339,7 +373,7 @@ function DocsContent() {
         mutate();
       }
     },
-    [client, remoteNode, mutate, tabs, updateTab, showToast]
+    [client, remoteNode, workspaceQuery, mutate, tabs, updateTab, showToast]
   );
 
   const handleInlineRename = useCallback(
@@ -367,7 +401,9 @@ function DocsContent() {
   const handleDelete = useCallback(async () => {
     try {
       const { error } = await client.DELETE('/docs/doc', {
-        params: { query: { remoteNode, path: deleteDocPath } },
+        params: {
+          query: { remoteNode, workspace: workspaceQuery, path: deleteDocPath },
+        },
       });
       if (error) {
         showToast('Failed to delete document');
@@ -394,6 +430,7 @@ function DocsContent() {
   }, [
     client,
     remoteNode,
+    workspaceQuery,
     deleteDocPath,
     mutate,
     tabs,
@@ -407,7 +444,7 @@ function DocsContent() {
   const handleBatchDelete = useCallback(async () => {
     try {
       const { data, error } = await client.POST('/docs/delete-batch', {
-        params: { query: { remoteNode } },
+        params: { query: { remoteNode, workspace: workspaceQuery } },
         body: { paths: batchDeletePaths },
       });
       if (error) {
@@ -443,6 +480,7 @@ function DocsContent() {
     batchDeletePaths,
     client,
     remoteNode,
+    workspaceQuery,
     mutate,
     tabs,
     closeTab,
@@ -495,12 +533,8 @@ function DocsContent() {
   const cockpitToolbar = (
     <div className="[&>div]:mb-0">
       <CockpitToolbar
-        workspaces={workspaces}
         selectedWorkspace={selectedWorkspace}
         selectedTemplate={selectedTemplate}
-        onSelectWorkspace={selectWorkspace}
-        onCreateWorkspace={createWorkspace}
-        onDeleteWorkspace={deleteWorkspace}
         onSelectTemplate={selectTemplate}
       />
     </div>
@@ -647,9 +681,14 @@ function DocsContent() {
 }
 
 function DocsPage() {
+  const appBarContext = useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const workspaceScope = appBarContext.selectedWorkspace || '__all__';
+  const docTabStorageKey = `dagu_doc_tabs:${remoteNode}:${workspaceScope}`;
+
   return (
     <UnsavedChangesProvider>
-      <DocTabProvider>
+      <DocTabProvider key={docTabStorageKey} storageKey={docTabStorageKey}>
         <DocsContent />
       </DocTabProvider>
     </UnsavedChangesProvider>

@@ -58,6 +58,12 @@ func (a *API) CreateWorkspace(ctx context.Context, request api.CreateWorkspaceRe
 			Message: "Name is required",
 		}, nil
 	}
+	if err := workspace.ValidateName(body.Name); err != nil {
+		return api.CreateWorkspace400JSONResponse{
+			Code:    api.ErrorCodeBadRequest,
+			Message: "Workspace name must contain only letters, numbers, underscores, and hyphens",
+		}, nil
+	}
 
 	ws := workspace.NewWorkspace(body.Name, valueOf(body.Description))
 	if err := a.workspaceStore.Create(ctx, ws); err != nil {
@@ -120,6 +126,13 @@ func (a *API) UpdateWorkspace(ctx context.Context, request api.UpdateWorkspaceRe
 
 	body := request.Body
 	if body.Name != nil && *body.Name != "" {
+		if err := workspace.ValidateName(*body.Name); err != nil {
+			return nil, &Error{
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "Workspace name must contain only letters, numbers, underscores, and hyphens",
+				HTTPStatus: http.StatusBadRequest,
+			}
+		}
 		existing.Name = *body.Name
 	}
 	if body.Description != nil {

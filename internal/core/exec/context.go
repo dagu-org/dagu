@@ -10,6 +10,7 @@ import (
 	"io"
 	"maps"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/config"
@@ -287,6 +288,21 @@ func WithArtifactDir(dir string) ContextOption {
 	}
 }
 
+func workspaceForDAGDocs(labels core.Labels) (string, bool) {
+	var workspaceName string
+	for _, label := range labels {
+		key, value, hasValue := strings.Cut(label.String(), "=")
+		if key != "workspace" || !hasValue || value == "" {
+			continue
+		}
+		if workspaceName != "" && workspaceName != value {
+			return "", false
+		}
+		workspaceName = value
+	}
+	return workspaceName, workspaceName != ""
+}
+
 // NewContext creates a new context with DAG execution metadata.
 // Required: ctx, dag, dagRunID, logFile
 // Optional: use ContextOption functions (WithDatabase, WithParams, etc.)
@@ -313,7 +329,11 @@ func NewContext(
 	// DAG_DOCS_DIR: per-DAG docs directory from global config
 	cfg := config.GetConfig(ctx)
 	if cfg.Paths.DocsDir != "" {
-		envs[EnvKeyDAGDocsDir] = filepath.Join(cfg.Paths.DocsDir, dag.Name)
+		docsDir := filepath.Join(cfg.Paths.DocsDir, dag.Name)
+		if workspaceName, ok := workspaceForDAGDocs(dag.Labels); ok {
+			docsDir = filepath.Join(cfg.Paths.DocsDir, workspaceName, dag.Name)
+		}
+		envs[EnvKeyDAGDocsDir] = docsDir
 	}
 
 	maps.Copy(envs, stringutil.KeyValuesToMap(options.params))

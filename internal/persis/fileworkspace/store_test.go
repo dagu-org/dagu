@@ -102,6 +102,14 @@ func TestStore_DuplicateName(t *testing.T) {
 	assert.ErrorIs(t, err, workspace.ErrWorkspaceAlreadyExists)
 }
 
+func TestStore_RejectsInvalidWorkspaceName(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	err := store.Create(ctx, workspace.NewWorkspace("bad/name", ""))
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+}
+
 func TestStore_NotFound(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

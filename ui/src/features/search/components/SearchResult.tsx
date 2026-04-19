@@ -52,9 +52,7 @@ function SearchSnippet({ match }: { match: SearchMatch }) {
             <span className="select-none text-[11px] text-muted-foreground">
               {lineNumber}
             </span>
-            <code className="font-mono text-foreground">
-              {line || ' '}
-            </code>
+            <code className="font-mono text-foreground">{line || ' '}</code>
           </div>
         );
       })}
@@ -165,6 +163,7 @@ function SearchResult(props: Props) {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const workspaceQuery = appBarContext.selectedWorkspace || undefined;
 
   const items =
     type === 'dag'
@@ -177,16 +176,19 @@ function SearchResult(props: Props) {
           initialHasMoreMatches: result.hasMoreMatches,
           initialNextCursor: result.nextMatchesCursor,
           loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
-            const response = await client.GET('/search/dags/{fileName}/matches', {
-              params: {
-                path: { fileName: result.fileName },
-                query: {
-                  remoteNode,
-                  q: query,
-                  cursor,
+            const response = await client.GET(
+              '/search/dags/{fileName}/matches',
+              {
+                params: {
+                  path: { fileName: result.fileName },
+                  query: {
+                    remoteNode,
+                    q: query,
+                    cursor,
+                  },
                 },
-              },
-            });
+              }
+            );
 
             return {
               error: response.error?.message || undefined,
@@ -209,6 +211,7 @@ function SearchResult(props: Props) {
               params: {
                 query: {
                   remoteNode,
+                  workspace: workspaceQuery,
                   path: result.id,
                   q: query,
                   cursor,

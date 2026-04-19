@@ -5,6 +5,7 @@ import { useContext, useState } from 'react';
 import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient } from '../../../../hooks/api';
+import { defaultDAGSpec } from '../../../../lib/dagSpec';
 
 /**
  * CreateDAGModal displays a button that opens a modal to create a new DAG
@@ -40,6 +41,9 @@ function CreateDAGModal() {
         },
         body: {
           name,
+          spec: appBarContext.selectedWorkspace
+            ? defaultDAGSpec(appBarContext.selectedWorkspace)
+            : undefined,
         },
       });
 

@@ -46,6 +46,8 @@ import { whenEnabled } from '@/hooks/queryUtils';
 import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { validateDAGName } from '@/lib/dag-validation';
+import { ensureWorkspaceLabelInDAGSpec } from '@/lib/dagSpec';
+import { workspaceLabel } from '@/lib/workspace';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -109,6 +111,7 @@ function WorkflowDesignPage() {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
   const { setContext } = usePageContext();
   const { schema: baseSchema } = useSchema();
   const { setHasUnsavedChanges } = useUnsavedChanges();
@@ -152,6 +155,7 @@ function WorkflowDesignPage() {
       query: {
         remoteNode,
         perPage: 200,
+        labels: workspaceLabel(selectedWorkspace),
       },
     },
   });
@@ -180,7 +184,7 @@ function WorkflowDesignPage() {
     markAsSaved,
     discardChanges,
   } = useContentEditor({
-    key: `${remoteNode}:${selectedDagFile || NEW_DAG_VALUE}`,
+    key: `${remoteNode}:${selectedWorkspace || '__all__'}:${selectedDagFile || NEW_DAG_VALUE}`,
     serverContent: serverSpec,
   });
 
@@ -237,9 +241,9 @@ function WorkflowDesignPage() {
   const editorModelUri = React.useMemo(
     () =>
       selectedDagFile
-        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/design/${encodeURIComponent(selectedDagFile)}.yaml`
-        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/design/new.yaml`,
-    [remoteNode, selectedDagFile]
+        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${encodeURIComponent(selectedWorkspace || '__all__')}/design/${encodeURIComponent(selectedDagFile)}.yaml`
+        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${encodeURIComponent(selectedWorkspace || '__all__')}/design/new.yaml`,
+    [remoteNode, selectedDagFile, selectedWorkspace]
   );
 
   const debouncedSpec = useDebouncedValue(editorValue, 500);
@@ -451,12 +455,15 @@ function WorkflowDesignPage() {
     }
 
     setIsSaving(true);
+    const specToSave = selectedWorkspace
+      ? ensureWorkspaceLabelInDAGSpec(newDraftSpec, selectedWorkspace)
+      : newDraftSpec;
     try {
       const { error } = await client.POST('/dags', {
         params: { query: { remoteNode } },
         body: {
           name: newDagName,
-          spec: newDraftSpec,
+          spec: specToSave,
         },
       });
       if (error) {
@@ -513,6 +520,7 @@ function WorkflowDesignPage() {
           newDagName: newDagName || undefined,
           stepName: selectedStepName || undefined,
           remoteNode,
+          selectedWorkspace,
           userPrompt: trimmed,
           draftSpec: selectedDagFile ? undefined : newDraftSpec,
           validationErrors: validation?.errors,
@@ -837,10 +845,14 @@ function useDesignPanelLayout() {
 
       if (event.key === 'ArrowLeft') {
         nextWidth =
-          side === 'left' ? currentWidth - resizeStep : currentWidth + resizeStep;
+          side === 'left'
+            ? currentWidth - resizeStep
+            : currentWidth + resizeStep;
       } else if (event.key === 'ArrowRight') {
         nextWidth =
-          side === 'left' ? currentWidth + resizeStep : currentWidth - resizeStep;
+          side === 'left'
+            ? currentWidth + resizeStep
+            : currentWidth - resizeStep;
       } else if (event.key === 'Home') {
         nextWidth = DESIGN_PANEL_LIMITS[side].minWidth;
       } else if (event.key === 'End') {
@@ -952,7 +964,8 @@ function DesignResizeHandle({
       <div
         className={cn(
           'h-8 w-1 rounded-full bg-muted-foreground/30 transition-all duration-200 group-hover:bg-primary group-focus-visible:bg-primary',
-          isDragging && 'scale-110 bg-primary shadow-[0_0_10px_var(--color-primary)]'
+          isDragging &&
+            'scale-110 bg-primary shadow-[0_0_10px_var(--color-primary)]'
         )}
       />
     </div>

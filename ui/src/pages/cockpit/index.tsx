@@ -7,15 +7,8 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 export default function CockpitPage(): React.ReactElement {
   const { setTitle } = React.useContext(AppBarContext);
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
-  const {
-    workspaces,
-    selectedWorkspace,
-    selectedTemplate,
-    createWorkspace,
-    deleteWorkspace,
-    selectWorkspace,
-    selectTemplate,
-  } = useCockpitState();
+  const { selectedWorkspace, selectedTemplate, selectTemplate } =
+    useCockpitState();
 
   useEffect(() => {
     setTitle('Cockpit');
@@ -26,12 +19,8 @@ export default function CockpitPage(): React.ReactElement {
   return (
     <div className="flex flex-col h-full min-h-0">
       <CockpitToolbar
-        workspaces={workspaces}
         selectedWorkspace={selectedWorkspace}
         selectedTemplate={selectedTemplate}
-        onSelectWorkspace={selectWorkspace}
-        onCreateWorkspace={createWorkspace}
-        onDeleteWorkspace={deleteWorkspace}
         onSelectTemplate={selectTemplate}
         onTemplateSelectorOpenChange={setIsTemplateSelectorOpen}
       />

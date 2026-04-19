@@ -299,6 +299,42 @@ func TestSearchCursorFailsWhenBaseDirIsNotReadableDirectory(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to read DAGs directory")
 }
 
+func TestSearchCursorFiltersByLabels(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-search-cursor-labels")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "ops-dag", []byte(`name: ops-dag
+labels:
+  - workspace=ops
+steps:
+  - name: step1
+    command: echo needle
+`)))
+	require.NoError(t, store.Create(ctx, "prod-dag", []byte(`name: prod-dag
+labels:
+  - workspace=prod
+steps:
+  - name: step1
+    command: echo needle
+`)))
+
+	result, errs, err := store.SearchCursor(ctx, exec.SearchDAGsOptions{
+		Query:      "needle",
+		Limit:      10,
+		MatchLimit: 1,
+		Labels:     []string{"workspace=ops"},
+	})
+	require.NoError(t, err)
+	require.Empty(t, errs)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "ops-dag", result.Items[0].FileName)
+}
+
 func TestUpdateSpec(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-update-spec")
 	defer func() {

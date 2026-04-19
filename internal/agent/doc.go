@@ -66,10 +66,11 @@ const (
 
 // ListDocsOptions holds parameters for listing documents.
 type ListDocsOptions struct {
-	Page    int
-	PerPage int
-	Sort    DocSortField
-	Order   DocSortOrder
+	Page       int
+	PerPage    int
+	Sort       DocSortField
+	Order      DocSortOrder
+	PathPrefix string
 }
 
 // SearchDocsOptions configures a paginated document search query.
@@ -78,13 +79,15 @@ type SearchDocsOptions struct {
 	Limit      int
 	Query      string
 	MatchLimit int
+	PathPrefix string
 }
 
 // SearchDocMatchesOptions configures cursor-based snippet loading for one document.
 type SearchDocMatchesOptions struct {
-	Cursor string
-	Limit  int
-	Query  string
+	Cursor     string
+	Limit      int
+	Query      string
+	PathPrefix string
 }
 
 // DocSearchResult holds a doc ID/title and its grep matches.

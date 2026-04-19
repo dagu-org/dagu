@@ -1577,6 +1577,12 @@ paths:
           schema:
             type: "string"
           description: "A search query string"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels."
         - $ref: "#/components/parameters/SearchCursor"
         - $ref: "#/components/parameters/SearchLimit"
       responses:
@@ -1608,6 +1614,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true
@@ -1689,6 +1696,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "path"
           in: "query"
           description: "Document path (may include slashes for nested docs)"
@@ -6284,6 +6292,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
         - name: flat
@@ -6334,6 +6343,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
         content:
@@ -6378,6 +6388,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: q
           in: query
           description: "Search query"
@@ -6413,6 +6424,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Document path (may include slashes for nested docs)"
@@ -6447,6 +6459,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Document path (may include slashes for nested docs)"
@@ -6490,6 +6503,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Document path (may include slashes for nested docs)"
@@ -6521,6 +6535,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Current document or directory path (may include slashes for nested docs)"
@@ -6571,6 +6586,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
         content:
@@ -6943,6 +6959,15 @@ components:
         minimum: 1
         maximum: 1000
         default: 50
+
+    Workspace:
+      name: workspace
+      in: query
+      description: selected workspace scope
+      required: false
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9_-]+$"
 
     SearchCursor:
       name: cursor

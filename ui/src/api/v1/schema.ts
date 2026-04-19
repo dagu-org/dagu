@@ -4897,6 +4897,8 @@ export interface components {
         APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
+        /** @description selected workspace scope */
+        Workspace: string;
         /** @description Opaque cursor returned by the previous search response */
         SearchCursor: string;
         /** @description Number of search results to return (default 20, max 50) */
@@ -6813,6 +6815,8 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description A search query string */
                 q: string;
+                /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. */
+                labels?: string;
                 /** @description Opaque cursor returned by the previous search response */
                 cursor?: components["parameters"]["SearchCursor"];
                 /** @description Number of search results to return (default 20, max 50) */
@@ -6858,6 +6862,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
                 /** @description Opaque cursor returned by the previous search response */
@@ -6964,6 +6970,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
                 /** @description A search query string */
@@ -12830,6 +12838,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description page number of items to fetch (default is 1) */
                 page?: components["parameters"]["Page"];
                 /** @description number of items per page (default is 30, max is 100) */
@@ -12876,6 +12886,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;
@@ -12932,6 +12944,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Search query */
                 q: string;
             };
@@ -12975,6 +12989,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -13018,6 +13034,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -13059,6 +13077,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -13108,6 +13128,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Current document or directory path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -13166,6 +13188,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;

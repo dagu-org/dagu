@@ -47,12 +47,14 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceQuery = selectedWorkspace || undefined;
   const canWrite = useCanWrite();
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
 
-  const docSSE = useDocSSE(docPath, !!docPath);
+  const docSSE = useDocSSE(docPath, !!docPath, workspaceQuery);
 
   // Fetch doc — SWR is the single source of truth, refreshed by live invalidations
   const { data: doc, mutate: mutateDoc } = useQuery(
@@ -61,6 +63,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
       params: {
         query: {
           remoteNode,
+          workspace: workspaceQuery,
           path: docPath,
         },
       },
@@ -80,7 +83,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     markAsSaved,
     discardChanges,
   } = useContentEditor({
-    key: `${docPath}:${remoteNode}`,
+    key: `${docPath}:${remoteNode}:${selectedWorkspace || '__all__'}`,
     serverContent,
   });
 
@@ -149,7 +152,9 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     setIsSaving(true);
     try {
       const { error } = await client.PATCH('/docs/doc', {
-        params: { query: { remoteNode, path: docPath } },
+        params: {
+          query: { remoteNode, workspace: workspaceQuery, path: docPath },
+        },
         body: { content: currentValueRef.current ?? '' },
       });
       if (error) {
@@ -171,6 +176,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     isSaving,
     client,
     remoteNode,
+    workspaceQuery,
     docPath,
     markAsSaved,
     mutateDoc,
