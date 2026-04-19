@@ -145,7 +145,7 @@ type runOptions struct {
 	defaultWorkingDir string
 	mode              ExecutionMode
 	workerSelector    map[string]string
-	tags              []string
+	labels            []string
 	dryRun            bool
 }
 
@@ -356,11 +356,18 @@ func WithWorkerSelector(selector map[string]string) RunOption {
 	}
 }
 
-// WithTags adds tags to one run.
-func WithTags(tags ...string) RunOption {
+// WithLabels adds labels to one run.
+func WithLabels(labels ...string) RunOption {
 	return func(o *runOptions) {
-		o.tags = cloneSlice(tags)
+		o.labels = cloneSlice(labels)
 	}
+}
+
+// WithTags adds labels to one run.
+//
+// Deprecated: use WithLabels.
+func WithTags(tags ...string) RunOption {
+	return WithLabels(tags...)
 }
 
 // WithDryRun enables or disables dry-run mode.
@@ -418,7 +425,7 @@ func internalRunOptions(opts runOptions) iengine.RunOptions {
 		DefaultWorkingDir: opts.defaultWorkingDir,
 		Mode:              iengine.ExecutionMode(opts.mode),
 		WorkerSelector:    opts.workerSelector,
-		Tags:              opts.tags,
+		Labels:            opts.labels,
 		DryRun:            opts.dryRun,
 	}
 }
