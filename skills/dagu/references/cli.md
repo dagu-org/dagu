@@ -17,7 +17,8 @@ Flags:
 - `--name/-N` — Override DAG name
 - `--run-id/-r` — Custom run ID
 - `--from-run-id` — Use a previous run as template for a new run
-- `--tags` — Additional tags (comma-separated key=value or key-only)
+- `--labels` — Additional labels (comma-separated key=value or key-only)
+- `--tags` — Deprecated alias for `--labels`
 - `--default-working-dir` — Default working directory for DAGs without explicit workingDir
 - `--worker-id` — Worker ID for distributed execution (defaults to `local`)
 - `--trigger-type` — How this run was initiated: `manual` (default), `scheduler`, `webhook`, `subdag`, `retry`, `catchup`
@@ -55,7 +56,8 @@ Flags:
 - `--name/-N` — Override DAG name
 - `--queue/-u` — Override the DAG-level queue definition
 - `--run-id/-r` — Custom run ID
-- `--tags` — Additional tags (comma-separated)
+- `--labels` — Additional labels (comma-separated key=value or key-only)
+- `--tags` — Deprecated alias for `--labels`
 - `--default-working-dir` — Default working directory for DAGs without explicit workingDir
 - `--trigger-type` — Trigger type (default: `manual`)
 
@@ -105,7 +107,8 @@ Flags:
 - `--last` — Relative time period (e.g. `7d`, `24h`, `1w`). Cannot combine with `--from`/`--to`
 - `--status` — Filter by status: `running`, `succeeded`, `failed`, `aborted`, `queued`, `waiting`, `rejected`, `not_started`, `partially_succeeded`
 - `--run-id` — Filter by run ID (partial match supported)
-- `--tags` — Filter by tags (comma-separated, AND logic)
+- `--labels` — Filter by labels (comma-separated key=value or key-only, AND logic)
+- `--tags` — Deprecated alias for `--labels`
 - `--format/-f` — Output format: `table` (default), `json`, `csv`
 - `--limit/-l` — Max results (default 100, max 1000)
 

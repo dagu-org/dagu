@@ -18,21 +18,113 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func tagsFromPatchedSpec(t *testing.T, data []byte) []any {
+func labelsFromPatchedSpec(t *testing.T, data []byte) []any {
 	t.Helper()
 
 	var firstDoc yaml.MapSlice
 	require.NoError(t, yaml.Unmarshal(data, &firstDoc))
 
-	raw, ok := getInlineEnqueueMapValue(firstDoc, "tags")
+	raw, ok := getInlineEnqueueMapValue(firstDoc, "labels")
 	require.True(t, ok)
 
-	tags, ok := raw.([]any)
+	labels, ok := raw.([]any)
 	require.True(t, ok)
-	return tags
+	return labels
 }
 
-func TestApplyInlineEnqueueTags_ArrayTags(t *testing.T) {
+func requireNoDeprecatedTagsKey(t *testing.T, data []byte) {
+	t.Helper()
+
+	var firstDoc yaml.MapSlice
+	require.NoError(t, yaml.Unmarshal(data, &firstDoc))
+
+	_, ok := getInlineEnqueueMapValue(firstDoc, "tags")
+	require.False(t, ok)
+}
+
+func TestApplyInlineEnqueueLabels_ArrayLabels(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`name: test
+labels:
+  - env=prod
+steps:
+  - name: s1
+    command: echo hi
+`)
+
+	patched, err := applyInlineEnqueueLabels(data, "team=backend")
+	require.NoError(t, err)
+
+	labels := labelsFromPatchedSpec(t, patched)
+	assert.Contains(t, labels, "env=prod")
+	assert.Contains(t, labels, "team=backend")
+	requireNoDeprecatedTagsKey(t, patched)
+}
+
+func TestApplyInlineEnqueueLabels_CommaSeparatedStringLabels(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`name: test
+labels: "daily, weekly"
+steps:
+  - name: s1
+    command: echo hi
+`)
+
+	patched, err := applyInlineEnqueueLabels(data, "team=backend")
+	require.NoError(t, err)
+
+	labels := labelsFromPatchedSpec(t, patched)
+	assert.Contains(t, labels, "daily")
+	assert.Contains(t, labels, "weekly")
+	assert.Contains(t, labels, "team=backend")
+	requireNoDeprecatedTagsKey(t, patched)
+}
+
+func TestApplyInlineEnqueueLabels_SpaceSeparatedKeyValueLabels(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`name: test
+labels: "env=prod team=platform"
+steps:
+  - name: s1
+    command: echo hi
+`)
+
+	patched, err := applyInlineEnqueueLabels(data, "team=backend")
+	require.NoError(t, err)
+
+	labels := labelsFromPatchedSpec(t, patched)
+	assert.Contains(t, labels, "env=prod")
+	assert.Contains(t, labels, "team=platform")
+	assert.Contains(t, labels, "team=backend")
+	requireNoDeprecatedTagsKey(t, patched)
+}
+
+func TestApplyInlineEnqueueLabels_MapLabels(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`name: test
+labels:
+  env: prod
+  team: platform
+steps:
+  - name: s1
+    command: echo hi
+`)
+
+	patched, err := applyInlineEnqueueLabels(data, "priority=high")
+	require.NoError(t, err)
+
+	labels := labelsFromPatchedSpec(t, patched)
+	assert.Contains(t, labels, "env=prod")
+	assert.Contains(t, labels, "team=platform")
+	assert.Contains(t, labels, "priority=high")
+	requireNoDeprecatedTagsKey(t, patched)
+}
+
+func TestApplyInlineEnqueueLabels_DeprecatedTagsCanonicalizeToLabels(t *testing.T) {
 	t.Parallel()
 
 	data := []byte(`name: test
@@ -43,74 +135,16 @@ steps:
     command: echo hi
 `)
 
-	patched, err := applyInlineEnqueueTags(data, "team=backend")
+	patched, err := applyInlineEnqueueLabels(data, "team=backend")
 	require.NoError(t, err)
 
-	tags := tagsFromPatchedSpec(t, patched)
-	assert.Contains(t, tags, "env=prod")
-	assert.Contains(t, tags, "team=backend")
+	labels := labelsFromPatchedSpec(t, patched)
+	assert.Contains(t, labels, "env=prod")
+	assert.Contains(t, labels, "team=backend")
+	requireNoDeprecatedTagsKey(t, patched)
 }
 
-func TestApplyInlineEnqueueTags_CommaSeparatedStringTags(t *testing.T) {
-	t.Parallel()
-
-	data := []byte(`name: test
-tags: "daily, weekly"
-steps:
-  - name: s1
-    command: echo hi
-`)
-
-	patched, err := applyInlineEnqueueTags(data, "team=backend")
-	require.NoError(t, err)
-
-	tags := tagsFromPatchedSpec(t, patched)
-	assert.Contains(t, tags, "daily")
-	assert.Contains(t, tags, "weekly")
-	assert.Contains(t, tags, "team=backend")
-}
-
-func TestApplyInlineEnqueueTags_SpaceSeparatedKeyValueTags(t *testing.T) {
-	t.Parallel()
-
-	data := []byte(`name: test
-tags: "env=prod team=platform"
-steps:
-  - name: s1
-    command: echo hi
-`)
-
-	patched, err := applyInlineEnqueueTags(data, "team=backend")
-	require.NoError(t, err)
-
-	tags := tagsFromPatchedSpec(t, patched)
-	assert.Contains(t, tags, "env=prod")
-	assert.Contains(t, tags, "team=platform")
-	assert.Contains(t, tags, "team=backend")
-}
-
-func TestApplyInlineEnqueueTags_MapTags(t *testing.T) {
-	t.Parallel()
-
-	data := []byte(`name: test
-tags:
-  env: prod
-  team: platform
-steps:
-  - name: s1
-    command: echo hi
-`)
-
-	patched, err := applyInlineEnqueueTags(data, "priority=high")
-	require.NoError(t, err)
-
-	tags := tagsFromPatchedSpec(t, patched)
-	assert.Contains(t, tags, "env=prod")
-	assert.Contains(t, tags, "team=platform")
-	assert.Contains(t, tags, "priority=high")
-}
-
-func TestApplyInlineEnqueueTags_PreservesLaterDocuments(t *testing.T) {
+func TestApplyInlineEnqueueLabels_PreservesLaterDocuments(t *testing.T) {
 	t.Parallel()
 
 	data := []byte(`name: main
@@ -124,21 +158,22 @@ steps:
     command: echo bye
 `)
 
-	patched, err := applyInlineEnqueueTags(data, "env=prod")
+	patched, err := applyInlineEnqueueLabels(data, "env=prod")
 	require.NoError(t, err)
 
 	content := string(patched)
-	assert.Contains(t, content, "tags:")
+	assert.Contains(t, content, "labels:")
 	assert.Contains(t, content, "env=prod")
 	assert.Contains(t, content, "---")
 	assert.True(t, strings.Contains(content, "name: child") || strings.Contains(content, "name: \"child\""))
 	assert.Contains(t, content, "echo bye")
+	requireNoDeprecatedTagsKey(t, patched)
 }
 
-func TestApplyInlineEnqueueTags_InvalidYAML(t *testing.T) {
+func TestApplyInlineEnqueueLabels_InvalidYAML(t *testing.T) {
 	t.Parallel()
 
-	_, err := applyInlineEnqueueTags([]byte("{{invalid yaml"), "env=prod")
+	_, err := applyInlineEnqueueLabels([]byte("{{invalid yaml"), "env=prod")
 	require.Error(t, err)
 }
 

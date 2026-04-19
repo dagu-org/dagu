@@ -37,7 +37,8 @@ func toDAG(dag *core.DAG) api.DAG {
 		Description:   ptrOf(dag.Description),
 		Params:        ptrOf(dag.Params),
 		DefaultParams: ptrOf(dag.DefaultParams),
-		Tags:          ptrOf(dag.Tags.Strings()),
+		Labels:        ptrOf(dag.Labels.Strings()),
+		Tags:          ptrOf(dag.Labels.Strings()),
 		Schedule:      ptrOf(schedules),
 	}
 }
@@ -204,7 +205,8 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 		StatusLabel:    api.StatusLabel(s.Status.String()),
 		WorkerId:       ptrOf(s.WorkerID),
 		TriggerType:    toTriggerType(s.TriggerType),
-		Tags:           &s.Tags,
+		Labels:         &s.Labels,
+		Tags:           &s.Labels,
 	}
 }
 
@@ -269,7 +271,8 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		OnFailure:          ptrOf(toNode(s.OnFailure)),
 		OnAbort:            ptrOf(toNode(s.OnAbort)),
 		OnExit:             ptrOf(toNode(s.OnExit)),
-		Tags:               &s.Tags,
+		Labels:             &s.Labels,
+		Tags:               &s.Labels,
 	}
 }
 
@@ -383,7 +386,8 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
-		Tags:              ptrOf(dag.Tags.Strings()),
+		Labels:            ptrOf(dag.Labels.Strings()),
+		Tags:              ptrOf(dag.Labels.Strings()),
 		RunConfig:         runConfig,
 	}
 }

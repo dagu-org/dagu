@@ -36,7 +36,7 @@ func createDayDir(t *testing.T, dayDir string, numRuns int, status core.Status) 
 			Status:     status,
 			StartedAt:  "2024-01-15T12:00:00Z",
 			FinishedAt: "2024-01-15T12:01:00Z",
-			Tags:       []string{"env=prod"},
+			Labels:     []string{"env=prod"},
 		}
 		data, err := json.Marshal(st)
 		require.NoError(t, err)

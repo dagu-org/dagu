@@ -104,7 +104,7 @@ type ListDAGRunStatusesOptions struct {
 	Statuses   []core.Status
 	Limit      int
 	Cursor     string
-	Tags       []string // Filter by DAG tags (AND logic - all tags must match)
+	Labels     []string // Filter by DAG labels (AND logic - all labels must match)
 	Unlimited  bool
 	AllHistory bool
 }
@@ -154,11 +154,17 @@ func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 	}
 }
 
-// WithTags sets the tags filter for listing dag-runs (AND logic - all tags must match)
-func WithTags(tags []string) ListDAGRunStatusesOption {
+// WithLabels sets the labels filter for listing dag-runs (AND logic - all labels must match)
+func WithLabels(labels []string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
-		o.Tags = tags
+		o.Labels = labels
 	}
+}
+
+// WithTags sets the labels filter for listing dag-runs.
+// Deprecated: use WithLabels.
+func WithTags(tags []string) ListDAGRunStatusesOption {
+	return WithLabels(tags)
 }
 
 // WithLimit sets the maximum number of results to return when listing dag-runs

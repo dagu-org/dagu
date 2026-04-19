@@ -516,13 +516,13 @@ func (f *testFixture) enqueueCatchup(scheduleTime time.Time) (string, error) {
 
 func (f *testFixture) start() error {
 	f.t.Helper()
-	return f.startWithTags("")
+	return f.startWithLabels("")
 }
 
-func (f *testFixture) startWithTags(tags string) error {
+func (f *testFixture) startWithLabels(labels string) error {
 	f.t.Helper()
 	subCmdBuilder := runtime.NewSubCmdBuilder(f.coord.Config)
-	startSpec := subCmdBuilder.Start(f.dagWrapper.DAG, runtime.StartOptions{Quiet: true, Tags: tags})
+	startSpec := subCmdBuilder.Start(f.dagWrapper.DAG, runtime.StartOptions{Quiet: true, Labels: labels})
 	return runtime.Start(f.coord.Context, startSpec)
 }
 

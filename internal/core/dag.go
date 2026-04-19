@@ -98,8 +98,8 @@ type DAG struct {
 	ShellArgs []string `json:"shellArgs,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
 	Dotenv []string `json:"dotenv,omitempty"`
-	// Tags contains the list of tags for the DAG. This is optional.
-	Tags Tags `json:"tags,omitempty"`
+	// Labels contains the list of labels for the DAG. This is optional.
+	Labels Labels `json:"labels,omitempty"`
 	// Description is the description of the DAG. This is optional.
 	Description string `json:"description,omitempty"`
 	// Schedule configuration for starting, stopping, and restarting the DAG.
@@ -187,7 +187,7 @@ type DAG struct {
 	// RetryPolicy controls automatic DAG-level retry behavior for failed runs.
 	RetryPolicy *DAGRetryPolicy `json:"retryPolicy,omitempty"`
 	// WorkerSelector defines labels required for worker selection in distributed execution.
-	// If specified, the DAG will only run on workers with matching tag.
+	// If specified, the DAG will only run on workers with matching labels.
 	WorkerSelector map[string]string `json:"workerSelector,omitempty"`
 	// ForceLocal forces the DAG to run locally even when the server default is distributed.
 	// Set by worker_selector: local in the DAG spec.
@@ -304,11 +304,41 @@ type SecretRef struct {
 	Options map[string]string `json:"options,omitempty"`
 }
 
-// HasTag checks if the DAG has the given tag.
-// Supports both simple tags ("production") and key-value filters ("env=prod").
+// UnmarshalJSON deserializes DAGs written by both the canonical labels field
+// and the deprecated tags field used by older persisted dag.json files.
+func (d *DAG) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	type alias DAG
+	aux := struct {
+		*alias
+		DeprecatedTags Labels `json:"tags,omitempty"`
+	}{
+		alias: (*alias)(d),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if _, hasLabels := raw["labels"]; !hasLabels && len(aux.DeprecatedTags) > 0 {
+		d.Labels = aux.DeprecatedTags
+	}
+	return nil
+}
+
+// HasLabel checks if the DAG has a label matching the given filter.
+// Supports both simple labels ("production") and key-value filters ("env=prod").
+func (d *DAG) HasLabel(label string) bool {
+	filter := ParseLabelFilter(label)
+	return filter.MatchesLabels(d.Labels)
+}
+
+// HasTag checks if the DAG has a tag matching the given filter.
+// Deprecated: use HasLabel.
 func (d *DAG) HasTag(tag string) bool {
-	filter := ParseTagFilter(tag)
-	return filter.MatchesTags(d.Tags)
+	return d.HasLabel(tag)
 }
 
 // Clone creates a shallow copy of the DAG.

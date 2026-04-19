@@ -807,17 +807,17 @@ func TestTaskStart(t *testing.T) {
 		}
 	})
 
-	t.Run("TaskStartWithTags", func(t *testing.T) {
+	t.Run("TaskStartWithLabels", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
 			DagRunId:  "task-run-id",
 			AttemptId: "attempt-1",
 			Target:    "/path/to/task.yaml",
-			Tags:      "env=prod,team=backend",
+			Labels:    "env=prod,team=backend",
 		}
 		spec := builder.TaskStart(task, nil, "")
 
-		assert.Contains(t, spec.Args, "--tags=env=prod,team=backend")
+		assert.Contains(t, spec.Args, "--labels=env=prod,team=backend")
 	})
 
 	t.Run("TaskStartWithScheduleTime", func(t *testing.T) {
@@ -859,7 +859,7 @@ func TestTaskStart(t *testing.T) {
 		assert.Contains(t, spec.Env, exec.EnvKeyExternalStepRetry+"=1")
 	})
 
-	t.Run("TaskStartWithoutTags", func(t *testing.T) {
+	t.Run("TaskStartWithoutLabels", func(t *testing.T) {
 		t.Parallel()
 		task := &coordinatorv1.Task{
 			DagRunId:  "task-run-id",
@@ -869,7 +869,7 @@ func TestTaskStart(t *testing.T) {
 		spec := builder.TaskStart(task, nil, "")
 
 		for _, arg := range spec.Args {
-			assert.NotContains(t, arg, "--tags=")
+			assert.NotContains(t, arg, "--labels=")
 		}
 	})
 

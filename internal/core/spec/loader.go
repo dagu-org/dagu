@@ -863,6 +863,12 @@ func unmarshalData(data []byte) (map[string]any, error) {
 
 // decode decodes the configuration map into a manifest.
 func decode(cm map[string]any) (*dag, error) {
+	if _, hasLabels := cm["labels"]; hasLabels {
+		if _, hasTags := cm["tags"]; hasTags {
+			return nil, fmt.Errorf("labels and deprecated tags cannot both be set")
+		}
+	}
+
 	c := new(dag)
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
@@ -944,9 +950,9 @@ func TypedUnionDecodeHook() mapstructure.DecodeHookFunc {
 		if to == reflect.TypeFor[types.ModelValue]() {
 			return decodeViaYAML[types.ModelValue](data)
 		}
-		// Handle types.TagsValue
-		if to == reflect.TypeFor[types.TagsValue]() {
-			return decodeViaYAML[types.TagsValue](data)
+		// Handle types.LabelsValue
+		if to == reflect.TypeFor[types.LabelsValue]() {
+			return decodeViaYAML[types.LabelsValue](data)
 		}
 		// Handle types.RepeatMode
 		if to == reflect.TypeFor[types.RepeatMode]() {

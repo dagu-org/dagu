@@ -525,7 +525,7 @@ func TestSummaryFromIndexEntry(t *testing.T) {
 		Status:           core.Succeeded,
 		StartedAtUnix:    1705320000,
 		FinishedAtUnix:   1705320060,
-		Tags:             []string{"env=prod"},
+		Labels:           []string{"env=prod"},
 		Name:             "test-dag",
 		WorkerID:         "worker-1",
 		Params:           "key=val",
@@ -542,7 +542,7 @@ func TestSummaryFromIndexEntry(t *testing.T) {
 	assert.Equal(t, entry.Status, summary.Status)
 	assert.Equal(t, entry.StartedAtUnix, summary.StartedAtUnix)
 	assert.Equal(t, entry.FinishedAtUnix, summary.FinishedAtUnix)
-	assert.Equal(t, entry.Tags, summary.Tags)
+	assert.Equal(t, entry.Labels, summary.Labels)
 	assert.Equal(t, entry.Name, summary.Name)
 	assert.Equal(t, entry.DagRunID, summary.DagRunID)
 	assert.Equal(t, entry.WorkerID, summary.WorkerID)

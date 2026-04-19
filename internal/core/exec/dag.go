@@ -45,8 +45,8 @@ type DAGStore interface {
 	UpdateSpec(ctx context.Context, fileName string, spec []byte) error
 	// LoadSpec loads a DAG from a YAML file and returns the DAG object
 	LoadSpec(ctx context.Context, spec []byte, opts ...spec.LoadOption) (*core.DAG, error)
-	// TagList returns all unique tags across all DAGs with any errors encountered
-	TagList(ctx context.Context) ([]string, []string, error)
+	// LabelList returns all unique labels across all DAGs with any errors encountered
+	LabelList(ctx context.Context) ([]string, []string, error)
 	// ToggleSuspend changes the suspension state of a DAG by ID
 	ToggleSuspend(ctx context.Context, fileName string, suspend bool) error
 	// IsSuspended checks if a DAG is currently suspended
@@ -57,7 +57,7 @@ type DAGStore interface {
 type ListDAGsOptions struct {
 	Paginator         *Paginator
 	Name              string                               // Optional name filter
-	Tags              []string                             // Optional tags filter (AND logic - all tags must match)
+	Labels            []string                             // Optional labels filter (AND logic - all labels must match)
 	Sort              string                               // Optional sort field (name, updated_at, created_at, nextRun)
 	Order             string                               // Optional sort order (asc, desc)
 	Time              *time.Time                           // Optional reference time for nextRun sorting/projection (defaults to time.Now())

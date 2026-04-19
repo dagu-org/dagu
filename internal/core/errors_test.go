@@ -187,10 +187,10 @@ func TestValidationError_Error(t *testing.T) {
 		},
 		{
 			name:     "slice value",
-			field:    "tags",
+			field:    "labels",
 			value:    []string{"a", "b"},
-			err:      errors.New("invalid tags"),
-			expected: "field 'tags': invalid tags (value: [a b])",
+			err:      errors.New("invalid labels"),
+			expected: "field 'labels': invalid labels (value: [a b])",
 		},
 		{
 			name:     "bool value",

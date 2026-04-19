@@ -23,10 +23,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { usePageContext } from '@/contexts/PageContext';
 import { useSchema } from '@/contexts/SchemaContext';
 import { useUnsavedChanges } from '@/contexts/UnsavedChangesContext';
-import {
-  AgentChatPanelView,
-  useAgentChat,
-} from '@/features/agent';
+import { AgentChatPanelView, useAgentChat } from '@/features/agent';
 import type {
   AgentChatController,
   DAGContext as AgentDAGContext,
@@ -146,7 +143,7 @@ function WorkflowDesignPage() {
     })
   );
 
-  const serverSpec = selectedDagFile ? specData?.spec ?? null : null;
+  const serverSpec = selectedDagFile ? (specData?.spec ?? null) : null;
   const {
     currentValue,
     setCurrentValue,
@@ -161,7 +158,7 @@ function WorkflowDesignPage() {
   });
 
   const editorValue = selectedDagFile
-    ? currentValue ?? serverSpec ?? ''
+    ? (currentValue ?? serverSpec ?? '')
     : newDraftSpec;
   const hasUnsavedChanges = selectedDagFile
     ? hasExistingUnsavedChanges
@@ -663,11 +660,14 @@ function DesignLeftPanel({
   const filteredDagFiles = React.useMemo(() => {
     if (!normalizedSearch) return dagFiles;
     return dagFiles.filter((item) => {
+      const metadataLabels = item.dag.labels?.length
+        ? item.dag.labels
+        : (item.dag.tags ?? []);
       const searchableText = [
         item.fileName,
         item.dag.name,
         item.dag.group,
-        ...(item.dag.tags || []),
+        ...metadataLabels,
       ]
         .filter(Boolean)
         .join(' ')
@@ -915,7 +915,9 @@ function DesignToolbar({
             <SelectContent>
               <SelectItem value={NEW_DAG_VALUE}>New DAG</SelectItem>
               {selectedDagFile && !hasSelectedDagInList && (
-                <SelectItem value={selectedDagFile}>{selectedDagFile}</SelectItem>
+                <SelectItem value={selectedDagFile}>
+                  {selectedDagFile}
+                </SelectItem>
               )}
               {dagFiles.map((item) => (
                 <SelectItem key={item.fileName} value={item.fileName}>
@@ -996,7 +998,9 @@ function ValidationSummary({
       <div className="flex flex-wrap items-center gap-2 text-sm text-success">
         <CheckCircle2 className="h-4 w-4" />
         Valid DAG
-        {validation.dag?.name && <Badge variant="outline">{validation.dag.name}</Badge>}
+        {validation.dag?.name && (
+          <Badge variant="outline">{validation.dag.name}</Badge>
+        )}
       </div>
     );
   }

@@ -1,9 +1,25 @@
-import React, { useState, useEffect, useRef, useCallback, useContext, useMemo } from 'react';
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useContext,
+  useMemo,
+} from 'react';
 import { useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Badge } from '@/components/ui/badge';
 import { whenEnabled } from '@/hooks/queryUtils';
-import { Search, ChevronDown, X, AlertTriangle, Tags } from 'lucide-react';
+import {
+  Search,
+  ChevronDown,
+  X,
+  AlertTriangle,
+  Tags as LabelsIcon,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { components } from '@/api/v1/schema';
 
@@ -28,8 +44,8 @@ export function TemplateSelector({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [isLabelFilterOpen, setIsLabelFilterOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [selectedDag, setSelectedDag] = useState<DAGFile | null>(null);
 
@@ -47,15 +63,15 @@ export function TemplateSelector({
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
 
-  // Keep tags fully lazy. We only request them when the user explicitly opens
-  // the tag filter UI inside the selector.
-  const { data: tagsData } = useQuery(
-    '/dags/tags',
-    whenEnabled(isOpen && isTagFilterOpen, {
+  // Keep labels fully lazy. We only request them when the user explicitly opens
+  // the label filter UI inside the selector.
+  const { data: labelsData } = useQuery(
+    '/dags/labels',
+    whenEnabled(isOpen && isLabelFilterOpen, {
       params: { query: { remoteNode } },
     })
   );
-  const availableTags = tagsData?.tags ?? [];
+  const availableLabels = labelsData?.labels ?? [];
 
   // The DAG list only stays live while the selector dropdown is open. The
   // closed trigger uses locally cached selection metadata instead.
@@ -67,37 +83,39 @@ export function TemplateSelector({
           remoteNode,
           perPage: 50,
           ...(debouncedTerm ? { name: debouncedTerm } : {}),
-          ...(selectedTags.length > 0 ? { tags: selectedTags.join(',') } : {}),
+          ...(selectedLabels.length > 0
+            ? { labels: selectedLabels.join(',') }
+            : {}),
         },
       },
     })
   );
   const dags = data?.dags ?? [];
 
-  // Filter out DAGs with a workspace= tag that doesn't match the selected workspace
+  // Filter out DAGs with a workspace= label that doesn't match the selected workspace
   const filteredDags = useMemo(() => {
     if (!selectedWorkspace) return dags;
     return dags.filter((dag) => {
-      const wsTags = (dag.dag.tags ?? [])
+      const workspaceLabels = (dag.dag.labels ?? dag.dag.tags ?? [])
         .filter((t) => t.startsWith('workspace='))
         .map((t) => t.slice('workspace='.length));
-      if (wsTags.length === 0) return true;
-      return wsTags.includes(selectedWorkspace);
+      if (workspaceLabels.length === 0) return true;
+      return workspaceLabels.includes(selectedWorkspace);
     });
   }, [dags, selectedWorkspace]);
 
-  // Filter workspace= tags from the tag filter row
-  const displayTags = useMemo(
-    () => availableTags.filter((t) => !t.startsWith('workspace=')),
-    [availableTags]
+  // Filter workspace= labels from the label filter row
+  const displayLabels = useMemo(
+    () => availableLabels.filter((t) => !t.startsWith('workspace=')),
+    [availableLabels]
   );
 
   const resetFilters = useCallback(() => {
     setSearchTerm('');
     setDebouncedTerm('');
-    setSelectedTags([]);
+    setSelectedLabels([]);
     setHighlightedIndex(-1);
-    setIsTagFilterOpen(false);
+    setIsLabelFilterOpen(false);
   }, []);
 
   // Cache selected DAG for trigger display
@@ -143,12 +161,15 @@ export function TemplateSelector({
   // Reset highlight on filter change
   useEffect(() => {
     setHighlightedIndex(-1);
-  }, [debouncedTerm, selectedTags]);
+  }, [debouncedTerm, selectedLabels]);
 
   // Click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
         resetFilters();
       }
@@ -159,10 +180,10 @@ export function TemplateSelector({
 
   useEffect(() => {
     setIsOpen(false);
-    setIsTagFilterOpen(false);
+    setIsLabelFilterOpen(false);
     setSearchTerm('');
     setDebouncedTerm('');
-    setSelectedTags([]);
+    setSelectedLabels([]);
     setHighlightedIndex(-1);
     setSelectedDag(null);
   }, [remoteNode]);
@@ -185,9 +206,9 @@ export function TemplateSelector({
     [filteredDags, onSelect, resetFilters]
   );
 
-  const toggleTag = useCallback((tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+  const toggleLabel = useCallback((label: string) => {
+    setSelectedLabels((prev) =>
+      prev.includes(label) ? prev.filter((t) => t !== label) : [...prev, label]
     );
   }, []);
 
@@ -195,11 +216,15 @@ export function TemplateSelector({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex((prev) => (prev < flatList.length - 1 ? prev + 1 : 0));
+        setHighlightedIndex((prev) =>
+          prev < flatList.length - 1 ? prev + 1 : 0
+        );
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : flatList.length - 1));
+        setHighlightedIndex((prev) =>
+          prev > 0 ? prev - 1 : flatList.length - 1
+        );
         break;
       case 'Enter':
         e.preventDefault();
@@ -264,7 +289,9 @@ export function TemplateSelector({
         ) : (
           <>
             <Search className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground truncate flex-1 text-left">Select template...</span>
+            <span className="text-muted-foreground truncate flex-1 text-left">
+              Select template...
+            </span>
           </>
         )}
         <ChevronDown
@@ -291,52 +318,60 @@ export function TemplateSelector({
               className="flex-1 bg-transparent border-none outline-none text-xs placeholder:text-muted-foreground"
             />
             {isLoading && debouncedTerm && (
-              <span className="text-[10px] text-muted-foreground">Searching...</span>
+              <span className="text-[10px] text-muted-foreground">
+                Searching...
+              </span>
             )}
             <button
               type="button"
-              onClick={() => setIsTagFilterOpen((prev) => !prev)}
+              onClick={() => setIsLabelFilterOpen((prev) => !prev)}
               className={cn(
                 'inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground',
-                isTagFilterOpen && 'border-ring text-foreground'
+                isLabelFilterOpen && 'border-ring text-foreground'
               )}
             >
-              <Tags className="h-3 w-3" />
-              Tags
+              <LabelsIcon className="h-3 w-3" />
+              Labels
             </button>
           </div>
 
-          {/* Tag filter row */}
-          {isTagFilterOpen && (
+          {/* Label filter row */}
+          {isLabelFilterOpen && (
             <div className="flex flex-wrap gap-1 px-3 pt-2 pb-2.5 border-b border-border max-h-[200px] overflow-y-auto shrink-0">
-              {displayTags.length === 0 ? (
+              {displayLabels.length === 0 ? (
                 <span className="text-[10px] text-muted-foreground">
-                  {tagsData ? 'No tags found' : 'Loading tags...'}
+                  {labelsData ? 'No labels found' : 'Loading labels...'}
                 </span>
-              ) : displayTags.map((tag) => {
-                const isActive = selectedTags.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    className="cursor-pointer"
-                  >
-                    <Badge
-                      variant={isActive ? 'primary' : 'default'}
-                      className="text-[10px] px-1.5 cursor-pointer"
+              ) : (
+                displayLabels.map((label) => {
+                  const isActive = selectedLabels.includes(label);
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => toggleLabel(label)}
+                      className="cursor-pointer"
                     >
-                      {isActive && <X className="h-2 w-2 mr-0.5" />}
-                      {tag}
-                    </Badge>
-                  </button>
-                );
-              })}
+                      <Badge
+                        variant={isActive ? 'primary' : 'default'}
+                        className="text-[10px] px-1.5 cursor-pointer"
+                      >
+                        {isActive && <X className="h-2 w-2 mr-0.5" />}
+                        {label}
+                      </Badge>
+                    </button>
+                  );
+                })
+              )}
             </div>
           )}
 
           {/* DAG list */}
-          <div ref={listRef} className="overflow-y-auto flex-1 min-h-0" onKeyDown={handleKeyDown}>
+          <div
+            ref={listRef}
+            className="overflow-y-auto flex-1 min-h-0"
+            onKeyDown={handleKeyDown}
+          >
             {flatList.length === 0 ? (
               <div className="px-3 py-4 text-xs text-muted-foreground text-center">
                 No DAGs found
@@ -345,7 +380,7 @@ export function TemplateSelector({
               groupedDags.map(([group, dagList]) => (
                 <div key={group}>
                   {/* Group header */}
-                  {(hasGroups) && (
+                  {hasGroups && (
                     <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium bg-popover border-b border-border sticky top-0 z-10">
                       {group || '(ungrouped)'}
                     </div>
@@ -354,7 +389,7 @@ export function TemplateSelector({
                   {dagList.map((dag) => {
                     const idx = flatList.indexOf(dag);
                     const params = dag.dag.params;
-                    const tags = dag.dag.tags;
+                    const labels = dag.dag.labels ?? dag.dag.tags;
                     const description = dag.dag.description;
                     return (
                       <div
@@ -371,10 +406,12 @@ export function TemplateSelector({
                       >
                         {/* Name + error/param indicators */}
                         <div className="flex items-center justify-between gap-2">
-                          <span className={cn(
-                            "font-medium text-xs truncate",
-                            dag.errors?.length > 0 && "text-destructive"
-                          )}>
+                          <span
+                            className={cn(
+                              'font-medium text-xs truncate',
+                              dag.errors?.length > 0 && 'text-destructive'
+                            )}
+                          >
                             {dag.dag.name}
                           </span>
                           <div className="flex items-center gap-1 shrink-0">
@@ -394,29 +431,33 @@ export function TemplateSelector({
                             {description}
                           </div>
                         )}
-                        {/* Tags */}
-                        {tags && tags.length > 0 && (
+                        {/* Labels */}
+                        {labels && labels.length > 0 && (
                           <div className="flex items-center gap-1 mt-0.5">
-                            {tags.slice(0, 3).map((tag) => (
+                            {labels.slice(0, 3).map((label) => (
                               <button
-                                key={tag}
+                                key={label}
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggleTag(tag);
+                                  toggleLabel(label);
                                 }}
                               >
                                 <Badge
-                                  variant={selectedTags.includes(tag) ? 'primary' : 'default'}
+                                  variant={
+                                    selectedLabels.includes(label)
+                                      ? 'primary'
+                                      : 'default'
+                                  }
                                   className="text-[10px] px-1 py-0 h-3 cursor-pointer"
                                 >
-                                  {tag}
+                                  {label}
                                 </Badge>
                               </button>
                             ))}
-                            {tags.length > 3 && (
+                            {labels.length > 3 && (
                               <span className="text-[10px] text-muted-foreground">
-                                +{tags.length - 3}
+                                +{labels.length - 3}
                               </span>
                             )}
                           </div>

@@ -109,8 +109,10 @@ type dag struct {
 	// It is a wait time to kill the processes when it is requested to stop.
 	// If the time is exceeded, the process is killed.
 	MaxCleanUpTimeSec *int `yaml:"max_clean_up_time_sec,omitempty"`
-	// Tags is the tags for the DAG.
-	Tags types.TagsValue `yaml:"tags,omitempty"`
+	// Labels is the labels for the DAG.
+	Labels types.LabelsValue `yaml:"labels,omitempty"`
+	// DeprecatedTags is the deprecated tags field for backward compatibility.
+	DeprecatedTags types.LabelsValue `yaml:"tags,omitempty"`
 	// Queue is the name of the queue to assign this DAG to.
 	Queue string `yaml:"queue,omitempty"`
 	// RetryPolicy is the DAG-level retry policy.
@@ -456,7 +458,7 @@ var metadataTransformers = []transform{
 	{"group", newTransformer("Group", buildGroup)},
 	{"description", newTransformer("Description", buildDescription)},
 	{"type", newTransformer("Type", buildType)},
-	{"tags", newTransformer("Tags", buildTags)},
+	{"labels", newTransformer("Labels", buildLabels)},
 	// params must run BEFORE env so that env: values can reference ${param_name}
 	{"params", newTransformer("Params", buildParams)},
 	{"default_params", newTransformer("DefaultParams", buildDefaultParams)},
@@ -722,21 +724,26 @@ func buildRestartWait(_ BuildContext, d *dag) (time.Duration, error) {
 	return time.Second * time.Duration(d.RestartWaitSec), nil
 }
 
-func buildTags(_ BuildContext, d *dag) (core.Tags, error) {
-	if d.Tags.IsZero() {
+func buildLabels(_ BuildContext, d *dag) (core.Labels, error) {
+	labelsValue := d.Labels
+	if labelsValue.IsZero() {
+		labelsValue = d.DeprecatedTags
+	}
+	if labelsValue.IsZero() {
 		return nil, nil
 	}
-	var tags core.Tags
-	for _, entry := range d.Tags.Entries() {
-		if entry.Key() == "" {
+	var labels core.Labels
+	for _, entry := range labelsValue.Entries() {
+		key := strings.ToLower(strings.TrimSpace(entry.Key()))
+		if key == "" {
 			continue
 		}
-		tags = append(tags, core.Tag{
-			Key:   strings.ToLower(strings.TrimSpace(entry.Key())),
+		labels = append(labels, core.Label{
+			Key:   key,
 			Value: strings.ToLower(strings.TrimSpace(entry.Value())),
 		})
 	}
-	return tags, nil
+	return labels, nil
 }
 
 func buildMaxActiveRuns(_ BuildContext, d *dag) (int, error) {

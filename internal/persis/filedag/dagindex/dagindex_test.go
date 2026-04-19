@@ -134,7 +134,7 @@ func TestLoad_Valid(t *testing.T) {
 				FileSize:  10,
 				ModTime:   100,
 				Name:      "a",
-				Tags:      []string{"env=prod"},
+				Labels:    []string{"env=prod"},
 				Suspended: true,
 			},
 		},
@@ -148,7 +148,7 @@ func TestLoad_Valid(t *testing.T) {
 	entries := Load(indexPath, files, flags)
 	require.Len(t, entries, 1)
 	assert.Equal(t, "a", entries[0].Name)
-	assert.Equal(t, []string{"env=prod"}, entries[0].Tags)
+	assert.Equal(t, []string{"env=prod"}, entries[0].Labels)
 	assert.True(t, entries[0].Suspended)
 }
 
@@ -156,14 +156,19 @@ func TestBuild_BasicDAGs(t *testing.T) {
 	dir := t.TempDir()
 
 	// Create a minimal DAG YAML file.
-	dagContent := []byte("name: test-dag\ngroup: mygroup\ndescription: a test dag\ntags:\n  - env=prod\nsteps:\n  - name: step1\n    command: echo hello\n")
+	dagContent := []byte("name: test-dag\ngroup: mygroup\ndescription: a test dag\nlabels:\n  - env=prod\nsteps:\n  - name: step1\n    command: echo hello\n")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "test.yaml"), dagContent, 0600))
+	legacyDagContent := []byte("name: legacy-dag\ntags:\n  - env=legacy\nsteps:\n  - name: step1\n    command: echo legacy\n")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "legacy.yaml"), legacyDagContent, 0600))
 
 	info, err := os.Stat(filepath.Join(dir, "test.yaml"))
+	require.NoError(t, err)
+	legacyInfo, err := os.Stat(filepath.Join(dir, "legacy.yaml"))
 	require.NoError(t, err)
 
 	files := []YAMLFileMeta{
 		{Name: "test.yaml", Size: info.Size(), ModTime: info.ModTime().UnixNano()},
+		{Name: "legacy.yaml", Size: legacyInfo.Size(), ModTime: legacyInfo.ModTime().UnixNano()},
 	}
 
 	// Register executor capabilities for testing.
@@ -172,14 +177,24 @@ func TestBuild_BasicDAGs(t *testing.T) {
 	})
 
 	idx := Build(context.Background(), dir, files, nil)
-	require.Len(t, idx.Entries, 1)
+	require.Len(t, idx.Entries, 2)
 
-	entry := idx.Entries[0]
-	assert.Equal(t, "test-dag", entry.Name)
+	entries := make(map[string]*indexv1.DAGIndexEntry, len(idx.Entries))
+	for _, entry := range idx.Entries {
+		entries[entry.Name] = entry
+	}
+
+	entry := entries["test-dag"]
+	require.NotNil(t, entry)
 	assert.Equal(t, "mygroup", entry.Group)
 	assert.Equal(t, "a test dag", entry.Description)
-	assert.Contains(t, entry.Tags, "env=prod")
+	assert.Contains(t, entry.Labels, "env=prod")
 	assert.Empty(t, entry.LoadError)
+
+	legacyEntry := entries["legacy-dag"]
+	require.NotNil(t, legacyEntry)
+	assert.Contains(t, legacyEntry.Labels, "env=legacy")
+	assert.Empty(t, legacyEntry.LoadError)
 }
 
 func TestBuild_WithBuildErrors(t *testing.T) {
@@ -229,7 +244,7 @@ func TestRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
 	// Create DAG YAML files.
-	cronContent := []byte("name: roundtrip\ntags:\n  - team=backend\nschedule:\n  - \"0 * * * *\"\nsteps:\n  - name: s1\n    command: echo ok\n")
+	cronContent := []byte("name: roundtrip\nlabels:\n  - team=backend\nschedule:\n  - \"0 * * * *\"\nsteps:\n  - name: s1\n    command: echo ok\n")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "rt.yaml"), cronContent, 0600))
 
 	oneOffContent := []byte("name: roundtrip-one-off\nschedule:\n  - at: \"2026-03-29T02:10:00+01:00\"\nsteps:\n  - name: s1\n    command: echo ok\n")
@@ -261,7 +276,7 @@ func TestRoundTrip(t *testing.T) {
 
 	cronDAG := DAGFromEntry(entries[0], dir)
 	assert.Equal(t, "roundtrip", cronDAG.Name)
-	assert.Contains(t, cronDAG.Tags.Strings(), "team=backend")
+	assert.Contains(t, cronDAG.Labels.Strings(), "team=backend")
 	require.Len(t, cronDAG.Schedule, 1)
 	assert.Equal(t, core.ScheduleKindCron, cronDAG.Schedule[0].GetKind())
 	assert.Equal(t, "0 * * * *", cronDAG.Schedule[0].Expression)
@@ -284,7 +299,7 @@ func TestDAGFromEntry(t *testing.T) {
 		Name:        "my-dag",
 		Group:       "group1",
 		Description: "desc",
-		Tags:        []string{"env=prod", "critical"},
+		Labels:      []string{"env=prod", "critical"},
 		Schedule:    "0 * * * *",
 		Suspended:   true,
 		LoadError:   "",
@@ -295,7 +310,7 @@ func TestDAGFromEntry(t *testing.T) {
 	assert.Equal(t, filepath.Join(baseDir, "my-dag.yaml"), dag.Location)
 	assert.Equal(t, "group1", dag.Group)
 	assert.Equal(t, "desc", dag.Description)
-	assert.Len(t, dag.Tags, 2)
+	assert.Len(t, dag.Labels, 2)
 	assert.Len(t, dag.Schedule, 1)
 	assert.Equal(t, "0 * * * *", dag.Schedule[0].Expression)
 	assert.NotNil(t, dag.Schedule[0].Parsed)

@@ -430,7 +430,7 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
 				continue
 			}
-			if len(opts.Tags) > 0 && !containsAllTags(dag.Tags, opts.Tags) {
+			if len(opts.Labels) > 0 && !containsAllLabels(dag.Labels, opts.Labels) {
 				continue
 			}
 
@@ -475,7 +475,7 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 				continue
 			}
 
-			if len(opts.Tags) > 0 && !containsAllTags(dag.Tags, opts.Tags) {
+			if len(opts.Labels) > 0 && !containsAllLabels(dag.Labels, opts.Labels) {
 				continue
 			}
 
@@ -903,11 +903,11 @@ func (store *Storage) locateDAG(nameOrPath string) (string, error) {
 	return "", fmt.Errorf("DAG %s not found: %w", nameOrPath, os.ErrNotExist)
 }
 
-// TagList lists all unique tags from the DAGs.
-func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
+// LabelList lists all unique labels from the DAGs.
+func (store *Storage) LabelList(ctx context.Context) ([]string, []string, error) {
 	var (
-		errList []string
-		tagSet  = make(map[string]struct{})
+		errList  []string
+		labelSet = make(map[string]struct{})
 	)
 
 	// Try index-accelerated path.
@@ -916,10 +916,10 @@ func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
 			if entry.LoadError != "" {
 				continue
 			}
-			for _, tagStr := range entry.Tags {
-				tagSet[strings.ToLower(tagStr)] = struct{}{}
-				if key, _, ok := strings.Cut(tagStr, "="); ok {
-					tagSet[strings.ToLower(key)] = struct{}{}
+			for _, labelStr := range entry.Labels {
+				labelSet[strings.ToLower(labelStr)] = struct{}{}
+				if key, _, ok := strings.Cut(labelStr, "="); ok {
+					labelSet[strings.ToLower(key)] = struct{}{}
 				}
 			}
 		}
@@ -945,21 +945,22 @@ func (store *Storage) TagList(ctx context.Context) ([]string, []string, error) {
 				continue
 			}
 
-			for _, t := range parsedDAG.Tags {
-				tagStr := t.String()
-				tagSet[strings.ToLower(tagStr)] = struct{}{}
+			for _, t := range parsedDAG.Labels {
+				labelStr := t.String()
+				labelSet[strings.ToLower(labelStr)] = struct{}{}
 				if t.Value != "" {
-					tagSet[strings.ToLower(t.Key)] = struct{}{}
+					labelSet[strings.ToLower(t.Key)] = struct{}{}
 				}
 			}
 		}
 	}
 
-	tagList := make([]string, 0, len(tagSet))
-	for t := range tagSet {
-		tagList = append(tagList, t)
+	labelList := make([]string, 0, len(labelSet))
+	for t := range labelSet {
+		labelList = append(labelList, t)
 	}
-	return tagList, errList, nil
+	sort.Strings(labelList)
+	return labelList, errList, nil
 }
 
 // CreateFlag creates the given file.
@@ -989,21 +990,21 @@ func containsSearchText(text string, search string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(search))
 }
 
-// containsAllTags checks if the DAG tags match all filter tags (AND logic).
+// containsAllLabels checks if the DAG labels match all filter labels (AND logic).
 // Supports key-only filters ("env"), exact filters ("env=prod"), and negation ("!deprecated").
-func containsAllTags(dagTags core.Tags, filterTags []string) bool {
-	if len(filterTags) == 0 {
+func containsAllLabels(dagLabels core.Labels, filterLabels []string) bool {
+	if len(filterLabels) == 0 {
 		return true
 	}
 
-	filters := make([]core.TagFilter, 0, len(filterTags))
-	for _, f := range filterTags {
+	filters := make([]core.LabelFilter, 0, len(filterLabels))
+	for _, f := range filterLabels {
 		if trimmed := strings.TrimSpace(f); trimmed != "" {
-			filters = append(filters, core.ParseTagFilter(trimmed))
+			filters = append(filters, core.ParseLabelFilter(trimmed))
 		}
 	}
 
-	return dagTags.MatchesFilters(filters)
+	return dagLabels.MatchesFilters(filters)
 }
 
 // fileExists checks if a file exists.

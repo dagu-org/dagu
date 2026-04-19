@@ -91,11 +91,17 @@ func WithStep(step string) TaskOption {
 	}
 }
 
-// WithTags sets additional tags (comma-separated) for the task.
-func WithTags(tags string) TaskOption {
+// WithLabels sets additional labels (comma-separated) for the task.
+func WithLabels(labels string) TaskOption {
 	return func(task *coordinatorv1.Task) {
-		task.Tags = tags
+		task.Labels = labels
 	}
+}
+
+// WithTags sets additional labels (comma-separated) for the task.
+// Deprecated: use WithLabels.
+func WithTags(tags string) TaskOption {
+	return WithLabels(tags)
 }
 
 // WithScheduleTime sets the RFC 3339 timestamp of when the task was scheduled.

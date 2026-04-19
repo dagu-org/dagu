@@ -258,10 +258,10 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 	}
 
 	// Set metadata from DAG if available
-	var tags []string
+	var labels []string
 	var preconditions []*core.Condition
 	if dag != nil {
-		tags = dag.Tags.Strings()
+		labels = dag.Labels.Strings()
 		preconditions = dag.Preconditions
 	}
 
@@ -278,7 +278,7 @@ func (m *historyMigrator) convertStatus(legacy *legacymodel.Status, dag *core.DA
 		StartedAt:     formatTime(startedAt),
 		FinishedAt:    formatTime(finishedAt),
 		QueuedAt:      formatTime(startedAt), // Use StartedAt as QueuedAt for migration
-		Tags:          tags,
+		Labels:        labels,
 		Preconditions: preconditions,
 	}
 

@@ -12,68 +12,68 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-// TagEntry represents a single tag entry with key and optional value.
-type TagEntry struct {
+// LabelEntry represents a single label entry with key and optional value.
+type LabelEntry struct {
 	key   string
 	value string
 }
 
-// Key returns the tag key.
-func (e TagEntry) Key() string { return e.key }
+// Key returns the label key.
+func (e LabelEntry) Key() string { return e.key }
 
-// Value returns the tag value.
-func (e TagEntry) Value() string { return e.value }
+// Value returns the label value.
+func (e LabelEntry) Value() string { return e.value }
 
 // String returns the canonical string representation.
 // Format: "key=value" or "key" if value is empty.
-func (e TagEntry) String() string {
+func (e LabelEntry) String() string {
 	if e.value == "" {
 		return e.key
 	}
 	return e.key + "=" + e.value
 }
 
-// TagsValue represents tag configuration that can be specified as:
+// LabelsValue represents label configuration that can be specified as:
 //   - A space-separated string: "foo=bar zoo=baz"
 //   - A map of key-value pairs: { foo: bar, zoo: baz }
-//   - An array of strings: ["foo=bar", "simple-tag"]
+//   - An array of strings: ["foo=bar", "simple-label"]
 //   - An array of maps: [{ foo: bar }, { zoo: baz }]
 //   - Backward compatible: ["tag1", "tag2"] or "tag1, tag2"
 //
 // YAML examples:
 //
-//	tags: "foo=bar zoo=baz"
+//	labels: "foo=bar zoo=baz"
 //
-//	tags:
+//	labels:
 //	  foo: bar
 //	  zoo: baz
 //
-//	tags:
+//	labels:
 //	  - foo=bar
-//	  - simple-tag
+//	  - simple-label
 //
-//	tags:
+//	labels:
 //	  - production
 //	  - critical
-type TagsValue struct {
-	raw     any        // Original value for error reporting
-	isSet   bool       // Whether the field was set in YAML
-	entries []TagEntry // Parsed entries in order
+type LabelsValue struct {
+	raw     any          // Original value for error reporting
+	isSet   bool         // Whether the field was set in YAML
+	entries []LabelEntry // Parsed entries in order
 }
 
 // UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
-func (t *TagsValue) UnmarshalYAML(data []byte) error {
-	t.isSet = true
+func (t *LabelsValue) UnmarshalYAML(data []byte) error {
+	*t = LabelsValue{isSet: true}
 
 	var raw any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("tags unmarshal error: %w", err)
+		return fmt.Errorf("labels unmarshal error: %w", err)
 	}
 	t.raw = raw
 
 	switch v := raw.(type) {
 	case string:
-		// Space-separated "key=value" or comma-separated simple tags
+		// Space-separated "key=value" or comma-separated simple labels
 		return t.parseString(v)
 
 	case map[string]any:
@@ -89,11 +89,11 @@ func (t *TagsValue) UnmarshalYAML(data []byte) error {
 		return nil
 
 	default:
-		return fmt.Errorf("tags must be string, map, or array, got %T", v)
+		return fmt.Errorf("labels must be string, map, or array, got %T", v)
 	}
 }
 
-func (t *TagsValue) parseString(s string) error {
+func (t *LabelsValue) parseString(s string) error {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil
@@ -107,12 +107,12 @@ func (t *TagsValue) parseString(s string) error {
 		// Space-separated key=value format: "foo=bar zoo=baz"
 		parts = strings.Fields(s)
 	} else {
-		// Comma-separated format (backward compatible): "tag1, tag2" or "tag1,tag2"
+		// Comma-separated format (backward compatible): "label1, label2" or "label1,label2"
 		parts = strings.Split(s, ",")
 	}
 
 	for _, part := range parts {
-		entry, err := parseTagEntry(part)
+		entry, err := parseLabelEntry(part)
 		if err != nil {
 			return err
 		}
@@ -123,11 +123,11 @@ func (t *TagsValue) parseString(s string) error {
 	return nil
 }
 
-func (t *TagsValue) parseMap(m map[string]any) error {
+func (t *LabelsValue) parseMap(m map[string]any) error {
 	return t.parseMapEntries(-1, m)
 }
 
-func (t *TagsValue) parseArray(arr []any) error {
+func (t *LabelsValue) parseArray(arr []any) error {
 	for i, item := range arr {
 		switch v := item.(type) {
 		case map[string]any:
@@ -135,23 +135,23 @@ func (t *TagsValue) parseArray(arr []any) error {
 				return err
 			}
 		case string:
-			entry, err := parseTagEntry(v)
+			entry, err := parseLabelEntry(v)
 			if err != nil {
-				return fmt.Errorf("tags[%d]: %w", i, err)
+				return fmt.Errorf("labels[%d]: %w", i, err)
 			}
 			if entry.key != "" {
 				t.entries = append(t.entries, entry)
 			}
 		default:
-			return fmt.Errorf("tags[%d]: expected map or string, got %T", i, item)
+			return fmt.Errorf("labels[%d]: expected map or string, got %T", i, item)
 		}
 	}
 	return nil
 }
 
 // parseMapEntries parses key-value pairs from a map.
-// If index >= 0, errors are prefixed with "tags[index]: ".
-func (t *TagsValue) parseMapEntries(index int, m map[string]any) error {
+// If index >= 0, errors are prefixed with "labels[index]: ".
+func (t *LabelsValue) parseMapEntries(index int, m map[string]any) error {
 	// Sort keys for deterministic ordering
 	keys := make([]string, 0, len(m))
 	for key := range m {
@@ -163,28 +163,28 @@ func (t *TagsValue) parseMapEntries(index int, m map[string]any) error {
 		k := strings.TrimSpace(key)
 		v := strings.TrimSpace(stringifyValue(m[key]))
 
-		if err := validateTagEntry(k, v); err != nil {
+		if err := validateLabelEntry(k, v); err != nil {
 			if index >= 0 {
-				return fmt.Errorf("tags[%d]: %w", index, err)
+				return fmt.Errorf("labels[%d]: %w", index, err)
 			}
 			return err
 		}
 
-		t.entries = append(t.entries, TagEntry{key: k, value: v})
+		t.entries = append(t.entries, LabelEntry{key: k, value: v})
 	}
 	return nil
 }
 
-// validateTagEntry validates a tag key-value pair using core.ValidateTag.
-func validateTagEntry(key, value string) error {
-	return core.ValidateTag(core.Tag{Key: key, Value: value})
+// validateLabelEntry validates a label key-value pair using core.ValidateLabel.
+func validateLabelEntry(key, value string) error {
+	return core.ValidateLabel(core.Label{Key: key, Value: value})
 }
 
-// parseTagEntry parses a single tag string into TagEntry with validation.
-func parseTagEntry(s string) (TagEntry, error) {
+// parseLabelEntry parses a single label string into LabelEntry with validation.
+func parseLabelEntry(s string) (LabelEntry, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return TagEntry{}, nil
+		return LabelEntry{}, nil
 	}
 
 	key, value, hasValue := strings.Cut(s, "=")
@@ -194,36 +194,36 @@ func parseTagEntry(s string) (TagEntry, error) {
 		value = strings.TrimSpace(value)
 	}
 
-	if err := validateTagEntry(key, value); err != nil {
-		return TagEntry{}, err
+	if err := validateLabelEntry(key, value); err != nil {
+		return LabelEntry{}, err
 	}
 
-	return TagEntry{key: key, value: value}, nil
+	return LabelEntry{key: key, value: value}, nil
 }
 
-// IsZero returns true if tags were not set in YAML.
-func (t TagsValue) IsZero() bool {
+// IsZero returns true if labels were not set in YAML.
+func (t LabelsValue) IsZero() bool {
 	return !t.isSet
 }
 
 // Value returns the original raw value for error reporting.
-func (t TagsValue) Value() any {
+func (t LabelsValue) Value() any {
 	return t.raw
 }
 
-// Entries returns the parsed tag entries in order.
-func (t TagsValue) Entries() []TagEntry {
+// Entries returns the parsed label entries in order.
+func (t LabelsValue) Entries() []LabelEntry {
 	return t.entries
 }
 
-// IsEmpty returns true if tags were set but contain no entries.
-func (t TagsValue) IsEmpty() bool {
+// IsEmpty returns true if labels were set but contain no entries.
+func (t LabelsValue) IsEmpty() bool {
 	return t.isSet && len(t.entries) == 0
 }
 
-// Values returns tag entries as strings for backward compatibility.
+// Values returns label entries as strings for backward compatibility.
 // Key-only entries return just the key, key-value entries return "key=value".
-func (t TagsValue) Values() []string {
+func (t LabelsValue) Values() []string {
 	if t.entries == nil {
 		return nil
 	}
@@ -233,3 +233,7 @@ func (t TagsValue) Values() []string {
 	}
 	return values
 }
+
+// Deprecated compatibility aliases. Prefer LabelsValue/LabelEntry in new code.
+type TagsValue = LabelsValue
+type TagEntry = LabelEntry

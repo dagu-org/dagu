@@ -18,7 +18,8 @@ import (
 
 var ErrInvalidQueryCursor = errors.New("filedagrun: invalid query cursor")
 
-const queryCursorVersion = 1
+// queryCursorVersion 2 reflects the filter hash JSON key migration from tags to labels.
+const queryCursorVersion = 2
 
 type queryCursorPayload struct {
 	Version    int    `json:"v"`
@@ -86,8 +87,8 @@ func queryFilterHash(opts exec.ListDAGRunStatusesOptions) string {
 	}
 	sort.Ints(statuses)
 
-	tags := append([]string(nil), opts.Tags...)
-	sort.Strings(tags)
+	labels := append([]string(nil), opts.Labels...)
+	sort.Strings(labels)
 
 	normalized := struct {
 		DAGRunID   string   `json:"dag_run_id,omitempty"`
@@ -96,14 +97,14 @@ func queryFilterHash(opts exec.ListDAGRunStatusesOptions) string {
 		From       string   `json:"from,omitempty"`
 		To         string   `json:"to,omitempty"`
 		Statuses   []int    `json:"statuses,omitempty"`
-		Tags       []string `json:"tags,omitempty"`
+		Labels     []string `json:"labels,omitempty"`
 		AllHistory bool     `json:"all_history,omitempty"`
 	}{
 		DAGRunID:   opts.DAGRunID,
 		Name:       opts.Name,
 		ExactName:  opts.ExactName,
 		Statuses:   statuses,
-		Tags:       tags,
+		Labels:     labels,
 		AllHistory: opts.AllHistory,
 	}
 	if !opts.From.IsZero() {
