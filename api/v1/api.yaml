@@ -2160,9 +2160,6 @@ paths:
                 dagName:
                   type: string
                   description: "Optional DAG name override for the edited retry run."
-                persistSpec:
-                  type: boolean
-                  description: "Whether the final edit-retry operation should save this specification to the DAG file before retrying."
               required:
                 - spec
       responses:
@@ -2257,9 +2254,6 @@ paths:
                 dagName:
                   type: string
                   description: "Optional DAG name override for the edited retry run."
-                persistSpec:
-                  type: boolean
-                  description: "When true, save the edited spec to the DAG file before launching the retry."
                 skipSteps:
                   type: array
                   description: "Steps to mark skipped while preserving their previous output variables."
@@ -2288,15 +2282,11 @@ paths:
                     type: array
                     items:
                       type: string
-                  persisted:
-                    type: boolean
-                    description: "Whether the edited specification was saved to the DAG file."
                 required:
                   - dagRunId
                   - queued
                   - skippedSteps
                   - startedSteps
-                  - persisted
         default:
           description: "Generic error response"
           content:

@@ -7,6 +7,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
@@ -15,16 +16,26 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import DAGSpecReadOnly from '../DAGSpecReadOnly';
 
 const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
   navigate: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
   showError: vi.fn(),
   showToast: vi.fn(),
   useQuery: vi.fn(),
 }));
 
 vi.mock('@/hooks/api', () => ({
-  useClient: () => ({ POST: mocks.post }),
+  useClient: () => ({ GET: mocks.get, POST: mocks.post, PUT: mocks.put }),
   useQuery: mocks.useQuery,
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useCanWrite: () => true,
+}));
+
+vi.mock('@/contexts/UserPreference', () => ({
+  useUserPreferences: () => ({ preferences: { theme: 'light' } }),
 }));
 
 vi.mock('@/components/ui/error-modal', () => ({
@@ -82,6 +93,28 @@ vi.mock('../../visualization/Graph', () => ({
   ),
 }));
 
+vi.mock('react-diff-viewer-continued', () => ({
+  default: ({
+    oldValue,
+    newValue,
+    leftTitle,
+    rightTitle,
+  }: {
+    oldValue: string;
+    newValue: string;
+    leftTitle: string;
+    rightTitle: string;
+  }) => (
+    <div data-testid="source-diff">
+      <div>{leftTitle}</div>
+      <div>{rightTitle}</div>
+      <pre>{oldValue}</pre>
+      <pre>{newValue}</pre>
+    </div>
+  ),
+  DiffMethod: { LINES: 'lines' },
+}));
+
 const appBarValue = {
   title: 'DAGs',
   setTitle: vi.fn(),
@@ -113,18 +146,22 @@ const previewResponse = {
   warnings: ['output variables will be copied'],
 };
 
-function renderSpec() {
+function renderSpec(
+  props: Partial<React.ComponentProps<typeof DAGSpecReadOnly>> = {}
+) {
   return render(
     <AppBarContext.Provider value={appBarValue}>
-      <DAGSpecReadOnly dagName="example" dagRunId="run-1" />
+      <DAGSpecReadOnly dagName="example" dagRunId="run-1" {...props} />
     </AppBarContext.Provider>
   );
 }
 
 afterEach(() => {
   cleanup();
+  mocks.get.mockReset();
   mocks.navigate.mockReset();
   mocks.post.mockReset();
+  mocks.put.mockReset();
   mocks.showError.mockReset();
   mocks.showToast.mockReset();
   mocks.useQuery.mockReset();
@@ -158,7 +195,6 @@ describe('DAGSpecReadOnly', () => {
         body: {
           spec: editedSpec,
           dagName: 'example',
-          persistSpec: false,
         },
       })
     );
@@ -190,7 +226,6 @@ describe('DAGSpecReadOnly', () => {
         body: {
           spec: editedSpec,
           dagName: 'example',
-          persistSpec: false,
           skipSteps: ['extract'],
         },
       })
@@ -231,10 +266,72 @@ describe('DAGSpecReadOnly', () => {
         body: {
           spec: editedSpec,
           dagName: 'example',
-          persistSpec: false,
           skipSteps: [],
         },
       })
+    );
+  });
+
+  it('shows a diff before saving the edited spec to the source DAG', async () => {
+    mocks.useQuery.mockReturnValue({
+      data: { spec: originalSpec },
+      isLoading: false,
+      error: undefined,
+    });
+    mocks.get.mockResolvedValueOnce({
+      data: { spec: originalSpec, errors: [] },
+    });
+    mocks.put.mockResolvedValueOnce({ data: { errors: [] } });
+
+    renderSpec({ sourceFileName: 'example' });
+
+    const editor = screen.getByLabelText('DAG spec');
+    await waitFor(() => expect(editor).toHaveValue(originalSpec));
+    fireEvent.change(editor, { target: { value: editedSpec } });
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /save source dag/i })
+    );
+
+    expect(mocks.get).toHaveBeenCalledWith(
+      '/dags/{fileName}/spec',
+      expect.objectContaining({
+        params: {
+          path: { fileName: 'example' },
+          query: { remoteNode: 'local' },
+        },
+      })
+    );
+    expect(await screen.findByTestId('source-diff')).toHaveTextContent(
+      'Current source DAG'
+    );
+    expect(screen.getByTestId('source-diff')).toHaveTextContent(
+      'Edited DAG spec'
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: /save source dag/i,
+    });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /^save source dag$/i })
+    );
+
+    await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(1));
+    expect(mocks.put).toHaveBeenCalledWith(
+      '/dags/{fileName}/spec',
+      expect.objectContaining({
+        body: {
+          spec: editedSpec,
+        },
+        params: {
+          path: { fileName: 'example' },
+          query: { remoteNode: 'local' },
+        },
+      })
+    );
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(mocks.showToast).toHaveBeenCalledWith(
+      'Source DAG saved successfully'
     );
   });
 

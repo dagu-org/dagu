@@ -38,7 +38,6 @@ type editRetryOptions struct {
 	specContent  string
 	nameOverride string
 	newDAGRunID  string
-	persistSpec  bool
 	skipSteps    *[]string
 }
 
@@ -46,7 +45,6 @@ type editRetryPlan struct {
 	sourceAttempt  exec.DAGRunAttempt
 	sourceDAGRunID string
 	sourceStatus   *exec.DAGRunStatus
-	sourceDAG      *core.DAG
 	editedDAG      *core.DAG
 	newDAGRunID    string
 	params         string
@@ -126,11 +124,6 @@ func (a *API) EditRetryDAGRun(ctx context.Context, request api.EditRetryDAGRunRe
 	if err != nil {
 		return nil, err
 	}
-	if opts.persistSpec {
-		if err := a.requireDAGWrite(ctx); err != nil {
-			return nil, err
-		}
-	}
 
 	plan, validationErrors, err := a.buildEditRetryPlan(ctx, request.Name, request.DagRunId, opts)
 	if err != nil {
@@ -154,33 +147,15 @@ func (a *API) EditRetryDAGRun(ctx context.Context, request api.EditRetryDAGRunRe
 		return nil, err
 	}
 
-	var rollbackPersistedSpec func() error
-	if opts.persistSpec {
-		rollbackPersistedSpec, err = a.persistEditRetrySpec(ctx, request.Name, opts.specContent)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	queued, err := a.launchEditRetryDAGRun(ctx, plan)
 	if err != nil {
-		if rollbackPersistedSpec != nil {
-			if rollbackErr := rollbackPersistedSpec(); rollbackErr != nil {
-				logger.Error(ctx, "Failed to restore DAG spec after edit retry launch failure",
-					tag.DAG(request.Name),
-					tag.Error(rollbackErr),
-				)
-				return nil, fmt.Errorf("%w; failed to restore DAG spec after launch failure: %v", err, rollbackErr)
-			}
-		}
 		return nil, err
 	}
 
-	a.logEditRetryAudit(ctx, request.Name, plan, queued, opts.persistSpec)
+	a.logEditRetryAudit(ctx, request.Name, plan, queued)
 
 	return api.EditRetryDAGRun200JSONResponse{
 		DagRunId:     api.DAGRunId(plan.newDAGRunID),
-		Persisted:    opts.persistSpec,
 		Queued:       queued,
 		SkippedSteps: nonNilEditRetryStrings(plan.skippedSteps),
 		StartedSteps: nonNilEditRetryStrings(plan.runnableSteps),
@@ -204,9 +179,6 @@ func previewEditRetryOptions(body *api.PreviewEditRetryDAGRunJSONRequestBody) (e
 	if body.DagName != nil {
 		opts.nameOverride = strings.TrimSpace(*body.DagName)
 	}
-	if body.PersistSpec != nil {
-		opts.persistSpec = *body.PersistSpec
-	}
 	return opts, nil
 }
 
@@ -222,9 +194,6 @@ func editRetryOptionsFromBody(body *api.EditRetryDAGRunJSONRequestBody) (editRet
 	}
 	if body.DagRunId != nil {
 		opts.newDAGRunID = strings.TrimSpace(*body.DagRunId)
-	}
-	if body.PersistSpec != nil {
-		opts.persistSpec = *body.PersistSpec
 	}
 	if body.SkipSteps != nil {
 		skipSteps := append([]string(nil), (*body.SkipSteps)...)
@@ -272,9 +241,6 @@ func (a *API) buildEditRetryPlan(
 			validationErrors = append(validationErrors, err.Error())
 		}
 	}
-	if opts.persistSpec && opts.nameOverride != "" {
-		validationErrors = append(validationErrors, "dagName cannot be used when persistSpec is true")
-	}
 	if opts.newDAGRunID != "" {
 		if err := validateDAGRunID(opts.newDAGRunID); err != nil {
 			validationErrors = append(validationErrors, err.Error())
@@ -285,7 +251,6 @@ func (a *API) buildEditRetryPlan(
 			sourceAttempt:  attempt,
 			sourceDAGRunID: sourceDAGRunID,
 			sourceStatus:   status,
-			sourceDAG:      sourceDAG,
 			editedDAG:      &core.DAG{Name: dagName},
 			newDAGRunID:    opts.newDAGRunID,
 		}, validationErrors, nil
@@ -300,7 +265,7 @@ func (a *API) buildEditRetryPlan(
 		params = preservedParams
 	}
 
-	editedDAG, validationErrors, err := a.loadEditedRetryDAG(ctx, dagName, sourceDAG, opts, params, sourceDAGRunID)
+	editedDAG, validationErrors, err := a.loadEditedRetryDAG(ctx, opts, params, sourceDAGRunID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -309,7 +274,6 @@ func (a *API) buildEditRetryPlan(
 			sourceAttempt:  attempt,
 			sourceDAGRunID: sourceDAGRunID,
 			sourceStatus:   status,
-			sourceDAG:      sourceDAG,
 			editedDAG:      &core.DAG{Name: editRetryFallbackDAGName(dagName, opts.nameOverride)},
 			newDAGRunID:    opts.newDAGRunID,
 			params:         params,
@@ -324,7 +288,6 @@ func (a *API) buildEditRetryPlan(
 		sourceAttempt:  attempt,
 		sourceDAGRunID: sourceDAGRunID,
 		sourceStatus:   status,
-		sourceDAG:      sourceDAG,
 		editedDAG:      editedDAG,
 		newDAGRunID:    opts.newDAGRunID,
 		params:         params,
@@ -337,16 +300,11 @@ func (a *API) buildEditRetryPlan(
 
 func (a *API) loadEditedRetryDAG(
 	ctx context.Context,
-	dagName string,
-	sourceDAG *core.DAG,
 	opts editRetryOptions,
 	params string,
 	sourceDAGRunID string,
 ) (*core.DAG, []string, error) {
 	loadName := opts.nameOverride
-	if opts.persistSpec {
-		loadName = dagName
-	}
 
 	var namePtr *string
 	if loadName != "" {
@@ -379,9 +337,6 @@ func (a *API) loadEditedRetryDAG(
 
 	resolved.Location = ""
 	resolved.SourceFile = ""
-	if opts.persistSpec {
-		resolved.SourceFile = sourceDAG.SourceFile
-	}
 
 	return resolved, validationErrors, nil
 }
@@ -588,19 +543,6 @@ func (a *API) markEditRetrySeedFailed(ctx context.Context, status *exec.DAGRunSt
 			tag.Error(err),
 		)
 	}
-}
-
-func (a *API) persistEditRetrySpec(ctx context.Context, dagName string, specContent string) (func() error, error) {
-	previousSpec, err := a.dagStore.GetSpec(ctx, dagName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read current DAG spec before edit retry persistence: %w", err)
-	}
-	if err := a.dagStore.UpdateSpec(ctx, dagName, []byte(specContent)); err != nil {
-		return nil, err
-	}
-	return func() error {
-		return a.dagStore.UpdateSpec(ctx, dagName, []byte(previousSpec))
-	}, nil
 }
 
 func (a *API) seedEditRetryAttempt(
@@ -1015,7 +957,7 @@ func badEditRetryRequest(message string) *Error {
 	}
 }
 
-func (a *API) logEditRetryAudit(ctx context.Context, requestDAGName string, plan *editRetryPlan, queued bool, persisted bool) {
+func (a *API) logEditRetryAudit(ctx context.Context, requestDAGName string, plan *editRetryPlan, queued bool) {
 	details := map[string]any{
 		"dag_name":          requestDAGName,
 		"from_dag_run_id":   plan.sourceDAGRunID,
@@ -1024,7 +966,6 @@ func (a *API) logEditRetryAudit(ctx context.Context, requestDAGName string, plan
 		"skipped_steps":     plan.skippedSteps,
 		"runnable_steps":    plan.runnableSteps,
 		"queued":            queued,
-		"persisted":         persisted,
 		"trigger_type":      core.TriggerTypeRetry.String(),
 		"source_attempt_id": plan.sourceAttempt.ID(),
 	}

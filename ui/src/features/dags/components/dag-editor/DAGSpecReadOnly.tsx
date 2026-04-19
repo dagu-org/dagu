@@ -5,12 +5,24 @@
  * @module features/dags/components/dag-editor
  */
 import React from 'react';
+import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
+import { useCanWrite } from '@/contexts/AuthContext';
+import { useUserPreferences } from '@/contexts/UserPreference';
 import { cn } from '@/lib/utils';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Save, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   components,
@@ -33,6 +45,8 @@ type DAGSpecReadOnlyProps = {
   dagRunId: string;
   /** Optional sub-DAG run ID for viewing subdag specs */
   subDAGRunId?: string;
+  /** Source DAG file name when the DAG-run was created from a DAGs-dir file */
+  sourceFileName?: string;
   /** Additional class name for the container */
   className?: string;
 };
@@ -129,11 +143,13 @@ function DAGSpecReadOnly({
   dagName,
   dagRunId,
   subDAGRunId,
+  sourceFileName,
   className,
 }: DAGSpecReadOnlyProps) {
   const appBarContext = React.useContext(AppBarContext);
   const client = useClient();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { showError } = useErrorModal();
   const { showToast } = useSimpleToast();
   const [sourceSpec, setSourceSpec] = React.useState('');
@@ -143,6 +159,10 @@ function DAGSpecReadOnly({
   const [previewVisible, setPreviewVisible] = React.useState(false);
   const [retryPreview, setRetryPreview] =
     React.useState<EditRetryPreview | null>(null);
+  const [sourceDAGSpec, setSourceDAGSpec] = React.useState<string | null>(null);
+  const [sourceDiffVisible, setSourceDiffVisible] = React.useState(false);
+  const [sourceDiffLoading, setSourceDiffLoading] = React.useState(false);
+  const [sourceSaving, setSourceSaving] = React.useState(false);
   const [selectedSkipSteps, setSelectedSkipSteps] = React.useState<string[]>(
     []
   );
@@ -184,6 +204,8 @@ function DAGSpecReadOnly({
     setSourceSpec(data.spec);
     setEditedSpec(data.spec);
     setRetryPreview(null);
+    setSourceDAGSpec(null);
+    setSourceDiffVisible(false);
     setSelectedSkipSteps([]);
     setSelectedPreviewStep('');
     setPreviewVisible(false);
@@ -194,6 +216,7 @@ function DAGSpecReadOnly({
   const editorSpec = !hasLoadedSpec && data?.spec ? data.spec : editedSpec;
   const hasEdits =
     isEditableRetry && hasLoadedSpec && editorSpec !== sourceSpec;
+  const canOpenSourceDAGDiff = hasEdits && !!sourceFileName;
 
   const previewEditedSpec = React.useCallback(async () => {
     if (!hasEdits || !editorSpec.trim() || previewLoading || retrySubmitting) {
@@ -217,7 +240,6 @@ function DAGSpecReadOnly({
           body: {
             spec: editorSpec,
             dagName,
-            persistSpec: false,
           },
         }
       );
@@ -289,7 +311,6 @@ function DAGSpecReadOnly({
           body: {
             spec: editorSpec,
             dagName,
-            persistSpec: false,
             skipSteps: orderedSelectedSkipSteps(
               retryPreview.steps,
               selectedSkipSteps
@@ -340,6 +361,139 @@ function DAGSpecReadOnly({
     selectedSkipSteps,
     showError,
     showToast,
+  ]);
+
+  const openSourceDAGDiff = React.useCallback(async () => {
+    if (
+      !canWrite ||
+      !sourceFileName ||
+      !hasEdits ||
+      !editorSpec.trim() ||
+      sourceDiffLoading ||
+      sourceSaving
+    ) {
+      return;
+    }
+
+    setSourceDiffLoading(true);
+    try {
+      const { data: sourceData, error: sourceError } = await client.GET(
+        '/dags/{fileName}/spec',
+        {
+          params: {
+            path: {
+              fileName: sourceFileName,
+            },
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+          },
+        }
+      );
+      if (sourceError) {
+        showError(
+          sourceError.message || 'Failed to load source DAG',
+          'The source DAG file may no longer be editable from the DAGs directory.'
+        );
+        return;
+      }
+
+      const currentSourceSpec = sourceData?.spec ?? '';
+      setSourceDAGSpec(currentSourceSpec);
+      if (currentSourceSpec === editorSpec) {
+        showToast('Source DAG already matches the edited spec');
+        return;
+      }
+      setSourceDiffVisible(true);
+    } catch (err) {
+      showError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to load source DAG',
+        'Check your connection and try again.'
+      );
+    } finally {
+      setSourceDiffLoading(false);
+    }
+  }, [
+    appBarContext.selectedRemoteNode,
+    canWrite,
+    client,
+    editorSpec,
+    hasEdits,
+    showError,
+    showToast,
+    sourceDiffLoading,
+    sourceFileName,
+    sourceSaving,
+  ]);
+
+  const saveSourceDAG = React.useCallback(async () => {
+    if (
+      !canWrite ||
+      !sourceFileName ||
+      sourceDAGSpec == null ||
+      !editorSpec.trim() ||
+      sourceSaving
+    ) {
+      return;
+    }
+
+    setSourceSaving(true);
+    try {
+      const { data: responseData, error: saveError } = await client.PUT(
+        '/dags/{fileName}/spec',
+        {
+          params: {
+            path: {
+              fileName: sourceFileName,
+            },
+            query: {
+              remoteNode: appBarContext.selectedRemoteNode || 'local',
+            },
+          },
+          body: {
+            spec: editorSpec,
+          },
+        }
+      );
+
+      if (saveError) {
+        showError(
+          saveError.message || 'Failed to save source DAG',
+          'Please check the YAML syntax and try again.'
+        );
+        return;
+      }
+
+      if (responseData?.errors?.length) {
+        showError('Validation errors', responseData.errors.join('\n'));
+        return;
+      }
+
+      setSourceDAGSpec(editorSpec);
+      setSourceDiffVisible(false);
+      showToast('Source DAG saved successfully');
+    } catch (err) {
+      showError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to save source DAG',
+        'Check your connection and try again.'
+      );
+    } finally {
+      setSourceSaving(false);
+    }
+  }, [
+    appBarContext.selectedRemoteNode,
+    canWrite,
+    client,
+    editorSpec,
+    showError,
+    showToast,
+    sourceDAGSpec,
+    sourceFileName,
+    sourceSaving,
   ]);
 
   const handleSpecChange = React.useCallback((value?: string) => {
@@ -428,16 +582,44 @@ function DAGSpecReadOnly({
         className={className}
         headerActions={
           hasEdits ? (
-            <Button
-              type="button"
-              size="xs"
-              variant="primary"
-              disabled={previewLoading || retrySubmitting || !editorSpec.trim()}
-              onClick={() => void previewEditedSpec()}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {previewLoading ? 'Previewing...' : 'Retry as a new run'}
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {canWrite && sourceFileName && (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  disabled={
+                    !canOpenSourceDAGDiff ||
+                    sourceDiffLoading ||
+                    sourceSaving ||
+                    !editorSpec.trim()
+                  }
+                  onClick={() => void openSourceDAGDiff()}
+                >
+                  {sourceDiffLoading ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="h-3.5 w-3.5" />
+                  )}
+                  {sourceDiffLoading ? 'Loading diff...' : 'Save source DAG'}
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="xs"
+                variant="primary"
+                disabled={
+                  previewLoading ||
+                  retrySubmitting ||
+                  sourceSaving ||
+                  !editorSpec.trim()
+                }
+                onClick={() => void previewEditedSpec()}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {previewLoading ? 'Previewing...' : 'Retry as a new run'}
+              </Button>
+            </div>
           ) : undefined
         }
         modelUri={`inmemory://dagu/dag-runs/${encodeURIComponent(
@@ -445,6 +627,20 @@ function DAGSpecReadOnly({
         )}/${encodeURIComponent(dagRunId)}/${encodeURIComponent(
           subDAGRunId ?? 'root'
         )}.yaml`}
+      />
+
+      <SourceDAGDiffDialog
+        open={sourceDiffVisible}
+        onOpenChange={(open) => {
+          if (!sourceSaving) {
+            setSourceDiffVisible(open);
+          }
+        }}
+        sourceFileName={sourceFileName ?? ''}
+        sourceSpec={sourceDAGSpec ?? ''}
+        editedSpec={editorSpec}
+        saving={sourceSaving}
+        onSave={() => void saveSourceDAG()}
       />
 
       <ConfirmModal
@@ -611,6 +807,126 @@ function DAGSpecReadOnly({
         )}
       </ConfirmModal>
     </>
+  );
+}
+
+function SourceDAGDiffDialog({
+  open,
+  onOpenChange,
+  sourceFileName,
+  sourceSpec,
+  editedSpec,
+  saving,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sourceFileName: string;
+  sourceSpec: string;
+  editedSpec: string;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const preferencesContext = useUserPreferences();
+  const isDarkMode = preferencesContext?.preferences.theme === 'dark';
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        hideCloseButton
+        className="grid max-h-[92vh] w-[calc(100vw-1rem)] max-w-6xl grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-0 duration-100 sm:w-[calc(100vw-2rem)]"
+      >
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/40 px-4 py-3">
+          <DialogTitle className="min-w-0 truncate text-sm font-mono">
+            Save Source DAG: {sourceFileName}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Review the current source DAG and edited DAG specification before
+            saving changes.
+          </DialogDescription>
+          <DialogClose className="rounded-md p-1.5 opacity-70 transition-opacity hover:bg-muted hover:opacity-100">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          <ReactDiffViewer
+            oldValue={sourceSpec}
+            newValue={editedSpec}
+            splitView={true}
+            leftTitle="Current source DAG"
+            rightTitle="Edited DAG spec"
+            useDarkTheme={isDarkMode}
+            compareMethod={DiffMethod.LINES}
+            showDiffOnly={false}
+            styles={{
+              variables: {
+                dark: {
+                  diffViewerBackground: '#1e1e1e',
+                  gutterBackground: '#252526',
+                  addedBackground: '#1e3a29',
+                  addedGutterBackground: '#1e3a29',
+                  removedBackground: '#3a1e1e',
+                  removedGutterBackground: '#3a1e1e',
+                  wordAddedBackground: '#2ea043',
+                  wordRemovedBackground: '#f85149',
+                  emptyLineBackground: '#1e1e1e',
+                  gutterColor: '#6e7681',
+                },
+                light: {
+                  diffViewerBackground: '#ffffff',
+                  gutterBackground: '#f6f8fa',
+                  addedBackground: '#e6ffec',
+                  addedGutterBackground: '#ccffd8',
+                  removedBackground: '#ffebe9',
+                  removedGutterBackground: '#ffd7d5',
+                  wordAddedBackground: '#abf2bc',
+                  wordRemovedBackground: '#ff818266',
+                  emptyLineBackground: '#ffffff',
+                  gutterColor: '#57606a',
+                },
+              },
+              contentText: {
+                fontFamily:
+                  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                fontSize: '12px',
+                lineHeight: '1.5',
+              },
+              titleBlock: {
+                padding: '8px 12px',
+                fontSize: '12px',
+                fontWeight: 500,
+              },
+              line: {
+                padding: '0 8px',
+              },
+            }}
+          />
+        </div>
+
+        <DialogFooter className="gap-2 border-t border-border/40 px-4 py-3 sm:gap-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+          >
+            <X className="h-3.5 w-3.5" />
+            Cancel
+          </Button>
+          <Button type="button" size="sm" disabled={saving} onClick={onSave}>
+            {saving ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            {saving ? 'Saving...' : 'Save source DAG'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

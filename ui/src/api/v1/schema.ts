@@ -7489,8 +7489,6 @@ export interface operations {
                     spec: string;
                     /** @description Optional DAG name override for the edited retry run. */
                     dagName?: string;
-                    /** @description Whether the final edit-retry operation should save this specification to the DAG file before retrying. */
-                    persistSpec?: boolean;
                 };
             };
         };
@@ -7556,8 +7554,6 @@ export interface operations {
                     dagRunId?: components["schemas"]["DAGRunCreateId"] & unknown;
                     /** @description Optional DAG name override for the edited retry run. */
                     dagName?: string;
-                    /** @description When true, save the edited spec to the DAG file before launching the retry. */
-                    persistSpec?: boolean;
                     /** @description Steps to mark skipped while preserving their previous output variables. */
                     skipSteps?: string[];
                 };
@@ -7576,8 +7572,6 @@ export interface operations {
                         queued: boolean;
                         skippedSteps: string[];
                         startedSteps: string[];
-                        /** @description Whether the edited specification was saved to the DAG file. */
-                        persisted: boolean;
                     };
                 };
             };
