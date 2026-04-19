@@ -8,7 +8,7 @@
  */
 import { useCanWrite } from '@/contexts/AuthContext';
 import { StepDetails } from '@/features/dags/components/step-details';
-import { toMermaidNodeId } from '@/lib/utils';
+import { cn, toMermaidNodeId } from '@/lib/utils';
 import BorderedBox from '@/ui/BorderedBox';
 import { AlertTriangle, MousePointerClick, Save, Undo2, X } from 'lucide-react';
 import React, { useEffect } from 'react';
@@ -617,6 +617,37 @@ function SpecStepDetailsDrawer({
   onClose: () => void;
   step?: components['schemas']['Step'];
 }) {
+  const [shouldRender, setShouldRender] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [renderedStep, setRenderedStep] = React.useState(step);
+
+  React.useEffect(() => {
+    let closeTimer: number | undefined;
+    let animationFrame: number | undefined;
+
+    if (isOpen && step) {
+      setRenderedStep(step);
+      setShouldRender(true);
+      animationFrame = window.requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    } else {
+      setIsVisible(false);
+      closeTimer = window.setTimeout(() => {
+        setShouldRender(false);
+      }, 180);
+    }
+
+    return () => {
+      if (animationFrame !== undefined) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      if (closeTimer !== undefined) {
+        window.clearTimeout(closeTimer);
+      }
+    };
+  }, [isOpen, step]);
+
   React.useEffect(() => {
     if (!isOpen) {
       return;
@@ -632,7 +663,7 @@ function SpecStepDetailsDrawer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !step) {
+  if (!shouldRender || !renderedStep) {
     return null;
   }
 
@@ -641,14 +672,20 @@ function SpecStepDetailsDrawer({
       <button
         type="button"
         aria-label="Close step details"
-        className="absolute inset-0 h-full w-full cursor-default bg-black/40 backdrop-blur-sm"
+        className={cn(
+          'absolute inset-0 h-full w-full cursor-default bg-black/10 transition-opacity duration-200 ease-out dark:bg-black/20',
+          isVisible ? 'opacity-100' : 'opacity-0'
+        )}
         onClick={onClose}
       />
       <aside
         role="dialog"
         aria-modal="true"
         aria-labelledby="spec-step-details-title"
-        className="relative z-10 flex h-full w-full max-w-[520px] flex-col border-l border-border bg-background shadow-2xl duration-200 animate-in slide-in-from-right"
+        className={cn(
+          'relative z-10 flex h-full w-full max-w-[520px] flex-col border-l border-border bg-background shadow-xl transition-all duration-200 ease-out will-change-transform',
+          isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        )}
       >
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div className="min-w-0">
@@ -659,7 +696,7 @@ function SpecStepDetailsDrawer({
               id="spec-step-details-title"
               className="mt-1 truncate text-base font-semibold text-foreground"
             >
-              {step.name}
+              {renderedStep.name}
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Selected graph node
@@ -676,7 +713,7 @@ function SpecStepDetailsDrawer({
           </Button>
         </header>
         <div className="min-h-0 flex-1 overflow-auto p-5">
-          <StepDetails step={step} />
+          <StepDetails step={renderedStep} />
         </div>
       </aside>
     </div>
