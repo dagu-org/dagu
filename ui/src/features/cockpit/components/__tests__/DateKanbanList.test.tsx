@@ -15,9 +15,16 @@ vi.mock('../DateKanbanSection', () => ({
   DateKanbanSection: ({ date }: { date: string }) => <div>{date}</div>,
 }));
 
-vi.mock('@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal', () => ({
-  default: () => null,
+vi.mock('../ArtifactListModal', () => ({
+  ArtifactListModal: () => null,
 }));
+
+vi.mock(
+  '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal',
+  () => ({
+    default: () => null,
+  })
+);
 
 const useInfiniteKanbanMock = useInfiniteKanban as unknown as {
   mockReturnValue: (value: unknown) => void;
@@ -56,7 +63,9 @@ describe('DateKanbanList', () => {
 
     render(<DateKanbanList selectedWorkspace="ops" suspendLoadMore={true} />);
 
-    expect(screen.getByRole('button', { name: 'Load older day' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Load older day' })
+    ).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Load older day' }));
     expect(loadNextDate).not.toHaveBeenCalled();
   });

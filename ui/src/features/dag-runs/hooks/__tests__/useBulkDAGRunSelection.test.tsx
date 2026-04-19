@@ -11,6 +11,7 @@ const buildDagRun = (name: string, dagRunId: string) => ({
   dagRunId,
   status: Status.Failed,
   statusLabel: StatusLabel.failed,
+  artifactsAvailable: false,
   autoRetryCount: 0,
   autoRetryLimit: 0,
   triggerType: TriggerType.manual,

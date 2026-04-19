@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { components } from '@/api/v1/schema';
 import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
 import { useInfiniteKanban } from '../hooks/useInfiniteKanban';
+import { ArtifactListModal } from './ArtifactListModal';
 import { DateKanbanSection } from './DateKanbanSection';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -15,8 +16,10 @@ export function DateKanbanList({
   selectedWorkspace,
   suspendLoadMore = false,
 }: Props): React.ReactElement {
-  const { loadedDates, todayStr, hasMore, loadNextDate } = useInfiniteKanban(selectedWorkspace);
+  const { loadedDates, todayStr, hasMore, loadNextDate } =
+    useInfiniteKanban(selectedWorkspace);
   const [selectedRun, setSelectedRun] = useState<DAGRunSummary | null>(null);
+  const [artifactRun, setArtifactRun] = useState<DAGRunSummary | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const awaitingSentinelExitRef = useRef(false);
@@ -27,6 +30,14 @@ export function DateKanbanList({
 
   const handleCloseModal = useCallback(() => {
     setSelectedRun(null);
+  }, []);
+
+  const handleArtifactsClick = useCallback((run: DAGRunSummary) => {
+    setArtifactRun(run);
+  }, []);
+
+  const handleCloseArtifactsModal = useCallback(() => {
+    setArtifactRun(null);
   }, []);
 
   const triggerLoadNextDate = useCallback(() => {
@@ -84,6 +95,7 @@ export function DateKanbanList({
             todayStr={todayStr}
             selectedWorkspace={selectedWorkspace}
             onCardClick={handleCardClick}
+            onArtifactsClick={handleArtifactsClick}
           />
         ))}
         {hasMore && (
@@ -108,6 +120,11 @@ export function DateKanbanList({
           onClose={handleCloseModal}
         />
       )}
+      <ArtifactListModal
+        run={artifactRun}
+        isOpen={!!artifactRun}
+        onClose={handleCloseArtifactsModal}
+      />
     </>
   );
 }

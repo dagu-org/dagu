@@ -20,6 +20,7 @@ func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 		DAGRunID:       "run-1",
 		AutoRetryCount: 2,
 		AutoRetryLimit: 5,
+		ArchiveDir:     "/tmp/artifacts/test-dag/run-1",
 		Status:         core.Queued,
 		ScheduleTime:   "2026-03-13T00:00:00Z",
 	}
@@ -30,6 +31,7 @@ func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 	assert.Equal(t, status.AutoRetryCount, summary.AutoRetryCount)
 	require.NotNil(t, summary.AutoRetryLimit)
 	assert.Equal(t, status.AutoRetryLimit, *summary.AutoRetryLimit)
+	assert.True(t, summary.ArtifactsAvailable)
 }
 
 func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {

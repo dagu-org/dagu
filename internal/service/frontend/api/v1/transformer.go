@@ -192,21 +192,22 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	}
 
 	return api.DAGRunSummary{
-		Name:           s.Name,
-		DagRunId:       s.DAGRunID,
-		Params:         ptrOf(s.Params),
-		QueuedAt:       ptrOf(s.QueuedAt),
-		AutoRetryCount: s.AutoRetryCount,
-		AutoRetryLimit: autoRetryLimit,
-		ScheduleTime:   ptrOf(s.ScheduleTime),
-		StartedAt:      s.StartedAt,
-		FinishedAt:     s.FinishedAt,
-		Status:         api.Status(s.Status),
-		StatusLabel:    api.StatusLabel(s.Status.String()),
-		WorkerId:       ptrOf(s.WorkerID),
-		TriggerType:    toTriggerType(s.TriggerType),
-		Labels:         &s.Labels,
-		Tags:           &s.Labels,
+		Name:               s.Name,
+		DagRunId:           s.DAGRunID,
+		Params:             ptrOf(s.Params),
+		QueuedAt:           ptrOf(s.QueuedAt),
+		AutoRetryCount:     s.AutoRetryCount,
+		AutoRetryLimit:     autoRetryLimit,
+		ScheduleTime:       ptrOf(s.ScheduleTime),
+		StartedAt:          s.StartedAt,
+		FinishedAt:         s.FinishedAt,
+		ArtifactsAvailable: s.ArchiveDir != "",
+		Status:             api.Status(s.Status),
+		StatusLabel:        api.StatusLabel(s.Status.String()),
+		WorkerId:           ptrOf(s.WorkerID),
+		TriggerType:        toTriggerType(s.TriggerType),
+		Labels:             &s.Labels,
+		Tags:               &s.Labels,
 	}
 }
 

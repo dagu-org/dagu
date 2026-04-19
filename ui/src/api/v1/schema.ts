@@ -3443,6 +3443,8 @@ export interface components {
             startedAt: string;
             /** @description RFC 3339 timestamp when the DAG-run finished */
             finishedAt: string;
+            /** @description Whether artifact endpoints are available for this DAG-run */
+            artifactsAvailable: boolean;
             /** @description Runtime parameters passed to the DAG-run in JSON format */
             params?: string;
             /** @description ID of the worker that executed this DAG-run ('local' for local execution) */
@@ -3466,8 +3468,6 @@ export interface components {
             parentDAGRunId?: components["schemas"]["DAGRunId"] & unknown;
             /** @description Path to the log file */
             log: string;
-            /** @description Whether artifact endpoints are available for this DAG-run */
-            artifactsAvailable: boolean;
             /** @description Status of individual steps within the DAG-run */
             nodes: components["schemas"]["Node"][];
             onExit?: components["schemas"]["Node"];
