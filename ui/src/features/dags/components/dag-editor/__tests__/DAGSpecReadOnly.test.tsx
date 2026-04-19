@@ -182,11 +182,15 @@ describe('DAGSpecReadOnly', () => {
 
     const editor = screen.getByLabelText('DAG spec');
     await waitFor(() => expect(editor).toHaveValue(originalSpec));
-    fireEvent.change(editor, { target: { value: editedSpec } });
+    const retryButton = await screen.findByRole('button', {
+      name: /retry as a new run/i,
+    });
+    expect(retryButton).toBeDisabled();
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: /retry as a new run/i })
-    );
+    fireEvent.change(editor, { target: { value: editedSpec } });
+    await waitFor(() => expect(retryButton).toBeEnabled());
+
+    await userEvent.click(retryButton);
 
     expect(mocks.post).toHaveBeenCalledTimes(1);
     expect(mocks.post).toHaveBeenLastCalledWith(
@@ -200,13 +204,15 @@ describe('DAGSpecReadOnly', () => {
     );
     expect(await screen.findByText('Step review')).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveClass('inset-0');
-    expect(dialog).toHaveClass('w-screen');
-    expect(dialog).toHaveClass('max-w-none');
-    expect(dialog).not.toHaveClass('left-[50%]');
-    expect(dialog).not.toHaveClass('max-w-lg');
+    expect(dialog).toHaveClass('!max-w-[1920px]');
+    expect(dialog).toHaveClass('sm:!h-[90vh]');
+    expect(dialog).toHaveClass('sm:!max-h-[1080px]');
+    expect(dialog).toHaveClass('sm:!w-[94vw]');
+    expect(dialog).toHaveClass('left-[50%]');
+    expect(dialog).not.toHaveClass('inset-0');
+    expect(dialog).not.toHaveClass('w-screen');
+    expect(dialog).not.toHaveClass('max-w-none');
     expect(dialog).not.toHaveClass('sm:max-w-[500px]');
-    expect(dialog).not.toHaveClass('translate-x-[-50%]');
     expect(screen.getByTestId('preview-graph')).toHaveTextContent('extract:4');
     expect(screen.getByTestId('preview-graph')).toHaveTextContent('load:0');
     expect(screen.getAllByText('Reuse previous output').length).toBeGreaterThan(
@@ -287,11 +293,15 @@ describe('DAGSpecReadOnly', () => {
 
     const editor = screen.getByLabelText('DAG spec');
     await waitFor(() => expect(editor).toHaveValue(originalSpec));
-    fireEvent.change(editor, { target: { value: editedSpec } });
+    const saveButton = await screen.findByRole('button', {
+      name: /save source dag/i,
+    });
+    expect(saveButton).toBeDisabled();
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: /save source dag/i })
-    );
+    fireEvent.change(editor, { target: { value: editedSpec } });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+
+    await userEvent.click(saveButton);
 
     expect(mocks.get).toHaveBeenCalledWith(
       '/dags/{fileName}/spec',

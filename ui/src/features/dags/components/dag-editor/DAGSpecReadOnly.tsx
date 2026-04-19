@@ -219,7 +219,13 @@ function DAGSpecReadOnly({
   const canOpenSourceDAGDiff = hasEdits && !!sourceFileName;
 
   const previewEditedSpec = React.useCallback(async () => {
-    if (!hasEdits || !editorSpec.trim() || previewLoading || retrySubmitting) {
+    if (
+      !hasEdits ||
+      !editorSpec.trim() ||
+      previewLoading ||
+      retrySubmitting ||
+      sourceSaving
+    ) {
       return;
     }
     setPreviewLoading(true);
@@ -282,6 +288,7 @@ function DAGSpecReadOnly({
     previewLoading,
     retrySubmitting,
     showError,
+    sourceSaving,
   ]);
 
   const submitEditedRetry = React.useCallback(async () => {
@@ -581,7 +588,7 @@ function DAGSpecReadOnly({
         readOnly={!isEditableRetry}
         className={className}
         headerActions={
-          hasEdits ? (
+          isEditableRetry && hasLoadedSpec ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {canWrite && sourceFileName && (
                 <Button
@@ -609,6 +616,7 @@ function DAGSpecReadOnly({
                 size="xs"
                 variant="primary"
                 disabled={
+                  !hasEdits ||
                   previewLoading ||
                   retrySubmitting ||
                   sourceSaving ||
@@ -656,14 +664,13 @@ function DAGSpecReadOnly({
         submitDisabled={
           retrySubmitting || !retryPreview || retryPreview.errors.length > 0
         }
-        fullscreen
-        contentClassName="grid-rows-[auto_minmax(0,1fr)_auto] rounded-none border-0 sm:rounded-none"
+        contentClassName="grid !h-[calc(100dvh-1rem)] !max-h-[calc(100dvh-1rem)] !w-[calc(100vw-1rem)] !max-w-[1920px] grid-rows-[auto_minmax(0,1fr)_auto] !gap-0 overflow-hidden !p-0 sm:!h-[90vh] sm:!max-h-[1080px] sm:!w-[94vw]"
         headerClassName="border-b px-4 py-3 pr-12 text-left sm:px-6 sm:pr-12"
         bodyClassName="min-h-0 overflow-hidden p-0"
         footerClassName="gap-2 border-t px-4 py-3 sm:gap-0 sm:px-6 [&>button]:w-full sm:[&>button]:w-auto"
       >
         {retryPreview && (
-          <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(280px,45fr)_minmax(240px,55fr)] gap-3 p-3 sm:p-4 xl:grid-cols-[minmax(0,1fr)_420px] xl:grid-rows-1">
+          <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(280px,45fr)_minmax(240px,55fr)] gap-3 p-3 sm:p-4 xl:grid-cols-[minmax(0,1fr)_440px] xl:grid-rows-1">
             <div className="flex min-h-0 flex-col rounded-md border bg-surface">
               <div className="grid grid-cols-2 gap-3 border-b px-3 py-2 text-xs sm:grid-cols-4">
                 <div className="min-w-0">
