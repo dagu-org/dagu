@@ -214,12 +214,12 @@ func TestLabelsValue(t *testing.T) {
 		wantValues []string
 	}{
 		{
-			name:       "SingleTag",
+			name:       "SingleLabel",
 			input:      "production",
 			wantValues: []string{"production"},
 		},
 		{
-			name:       "MultipleTags",
+			name:       "MultipleLabels",
 			input:      `["production", "critical", "monitored"]`,
 			wantValues: []string{"production", "critical", "monitored"},
 		},

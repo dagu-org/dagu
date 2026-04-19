@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import {
   Column,
   ColumnFiltersState,
@@ -193,20 +196,22 @@ function DAGCard({
       {/* Labels */}
       {labels.length > 0 && (
         <div className="flex flex-wrap gap-0.5 mb-1.5">
-          {[...labels].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map((label) => (
-            <Badge
-              key={label}
-              variant="outline"
-              className="text-xs px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                onLabelClick(label);
-              }}
-            >
-              <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-              {label}
-            </Badge>
-          ))}
+          {[...labels]
+            .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+            .map((label) => (
+              <Badge
+                key={label}
+                variant="outline"
+                className="text-xs px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLabelClick(label);
+                }}
+              >
+                <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
+                {label}
+              </Badge>
+            ))}
         </div>
       )}
 
@@ -421,43 +426,49 @@ const defaultColumns = [
 
             {labels.length > 0 && (
               <div className="flex flex-wrap gap-0.5">
-                {[...labels].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map((label) => {
-                  const { key, value } = parseLabelParts(label);
-                  return (
-                    <Badge
-                      key={label}
-                      variant="outline"
-                      className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
+                {[...labels]
+                  .sort((a, b) =>
+                    a.toLowerCase().localeCompare(b.toLowerCase())
+                  )
+                  .map((label) => {
+                    const { key, value } = parseLabelParts(label);
+                    return (
+                      <Badge
+                        key={label}
+                        variant="outline"
+                        className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const handleLabelClick =
+                              table.options.meta?.onLabelClick;
+                            if (handleLabelClick) handleLabelClick(label);
+                          }
+                        }}
+                        onClick={(e) => {
                           e.stopPropagation();
-                          const handleLabelClick = table.options.meta?.onLabelClick;
+                          e.preventDefault();
+                          const handleLabelClick =
+                            table.options.meta?.onLabelClick;
                           if (handleLabelClick) handleLabelClick(label);
-                        }
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        const handleLabelClick = table.options.meta?.onLabelClick;
-                        if (handleLabelClick) handleLabelClick(label);
-                      }}
-                    >
-                      <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-                      {value !== null ? (
-                        <>
-                          <span className="font-medium">{key}</span>
-                          <span className="opacity-60">=</span>
-                          <span>{value}</span>
-                        </>
-                      ) : (
-                        key
-                      )}
-                    </Badge>
-                  );
-                })}
+                        }}
+                      >
+                        <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
+                        {value !== null ? (
+                          <>
+                            <span className="font-medium">{key}</span>
+                            <span className="opacity-60">=</span>
+                            <span>{value}</span>
+                          </>
+                        ) : (
+                          key
+                        )}
+                      </Badge>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -474,38 +485,37 @@ const defaultColumns = [
         const name = data.dag.dag.name.toLowerCase();
         const fileName = data.dag.fileName.toLowerCase();
         const description = (data.dag.dag.description || '').toLowerCase();
-        const searchValue = Array.isArray(filterValue)
-          ? ''
-          : String(filterValue).toLowerCase();
+        const filterObject =
+          typeof filterValue === 'object' &&
+          filterValue !== null &&
+          !Array.isArray(filterValue)
+            ? (filterValue as { searchText?: string; labels?: string[] })
+            : undefined;
+        const searchValue = filterObject
+          ? (filterObject.searchText ?? '').toLowerCase()
+          : Array.isArray(filterValue)
+            ? ''
+            : String(filterValue ?? '').toLowerCase();
 
-        const labelFilters = Array.isArray(filterValue)
-          ? filterValue.map((t) => t.toLowerCase())
-          : [];
+        const labelFilters = (
+          filterObject?.labels ??
+          (Array.isArray(filterValue) ? filterValue : [])
+        ).map((label) => label.toLowerCase());
 
-        // Search in name and description
-        if (
-          !labelFilters.length && // Only search text if no label filters
-          (fileName.includes(searchValue) ||
-            name.includes(searchValue) ||
-            description.includes(searchValue))
-        ) {
-          return true;
-        }
-
-        // Also search in labels if needed
         const labels = data.dag.dag.labels ?? data.dag.dag.tags ?? [];
+        const rowLabels = labels.map((label) => label.toLowerCase());
 
-        if (labelFilters.length > 0) {
-          const rowLabels = labels.map((label) => label.toLowerCase());
-          // AND logic: all selected labels must be present
-          if (labelFilters.every((label) => rowLabels.includes(label))) {
-            return true;
-          }
-        } else if (
-          labels.some((label) => label.toLowerCase().includes(searchValue))
-        ) {
-          return true;
-        }
+        const matchesText =
+          searchValue === '' ||
+          fileName.includes(searchValue) ||
+          name.includes(searchValue) ||
+          description.includes(searchValue) ||
+          rowLabels.some((label) => label.includes(searchValue));
+        const matchesLabels =
+          labelFilters.length === 0 ||
+          labelFilters.every((label) => rowLabels.includes(label));
+
+        return matchesText && matchesLabels;
       }
       return false;
     },
@@ -637,9 +647,7 @@ const defaultColumns = [
         return (
           <div className="flex items-center gap-2">
             {liveSwitch}
-            <span className="text-xs text-muted-foreground">
-              No schedule
-            </span>
+            <span className="text-xs text-muted-foreground">No schedule</span>
           </div>
         );
       }
@@ -757,7 +765,9 @@ const cardSortOptions = [
 ] as const;
 
 function getCardSortLabel(sort: string): string {
-  return cardSortOptions.find((option) => option.value === sort)?.label ?? 'Name';
+  return (
+    cardSortOptions.find((option) => option.value === sort)?.label ?? 'Name'
+  );
 }
 
 function getDefaultSortOrder(field: string): string {
@@ -929,13 +939,17 @@ function DAGTable({
 
     // Combine searchText and searchLabels for the Name filter
     const combinedFilter =
-      searchLabels.length > 0 ? searchLabels.join(',') : searchText || '';
+      searchText || searchLabels.length > 0
+        ? { searchText, labels: searchLabels }
+        : '';
     const currentValue = nameFilter?.value || '';
+    const currentFilterKey = JSON.stringify(currentValue);
+    const combinedFilterKey = JSON.stringify(combinedFilter);
 
     let updated = false;
     const newFilters = [...columnFilters];
 
-    if (combinedFilter !== currentValue) {
+    if (combinedFilterKey !== currentFilterKey) {
       const idx = newFilters.findIndex((f) => f.id === 'Name');
       if (combinedFilter) {
         if (idx > -1) newFilters[idx] = { id: 'Name', value: combinedFilter };
@@ -964,7 +978,9 @@ function DAGTable({
 
   // Helper function for client-side sorting comparison
   const getSortValue = useCallback(
-    (dag: components['schemas']['DAGFile']): string | components['schemas']['Status'] => {
+    (
+      dag: components['schemas']['DAGFile']
+    ): string | components['schemas']['Status'] => {
       if (clientSort === 'Status') {
         return dag.latestDAGRun?.status || '';
       }
@@ -977,7 +993,10 @@ function DAGTable({
   );
 
   const compareDags = useCallback(
-    (a: components['schemas']['DAGFile'], b: components['schemas']['DAGFile']): number => {
+    (
+      a: components['schemas']['DAGFile'],
+      b: components['schemas']['DAGFile']
+    ): number => {
       let aValue = getSortValue(a);
       let bValue = getSortValue(b);
 
@@ -1255,7 +1274,9 @@ function DAGTable({
                 ) : (
                   <ArrowDown className="h-3.5 w-3.5" />
                 )}
-                <span className="ml-1">{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+                <span className="ml-1">
+                  {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+                </span>
               </Button>
             </div>
           </div>

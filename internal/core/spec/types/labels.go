@@ -63,7 +63,7 @@ type LabelsValue struct {
 
 // UnmarshalYAML implements BytesUnmarshaler for goccy/go-yaml.
 func (t *LabelsValue) UnmarshalYAML(data []byte) error {
-	t.isSet = true
+	*t = LabelsValue{isSet: true}
 
 	var raw any
 	if err := yaml.Unmarshal(data, &raw); err != nil {

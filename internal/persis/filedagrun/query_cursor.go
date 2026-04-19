@@ -18,7 +18,8 @@ import (
 
 var ErrInvalidQueryCursor = errors.New("filedagrun: invalid query cursor")
 
-const queryCursorVersion = 1
+// queryCursorVersion 2 reflects the filter hash JSON key migration from tags to labels.
+const queryCursorVersion = 2
 
 type queryCursorPayload struct {
 	Version    int    `json:"v"`

@@ -1410,7 +1410,8 @@ func TestLabelListUsesIndex(t *testing.T) {
 	labels1, errList1, err := store.LabelList(ctx)
 	require.NoError(t, err)
 	require.Empty(t, errList1)
-	assert.GreaterOrEqual(t, len(labels1), 3) // env=prod, env=staging, team=backend, env, team
+	expectedLabels := []string{"env", "env=prod", "env=staging", "team", "team=backend"}
+	assert.ElementsMatch(t, expectedLabels, labels1)
 
 	// Verify index exists.
 	indexPath := filepath.Join(tmpDir, ".dag.index")
@@ -1420,5 +1421,6 @@ func TestLabelListUsesIndex(t *testing.T) {
 	labels2, errList2, err := store.LabelList(ctx)
 	require.NoError(t, err)
 	require.Empty(t, errList2)
-	assert.Equal(t, len(labels1), len(labels2))
+	assert.ElementsMatch(t, expectedLabels, labels2)
+	assert.ElementsMatch(t, labels1, labels2)
 }

@@ -1,9 +1,25 @@
-import React, { useState, useEffect, useRef, useCallback, useContext, useMemo } from 'react';
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useContext,
+  useMemo,
+} from 'react';
 import { useQuery } from '@/hooks/api';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Badge } from '@/components/ui/badge';
 import { whenEnabled } from '@/hooks/queryUtils';
-import { Search, ChevronDown, X, AlertTriangle, Tags as LabelsIcon } from 'lucide-react';
+import {
+  Search,
+  ChevronDown,
+  X,
+  AlertTriangle,
+  Tags as LabelsIcon,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { components } from '@/api/v1/schema';
 
@@ -67,7 +83,9 @@ export function TemplateSelector({
           remoteNode,
           perPage: 50,
           ...(debouncedTerm ? { name: debouncedTerm } : {}),
-          ...(selectedLabels.length > 0 ? { labels: selectedLabels.join(',') } : {}),
+          ...(selectedLabels.length > 0
+            ? { labels: selectedLabels.join(',') }
+            : {}),
         },
       },
     })
@@ -148,7 +166,10 @@ export function TemplateSelector({
   // Click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
         resetFilters();
       }
@@ -195,11 +216,15 @@ export function TemplateSelector({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex((prev) => (prev < flatList.length - 1 ? prev + 1 : 0));
+        setHighlightedIndex((prev) =>
+          prev < flatList.length - 1 ? prev + 1 : 0
+        );
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : flatList.length - 1));
+        setHighlightedIndex((prev) =>
+          prev > 0 ? prev - 1 : flatList.length - 1
+        );
         break;
       case 'Enter':
         e.preventDefault();
@@ -264,7 +289,9 @@ export function TemplateSelector({
         ) : (
           <>
             <Search className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground truncate flex-1 text-left">Select template...</span>
+            <span className="text-muted-foreground truncate flex-1 text-left">
+              Select template...
+            </span>
           </>
         )}
         <ChevronDown
@@ -291,7 +318,9 @@ export function TemplateSelector({
               className="flex-1 bg-transparent border-none outline-none text-xs placeholder:text-muted-foreground"
             />
             {isLoading && debouncedTerm && (
-              <span className="text-[10px] text-muted-foreground">Searching...</span>
+              <span className="text-[10px] text-muted-foreground">
+                Searching...
+              </span>
             )}
             <button
               type="button"
@@ -313,30 +342,36 @@ export function TemplateSelector({
                 <span className="text-[10px] text-muted-foreground">
                   {labelsData ? 'No labels found' : 'Loading labels...'}
                 </span>
-              ) : displayLabels.map((label) => {
-                const isActive = selectedLabels.includes(label);
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => toggleLabel(label)}
-                    className="cursor-pointer"
-                  >
-                    <Badge
-                      variant={isActive ? 'primary' : 'default'}
-                      className="text-[10px] px-1.5 cursor-pointer"
+              ) : (
+                displayLabels.map((label) => {
+                  const isActive = selectedLabels.includes(label);
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => toggleLabel(label)}
+                      className="cursor-pointer"
                     >
-                      {isActive && <X className="h-2 w-2 mr-0.5" />}
-                      {label}
-                    </Badge>
-                  </button>
-                );
-              })}
+                      <Badge
+                        variant={isActive ? 'primary' : 'default'}
+                        className="text-[10px] px-1.5 cursor-pointer"
+                      >
+                        {isActive && <X className="h-2 w-2 mr-0.5" />}
+                        {label}
+                      </Badge>
+                    </button>
+                  );
+                })
+              )}
             </div>
           )}
 
           {/* DAG list */}
-          <div ref={listRef} className="overflow-y-auto flex-1 min-h-0" onKeyDown={handleKeyDown}>
+          <div
+            ref={listRef}
+            className="overflow-y-auto flex-1 min-h-0"
+            onKeyDown={handleKeyDown}
+          >
             {flatList.length === 0 ? (
               <div className="px-3 py-4 text-xs text-muted-foreground text-center">
                 No DAGs found
@@ -345,7 +380,7 @@ export function TemplateSelector({
               groupedDags.map(([group, dagList]) => (
                 <div key={group}>
                   {/* Group header */}
-                  {(hasGroups) && (
+                  {hasGroups && (
                     <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium bg-popover border-b border-border sticky top-0 z-10">
                       {group || '(ungrouped)'}
                     </div>
@@ -371,10 +406,12 @@ export function TemplateSelector({
                       >
                         {/* Name + error/param indicators */}
                         <div className="flex items-center justify-between gap-2">
-                          <span className={cn(
-                            "font-medium text-xs truncate",
-                            dag.errors?.length > 0 && "text-destructive"
-                          )}>
+                          <span
+                            className={cn(
+                              'font-medium text-xs truncate',
+                              dag.errors?.length > 0 && 'text-destructive'
+                            )}
+                          >
                             {dag.dag.name}
                           </span>
                           <div className="flex items-center gap-1 shrink-0">
@@ -407,7 +444,11 @@ export function TemplateSelector({
                                 }}
                               >
                                 <Badge
-                                  variant={selectedLabels.includes(label) ? 'primary' : 'default'}
+                                  variant={
+                                    selectedLabels.includes(label)
+                                      ? 'primary'
+                                      : 'default'
+                                  }
                                   className="text-[10px] px-1 py-0 h-3 cursor-pointer"
                                 >
                                   {label}

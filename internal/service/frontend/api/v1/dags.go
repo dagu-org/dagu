@@ -1631,20 +1631,18 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		sortOrder = "asc"
 	}
 
-	var labels []string
-	if labelsParam := params.Get("labels"); labelsParam != "" {
-		labels = parseCommaSeparatedLabels(&labelsParam)
+	var labelsParam, deprecatedTagsParam *string
+	if rawLabels := params.Get("labels"); rawLabels != "" {
+		labelsParam = &rawLabels
 	}
-	if tagsParam := params.Get("tags"); tagsParam != "" {
-		if len(labels) > 0 {
-			return nil, &Error{
-				HTTPStatus: http.StatusBadRequest,
-				Code:       api.ErrorCodeBadRequest,
-				Message:    "labels and deprecated tags cannot both be set",
-			}
-		}
-		labels = parseCommaSeparatedLabels(&tagsParam)
+	if rawTags := params.Get("tags"); rawTags != "" {
+		deprecatedTagsParam = &rawTags
 	}
+	labelQueryParam, labelErr := queryLabelsParam(labelsParam, deprecatedTagsParam)
+	if labelErr != nil {
+		return nil, labelErr
+	}
+	labels := parseCommaSeparatedLabels(labelQueryParam)
 
 	pg := exec.NewPaginator(page, perPage)
 	listOpts := exec.ListDAGsOptions{

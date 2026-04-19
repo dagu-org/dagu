@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useContext, useMemo } from 'react';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -95,7 +98,9 @@ export function useDateKanbanData(
   const appBarContext = useContext(AppBarContext);
   const { tzOffsetInSec } = useConfig();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const label = selectedWorkspace ? `workspace=${selectedWorkspace}` : undefined;
+  const label = selectedWorkspace
+    ? `workspace=${selectedWorkspace}`
+    : undefined;
 
   const { fromDate, toDate } = useMemo(
     () => dayBounds(date, tzOffsetInSec),

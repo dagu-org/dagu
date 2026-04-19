@@ -195,7 +195,9 @@ func newDAGRunStatusIterator(store *Store, root DataRoot, opts exec.ListDAGRunSt
 
 	labelFilters := make([]core.LabelFilter, 0, len(opts.Labels))
 	for _, label := range opts.Labels {
-		labelFilters = append(labelFilters, core.ParseLabelFilter(label))
+		if trimmed := strings.TrimSpace(label); trimmed != "" {
+			labelFilters = append(labelFilters, core.ParseLabelFilter(trimmed))
+		}
 	}
 
 	return &dagRunStatusIterator{

@@ -228,6 +228,12 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 // UnmarshalJSON keeps legacy onCancel and tags status files readable while
 // normalizing canonical handler/metadata names in memory.
 func (st *DAGRunStatus) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	_, hasLabels := raw["labels"]
+
 	type alias DAGRunStatus
 	aux := struct {
 		alias
@@ -239,7 +245,7 @@ func (st *DAGRunStatus) UnmarshalJSON(data []byte) error {
 	}
 
 	*st = DAGRunStatus(aux.alias)
-	if len(st.Labels) == 0 && len(aux.DeprecatedTags) > 0 {
+	if !hasLabels && len(aux.DeprecatedTags) > 0 {
 		st.Labels = aux.DeprecatedTags
 	}
 	if st.OnAbort == nil {

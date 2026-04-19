@@ -2770,10 +2770,10 @@ export interface components {
     schemas: {
         /**
          * @deprecated
-         * @description Deprecated alias for Labels. Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec.
+         * @description Deprecated alias for Labels. Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with `labels`; the server returns HTTP 400 if both are set.
          */
         Tags: string[];
-        /** @description Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. */
+        /** @description Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with deprecated `tags`; the server returns HTTP 400 if both are set. */
         Labels: string[];
         /** @description A single audit log entry */
         AuditEntry: {
@@ -5976,11 +5976,11 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAGs by name */
                 name?: string;
-                /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. */
+                /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
                 labels?: string;
                 /**
                  * @deprecated
-                 * @description Deprecated alias for labels. Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels.
+                 * @description Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAGs by labels (comma-separated).
                  */
                 tags?: string;
                 /** @description Field to sort by:
@@ -6239,7 +6239,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
                     labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };
@@ -6311,7 +6313,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
                     labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                     /** @description Maximum seconds to wait for DAG execution to complete (required) */
                     timeout: number;
@@ -6396,7 +6400,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
                     labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };
@@ -7094,11 +7100,11 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAG-runs by name */
                 name?: string;
-                /** @description Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels. */
+                /** @description Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
                 labels?: string;
                 /**
                  * @deprecated
-                 * @description Deprecated alias for labels. Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels.
+                 * @description Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAG-runs by DAG labels (comma-separated).
                  */
                 tags?: string;
             };
@@ -7162,7 +7168,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
                     labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };
@@ -7235,7 +7243,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
                     labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };

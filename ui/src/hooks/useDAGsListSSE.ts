@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components } from '../api/v1/schema';
 import { buildSSEEndpoint, SSEState, useSSE } from './useSSE';
 
@@ -17,6 +20,7 @@ interface DAGsListParams {
   labels?: string;
   sort?: string;
   order?: string;
+  remoteNode?: string;
 }
 
 export function useDAGsListSSE(

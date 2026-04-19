@@ -353,48 +353,72 @@ func (t Labels) MatchesFilters(filters []LabelFilter) bool {
 }
 
 // Deprecated compatibility aliases. Prefer the Label/Labels names for new code.
+//
+// Deprecated: use Label instead.
 type Tag = Label
+
+// Deprecated: use Labels instead.
 type Tags = Labels
+
+// Deprecated: use LabelFilterType instead.
 type TagFilterType = LabelFilterType
+
+// Deprecated: use LabelFilter instead.
 type TagFilter = LabelFilter
 
 const (
-	MaxTagKeyLength    = MaxLabelKeyLength
-	MaxTagValueLength  = MaxLabelValueLength
-	TagKeyPatternStr   = LabelKeyPatternStr
+	// Deprecated: use MaxLabelKeyLength instead.
+	MaxTagKeyLength = MaxLabelKeyLength
+	// Deprecated: use MaxLabelValueLength instead.
+	MaxTagValueLength = MaxLabelValueLength
+	// Deprecated: use LabelKeyPatternStr instead.
+	TagKeyPatternStr = LabelKeyPatternStr
+	// Deprecated: use LabelValuePatternStr instead.
 	TagValuePatternStr = LabelValuePatternStr
 
-	TagFilterTypeKeyOnly  = LabelFilterTypeKeyOnly
-	TagFilterTypeExact    = LabelFilterTypeExact
+	// Deprecated: use LabelFilterTypeKeyOnly instead.
+	TagFilterTypeKeyOnly = LabelFilterTypeKeyOnly
+	// Deprecated: use LabelFilterTypeExact instead.
+	TagFilterTypeExact = LabelFilterTypeExact
+	// Deprecated: use LabelFilterTypeNegation instead.
 	TagFilterTypeNegation = LabelFilterTypeNegation
+	// Deprecated: use LabelFilterTypeWildcard instead.
 	TagFilterTypeWildcard = LabelFilterTypeWildcard
 )
 
 var (
-	ValidTagKeyPattern   = ValidLabelKeyPattern
+	// Deprecated: use ValidLabelKeyPattern instead.
+	ValidTagKeyPattern = ValidLabelKeyPattern
+	// Deprecated: use ValidLabelValuePattern instead.
 	ValidTagValuePattern = ValidLabelValuePattern
 )
 
+// Deprecated: use ValidateLabel instead.
 func ValidateTag(label Label) error {
 	return ValidateLabel(label)
 }
 
+// Deprecated: use ValidateLabels instead.
 func ValidateTags(labels Labels) error {
 	return ValidateLabels(labels)
 }
 
+// Deprecated: use ParseLabel instead.
 func ParseTag(s string) Label {
 	return ParseLabel(s)
 }
 
+// Deprecated: use NewLabels instead.
 func NewTags(strs []string) Labels {
 	return NewLabels(strs)
 }
 
+// Deprecated: use ParseLabelFilter instead.
 func ParseTagFilter(s string) LabelFilter {
 	return ParseLabelFilter(s)
 }
 
+// Deprecated: use MatchesLabels instead.
 func (f LabelFilter) MatchesTags(labels Labels) bool {
 	return f.MatchesLabels(labels)
 }

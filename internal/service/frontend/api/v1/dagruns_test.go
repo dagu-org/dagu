@@ -23,6 +23,7 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/runtime/transform"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -270,6 +271,10 @@ func TestGetDAGRunSpecInlineStartWithLabelsDoesNotPatchSpec(t *testing.T) {
 	execResp.Unmarshal(t, &execBody)
 	require.NotEmpty(t, execBody.DagRunId)
 
+	details := requireDAGRunDetails(t, server, name, execBody.DagRunId)
+	require.NotNil(t, details.DagRunDetails.Labels)
+	assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
+
 	specBody := requireDAGRunSpec(t, server, name, execBody.DagRunId)
 	require.Contains(t, specBody.Spec, "echo inline_start_labels")
 	require.NotContains(t, specBody.Spec, "labels:")
@@ -295,6 +300,25 @@ func requireDAGRunSpec(t *testing.T, server test.Server, dagName, dagRunID strin
 	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 
 	return specBody
+}
+
+func requireDAGRunDetails(t *testing.T, server test.Server, dagName, dagRunID string) api.GetDAGRunDetails200JSONResponse {
+	t.Helper()
+
+	var details api.GetDAGRunDetails200JSONResponse
+	require.Eventually(t, func() bool {
+		resp := server.Client().Get(
+			fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, dagRunID),
+		).Send(t)
+		if resp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		resp.Unmarshal(t, &details)
+		return details.DagRunDetails.DagRunId == dagRunID
+	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+
+	return details
 }
 
 func TestGetDAGRunSpecInlineEnqueueWithLabelsPatchesSpec(t *testing.T) {
@@ -331,6 +355,9 @@ func TestGetDAGRunSpecInlineEnqueueWithLabelsPatchesSpec(t *testing.T) {
 			status == api.Status(core.Running) ||
 			status == api.Status(core.Succeeded)
 	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+	details := requireDAGRunDetails(t, server, name, enqBody.DagRunId)
+	require.NotNil(t, details.DagRunDetails.Labels)
+	assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
 
 	specResp := server.Client().Get(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/spec", name, enqBody.DagRunId),
@@ -383,6 +410,9 @@ func TestGetDAGRunSpecFileEnqueueWithLabelsDoesNotPatchSpec(t *testing.T) {
 			status == api.Status(core.Running) ||
 			status == api.Status(core.Succeeded)
 	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+	details := requireDAGRunDetails(t, server, dagName, enqBody.DagRunId)
+	require.NotNil(t, details.DagRunDetails.Labels)
+	assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
 
 	specResp := server.Client().Get(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/spec", dagName, enqBody.DagRunId),

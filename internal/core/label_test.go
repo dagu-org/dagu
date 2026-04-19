@@ -91,7 +91,7 @@ func TestParseLabel(t *testing.T) {
 	}
 }
 
-func TestTag_IsZero(t *testing.T) {
+func TestLabel_IsZero(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -265,56 +265,56 @@ func TestParseLabelFilter(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
-		wantType  TagFilterType
+		wantType  LabelFilterType
 		wantKey   string
 		wantValue string
 	}{
 		{
 			name:      "key only",
 			input:     "env",
-			wantType:  TagFilterTypeKeyOnly,
+			wantType:  LabelFilterTypeKeyOnly,
 			wantKey:   "env",
 			wantValue: "",
 		},
 		{
 			name:      "exact match",
 			input:     "env=prod",
-			wantType:  TagFilterTypeExact,
+			wantType:  LabelFilterTypeExact,
 			wantKey:   "env",
 			wantValue: "prod",
 		},
 		{
 			name:      "negation",
 			input:     "!deprecated",
-			wantType:  TagFilterTypeNegation,
+			wantType:  LabelFilterTypeNegation,
 			wantKey:   "deprecated",
 			wantValue: "",
 		},
 		{
 			name:      "case normalized",
 			input:     "ENV=PROD",
-			wantType:  TagFilterTypeExact,
+			wantType:  LabelFilterTypeExact,
 			wantKey:   "env",
 			wantValue: "prod",
 		},
 		{
 			name:      "spaces trimmed",
 			input:     "  env = prod  ",
-			wantType:  TagFilterTypeExact,
+			wantType:  LabelFilterTypeExact,
 			wantKey:   "env",
 			wantValue: "prod",
 		},
 		{
 			name:      "negation with spaces",
 			input:     "! deprecated ",
-			wantType:  TagFilterTypeNegation,
+			wantType:  LabelFilterTypeNegation,
 			wantKey:   "deprecated",
 			wantValue: "",
 		},
 		{
 			name:      "empty string",
 			input:     "",
-			wantType:  TagFilterTypeKeyOnly,
+			wantType:  LabelFilterTypeKeyOnly,
 			wantKey:   "",
 			wantValue: "",
 		},
@@ -425,7 +425,7 @@ func TestLabels_MatchesFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filters := make([]TagFilter, len(tt.filters))
+			filters := make([]LabelFilter, len(tt.filters))
 			for i, f := range tt.filters {
 				filters[i] = ParseLabelFilter(f)
 			}
@@ -440,42 +440,42 @@ func TestParseLabelFilter_Wildcard(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
-		wantType  TagFilterType
+		wantType  LabelFilterType
 		wantKey   string
 		wantValue string
 	}{
 		{
 			name:      "key wildcard star",
 			input:     "env*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "env*",
 			wantValue: "",
 		},
 		{
 			name:      "key wildcard question",
 			input:     "te?m",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "te?m",
 			wantValue: "",
 		},
 		{
 			name:      "value wildcard",
 			input:     "env=prod*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "env",
 			wantValue: "prod*",
 		},
 		{
 			name:      "both wildcard",
 			input:     "env*=prod*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "env*",
 			wantValue: "prod*",
 		},
 		{
 			name:      "match any value",
 			input:     "team=*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "team",
 			wantValue: "*",
 		},

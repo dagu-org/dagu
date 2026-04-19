@@ -82,6 +82,17 @@ func TestLabelsValue_UnmarshalYAML_String(t *testing.T) {
 	}
 }
 
+func TestLabelsValue_UnmarshalYAML_ResetState(t *testing.T) {
+	t.Parallel()
+
+	var v LabelsValue
+	require.NoError(t, yaml.Unmarshal([]byte(`"env=prod"`), &v))
+	assert.Equal(t, []LabelEntry{{key: "env", value: "prod"}}, v.Entries())
+
+	require.NoError(t, yaml.Unmarshal([]byte(`"team=platform"`), &v))
+	assert.Equal(t, []LabelEntry{{key: "team", value: "platform"}}, v.Entries())
+}
+
 func TestLabelsValue_UnmarshalYAML_Map(t *testing.T) {
 	t.Parallel()
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/cmd"
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -324,6 +325,15 @@ steps:
 		Name: "FilterByLabel",
 		Args: []string{"history", "--labels=prod"},
 	})
+
+	statuses, err := th.DAGRunStore.ListStatuses(ctx, exec.WithLabels([]string{"prod"}), exec.WithAllHistory())
+	require.NoError(t, err)
+	names := make(map[string]bool, len(statuses))
+	for _, status := range statuses {
+		names[status.Name] = true
+	}
+	assert.True(t, names[dag1.DAG.Name])
+	assert.False(t, names[dag2.DAG.Name])
 }
 
 func TestHistoryCommand_Limit(t *testing.T) {

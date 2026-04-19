@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Badge } from '@/components/ui/badge';
 import { cn, parseLabelParts } from '@/lib/utils';
 import { ChevronDown, X } from 'lucide-react';
@@ -9,6 +12,16 @@ interface LabelComboboxProps {
   availableLabels: string[];
   placeholder?: string;
   className?: string;
+}
+
+function canonicalizeLabel(label: string) {
+  const { key, value } = parseLabelParts(label);
+  const normalizedKey = key.trim().toLowerCase();
+  if (!normalizedKey) return '';
+  if (value === null) {
+    return normalizedKey;
+  }
+  return `${normalizedKey}=${value.trim().toLowerCase()}`;
 }
 
 function LabelCombobox({
@@ -26,9 +39,9 @@ function LabelCombobox({
 
   // Filter suggestions based on input value and sort alphabetically
   const filteredSuggestions = React.useMemo(() => {
-    const selectedLower = new Set(selectedLabels.map((t) => t.toLowerCase()));
+    const selectedLower = new Set(selectedLabels.map(canonicalizeLabel));
     const available = availableLabels.filter(
-      (label) => !selectedLower.has(label.toLowerCase())
+      (label) => !selectedLower.has(canonicalizeLabel(label))
     );
 
     const sortAlphabetically = (a: string, b: string) =>
@@ -39,9 +52,9 @@ function LabelCombobox({
     }
 
     const searchLower = inputValue.toLowerCase().trim();
-      return available
-        .filter((label) => label.toLowerCase().includes(searchLower))
-        .sort(sortAlphabetically);
+    return available
+      .filter((label) => label.toLowerCase().includes(searchLower))
+      .sort(sortAlphabetically);
   }, [inputValue, availableLabels, selectedLabels]);
 
   // Reset highlighted index when suggestions change
@@ -65,11 +78,11 @@ function LabelCombobox({
   }, []);
 
   const addLabel = (label: string) => {
-    const normalized = label.toLowerCase().trim();
+    const normalized = canonicalizeLabel(label);
     if (!normalized) return;
 
     // Check for duplicates (case-insensitive)
-    if (selectedLabels.some((t) => t.toLowerCase() === normalized)) {
+    if (selectedLabels.some((t) => canonicalizeLabel(t) === normalized)) {
       return;
     }
 

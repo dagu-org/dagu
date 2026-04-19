@@ -365,6 +365,26 @@ func TestTaskOption_Functions(t *testing.T) {
 		assert.Empty(t, task.Labels)
 	})
 
+	t.Run("WithTags", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+
+		executor.WithTags("env=prod,team=backend")(task)
+
+		assert.Equal(t, "env=prod,team=backend", task.Labels)
+	})
+
+	t.Run("WithTagsEmpty", func(t *testing.T) {
+		t.Parallel()
+
+		task := &coordinatorv1.Task{}
+
+		executor.WithTags("")(task)
+
+		assert.Empty(t, task.Labels)
+	})
+
 	t.Run("WithPreviousStatus", func(t *testing.T) {
 		t.Parallel()
 

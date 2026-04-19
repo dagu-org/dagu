@@ -959,6 +959,7 @@ func (store *Storage) LabelList(ctx context.Context) ([]string, []string, error)
 	for t := range labelSet {
 		labelList = append(labelList, t)
 	}
+	sort.Strings(labelList)
 	return labelList, errList, nil
 }
 

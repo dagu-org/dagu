@@ -734,11 +734,12 @@ func buildLabels(_ BuildContext, d *dag) (core.Labels, error) {
 	}
 	var labels core.Labels
 	for _, entry := range labelsValue.Entries() {
-		if entry.Key() == "" {
+		key := strings.ToLower(strings.TrimSpace(entry.Key()))
+		if key == "" {
 			continue
 		}
 		labels = append(labels, core.Label{
-			Key:   strings.ToLower(strings.TrimSpace(entry.Key())),
+			Key:   key,
 			Value: strings.ToLower(strings.TrimSpace(entry.Value())),
 		})
 	}

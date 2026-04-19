@@ -307,6 +307,11 @@ type SecretRef struct {
 // UnmarshalJSON deserializes DAGs written by both the canonical labels field
 // and the deprecated tags field used by older persisted dag.json files.
 func (d *DAG) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
 	type alias DAG
 	aux := struct {
 		*alias
@@ -317,7 +322,7 @@ func (d *DAG) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	if len(d.Labels) == 0 && len(aux.DeprecatedTags) > 0 {
+	if _, hasLabels := raw["labels"]; !hasLabels && len(aux.DeprecatedTags) > 0 {
 		d.Labels = aux.DeprecatedTags
 	}
 	return nil

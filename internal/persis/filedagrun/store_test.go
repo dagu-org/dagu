@@ -901,7 +901,7 @@ func TestResolveStatus_FastPath_StatusFilterReject(t *testing.T) {
 	assert.Nil(t, status)
 }
 
-func TestResolveStatus_FastPath_TagFilterReject(t *testing.T) {
+func TestResolveStatus_FastPath_LabelFilterReject(t *testing.T) {
 	store := &Store{}
 	ctx := context.Background()
 
@@ -912,8 +912,8 @@ func TestResolveStatus_FastPath_TagFilterReject(t *testing.T) {
 		},
 	}
 
-	tagFilters := []core.TagFilter{core.ParseLabelFilter("env=prod")}
-	status := store.resolveStatus(ctx, dagRun, tagFilters, nil, false)
+	labelFilters := []core.LabelFilter{core.ParseLabelFilter("env=prod")}
+	status := store.resolveStatus(ctx, dagRun, labelFilters, nil, false)
 	assert.Nil(t, status)
 }
 
@@ -935,13 +935,13 @@ func TestResolveStatus_StandardPath(t *testing.T) {
 	require.NotEmpty(t, dagRuns)
 
 	// Standard path (no summary) with matching label filter.
-	tagFilters := []core.TagFilter{core.ParseLabelFilter("env=prod")}
-	status := store.resolveStatus(ctx, dagRuns[0], tagFilters, nil, false)
+	labelFilters := []core.LabelFilter{core.ParseLabelFilter("env=prod")}
+	status := store.resolveStatus(ctx, dagRuns[0], labelFilters, nil, false)
 	require.NotNil(t, status, "should resolve status via standard path with matching label")
 
 	// Standard path with non-matching label filter.
-	tagFilters = []core.TagFilter{core.ParseLabelFilter("env=staging")}
-	status = store.resolveStatus(ctx, dagRuns[0], tagFilters, nil, false)
+	labelFilters = []core.LabelFilter{core.ParseLabelFilter("env=staging")}
+	status = store.resolveStatus(ctx, dagRuns[0], labelFilters, nil, false)
 	assert.Nil(t, status, "should reject via standard path when label doesn't match")
 
 	// Standard path with matching status filter.

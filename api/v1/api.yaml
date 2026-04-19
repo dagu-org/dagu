@@ -783,14 +783,14 @@ paths:
           required: false
           schema:
             type: "string"
-          description: "Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels."
+          description: "Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
         - name: "tags"
           in: "query"
           required: false
           schema:
             type: "string"
           deprecated: true
-          description: "Deprecated alias for labels. Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels."
+          description: "Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAGs by labels (comma-separated)."
         - name: "sort"
           in: "query"
           required: false
@@ -1057,8 +1057,10 @@ paths:
                   default: false
                 labels:
                   $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
       responses:
         "200":
           description: "A successful response"
@@ -1130,8 +1132,10 @@ paths:
                   default: false
                 labels:
                   $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
                 timeout:
                   type: integer
                   minimum: 1
@@ -1210,8 +1214,10 @@ paths:
                   default: false
                 labels:
                   $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
       responses:
         "200":
           description: "A successful response"
@@ -1796,14 +1802,14 @@ paths:
           required: false
           schema:
             type: "string"
-          description: "Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels."
+          description: "Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
         - name: "tags"
           in: "query"
           required: false
           schema:
             type: "string"
           deprecated: true
-          description: "Deprecated alias for labels. Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels."
+          description: "Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAG-runs by DAG labels (comma-separated)."
       responses:
         "200":
           description: "A successful response"
@@ -1862,8 +1868,10 @@ paths:
                   default: false
                 labels:
                   $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
               required:
                 - spec
       responses:
@@ -1939,8 +1947,10 @@ paths:
                   default: false
                 labels:
                   $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
               required:
                 - spec
       responses:
@@ -7274,13 +7284,13 @@ components:
       items:
         type: string
       deprecated: true
-      description: "Deprecated alias for Labels. Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec."
+      description: "Deprecated alias for Labels. Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with `labels`; the server returns HTTP 400 if both are set."
 
     Labels:
       type: array
       items:
         type: string
-      description: "Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec."
+      description: "Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with deprecated `tags`; the server returns HTTP 400 if both are set."
 
     AuditEntry:
       type: object

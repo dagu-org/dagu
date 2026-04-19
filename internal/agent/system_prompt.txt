@@ -193,7 +193,7 @@ Actively report your progress during multi-step work so the user is not left wai
 </tools>
 
 <docs>
-When a user message begins with [Doc: id | title] labels, these reference markdown
+When a user message begins with [Doc: id | title] document markers, these reference markdown
 documents stored under {{.DocsDir}}/. To access a referenced document:
 1. Validate the id: reject any id containing "..", leading "/", or backslashes
 2. Reconstruct the file path: {{.DocsDir}}/<id>.md

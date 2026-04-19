@@ -158,12 +158,17 @@ func TestBuild_BasicDAGs(t *testing.T) {
 	// Create a minimal DAG YAML file.
 	dagContent := []byte("name: test-dag\ngroup: mygroup\ndescription: a test dag\nlabels:\n  - env=prod\nsteps:\n  - name: step1\n    command: echo hello\n")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "test.yaml"), dagContent, 0600))
+	legacyDagContent := []byte("name: legacy-dag\ntags:\n  - env=legacy\nsteps:\n  - name: step1\n    command: echo legacy\n")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "legacy.yaml"), legacyDagContent, 0600))
 
 	info, err := os.Stat(filepath.Join(dir, "test.yaml"))
+	require.NoError(t, err)
+	legacyInfo, err := os.Stat(filepath.Join(dir, "legacy.yaml"))
 	require.NoError(t, err)
 
 	files := []YAMLFileMeta{
 		{Name: "test.yaml", Size: info.Size(), ModTime: info.ModTime().UnixNano()},
+		{Name: "legacy.yaml", Size: legacyInfo.Size(), ModTime: legacyInfo.ModTime().UnixNano()},
 	}
 
 	// Register executor capabilities for testing.
@@ -172,14 +177,24 @@ func TestBuild_BasicDAGs(t *testing.T) {
 	})
 
 	idx := Build(context.Background(), dir, files, nil)
-	require.Len(t, idx.Entries, 1)
+	require.Len(t, idx.Entries, 2)
 
-	entry := idx.Entries[0]
-	assert.Equal(t, "test-dag", entry.Name)
+	entries := make(map[string]*indexv1.DAGIndexEntry, len(idx.Entries))
+	for _, entry := range idx.Entries {
+		entries[entry.Name] = entry
+	}
+
+	entry := entries["test-dag"]
+	require.NotNil(t, entry)
 	assert.Equal(t, "mygroup", entry.Group)
 	assert.Equal(t, "a test dag", entry.Description)
 	assert.Contains(t, entry.Labels, "env=prod")
 	assert.Empty(t, entry.LoadError)
+
+	legacyEntry := entries["legacy-dag"]
+	require.NotNil(t, legacyEntry)
+	assert.Contains(t, legacyEntry.Labels, "env=legacy")
+	assert.Empty(t, legacyEntry.LoadError)
 }
 
 func TestBuild_WithBuildErrors(t *testing.T) {

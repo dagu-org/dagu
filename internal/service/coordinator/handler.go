@@ -479,7 +479,7 @@ func (h *Handler) createAttemptForTask(ctx context.Context, task *coordinatorv1.
 		return nil, fmt.Errorf("failed to open attempt: %w", err)
 	}
 
-	if err := h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, task.ScheduleTime, exec.DAGRunRef{}, dag.Labels.Strings()); err != nil {
+	if err := h.writeInitialStatus(ctx, attempt, dag.Name, task.DagRunId, task.AttemptKey, task.ScheduleTime, exec.DAGRunRef{}, labelsForInitialStatus(task, dag)); err != nil {
 		return nil, fmt.Errorf("failed to write initial status: %w", err)
 	}
 
@@ -565,7 +565,7 @@ func (h *Handler) createSubAttemptForTask(ctx context.Context, task *coordinator
 		return nil, fmt.Errorf("failed to open sub-attempt: %w", err)
 	}
 
-	if err := h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, task.ScheduleTime, rootRef, dag.Labels.Strings()); err != nil {
+	if err := h.writeInitialStatus(ctx, attempt, task.Target, task.DagRunId, task.AttemptKey, task.ScheduleTime, rootRef, labelsForInitialStatus(task, dag)); err != nil {
 		return nil, fmt.Errorf("failed to write initial status: %w", err)
 	}
 
@@ -598,6 +598,30 @@ func (h *Handler) writeInitialStatus(ctx context.Context, attempt exec.DAGRunAtt
 		ScheduleTime: scheduleTime,
 	}
 	return attempt.Write(ctx, initialStatus)
+}
+
+func labelsForInitialStatus(task *coordinatorv1.Task, dag *core.DAG) []string {
+	if task != nil {
+		labels := splitTaskLabels(task.Labels)
+		if len(labels) > 0 {
+			return labels
+		}
+	}
+	if dag == nil {
+		return nil
+	}
+	return dag.Labels.Strings()
+}
+
+func splitTaskLabels(raw string) []string {
+	parts := strings.Split(raw, ",")
+	labels := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if label := strings.TrimSpace(part); label != "" {
+			labels = append(labels, label)
+		}
+	}
+	return labels
 }
 
 func (h *Handler) prepareAttemptForDispatch(ctx context.Context, task *coordinatorv1.Task) (*preparedDispatchAttempt, error) {

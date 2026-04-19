@@ -19,6 +19,7 @@ import (
 	"github.com/dagucloud/dagu/internal/service/coordinator"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -545,6 +546,15 @@ steps:
 		resp.Unmarshal(t, &execResp)
 		require.NotEmpty(t, execResp.DagRunId)
 
+		var details api.GetDAGRunDetails200JSONResponse
+		require.Eventually(t, func() bool {
+			if !getJSONWhenAvailable(t, server, fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, execResp.DagRunId), &details) {
+				return false
+			}
+			return details.DagRunDetails.Labels != nil
+		}, 5*time.Second, 250*time.Millisecond)
+		assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
+
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})
 
@@ -594,6 +604,15 @@ steps:
 		var enqResp api.EnqueueDAGDAGRun200JSONResponse
 		resp.Unmarshal(t, &enqResp)
 		require.NotEmpty(t, enqResp.DagRunId)
+
+		var details api.GetDAGRunDetails200JSONResponse
+		require.Eventually(t, func() bool {
+			if !getJSONWhenAvailable(t, server, fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, enqResp.DagRunId), &details) {
+				return false
+			}
+			return details.DagRunDetails.Labels != nil
+		}, 5*time.Second, 250*time.Millisecond)
+		assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
 
 		_ = server.Client().Delete("/api/v1/dags/" + dagName).ExpectStatus(http.StatusNoContent).Send(t)
 	})

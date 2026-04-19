@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
@@ -197,14 +200,17 @@ function DAGsContent() {
 
   const queryParams = React.useMemo(
     () => ({
+      remoteNode,
       page,
       perPage: preferences.pageLimit || 200,
       name: apiSearchText || undefined,
-      labels: apiSearchLabels.length > 0 ? apiSearchLabels.join(',') : undefined,
+      labels:
+        apiSearchLabels.length > 0 ? apiSearchLabels.join(',') : undefined,
       sort: sortField,
       order: sortOrder,
     }),
     [
+      remoteNode,
       page,
       preferences.pageLimit,
       apiSearchText,
@@ -221,7 +227,6 @@ function DAGsContent() {
       params: {
         query: {
           ...queryParams,
-          remoteNode,
           sort: sortField as PathsDagsGetParametersQuerySort,
           order: sortOrder as PathsDagsGetParametersQueryOrder,
         },

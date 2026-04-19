@@ -168,3 +168,17 @@ func TestPendingStepRetriesFromStatus(t *testing.T) {
 		assert.Empty(t, exec.PendingStepRetriesFromStatus(&decoded))
 	})
 }
+
+func TestDAGRunStatusUnmarshalJSONDeprecatedTags(t *testing.T) {
+	t.Parallel()
+
+	var status exec.DAGRunStatus
+	err := json.Unmarshal([]byte(`{"name":"legacy","tags":["env=prod","team=platform"]}`), &status)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"env=prod", "team=platform"}, status.Labels)
+
+	var explicitLabels exec.DAGRunStatus
+	err = json.Unmarshal([]byte(`{"name":"canonical","labels":[],"tags":["env=legacy"]}`), &explicitLabels)
+	require.NoError(t, err)
+	assert.Empty(t, explicitLabels.Labels)
+}

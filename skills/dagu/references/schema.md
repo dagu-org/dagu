@@ -7,7 +7,7 @@
 | `name` | string | filename | DAG name |
 | `group` | string | — | Group for UI organization |
 | `description` | string | — | Description |
-| `labels` | map or array | — | Key-value labels (keys max 63 chars, values max 255 chars). `tags` is accepted as a deprecated alias. |
+| `labels` | map or array | — | Labels as a map or array. Array entries may be bare labels or `key=value` labels; map keys max 63 chars and values max 255 chars. `tags` is accepted as a deprecated alias. |
 | `type` | string | `chain` | Execution type: `chain` (sequential), `graph` (parallel/dependency-based) |
 | `steps` | array or map | — | Step definitions |
 | `schedule` | string or array | — | Cron expression(s) |

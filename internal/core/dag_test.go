@@ -189,6 +189,11 @@ func TestDAGUnmarshalJSONDeprecatedTags(t *testing.T) {
 	err := json.Unmarshal([]byte(`{"name":"legacy","tags":["env=prod","team=platform"]}`), &dag)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"env=prod", "team=platform"}, dag.Labels.Strings())
+
+	var explicitLabels core.DAG
+	err = json.Unmarshal([]byte(`{"name":"canonical","labels":[],"tags":["env=legacy"]}`), &explicitLabels)
+	require.NoError(t, err)
+	assert.Empty(t, explicitLabels.Labels.Strings())
 }
 
 func TestScheduleJSON(t *testing.T) {
