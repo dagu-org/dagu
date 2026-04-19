@@ -124,7 +124,8 @@ function WriteElement({
   children: React.ReactElement;
 }): React.ReactElement {
   const canWrite = useCanWrite();
-  if (!canWrite) return <Navigate to="/" replace />;
+  const config = React.useContext(ConfigContext);
+  if (!canWrite || !config.agentEnabled) return <Navigate to="/" replace />;
   return children;
 }
 

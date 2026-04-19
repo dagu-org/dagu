@@ -528,7 +528,7 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {canWrite && (
+            {canWrite && config.agentEnabled && (
               <NavItem
                 to="/design"
                 text="Design"
