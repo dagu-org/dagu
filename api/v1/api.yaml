@@ -8475,7 +8475,7 @@ components:
           description: "RFC 3339 timestamp when the DAG-run finished"
         artifactsAvailable:
           type: boolean
-          description: "Whether artifact endpoints are available for this DAG-run"
+          description: "Whether artifact files are available for this DAG-run"
         params:
           type: string
           description: "Runtime parameters passed to the DAG-run in JSON format"

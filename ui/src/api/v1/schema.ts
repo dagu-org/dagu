@@ -3443,7 +3443,7 @@ export interface components {
             startedAt: string;
             /** @description RFC 3339 timestamp when the DAG-run finished */
             finishedAt: string;
-            /** @description Whether artifact endpoints are available for this DAG-run */
+            /** @description Whether artifact files are available for this DAG-run */
             artifactsAvailable: boolean;
             /** @description Runtime parameters passed to the DAG-run in JSON format */
             params?: string;

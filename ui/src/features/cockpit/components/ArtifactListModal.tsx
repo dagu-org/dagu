@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Download,
@@ -74,6 +74,38 @@ function fileIconFor(node: ArtifactTreeNode) {
     return FileText;
   }
   return File;
+}
+
+function trimDispositionValue(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).replace(/\\"/g, '"');
+  }
+  return trimmed;
+}
+
+function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) {
+    return null;
+  }
+
+  const encoded = header.match(/(?:^|;)\s*filename\*\s*=\s*([^;]+)/i)?.[1];
+  if (encoded) {
+    const value = trimDispositionValue(encoded);
+    const encodedFilename = value.includes("''")
+      ? value.split("''").slice(1).join("''")
+      : value;
+    try {
+      return decodeURIComponent(encodedFilename);
+    } catch {
+      return encodedFilename;
+    }
+  }
+
+  const filename = header.match(
+    /(?:^|;)\s*filename\s*=\s*("[^"]*"|[^;]*)/i
+  )?.[1];
+  return filename ? trimDispositionValue(filename) : null;
 }
 
 function ArtifactRow({
@@ -169,6 +201,10 @@ export function ArtifactListModal({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const treeRef = useRef<ArtifactTreeNode[]>([]);
+  const downloadControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
 
   const flatNodes = useMemo(() => flattenNodes(tree), [tree]);
   const fileCount = flatNodes.filter((node) => node.type === 'file').length;
@@ -178,19 +214,43 @@ export function ArtifactListModal({
   );
 
   useEffect(() => {
+    treeRef.current = tree;
+  }, [tree]);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      downloadControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      return;
+    }
+
+    downloadControllerRef.current?.abort();
+    downloadControllerRef.current = null;
+    setDownloadingPath(null);
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen || !runName || !runId) {
       setTree([]);
       setError(null);
       setDownloadError(null);
       setIsLoading(false);
+      setIsRefreshing(false);
       return;
     }
 
     let cancelled = false;
     const controller = new AbortController();
+    const isInitialLoad = treeRef.current.length === 0;
 
     const fetchTree = async () => {
-      setIsLoading(true);
+      setIsLoading(isInitialLoad);
+      setIsRefreshing(!isInitialLoad);
       setError(null);
       setDownloadError(null);
 
@@ -214,7 +274,9 @@ export function ArtifactListModal({
         }
 
         if (request.error) {
-          setTree([]);
+          if (isInitialLoad) {
+            setTree([]);
+          }
           setError(request.error.message || 'Failed to load artifacts');
           return;
         }
@@ -224,13 +286,18 @@ export function ArtifactListModal({
         if (cancelled || controller.signal.aborted) {
           return;
         }
-        setTree([]);
+        if (isInitialLoad) {
+          setTree([]);
+        }
         setError(
           err instanceof Error ? err.message : 'Failed to load artifacts'
         );
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          if (isInitialLoad) {
+            setIsLoading(false);
+          }
+          setIsRefreshing(false);
         }
       }
     };
@@ -248,6 +315,14 @@ export function ArtifactListModal({
       return;
     }
 
+    downloadControllerRef.current?.abort();
+    const controller = new AbortController();
+    downloadControllerRef.current = controller;
+    const isCurrentDownload = () =>
+      mountedRef.current &&
+      downloadControllerRef.current === controller &&
+      !controller.signal.aborted;
+
     setDownloadingPath(node.path);
     setDownloadError(null);
 
@@ -263,8 +338,13 @@ export function ArtifactListModal({
             query: { remoteNode, path: node.path },
           },
           parseAs: 'blob',
+          signal: controller.signal,
         }
       );
+
+      if (!isCurrentDownload()) {
+        return;
+      }
 
       if (request.error) {
         throw new Error(
@@ -275,21 +355,37 @@ export function ArtifactListModal({
       }
 
       const blob = request.data;
+      if (!blob) {
+        throw new Error('Empty response');
+      }
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       const fileName =
-        request.response.headers
-          .get('Content-Disposition')
-          ?.match(/filename="(.+)"/)?.[1] || node.name;
+        filenameFromContentDisposition(
+          request.response.headers.get('Content-Disposition')
+        ) || node.name;
 
       link.href = objectUrl;
       link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(objectUrl);
+      setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+        link.remove();
+      }, 0);
     } catch (err: unknown) {
+      if (!isCurrentDownload()) {
+        return;
+      }
       setDownloadError(err instanceof Error ? err.message : 'Download failed');
     } finally {
-      setDownloadingPath(null);
+      if (downloadControllerRef.current === controller) {
+        downloadControllerRef.current = null;
+        if (mountedRef.current) {
+          setDownloadingPath(null);
+        }
+      }
     }
   };
 
@@ -324,9 +420,14 @@ export function ArtifactListModal({
             variant="ghost"
             size="sm"
             onClick={() => setRefreshKey((current) => current + 1)}
-            disabled={isLoading || !run}
+            disabled={isLoading || isRefreshing || !run}
           >
-            <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+            <RefreshCw
+              className={cn(
+                'h-4 w-4',
+                (isLoading || isRefreshing) && 'animate-spin'
+              )}
+            />
             Refresh
           </Button>
         </div>
@@ -344,7 +445,7 @@ export function ArtifactListModal({
             </div>
           ) : null}
 
-          {isLoading ? (
+          {isLoading && tree.length === 0 ? (
             <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
               Loading artifacts...
             </div>

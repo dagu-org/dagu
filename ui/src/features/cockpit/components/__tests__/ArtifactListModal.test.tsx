@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Status, StatusLabel, TriggerType } from '@/api/v1/schema';
@@ -38,6 +38,8 @@ const run = {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('ArtifactListModal', () => {
@@ -86,6 +88,74 @@ describe('ArtifactListModal', () => {
           signal: expect.any(AbortSignal),
         }
       );
+    });
+  });
+
+  it('downloads artifacts with the encoded response filename', async () => {
+    const createObjectURL = vi.fn(() => 'blob:artifact');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', {
+      createObjectURL,
+      revokeObjectURL,
+    });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+    const appendChild = vi.spyOn(document.body, 'appendChild');
+    const get = vi.fn(async (path: string) => {
+      if (path.endsWith('/download')) {
+        return {
+          data: new Blob(['artifact']),
+          error: undefined,
+          response: new Response(null, {
+            headers: {
+              'Content-Disposition':
+                "attachment; filename*=UTF-8''summary%20report.md",
+            },
+          }),
+        };
+      }
+
+      return {
+        data: {
+          items: [
+            {
+              type: 'file',
+              name: 'summary.md',
+              path: 'summary.md',
+              size: 12,
+            },
+          ],
+        },
+        error: undefined,
+      };
+    });
+
+    vi.mocked(useClient).mockReturnValue({ GET: get } as never);
+
+    render(
+      <AppBarContext.Provider value={appBarValue}>
+        <ArtifactListModal run={run} isOpen={true} onClose={() => {}} />
+      </AppBarContext.Provider>
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Download summary.md' })
+    );
+
+    await waitFor(() => {
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    const link = appendChild.mock.calls.find(
+      ([node]) => node instanceof HTMLAnchorElement
+    )?.[0] as HTMLAnchorElement | undefined;
+    expect(link?.download).toBe('summary report.md');
+    expect(link?.href).toBe('blob:artifact');
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+
+    await waitFor(() => {
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:artifact');
     });
   });
 });

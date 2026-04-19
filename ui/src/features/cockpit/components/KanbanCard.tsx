@@ -83,37 +83,19 @@ export function KanbanCard({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onClick}
-        onKeyDown={handleKeyDown}
-        className="w-full text-left p-2 rounded-md border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-      >
-        <div className="mb-1 flex items-start justify-between gap-2">
-          <span className="min-w-0 flex-1 truncate text-xs font-medium leading-tight">
-            {run.name}
-          </span>
-          <div className="flex shrink-0 items-start gap-1.5">
-            {showArtifacts && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={`View artifacts for ${run.name}`}
-                    className="inline-flex size-6 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary transition-colors hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onArtifactsClick?.();
-                    }}
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>View artifacts</TooltipContent>
-              </Tooltip>
-            )}
-            <div className="flex flex-col items-end gap-1">
+      <div className="relative rounded-md border border-border bg-card transition-colors hover:bg-accent/50">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onClick}
+          onKeyDown={handleKeyDown}
+          className={`w-full cursor-pointer rounded-md p-2 text-left focus:outline-none focus:ring-2 focus:ring-ring ${showArtifacts ? 'pr-10' : ''}`}
+        >
+          <div className="mb-1 flex items-start justify-between gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs font-medium leading-tight">
+              {run.name}
+            </span>
+            <div className="flex shrink-0 flex-col items-end gap-1">
               <StatusChip status={run.status} size="xs">
                 {run.statusLabel}
               </StatusChip>
@@ -125,30 +107,45 @@ export function KanbanCard({
               />
             </div>
           </div>
-        </div>
-        {run.startedAt &&
-          (run.status === Status.Running ? (
-            <Ticker intervalMs={1000}>
-              {() => (
-                <div className="text-[11px] text-muted-foreground">
-                  {formatElapsed(run)}
-                </div>
-              )}
-            </Ticker>
-          ) : (
+          {run.startedAt &&
+            (run.status === Status.Running ? (
+              <Ticker intervalMs={1000}>
+                {() => (
+                  <div className="text-[11px] text-muted-foreground">
+                    {formatElapsed(run)}
+                  </div>
+                )}
+              </Ticker>
+            ) : (
+              <div className="text-[11px] text-muted-foreground">
+                {formatElapsed(run)}
+              </div>
+            ))}
+          {scheduleTime && (
             <div className="text-[11px] text-muted-foreground">
-              {formatElapsed(run)}
+              Scheduled {scheduleTime}
             </div>
-          ))}
-        {scheduleTime && (
-          <div className="text-[11px] text-muted-foreground">
-            Scheduled {scheduleTime}
-          </div>
-        )}
-        {params && (
-          <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">
-            {params}
-          </div>
+          )}
+          {params && (
+            <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">
+              {params}
+            </div>
+          )}
+        </div>
+        {showArtifacts && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={`View artifacts for ${run.name}`}
+                className="absolute right-2 top-2 inline-flex size-6 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary transition-colors hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                onClick={() => onArtifactsClick?.()}
+              >
+                <Archive className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>View artifacts</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </motion.div>
