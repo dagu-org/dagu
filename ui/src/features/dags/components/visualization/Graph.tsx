@@ -359,7 +359,10 @@ function Graph({
 
   return (
     <div
-      className={cn('relative', isExpandedView ? 'h-full flex flex-col' : '')}
+      className={cn(
+        'relative',
+        isExpandedView ? 'flex h-full min-h-0 flex-col' : ''
+      )}
       ref={containerRef}
     >
       <div className="absolute right-4 top-2 z-10 bg-card rounded-md shadow-sm border border-border/50">
@@ -439,9 +442,9 @@ function Graph({
 
       <div
         className={cn(
-          'overflow-auto custom-scrollbar',
+          'custom-scrollbar overflow-auto',
           isExpandedView
-            ? 'flex-1 rounded-lg border border-border/30 bg-muted/5'
+            ? 'min-h-0 flex-1 rounded-lg border border-border/30 bg-muted/5'
             : ''
         )}
       >

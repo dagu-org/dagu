@@ -668,49 +668,40 @@ func TestApproveDAGRunStepNotWaiting(t *testing.T) {
 func TestRejectDAGRunStep(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := fmt.Sprintf(`type: graph
+	dag := server.DAG(t, `name: rejection_test_dag
+type: graph
 steps:
   - name: wait-step
-    command: %q
+    command: "exit 0"
     approval:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
-    command: "echo should not run"`, "exit 0")
-
-	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "rejection_test_dag",
-		Spec: &dagSpec,
-	}).ExpectStatus(http.StatusCreated).Send(t)
-
-	startResp := server.Client().Post("/api/v1/dags/rejection_test_dag/start", api.ExecuteDAGJSONRequestBody{}).
-		ExpectStatus(http.StatusOK).Send(t)
-
-	var startBody api.ExecuteDAG200JSONResponse
-	startResp.Unmarshal(t, &startBody)
-	require.NotEmpty(t, startBody.DagRunId)
-
-	// Wait for DAG to enter Wait status
-	waitForStoredDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
-		return status.Status == core.Waiting
+    command: "echo should not run"`)
+	ref := seedLatestDAGRunStatus(t, server, dag.DAG, "reject-waiting-run", core.Waiting, seedDAGRunStatusOptions{
+		nodeStatuses: map[string]core.NodeStatus{
+			"wait-step": core.NodeWaiting,
+		},
 	})
 
 	// Reject the wait step
 	reason := "test rejection reason"
 	rejectResp := server.Client().Post(
-		fmt.Sprintf("/api/v1/dag-runs/rejection_test_dag/%s/steps/wait-step/reject", startBody.DagRunId),
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/steps/wait-step/reject", ref.Name, ref.ID),
 		api.RejectStepRequest{Reason: &reason},
 	).ExpectStatus(http.StatusOK).Send(t)
 
 	var rejectBody api.RejectDAGRunStep200JSONResponse
 	rejectResp.Unmarshal(t, &rejectBody)
-	require.Equal(t, startBody.DagRunId, rejectBody.DagRunId)
+	require.Equal(t, api.DAGRunId(ref.ID), rejectBody.DagRunId)
 	require.Equal(t, "wait-step", rejectBody.StepName)
 
 	// Verify DAG status is Rejected
-	waitForStoredDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	status := waitForStoredDAGRunStatus(t, server, ref.Name, ref.ID, 2*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Rejected
 	})
+	require.True(t, hasNodeWithStatus(status, "wait-step", core.NodeRejected))
+	require.Equal(t, reason, status.Nodes[0].RejectionReason)
 }
 
 func TestRejectDAGRunStepNotWaiting(t *testing.T) {
@@ -1296,6 +1287,7 @@ type seedDAGRunStatusOptions struct {
 	errorText      string
 	parentRef      exec.DAGRunRef
 	paramsList     []string
+	nodeStatuses   map[string]core.NodeStatus
 }
 
 func seedLatestDAGRunStatus(
@@ -1318,16 +1310,22 @@ func seedLatestDAGRunStatus(
 	require.NoError(t, err)
 
 	ref := exec.NewDAGRunRef(dag.Name, dagRunID)
+	statusOptions := []transform.StatusOption{
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithHierarchyRefs(ref, opts.parentRef),
+		transform.WithAutoRetryCount(opts.autoRetryCount),
+		transform.WithError(opts.errorText),
+	}
+	if !status.IsActive() && status != core.NotStarted {
+		statusOptions = append(statusOptions, transform.WithFinishedAt(time.Now().Add(-time.Minute)))
+	}
+
 	dagRunStatus := transform.NewStatusBuilder(dag).Create(
 		dagRunID,
 		status,
 		0,
 		time.Now().Add(-2*time.Minute),
-		transform.WithAttemptID(attempt.ID()),
-		transform.WithHierarchyRefs(ref, opts.parentRef),
-		transform.WithFinishedAt(time.Now().Add(-time.Minute)),
-		transform.WithAutoRetryCount(opts.autoRetryCount),
-		transform.WithError(opts.errorText),
+		statusOptions...,
 	)
 	if len(opts.paramsList) > 0 {
 		dagRunStatus.ParamsList = append([]string(nil), opts.paramsList...)
@@ -1336,6 +1334,18 @@ func seedLatestDAGRunStatus(
 		dagRunStatus.Nodes[0].Status = core.NodeFailed
 		dagRunStatus.Nodes[0].FinishedAt = exec.FormatTime(time.Now().Add(-time.Minute))
 		dagRunStatus.Nodes[0].Error = opts.errorText
+	}
+	for stepName, nodeStatus := range opts.nodeStatuses {
+		found := false
+		for _, node := range dagRunStatus.Nodes {
+			if node.Step.Name != stepName {
+				continue
+			}
+			node.Status = nodeStatus
+			found = true
+			break
+		}
+		require.Truef(t, found, "seeded DAG-run status step %q not found", stepName)
 	}
 
 	require.NoError(t, attempt.Open(server.Context))
@@ -1610,24 +1620,20 @@ func TestListDAGRunsFilterByPartialName(t *testing.T) {
   - name: main
     command: "echo search"`
 
-	for _, dagName := range []string{
+	for idx, dagName := range []string{
 		"test-params-flag",
 		"other-dag",
 		"alpha-test-case",
 	} {
-		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-			Name: dagName,
-			Spec: &spec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		resp := server.Client().Post(
-			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
-			api.ExecuteDAGJSONRequestBody{},
-		).ExpectStatus(http.StatusOK).Send(t)
-
-		var body api.ExecuteDAG200JSONResponse
-		resp.Unmarshal(t, &body)
-		require.NotEmpty(t, body.DagRunId)
+		dag := server.DAG(t, fmt.Sprintf("name: %s\n%s", dagName, spec))
+		seedLatestDAGRunStatus(
+			t,
+			server,
+			dag.DAG,
+			fmt.Sprintf("search-run-%d", idx),
+			core.Succeeded,
+			seedDAGRunStatusOptions{},
+		)
 	}
 
 	resp := server.Client().Get("/api/v1/dag-runs?name=test").
@@ -1653,23 +1659,19 @@ func TestListDAGRunsByNameRemainsExact(t *testing.T) {
   - name: main
     command: "echo search"`
 
-	for _, dagName := range []string{
+	for idx, dagName := range []string{
 		"test-params-flag",
 		"alpha-test-case",
 	} {
-		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-			Name: dagName,
-			Spec: &spec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		resp := server.Client().Post(
-			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
-			api.ExecuteDAGJSONRequestBody{},
-		).ExpectStatus(http.StatusOK).Send(t)
-
-		var body api.ExecuteDAG200JSONResponse
-		resp.Unmarshal(t, &body)
-		require.NotEmpty(t, body.DagRunId)
+		dag := server.DAG(t, fmt.Sprintf("name: %s\n%s", dagName, spec))
+		seedLatestDAGRunStatus(
+			t,
+			server,
+			dag.DAG,
+			fmt.Sprintf("exact-run-%d", idx),
+			core.Succeeded,
+			seedDAGRunStatusOptions{},
+		)
 	}
 
 	resp := server.Client().Get("/api/v1/dag-runs/test-params-flag").

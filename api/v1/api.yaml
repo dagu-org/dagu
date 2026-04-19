@@ -2136,6 +2136,164 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dag-runs/{name}/{dagRunId}/edit-retry/preview:
+    post:
+      summary: "Preview edited DAG-run retry"
+      description: "Validates an edited DAG definition against a previous DAG-run and returns the default step skip selection."
+      operationId: "previewEditRetryDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "Edited DAG specification in YAML format."
+                dagName:
+                  type: string
+                  description: "Optional DAG name override for the edited retry run."
+              required:
+                - spec
+      responses:
+        "200":
+          description: "Successfully previewed the edited retry"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagName:
+                    type: string
+                    description: "Resolved DAG name for the edited retry."
+                  skippedSteps:
+                    type: array
+                    description: "Default steps selected to be skipped."
+                    items:
+                      type: string
+                  runnableSteps:
+                    type: array
+                    description: "Steps that will be started if not skipped."
+                    items:
+                      type: string
+                  steps:
+                    type: array
+                    description: "Resolved edited DAG steps in execution order for preview rendering."
+                    items:
+                      $ref: "#/components/schemas/Step"
+                  ineligibleSteps:
+                    type: array
+                    description: "Previous completed steps that cannot be skipped with the edited specification."
+                    items:
+                      type: object
+                      properties:
+                        stepName:
+                          type: string
+                        reason:
+                          type: string
+                      required:
+                        - stepName
+                        - reason
+                  errors:
+                    type: array
+                    description: "Validation errors that must be fixed before launching."
+                    items:
+                      type: string
+                  warnings:
+                    type: array
+                    description: "Non-blocking warnings for the edited retry."
+                    items:
+                      type: string
+                required:
+                  - dagName
+                  - skippedSteps
+                  - runnableSteps
+                  - steps
+                  - ineligibleSteps
+                  - errors
+                  - warnings
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/edit-retry:
+    post:
+      summary: "Run edited DAG retry"
+      description: "Creates a new DAG-run from an edited DAG definition while preserving outputs from selected skipped steps."
+      operationId: "editRetryDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "Edited DAG specification in YAML format."
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunCreateId"
+                    - description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
+                dagName:
+                  type: string
+                  description: "Optional DAG name override for the edited retry run."
+                skipSteps:
+                  type: array
+                  description: "Steps to mark skipped while preserving their previous output variables."
+                  items:
+                    type: string
+              required:
+                - spec
+      responses:
+        "200":
+          description: "Successfully launched edited retry"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                  queued:
+                    type: boolean
+                    description: "Indicates whether the run was queued instead of starting immediately."
+                  skippedSteps:
+                    type: array
+                    items:
+                      type: string
+                  startedSteps:
+                    type: array
+                    items:
+                      type: string
+                required:
+                  - dagRunId
+                  - queued
+                  - skippedSteps
+                  - startedSteps
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dag-runs/{name}/{dagRunId}/sub-dag-runs:
     get:
       summary: "Get sub DAG runs with timing info"
@@ -7636,6 +7794,15 @@ components:
       description: "Unique identifier for the DAG-run. The special value 'latest' can be used to reference the most recent DAG-run."
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
+
+    DAGRunCreateId:
+      type: string
+      description: "Unique identifier for a newly-created DAG-run. The special value 'latest' is not allowed."
+      example: "20240101_120000"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      not:
+        enum:
+          - latest
 
     HealthResponse:
       type: object

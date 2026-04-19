@@ -571,10 +571,14 @@ steps:
 }
 
 func TestAgent_HandleHTTP(t *testing.T) {
-	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
 
 	t.Run("HTTPValid", func(t *testing.T) {
-		t.Parallel()
+		if runtime.GOOS != "windows" {
+			t.Parallel()
+		}
 		th := test.Setup(t)
 
 		releaseFile := filepath.Join(t.TempDir(), "http-valid.release")
@@ -611,7 +615,9 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPInvalidRequest", func(t *testing.T) {
-		t.Parallel()
+		if runtime.GOOS != "windows" {
+			t.Parallel()
+		}
 		th := test.Setup(t)
 
 		releaseFile := filepath.Join(t.TempDir(), "http-invalid.release")
@@ -644,7 +650,9 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPHandleCancel", func(t *testing.T) {
-		t.Parallel()
+		if runtime.GOOS != "windows" {
+			t.Parallel()
+		}
 		th := test.Setup(t)
 
 		releaseFile := filepath.Join(t.TempDir(), "http-cancel.release")

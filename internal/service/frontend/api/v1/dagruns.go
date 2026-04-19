@@ -479,11 +479,7 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 		return nil, func() {}, fmt.Errorf("failed to write spec to temp file: %w", err)
 	}
 
-	workDir, _ := os.Getwd()
-	if workDir == "" {
-		workDir, _ = os.UserHomeDir()
-	}
-	loadOpts := []spec.LoadOption{spec.WithDefaultWorkingDir(workDir)}
+	loadOpts := []spec.LoadOption{}
 	if name != nil && *name != "" {
 		loadOpts = append(loadOpts, spec.WithName(*name))
 	}
@@ -495,6 +491,9 @@ func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *strin
 			Code:       api.ErrorCodeBadRequest,
 			Message:    err.Error(),
 		}
+	}
+	if !dag.WorkingDirExplicit {
+		dag.WorkingDir = ""
 	}
 	dag.SourceFile = ""
 

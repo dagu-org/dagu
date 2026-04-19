@@ -53,6 +53,9 @@ type NodeState struct {
 	// This is used to generate unique run IDs for repeated steps in case the node
 	// runs nested DAGs.
 	Repeated bool
+	// SkippedByRetry marks a node that was intentionally skipped by an edited
+	// retry while preserving its output variables for downstream steps.
+	SkippedByRetry bool
 	// Error is the error that the executor encountered.
 	Error error
 	// ExitCode is the exit code that the command exited with.

@@ -95,6 +95,14 @@ function DAGRunActions({
     }
   };
 
+  const resetRetryModalState = React.useCallback(() => {
+    setRetryAsNew(false);
+    setNewRunId('');
+    setDagNameOverride('');
+    setSpecFromFile(false);
+    setUseCurrentDagFile(false);
+  }, []);
+
   React.useEffect(() => {
     if (!isRetryModal || !dagRun?.dagRunId) {
       return;
@@ -319,11 +327,7 @@ function DAGRunActions({
           visible={isRetryModal}
           dismissModal={() => {
             setIsRetryModal(false);
-            setRetryAsNew(false);
-            setNewRunId('');
-            setDagNameOverride('');
-            setSpecFromFile(false);
-            setUseCurrentDagFile(false);
+            resetRetryModalState();
           }}
           onSubmit={async () => {
             setIsRetryModal(false);
@@ -354,24 +358,14 @@ function DAGRunActions({
                   error.message || 'Failed to reschedule DAG run',
                   'Check if the worker is running and the DAG definition is valid.'
                 );
-                // Reset state on error
-                setRetryAsNew(false);
-                setNewRunId('');
-                setDagNameOverride('');
-                setSpecFromFile(false);
-                setUseCurrentDagFile(false);
+                resetRetryModalState();
                 return;
               }
               // Show success message with new run ID
               if (data?.dagRunId) {
                 showToast(`New DAG run created: ${data.dagRunId}`);
               }
-              // Reset state after success
-              setRetryAsNew(false);
-              setNewRunId('');
-              setDagNameOverride('');
-              setSpecFromFile(false);
-              setUseCurrentDagFile(false);
+              resetRetryModalState();
             } else {
               // Use retry endpoint for regular retry
               const { error } = await client.POST(
@@ -519,11 +513,20 @@ function DAGRunActions({
                 </div>
               </div>
             )}
+
           </div>
         </ConfirmModal>
 
         {/* Reject Modal */}
-        <Dialog open={isRejectModal} onOpenChange={(open) => { if (!open) { setIsRejectModal(false); setRejectReason(''); } }}>
+        <Dialog
+          open={isRejectModal}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsRejectModal(false);
+              setRejectReason('');
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle>Reject DAG Run</DialogTitle>
@@ -538,7 +541,14 @@ function DAGRunActions({
               />
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={() => { setIsRejectModal(false); setRejectReason(''); }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsRejectModal(false);
+                  setRejectReason('');
+                }}
+              >
                 <X className="h-4 w-4" /> Cancel
               </Button>
               <Button
@@ -546,16 +556,26 @@ function DAGRunActions({
                 size="sm"
                 onClick={async () => {
                   setIsRejectModal(false);
-                  const details = dagRun as components['schemas']['DAGRunDetails'];
-                  const waitingNodes = details.nodes.filter(n => n.status === NodeStatus.Waiting);
+                  const details =
+                    dagRun as components['schemas']['DAGRunDetails'];
+                  const waitingNodes = details.nodes.filter(
+                    (n) => n.status === NodeStatus.Waiting
+                  );
                   const errors: string[] = [];
                   for (const node of waitingNodes) {
                     const { error } = await client.POST(
                       '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject',
                       {
                         params: {
-                          path: { name, dagRunId: dagRun!.dagRunId, stepName: node.step.name },
-                          query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
+                          path: {
+                            name,
+                            dagRunId: dagRun!.dagRunId,
+                            stepName: node.step.name,
+                          },
+                          query: {
+                            remoteNode:
+                              appBarContext.selectedRemoteNode || 'local',
+                          },
                         },
                         body: { reason: rejectReason || undefined },
                       }

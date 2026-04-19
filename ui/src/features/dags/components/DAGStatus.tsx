@@ -46,7 +46,14 @@ type Props = {
   artifactEnabled?: boolean;
 };
 
-type StatusTab = 'status' | 'timeline' | 'outputs' | 'artifacts' | 'chat' | 'spec' | 'approval';
+type StatusTab =
+  | 'status'
+  | 'timeline'
+  | 'outputs'
+  | 'artifacts'
+  | 'chat'
+  | 'spec'
+  | 'approval';
 
 /** Check if the current DAG run is a sub DAG-run (has a different root) */
 function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
@@ -314,9 +321,9 @@ function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
   );
 
   // Check if there are any steps awaiting approval
-  const waitingStepCount = dagRun.nodes?.filter(
-    (node) => node.status === NodeStatus.Waiting
-  ).length || 0;
+  const waitingStepCount =
+    dagRun.nodes?.filter((node) => node.status === NodeStatus.Waiting).length ||
+    0;
   const hasWaitingSteps = waitingStepCount > 0;
   const hasArtifacts = artifactEnabled || !!dagRun.artifactsAvailable;
 
@@ -542,6 +549,9 @@ function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
           dagName={isSubDAGRun(dagRun) ? dagRun.rootDAGRunName : dagRun.name}
           dagRunId={isSubDAGRun(dagRun) ? dagRun.rootDAGRunId : dagRun.dagRunId}
           subDAGRunId={isSubDAGRun(dagRun) ? dagRun.dagRunId : undefined}
+          sourceFileName={
+            isSubDAGRun(dagRun) ? undefined : dagRun.sourceFileName
+          }
         />
       )}
 
