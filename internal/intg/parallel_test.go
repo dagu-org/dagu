@@ -762,15 +762,15 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
       items:
         - "item1"
     output: RESULTS
+    retry_policy:
+      limit: 1
+      interval_sec: 0
 ---
 name: child-retry-simple
 steps:
   - command: |
 %s
     output: OUTPUT
-    retry_policy:
-      limit: 1
-      interval_sec: 0
 `, indentCommandBlock(childScript, 6)))
 
 	agent := dag.Agent()
