@@ -2246,7 +2246,7 @@ paths:
                   description: "Edited DAG specification in YAML format."
                 dagRunId:
                   allOf:
-                    - $ref: "#/components/schemas/DAGRunId"
+                    - $ref: "#/components/schemas/DAGRunCreateId"
                     - description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
                 dagName:
                   type: string
@@ -7798,6 +7798,15 @@ components:
       description: "Unique identifier for the DAG-run. The special value 'latest' can be used to reference the most recent DAG-run."
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
+
+    DAGRunCreateId:
+      type: string
+      description: "Unique identifier for a newly-created DAG-run. The special value 'latest' is not allowed."
+      example: "20240101_120000"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      not:
+        enum:
+          - latest
 
     HealthResponse:
       type: object

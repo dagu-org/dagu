@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -45,6 +46,37 @@ func TestPreviewEditRetryDAGRun_SelectsCompletedOutputSteps(t *testing.T) {
 	require.Equal(t, []string{"build"}, body.SkippedSteps)
 	require.Equal(t, []string{"consume", "notify"}, body.RunnableSteps)
 	require.Empty(t, body.IneligibleSteps)
+}
+
+func TestPreviewEditRetryDAGRun_ReturnsEmptyArraysOnValidationError(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAML())
+	seedEditRetrySourceAttempt(t, ctx, api.dagRunStore, dag, "source-run")
+
+	resp, err := api.PreviewEditRetryDAGRun(ctx, openapiv1.PreviewEditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.PreviewEditRetryDAGRunJSONRequestBody{
+			Spec: "",
+		},
+	})
+	require.NoError(t, err)
+
+	body, ok := resp.(openapiv1.PreviewEditRetryDAGRun200JSONResponse)
+	require.True(t, ok)
+	require.Equal(t, []string{"spec is required"}, body.Errors)
+	require.NotNil(t, body.SkippedSteps)
+	require.NotNil(t, body.RunnableSteps)
+	require.NotNil(t, body.IneligibleSteps)
+	require.NotNil(t, body.Warnings)
+
+	raw, err := json.Marshal(body)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"skippedSteps":[]`)
+	require.Contains(t, string(raw), `"runnableSteps":[]`)
+	require.Contains(t, string(raw), `"ineligibleSteps":[]`)
+	require.Contains(t, string(raw), `"warnings":[]`)
 }
 
 func TestEditRetryDAGRun_DispatchesSeededRetryWithSkippedOutputs(t *testing.T) {
@@ -120,6 +152,9 @@ func TestEditRetryDAGRun_ExplicitEmptySkipStepsRunsAllSteps(t *testing.T) {
 	require.True(t, ok)
 	require.Empty(t, body.SkippedSteps)
 	require.Equal(t, []string{"build", "consume", "notify"}, body.StartedSteps)
+	raw, err := json.Marshal(body)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"skippedSteps":[]`)
 
 	require.Len(t, recorder.dispatched, 1)
 	previousStatus, err := convert.ProtoToDAGRunStatus(recorder.dispatched[0].PreviousStatus)

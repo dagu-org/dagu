@@ -76,24 +76,30 @@ func (a *API) PreviewEditRetryDAGRun(ctx context.Context, request api.PreviewEdi
 	}
 
 	dagName := request.Name
-	var skippedSteps []string
-	var runnableSteps []string
-	var ineligible []struct {
+	skippedSteps := []string{}
+	runnableSteps := []string{}
+	ineligible := []struct {
 		Reason   string `json:"reason"`
 		StepName string `json:"stepName"`
-	}
-	var warnings []string
+	}{}
+	warnings := []string{}
 	if plan != nil {
 		dagName = plan.editedDAG.Name
-		skippedSteps = plan.skippedSteps
-		runnableSteps = plan.runnableSteps
+		skippedSteps = nonNilEditRetryStrings(plan.skippedSteps)
+		runnableSteps = nonNilEditRetryStrings(plan.runnableSteps)
 		ineligible = ineligibleStepsToAPI(plan.ineligible)
-		warnings = plan.warnings
+		if ineligible == nil {
+			ineligible = []struct {
+				Reason   string `json:"reason"`
+				StepName string `json:"stepName"`
+			}{}
+		}
+		warnings = nonNilEditRetryStrings(plan.warnings)
 	}
 
 	return api.PreviewEditRetryDAGRun200JSONResponse{
 		DagName:         dagName,
-		Errors:          validationErrors,
+		Errors:          nonNilEditRetryStrings(validationErrors),
 		IneligibleSteps: ineligible,
 		RunnableSteps:   runnableSteps,
 		SkippedSteps:    skippedSteps,
@@ -169,9 +175,16 @@ func (a *API) EditRetryDAGRun(ctx context.Context, request api.EditRetryDAGRunRe
 		DagRunId:     api.DAGRunId(plan.newDAGRunID),
 		Persisted:    opts.persistSpec,
 		Queued:       queued,
-		SkippedSteps: plan.skippedSteps,
-		StartedSteps: plan.runnableSteps,
+		SkippedSteps: nonNilEditRetryStrings(plan.skippedSteps),
+		StartedSteps: nonNilEditRetryStrings(plan.runnableSteps),
 	}, nil
+}
+
+func nonNilEditRetryStrings(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
 }
 
 func previewEditRetryOptions(body *api.PreviewEditRetryDAGRunJSONRequestBody) (editRetryOptions, error) {

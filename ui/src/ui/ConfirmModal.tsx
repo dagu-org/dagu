@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,8 @@ type Props = {
   visible: boolean;
   dismissModal: () => void;
   onSubmit: () => void;
+  contentClassName?: string;
+  bodyClassName?: string;
 };
 
 function ConfirmModal({
@@ -29,6 +32,8 @@ function ConfirmModal({
   visible,
   dismissModal,
   onSubmit,
+  contentClassName,
+  bodyClassName,
 }: Props) {
   // Create refs for the buttons
   const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -97,7 +102,7 @@ function ConfirmModal({
   }, [visible, onSubmit, dismissModal]);
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className={cn('sm:max-w-[500px]', contentClassName)}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -105,7 +110,7 @@ function ConfirmModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">{children}</div>
+        <div className={cn('py-4', bodyClassName)}>{children}</div>
 
         <DialogFooter>
           <Button ref={cancelButtonRef} variant="ghost" onClick={dismissModal}>

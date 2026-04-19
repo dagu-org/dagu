@@ -3066,6 +3066,11 @@ export interface components {
          * @example latest
          */
         DAGRunId: string;
+        /**
+         * @description Unique identifier for a newly-created DAG-run. The special value 'latest' is not allowed.
+         * @example 20240101_120000
+         */
+        DAGRunCreateId: string;
         /** @description Response object for the health check endpoint */
         HealthResponse: {
             /**
@@ -7546,7 +7551,7 @@ export interface operations {
                 "application/json": {
                     /** @description Edited DAG specification in YAML format. */
                     spec: string;
-                    dagRunId?: components["schemas"]["DAGRunId"] & unknown;
+                    dagRunId?: components["schemas"]["DAGRunCreateId"] & unknown;
                     /** @description Optional DAG name override for the edited retry run. */
                     dagName?: string;
                     /** @description When true, save the edited spec to the DAG file before launching the retry. */

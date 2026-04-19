@@ -86,6 +86,11 @@ func TestValidateStartPositionalParamCount(t *testing.T) {
 			defaultArgs: `p1 p2`,
 		},
 		{
+			name:        "NamedDefaultsWithNamedParamsDoNotTriggerPositionalValidation",
+			cliArgs:     []string{"--params", "KEY1=value1 KEY2=value2", "dag.yaml"},
+			defaultArgs: `KEY1=default1 KEY2=default2`,
+		},
+		{
 			name:        "JSONAfterDashSkipsPositionalValidation",
 			cliArgs:     []string{"dag.yaml", "--", `{"REGION":"us-east","VERSION":"2.0"}`},
 			defaultArgs: `REGION=us-east-1 VERSION=1.0.0`,

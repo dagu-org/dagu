@@ -8,7 +8,6 @@ import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
@@ -34,6 +33,7 @@ import { useClient } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
 import LabeledItem from '../../../../ui/LabeledItem';
 import StatusChip from '../../../../ui/StatusChip';
+import DAGEditorWithDocs from '../../../dags/components/dag-editor/DAGEditorWithDocs';
 import { getDAGRunTerminateActionDetails } from './terminateAction';
 
 /**
@@ -63,6 +63,22 @@ type EditRetryPreview = {
   ineligibleSteps: { stepName: string; reason: string }[];
   errors: string[];
   warnings: string[];
+};
+
+const normalizeEditRetryPreview = (
+  preview: EditRetryPreview | null | undefined
+): EditRetryPreview | null => {
+  if (!preview) {
+    return null;
+  }
+  return {
+    dagName: preview.dagName ?? '',
+    skippedSteps: preview.skippedSteps ?? [],
+    runnableSteps: preview.runnableSteps ?? [],
+    ineligibleSteps: preview.ineligibleSteps ?? [],
+    errors: preview.errors ?? [],
+    warnings: preview.warnings ?? [],
+  };
 };
 
 const asyncErrorMessage = (error: unknown, fallback: string) =>
@@ -169,9 +185,10 @@ function DAGRunActions({
           );
           return;
         }
-        if (data) {
-          setEditRetryPreview(data);
-          setEditRetrySkipSteps(data.skippedSteps ?? []);
+        const preview = normalizeEditRetryPreview(data);
+        if (preview) {
+          setEditRetryPreview(preview);
+          setEditRetrySkipSteps(preview.skippedSteps);
         }
       } catch (error) {
         showError(
@@ -476,6 +493,16 @@ function DAGRunActions({
             setIsRetryModal(false);
             resetRetryModalState();
           }}
+          contentClassName={
+            editRetry
+              ? 'sm:max-w-[90vw] xl:max-w-[1200px] max-h-[90vh]'
+              : undefined
+          }
+          bodyClassName={
+            editRetry
+              ? 'max-h-[calc(90vh-9rem)] overflow-y-auto pr-1'
+              : undefined
+          }
           onSubmit={async () => {
             setIsRetryModal(false);
 
@@ -789,14 +816,15 @@ function DAGRunActions({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="edit-retry-spec" className="text-sm">
-                    Edited DAG Spec
-                  </Label>
-                  <Textarea
-                    id="edit-retry-spec"
+                  <Label className="text-sm">Edited DAG Spec</Label>
+                  <DAGEditorWithDocs
                     value={editRetrySpec}
-                    onChange={(event) => setEditRetrySpec(event.target.value)}
-                    className="min-h-56 resize-y font-mono text-xs"
+                    onChange={(value) => setEditRetrySpec(value ?? '')}
+                    readOnly={false}
+                    className="h-[56vh] min-h-[360px]"
+                    modelUri={`inmemory://dagu/edit-retry/${encodeURIComponent(
+                      name
+                    )}/${encodeURIComponent(dagRun?.dagRunId ?? 'latest')}.yaml`}
                   />
                 </div>
 
@@ -824,6 +852,14 @@ function DAGRunActions({
 
                 {editRetryPreview && (
                   <div className="space-y-2 rounded-md border p-3 text-sm">
+                    <div className="text-xs text-muted-foreground">
+                      Preview ready for{' '}
+                      <span className="font-mono">
+                        {editRetryPreview.dagName}
+                      </span>
+                      : {editRetryPreview.skippedSteps.length} skipped,{' '}
+                      {editRetryPreview.runnableSteps.length} runnable.
+                    </div>
                     {editRetryPreview.errors.length > 0 && (
                       <div className="space-y-1 text-destructive">
                         {editRetryPreview.errors.map((error) => (
@@ -890,7 +926,15 @@ function DAGRunActions({
         </ConfirmModal>
 
         {/* Reject Modal */}
-        <Dialog open={isRejectModal} onOpenChange={(open) => { if (!open) { setIsRejectModal(false); setRejectReason(''); } }}>
+        <Dialog
+          open={isRejectModal}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsRejectModal(false);
+              setRejectReason('');
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle>Reject DAG Run</DialogTitle>
@@ -905,7 +949,14 @@ function DAGRunActions({
               />
             </div>
             <DialogFooter>
-              <Button variant="ghost" size="sm" onClick={() => { setIsRejectModal(false); setRejectReason(''); }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsRejectModal(false);
+                  setRejectReason('');
+                }}
+              >
                 <X className="h-4 w-4" /> Cancel
               </Button>
               <Button
@@ -913,16 +964,26 @@ function DAGRunActions({
                 size="sm"
                 onClick={async () => {
                   setIsRejectModal(false);
-                  const details = dagRun as components['schemas']['DAGRunDetails'];
-                  const waitingNodes = details.nodes.filter(n => n.status === NodeStatus.Waiting);
+                  const details =
+                    dagRun as components['schemas']['DAGRunDetails'];
+                  const waitingNodes = details.nodes.filter(
+                    (n) => n.status === NodeStatus.Waiting
+                  );
                   const errors: string[] = [];
                   for (const node of waitingNodes) {
                     const { error } = await client.POST(
                       '/dag-runs/{name}/{dagRunId}/steps/{stepName}/reject',
                       {
                         params: {
-                          path: { name, dagRunId: dagRun!.dagRunId, stepName: node.step.name },
-                          query: { remoteNode: appBarContext.selectedRemoteNode || 'local' },
+                          path: {
+                            name,
+                            dagRunId: dagRun!.dagRunId,
+                            stepName: node.step.name,
+                          },
+                          query: {
+                            remoteNode:
+                              appBarContext.selectedRemoteNode || 'local',
+                          },
                         },
                         body: { reason: rejectReason || undefined },
                       }
