@@ -182,6 +182,48 @@ dagu start-all
 
 Visit http://localhost:8080
 
+## Embedded Go API (Experimental)
+
+Go applications can import Dagu and start DAG runs from the host process:
+
+```go
+import "github.com/dagucloud/dagu"
+```
+
+```go
+engine, err := dagu.New(ctx, dagu.Options{
+	HomeDir: "/var/lib/myapp/dagu",
+})
+if err != nil {
+	return err
+}
+defer engine.Close(context.Background())
+
+run, err := engine.RunYAML(ctx, []byte(`
+name: embedded
+params:
+  - MESSAGE
+steps:
+  - name: hello
+    command: echo "${MESSAGE}"
+`), dagu.WithParams(map[string]string{
+	"MESSAGE": "hello from the host app",
+}))
+if err != nil {
+	return err
+}
+
+status, err := run.Wait(ctx)
+if err != nil {
+	return err
+}
+fmt.Println(status.Status)
+```
+
+The embedded API is experimental and may change before it is declared stable. It uses Dagu's YAML loader, built-in executors, and file-backed state. `RunFile` and `RunYAML` start runs asynchronously and return a run handle for `Wait`, `Status`, and `Stop`. Distributed embedded runs require an existing Dagu coordinator; embedded workers can be started with `NewWorker`.
+
+See the [embedded API documentation](https://docs.dagu.sh/getting-started/embedded) and [examples/embedded](./examples/embedded).
+
 ## Workflow Examples
 
 ### Sequential execution
