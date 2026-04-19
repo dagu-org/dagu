@@ -61,7 +61,7 @@ type RunOptions struct {
 	DefaultWorkingDir string
 	Mode              ExecutionMode
 	WorkerSelector    map[string]string
-	Tags              []string
+	Labels            []string
 	DryRun            bool
 }
 

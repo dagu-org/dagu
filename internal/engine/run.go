@@ -278,18 +278,18 @@ func applyRunOverrides(dag *core.DAG, opts RunOptions) {
 	if len(opts.WorkerSelector) > 0 {
 		dag.WorkerSelector = cloneStringMap(opts.WorkerSelector)
 	}
-	if len(opts.Tags) > 0 {
-		seen := make(map[string]struct{}, len(dag.Tags)+len(opts.Tags))
-		for _, existing := range dag.Tags {
+	if len(opts.Labels) > 0 {
+		seen := make(map[string]struct{}, len(dag.Labels)+len(opts.Labels))
+		for _, existing := range dag.Labels {
 			seen[existing.String()] = struct{}{}
 		}
-		for _, candidate := range core.NewTags(opts.Tags) {
+		for _, candidate := range core.NewLabels(opts.Labels) {
 			key := candidate.String()
 			if _, ok := seen[key]; ok {
 				continue
 			}
 			seen[key] = struct{}{}
-			dag.Tags = append(dag.Tags, candidate)
+			dag.Labels = append(dag.Labels, candidate)
 		}
 	}
 }
@@ -428,8 +428,8 @@ func (e *Engine) runDistributed(ctx context.Context, dag *core.DAG, runID string
 	if len(dist.WorkerSelector) > 0 {
 		taskOpts = append(taskOpts, runtimeexec.WithWorkerSelector(dist.WorkerSelector))
 	}
-	if len(dag.Tags) > 0 {
-		taskOpts = append(taskOpts, runtimeexec.WithTags(strings.Join(dag.Tags.Strings(), ",")))
+	if len(dag.Labels) > 0 {
+		taskOpts = append(taskOpts, runtimeexec.WithLabels(strings.Join(dag.Labels.Strings(), ",")))
 	}
 	if dag.SourceFile != "" {
 		taskOpts = append(taskOpts, runtimeexec.WithSourceFile(dag.SourceFile))
