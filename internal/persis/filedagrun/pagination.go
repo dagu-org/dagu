@@ -177,7 +177,7 @@ type dagRunStatusIterator struct {
 	dayIndex        int
 	dayItems        []dagRunListItem
 	dayItemIndex    int
-	tagFilters      []core.TagFilter
+	labelFilters    []core.LabelFilter
 	statusesFilter  map[core.Status]struct{}
 	hasStatusFilter bool
 }
@@ -193,9 +193,9 @@ func newDAGRunStatusIterator(store *Store, root DataRoot, opts exec.ListDAGRunSt
 		statusesFilter[status] = struct{}{}
 	}
 
-	tagFilters := make([]core.TagFilter, 0, len(opts.Tags))
-	for _, tag := range opts.Tags {
-		tagFilters = append(tagFilters, core.ParseTagFilter(tag))
+	labelFilters := make([]core.LabelFilter, 0, len(opts.Labels))
+	for _, label := range opts.Labels {
+		labelFilters = append(labelFilters, core.ParseLabelFilter(label))
 	}
 
 	return &dagRunStatusIterator{
@@ -203,7 +203,7 @@ func newDAGRunStatusIterator(store *Store, root DataRoot, opts exec.ListDAGRunSt
 		root:            root,
 		opts:            opts,
 		dayPaths:        dayPaths,
-		tagFilters:      tagFilters,
+		labelFilters:    labelFilters,
 		statusesFilter:  statusesFilter,
 		hasStatusFilter: len(statusesFilter) > 0,
 	}, nil
@@ -263,7 +263,7 @@ func (it *dagRunStatusIterator) loadDay(ctx context.Context, dayPath string) ([]
 			continue
 		}
 
-		status := it.store.resolveStatus(ctx, run, it.tagFilters, it.statusesFilter, it.hasStatusFilter)
+		status := it.store.resolveStatus(ctx, run, it.labelFilters, it.statusesFilter, it.hasStatusFilter)
 		if status == nil {
 			continue
 		}

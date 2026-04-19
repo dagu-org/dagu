@@ -49,7 +49,7 @@ function dayBounds(
 function useKanbanBucket(
   query: {
     remoteNode: string;
-    tags?: string;
+    labels?: string;
     fromDate: number;
     toDate: number;
     status: Status[];
@@ -95,7 +95,7 @@ export function useDateKanbanData(
   const appBarContext = useContext(AppBarContext);
   const { tzOffsetInSec } = useConfig();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const tag = selectedWorkspace ? `workspace=${selectedWorkspace}` : undefined;
+  const label = selectedWorkspace ? `workspace=${selectedWorkspace}` : undefined;
 
   const { fromDate, toDate } = useMemo(
     () => dayBounds(date, tzOffsetInSec),
@@ -104,11 +104,11 @@ export function useDateKanbanData(
   const baseQuery = useMemo(
     () => ({
       remoteNode,
-      tags: tag,
+      labels: label,
       fromDate,
       toDate,
     }),
-    [fromDate, remoteNode, tag, toDate]
+    [fromDate, remoteNode, label, toDate]
   );
   const fallbackIntervalMs = isToday ? 2000 : 0;
 

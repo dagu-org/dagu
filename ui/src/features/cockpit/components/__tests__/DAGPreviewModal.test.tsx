@@ -78,7 +78,7 @@ describe('DAGPreviewModal', () => {
     );
   });
 
-  it('enqueues with a sanitized workspace tag and returns the dag run id', async () => {
+  it('enqueues with a sanitized workspace label and returns the dag run id', async () => {
     const post = vi.fn().mockResolvedValue({
       data: { dagRunId: 'queued-run' },
       error: undefined,
@@ -108,7 +108,7 @@ describe('DAGPreviewModal', () => {
       body: {
         params: '["x"]',
         dagRunId: 'manual-run',
-        tags: ['workspace=briefingalpha'],
+        labels: ['workspace=briefingalpha'],
       },
     });
     expect(onClose).not.toHaveBeenCalled();

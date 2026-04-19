@@ -68,7 +68,7 @@ func InitialStatus(dag *core.DAG) DAGRunStatus {
 		StartedAt:            stringutil.FormatTime(time.Time{}),
 		FinishedAt:           stringutil.FormatTime(time.Time{}),
 		Preconditions:        dag.Preconditions,
-		Tags:                 dag.Tags.Strings(),
+		Labels:               dag.Labels.Strings(),
 	}
 }
 
@@ -112,8 +112,14 @@ type DAGRunStatus struct {
 	ParamsList           []string           `json:"paramsList,omitempty"`
 	PendingStepRetries   []PendingStepRetry `json:"pendingStepRetries"`
 	Preconditions        []*core.Condition  `json:"preconditions,omitempty"`
-	Tags                 []string           `json:"tags,omitempty"`
+	Labels               []string           `json:"labels,omitempty"`
 	LeaseAt              int64              `json:"leaseAt,omitempty"` // Unix millis; stamped by coordinator on observed run liveness
+}
+
+// Tags returns labels under their deprecated name.
+// Deprecated: use Labels directly.
+func (s DAGRunStatus) Tags() []string {
+	return s.Labels
 }
 
 // IsLeaseActive reports whether the run's lease is fresh (i.e. a worker is
@@ -219,19 +225,23 @@ func StatusFromJSON(s string) (*DAGRunStatus, error) {
 	return &status, nil
 }
 
-// UnmarshalJSON keeps legacy onCancel status files readable while normalizing
-// the canonical handler identity to onAbort in memory.
+// UnmarshalJSON keeps legacy onCancel and tags status files readable while
+// normalizing canonical handler/metadata names in memory.
 func (st *DAGRunStatus) UnmarshalJSON(data []byte) error {
 	type alias DAGRunStatus
 	aux := struct {
 		alias
-		OnCancel *Node `json:"onCancel,omitempty"`
+		OnCancel       *Node    `json:"onCancel,omitempty"`
+		DeprecatedTags []string `json:"tags,omitempty"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
 	*st = DAGRunStatus(aux.alias)
+	if len(st.Labels) == 0 && len(aux.DeprecatedTags) > 0 {
+		st.Labels = aux.DeprecatedTags
+	}
 	if st.OnAbort == nil {
 		st.OnAbort = aux.OnCancel
 	}

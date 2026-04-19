@@ -667,7 +667,7 @@ function DesignLeftPanel({
         item.fileName,
         item.dag.name,
         item.dag.group,
-        ...(item.dag.tags || []),
+        ...(item.dag.labels ?? item.dag.tags ?? []),
       ]
         .filter(Boolean)
         .join(' ')

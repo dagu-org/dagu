@@ -27,7 +27,7 @@ const mockDags = [
     dag: {
       name: 'Example DAG',
       group: 'main',
-      tags: ['batch', 'workspace=ops'],
+      labels: ['batch', 'workspace=ops'],
       description: 'Example workflow',
       params: [],
     },
@@ -76,14 +76,14 @@ afterEach(() => {
 });
 
 describe('TemplateSelector', () => {
-  it('loads dags only while open and loads tags only when the tag filter is opened', () => {
+  it('loads dags only while open and loads labels only when the label filter is opened', () => {
     useQueryMock.mockImplementation((path, init) => {
       queryCalls.push({ path, init });
       if (path === '/dags') {
         return { data: { dags: mockDags }, isLoading: false } as never;
       }
-      if (path === '/dags/tags') {
-        return { data: { tags: ['batch', 'workspace=ops'] } } as never;
+      if (path === '/dags/labels') {
+        return { data: { labels: ['batch', 'workspace=ops'] } } as never;
       }
       return { data: undefined } as never;
     });
@@ -91,7 +91,7 @@ describe('TemplateSelector', () => {
     renderSelector();
 
     expect(latestQueryCall('/dags')?.init).toBeNull();
-    expect(latestQueryCall('/dags/tags')?.init).toBeNull();
+    expect(latestQueryCall('/dags/labels')?.init).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /select template/i }));
 
@@ -102,11 +102,11 @@ describe('TemplateSelector', () => {
         }),
       })
     );
-    expect(latestQueryCall('/dags/tags')?.init).toBeNull();
+    expect(latestQueryCall('/dags/labels')?.init).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: /tags/i }));
+    fireEvent.click(screen.getByRole('button', { name: /labels/i }));
 
-    expect(latestQueryCall('/dags/tags')?.init).toEqual(
+    expect(latestQueryCall('/dags/labels')?.init).toEqual(
       expect.objectContaining({
         params: expect.objectContaining({
           query: { remoteNode: 'local' },
@@ -121,8 +121,8 @@ describe('TemplateSelector', () => {
       if (path === '/dags') {
         return { data: { dags: mockDags }, isLoading: false } as never;
       }
-      if (path === '/dags/tags') {
-        return { data: { tags: ['batch', 'workspace=ops'] } } as never;
+      if (path === '/dags/labels') {
+        return { data: { labels: ['batch', 'workspace=ops'] } } as never;
       }
       return { data: undefined } as never;
     });
@@ -157,8 +157,8 @@ describe('TemplateSelector', () => {
       if (path === '/dags') {
         return { data: { dags: mockDags }, isLoading: false } as never;
       }
-      if (path === '/dags/tags') {
-        return { data: { tags: [] } } as never;
+      if (path === '/dags/labels') {
+        return { data: { labels: [] } } as never;
       }
       return { data: undefined } as never;
     });

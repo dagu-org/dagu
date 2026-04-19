@@ -46,7 +46,7 @@ func (s *StringOrArray) UnmarshalYAML(data []byte) error {
 			if str, ok := item.(string); ok {
 				s.values = append(s.values, str)
 			} else {
-				// Stringify non-string items (e.g., numeric tags)
+				// Stringify non-string items (e.g., numeric labels)
 				s.values = append(s.values, fmt.Sprintf("%v", item))
 			}
 		}

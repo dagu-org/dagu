@@ -32,7 +32,7 @@ Examples:
 	)
 }
 
-var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, tagsFlag, defaultWorkingDirFlag, triggerTypeFlag, scheduleTimeFlag}
+var enqueueFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, queueFlag, labelsFlag, tagsFlag, defaultWorkingDirFlag, triggerTypeFlag, scheduleTimeFlag}
 
 func runEnqueue(ctx *Context, args []string) error {
 	if ctx.IsRemote() {
@@ -66,7 +66,7 @@ func runEnqueue(ctx *Context, args []string) error {
 		dag.Queue = queueOverride
 	}
 
-	if err := parseAndAppendTags(ctx, dag); err != nil {
+	if err := parseAndAppendLabels(ctx, dag); err != nil {
 		return err
 	}
 

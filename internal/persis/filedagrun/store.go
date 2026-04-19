@@ -145,7 +145,7 @@ func prepareListOptions(opts []exec.ListDAGRunStatusesOption) (exec.ListDAGRunSt
 func (store *Store) resolveStatus(
 	ctx context.Context,
 	dagRun *DAGRun,
-	tagFilters []core.TagFilter,
+	labelFilters []core.LabelFilter,
 	statusesFilter map[core.Status]struct{},
 	hasStatusFilter bool,
 ) *exec.DAGRunStatus {
@@ -156,9 +156,9 @@ func (store *Store) resolveStatus(
 				return nil
 			}
 		}
-		if len(tagFilters) > 0 {
-			summaryTags := core.NewTags(dagRun.summary.Tags)
-			if !summaryTags.MatchesFilters(tagFilters) {
+		if len(labelFilters) > 0 {
+			summaryLabels := core.NewLabels(dagRun.summary.Labels)
+			if !summaryLabels.MatchesFilters(labelFilters) {
 				return nil
 			}
 		}
@@ -171,7 +171,7 @@ func (store *Store) resolveStatus(
 			DAGRunID:             s.DagRunID,
 			AttemptID:            s.AttemptID,
 			Status:               s.Status,
-			Tags:                 s.Tags,
+			Labels:               s.Labels,
 			StartedAt:            formatUnixToRFC3339(s.StartedAtUnix),
 			FinishedAt:           formatUnixToRFC3339(s.FinishedAtUnix),
 			WorkerID:             s.WorkerID,
@@ -206,9 +206,9 @@ func (store *Store) resolveStatus(
 		return nil
 	}
 
-	if len(tagFilters) > 0 {
-		statusTags := core.NewTags(status.Tags)
-		if !statusTags.MatchesFilters(tagFilters) {
+	if len(labelFilters) > 0 {
+		statusLabels := core.NewLabels(status.Labels)
+		if !statusLabels.MatchesFilters(labelFilters) {
 			return nil
 		}
 	}

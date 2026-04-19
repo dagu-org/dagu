@@ -189,11 +189,11 @@ Actively report your progress during multi-step work so the user is not left wai
 - `think`: Reason through complex multi-step tasks before acting.
 - `navigate`: Open a UI page (/dags/<name>, /dag-runs/<name>/<id>, /docs, /docs/<doc-id>).
 - `delegate`: Spawn a sub-agent for a focused sub-task. The sub-agent works independently with the same tools and returns a summary. Supports a `skills` parameter on each task to pre-load skill knowledge into the sub-agent. You can delegate multiple tasks simultaneously.
-- `search_skills`: Discover available skills by keyword or tag. Returns summaries without loading full knowledge.
+- `search_skills`: Discover available skills by keyword or label. Returns summaries without loading full knowledge.
 </tools>
 
 <docs>
-When a user message begins with [Doc: id | title] tags, these reference markdown
+When a user message begins with [Doc: id | title] labels, these reference markdown
 documents stored under {{.DocsDir}}/. To access a referenced document:
 1. Validate the id: reject any id containing "..", leading "/", or backslashes
 2. Reconstruct the file path: {{.DocsDir}}/<id>.md
@@ -238,7 +238,7 @@ Use `dagu history` to view past executions—essential for debugging and monitor
 Examples:
 - `dagu history my-dag --last 7d --status failed` - Recent failures
 - `dagu history --format json --limit 50` - Programmatic access
-Filters: --status, --tags, --from/--to, --last, --run-id, --limit
+Filters: --status, --labels, --from/--to, --last, --run-id, --limit
 Formats: table (default), json
 
 ### Working with Documents

@@ -451,7 +451,7 @@ type Task struct {
 	xxx_hidden_PreviousStatus       *DAGRunStatusProto     `protobuf:"bytes,13,opt,name=previous_status,json=previousStatus,proto3"`
 	xxx_hidden_AttemptId            string                 `protobuf:"bytes,14,opt,name=attempt_id,json=attemptId,proto3"`
 	xxx_hidden_AttemptKey           string                 `protobuf:"bytes,15,opt,name=attempt_key,json=attemptKey,proto3"`
-	xxx_hidden_Tags                 string                 `protobuf:"bytes,16,opt,name=tags,proto3"`
+	xxx_hidden_Labels               string                 `protobuf:"bytes,16,opt,name=labels,proto3"`
 	xxx_hidden_BaseConfig           string                 `protobuf:"bytes,17,opt,name=base_config,json=baseConfig,proto3"`
 	xxx_hidden_ScheduleTime         string                 `protobuf:"bytes,18,opt,name=schedule_time,json=scheduleTime,proto3"`
 	xxx_hidden_ExternalStepRetry    bool                   `protobuf:"varint,19,opt,name=external_step_retry,json=externalStepRetry,proto3"`
@@ -596,9 +596,9 @@ func (x *Task) GetAttemptKey() string {
 	return ""
 }
 
-func (x *Task) GetTags() string {
+func (x *Task) GetLabels() string {
 	if x != nil {
-		return x.xxx_hidden_Tags
+		return x.xxx_hidden_Labels
 	}
 	return ""
 }
@@ -733,8 +733,8 @@ func (x *Task) SetAttemptKey(v string) {
 	x.xxx_hidden_AttemptKey = v
 }
 
-func (x *Task) SetTags(v string) {
-	x.xxx_hidden_Tags = v
+func (x *Task) SetLabels(v string) {
+	x.xxx_hidden_Labels = v
 }
 
 func (x *Task) SetBaseConfig(v string) {
@@ -813,8 +813,8 @@ type Task_builder struct {
 	AttemptId string
 	// Globally unique attempt identifier for cancellation tracking.
 	AttemptKey string
-	// Additional tags (comma-separated key=value or key-only) to apply to the DAG run.
-	Tags string
+	// Additional labels (comma-separated key=value or key-only) to apply to the DAG run.
+	Labels string
 	// Base config YAML content for workers (avoids relying on local base config files).
 	BaseConfig string
 	// RFC 3339 timestamp of when this task was originally scheduled.
@@ -854,7 +854,7 @@ func (b0 Task_builder) Build() *Task {
 	x.xxx_hidden_PreviousStatus = b.PreviousStatus
 	x.xxx_hidden_AttemptId = b.AttemptId
 	x.xxx_hidden_AttemptKey = b.AttemptKey
-	x.xxx_hidden_Tags = b.Tags
+	x.xxx_hidden_Labels = b.Labels
 	x.xxx_hidden_BaseConfig = b.BaseConfig
 	x.xxx_hidden_ScheduleTime = b.ScheduleTime
 	x.xxx_hidden_ExternalStepRetry = b.ExternalStepRetry
@@ -3103,7 +3103,7 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\";\n" +
 	"\x0fDispatchRequest\x12(\n" +
 	"\x04task\x18\x01 \x01(\v2\x14.coordinator.v1.TaskR\x04task\"\x12\n" +
-	"\x10DispatchResponse\"\xdc\b\n" +
+	"\x10DispatchResponse\"\xe0\b\n" +
 	"\x04Task\x127\n" +
 	"\toperation\x18\x06 \x01(\x0e2\x19.coordinator.v1.OperationR\toperation\x12)\n" +
 	"\x11root_dag_run_name\x18\x01 \x01(\tR\x0erootDagRunName\x12%\n" +
@@ -3125,8 +3125,8 @@ const file_proto_coordinator_v1_coordinator_proto_rawDesc = "" +
 	"\n" +
 	"attempt_id\x18\x0e \x01(\tR\tattemptId\x12\x1f\n" +
 	"\vattempt_key\x18\x0f \x01(\tR\n" +
-	"attemptKey\x12\x12\n" +
-	"\x04tags\x18\x10 \x01(\tR\x04tags\x12\x1f\n" +
+	"attemptKey\x12\x16\n" +
+	"\x06labels\x18\x10 \x01(\tR\x06labels\x12\x1f\n" +
 	"\vbase_config\x18\x11 \x01(\tR\n" +
 	"baseConfig\x12#\n" +
 	"\rschedule_time\x18\x12 \x01(\tR\fscheduleTime\x12.\n" +

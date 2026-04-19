@@ -21,7 +21,7 @@ message DAGIndexEntry {
   int64 file_size = 2;
   int64 mod_time = 3;
   string name = 4;
-  repeated string tags = 5;
+  repeated string labels = 5;
   string group = 6;
   string schedule = 7;
   bool suspended = 8;
@@ -46,7 +46,7 @@ message DAGRunIndexEntry {
   int32 status = 6;
   int64 started_at = 7;     // Unix epoch seconds
   int64 finished_at = 8;    // Unix epoch seconds
-  repeated string tags = 9;
+  repeated string labels = 9;
   int64 run_dir_mod_time = 10;
   string worker_id = 11;
   string params = 12;

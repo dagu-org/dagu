@@ -28,7 +28,7 @@ func TestRebuildDAGFromYAML_PreservesJSONSerializedFields(t *testing.T) {
 		MaxActiveRuns:  5,
 		MaxActiveSteps: 3,
 		LogDir:         "/custom/logs",
-		Tags:           core.NewTags([]string{"important", "production"}),
+		Labels:         core.NewLabels([]string{"important", "production"}),
 		Location:       "/path/to/dag.yaml",
 		YamlData:       []byte("steps:\n  - name: test\n    command: echo hello"),
 	}
@@ -42,7 +42,7 @@ func TestRebuildDAGFromYAML_PreservesJSONSerializedFields(t *testing.T) {
 	assert.Equal(t, 5, result.MaxActiveRuns)
 	assert.Equal(t, 3, result.MaxActiveSteps)
 	assert.Equal(t, "/custom/logs", result.LogDir)
-	assert.Equal(t, []string{"important", "production"}, result.Tags.Strings())
+	assert.Equal(t, []string{"important", "production"}, result.Labels.Strings())
 	assert.Equal(t, "/path/to/dag.yaml", result.Location)
 
 	// Verify the original DAG pointer is returned (not a new DAG)

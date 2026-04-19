@@ -40,6 +40,27 @@ func parseTriggerTypeParam(ctx *Context) (core.TriggerType, error) {
 	return triggerType, nil
 }
 
+func labelsParam(ctx *Context) (string, error) {
+	labels, err := ctx.StringParam("labels")
+	if err != nil {
+		return "", fmt.Errorf("failed to get labels: %w", err)
+	}
+	tags, err := ctx.StringParam("tags")
+	if err != nil {
+		return "", fmt.Errorf("failed to get deprecated tags: %w", err)
+	}
+
+	labelsChanged := ctx.Command.Flags().Changed("labels")
+	tagsChanged := ctx.Command.Flags().Changed("tags")
+	if labelsChanged && tagsChanged {
+		return "", fmt.Errorf("labels and deprecated tags cannot both be set")
+	}
+	if labelsChanged {
+		return labels, nil
+	}
+	return tags, nil
+}
+
 // parseScheduleTimeParam reads and validates the --schedule-time flag.
 // Returns the validated RFC 3339 string or empty if not set.
 func parseScheduleTimeParam(ctx *Context) (string, error) {
@@ -116,7 +137,7 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	}
 
 	// Copy only fields excluded from JSON serialization (json:"-").
-	// All other fields (Queue, WorkerSelector, HandlerOn, Steps, Tags, etc.)
+	// All other fields (Queue, WorkerSelector, HandlerOn, Steps, Labels, etc.)
 	// are already correctly stored in dag.json and must be preserved.
 	dag.Env = fresh.Env
 	dag.Params = fresh.Params

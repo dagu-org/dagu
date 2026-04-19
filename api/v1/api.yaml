@@ -764,7 +764,7 @@ paths:
   /dags:
     get:
       summary: "List all available DAGs"
-      description: "Retrieves DAG definitions with optional filtering by name and tags"
+      description: "Retrieves DAG definitions with optional filtering by name and labels"
       operationId: "listDAGs"
       tags:
         - "dags"
@@ -778,12 +778,19 @@ paths:
           schema:
             type: "string"
           description: "Filter DAGs by name"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels."
         - name: "tags"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags."
+          deprecated: true
+          description: "Deprecated alias for labels. Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels."
         - name: "sort"
           in: "query"
           required: false
@@ -1048,6 +1055,8 @@ paths:
                   type: boolean
                   description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
                 tags:
                   $ref: "#/components/schemas/Tags"
       responses:
@@ -1063,7 +1072,7 @@ paths:
                 required:
                   - dagRunId
         "400":
-          description: "Invalid request parameters or tags"
+          description: "Invalid request parameters or labels"
           content:
             application/json:
               schema:
@@ -1119,6 +1128,8 @@ paths:
                   type: boolean
                   description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
                 tags:
                   $ref: "#/components/schemas/Tags"
                 timeout:
@@ -1139,7 +1150,7 @@ paths:
                   dagRun:
                     $ref: "#/components/schemas/DAGRunDetails"
         "400":
-          description: "Invalid request parameters or tags"
+          description: "Invalid request parameters or labels"
           content:
             application/json:
               schema:
@@ -1197,6 +1208,8 @@ paths:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
                 tags:
                   $ref: "#/components/schemas/Tags"
       responses:
@@ -1212,7 +1225,7 @@ paths:
                 required:
                   - dagRunId
         "400":
-          description: "Invalid request parameters or tags"
+          description: "Invalid request parameters or labels"
           content:
             application/json:
               schema:
@@ -1710,11 +1723,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/labels:
+    get:
+      summary: "List all available DAG labels"
+      description: "Retrieves all unique labels used across DAG definitions"
+      operationId: "getAllDAGLabels"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLabelResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/tags:
     get:
       summary: "List all available DAG tags"
-      description: "Retrieves all unique tags used across DAG definitions"
+      description: "Deprecated alias for /dags/labels. Retrieves all unique labels used across DAG definitions."
       operationId: "getAllDAGTags"
+      deprecated: true
       tags:
         - "dags"
       parameters:
@@ -1754,12 +1791,19 @@ paths:
           schema:
             type: "string"
           description: "Filter DAG-runs by name"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels."
         - name: "tags"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags."
+          deprecated: true
+          description: "Deprecated alias for labels. Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels."
       responses:
         "200":
           description: "A successful response"
@@ -1816,6 +1860,8 @@ paths:
                   type: boolean
                   description: "If true, prevent starting if a DAG with the same name is already running (returns 409)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
                 tags:
                   $ref: "#/components/schemas/Tags"
               required:
@@ -1891,6 +1937,8 @@ paths:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
                 tags:
                   $ref: "#/components/schemas/Tags"
               required:
@@ -7225,7 +7273,14 @@ components:
       type: array
       items:
         type: string
-      description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+      deprecated: true
+      description: "Deprecated alias for Labels. Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec."
+
+    Labels:
+      type: array
+      items:
+        type: string
+      description: "Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec."
 
     AuditEntry:
       type: object
@@ -7886,9 +7941,15 @@ components:
         defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at DAG-run creation"
+        labels:
+          type: array
+          description: "List of labels for categorizing and filtering DAGs"
+          items:
+            type: string
         tags:
           type: array
-          description: "List of tags for categorizing and filtering DAGs"
+          description: "Deprecated alias for labels. List of labels for categorizing and filtering DAGs"
+          deprecated: true
           items:
             type: string
         queue:
@@ -8212,9 +8273,15 @@ components:
         defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at DAG-run creation"
+        labels:
+          type: array
+          description: "List of labels for categorizing and filtering DAGs"
+          items:
+            type: string
         tags:
           type: array
-          description: "List of tags for categorizing and filtering DAGs"
+          description: "Deprecated alias for labels. List of labels for categorizing and filtering DAGs"
+          deprecated: true
           items:
             type: string
         runConfig:
@@ -8404,11 +8471,17 @@ components:
           description: "ID of the worker that executed this DAG-run ('local' for local execution)"
         triggerType:
           $ref: "#/components/schemas/TriggerType"
+        labels:
+          type: array
+          items:
+            type: string
+          description: "List of labels for categorizing and filtering DAG runs"
         tags:
           type: array
           items:
             type: string
-          description: "List of tags for categorizing and filtering DAG runs"
+          description: "Deprecated alias for labels. List of labels for categorizing and filtering DAG runs"
+          deprecated: true
       required:
         - dagRunId
         - name
@@ -9108,13 +9181,32 @@ components:
       required:
         - command
 
+    ListLabelResponse:
+      type: object
+      description: "Response object for listing all labels"
+      properties:
+        labels:
+          type: array
+          description: "List of unique labels"
+          items:
+            type: string
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - labels
+        - errors
+
     ListTagResponse:
       type: object
-      description: "Response object for listing all tags"
+      description: "Deprecated response object for listing all labels"
+      deprecated: true
       properties:
         tags:
           type: array
-          description: "List of unique tags"
+          description: "List of unique labels"
           items:
             type: string
         errors:

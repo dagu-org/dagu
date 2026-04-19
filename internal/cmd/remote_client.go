@@ -51,7 +51,7 @@ type remoteHistoryQuery struct {
 	To     *int64
 	Status *int
 	RunID  string
-	Tags   []string
+	Labels []string
 }
 
 func newRemoteClient(ctx *clicontext.Context) (*remoteClient, error) {
@@ -172,8 +172,8 @@ func (c *remoteClient) listDAGRuns(ctx context.Context, query remoteHistoryQuery
 	if query.RunID != "" {
 		params["dagRunId"] = query.RunID
 	}
-	if len(query.Tags) > 0 {
-		params["tags"] = strings.Join(query.Tags, ",")
+	if len(query.Labels) > 0 {
+		params["labels"] = strings.Join(query.Labels, ",")
 	}
 
 	var out struct {

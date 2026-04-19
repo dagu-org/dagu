@@ -14,7 +14,7 @@ interface DAGsListParams {
   page?: number;
   perPage?: number;
   name?: string;
-  tags?: string;
+  labels?: string;
   sort?: string;
   order?: string;
 }

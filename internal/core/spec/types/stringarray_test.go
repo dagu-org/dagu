@@ -205,7 +205,7 @@ func TestMailToValue(t *testing.T) {
 	}
 }
 
-func TestTagsValue(t *testing.T) {
+func TestLabelsValue(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -228,10 +228,10 @@ func TestTagsValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var tags types.TagsValue
-			err := yaml.Unmarshal([]byte(tt.input), &tags)
+			var labels types.LabelsValue
+			err := yaml.Unmarshal([]byte(tt.input), &labels)
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantValues, tags.Values())
+			assert.Equal(t, tt.wantValues, labels.Values())
 		})
 	}
 }

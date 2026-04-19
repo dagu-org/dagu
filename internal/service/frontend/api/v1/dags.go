@@ -673,12 +673,16 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 		sortOrder = string(*request.Params.Order)
 	}
 
+	labelsParam, err := queryLabelsParam(request.Params.Labels, request.Params.Tags)
+	if err != nil {
+		return nil, err
+	}
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
-	tags := parseCommaSeparatedTags(request.Params.Tags)
+	labels := parseCommaSeparatedLabels(labelsParam)
 	resp, err := a.listDAGsData(ctx, exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      valueOf(request.Params.Name),
-		Tags:      tags,
+		Labels:    labels,
 		Sort:      sortField,
 		Order:     sortOrder,
 	})
@@ -688,13 +692,24 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	return &resp, nil
 }
 
-func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
-	tags, errs, err := a.dagStore.TagList(ctx)
+func (a *API) GetAllDAGLabels(ctx context.Context, _ api.GetAllDAGLabelsRequestObject) (api.GetAllDAGLabelsResponseObject, error) {
+	labels, errs, err := a.dagStore.LabelList(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error getting tags: %w", err)
+		return nil, fmt.Errorf("error getting labels: %w", err)
+	}
+	return &api.GetAllDAGLabels200JSONResponse{
+		Labels: labels,
+		Errors: errs,
+	}, nil
+}
+
+func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
+	labels, errs, err := a.dagStore.LabelList(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting labels: %w", err)
 	}
 	return &api.GetAllDAGTags200JSONResponse{
-		Tags:   tags,
+		Tags:   labels,
 		Errors: errs,
 	}, nil
 }
@@ -834,12 +849,12 @@ func (a *API) ExecuteDAG(ctx context.Context, request api.ExecuteDAGRequestObjec
 		return nil, err
 	}
 
-	tags, err := extractTagsParam(request.Body.Tags)
+	labels, err := extractLabelsParam(request.Body.Labels, request.Body.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, tags); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, labels); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -927,12 +942,12 @@ func (a *API) ExecuteDAGSync(ctx context.Context, request api.ExecuteDAGSyncRequ
 		return nil, err
 	}
 
-	tags, err := extractTagsParam(request.Body.Tags)
+	labels, err := extractLabelsParam(request.Body.Labels, request.Body.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, tags); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, nameOverride, labels); err != nil {
 		return nil, fmt.Errorf("error starting dag-run: %w", err)
 	}
 
@@ -1022,27 +1037,37 @@ func (a *API) waitForDAGCompletion(
 	}
 }
 
-func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride, tags string) error {
+func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride, labels string) error {
 	return a.startDAGRunWithOptions(ctx, dag, startDAGRunOptions{
 		params:       params,
 		dagRunID:     dagRunID,
 		nameOverride: nameOverride,
 		triggerType:  core.TriggerTypeManual,
-		tags:         tags,
+		labels:       labels,
 	})
 }
 
-// extractTagsParam validates and serializes an optional tags array into a comma-separated string.
-func extractTagsParam(tags *[]string) (string, error) {
-	if tags == nil || len(*tags) == 0 {
-		return "", nil
-	}
-	parsed := core.NewTags(*tags)
-	if err := core.ValidateTags(parsed); err != nil {
+// extractLabelsParam validates and serializes an optional labels array into a comma-separated string.
+func extractLabelsParam(labels, deprecatedTags *[]string) (string, error) {
+	if labels != nil && deprecatedTags != nil && len(*labels) > 0 && len(*deprecatedTags) > 0 {
 		return "", &Error{
 			HTTPStatus: http.StatusBadRequest,
 			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("invalid tags: %s", err.Error()),
+			Message:    "labels and deprecated tags cannot both be set",
+		}
+	}
+	if (labels == nil || len(*labels) == 0) && deprecatedTags != nil {
+		labels = deprecatedTags
+	}
+	if labels == nil || len(*labels) == 0 {
+		return "", nil
+	}
+	parsed := core.NewLabels(*labels)
+	if err := core.ValidateLabels(parsed); err != nil {
+		return "", &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("invalid labels: %s", err.Error()),
 		}
 	}
 	return strings.Join(parsed.Strings(), ","), nil
@@ -1100,7 +1125,7 @@ type startDAGRunOptions struct {
 	fromRunID    string
 	target       string
 	triggerType  core.TriggerType
-	tags         string
+	labels       string
 }
 
 // waitForDAGStatusChange waits until the DAG status transitions from NotStarted.
@@ -1126,7 +1151,7 @@ func (a *API) waitForDAGStatusChange(ctx context.Context, dag *core.DAG, dagRunI
 
 // dispatchStartToCoordinator dispatches a DAG start operation to the coordinator
 // and waits for the DAG status to change from NotStarted within the given timeout.
-func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration, params, tags string) error {
+func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dagRunID string, timeout time.Duration, params, labels string) error {
 	var taskOpts []executor.TaskOption
 	if len(dag.WorkerSelector) > 0 {
 		taskOpts = append(taskOpts, executor.WithWorkerSelector(dag.WorkerSelector))
@@ -1134,8 +1159,8 @@ func (a *API) dispatchStartToCoordinator(ctx context.Context, dag *core.DAG, dag
 	if params != "" {
 		taskOpts = append(taskOpts, executor.WithTaskParams(params))
 	}
-	if tags != "" {
-		taskOpts = append(taskOpts, executor.WithTags(tags))
+	if labels != "" {
+		taskOpts = append(taskOpts, executor.WithLabels(labels))
 	}
 	taskOpts = append(taskOpts, executor.WithBaseConfig(executor.ResolveBaseConfig(dag.BaseConfigData, a.config.Paths.BaseConfig)))
 	if dag.SourceFile != "" {
@@ -1212,7 +1237,7 @@ func (a *API) startPreparedDAGRunWithOptions(
 		if osrt.GOOS == "windows" {
 			timeout = 20 * time.Second
 		}
-		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, dispatchParams, opts.tags)
+		return a.dispatchStartToCoordinator(ctx, dag, opts.dagRunID, timeout, dispatchParams, opts.labels)
 	}
 
 	// Only pass trigger type if it's a known value (not TriggerTypeUnknown)
@@ -1241,7 +1266,7 @@ func (a *API) startPreparedDAGRunWithOptions(
 		FromRunID:    fromRunID,
 		Target:       target,
 		TriggerType:  triggerTypeStr,
-		Tags:         opts.tags,
+		Labels:       opts.labels,
 	})
 
 	if err := runtime.Start(ctx, spec); err != nil {
@@ -1353,12 +1378,12 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 		}
 	}
 
-	tags, err := extractTagsParam(request.Body.Tags)
+	labels, err := extractLabelsParam(request.Body.Labels, request.Body.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride, core.TriggerTypeManual, tags); err != nil {
+	if err := a.enqueueDAGRun(ctx, dag, valueOf(request.Body.Params), dagRunId, nameOverride, core.TriggerTypeManual, labels); err != nil {
 		return nil, fmt.Errorf("error enqueuing dag-run: %w", err)
 	}
 
@@ -1376,7 +1401,7 @@ func (a *API) EnqueueDAGDAGRun(ctx context.Context, request api.EnqueueDAGDAGRun
 	}, nil
 }
 
-func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType, tags string) error {
+func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride string, triggerType core.TriggerType, labels string) error {
 	resolvedDAG, err := spec.ResolveRuntimeParams(ctx, dag, params, spec.ResolveRuntimeParamsOptions{
 		BaseConfig: a.config.Paths.BaseConfig,
 	})
@@ -1413,7 +1438,7 @@ func (a *API) enqueueDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID
 		DAGRunID:     dagRunID,
 		NameOverride: nameOverride,
 		TriggerType:  triggerTypeStr,
-		Tags:         tags,
+		Labels:       labels,
 	}
 	if dag.Queue != "" {
 		opts.Queue = dag.Queue
@@ -1606,16 +1631,26 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		sortOrder = "asc"
 	}
 
-	var tags []string
+	var labels []string
+	if labelsParam := params.Get("labels"); labelsParam != "" {
+		labels = parseCommaSeparatedLabels(&labelsParam)
+	}
 	if tagsParam := params.Get("tags"); tagsParam != "" {
-		tags = parseCommaSeparatedTags(&tagsParam)
+		if len(labels) > 0 {
+			return nil, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "labels and deprecated tags cannot both be set",
+			}
+		}
+		labels = parseCommaSeparatedLabels(&tagsParam)
 	}
 
 	pg := exec.NewPaginator(page, perPage)
 	listOpts := exec.ListDAGsOptions{
 		Paginator: &pg,
 		Name:      params.Get("name"),
-		Tags:      tags,
+		Labels:    labels,
 		Sort:      sortField,
 		Order:     sortOrder,
 	}

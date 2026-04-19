@@ -1,23 +1,23 @@
 import { Badge } from '@/components/ui/badge';
-import { cn, parseTagParts } from '@/lib/utils';
+import { cn, parseLabelParts } from '@/lib/utils';
 import { ChevronDown, X } from 'lucide-react';
 import * as React from 'react';
 
-interface TagComboboxProps {
-  selectedTags: string[];
-  onTagsChange: (tags: string[]) => void;
-  availableTags: string[];
+interface LabelComboboxProps {
+  selectedLabels: string[];
+  onLabelsChange: (labels: string[]) => void;
+  availableLabels: string[];
   placeholder?: string;
   className?: string;
 }
 
-function TagCombobox({
-  selectedTags,
-  onTagsChange,
-  availableTags,
-  placeholder = 'Filter by tags...',
+function LabelCombobox({
+  selectedLabels,
+  onLabelsChange,
+  availableLabels,
+  placeholder = 'Filter by labels...',
   className,
-}: TagComboboxProps) {
+}: LabelComboboxProps) {
   const [inputValue, setInputValue] = React.useState('');
   const [isOpen, setIsOpen] = React.useState(false);
   const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
@@ -26,9 +26,9 @@ function TagCombobox({
 
   // Filter suggestions based on input value and sort alphabetically
   const filteredSuggestions = React.useMemo(() => {
-    const selectedLower = new Set(selectedTags.map((t) => t.toLowerCase()));
-    const available = availableTags.filter(
-      (tag) => !selectedLower.has(tag.toLowerCase())
+    const selectedLower = new Set(selectedLabels.map((t) => t.toLowerCase()));
+    const available = availableLabels.filter(
+      (label) => !selectedLower.has(label.toLowerCase())
     );
 
     const sortAlphabetically = (a: string, b: string) =>
@@ -39,10 +39,10 @@ function TagCombobox({
     }
 
     const searchLower = inputValue.toLowerCase().trim();
-    return available
-      .filter((tag) => tag.toLowerCase().includes(searchLower))
-      .sort(sortAlphabetically);
-  }, [inputValue, availableTags, selectedTags]);
+      return available
+        .filter((label) => label.toLowerCase().includes(searchLower))
+        .sort(sortAlphabetically);
+  }, [inputValue, availableLabels, selectedLabels]);
 
   // Reset highlighted index when suggestions change
   React.useEffect(() => {
@@ -64,23 +64,23 @@ function TagCombobox({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const addTag = (tag: string) => {
-    const normalized = tag.toLowerCase().trim();
+  const addLabel = (label: string) => {
+    const normalized = label.toLowerCase().trim();
     if (!normalized) return;
 
     // Check for duplicates (case-insensitive)
-    if (selectedTags.some((t) => t.toLowerCase() === normalized)) {
+    if (selectedLabels.some((t) => t.toLowerCase() === normalized)) {
       return;
     }
 
-    onTagsChange([...selectedTags, normalized]);
+    onLabelsChange([...selectedLabels, normalized]);
     setInputValue('');
     setIsOpen(false);
     inputRef.current?.focus();
   };
 
-  const removeTag = (tagToRemove: string) => {
-    onTagsChange(selectedTags.filter((t) => t !== tagToRemove));
+  const removeLabel = (labelToRemove: string) => {
+    onLabelsChange(selectedLabels.filter((t) => t !== labelToRemove));
     inputRef.current?.focus();
   };
 
@@ -92,17 +92,17 @@ function TagCombobox({
           highlightedIndex >= 0 &&
           highlightedIndex < filteredSuggestions.length
         ) {
-          const tag = filteredSuggestions[highlightedIndex];
-          if (tag) addTag(tag);
+          const label = filteredSuggestions[highlightedIndex];
+          if (label) addLabel(label);
         } else if (inputValue.trim()) {
-          addTag(inputValue);
+          addLabel(inputValue);
         }
         break;
 
       case 'Backspace':
-        if (!inputValue && selectedTags.length > 0) {
-          const lastTag = selectedTags[selectedTags.length - 1];
-          if (lastTag) removeTag(lastTag);
+        if (!inputValue && selectedLabels.length > 0) {
+          const lastLabel = selectedLabels[selectedLabels.length - 1];
+          if (lastLabel) removeLabel(lastLabel);
         }
         break;
 
@@ -141,12 +141,12 @@ function TagCombobox({
     setIsOpen(true);
   };
 
-  const handleSuggestionClick = (tag: string) => {
-    addTag(tag);
+  const handleSuggestionClick = (label: string) => {
+    addLabel(label);
   };
 
   const clearAll = () => {
-    onTagsChange([]);
+    onLabelsChange([]);
     setInputValue('');
     inputRef.current?.focus();
   };
@@ -160,11 +160,11 @@ function TagCombobox({
         )}
         onClick={() => inputRef.current?.focus()}
       >
-        {selectedTags.map((tag) => {
-          const { key, value } = parseTagParts(tag);
+        {selectedLabels.map((label) => {
+          const { key, value } = parseLabelParts(label);
           return (
             <Badge
-              key={tag}
+              key={label}
               variant="secondary"
               className="text-xs h-6 px-2 gap-1"
             >
@@ -182,7 +182,7 @@ function TagCombobox({
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
-                  removeTag(tag);
+                  removeLabel(label);
                 }}
                 onMouseDown={(e) => {
                   e.stopPropagation();
@@ -202,16 +202,16 @@ function TagCombobox({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={handleInputFocus}
-          placeholder={selectedTags.length === 0 ? placeholder : ''}
+          placeholder={selectedLabels.length === 0 ? placeholder : ''}
           role="combobox"
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           aria-autocomplete="list"
-          aria-controls="tag-suggestions"
+          aria-controls="label-suggestions"
           className="flex-1 min-w-[80px] h-6 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground"
         />
         <div className="flex items-center gap-1 ml-auto">
-          {selectedTags.length > 0 && (
+          {selectedLabels.length > 0 && (
             <button
               type="button"
               onClick={(e) => {
@@ -219,7 +219,7 @@ function TagCombobox({
                 clearAll();
               }}
               className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Clear all tags"
+              title="Clear all labels"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -235,7 +235,7 @@ function TagCombobox({
 
       {isOpen && (filteredSuggestions.length > 0 || inputValue.trim()) && (
         <div
-          id="tag-suggestions"
+          id="label-suggestions"
           role="listbox"
           className="absolute z-50 mt-1 w-full max-h-[200px] overflow-y-auto rounded-md border border-border bg-popover shadow-md"
         >
@@ -250,24 +250,24 @@ function TagCombobox({
                     ? 'bg-accent text-accent-foreground'
                     : ''
                 )}
-                onClick={() => addTag(inputValue)}
+                onClick={() => addLabel(inputValue)}
               >
                 Add "{inputValue.trim()}"
               </div>
             )}
-          {filteredSuggestions.map((tag, index) => (
+          {filteredSuggestions.map((label, index) => (
             <div
-              key={tag}
+              key={label}
               className={cn(
                 'px-3 py-1.5 text-sm cursor-pointer',
                 index === highlightedIndex
                   ? 'bg-accent text-accent-foreground'
                   : 'hover:bg-muted'
               )}
-              onClick={() => handleSuggestionClick(tag)}
+              onClick={() => handleSuggestionClick(label)}
               onMouseEnter={() => setHighlightedIndex(index)}
             >
-              {tag}
+              {label}
             </div>
           ))}
         </div>
@@ -276,4 +276,4 @@ function TagCombobox({
   );
 }
 
-export { TagCombobox };
+export { LabelCombobox };

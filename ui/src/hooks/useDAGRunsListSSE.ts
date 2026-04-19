@@ -16,7 +16,7 @@ interface DAGRunsListParams {
   toDate?: number;
   name?: string;
   dagRunId?: string;
-  tags?: string;
+  labels?: string;
 }
 
 export function useDAGRunsListSSE(

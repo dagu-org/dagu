@@ -211,12 +211,12 @@ func (a *API) ExecuteDAGRunFromSpec(ctx context.Context, request api.ExecuteDAGR
 		}
 	}
 
-	tags, err := extractTagsParam(request.Body.Tags)
+	labels, err := extractLabelsParam(request.Body.Labels, request.Body.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), tags); err != nil {
+	if err := a.startDAGRun(ctx, dag, params, dagRunId, valueOf(request.Body.Name), labels); err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -304,12 +304,12 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 		}
 	}
 
-	tags, err := extractTagsParam(request.Body.Tags)
+	labels, err := extractLabelsParam(request.Body.Labels, request.Body.Tags)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := persistInlineEnqueueTags(dag, tags); err != nil {
+	if err := persistInlineEnqueueLabels(dag, labels); err != nil {
 		return nil, &Error{
 			HTTPStatus: http.StatusInternalServerError,
 			Code:       api.ErrorCodeInternalError,
@@ -336,14 +336,14 @@ func (a *API) EnqueueDAGRunFromSpec(ctx context.Context, request api.EnqueueDAGR
 	}, nil
 }
 
-// persistInlineEnqueueTags patches the inline temp spec file so queued DAG runs
-// persist the effective tag set without relying on the generic CLI sync path.
-func persistInlineEnqueueTags(dag *core.DAG, tags string) error {
-	if tags == "" || len(dag.YamlData) == 0 {
+// persistInlineEnqueueLabels patches the inline temp spec file so queued DAG runs
+// persist the effective label set without relying on the generic CLI sync path.
+func persistInlineEnqueueLabels(dag *core.DAG, labels string) error {
+	if labels == "" || len(dag.YamlData) == 0 {
 		return nil
 	}
 
-	patched, err := applyInlineEnqueueTags(dag.YamlData, tags)
+	patched, err := applyInlineEnqueueLabels(dag.YamlData, labels)
 	if err != nil {
 		return err
 	}
@@ -360,12 +360,12 @@ func persistInlineEnqueueTags(dag *core.DAG, tags string) error {
 	return nil
 }
 
-func applyInlineEnqueueTags(data []byte, tags string) ([]byte, error) {
-	if len(data) == 0 || tags == "" {
+func applyInlineEnqueueLabels(data []byte, labels string) ([]byte, error) {
+	if len(data) == 0 || labels == "" {
 		return data, nil
 	}
 
-	existingTags, err := extractInlineEnqueueTagStrings(data)
+	existingLabels, err := extractInlineEnqueueLabelStrings(data)
 	if err != nil {
 		return nil, err
 	}
@@ -375,8 +375,9 @@ func applyInlineEnqueueTags(data []byte, tags string) ([]byte, error) {
 		return nil, fmt.Errorf("decode first document: %w", err)
 	}
 
-	merged := append(existingTags, strings.Split(tags, ",")...)
-	setInlineEnqueueMapValue(&firstDoc, "tags", core.NewTags(merged).Strings())
+	merged := append(existingLabels, strings.Split(labels, ",")...)
+	deleteInlineEnqueueMapValue(&firstDoc, "tags")
+	setInlineEnqueueMapValue(&firstDoc, "labels", core.NewLabels(merged).Strings())
 
 	patched, err := yaml.Marshal(firstDoc)
 	if err != nil {
@@ -403,14 +404,18 @@ func applyInlineEnqueueTags(data []byte, tags string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func extractInlineEnqueueTagStrings(data []byte) ([]string, error) {
+func extractInlineEnqueueLabelStrings(data []byte) ([]string, error) {
 	var parsed struct {
-		Tags spectypes.TagsValue `yaml:"tags"`
+		Labels         spectypes.LabelsValue `yaml:"labels"`
+		DeprecatedTags spectypes.LabelsValue `yaml:"tags"`
 	}
 	if err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&parsed); err != nil {
-		return nil, fmt.Errorf("decode existing tags: %w", err)
+		return nil, fmt.Errorf("decode existing labels: %w", err)
 	}
-	return parsed.Tags.Values(), nil
+	if !parsed.Labels.IsZero() {
+		return parsed.Labels.Values(), nil
+	}
+	return parsed.DeprecatedTags.Values(), nil
 }
 
 func getInlineEnqueueMapValue(ms yaml.MapSlice, key string) (any, bool) {
@@ -431,6 +436,15 @@ func setInlineEnqueueMapValue(ms *yaml.MapSlice, key string, value any) {
 	}
 
 	*ms = append(*ms, yaml.MapItem{Key: key, Value: value})
+}
+
+func deleteInlineEnqueueMapValue(ms *yaml.MapSlice, key string) {
+	for i := range *ms {
+		if itemKey, ok := (*ms)[i].Key.(string); ok && itemKey == key {
+			*ms = append((*ms)[:i], (*ms)[i+1:]...)
+			return
+		}
+	}
 }
 
 func (a *API) loadInlineDAG(ctx context.Context, specContent string, name *string, dagRunID string) (*core.DAG, func(), error) {
@@ -572,13 +586,17 @@ func rebuildDAGRunSnapshotFromYAML(ctx context.Context, dag *core.DAG) (*core.DA
 }
 
 func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObject) (api.ListDAGRunsResponseObject, error) {
+	labelsParam, err := queryLabelsParam(request.Params.Labels, request.Params.Tags)
+	if err != nil {
+		return nil, err
+	}
 	opts := buildDAGRunListOptions(dagRunListFilterInput{
 		statuses: request.Params.Status,
 		fromDate: request.Params.FromDate,
 		toDate:   request.Params.ToDate,
 		name:     request.Params.Name,
 		dagRunID: request.Params.DagRunId,
-		tags:     request.Params.Tags,
+		labels:   labelsParam,
 		limit:    request.Params.Limit,
 		cursor:   request.Params.Cursor,
 	})
@@ -658,7 +676,7 @@ type dagRunListFilterInput struct {
 	name      *string
 	exactName *string
 	dagRunID  *string
-	tags      *string
+	labels    *string
 	limit     *int
 	cursor    *string
 }
@@ -689,8 +707,8 @@ func buildDAGRunListOptions(input dagRunListFilterInput) dagRunListOptions {
 	if input.dagRunID != nil && *input.dagRunID != "" {
 		opts.query = append(opts.query, exec.WithDAGRunID(*input.dagRunID))
 	}
-	if tags := parseCommaSeparatedTags(input.tags); len(tags) > 0 {
-		opts.query = append(opts.query, exec.WithTags(tags))
+	if labels := parseCommaSeparatedLabels(input.labels); len(labels) > 0 {
+		opts.query = append(opts.query, exec.WithLabels(labels))
 	}
 	if input.limit != nil {
 		limit = clampInt(*input.limit, 1, maxLimit)
@@ -731,24 +749,43 @@ func dagRunListBadRequest(err error) *Error {
 	}
 }
 
-func parseCommaSeparatedTags(tagsParam *string) []string {
-	if tagsParam == nil || *tagsParam == "" {
+func parseCommaSeparatedLabels(labelsParam *string) []string {
+	if labelsParam == nil || *labelsParam == "" {
 		return nil
 	}
 
-	parts := strings.Split(*tagsParam, ",")
+	parts := strings.Split(*labelsParam, ",")
 	seen := make(map[string]struct{}, len(parts))
-	tags := make([]string, 0, len(parts))
-	for _, tag := range parts {
-		normalized := strings.ToLower(strings.TrimSpace(tag))
+	labels := make([]string, 0, len(parts))
+	for _, label := range parts {
+		normalized := strings.ToLower(strings.TrimSpace(label))
 		if normalized != "" {
 			if _, exists := seen[normalized]; !exists {
 				seen[normalized] = struct{}{}
-				tags = append(tags, normalized)
+				labels = append(labels, normalized)
 			}
 		}
 	}
-	return tags
+	return labels
+}
+
+func queryLabelsParam(labelsParam, deprecatedTagsParam *string) (*string, error) {
+	hasLabels := labelsParam != nil && *labelsParam != ""
+	hasTags := deprecatedTagsParam != nil && *deprecatedTagsParam != ""
+	if hasLabels && hasTags {
+		return nil, &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "labels and deprecated tags cannot both be set",
+		}
+	}
+	if hasLabels {
+		return labelsParam, nil
+	}
+	if hasTags {
+		return deprecatedTagsParam, nil
+	}
+	return nil, nil
 }
 
 func (a *API) GetDAGRunLog(ctx context.Context, request api.GetDAGRunLogRequestObject) (api.GetDAGRunLogResponseObject, error) {
@@ -3703,7 +3740,7 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 		toDate       *int64
 		name         *string
 		dagRunID     *string
-		tags         *string
+		labels       *string
 		limit        *int
 		cursor       *string
 	)
@@ -3742,8 +3779,18 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 	if rawDAGRunID := params.Get("dagRunId"); rawDAGRunID != "" {
 		dagRunID = &rawDAGRunID
 	}
+	if rawLabels := params.Get("labels"); rawLabels != "" {
+		labels = &rawLabels
+	}
 	if rawTags := params.Get("tags"); rawTags != "" {
-		tags = &rawTags
+		if labels != nil {
+			return dagRunListOptions{}, &Error{
+				HTTPStatus: http.StatusBadRequest,
+				Code:       api.ErrorCodeBadRequest,
+				Message:    "labels and deprecated tags cannot both be set",
+			}
+		}
+		labels = &rawTags
 	}
 	if rawLimit := params.Get("limit"); rawLimit != "" {
 		if parsed, convErr := strconv.Atoi(rawLimit); convErr == nil {
@@ -3762,7 +3809,7 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 		toDate:   toDate,
 		name:     name,
 		dagRunID: dagRunID,
-		tags:     tags,
+		labels:   labels,
 		limit:    limit,
 		cursor:   cursor,
 	}), nil

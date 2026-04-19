@@ -116,7 +116,7 @@ func TestGetMetadata(t *testing.T) {
 
 	// Test successful metadata retrieval
 	dagContent := `name: test-dag
-tags: ["tag1", "tag2"]
+labels: ["tag1", "tag2"]
 steps:
   - name: step1
     command: echo "hello"`
@@ -127,7 +127,7 @@ steps:
 	require.NoError(t, err)
 	require.NotNil(t, dag)
 	assert.Equal(t, "test-dag", dag.Name)
-	assert.Equal(t, []string{"tag1", "tag2"}, dag.Tags.Strings())
+	assert.Equal(t, []string{"tag1", "tag2"}, dag.Labels.Strings())
 
 	// Test DAG not found
 	_, err = store.GetMetadata(ctx, "non-existent")
@@ -481,8 +481,8 @@ steps:
 	require.Empty(t, results)
 }
 
-func TestTagList(t *testing.T) {
-	tmpDir := fileutil.MustTempDir("test-tag-list")
+func TestLabelList(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-label-list")
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -490,40 +490,40 @@ func TestTagList(t *testing.T) {
 	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
-	// Create DAGs with different tags
-	dag1Content := `name: tag-dag-1
-tags: ["web", "daily"]
+	// Create DAGs with different labels
+	dag1Content := `name: label-dag-1
+labels: ["web", "daily"]
 steps:
   - name: step1
     command: echo "tag1"`
-	err := store.Create(ctx, "tag-dag-1", []byte(dag1Content))
+	err := store.Create(ctx, "label-dag-1", []byte(dag1Content))
 	require.NoError(t, err)
 
-	dag2Content := `name: tag-dag-2
-tags: ["batch", "daily", "weekly"]
+	dag2Content := `name: label-dag-2
+labels: ["batch", "daily", "weekly"]
 steps:
   - name: step1
     command: echo "tag2"`
-	err = store.Create(ctx, "tag-dag-2", []byte(dag2Content))
+	err = store.Create(ctx, "label-dag-2", []byte(dag2Content))
 	require.NoError(t, err)
 
-	dag3Content := `name: tag-dag-3
+	dag3Content := `name: label-dag-3
 steps:
   - name: step1
-    command: echo "no tags"`
-	err = store.Create(ctx, "tag-dag-3", []byte(dag3Content))
+    command: echo "no labels"`
+	err = store.Create(ctx, "label-dag-3", []byte(dag3Content))
 	require.NoError(t, err)
 
-	// Test tag list
-	tags, errList, err := store.TagList(ctx)
+	// Test label list
+	labels, errList, err := store.LabelList(ctx)
 	require.NoError(t, err)
 	require.Empty(t, errList)
-	require.Len(t, tags, 4)
+	require.Len(t, labels, 4)
 
-	// Verify all unique tags are present
+	// Verify all unique labels are present
 	tagSet := make(map[string]bool)
-	for _, tag := range tags {
-		tagSet[tag] = true
+	for _, label := range labels {
+		tagSet[label] = true
 	}
 	assert.True(t, tagSet["web"])
 	assert.True(t, tagSet["daily"])
@@ -630,7 +630,7 @@ func TestListRebuildsIndexWhenBaseConfigChanges(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoError(t, os.WriteFile(filepath.Join(dagDir, "index-refresh.yaml"), []byte(`name: index-refresh
-tags:
+labels:
   - env=dev
 steps:
   - name: step1
@@ -753,9 +753,9 @@ func TestListWithFiltering(t *testing.T) {
 	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
-	// Create DAGs with different names and tags
+	// Create DAGs with different names and labels
 	dag1Content := `name: filter-web-dag
-tags: ["web", "frontend"]
+labels: ["web", "frontend"]
 steps:
   - name: step1
     command: echo "web"`
@@ -763,7 +763,7 @@ steps:
 	require.NoError(t, err)
 
 	dag2Content := `name: filter-batch-dag
-tags: ["batch", "backend"]
+labels: ["batch", "backend"]
 steps:
   - name: step1
     command: echo "batch"`
@@ -778,32 +778,32 @@ steps:
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
-	// Test tag filtering
-	opts = exec.ListDAGsOptions{Tags: []string{"frontend"}}
+	// Test label filtering
+	opts = exec.ListDAGsOptions{Labels: []string{"frontend"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
-	// Test case-insensitive tag filtering
-	opts = exec.ListDAGsOptions{Tags: []string{"FRONTEND"}}
+	// Test case-insensitive label filtering
+	opts = exec.ListDAGsOptions{Labels: []string{"FRONTEND"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
-	// Test multi-tag AND filtering (all tags must match)
-	opts = exec.ListDAGsOptions{Tags: []string{"web", "frontend"}}
+	// Test multi-label AND filtering (all labels must match)
+	opts = exec.ListDAGsOptions{Labels: []string{"web", "frontend"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
-	// Negative case: missing one tag should return nothing
-	opts = exec.ListDAGsOptions{Tags: []string{"web", "backend"}}
+	// Negative case: missing one label should return nothing
+	opts = exec.ListDAGsOptions{Labels: []string{"web", "backend"}}
 	result, errList, err = store.List(ctx, opts)
 	require.NoError(t, err)
 	require.Empty(t, errList)
@@ -1322,7 +1322,7 @@ func TestListUsesIndex(t *testing.T) {
 
 	// Create DAGs.
 	for i := range 3 {
-		content := fmt.Sprintf("name: idx-dag-%d\ntags:\n  - env=prod\nsteps:\n  - name: s1\n    command: echo ok\n", i)
+		content := fmt.Sprintf("name: idx-dag-%d\nlabels:\n  - env=prod\nsteps:\n  - name: s1\n    command: echo ok\n", i)
 		require.NoError(t, store.Create(ctx, fmt.Sprintf("idx-dag-%d", i), []byte(content)))
 	}
 
@@ -1343,7 +1343,7 @@ func TestListUsesIndex(t *testing.T) {
 	assert.Equal(t, 3, result2.TotalCount)
 
 	// Verify filtering works with index.
-	result3, _, err := store.List(ctx, exec.ListDAGsOptions{Tags: []string{"env=prod"}})
+	result3, _, err := store.List(ctx, exec.ListDAGsOptions{Labels: []string{"env=prod"}})
 	require.NoError(t, err)
 	assert.Equal(t, 3, result3.TotalCount)
 }
@@ -1395,30 +1395,30 @@ steps:
 	assert.False(t, fileExists(indexPath), "index should be removed after invalidation")
 }
 
-func TestTagListUsesIndex(t *testing.T) {
+func TestLabelListUsesIndex(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := New(tmpDir, WithSkipExamples(true))
 	ctx := context.Background()
 
-	// Create DAGs with tags.
-	dag1 := "name: tag-idx-1\ntags:\n  - env=prod\n  - team=backend\nsteps:\n  - name: s1\n    command: echo ok\n"
-	dag2 := "name: tag-idx-2\ntags:\n  - env=staging\nsteps:\n  - name: s1\n    command: echo ok\n"
-	require.NoError(t, store.Create(ctx, "tag-idx-1", []byte(dag1)))
-	require.NoError(t, store.Create(ctx, "tag-idx-2", []byte(dag2)))
+	// Create DAGs with labels.
+	dag1 := "name: label-idx-1\nlabels:\n  - env=prod\n  - team=backend\nsteps:\n  - name: s1\n    command: echo ok\n"
+	dag2 := "name: label-idx-2\nlabels:\n  - env=staging\nsteps:\n  - name: s1\n    command: echo ok\n"
+	require.NoError(t, store.Create(ctx, "label-idx-1", []byte(dag1)))
+	require.NoError(t, store.Create(ctx, "label-idx-2", []byte(dag2)))
 
 	// First call builds index.
-	tags1, errList1, err := store.TagList(ctx)
+	labels1, errList1, err := store.LabelList(ctx)
 	require.NoError(t, err)
 	require.Empty(t, errList1)
-	assert.GreaterOrEqual(t, len(tags1), 3) // env=prod, env=staging, team=backend, env, team
+	assert.GreaterOrEqual(t, len(labels1), 3) // env=prod, env=staging, team=backend, env, team
 
 	// Verify index exists.
 	indexPath := filepath.Join(tmpDir, ".dag.index")
 	assert.True(t, fileExists(indexPath))
 
 	// Second call uses index.
-	tags2, errList2, err := store.TagList(ctx)
+	labels2, errList2, err := store.LabelList(ctx)
 	require.NoError(t, err)
 	require.Empty(t, errList2)
-	assert.Equal(t, len(tags1), len(tags2))
+	assert.Equal(t, len(labels1), len(labels2))
 }

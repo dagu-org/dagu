@@ -106,7 +106,7 @@ func (m *mockDAGStore) LoadSpec(_ context.Context, _ []byte, _ ...spec.LoadOptio
 	return nil, nil
 }
 
-func (m *mockDAGStore) TagList(_ context.Context) ([]string, []string, error) {
+func (m *mockDAGStore) LabelList(_ context.Context) ([]string, []string, error) {
 	return nil, nil, nil
 }
 

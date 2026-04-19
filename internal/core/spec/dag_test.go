@@ -73,9 +73,9 @@ func stringOrArrayList(ss []string) types.StringOrArray {
 	return v
 }
 
-// Helper to create TagsValue from single string
-func tagsValue(s string) types.TagsValue {
-	var v types.TagsValue
+// Helper to create LabelsValue from single string
+func labelsValue(s string) types.LabelsValue {
+	var v types.LabelsValue
 	_ = yaml.Unmarshal([]byte(`"`+s+`"`), &v)
 	return v
 }
@@ -366,54 +366,100 @@ func TestBuildRestartWait(t *testing.T) {
 	}
 }
 
-func TestBuildTags(t *testing.T) {
+func TestBuildLabels(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		tags     types.TagsValue
-		expected core.Tags
+		labels   types.LabelsValue
+		expected core.Labels
 	}{
 		{
-			name:     "NilTags",
-			tags:     types.TagsValue{},
+			name:     "NilLabels",
+			labels:   types.LabelsValue{},
 			expected: nil,
 		},
 		{
 			name:     "CommaSeparated",
-			tags:     tagsValue("daily,weekly"),
-			expected: core.Tags{{Key: "daily"}, {Key: "weekly"}},
+			labels:   labelsValue("daily,weekly"),
+			expected: core.Labels{{Key: "daily"}, {Key: "weekly"}},
 		},
 		{
 			name:     "NormalizedToLowercase",
-			tags:     tagsValue("Daily,WEEKLY"),
-			expected: core.Tags{{Key: "daily"}, {Key: "weekly"}},
+			labels:   labelsValue("Daily,WEEKLY"),
+			expected: core.Labels{{Key: "daily"}, {Key: "weekly"}},
 		},
 		{
 			name:     "TrimmedWhitespace",
-			tags:     tagsValue(" tag1 , tag2 "),
-			expected: core.Tags{{Key: "tag1"}, {Key: "tag2"}},
+			labels:   labelsValue("label1, label2"),
+			expected: core.Labels{{Key: "label1"}, {Key: "label2"}},
 		},
 		{
-			name:     "KeyValueTags",
-			tags:     tagsValue("env=prod team=platform"),
-			expected: core.Tags{{Key: "env", Value: "prod"}, {Key: "team", Value: "platform"}},
+			name:     "KeyValueLabels",
+			labels:   labelsValue("env=prod team=platform"),
+			expected: core.Labels{{Key: "env", Value: "prod"}, {Key: "team", Value: "platform"}},
 		},
 		{
-			name:     "MixedTags",
-			tags:     tagsValue("env=prod,critical"),
-			expected: core.Tags{{Key: "env", Value: "prod"}, {Key: "critical"}},
+			name:     "MixedLabels",
+			labels:   labelsValue("env=prod,critical"),
+			expected: core.Labels{{Key: "env", Value: "prod"}, {Key: "critical"}},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := &dag{Tags: tt.tags}
-			result, err := buildTags(testBuildContext(), d)
+			d := &dag{Labels: tt.labels}
+			result, err := buildLabels(testBuildContext(), d)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestLoadYAMLLabels(t *testing.T) {
+	t.Parallel()
+
+	d, err := LoadYAML(context.Background(), []byte(`
+labels:
+  env: prod
+  team: platform
+steps:
+  - name: step
+    command: echo ok
+`), WithoutEval())
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"env=prod", "team=platform"}, d.Labels.Strings())
+}
+
+func TestLoadYAMLDeprecatedTags(t *testing.T) {
+	t.Parallel()
+
+	d, err := LoadYAML(context.Background(), []byte(`
+tags:
+  - env=prod
+  - team=platform
+steps:
+  - name: step
+    command: echo ok
+`), WithoutEval())
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"env=prod", "team=platform"}, d.Labels.Strings())
+}
+
+func TestLoadYAMLLabelsAndDeprecatedTagsRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+labels:
+  - env=prod
+tags:
+  - team=platform
+steps:
+  - name: step
+    command: echo ok
+`), WithoutEval())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "labels and deprecated tags cannot both be set")
 }
 
 func TestBuildMaxActiveRuns(t *testing.T) {

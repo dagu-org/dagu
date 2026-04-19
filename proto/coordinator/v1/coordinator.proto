@@ -90,8 +90,8 @@ message Task {
   string attempt_id = 14;
   // Globally unique attempt identifier for cancellation tracking.
   string attempt_key = 15;
-  // Additional tags (comma-separated key=value or key-only) to apply to the DAG run.
-  string tags = 16;
+  // Additional labels (comma-separated key=value or key-only) to apply to the DAG run.
+  string labels = 16;
   // Base config YAML content for workers (avoids relying on local base config files).
   string base_config = 17;
   // RFC 3339 timestamp of when this task was originally scheduled.

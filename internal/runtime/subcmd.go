@@ -160,8 +160,8 @@ func (b *SubCmdBuilder) Start(dag *core.DAG, opts StartOptions) CmdSpec {
 	if opts.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
-	if opts.Tags != "" {
-		args = append(args, fmt.Sprintf("--tags=%s", opts.Tags))
+	if labels := effectiveLabels(opts.Labels, opts.Tags); labels != "" {
+		args = append(args, fmt.Sprintf("--labels=%s", labels))
 	}
 	if opts.ScheduleTime != "" {
 		args = append(args, fmt.Sprintf("--schedule-time=%s", opts.ScheduleTime))
@@ -208,8 +208,8 @@ func (b *SubCmdBuilder) Enqueue(dag *core.DAG, opts EnqueueOptions) CmdSpec {
 	if opts.TriggerType != "" {
 		args = append(args, fmt.Sprintf("--trigger-type=%s", opts.TriggerType))
 	}
-	if opts.Tags != "" {
-		args = append(args, fmt.Sprintf("--tags=%s", opts.Tags))
+	if labels := effectiveLabels(opts.Labels, opts.Tags); labels != "" {
+		args = append(args, fmt.Sprintf("--labels=%s", labels))
 	}
 	if opts.ScheduleTime != "" {
 		args = append(args, fmt.Sprintf("--schedule-time=%s", opts.ScheduleTime))
@@ -338,8 +338,8 @@ func (b *SubCmdBuilder) TaskStart(task *coordinatorv1.Task, envHints []string, d
 		args = append(args, fmt.Sprintf("--worker-id=%s", task.WorkerId))
 	}
 
-	if task.Tags != "" {
-		args = append(args, fmt.Sprintf("--tags=%s", task.Tags))
+	if task.Labels != "" {
+		args = append(args, fmt.Sprintf("--labels=%s", task.Labels))
 	}
 	if task.ScheduleTime != "" {
 		args = append(args, fmt.Sprintf("--schedule-time=%s", task.ScheduleTime))
@@ -429,7 +429,8 @@ type StartOptions struct {
 	FromRunID    string // Historic dag-run ID to use as a template
 	Target       string // Optional CLI argument override (DAG name or file path)
 	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
-	Tags         string // Additional tags (comma-separated)
+	Labels       string // Additional labels (comma-separated)
+	Tags         string // Deprecated: use Labels.
 	ScheduleTime string // RFC 3339 timestamp of when this run was scheduled
 }
 
@@ -441,7 +442,8 @@ type EnqueueOptions struct {
 	Queue        string // Queue name to enqueue to
 	NameOverride string // Optional DAG name override
 	TriggerType  string // How this DAG run was initiated (scheduler, manual, webhook, subdag)
-	Tags         string // Additional tags (comma-separated)
+	Labels       string // Additional labels (comma-separated)
+	Tags         string // Deprecated: use Labels.
 	ScheduleTime string // RFC 3339 timestamp of when this run was scheduled
 }
 
@@ -488,6 +490,13 @@ func fileOrDefault(file, defaultFile *os.File) *os.File {
 		return file
 	}
 	return defaultFile
+}
+
+func effectiveLabels(labels, tags string) string {
+	if labels != "" {
+		return labels
+	}
+	return tags
 }
 
 // Start executes the command without waiting for it to complete.

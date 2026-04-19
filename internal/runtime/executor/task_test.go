@@ -221,7 +221,7 @@ steps:
 		assert.Equal(t, coordinatorv1.Operation_OPERATION_RETRY, task.Operation)
 	})
 
-	t.Run("WithTagsOption", func(t *testing.T) {
+	t.Run("WithLabelsOption", func(t *testing.T) {
 		t.Parallel()
 
 		task := executor.CreateTask(
@@ -229,10 +229,10 @@ steps:
 			`name: test-dag`,
 			coordinatorv1.Operation_OPERATION_START,
 			"run-123",
-			executor.WithTags("env=prod,region=us-east-1"),
+			executor.WithLabels("env=prod,region=us-east-1"),
 		)
 
-		assert.Equal(t, "env=prod,region=us-east-1", task.Tags)
+		assert.Equal(t, "env=prod,region=us-east-1", task.Labels)
 	})
 
 	t.Run("WithScheduleTimeOption", func(t *testing.T) {
@@ -345,24 +345,24 @@ func TestTaskOption_Functions(t *testing.T) {
 		assert.Equal(t, "step-name", task.Step)
 	})
 
-	t.Run("WithTags", func(t *testing.T) {
+	t.Run("WithLabels", func(t *testing.T) {
 		t.Parallel()
 
 		task := &coordinatorv1.Task{}
 
-		executor.WithTags("env=prod,team=backend")(task)
+		executor.WithLabels("env=prod,team=backend")(task)
 
-		assert.Equal(t, "env=prod,team=backend", task.Tags)
+		assert.Equal(t, "env=prod,team=backend", task.Labels)
 	})
 
-	t.Run("WithTagsEmpty", func(t *testing.T) {
+	t.Run("WithLabelsEmpty", func(t *testing.T) {
 		t.Parallel()
 
 		task := &coordinatorv1.Task{}
 
-		executor.WithTags("")(task)
+		executor.WithLabels("")(task)
 
-		assert.Empty(t, task.Tags)
+		assert.Empty(t, task.Labels)
 	})
 
 	t.Run("WithPreviousStatus", func(t *testing.T) {

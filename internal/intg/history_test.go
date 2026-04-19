@@ -285,15 +285,15 @@ func TestHistoryCommand_EmptyResults(t *testing.T) {
 	})
 }
 
-func TestHistoryCommand_Tags(t *testing.T) {
+func TestHistoryCommand_Labels(t *testing.T) {
 	t.Parallel()
 
 	th := test.SetupCommand(t)
 	ctx := context.Background()
 
-	// Create DAGs with different tags
-	dag1 := th.DAG(t, `name: tagged-dag-1
-tags:
+	// Create DAGs with different labels
+	dag1 := th.DAG(t, `name: labeled-dag-1
+labels:
   - prod
   - critical
 steps:
@@ -301,8 +301,8 @@ steps:
     command: "echo test"
 `)
 
-	dag2 := th.DAG(t, `name: tagged-dag-2
-tags:
+	dag2 := th.DAG(t, `name: labeled-dag-2
+labels:
   - dev
 steps:
   - name: step2
@@ -318,11 +318,11 @@ steps:
 		return err1 == nil && err2 == nil && s1.Status == core.Succeeded && s2.Status == core.Succeeded
 	}, 5*time.Second, 100*time.Millisecond)
 
-	// Filter by tag - stdout table output is not captured,
+	// Filter by label - stdout table output is not captured,
 	// so we just verify the command runs without error
 	th.RunCommand(t, cmd.History(), test.CmdTest{
-		Name: "FilterByTag",
-		Args: []string{"history", "--tags=prod"},
+		Name: "FilterByLabel",
+		Args: []string{"history", "--labels=prod"},
 	})
 }
 
