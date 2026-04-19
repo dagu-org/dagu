@@ -2186,6 +2186,11 @@ paths:
                     description: "Steps that will be started if not skipped."
                     items:
                       type: string
+                  steps:
+                    type: array
+                    description: "Resolved edited DAG steps in execution order for preview rendering."
+                    items:
+                      $ref: "#/components/schemas/Step"
                   ineligibleSteps:
                     type: array
                     description: "Previous completed steps that cannot be skipped with the edited specification."
@@ -2213,6 +2218,7 @@ paths:
                   - dagName
                   - skippedSteps
                   - runnableSteps
+                  - steps
                   - ineligibleSteps
                   - errors
                   - warnings

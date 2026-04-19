@@ -6,14 +6,21 @@
  */
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { cn } from '@/lib/utils';
 import { RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  components,
+  NodeStatus,
+  NodeStatusLabel,
+} from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
 import ConfirmModal from '../../../../ui/ConfirmModal';
+import Graph, { type FlowchartType } from '../visualization/Graph';
 import DAGEditorWithDocs from './DAGEditorWithDocs';
 
 /**
@@ -34,6 +41,7 @@ type EditRetryPreview = {
   dagName: string;
   skippedSteps: string[];
   runnableSteps: string[];
+  steps: components['schemas']['Step'][];
   ineligibleSteps: { stepName: string; reason: string }[];
   errors: string[];
   warnings: string[];
@@ -49,37 +57,43 @@ const normalizeEditRetryPreview = (
     dagName: preview.dagName ?? '',
     skippedSteps: preview.skippedSteps ?? [],
     runnableSteps: preview.runnableSteps ?? [],
+    steps: preview.steps ?? [],
     ineligibleSteps: preview.ineligibleSteps ?? [],
     errors: preview.errors ?? [],
     warnings: preview.warnings ?? [],
   };
 };
 
-function PreviewStepList({ label, steps }: { label: string; steps: string[] }) {
-  if (steps.length === 0) {
-    return null;
-  }
+const orderedSelectedSkipSteps = (
+  steps: components['schemas']['Step'][],
+  selectedSkipSteps: string[]
+) => {
+  const selected = new Set(selectedSkipSteps);
+  return steps.map((step) => step.name).filter((name) => selected.has(name));
+};
 
-  return (
-    <div className="space-y-1">
-      <div className="text-xs font-medium uppercase text-muted-foreground">
-        {label}
-      </div>
-      <div className="max-h-32 overflow-y-auto rounded-md border bg-muted/20 p-2">
-        <div className="flex flex-wrap gap-1.5">
-          {steps.map((step) => (
-            <span
-              key={step}
-              className="rounded border bg-background px-1.5 py-0.5 font-mono text-xs"
-            >
-              {step}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+const buildPreviewNodes = (
+  steps: components['schemas']['Step'][],
+  selectedSkipSteps: string[]
+): components['schemas']['Node'][] => {
+  const selected = new Set(selectedSkipSteps);
+  return steps.map((step) => {
+    const willReuseOutput = selected.has(step.name);
+    return {
+      step,
+      stdout: '',
+      stderr: '',
+      startedAt: '',
+      finishedAt: '',
+      retryCount: 0,
+      doneCount: 0,
+      status: willReuseOutput ? NodeStatus.Success : NodeStatus.NotStarted,
+      statusLabel: willReuseOutput
+        ? NodeStatusLabel.succeeded
+        : NodeStatusLabel.not_started,
+    };
+  });
+};
 
 /**
  * Skeleton placeholder for the editor while loading
@@ -129,6 +143,12 @@ function DAGSpecReadOnly({
   const [previewVisible, setPreviewVisible] = React.useState(false);
   const [retryPreview, setRetryPreview] =
     React.useState<EditRetryPreview | null>(null);
+  const [selectedSkipSteps, setSelectedSkipSteps] = React.useState<string[]>(
+    []
+  );
+  const [selectedPreviewStep, setSelectedPreviewStep] = React.useState('');
+  const [previewFlowchart, setPreviewFlowchart] =
+    React.useState<FlowchartType>('TD');
 
   // Select endpoint based on whether this is a subdag
   const endpoint = subDAGRunId
@@ -156,12 +176,16 @@ function DAGSpecReadOnly({
       setSourceSpec('');
       setEditedSpec('');
       setRetryPreview(null);
+      setSelectedSkipSteps([]);
+      setSelectedPreviewStep('');
       setPreviewVisible(false);
       return;
     }
     setSourceSpec(data.spec);
     setEditedSpec(data.spec);
     setRetryPreview(null);
+    setSelectedSkipSteps([]);
+    setSelectedPreviewStep('');
     setPreviewVisible(false);
   }, [data?.spec]);
 
@@ -213,6 +237,8 @@ function DAGSpecReadOnly({
         return;
       }
       setRetryPreview(preview);
+      setSelectedSkipSteps(preview.skippedSteps);
+      setSelectedPreviewStep(preview.steps[0]?.name ?? '');
       setPreviewVisible(true);
     } catch (err) {
       showError(
@@ -264,7 +290,10 @@ function DAGSpecReadOnly({
             spec: editorSpec,
             dagName,
             persistSpec: false,
-            skipSteps: retryPreview.skippedSteps,
+            skipSteps: orderedSelectedSkipSteps(
+              retryPreview.steps,
+              selectedSkipSteps
+            ),
           },
         }
       );
@@ -308,6 +337,7 @@ function DAGSpecReadOnly({
     navigate,
     retryPreview,
     retrySubmitting,
+    selectedSkipSteps,
     showError,
     showToast,
   ]);
@@ -315,7 +345,59 @@ function DAGSpecReadOnly({
   const handleSpecChange = React.useCallback((value?: string) => {
     setEditedSpec(value ?? '');
     setRetryPreview(null);
+    setSelectedSkipSteps([]);
+    setSelectedPreviewStep('');
   }, []);
+
+  const previewNodes = React.useMemo(
+    () =>
+      retryPreview
+        ? buildPreviewNodes(retryPreview.steps, selectedSkipSteps)
+        : [],
+    [retryPreview, selectedSkipSteps]
+  );
+
+  const selectedPreviewNode = React.useMemo(
+    () =>
+      previewNodes.find((node) => node.step.name === selectedPreviewStep) ??
+      previewNodes[0],
+    [previewNodes, selectedPreviewStep]
+  );
+
+  const retryStepCount = React.useMemo(() => {
+    if (!retryPreview) {
+      return 0;
+    }
+    const selected = new Set(selectedSkipSteps);
+    return retryPreview.steps.filter((step) => !selected.has(step.name)).length;
+  }, [retryPreview, selectedSkipSteps]);
+
+  const eligibleReuseSteps = React.useMemo(
+    () => new Set(retryPreview?.skippedSteps ?? []),
+    [retryPreview]
+  );
+
+  const ineligibleReasonByStep = React.useMemo(() => {
+    const reasons = new Map<string, string>();
+    retryPreview?.ineligibleSteps.forEach((step) => {
+      reasons.set(step.stepName, step.reason);
+    });
+    return reasons;
+  }, [retryPreview]);
+
+  const toggleReuseStep = React.useCallback(
+    (stepName: string) => {
+      if (!eligibleReuseSteps.has(stepName)) {
+        return;
+      }
+      setSelectedSkipSteps((current) =>
+        current.includes(stepName)
+          ? current.filter((name) => name !== stepName)
+          : [...current, stepName]
+      );
+    },
+    [eligibleReuseSteps]
+  );
 
   if (isLoading) {
     return <EditorSkeleton className={className} />;
@@ -378,24 +460,13 @@ function DAGSpecReadOnly({
         submitDisabled={
           retrySubmitting || !retryPreview || retryPreview.errors.length > 0
         }
-        contentClassName="sm:max-w-[680px]"
-        bodyClassName="max-h-[70vh] overflow-y-auto pr-1"
+        contentClassName="w-[96vw] max-w-[96vw] h-[92vh] max-h-[92vh] grid grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
+        bodyClassName="min-h-0 overflow-hidden py-2"
       >
-        <div className="space-y-3 text-sm">
-          <p>
-            Review the server preview before creating a new run from this edited
-            DAG spec.
-          </p>
-
-          {retryPreview && (
-            <>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div>
-                  <div className="text-xs uppercase text-muted-foreground">
-                    Source DAG-run ID
-                  </div>
-                  <div className="font-mono text-xs">{dagRunId}</div>
-                </div>
+        {retryPreview && (
+          <div className="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="flex min-h-0 flex-col rounded-md border bg-surface">
+              <div className="flex flex-wrap items-center gap-4 border-b px-3 py-2 text-sm">
                 <div>
                   <div className="text-xs uppercase text-muted-foreground">
                     Target DAG
@@ -406,61 +477,135 @@ function DAGSpecReadOnly({
                 </div>
                 <div>
                   <div className="text-xs uppercase text-muted-foreground">
-                    Skipped steps
+                    Reuse previous output
                   </div>
-                  <div>{retryPreview.skippedSteps.length}</div>
+                  <div>{selectedSkipSteps.length}</div>
                 </div>
                 <div>
                   <div className="text-xs uppercase text-muted-foreground">
-                    Runnable steps
+                    Run again
                   </div>
-                  <div>{retryPreview.runnableSteps.length}</div>
+                  <div>{retryStepCount}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase text-muted-foreground">
+                    Source DAG-run ID
+                  </div>
+                  <div className="font-mono text-xs">{dagRunId}</div>
                 </div>
               </div>
+              <div className="min-h-0 flex-1 overflow-hidden p-2">
+                <Graph
+                  steps={previewNodes}
+                  type="status"
+                  flowchart={previewFlowchart}
+                  onChangeFlowchart={setPreviewFlowchart}
+                  onClickNode={setSelectedPreviewStep}
+                  onRightClickNode={setSelectedPreviewStep}
+                  isExpandedView={true}
+                  height="100%"
+                />
+              </div>
+            </div>
 
-              {retryPreview.errors.length > 0 && (
-                <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-destructive">
-                  {retryPreview.errors.map((error) => (
-                    <div key={error}>{error}</div>
-                  ))}
-                </div>
-              )}
-
-              {retryPreview.warnings.length > 0 && (
-                <div className="space-y-1 rounded-md border p-2 text-muted-foreground">
-                  {retryPreview.warnings.map((warning) => (
-                    <div key={warning}>{warning}</div>
-                  ))}
-                </div>
-              )}
-
-              <PreviewStepList
-                label="Skipped steps"
-                steps={retryPreview.skippedSteps}
-              />
-              <PreviewStepList
-                label="Runnable steps"
-                steps={retryPreview.runnableSteps}
-              />
-
-              {retryPreview.ineligibleSteps.length > 0 && (
-                <div className="space-y-1">
-                  <div className="text-xs font-medium uppercase text-muted-foreground">
-                    Not eligible to skip
+            <div className="flex min-h-0 flex-col rounded-md border bg-surface">
+              <div className="border-b px-3 py-2">
+                <div className="text-sm font-medium">Step review</div>
+                {selectedPreviewNode && (
+                  <div className="mt-1 font-mono text-xs text-muted-foreground">
+                    {selectedPreviewNode.step.name}
                   </div>
-                  <div className="max-h-32 overflow-y-auto rounded-md border bg-muted/20 p-2">
-                    {retryPreview.ineligibleSteps.map((step) => (
-                      <div key={step.stepName} className="text-xs">
-                        <span className="font-mono">{step.stepName}</span>:{' '}
-                        {step.reason}
-                      </div>
+                )}
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                {retryPreview.errors.length > 0 && (
+                  <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
+                    {retryPreview.errors.map((error) => (
+                      <div key={error}>{error}</div>
                     ))}
                   </div>
+                )}
+
+                {retryPreview.warnings.length > 0 && (
+                  <div className="space-y-1 rounded-md border p-2 text-sm text-muted-foreground">
+                    {retryPreview.warnings.map((warning) => (
+                      <div key={warning}>{warning}</div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {retryPreview.steps.map((step) => {
+                    const canReuse = eligibleReuseSteps.has(step.name);
+                    const willReuse = selectedSkipSteps.includes(step.name);
+                    const ineligibleReason = ineligibleReasonByStep.get(
+                      step.name
+                    );
+                    return (
+                      <div
+                        key={step.name}
+                        role="button"
+                        tabIndex={0}
+                        className={cn(
+                          'w-full rounded-md border p-3 text-left transition-colors hover:bg-muted/40',
+                          selectedPreviewStep === step.name &&
+                            'border-primary bg-primary/5'
+                        )}
+                        onClick={() => setSelectedPreviewStep(step.name)}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') {
+                            return;
+                          }
+                          event.preventDefault();
+                          setSelectedPreviewStep(step.name);
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            checked={willReuse}
+                            disabled={!canReuse}
+                            onCheckedChange={() => toggleReuseStep(step.name)}
+                            onClick={(event) => event.stopPropagation()}
+                            className="mt-0.5 border-border"
+                            aria-label={`Reuse previous output for ${step.name}`}
+                          />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="break-all font-mono text-xs">
+                              {step.name}
+                            </div>
+                            <div
+                              className={cn(
+                                'text-xs',
+                                willReuse
+                                  ? 'text-success'
+                                  : 'text-muted-foreground'
+                              )}
+                            >
+                              {willReuse
+                                ? 'Reuse previous output'
+                                : 'Run again'}
+                            </div>
+                            {step.depends && step.depends.length > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                Depends on {step.depends.join(', ')}
+                              </div>
+                            )}
+                            {!canReuse && ineligibleReason && (
+                              <div className="text-xs text-muted-foreground">
+                                {ineligibleReason}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
-            </>
-          )}
-        </div>
+              </div>
+            </div>
+          </div>
+        )}
       </ConfirmModal>
     </>
   );

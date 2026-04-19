@@ -7508,6 +7508,8 @@ export interface operations {
                         skippedSteps: string[];
                         /** @description Steps that will be started if not skipped. */
                         runnableSteps: string[];
+                        /** @description Resolved edited DAG steps in execution order for preview rendering. */
+                        steps: components["schemas"]["Step"][];
                         /** @description Previous completed steps that cannot be skipped with the edited specification. */
                         ineligibleSteps: {
                             stepName: string;

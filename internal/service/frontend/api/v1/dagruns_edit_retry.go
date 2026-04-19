@@ -78,6 +78,7 @@ func (a *API) PreviewEditRetryDAGRun(ctx context.Context, request api.PreviewEdi
 	dagName := request.Name
 	skippedSteps := []string{}
 	runnableSteps := []string{}
+	steps := []api.Step{}
 	ineligible := []struct {
 		Reason   string `json:"reason"`
 		StepName string `json:"stepName"`
@@ -87,6 +88,7 @@ func (a *API) PreviewEditRetryDAGRun(ctx context.Context, request api.PreviewEdi
 		dagName = plan.editedDAG.Name
 		skippedSteps = nonNilEditRetryStrings(plan.skippedSteps)
 		runnableSteps = nonNilEditRetryStrings(plan.runnableSteps)
+		steps = editRetryPreviewSteps(plan.editedDAG)
 		ineligible = ineligibleStepsToAPI(plan.ineligible)
 		if ineligible == nil {
 			ineligible = []struct {
@@ -103,6 +105,7 @@ func (a *API) PreviewEditRetryDAGRun(ctx context.Context, request api.PreviewEdi
 		IneligibleSteps: ineligible,
 		RunnableSteps:   runnableSteps,
 		SkippedSteps:    skippedSteps,
+		Steps:           steps,
 		Warnings:        warnings,
 	}, nil
 }
@@ -312,7 +315,7 @@ func (a *API) buildEditRetryPlan(
 	stepPlan := planEditRetrySteps(status, editedDAG, opts.skipSteps)
 	validationErrors = append(validationErrors, stepPlan.validationErrors...)
 
-	warnings := editRetryWarnings(stepPlan.skippedSteps, stepPlan.ineligible, stepPlan.successfulSourceSteps)
+	warnings := editRetryWarnings(stepPlan.skippedSteps, stepPlan.ineligible, stepPlan.reusableSourceSteps)
 	return &editRetryPlan{
 		sourceAttempt:  attempt,
 		sourceDAGRunID: sourceDAGRunID,
@@ -380,11 +383,11 @@ func (a *API) loadEditedRetryDAG(
 }
 
 type editRetryStepPlan struct {
-	skippedSteps          []string
-	runnableSteps         []string
-	ineligible            []editRetryIneligibleStep
-	validationErrors      []string
-	successfulSourceSteps int
+	skippedSteps        []string
+	runnableSteps       []string
+	ineligible          []editRetryIneligibleStep
+	validationErrors    []string
+	reusableSourceSteps int
 }
 
 func planEditRetrySteps(
@@ -408,10 +411,10 @@ func planEditRetrySteps(
 			continue
 		}
 		sourceNodes[node.Step.Name] = node
-		if !node.Status.IsSuccess() {
+		if !isReusableEditRetrySourceNode(node) {
 			continue
 		}
-		plan.successfulSourceSteps++
+		plan.reusableSourceSteps++
 		editedStep, ok := editedSteps[node.Step.Name]
 		if !ok {
 			reason := "step does not exist in the edited DAG"
@@ -454,7 +457,7 @@ func planEditRetrySteps(
 					if sourceNode == nil {
 						reason = "step was not present in the source DAG-run"
 					} else {
-						reason = fmt.Sprintf("source step status is %s, not success", sourceNode.Status.String())
+						reason = editRetrySourceStatusReason(sourceNode)
 					}
 				}
 				plan.validationErrors = append(plan.validationErrors, fmt.Sprintf("skipSteps contains ineligible step %q: %s", stepName, reason))
@@ -473,6 +476,26 @@ func planEditRetrySteps(
 	}
 	sortIneligibleSteps(plan.ineligible)
 	return plan
+}
+
+func isReusableEditRetrySourceNode(node *exec.Node) bool {
+	if node == nil {
+		return false
+	}
+	return node.Status.IsSuccess() || (node.Status == core.NodeSkipped && node.SkippedByRetry)
+}
+
+func editRetrySourceStatusReason(node *exec.Node) string {
+	if node == nil {
+		return "step was not present in the source DAG-run"
+	}
+	if node.Status == core.NodeSkipped {
+		if node.SkippedByRetry {
+			return "source step was skipped by edit retry but is missing reusable output data"
+		}
+		return "source step was skipped by normal DAG execution, not by edit retry"
+	}
+	return fmt.Sprintf("source step status is %s, not reusable", node.Status.String())
 }
 
 func missingEditedRetryOutputReason(node *exec.Node, editedStep core.Step) string {
@@ -770,13 +793,24 @@ func editRetryArtifactDir(ctx context.Context, baseDir string, dag *core.DAG, da
 	return artifactDir, nil
 }
 
-func editRetryWarnings(skipped []string, ineligible []editRetryIneligibleStep, successfulSourceSteps int) []string {
+func editRetryPreviewSteps(dag *core.DAG) []api.Step {
+	if dag == nil || len(dag.Steps) == 0 {
+		return []api.Step{}
+	}
+	steps := make([]api.Step, len(dag.Steps))
+	for i, step := range dag.Steps {
+		steps[i] = toStep(step)
+	}
+	return steps
+}
+
+func editRetryWarnings(skipped []string, ineligible []editRetryIneligibleStep, reusableSourceSteps int) []string {
 	var warnings []string
-	if len(skipped) == 0 && successfulSourceSteps > 0 {
-		warnings = append(warnings, "no previously successful steps are eligible to skip")
+	if len(skipped) == 0 && reusableSourceSteps > 0 {
+		warnings = append(warnings, "no previously completed steps are eligible to reuse")
 	}
 	if len(ineligible) > 0 {
-		warnings = append(warnings, "some previously successful steps cannot be skipped with the edited DAG")
+		warnings = append(warnings, "some previously completed steps cannot be reused with the edited DAG")
 	}
 	return warnings
 }

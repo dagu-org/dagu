@@ -45,6 +45,33 @@ func TestPreviewEditRetryDAGRun_SelectsCompletedOutputSteps(t *testing.T) {
 	require.Equal(t, dag.Name, body.DagName)
 	require.Equal(t, []string{"build"}, body.SkippedSteps)
 	require.Equal(t, []string{"consume", "notify"}, body.RunnableSteps)
+	require.Len(t, body.Steps, 3)
+	require.Equal(t, "build", body.Steps[0].Name)
+	require.Equal(t, "consume", body.Steps[1].Name)
+	require.Equal(t, "notify", body.Steps[2].Name)
+	require.Empty(t, body.IneligibleSteps)
+}
+
+func TestPreviewEditRetryDAGRun_SelectsPreviousEditRetrySkippedSteps(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAML())
+	seedEditRetrySkippedSourceAttempt(t, ctx, api.dagRunStore, dag, "source-run")
+
+	resp, err := api.PreviewEditRetryDAGRun(ctx, openapiv1.PreviewEditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.PreviewEditRetryDAGRunJSONRequestBody{
+			Spec: editRetryEditedYAML(),
+		},
+	})
+	require.NoError(t, err)
+
+	body, ok := resp.(openapiv1.PreviewEditRetryDAGRun200JSONResponse)
+	require.True(t, ok)
+	require.Empty(t, body.Errors)
+	require.Equal(t, []string{"build"}, body.SkippedSteps)
+	require.Equal(t, []string{"consume", "notify"}, body.RunnableSteps)
 	require.Empty(t, body.IneligibleSteps)
 }
 
@@ -68,6 +95,7 @@ func TestPreviewEditRetryDAGRun_ReturnsEmptyArraysOnValidationError(t *testing.T
 	require.Equal(t, []string{"spec is required"}, body.Errors)
 	require.NotNil(t, body.SkippedSteps)
 	require.NotNil(t, body.RunnableSteps)
+	require.NotNil(t, body.Steps)
 	require.NotNil(t, body.IneligibleSteps)
 	require.NotNil(t, body.Warnings)
 
@@ -75,6 +103,7 @@ func TestPreviewEditRetryDAGRun_ReturnsEmptyArraysOnValidationError(t *testing.T
 	require.NoError(t, err)
 	require.Contains(t, string(raw), `"skippedSteps":[]`)
 	require.Contains(t, string(raw), `"runnableSteps":[]`)
+	require.Contains(t, string(raw), `"steps":[]`)
 	require.Contains(t, string(raw), `"ineligibleSteps":[]`)
 	require.Contains(t, string(raw), `"warnings":[]`)
 }
@@ -235,6 +264,44 @@ func seedEditRetrySourceAttempt(
 	)
 	require.Len(t, status.Nodes, 2)
 	status.Nodes[0].Status = core.NodeSucceeded
+	status.Nodes[0].StartedAt = exec.FormatTime(time.Now().Add(-2 * time.Minute))
+	status.Nodes[0].FinishedAt = exec.FormatTime(time.Now().Add(-90 * time.Second))
+	status.Nodes[0].OutputVariables = &collections.SyncMap{}
+	status.Nodes[0].OutputVariables.Store("RESULT", "RESULT=from-source")
+	status.Nodes[1].Status = core.NodeFailed
+	status.Nodes[1].StartedAt = exec.FormatTime(time.Now().Add(-80 * time.Second))
+	status.Nodes[1].FinishedAt = exec.FormatTime(time.Now().Add(-70 * time.Second))
+	status.Nodes[1].Error = "consume failed"
+
+	require.NoError(t, attempt.Open(ctx))
+	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, attempt.Close(ctx))
+}
+
+func seedEditRetrySkippedSourceAttempt(
+	t *testing.T,
+	ctx context.Context,
+	store exec.DAGRunStore,
+	dag *core.DAG,
+	dagRunID string,
+) {
+	t.Helper()
+
+	attempt, err := store.CreateAttempt(ctx, dag, time.Now().Add(-2*time.Minute), dagRunID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	status := transform.NewStatusBuilder(dag).Create(
+		dagRunID,
+		core.Failed,
+		0,
+		time.Now().Add(-2*time.Minute),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithFinishedAt(time.Now().Add(-time.Minute)),
+		transform.WithError("consume failed"),
+	)
+	require.Len(t, status.Nodes, 2)
+	status.Nodes[0].Status = core.NodeSkipped
+	status.Nodes[0].SkippedByRetry = true
 	status.Nodes[0].StartedAt = exec.FormatTime(time.Now().Add(-2 * time.Minute))
 	status.Nodes[0].FinishedAt = exec.FormatTime(time.Now().Add(-90 * time.Second))
 	status.Nodes[0].OutputVariables = &collections.SyncMap{}
