@@ -120,6 +120,80 @@ steps:
 	require.Equal(t, "CONSUMED=from-source", rawConsumed)
 }
 
+func TestAPIEditRetryPreviewUsesPersistedParamsList(t *testing.T) {
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Queues.Enabled = true
+		cfg.Queues.Config = []config.QueueConfig{
+			{Name: "intg_edit_retry_params", MaxActiveRuns: 1},
+		}
+	}))
+
+	dagName := "intg_edit_retry_params"
+	sourceSpec := fmt.Sprintf(`name: %s
+queue: intg_edit_retry_params
+type: graph
+params:
+  - problem: ""
+steps:
+  - name: build
+    command: %s
+    output: RESULT
+  - name: consume
+%s
+    depends:
+      - build
+`, dagName, editRetryEchoResultCommand(), indentStepField(portableDirectFailureStepYAML(t)))
+
+	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: dagName,
+		Spec: &sourceSpec,
+	}).ExpectStatus(http.StatusCreated).Send(t)
+
+	sourceRunID := "source-edit-retry-params"
+	params := `problem="one two three"`
+	server.Client().Post(
+		fmt.Sprintf("/api/v1/dags/%s/start", dagName),
+		api.ExecuteDAGJSONRequestBody{DagRunId: &sourceRunID, Params: &params},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	test.ProcessQueuedInlineRun(t, server, dagName)
+	sourceStatus := waitForEditRetryStoredStatus(t, server, dagName, sourceRunID, core.Failed)
+	sourceStatus.Params = "one two three"
+	sourceStatus.ParamsList = []string{"problem=one two three"}
+
+	attempt, err := server.DAGRunStore.FindAttempt(server.Context, exec.NewDAGRunRef(dagName, sourceRunID))
+	require.NoError(t, err)
+	require.NoError(t, attempt.Open(server.Context))
+	require.NoError(t, attempt.Write(server.Context, *sourceStatus))
+	require.NoError(t, attempt.Close(server.Context))
+
+	editedSpec := fmt.Sprintf(`name: %s
+queue: intg_edit_retry_params
+type: graph
+params:
+  - problem: ""
+steps:
+  - name: build
+%s
+    output: RESULT
+  - name: consume
+    command: %s
+    depends:
+      - build
+`, dagName, indentStepField(portableDirectFailureStepYAML(t)), editRetryEchoConsumedCommand())
+
+	previewResp := server.Client().Post(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/edit-retry/preview", dagName, sourceRunID),
+		api.PreviewEditRetryDAGRunJSONRequestBody{Spec: editedSpec},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	var preview api.PreviewEditRetryDAGRun200JSONResponse
+	previewResp.Unmarshal(t, &preview)
+	require.Empty(t, preview.Errors)
+	require.Equal(t, []string{"build"}, preview.SkippedSteps)
+	require.Equal(t, []string{"consume"}, preview.RunnableSteps)
+}
+
 func waitForEditRetryStoredStatus(t *testing.T, server test.Server, dagName, dagRunID string, expected core.Status) *exec.DAGRunStatus {
 	t.Helper()
 

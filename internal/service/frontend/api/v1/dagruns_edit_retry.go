@@ -169,6 +169,19 @@ func nonNilEditRetryStrings(values []string) []string {
 	return values
 }
 
+func editRetryRuntimeParams(status *exec.DAGRunStatus, preservedParams string) string {
+	if status == nil {
+		return preservedParams
+	}
+	if len(status.ParamsList) > 0 {
+		return preservedParams
+	}
+	if status.Params != "" {
+		return status.Params
+	}
+	return preservedParams
+}
+
 func previewEditRetryOptions(body *api.PreviewEditRetryDAGRunJSONRequestBody) (editRetryOptions, error) {
 	if body == nil {
 		return editRetryOptions{}, badEditRetryRequest("request body is required")
@@ -260,10 +273,7 @@ func (a *API) buildEditRetryPlan(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to restore DAG snapshot: %w", err)
 	}
-	params := status.Params
-	if params == "" {
-		params = preservedParams
-	}
+	params := editRetryRuntimeParams(status, preservedParams)
 
 	editedDAG, validationErrors, err := a.loadEditedRetryDAG(ctx, opts, params, sourceDAGRunID)
 	if err != nil {

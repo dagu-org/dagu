@@ -76,6 +76,28 @@ func TestPreviewEditRetryDAGRun_SelectsPreviousEditRetrySkippedSteps(t *testing.
 	require.Empty(t, body.IneligibleSteps)
 }
 
+func TestPreviewEditRetryDAGRun_UsesPersistedParamsListInsteadOfRawPositionalParams(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	api, dag := setupEditRetryAPI(t, tmpDir, editRetrySourceYAMLWithParams())
+	seedEditRetrySourceAttemptWithParams(t, ctx, api.dagRunStore, dag, "source-run")
+
+	resp, err := api.PreviewEditRetryDAGRun(ctx, openapiv1.PreviewEditRetryDAGRunRequestObject{
+		Name:     dag.Name,
+		DagRunId: "source-run",
+		Body: &openapiv1.PreviewEditRetryDAGRunJSONRequestBody{
+			Spec: editRetryEditedYAMLWithParams(),
+		},
+	})
+	require.NoError(t, err)
+
+	body, ok := resp.(openapiv1.PreviewEditRetryDAGRun200JSONResponse)
+	require.True(t, ok)
+	require.Empty(t, body.Errors)
+	require.Equal(t, []string{"build"}, body.SkippedSteps)
+	require.Equal(t, []string{"consume"}, body.RunnableSteps)
+}
+
 func TestPreviewEditRetryDAGRun_ReturnsEmptyArraysOnValidationError(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
@@ -410,6 +432,41 @@ func seedEditRetrySkippedSourceAttempt(
 	require.NoError(t, attempt.Close(ctx))
 }
 
+func seedEditRetrySourceAttemptWithParams(
+	t *testing.T,
+	ctx context.Context,
+	store exec.DAGRunStore,
+	dag *core.DAG,
+	dagRunID string,
+) {
+	t.Helper()
+
+	attempt, err := store.CreateAttempt(ctx, dag, time.Now().Add(-2*time.Minute), dagRunID, exec.NewDAGRunAttemptOptions{})
+	require.NoError(t, err)
+
+	status := transform.NewStatusBuilder(dag).Create(
+		dagRunID,
+		core.Failed,
+		0,
+		time.Now().Add(-2*time.Minute),
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithFinishedAt(time.Now().Add(-time.Minute)),
+		transform.WithError("consume failed"),
+	)
+	status.Params = "one two three"
+	status.ParamsList = []string{"problem=one two three"}
+	require.Len(t, status.Nodes, 2)
+	status.Nodes[0].Status = core.NodeSucceeded
+	status.Nodes[0].OutputVariables = &collections.SyncMap{}
+	status.Nodes[0].OutputVariables.Store("RESULT", "RESULT=from-source")
+	status.Nodes[1].Status = core.NodeFailed
+	status.Nodes[1].Error = "consume failed"
+
+	require.NoError(t, attempt.Open(ctx))
+	require.NoError(t, attempt.Write(ctx, status))
+	require.NoError(t, attempt.Close(ctx))
+}
+
 func editRetrySourceYAML() string {
 	return `
 name: edit_retry_test
@@ -417,6 +474,23 @@ type: graph
 steps:
   - name: build
     command: echo "RESULT=from-source"
+    output: RESULT
+  - name: consume
+    command: exit 1
+    depends:
+      - build
+`
+}
+
+func editRetrySourceYAMLWithParams() string {
+	return `
+name: edit_retry_test
+type: graph
+params:
+  - problem: ""
+steps:
+  - name: build
+    command: echo "$problem"
     output: RESULT
   - name: consume
     command: exit 1
@@ -441,6 +515,23 @@ steps:
     command: echo done
     depends:
       - consume
+`
+}
+
+func editRetryEditedYAMLWithParams() string {
+	return `
+name: edit_retry_test
+type: graph
+params:
+  - problem: ""
+steps:
+  - name: build
+    command: exit 99
+    output: RESULT
+  - name: consume
+    command: echo "$RESULT $problem"
+    depends:
+      - build
 `
 }
 
