@@ -88,7 +88,8 @@
 
 /* Inline code */
 .doc-preview code {
-  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
+  font-family:
+    'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
   font-size: 0.85em;
   color: var(--foreground);
   background: var(--muted);

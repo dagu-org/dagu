@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Button } from '@/components/ui/button';
+import { DocMarkdownPreview } from '@/components/ui/doc-markdown-preview';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
@@ -16,8 +17,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { components } from '../../../../api/v1/schema';
 
 type ArtifactTreeNode = components['schemas']['ArtifactTreeNode'];
@@ -27,6 +26,8 @@ type DAGRunDetails = components['schemas']['DAGRunDetails'];
 type Props = {
   dagRun: DAGRunDetails;
   artifactEnabled?: boolean;
+  className?: string;
+  fillHeight?: boolean;
 };
 
 function collectDirectoryPaths(nodes: ArtifactTreeNode[]): string[] {
@@ -66,14 +67,6 @@ function flattenNodes(nodes: ArtifactTreeNode[]): ArtifactTreeNode[] {
     }
   }
   return flat;
-}
-
-function ArtifactMarkdown({ content }: { content: string }) {
-  return (
-    <div className="prose prose-slate max-w-none text-sm leading-6 prose-headings:font-semibold prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:before:content-none prose-code:after:content-none">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </div>
-  );
 }
 
 function TreeNode({
@@ -154,6 +147,8 @@ function TreeNode({
 export default function ArtifactsTab({
   dagRun,
   artifactEnabled = false,
+  className,
+  fillHeight = false,
 }: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
@@ -548,8 +543,19 @@ export default function ArtifactsTab({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-      <div className="rounded-lg border border-border bg-surface">
+    <div
+      className={cn(
+        'grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]',
+        fillHeight && 'h-full min-h-0',
+        className
+      )}
+    >
+      <div
+        className={cn(
+          'rounded-lg border border-border bg-surface',
+          fillHeight && 'flex min-h-0 flex-col overflow-hidden'
+        )}
+      >
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <div>
             <p className="text-sm font-medium">Artifacts</p>
@@ -573,7 +579,12 @@ export default function ArtifactsTab({
           </Button>
         </div>
 
-        <div className="max-h-[34rem] overflow-auto p-2">
+        <div
+          className={cn(
+            'overflow-auto p-2',
+            fillHeight ? 'min-h-0 flex-1' : 'max-h-[34rem]'
+          )}
+        >
           {treeLoading ? (
             <div className="px-2 py-6 text-sm text-muted-foreground">
               Loading artifacts...
@@ -615,7 +626,12 @@ export default function ArtifactsTab({
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-background">
+      <div
+        className={cn(
+          'rounded-lg border border-border bg-background',
+          fillHeight && 'flex min-h-0 flex-col overflow-hidden'
+        )}
+      >
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">
@@ -642,7 +658,12 @@ export default function ArtifactsTab({
           </Button>
         </div>
 
-        <div className="max-h-[34rem] overflow-auto p-4">
+        <div
+          className={cn(
+            'overflow-auto p-4',
+            fillHeight ? 'min-h-0 flex-1' : 'max-h-[34rem]'
+          )}
+        >
           {!selectedPath ? (
             <div className="text-sm text-muted-foreground">
               Select a file to preview it.
@@ -681,7 +702,7 @@ export default function ArtifactsTab({
               </dl>
             </div>
           ) : preview.kind === 'markdown' ? (
-            <ArtifactMarkdown content={preview.content || ''} />
+            <DocMarkdownPreview content={preview.content} />
           ) : preview.kind === 'text' ? (
             <pre className="overflow-auto rounded-md border border-border bg-muted/20 p-4 text-sm leading-6 whitespace-pre-wrap">
               {preview.content || ''}
@@ -691,7 +712,10 @@ export default function ArtifactsTab({
               <img
                 src={imageUrl}
                 alt={preview.name}
-                className="max-h-[40rem] max-w-full rounded-md border border-border object-contain"
+                className={cn(
+                  'max-w-full rounded-md border border-border object-contain',
+                  fillHeight ? 'max-h-full' : 'max-h-[40rem]'
+                )}
               />
             ) : (
               <div className="text-sm text-muted-foreground">

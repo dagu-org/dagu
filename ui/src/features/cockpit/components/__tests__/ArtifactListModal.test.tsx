@@ -1,16 +1,23 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Status, StatusLabel, TriggerType } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
+import { useBoundedDAGRunDetails } from '@/features/dag-runs/hooks/useBoundedDAGRunDetails';
+import ArtifactsTab from '@/features/dags/components/artifacts/ArtifactsTab';
 import { ArtifactListModal } from '../ArtifactListModal';
 
-vi.mock('@/hooks/api', () => ({
-  useClient: vi.fn(),
+vi.mock('@/features/dag-runs/hooks/useBoundedDAGRunDetails', () => ({
+  useBoundedDAGRunDetails: vi.fn(),
+}));
+
+vi.mock('@/features/dags/components/artifacts/ArtifactsTab', () => ({
+  default: vi.fn(({ dagRun }) => (
+    <div data-testid="artifact-preview-tab">{dagRun.name}</div>
+  )),
 }));
 
 const appBarValue = {
@@ -36,126 +43,53 @@ const run = {
   finishedAt: '2026-03-16T00:01:00Z',
 };
 
+const details = {
+  ...run,
+  rootDAGRunName: 'artifact-dag',
+  rootDAGRunId: 'run-1',
+  nodes: [],
+};
+
 afterEach(() => {
   vi.clearAllMocks();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
 });
 
 describe('ArtifactListModal', () => {
-  it('loads and renders the run artifact tree for the selected remote node', async () => {
-    const get = vi.fn(async () => ({
-      data: {
-        items: [
-          {
-            type: 'directory',
-            name: 'reports',
-            path: 'reports',
-            children: [
-              {
-                type: 'file',
-                name: 'summary.md',
-                path: 'reports/summary.md',
-                size: 12,
-              },
-            ],
-          },
-        ],
+  it('loads DAG-run details and renders the shared artifact preview tab', () => {
+    vi.mocked(useBoundedDAGRunDetails).mockReturnValue({
+      data: details,
+      error: null,
+      isLoading: false,
+      isValidating: false,
+      refresh: vi.fn(),
+    } as never);
+
+    render(
+      <AppBarContext.Provider value={appBarValue}>
+        <ArtifactListModal run={run} isOpen={true} onClose={() => {}} />
+      </AppBarContext.Provider>
+    );
+
+    expect(screen.getByTestId('artifact-preview-tab')).toHaveTextContent(
+      'artifact-dag'
+    );
+    expect(useBoundedDAGRunDetails).toHaveBeenCalledWith({
+      target: {
+        remoteNode: 'edge',
+        name: 'artifact-dag',
+        dagRunId: 'run-1',
       },
-      error: undefined,
-    }));
-
-    vi.mocked(useClient).mockReturnValue({ GET: get } as never);
-
-    render(
-      <AppBarContext.Provider value={appBarValue}>
-        <ArtifactListModal run={run} isOpen={true} onClose={() => {}} />
-      </AppBarContext.Provider>
+      enabled: true,
+      pollIntervalMs: 2000,
+    });
+    expect(ArtifactsTab).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dagRun: details,
+        artifactEnabled: true,
+        className: 'h-full',
+        fillHeight: true,
+      }),
+      undefined
     );
-
-    expect((await screen.findAllByText('reports')).length).toBeGreaterThan(0);
-    expect(screen.getByText('summary.md')).toBeInTheDocument();
-    expect(screen.getByText('12 B')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(get).toHaveBeenCalledWith(
-        '/dag-runs/{name}/{dagRunId}/artifacts',
-        {
-          params: {
-            path: { name: 'artifact-dag', dagRunId: 'run-1' },
-            query: { remoteNode: 'edge', recursive: true },
-          },
-          signal: expect.any(AbortSignal),
-        }
-      );
-    });
-  });
-
-  it('downloads artifacts with the encoded response filename', async () => {
-    const createObjectURL = vi.fn(() => 'blob:artifact');
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', {
-      createObjectURL,
-      revokeObjectURL,
-    });
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => {});
-    const appendChild = vi.spyOn(document.body, 'appendChild');
-    const get = vi.fn(async (path: string) => {
-      if (path.endsWith('/download')) {
-        return {
-          data: new Blob(['artifact']),
-          error: undefined,
-          response: new Response(null, {
-            headers: {
-              'Content-Disposition':
-                "attachment; filename*=UTF-8''summary%20report.md",
-            },
-          }),
-        };
-      }
-
-      return {
-        data: {
-          items: [
-            {
-              type: 'file',
-              name: 'summary.md',
-              path: 'summary.md',
-              size: 12,
-            },
-          ],
-        },
-        error: undefined,
-      };
-    });
-
-    vi.mocked(useClient).mockReturnValue({ GET: get } as never);
-
-    render(
-      <AppBarContext.Provider value={appBarValue}>
-        <ArtifactListModal run={run} isOpen={true} onClose={() => {}} />
-      </AppBarContext.Provider>
-    );
-
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Download summary.md' })
-    );
-
-    await waitFor(() => {
-      expect(click).toHaveBeenCalledTimes(1);
-    });
-
-    const link = appendChild.mock.calls.find(
-      ([node]) => node instanceof HTMLAnchorElement
-    )?.[0] as HTMLAnchorElement | undefined;
-    expect(link?.download).toBe('summary report.md');
-    expect(link?.href).toBe('blob:artifact');
-    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-
-    await waitFor(() => {
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:artifact');
-    });
   });
 });

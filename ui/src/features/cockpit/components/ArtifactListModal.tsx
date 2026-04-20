@@ -2,30 +2,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AlertCircle,
-  Download,
-  File,
-  FileImage,
-  FileText,
-  Folder,
-  RefreshCw,
-} from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { AlertCircle, Archive, Loader2, X } from 'lucide-react';
 import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useClient } from '@/hooks/api';
+import { useBoundedDAGRunDetails } from '@/features/dag-runs/hooks/useBoundedDAGRunDetails';
+import {
+  type DAGRunDetailsRequestTarget,
+  matchesRequestedDAGRunDetails,
+} from '@/features/dag-runs/hooks/dagRunDetailsRequest';
+import ArtifactsTab from '@/features/dags/components/artifacts/ArtifactsTab';
 import { cn } from '@/lib/utils';
+import LoadingIndicator from '@/ui/LoadingIndicator';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
-type ArtifactTreeNode = components['schemas']['ArtifactTreeNode'];
+const CLOSE_ANIMATION_MS = 200;
 
 interface Props {
   run: DAGRunSummary | null;
@@ -33,441 +25,233 @@ interface Props {
   onClose: () => void;
 }
 
-function flattenNodes(nodes: ArtifactTreeNode[]): ArtifactTreeNode[] {
-  const flat: ArtifactTreeNode[] = [];
-  for (const node of nodes) {
-    flat.push(node);
-    if (node.children) {
-      flat.push(...flattenNodes(node.children));
-    }
-  }
-  return flat;
-}
-
-function formatBytes(size: number | undefined): string {
-  if (size == null) {
-    return '';
-  }
-  if (size < 1024) {
-    return `${size} B`;
-  }
-
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = size / 1024;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
-}
-
-function fileIconFor(node: ArtifactTreeNode) {
-  if (node.type === 'directory') {
-    return Folder;
-  }
-  if (node.path.match(/\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i)) {
-    return FileImage;
-  }
-  if (node.path.match(/\.(md|markdown|mdown|mkd|txt|log|json|ya?ml|csv)$/i)) {
-    return FileText;
-  }
-  return File;
-}
-
-function trimDispositionValue(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-    return trimmed.slice(1, -1).replace(/\\"/g, '"');
-  }
-  return trimmed;
-}
-
-function filenameFromContentDisposition(header: string | null): string | null {
-  if (!header) {
-    return null;
-  }
-
-  const encoded = header.match(/(?:^|;)\s*filename\*\s*=\s*([^;]+)/i)?.[1];
-  if (encoded) {
-    const value = trimDispositionValue(encoded);
-    const encodedFilename = value.includes("''")
-      ? value.split("''").slice(1).join("''")
-      : value;
-    try {
-      return decodeURIComponent(encodedFilename);
-    } catch {
-      return encodedFilename;
-    }
-  }
-
-  const filename = header.match(
-    /(?:^|;)\s*filename\s*=\s*("[^"]*"|[^;]*)/i
-  )?.[1];
-  return filename ? trimDispositionValue(filename) : null;
-}
-
-function ArtifactRow({
-  node,
-  depth,
-  downloadingPath,
-  onDownload,
-}: {
-  node: ArtifactTreeNode;
-  depth: number;
-  downloadingPath: string | null;
-  onDownload: (node: ArtifactTreeNode) => void;
-}) {
-  const Icon = fileIconFor(node);
-  const isDirectory = node.type === 'directory';
-  const isDownloading = downloadingPath === node.path;
-
-  return (
-    <div>
-      <div
-        className={cn(
-          'flex min-h-9 items-center gap-2 rounded-md px-2 py-1.5 text-sm',
-          isDirectory ? 'bg-muted/30 text-foreground' : 'hover:bg-muted/50'
-        )}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-      >
-        <Icon
-          className={cn(
-            'h-4 w-4 shrink-0',
-            isDirectory ? 'text-primary' : 'text-muted-foreground'
-          )}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium leading-tight">{node.name}</div>
-          <div className="truncate text-[11px] text-muted-foreground">
-            {node.path}
-          </div>
-        </div>
-        {!isDirectory && (
-          <>
-            {node.size != null && (
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                {formatBytes(node.size)}
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onDownload(node)}
-              disabled={isDownloading}
-              aria-label={`Download ${node.name}`}
-              title={`Download ${node.name}`}
-            >
-              <Download
-                className={cn('h-4 w-4', isDownloading && 'opacity-50')}
-              />
-            </Button>
-          </>
-        )}
-      </div>
-      {isDirectory && node.children && node.children.length > 0 && (
-        <div className="space-y-1">
-          {node.children.map((child) => (
-            <ArtifactRow
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              downloadingPath={downloadingPath}
-              onDownload={onDownload}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function ArtifactListModal({
   run,
   isOpen,
   onClose,
-}: Props): React.ReactElement {
-  const client = useClient();
+}: Props): React.ReactElement | null {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const runName = run?.name;
-  const runId = run?.dagRunId;
-
-  const [tree, setTree] = useState<ArtifactTreeNode[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const treeRef = useRef<ArtifactTreeNode[]>([]);
-  const downloadControllerRef = useRef<AbortController | null>(null);
-  const mountedRef = useRef(true);
-
-  const flatNodes = useMemo(() => flattenNodes(tree), [tree]);
-  const fileCount = flatNodes.filter((node) => node.type === 'file').length;
-  const totalSize = flatNodes.reduce(
-    (sum, node) => sum + (node.type === 'file' ? node.size || 0 : 0),
-    0
-  );
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(false);
+  const [renderedRun, setRenderedRun] = useState<DAGRunSummary | null>(run);
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const visibleRun = isOpen ? run : renderedRun;
 
   useEffect(() => {
-    treeRef.current = tree;
-  }, [tree]);
+    let closeTimer: number | undefined;
+    let animationFrame: number | undefined;
 
-  useEffect(() => {
+    if (isOpen && run) {
+      previouslyFocusedRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      setRenderedRun(run);
+      setShouldRender(true);
+      animationFrame = window.requestAnimationFrame(() => {
+        setIsVisible(true);
+        closeButtonRef.current?.focus();
+      });
+    } else {
+      setIsVisible(false);
+      closeTimer = window.setTimeout(() => {
+        setShouldRender(false);
+        setRenderedRun(null);
+        previouslyFocusedRef.current?.focus();
+        previouslyFocusedRef.current = null;
+      }, CLOSE_ANIMATION_MS);
+    }
+
     return () => {
-      mountedRef.current = false;
-      downloadControllerRef.current?.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      return;
-    }
-
-    downloadControllerRef.current?.abort();
-    downloadControllerRef.current = null;
-    setDownloadingPath(null);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen || !runName || !runId) {
-      setTree([]);
-      setError(null);
-      setDownloadError(null);
-      setIsLoading(false);
-      setIsRefreshing(false);
-      return;
-    }
-
-    let cancelled = false;
-    const controller = new AbortController();
-    const isInitialLoad = treeRef.current.length === 0;
-
-    const fetchTree = async () => {
-      setIsLoading(isInitialLoad);
-      setIsRefreshing(!isInitialLoad);
-      setError(null);
-      setDownloadError(null);
-
-      try {
-        const request = await client.GET(
-          '/dag-runs/{name}/{dagRunId}/artifacts',
-          {
-            params: {
-              path: {
-                name: runName,
-                dagRunId: runId,
-              },
-              query: { remoteNode, recursive: true },
-            },
-            signal: controller.signal,
-          }
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        if (request.error) {
-          if (isInitialLoad) {
-            setTree([]);
-          }
-          setError(request.error.message || 'Failed to load artifacts');
-          return;
-        }
-
-        setTree(request.data?.items ?? []);
-      } catch (err: unknown) {
-        if (cancelled || controller.signal.aborted) {
-          return;
-        }
-        if (isInitialLoad) {
-          setTree([]);
-        }
-        setError(
-          err instanceof Error ? err.message : 'Failed to load artifacts'
-        );
-      } finally {
-        if (!cancelled) {
-          if (isInitialLoad) {
-            setIsLoading(false);
-          }
-          setIsRefreshing(false);
-        }
+      if (animationFrame !== undefined) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      if (closeTimer !== undefined) {
+        window.clearTimeout(closeTimer);
       }
     };
+  }, [isOpen, run]);
 
-    void fetchTree();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [client, isOpen, refreshKey, remoteNode, runId, runName]);
-
-  const handleDownload = async (node: ArtifactTreeNode) => {
-    if (!run || node.type !== 'file') {
+  useEffect(() => {
+    if (!isOpen) {
       return;
     }
 
-    downloadControllerRef.current?.abort();
-    const controller = new AbortController();
-    downloadControllerRef.current = controller;
-    const isCurrentDownload = () =>
-      mountedRef.current &&
-      downloadControllerRef.current === controller &&
-      !controller.signal.aborted;
-
-    setDownloadingPath(node.path);
-    setDownloadError(null);
-
-    try {
-      const request = await client.GET(
-        '/dag-runs/{name}/{dagRunId}/artifacts/download',
-        {
-          params: {
-            path: {
-              name: run.name,
-              dagRunId: run.dagRunId,
-            },
-            query: { remoteNode, path: node.path },
-          },
-          parseAs: 'blob',
-          signal: controller.signal,
-        }
-      );
-
-      if (!isCurrentDownload()) {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
         return;
       }
 
-      if (request.error) {
-        throw new Error(
-          request.error.message ||
-            request.response.statusText ||
-            'Download failed'
-        );
-      }
-
-      const blob = request.data;
-      if (!blob) {
-        throw new Error('Empty response');
-      }
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      const fileName =
-        filenameFromContentDisposition(
-          request.response.headers.get('Content-Disposition')
-        ) || node.name;
-
-      link.href = objectUrl;
-      link.download = fileName;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-        link.remove();
-      }, 0);
-    } catch (err: unknown) {
-      if (!isCurrentDownload()) {
+      if (event.key !== 'Tab') {
         return;
       }
-      setDownloadError(err instanceof Error ? err.message : 'Download failed');
-    } finally {
-      if (downloadControllerRef.current === controller) {
-        downloadControllerRef.current = null;
-        if (mountedRef.current) {
-          setDownloadingPath(null);
-        }
+
+      const focusableElements =
+        drawerRef.current?.querySelectorAll<HTMLElement>(
+          [
+            'a[href]',
+            'button:not([disabled])',
+            'textarea:not([disabled])',
+            'input:not([disabled])',
+            'select:not([disabled])',
+            '[tabindex]:not([tabindex="-1"])',
+          ].join(',')
+        );
+      if (!focusableElements || focusableElements.length === 0) {
+        event.preventDefault();
+        return;
       }
+
+      const firstElement = focusableElements.item(0);
+      const lastElement = focusableElements.item(focusableElements.length - 1);
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!shouldRender) {
+      return;
     }
-  };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-hidden p-0">
-        <DialogHeader className="border-b border-border px-5 py-4 pr-12">
-          <DialogTitle className="flex items-center gap-2">
-            <Folder className="h-5 w-5 text-primary" />
-            Artifacts
-          </DialogTitle>
-          <DialogDescription className="truncate">
-            {run ? `${run.name} / ${run.dagRunId}` : 'DAG run artifacts'}
-          </DialogDescription>
-        </DialogHeader>
+    const appRoot = document.getElementById('root');
+    const previousAriaHidden = appRoot?.getAttribute('aria-hidden') ?? null;
+    appRoot?.setAttribute('aria-hidden', 'true');
 
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
-          <div className="min-w-0 text-sm">
-            <span className="font-medium">{fileCount}</span>{' '}
-            <span className="text-muted-foreground">
-              {fileCount === 1 ? 'file' : 'files'}
-            </span>
-            {totalSize > 0 && (
-              <span className="text-muted-foreground">
-                {' '}
-                · {formatBytes(totalSize)}
-              </span>
-            )}
+    return () => {
+      if (!appRoot) {
+        return;
+      }
+      if (previousAriaHidden === null) {
+        appRoot.removeAttribute('aria-hidden');
+      } else {
+        appRoot.setAttribute('aria-hidden', previousAriaHidden);
+      }
+    };
+  }, [shouldRender]);
+
+  const target = useMemo<DAGRunDetailsRequestTarget | null>(() => {
+    if (!isOpen || !run) {
+      return null;
+    }
+
+    return {
+      remoteNode,
+      name: run.name,
+      dagRunId: run.dagRunId,
+    };
+  }, [isOpen, remoteNode, run]);
+
+  const {
+    data: details,
+    error,
+    isLoading,
+    isValidating,
+  } = useBoundedDAGRunDetails({
+    target,
+    enabled: target !== null,
+    pollIntervalMs: isOpen ? 2000 : 0,
+  });
+
+  const displayDetails = matchesRequestedDAGRunDetails(
+    details,
+    visibleRun?.dagRunId ?? ''
+  )
+    ? details
+    : null;
+
+  if (!shouldRender || !visibleRun) {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex justify-end">
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close artifact preview"
+        className={cn(
+          'absolute inset-0 h-full w-full cursor-default bg-black/20 transition-opacity duration-200 ease-out',
+          isVisible ? 'opacity-100' : 'opacity-0'
+        )}
+        onClick={onClose}
+      />
+      <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cockpit-artifacts-title"
+        className={cn(
+          'relative z-10 flex h-full w-full flex-col border-l border-border bg-background shadow-xl transition-all duration-200 ease-out will-change-transform sm:w-[calc(100vw-2rem)]',
+          isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        )}
+      >
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <h2
+              id="cockpit-artifacts-title"
+              className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight"
+            >
+              <Archive className="h-5 w-5 text-primary" />
+              Artifacts
+              {isValidating && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </h2>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {visibleRun.name} / {visibleRun.dagRunId}
+            </p>
           </div>
           <Button
+            ref={closeButtonRef}
             type="button"
             variant="ghost"
-            size="sm"
-            onClick={() => setRefreshKey((current) => current + 1)}
-            disabled={isLoading || isRefreshing || !run}
+            size="icon"
+            onClick={onClose}
+            title="Close artifact preview"
           >
-            <RefreshCw
-              className={cn(
-                'h-4 w-4',
-                (isLoading || isRefreshing) && 'animate-spin'
-              )}
-            />
-            Refresh
+            <X className="h-4 w-4" />
           </Button>
-        </div>
+        </header>
 
-        <div className="max-h-[58vh] overflow-auto px-5 py-4">
-          {error ? (
+        <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
+          {isLoading && !displayDetails ? (
+            <div className="flex h-full min-h-80 items-center justify-center">
+              <LoadingIndicator />
+            </div>
+          ) : error && !displayDetails ? (
             <div className="flex items-start gap-2 rounded-md bg-destructive/5 px-3 py-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{error}</span>
+              <span>{error.message || 'Failed to load DAG run details'}</span>
             </div>
-          ) : downloadError ? (
-            <div className="mb-3 flex items-start gap-2 rounded-md bg-destructive/5 px-3 py-3 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{downloadError}</span>
-            </div>
-          ) : null}
-
-          {isLoading && tree.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-              Loading artifacts...
-            </div>
-          ) : !error && tree.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-              No artifact files were found for this run.
-            </div>
-          ) : !error ? (
-            <div className="space-y-1">
-              {tree.map((node) => (
-                <ArtifactRow
-                  key={node.path}
-                  node={node}
-                  depth={0}
-                  downloadingPath={downloadingPath}
-                  onDownload={handleDownload}
-                />
-              ))}
-            </div>
+          ) : displayDetails ? (
+            <ArtifactsTab
+              dagRun={displayDetails}
+              artifactEnabled={visibleRun.artifactsAvailable ?? false}
+              className="h-full"
+              fillHeight
+            />
           ) : null}
         </div>
-      </DialogContent>
-    </Dialog>
+      </aside>
+    </div>,
+    document.body
   );
 }
