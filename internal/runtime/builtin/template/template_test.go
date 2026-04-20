@@ -603,8 +603,10 @@ func TestFuncMap_JoinGenericSlices(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fn := funcMap["join"].(func(string, any) string)
-			result := fn(tt.sep, tt.input)
+			fn, ok := funcMap["join"].(func(string, any) (string, error))
+			require.Truef(t, ok, "join has unexpected signature: %T", funcMap["join"])
+			result, err := fn(tt.sep, tt.input)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

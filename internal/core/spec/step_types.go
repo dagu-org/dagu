@@ -14,6 +14,7 @@ import (
 	"sync"
 	gotemplate "text/template"
 
+	"github.com/dagucloud/dagu/internal/cmn/templatefuncs"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/spec/types"
 	"github.com/goccy/go-yaml"
@@ -606,17 +607,18 @@ func renderCustomStepTemplateValue(stepTypeName string, value any, data map[stri
 }
 
 func renderCustomStepTemplateString(stepTypeName string, text string, data map[string]any) (string, error) {
+	funcs := templatefuncs.FuncMap()
+	funcs["json"] = func(v any) (string, error) {
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(raw), nil
+	}
+
 	tmpl, err := gotemplate.New(stepTypeName).
 		Option("missingkey=error").
-		Funcs(gotemplate.FuncMap{
-			"json": func(v any) (string, error) {
-				raw, err := json.Marshal(v)
-				if err != nil {
-					return "", err
-				}
-				return string(raw), nil
-			},
-		}).
+		Funcs(funcs).
 		Parse(text)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template string: %w", err)

@@ -10,13 +10,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"text/template"
 
-	sprig "github.com/go-task/slim-sprig/v3"
-
 	"github.com/dagucloud/dagu/internal/cmn/eval"
+	"github.com/dagucloud/dagu/internal/cmn/templatefuncs"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/runtime"
 	"github.com/dagucloud/dagu/internal/runtime/executor"
@@ -140,142 +137,15 @@ func validateTemplate(step core.Step) error {
 	return nil
 }
 
-// blockedFuncs are removed even from the hermetic set as defense-in-depth.
-// If a future slim-sprig release adds these to HermeticTxtFuncMap, we still
-// block them from template steps.
-var blockedFuncs = []string{
-	// Environment variable access
-	"env", "expandenv",
-	// Network I/O
-	"getHostByName",
-	// Non-deterministic time
-	"now", "date", "dateInZone", "date_in_zone",
-	"dateModify", "date_modify", "mustDateModify", "must_date_modify",
-	"ago", "duration", "durationRound",
-	"unixEpoch", "toDate", "mustToDate",
-	"htmlDate", "htmlDateInZone",
-	// Crypto key generation
-	"genPrivateKey", "derivePassword",
-	"buildCustomCert", "genCA",
-	"genSelfSignedCert", "genSignedCert",
-	// Non-deterministic random
-	"randBytes", "randString", "randNumeric",
-	"randAlphaNum", "randAlpha", "randAscii", "randInt",
-	"uuidv4",
-}
-
 // funcMap provides template functions for pipeline-compatible usage.
 // Built from the hermetic slim-sprig base with Dagu-specific overrides.
 // Functions that accept a pipeline value take it as the last argument.
 var funcMap = buildFuncMap()
 
+var blockedFuncs = templatefuncs.BlockedFuncNames()
+
 func buildFuncMap() template.FuncMap {
-	// Start from the hermetic (no env/network/random) slim-sprig set.
-	m := sprig.HermeticTxtFuncMap()
-
-	// Defense-in-depth: remove any functions that should never be
-	// available in template steps.
-	for _, name := range blockedFuncs {
-		delete(m, name)
-	}
-
-	// Dagu-specific overrides. These preserve pipeline-compatible argument
-	// order (pipeline value as last arg) and existing behavior. Each
-	// override is intentional — slim-sprig defines overlapping names with
-	// different arg order or semantics.
-
-	// split: sprig uses split(s, sep); Dagu uses split(sep, s) for pipelines.
-	m["split"] = func(sep, s string) []string {
-		return strings.Split(s, sep)
-	}
-	// join: Dagu accepts []string; also accept []any for interop with
-	// sprig functions like list/uniq/sortAlpha that return []any.
-	m["join"] = func(sep string, v any) string {
-		if v == nil {
-			return ""
-		}
-		switch elems := v.(type) {
-		case []string:
-			return strings.Join(elems, sep)
-		case []any:
-			strs := make([]string, len(elems))
-			for i, e := range elems {
-				strs[i] = fmt.Sprint(e)
-			}
-			return strings.Join(strs, sep)
-		default:
-			rv := reflect.ValueOf(v)
-			if rv.IsValid() && (rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array) {
-				strs := make([]string, rv.Len())
-				for i := range strs {
-					strs[i] = fmt.Sprint(rv.Index(i).Interface())
-				}
-				return strings.Join(strs, sep)
-			}
-			return fmt.Sprint(v)
-		}
-	}
-	m["count"] = func(v any) (int, error) {
-		rv := reflect.ValueOf(v)
-		switch rv.Kind() {
-		case reflect.Slice, reflect.Map, reflect.Array:
-			return rv.Len(), nil
-		case reflect.String:
-			return rv.Len(), nil
-		default:
-			return 0, fmt.Errorf("count: unsupported type %T", v)
-		}
-	}
-	// add: sprig uses add(a, b any); Dagu uses add(b, a int) for pipelines.
-	m["add"] = func(b, a int) int {
-		return a + b
-	}
-	m["empty"] = func(v any) bool {
-		if v == nil {
-			return true
-		}
-		rv := reflect.ValueOf(v)
-		switch rv.Kind() {
-		case reflect.String:
-			return rv.Len() == 0
-		case reflect.Slice, reflect.Map, reflect.Array:
-			return rv.Len() == 0
-		default:
-			return rv.IsZero()
-		}
-	}
-	m["upper"] = func(s string) string {
-		return strings.ToUpper(s)
-	}
-	m["lower"] = func(s string) string {
-		return strings.ToLower(s)
-	}
-	m["trim"] = func(s string) string {
-		return strings.TrimSpace(s)
-	}
-	m["default"] = func(def, val any) any {
-		if val == nil {
-			return def
-		}
-		rv := reflect.ValueOf(val)
-		switch rv.Kind() {
-		case reflect.String:
-			if rv.Len() == 0 {
-				return def
-			}
-		case reflect.Slice, reflect.Map, reflect.Array:
-			if rv.Len() == 0 {
-				return def
-			}
-		default:
-			if rv.IsZero() {
-				return def
-			}
-		}
-		return val
-	}
-
-	return m
+	return templatefuncs.FuncMap()
 }
 
 func init() {

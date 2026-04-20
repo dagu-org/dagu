@@ -117,6 +117,137 @@ steps:
 	assert.Contains(t, err.Error(), `fields "with" and "config" cannot be used together`)
 }
 
+func TestCustomStepTypes_TemplateSupportsHermeticFunctions(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-template-functions
+step_types:
+  format_message:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+        fallback:
+          type: string
+          default: ""
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - '{{ .input.message | trim | upper | replace "HELLO" "HI" }}'
+          - '{{ list "b" "a" "b" | uniq | sortAlpha | join "," }}'
+          - '{{ .input.fallback | default "fallback" }}'
+steps:
+  - type: format_message
+    config:
+      message: " hello "
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"HI", "a,b", "fallback"}, step.Commands[0].Args)
+	assert.Equal(t, "format_message", step.ExecutorConfig.Metadata["custom_type"])
+}
+
+func TestCustomStepTypes_TemplateKeepsJSONHelper(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-json-helper
+step_types:
+  emit:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - '{{ json .input.message }}'
+steps:
+  - type: emit
+    config:
+      message: 'hello "quoted" world'
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{`"hello \"quoted\" world"`}, step.Commands[0].Args)
+}
+
+func TestCustomStepTypes_TemplateRejectsBlockedFunctions(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-template-blocked-functions
+step_types:
+  stamp:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - '{{ now }}'
+steps:
+  - type: stamp
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `function "now" not defined`)
+}
+
+func TestCustomStepTypes_HarnessCommandCanUseTypedInput(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-harness-typed-input
+step_types:
+  codex_task:
+    type: harness
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+    template:
+      command:
+        $input: prompt
+      config:
+        provider: codex
+steps:
+  - type: codex_task
+    config:
+      prompt: 'Review "quoted" text'
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "harness", step.ExecutorConfig.Type)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, `Review "quoted" text`, step.Commands[0].CmdWithArgs)
+	assert.Equal(t, "codex_task", step.ExecutorConfig.Metadata["custom_type"])
+}
+
 func TestCustomStepTypes_RuntimeVariableInputsDeferSchemaValidation(t *testing.T) {
 	t.Parallel()
 
