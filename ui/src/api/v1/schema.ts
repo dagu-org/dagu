@@ -3960,6 +3960,11 @@ export interface components {
             /** @description Workspace-specific grants used when all=false */
             grants: components["schemas"]["WorkspaceGrant"][];
         };
+        /**
+         * @description Workspace scope selector for list and search APIs
+         * @enum {string}
+         */
+        WorkspaceScope: WorkspaceScope;
         /** @description Request body for initial admin account setup */
         SetupRequest: {
             /** @description Admin username */
@@ -4916,8 +4921,10 @@ export interface components {
         APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
-        /** @description selected workspace scope */
+        /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
         Workspace: string;
+        /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+        WorkspaceScope: components["schemas"]["WorkspaceScope"];
         /** @description Opaque cursor returned by the previous search response */
         SearchCursor: string;
         /** @description Number of search results to return (default 20, max 50) */
@@ -5995,6 +6002,10 @@ export interface operations {
                 perPage?: components["parameters"]["PerPage"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Filter DAGs by name */
                 name?: string;
                 /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
@@ -6832,7 +6843,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
@@ -6883,7 +6896,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
@@ -6932,7 +6947,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
@@ -6995,7 +7012,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -7055,6 +7074,10 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;
@@ -7087,6 +7110,10 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;
@@ -7131,6 +7158,10 @@ export interface operations {
                 cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Filter DAG-runs by name */
                 name?: string;
                 /** @description Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
@@ -7341,6 +7372,10 @@ export interface operations {
                 cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path: {
@@ -12863,7 +12898,9 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description page number of items to fetch (default is 1) */
                 page?: components["parameters"]["Page"];
@@ -12911,7 +12948,9 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -12969,7 +13008,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Search query */
                 q: string;
@@ -13014,7 +13055,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13059,7 +13102,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13102,7 +13147,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13153,7 +13200,9 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Current document or directory path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13213,7 +13262,9 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -13844,6 +13895,11 @@ export enum UserRole {
     developer = "developer",
     operator = "operator",
     viewer = "viewer"
+}
+export enum WorkspaceScope {
+    accessible = "accessible",
+    none = "none",
+    workspace = "workspace"
 }
 export enum UserAuthProvider {
     builtin = "builtin",

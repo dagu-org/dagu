@@ -174,7 +174,7 @@ func (a *API) UpdateAPIKey(ctx context.Context, request api.UpdateAPIKeyRequestO
 		input.Role = &role
 	}
 	if request.Body.WorkspaceAccess != nil {
-		roleForAccess := auth.RoleViewer
+		var roleForAccess auth.Role
 		if input.Role != nil {
 			roleForAccess = *input.Role
 		} else {

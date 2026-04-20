@@ -4,6 +4,8 @@
 package exec
 
 import (
+	"slices"
+
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/workspace"
 )
@@ -47,10 +49,5 @@ func (f *WorkspaceFilter) MatchesLabels(labels core.Labels) bool {
 	if !ok {
 		return f.IncludeUnlabelled
 	}
-	for _, allowed := range f.Workspaces {
-		if workspaceName == allowed {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(f.Workspaces, workspaceName)
 }

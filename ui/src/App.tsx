@@ -41,12 +41,16 @@ import { getAuthHeaders } from './lib/authHeaders';
 import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
 import { useClient } from './hooks/api';
 import {
-  getStoredWorkspaceName,
-  persistWorkspaceName,
+  getStoredWorkspaceSelection,
+  isMutableWorkspaceSelection,
+  persistWorkspaceSelection,
   sanitizeWorkspaceName,
+  sanitizeWorkspaceSelection,
+  workspaceNameForSelection,
+  type WorkspaceSelection,
 } from './lib/workspace';
 import { effectiveWorkspaceRole, roleAtLeast } from './lib/workspaceAccess';
-import { UserRole } from './api/v1/schema';
+import { UserRole, WorkspaceScope } from './api/v1/schema';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
@@ -108,7 +112,9 @@ function AdminElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole={UserRole.admin}>{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute requiredRole={UserRole.admin}>{children}</ProtectedRoute>
+  );
 }
 
 function ManagerElement({
@@ -116,7 +122,9 @@ function ManagerElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole={UserRole.manager}>{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute requiredRole={UserRole.manager}>{children}</ProtectedRoute>
+  );
 }
 
 function DeveloperElement({
@@ -124,7 +132,11 @@ function DeveloperElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole={UserRole.developer}>{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute requiredRole={UserRole.developer}>
+      {children}
+    </ProtectedRoute>
+  );
 }
 
 function WriteElement({
@@ -135,17 +147,21 @@ function WriteElement({
   const { user } = useAuth();
   const config = React.useContext(ConfigContext);
   const appBarContext = React.useContext(AppBarContext);
+  const workspaceSelection = sanitizeWorkspaceSelection(
+    appBarContext.workspaceSelection
+  );
+  const workspaceName = workspaceNameForSelection(workspaceSelection);
+  const hasMutableScope = isMutableWorkspaceSelection(workspaceSelection);
   const canWrite =
     config.authMode !== 'builtin'
       ? config.permissions.writeDags
       : roleAtLeast(
-          effectiveWorkspaceRole(
-            user,
-            appBarContext.selectedWorkspace || ''
-          ),
+          effectiveWorkspaceRole(user, workspaceName),
           UserRole.developer
         );
-  if (!canWrite || !config.agentEnabled) return <Navigate to="/" replace />;
+  if (!hasMutableScope || !canWrite || !config.agentEnabled) {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 
@@ -219,8 +235,20 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const [workspaceError, setWorkspaceError] = React.useState<Error | null>(
     null
   );
-  const [selectedWorkspace, setSelectedWorkspace] = React.useState<string>(() =>
-    getStoredWorkspaceName()
+  const [workspaceSelection, setWorkspaceSelection] =
+    React.useState<WorkspaceSelection>(() => getStoredWorkspaceSelection());
+  const selectedWorkspace = workspaceNameForSelection(workspaceSelection);
+  const handleSelectWorkspaceScope = React.useCallback(
+    (selection: WorkspaceSelection) => {
+      const sanitized = sanitizeWorkspaceSelection(selection);
+      setWorkspaceSelection(sanitized);
+      persistWorkspaceSelection(sanitized);
+
+      // Workspace scopes are part of most active data keys. Clear cached responses
+      // so pages that do not remount still refetch with the new global scope.
+      globalMutate(() => true, undefined, { revalidate: false });
+    },
+    []
   );
   const workspaceFetchSeqRef = React.useRef(0);
 
@@ -233,15 +261,17 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     [updateConfig]
   );
 
-  const handleSelectWorkspace = React.useCallback((name: string) => {
-    const sanitized = sanitizeWorkspaceName(name);
-    setSelectedWorkspace(sanitized);
-    persistWorkspaceName(sanitized);
-
-    // Workspace scopes are part of most active data keys. Clear cached responses
-    // so pages that do not remount still refetch with the new global scope.
-    globalMutate(() => true, undefined, { revalidate: false });
-  }, []);
+  const handleSelectWorkspace = React.useCallback(
+    (name: string) => {
+      const sanitized = sanitizeWorkspaceName(name);
+      handleSelectWorkspaceScope(
+        sanitized
+          ? { scope: WorkspaceScope.workspace, workspace: sanitized }
+          : { scope: WorkspaceScope.accessible }
+      );
+    },
+    [handleSelectWorkspaceScope]
+  );
 
   const handleSelectRemoteNode = React.useCallback(
     (node: string) => {
@@ -400,12 +430,18 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   React.useEffect(() => {
     if (
       workspacesLoaded &&
-      selectedWorkspace &&
+      workspaceSelection.scope === WorkspaceScope.workspace &&
       !workspaces.some((workspace) => workspace.name === selectedWorkspace)
     ) {
       handleSelectWorkspace('');
     }
-  }, [handleSelectWorkspace, selectedWorkspace, workspaces, workspacesLoaded]);
+  }, [
+    handleSelectWorkspace,
+    selectedWorkspace,
+    workspaceSelection.scope,
+    workspaces,
+    workspacesLoaded,
+  ]);
 
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -438,6 +474,8 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
             selectRemoteNode: handleSelectRemoteNode,
             workspaces,
             workspaceError,
+            workspaceSelection,
+            selectWorkspaceScope: handleSelectWorkspaceScope,
             selectedWorkspace,
             selectWorkspace: handleSelectWorkspace,
             createWorkspace: handleCreateWorkspace,

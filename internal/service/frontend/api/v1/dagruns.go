@@ -600,7 +600,11 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 		limit:    request.Params.Limit,
 		cursor:   request.Params.Cursor,
 	})
-	opts.query = append(opts.query, exec.WithWorkspaceFilter(a.workspaceFilterForContext(ctx)))
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
+	opts.query = append(opts.query, exec.WithWorkspaceFilter(workspaceFilter))
 	var dagName, dagRunID string
 	if request.Params.Name != nil {
 		dagName = *request.Params.Name
@@ -640,7 +644,11 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 		cursor:    request.Params.Cursor,
 		exactName: &request.Name,
 	})
-	opts.query = append(opts.query, exec.WithWorkspaceFilter(a.workspaceFilterForContext(ctx)))
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
+	opts.query = append(opts.query, exec.WithWorkspaceFilter(workspaceFilter))
 	var dagRunID string
 	if request.Params.DagRunId != nil {
 		dagRunID = *request.Params.DagRunId

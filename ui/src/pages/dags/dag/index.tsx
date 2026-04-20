@@ -3,7 +3,7 @@
 
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { components } from '../../../api/v1/schema';
+import { components, WorkspaceScope } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { usePageContext } from '../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../contexts/UnsavedChangesContext';
@@ -23,7 +23,10 @@ import {
 } from '../../../hooks/useSSECacheSync';
 import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
 import dayjs from '../../../lib/dayjs';
-import { workspaceLabel } from '../../../lib/workspace';
+import {
+  sanitizeWorkspaceSelection,
+  workspaceNameFromLabels,
+} from '../../../lib/workspace';
 
 type Params = {
   fileName: string;
@@ -48,7 +51,9 @@ function DAGDetails() {
     searchParams.get('remoteNode') ||
     appBarContext.selectedRemoteNode ||
     'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceSelection = sanitizeWorkspaceSelection(
+    appBarContext.workspaceSelection
+  );
   const fileName = params.fileName || '';
 
   // Set page context for agent chat
@@ -130,12 +135,14 @@ function DAGDetails() {
     sseFallbackOptions(dagSSE)
   );
   useSSECacheSync(dagSSE, mutateDag);
-  const selectedWorkspaceLabel = workspaceLabel(selectedWorkspace);
+  const dagWorkspaceName = workspaceNameFromLabels(
+    dagData?.dag?.labels ?? dagData?.dag?.tags ?? []
+  );
   const dagMatchesWorkspace =
-    !selectedWorkspaceLabel ||
-    (dagData?.dag?.labels ?? dagData?.dag?.tags ?? []).includes(
-      selectedWorkspaceLabel
-    );
+    workspaceSelection.scope === WorkspaceScope.accessible ||
+    (workspaceSelection.scope === WorkspaceScope.none && !dagWorkspaceName) ||
+    (workspaceSelection.scope === WorkspaceScope.workspace &&
+      dagWorkspaceName === workspaceSelection.workspace);
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';

@@ -12,16 +12,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { WorkspaceScope } from '@/api/v1/schema';
 import type { components } from '@/api/v1/schema';
 import { cn } from '@/lib/utils';
-import { sanitizeWorkspaceName } from '@/lib/workspace';
+import {
+  defaultWorkspaceSelection,
+  sanitizeWorkspaceName,
+  sanitizeWorkspaceSelection,
+  workspaceSelectionLabel,
+  type WorkspaceSelection,
+} from '@/lib/workspace';
 
 type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
 
+const ACCESSIBLE_VALUE = '__accessible__';
+const NONE_VALUE = '__none__';
+const NEW_VALUE = '__new__';
+const WORKSPACE_VALUE_PREFIX = 'workspace:';
+
 interface Props {
   workspaces: WorkspaceResponse[];
-  selectedWorkspace: string;
-  onSelect: (name: string) => void;
+  workspaceSelection?: WorkspaceSelection;
+  onSelectScope?: (selection: WorkspaceSelection) => void;
+  selectedWorkspace?: string;
+  onSelect?: (name: string) => void;
   onCreate: (name: string) => void;
   onDelete: (id: string) => void;
   canWrite?: boolean;
@@ -31,6 +45,8 @@ interface Props {
 
 export function WorkspaceSelector({
   workspaces,
+  workspaceSelection,
+  onSelectScope,
   selectedWorkspace,
   onSelect,
   onCreate,
@@ -42,9 +58,22 @@ export function WorkspaceSelector({
   const [isCreating, setIsCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>(
-    'idle'
+  const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>('idle');
+  const selection = sanitizeWorkspaceSelection(
+    workspaceSelection ??
+      (selectedWorkspace
+        ? {
+            scope: WorkspaceScope.workspace,
+            workspace: selectedWorkspace,
+          }
+        : defaultWorkspaceSelection())
   );
+  const selectedValue =
+    selection.scope === WorkspaceScope.workspace && selection.workspace
+      ? `${WORKSPACE_VALUE_PREFIX}${selection.workspace}`
+      : selection.scope === WorkspaceScope.none
+        ? NONE_VALUE
+        : ACCESSIBLE_VALUE;
 
   const handleCreate = useCallback(() => {
     if (createStateRef.current !== 'idle') return;
@@ -71,7 +100,21 @@ export function WorkspaceSelector({
     [handleCreate]
   );
 
-  const selectedWs = workspaces.find((ws) => ws.name === selectedWorkspace);
+  const selectedWs =
+    selection.scope === WorkspaceScope.workspace
+      ? workspaces.find((ws) => ws.name === selection.workspace)
+      : undefined;
+  const handleSelect = (nextSelection: WorkspaceSelection) => {
+    const sanitized = sanitizeWorkspaceSelection(nextSelection);
+    onSelectScope?.(sanitized);
+    if (!onSelectScope) {
+      onSelect?.(
+        sanitized.scope === WorkspaceScope.workspace
+          ? (sanitized.workspace ?? '')
+          : ''
+      );
+    }
+  };
 
   if (isCreating) {
     return (
@@ -105,15 +148,22 @@ export function WorkspaceSelector({
         )}
       >
         <Select
-          value={selectedWorkspace || '__none__'}
+          value={selectedValue}
           onValueChange={(v) => {
-            if (v === '__new__') {
+            if (v === NEW_VALUE) {
               createStateRef.current = 'idle';
               setIsCreating(true);
-            } else if (v === '__none__') {
-              onSelect('');
+            } else if (v === ACCESSIBLE_VALUE) {
+              handleSelect({ scope: WorkspaceScope.accessible });
+            } else if (v === NONE_VALUE) {
+              handleSelect({ scope: WorkspaceScope.none });
+            } else if (v.startsWith(WORKSPACE_VALUE_PREFIX)) {
+              handleSelect({
+                scope: WorkspaceScope.workspace,
+                workspace: v.slice(WORKSPACE_VALUE_PREFIX.length),
+              });
             } else {
-              onSelect(v);
+              handleSelect({ scope: WorkspaceScope.accessible });
             }
           }}
         >
@@ -138,9 +188,7 @@ export function WorkspaceSelector({
                   }
                 : undefined
             }
-            title={
-              collapsed ? selectedWorkspace || 'All workspaces' : undefined
-            }
+            title={collapsed ? workspaceSelectionLabel(selection) : undefined}
           >
             {variant === 'sidebar' ? (
               <div className="flex items-center gap-2 min-w-0">
@@ -165,14 +213,20 @@ export function WorkspaceSelector({
             )}
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__none__">All workspaces</SelectItem>
+            <SelectItem value={ACCESSIBLE_VALUE}>
+              Accessible workspaces
+            </SelectItem>
+            <SelectItem value={NONE_VALUE}>No workspace</SelectItem>
             {workspaces.map((ws) => (
-              <SelectItem key={ws.id} value={ws.name}>
+              <SelectItem
+                key={ws.id}
+                value={`${WORKSPACE_VALUE_PREFIX}${ws.name}`}
+              >
                 {ws.name}
               </SelectItem>
             ))}
             {canWrite && !collapsed && (
-              <SelectItem value="__new__">
+              <SelectItem value={NEW_VALUE}>
                 <span className="flex items-center gap-1 text-primary">
                   <Plus size={12} /> New workspace
                 </span>

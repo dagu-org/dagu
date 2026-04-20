@@ -5,7 +5,7 @@ import { render, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Status } from '@/api/v1/schema';
+import { Status, WorkspaceScope } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
@@ -103,6 +103,12 @@ function renderPage({
               workspaces: selectedWorkspace
                 ? [{ id: 'workspace-1', name: selectedWorkspace }]
                 : [],
+              workspaceSelection: selectedWorkspace
+                ? {
+                    scope: WorkspaceScope.workspace,
+                    workspace: selectedWorkspace,
+                  }
+                : { scope: WorkspaceScope.accessible },
               selectedWorkspace,
               selectWorkspace: () => undefined,
             }}
@@ -204,7 +210,8 @@ describe('DashboardPage', () => {
     expect(latestCall?.query).toEqual(
       expect.objectContaining({
         remoteNode: 'remote-a',
-        labels: 'workspace=ops',
+        workspaceScope: WorkspaceScope.workspace,
+        workspace: 'ops',
       })
     );
 
@@ -214,7 +221,8 @@ describe('DashboardPage', () => {
         params: {
           query: expect.objectContaining({
             remoteNode: 'remote-a',
-            labels: 'workspace=ops',
+            workspaceScope: WorkspaceScope.workspace,
+            workspace: 'ops',
           }),
         },
       })

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import { TemplateSelector } from '../TemplateSelector';
+import { WorkspaceScope } from '@/api/v1/schema';
 
 vi.mock('@/hooks/api', () => ({
   useQuery: vi.fn(),
@@ -19,6 +20,7 @@ const appBarValue = {
   setRemoteNodes: vi.fn(),
   selectedRemoteNode: 'local',
   selectRemoteNode: vi.fn(),
+  workspaceSelection: { scope: WorkspaceScope.accessible },
 };
 
 const mockDags = [
@@ -41,12 +43,7 @@ const queryCalls: Array<{
 }> = [];
 
 const useQueryMock = useQuery as unknown as {
-  mockImplementation: (
-    fn: (
-      path: string,
-      params?: unknown,
-    ) => unknown
-  ) => void;
+  mockImplementation: (fn: (path: string, params?: unknown) => unknown) => void;
 };
 
 function latestQueryCall(path: string) {
@@ -109,7 +106,10 @@ describe('TemplateSelector', () => {
     expect(latestQueryCall('/dags/labels')?.init).toEqual(
       expect.objectContaining({
         params: expect.objectContaining({
-          query: { remoteNode: 'local' },
+          query: {
+            remoteNode: 'local',
+            workspaceScope: WorkspaceScope.accessible,
+          },
         }),
       })
     );
@@ -145,7 +145,9 @@ describe('TemplateSelector', () => {
     fireEvent.click(screen.getByRole('button', { name: /select template/i }));
     fireEvent.click(screen.getByText('Example DAG'));
 
-    expect(screen.queryByPlaceholderText('Search DAGs...')).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText('Search DAGs...')
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Example DAG')).toBeInTheDocument();
     expect(latestQueryCall('/dags')?.init).toBeNull();
   });

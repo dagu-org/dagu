@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SearchResult from '../SearchResult';
+import { WorkspaceScope } from '@/api/v1/schema';
 
 const { getMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
@@ -66,6 +67,7 @@ describe('SearchResult', () => {
         path: { fileName: 'build' },
         query: {
           remoteNode: 'local',
+          workspaceScope: WorkspaceScope.accessible,
           q: 'needle',
           cursor: 'cursor-1',
         },

@@ -24,6 +24,11 @@ import { useClient, useQuery } from '@/hooks/api';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
+import {
+  isMutableWorkspaceSelection,
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+} from '@/lib/workspace';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
@@ -58,7 +63,12 @@ function DocsContent() {
 
   const { selectedTemplate, selectTemplate } = useCockpitState();
   const selectedWorkspace = appBarContext.selectedWorkspace || '';
-  const workspaceQuery = selectedWorkspace || undefined;
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const canMutateDocs = isMutableWorkspaceSelection(workspaceSelection);
 
   const { setContext } = usePageContext();
   const {
@@ -111,7 +121,7 @@ function DocsContent() {
     sort,
     order,
     remoteNode,
-    workspace: workspaceQuery,
+    ...workspaceQuery,
   });
 
   const {
@@ -125,10 +135,10 @@ function DocsContent() {
       params: {
         query: {
           remoteNode,
-          workspace: workspaceQuery,
           perPage: 200,
           sort,
           order,
+          ...workspaceQuery,
         },
       },
     },
@@ -254,11 +264,15 @@ function DocsContent() {
   // Create handler
   const handleCreate = useCallback(
     async (path: string) => {
+      if (!canMutateDocs) {
+        setCreateError('Select a workspace or No workspace before creating.');
+        return;
+      }
       setCreateLoading(true);
       setCreateError(null);
       try {
         const { error } = await client.POST('/docs', {
-          params: { query: { remoteNode, workspace: workspaceQuery } },
+          params: { query: { remoteNode, ...workspaceQuery } },
           body: { id: path, content: '' },
         });
         if (error) {
@@ -275,12 +289,24 @@ function DocsContent() {
         setCreateLoading(false);
       }
     },
-    [client, remoteNode, workspaceQuery, mutate, openDoc, showToast]
+    [
+      canMutateDocs,
+      client,
+      remoteNode,
+      workspaceQuery,
+      mutate,
+      openDoc,
+      showToast,
+    ]
   );
 
   // Rename handler (from modal)
   const handleRenameModal = useCallback(
     async (newPath: string) => {
+      if (!canMutateDocs) {
+        setRenameError('Select a workspace or No workspace before renaming.');
+        return;
+      }
       setRenameLoading(true);
       setRenameError(null);
       try {
@@ -288,8 +314,8 @@ function DocsContent() {
           params: {
             query: {
               remoteNode,
-              workspace: workspaceQuery,
               path: renameDocPath,
+              ...workspaceQuery,
             },
           },
           body: { newPath },
@@ -323,6 +349,7 @@ function DocsContent() {
     },
     [
       client,
+      canMutateDocs,
       remoteNode,
       workspaceQuery,
       renameDocPath,
@@ -336,10 +363,16 @@ function DocsContent() {
   // Shared path-change handler for rename and move
   const handlePathChange = useCallback(
     async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
+      if (!canMutateDocs) {
+        showToast(
+          'Select a workspace or No workspace before editing documents'
+        );
+        return;
+      }
       try {
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
-            query: { remoteNode, workspace: workspaceQuery, path: oldPath },
+            query: { remoteNode, path: oldPath, ...workspaceQuery },
           },
           body: { newPath },
         });
@@ -373,7 +406,16 @@ function DocsContent() {
         mutate();
       }
     },
-    [client, remoteNode, workspaceQuery, mutate, tabs, updateTab, showToast]
+    [
+      canMutateDocs,
+      client,
+      remoteNode,
+      workspaceQuery,
+      mutate,
+      tabs,
+      updateTab,
+      showToast,
+    ]
   );
 
   const handleInlineRename = useCallback(
@@ -399,10 +441,15 @@ function DocsContent() {
 
   // Delete handler (supports both files and directories)
   const handleDelete = useCallback(async () => {
+    if (!canMutateDocs) {
+      showToast('Select a workspace or No workspace before deleting documents');
+      setDeleteConfirmOpen(false);
+      return;
+    }
     try {
       const { error } = await client.DELETE('/docs/doc', {
         params: {
-          query: { remoteNode, workspace: workspaceQuery, path: deleteDocPath },
+          query: { remoteNode, path: deleteDocPath, ...workspaceQuery },
         },
       });
       if (error) {
@@ -429,6 +476,7 @@ function DocsContent() {
     }
   }, [
     client,
+    canMutateDocs,
     remoteNode,
     workspaceQuery,
     deleteDocPath,
@@ -442,9 +490,15 @@ function DocsContent() {
 
   // Batch delete handler
   const handleBatchDelete = useCallback(async () => {
+    if (!canMutateDocs) {
+      showToast('Select a workspace or No workspace before deleting documents');
+      setBatchDeleteConfirmOpen(false);
+      setBatchDeletePaths([]);
+      return;
+    }
     try {
       const { data, error } = await client.POST('/docs/delete-batch', {
-        params: { query: { remoteNode, workspace: workspaceQuery } },
+        params: { query: { remoteNode, ...workspaceQuery } },
         body: { paths: batchDeletePaths },
       });
       if (error) {
@@ -478,6 +532,7 @@ function DocsContent() {
     }
   }, [
     batchDeletePaths,
+    canMutateDocs,
     client,
     remoteNode,
     workspaceQuery,
@@ -519,6 +574,7 @@ function DocsContent() {
       onMove={handleMove}
       onBatchDelete={handleBatchDeleteFromBar}
       onSelectionChange={handleSelectionChange}
+      canMutate={canMutateDocs}
       activeDocContent={activeDocContent}
       onHeadingClick={handleHeadingClick}
       sortField={docSortField}
@@ -685,7 +741,7 @@ function DocsPage() {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const docTabStorageKey = `dagu_doc_tabs:${JSON.stringify({
     remoteNode,
-    workspace: appBarContext.selectedWorkspace || null,
+    workspace: workspaceSelectionKey(appBarContext.workspaceSelection),
   })}`;
 
   return (

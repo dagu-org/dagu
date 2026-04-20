@@ -4,7 +4,7 @@
 import { Button } from '@/components/ui/button';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
-import { workspaceLabel } from '@/lib/workspace';
+import { workspaceSelectionQuery } from '@/lib/workspace';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
@@ -167,10 +167,10 @@ function SearchResult(props: Props) {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const workspaceQuery = appBarContext.selectedWorkspace || undefined;
-  const workspaceLabelQuery = workspaceQuery
-    ? workspaceLabel(workspaceQuery)
-    : undefined;
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(appBarContext.workspaceSelection),
+    [appBarContext.workspaceSelection]
+  );
 
   const items =
     type === 'dag'
@@ -190,10 +190,9 @@ function SearchResult(props: Props) {
                   path: { fileName: result.fileName },
                   query: {
                     remoteNode,
-                    workspace: workspaceQuery,
                     q: query,
-                    labels: workspaceLabelQuery,
                     cursor,
+                    ...workspaceQuery,
                   },
                 },
               }
@@ -220,10 +219,10 @@ function SearchResult(props: Props) {
               params: {
                 query: {
                   remoteNode,
-                  workspace: workspaceQuery,
                   path: result.id,
                   q: query,
                   cursor,
+                  ...workspaceQuery,
                 },
               },
             });

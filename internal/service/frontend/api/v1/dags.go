@@ -713,13 +713,17 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 	labels := parseCommaSeparatedLabels(labelsParam)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := a.listDAGsData(ctx, exec.ListDAGsOptions{
 		Paginator:       &pg,
 		Name:            valueOf(request.Params.Name),
 		Labels:          labels,
 		Sort:            sortField,
 		Order:           sortOrder,
-		WorkspaceFilter: a.workspaceFilterForContext(ctx),
+		WorkspaceFilter: workspaceFilter,
 	})
 	if err != nil {
 		return nil, err
@@ -727,8 +731,10 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	return &resp, nil
 }
 
-func (a *API) GetAllDAGLabels(ctx context.Context, _ api.GetAllDAGLabelsRequestObject) (api.GetAllDAGLabelsResponseObject, error) {
-	if filter := a.workspaceFilterForContext(ctx); filter != nil {
+func (a *API) GetAllDAGLabels(ctx context.Context, request api.GetAllDAGLabelsRequestObject) (api.GetAllDAGLabelsResponseObject, error) {
+	if filter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace); err != nil {
+		return nil, err
+	} else if filter != nil {
 		pg := exec.NewPaginator(1, int(^uint(0)>>1))
 		result, errs, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
 			Paginator:       &pg,
@@ -764,8 +770,10 @@ func (a *API) GetAllDAGLabels(ctx context.Context, _ api.GetAllDAGLabelsRequestO
 	}, nil
 }
 
-func (a *API) GetAllDAGTags(ctx context.Context, _ api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
-	if filter := a.workspaceFilterForContext(ctx); filter != nil {
+func (a *API) GetAllDAGTags(ctx context.Context, request api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
+	if filter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace); err != nil {
+		return nil, err
+	} else if filter != nil {
 		pg := exec.NewPaginator(1, int(^uint(0)>>1))
 		result, errs, err := a.dagStore.List(ctx, exec.ListDAGsOptions{
 			Paginator:       &pg,
@@ -1737,13 +1745,18 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 	labels := parseCommaSeparatedLabels(labelQueryParam)
 
 	pg := exec.NewPaginator(page, perPage)
+	scopeParam, workspaceParam := workspaceScopeParamsFromValues(params)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, scopeParam, workspaceParam)
+	if err != nil {
+		return nil, err
+	}
 	listOpts := exec.ListDAGsOptions{
 		Paginator:       &pg,
 		Name:            params.Get("name"),
 		Labels:          labels,
 		Sort:            sortField,
 		Order:           sortOrder,
-		WorkspaceFilter: a.workspaceFilterForContext(ctx),
+		WorkspaceFilter: workspaceFilter,
 	}
 
 	return a.listDAGsData(ctx, listOpts)

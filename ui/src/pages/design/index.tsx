@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { components } from '@/api/v1/schema';
+import { components, WorkspaceScope } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -47,7 +47,11 @@ import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { validateDAGName } from '@/lib/dag-validation';
 import { ensureWorkspaceLabelInDAGSpec } from '@/lib/dagSpec';
-import { workspaceLabel } from '@/lib/workspace';
+import {
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+  workspaceSelectionLabel,
+} from '@/lib/workspace';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -112,6 +116,13 @@ function WorkflowDesignPage() {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
+  const workspaceDescription = workspaceSelectionLabel(workspaceSelection);
   const { setContext } = usePageContext();
   const { schema: baseSchema } = useSchema();
   const { setHasUnsavedChanges } = useUnsavedChanges();
@@ -155,7 +166,7 @@ function WorkflowDesignPage() {
       query: {
         remoteNode,
         perPage: 200,
-        labels: workspaceLabel(selectedWorkspace),
+        ...workspaceQuery,
       },
     },
   });
@@ -210,7 +221,7 @@ function WorkflowDesignPage() {
   } = useContentEditor({
     key: JSON.stringify({
       remoteNode,
-      workspace: selectedWorkspace || null,
+      workspace: workspaceScopeKey,
       dag: selectedDagFile || NEW_DAG_VALUE,
     }),
     serverContent: serverSpec,
@@ -266,17 +277,14 @@ function WorkflowDesignPage() {
     );
   }, [baseSchema, inheritedCustomStepTypes, effectiveLocalStepTypes]);
 
-  const editorModelUri = React.useMemo(
-    () => {
-      const workspaceSegment = encodeURIComponent(
-        JSON.stringify({ workspace: selectedWorkspace || null })
-      );
-      return selectedDagFile
-        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/${encodeURIComponent(selectedDagFile)}.yaml`
-        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/new.yaml`;
-    },
-    [remoteNode, selectedDagFile, selectedWorkspace]
-  );
+  const editorModelUri = React.useMemo(() => {
+    const workspaceSegment = encodeURIComponent(
+      JSON.stringify({ workspace: workspaceScopeKey })
+    );
+    return selectedDagFile
+      ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/${encodeURIComponent(selectedDagFile)}.yaml`
+      : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/new.yaml`;
+  }, [remoteNode, selectedDagFile, workspaceScopeKey]);
 
   const debouncedSpec = useDebouncedValue(editorValue, 500);
   const validationName = selectedDagFile || newDagName || 'designed-dag';
@@ -487,9 +495,11 @@ function WorkflowDesignPage() {
     }
 
     setIsSaving(true);
-    const specToSave = selectedWorkspace
-      ? ensureWorkspaceLabelInDAGSpec(newDraftSpec, selectedWorkspace)
-      : newDraftSpec;
+    const specToSave =
+      workspaceSelection?.scope === WorkspaceScope.workspace &&
+      selectedWorkspace
+        ? ensureWorkspaceLabelInDAGSpec(newDraftSpec, selectedWorkspace)
+        : newDraftSpec;
     try {
       const { error } = await client.POST('/dags', {
         params: { query: { remoteNode } },
@@ -553,6 +563,7 @@ function WorkflowDesignPage() {
           stepName: selectedStepName || undefined,
           remoteNode,
           selectedWorkspace,
+          workspaceDescription,
           userPrompt: trimmed,
           draftSpec: selectedDagFile ? undefined : newDraftSpec,
           validationErrors: validation?.errors,

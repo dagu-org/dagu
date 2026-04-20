@@ -8,6 +8,7 @@ export type BuildWorkflowDesignPromptInput = {
   stepName?: string;
   remoteNode: string;
   selectedWorkspace?: string;
+  workspaceDescription?: string;
   userPrompt: string;
   draftSpec?: string;
   validationErrors?: string[];
@@ -22,6 +23,7 @@ export function buildWorkflowDesignPrompt({
   stepName,
   remoteNode,
   selectedWorkspace,
+  workspaceDescription,
   userPrompt,
   draftSpec,
   validationErrors,
@@ -35,7 +37,7 @@ export function buildWorkflowDesignPrompt({
     '',
     `Mode: ${mode === 'update' ? 'Update existing DAG' : 'Create new DAG'}`,
     `Remote node: ${remoteNode}`,
-    `Workspace: ${selectedWorkspace || '(all workspaces)'}`,
+    `Workspace: ${workspaceDescription || selectedWorkspace || 'No workspace'}`,
     `Target DAG: ${target || '(not selected)'}`,
   ];
 

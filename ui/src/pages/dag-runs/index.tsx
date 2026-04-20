@@ -31,7 +31,8 @@ import { useQuery } from '../../hooks/api';
 import { useBulkDAGRunSelection } from '../../features/dag-runs/hooks/useBulkDAGRunSelection';
 import {
   withoutWorkspaceLabels,
-  withWorkspaceLabel,
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
 } from '../../lib/workspace';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
@@ -137,10 +138,15 @@ function DAGRuns() {
   const { preferences, updatePreference } = useUserPreferences();
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = JSON.stringify({
     remoteNode: remoteKey,
-    workspace: selectedWorkspace || null,
+    workspace: workspaceScopeKey,
   });
 
   // Extract short datetime format from URL if present
@@ -451,6 +457,7 @@ function DAGRuns() {
       params: {
         query: {
           remoteNode: appBarContext.selectedRemoteNode || 'local',
+          ...workspaceQuery,
         },
       },
     },
@@ -464,33 +471,27 @@ function DAGRuns() {
     [labelsData?.labels]
   );
 
-  const effectiveApiLabels = React.useMemo(
-    () => withWorkspaceLabel(apiLabels, selectedWorkspace),
-    [apiLabels, selectedWorkspace]
-  );
-
   const dagRunQuery = React.useMemo(
     () => ({
       remoteNode: appBarContext.selectedRemoteNode || 'local',
       name: apiSearchText || undefined,
       dagRunId: apiDagRunId || undefined,
       status: apiStatus !== 'all' ? [parseInt(apiStatus)] : undefined,
-      labels:
-        effectiveApiLabels.length > 0
-          ? effectiveApiLabels.join(',')
-          : undefined,
+      labels: apiLabels.length > 0 ? apiLabels.join(',') : undefined,
       fromDate: formatDateForApi(apiFromDate),
       toDate: formatDateForApi(apiToDate),
       limit: 100,
+      ...workspaceQuery,
     }),
     [
       apiDagRunId,
       apiFromDate,
       apiSearchText,
       apiStatus,
-      effectiveApiLabels,
+      apiLabels,
       apiToDate,
       appBarContext.selectedRemoteNode,
+      workspaceQuery,
     ]
   );
   const {

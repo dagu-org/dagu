@@ -21,7 +21,11 @@ import {
   Tags as LabelsIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { withoutWorkspaceLabels, withWorkspaceLabel } from '@/lib/workspace';
+import {
+  withoutWorkspaceLabels,
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+} from '@/lib/workspace';
 import type { components } from '@/api/v1/schema';
 
 type DAGFile = components['schemas']['DAGFile'];
@@ -41,6 +45,13 @@ export function TemplateSelector({
 }: Props): React.ReactElement {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const workspaceQuery = useMemo(
+    () => workspaceSelectionQuery(appBarContext.workspaceSelection),
+    [appBarContext.workspaceSelection]
+  );
+  const workspaceScopeKey = workspaceSelectionKey(
+    appBarContext.workspaceSelection
+  );
 
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,18 +80,13 @@ export function TemplateSelector({
   const { data: labelsData } = useQuery(
     '/dags/labels',
     whenEnabled(isOpen && isLabelFilterOpen, {
-      params: { query: { remoteNode } },
+      params: { query: { remoteNode, ...workspaceQuery } },
     })
   );
   const availableLabels = useMemo(
     () => withoutWorkspaceLabels(labelsData?.labels ?? []),
     [labelsData?.labels]
   );
-  const apiLabels = useMemo(
-    () => withWorkspaceLabel(selectedLabels, selectedWorkspace),
-    [selectedLabels, selectedWorkspace]
-  );
-
   // The DAG list only stays live while the selector dropdown is open. The
   // closed trigger uses locally cached selection metadata instead.
   const { data, isLoading } = useQuery(
@@ -91,7 +97,10 @@ export function TemplateSelector({
           remoteNode,
           perPage: 50,
           ...(debouncedTerm ? { name: debouncedTerm } : {}),
-          ...(apiLabels.length > 0 ? { labels: apiLabels.join(',') } : {}),
+          ...(selectedLabels.length > 0
+            ? { labels: selectedLabels.join(',') }
+            : {}),
+          ...workspaceQuery,
         },
       },
     })
@@ -174,7 +183,7 @@ export function TemplateSelector({
     setSelectedLabels([]);
     setHighlightedIndex(-1);
     setSelectedDag(null);
-  }, [remoteNode]);
+  }, [remoteNode, workspaceScopeKey]);
 
   // Scroll highlighted item into view
   useEffect(() => {

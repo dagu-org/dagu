@@ -6,6 +6,11 @@ import { DAGNameInputModal } from '../../../../components/DAGNameInputModal';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient } from '../../../../hooks/api';
 import { defaultDAGSpec } from '../../../../lib/dagSpec';
+import {
+  isMutableWorkspaceSelection,
+  sanitizeWorkspaceSelection,
+} from '../../../../lib/workspace';
+import { WorkspaceScope } from '../../../../api/v1/schema';
 
 /**
  * CreateDAGModal displays a button that opens a modal to create a new DAG
@@ -18,8 +23,11 @@ function CreateDAGModal() {
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const workspaceSelection = sanitizeWorkspaceSelection(
+    appBarContext.workspaceSelection
+  );
 
-  if (!canWrite) {
+  if (!canWrite || !isMutableWorkspaceSelection(workspaceSelection)) {
     return null;
   }
 
@@ -41,9 +49,11 @@ function CreateDAGModal() {
         },
         body: {
           name,
-          spec: appBarContext.selectedWorkspace
-            ? defaultDAGSpec(appBarContext.selectedWorkspace)
-            : undefined,
+          spec:
+            workspaceSelection.scope === WorkspaceScope.workspace &&
+            workspaceSelection.workspace
+              ? defaultDAGSpec(workspaceSelection.workspace)
+              : undefined,
         },
       });
 

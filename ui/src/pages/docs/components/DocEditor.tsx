@@ -10,6 +10,11 @@ import { useClient, useQuery } from '@/hooks/api';
 import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
+import {
+  isMutableWorkspaceSelection,
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+} from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import {
@@ -42,9 +47,14 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
-  const workspaceQuery = selectedWorkspace || undefined;
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const workspaceQuery = useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
   const canWrite = useCanWrite();
+  const canEdit = canWrite && isMutableWorkspaceSelection(workspaceSelection);
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
@@ -58,8 +68,8 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
       params: {
         query: {
           remoteNode,
-          workspace: workspaceQuery,
           path: docPath,
+          ...workspaceQuery,
         },
       },
     },
@@ -81,7 +91,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     key: JSON.stringify({
       docPath,
       remoteNode,
-      workspace: selectedWorkspace || null,
+      workspace: workspaceScopeKey,
     }),
     serverContent,
   });
@@ -102,9 +112,9 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
       JSON.stringify({
         tabId,
         remoteNode,
-        workspace: selectedWorkspace || null,
+        workspace: workspaceScopeKey,
       }),
-    [remoteNode, selectedWorkspace, tabId]
+    [remoteNode, tabId, workspaceScopeKey]
   );
 
   // Restore drafts by document tab and selected scope.
@@ -157,12 +167,12 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   }, [currentValue, onContentChange]);
 
   const handleSave = useCallback(async () => {
-    if (isSaving || !hasUnsavedChangesRef.current) return;
+    if (isSaving || !canEdit || !hasUnsavedChangesRef.current) return;
     setIsSaving(true);
     try {
       const { error } = await client.PATCH('/docs/doc', {
         params: {
-          query: { remoteNode, workspace: workspaceQuery, path: docPath },
+          query: { remoteNode, path: docPath, ...workspaceQuery },
         },
         body: { content: currentValueRef.current ?? '' },
       });
@@ -183,6 +193,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     }
   }, [
     isSaving,
+    canEdit,
     client,
     remoteNode,
     workspaceQuery,
@@ -327,7 +338,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
         </div>
 
         {/* Discard button */}
-        {canWrite && hasUnsavedChanges && (
+        {canEdit && hasUnsavedChanges && (
           <button
             type="button"
             onClick={() => {
@@ -344,7 +355,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
         )}
 
         {/* Save button */}
-        {canWrite && (
+        {canEdit && (
           <button
             type="button"
             onClick={handleSave}
@@ -360,7 +371,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
             {isSaving ? 'Saving...' : 'Save'}
           </button>
         )}
-        {canWrite && onDeleteDoc && (
+        {canEdit && onDeleteDoc && (
           <button
             type="button"
             onClick={onDeleteDoc}
@@ -379,7 +390,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
           <MarkdownEditor
             value={currentValue ?? ''}
             onChange={(val) => setCurrentValue(val ?? '')}
-            readOnly={!canWrite}
+            readOnly={!canEdit}
           />
         ) : (
           <div className="h-full overflow-y-auto p-6">

@@ -173,7 +173,7 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		input.Role = &role
 	}
 	if request.Body.WorkspaceAccess != nil {
-		roleForAccess := auth.RoleViewer
+		var roleForAccess auth.Role
 		if input.Role != nil {
 			roleForAccess = *input.Role
 		} else {

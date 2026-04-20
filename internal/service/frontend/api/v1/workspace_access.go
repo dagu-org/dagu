@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/dagucloud/dagu/api/v1"
@@ -15,7 +16,14 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/workspace"
 )
+
+type workspaceScopeSelection struct {
+	scope     api.WorkspaceScope
+	workspace string
+	explicit  bool
+}
 
 func toAPIWorkspaceAccess(access *auth.WorkspaceAccess) api.WorkspaceAccess {
 	normalized := auth.NormalizeWorkspaceAccess(access)
@@ -65,6 +73,7 @@ func (a *API) parseAndValidateWorkspaceAccess(
 		return nil, badWorkspaceAccessError("Invalid workspace role")
 	}
 
+	var validationErr error
 	if !auth.NormalizeWorkspaceAccess(parsed).All {
 		if a.workspaceStore == nil {
 			return nil, workspaceStoreUnavailable()
@@ -77,18 +86,18 @@ func (a *API) parseAndValidateWorkspaceAccess(
 		for _, ws := range workspaces {
 			names[ws.Name] = struct{}{}
 		}
-		err = auth.ValidateWorkspaceAccess(role, parsed, func(name string) bool {
+		validationErr = auth.ValidateWorkspaceAccess(role, parsed, func(name string) bool {
 			_, ok := names[name]
 			return ok
 		})
 	} else {
-		err = auth.ValidateWorkspaceAccess(role, parsed, nil)
+		validationErr = auth.ValidateWorkspaceAccess(role, parsed, nil)
 	}
-	if err != nil {
-		if errors.Is(err, auth.ErrInvalidWorkspaceAccess) {
-			return nil, badWorkspaceAccessError(err.Error())
+	if validationErr != nil {
+		if errors.Is(validationErr, auth.ErrInvalidWorkspaceAccess) {
+			return nil, badWorkspaceAccessError(validationErr.Error())
 		}
-		return nil, err
+		return nil, validationErr
 	}
 
 	return auth.CloneWorkspaceAccess(parsed), nil
@@ -108,6 +117,79 @@ func workspaceResourceNotFound() *Error {
 		Message:    "Resource not found",
 		HTTPStatus: http.StatusNotFound,
 	}
+}
+
+func badWorkspaceScopeError(message string) *Error {
+	return &Error{
+		Code:       api.ErrorCodeBadRequest,
+		Message:    message,
+		HTTPStatus: http.StatusBadRequest,
+	}
+}
+
+func validateWorkspaceParam(name string) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+	if err := workspace.ValidateName(name); err != nil {
+		return "", badWorkspaceScopeError("invalid workspace: must contain only letters, numbers, underscores, and hyphens")
+	}
+	return name, nil
+}
+
+func parseWorkspaceScope(scopeParam *api.WorkspaceScope, workspaceParam *api.Workspace) (workspaceScopeSelection, error) {
+	workspaceName := ""
+	if workspaceParam != nil {
+		var err error
+		workspaceName, err = validateWorkspaceParam(string(*workspaceParam))
+		if err != nil {
+			return workspaceScopeSelection{}, err
+		}
+	}
+
+	if scopeParam == nil {
+		if workspaceName != "" {
+			return workspaceScopeSelection{
+				scope:     api.WorkspaceScopeWorkspace,
+				workspace: workspaceName,
+			}, nil
+		}
+		return workspaceScopeSelection{scope: api.WorkspaceScopeAccessible}, nil
+	}
+
+	selection := workspaceScopeSelection{scope: *scopeParam, explicit: true}
+	switch *scopeParam {
+	case api.WorkspaceScopeAccessible:
+		if workspaceName != "" {
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must be omitted when workspaceScope=accessible")
+		}
+	case api.WorkspaceScopeNone:
+		if workspaceName != "" {
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must be omitted when workspaceScope=none")
+		}
+	case api.WorkspaceScopeWorkspace:
+		if workspaceName == "" {
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace is required when workspaceScope=workspace")
+		}
+		selection.workspace = workspaceName
+	default:
+		return workspaceScopeSelection{}, badWorkspaceScopeError("invalid workspaceScope")
+	}
+	return selection, nil
+}
+
+func workspaceScopeParamsFromValues(params url.Values) (*api.WorkspaceScope, *api.Workspace) {
+	var scopeParam *api.WorkspaceScope
+	if raw := params.Get("workspaceScope"); raw != "" {
+		scope := api.WorkspaceScope(raw)
+		scopeParam = &scope
+	}
+	var workspaceParam *api.Workspace
+	if raw := params.Get("workspace"); raw != "" {
+		workspace := api.Workspace(raw)
+		workspaceParam = &workspace
+	}
+	return scopeParam, workspaceParam
 }
 
 func dagWorkspaceName(dag *core.DAG) string {
@@ -171,6 +253,36 @@ func (a *API) workspaceFilterForContext(ctx context.Context) *exec.WorkspaceFilt
 		Workspaces:        names,
 		IncludeUnlabelled: true,
 	}
+}
+
+func (a *API) workspaceFilterForSelection(ctx context.Context, selection workspaceScopeSelection) (*exec.WorkspaceFilter, error) {
+	switch selection.scope {
+	case api.WorkspaceScopeAccessible:
+		return a.workspaceFilterForContext(ctx), nil
+	case api.WorkspaceScopeNone:
+		return &exec.WorkspaceFilter{
+			Enabled:           true,
+			IncludeUnlabelled: true,
+		}, nil
+	case api.WorkspaceScopeWorkspace:
+		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
+			return nil, err
+		}
+		return &exec.WorkspaceFilter{
+			Enabled:    true,
+			Workspaces: []string{selection.workspace},
+		}, nil
+	default:
+		return nil, badWorkspaceScopeError("invalid workspaceScope")
+	}
+}
+
+func (a *API) workspaceFilterForParams(ctx context.Context, scopeParam *api.WorkspaceScope, workspaceParam *api.Workspace) (*exec.WorkspaceFilter, error) {
+	selection, err := parseWorkspaceScope(scopeParam, workspaceParam)
+	if err != nil {
+		return nil, err
+	}
+	return a.workspaceFilterForSelection(ctx, selection)
 }
 
 func (a *API) effectiveRoleForWorkspace(ctx context.Context, workspaceName string) (auth.Role, bool, error) {

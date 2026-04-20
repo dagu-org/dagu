@@ -11,7 +11,10 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
-import { workspaceLabel } from '../../lib/workspace';
+import {
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+} from '../../lib/workspace';
 import Title from '../../ui/Title';
 
 type SearchScope = 'dags' | 'docs';
@@ -40,7 +43,7 @@ type SearchFeedPanelProps = {
 type SearchFeedProps = {
   query: string;
   remoteNode: string;
-  selectedWorkspace: string;
+  workspaceQuery: ReturnType<typeof workspaceSelectionQuery>;
 };
 
 function parseScope(value: string | null): SearchScope {
@@ -194,13 +197,8 @@ function SearchFeedPanel({
   );
 }
 
-function DAGSearchFeed({
-  query,
-  remoteNode,
-  selectedWorkspace,
-}: SearchFeedProps) {
+function DAGSearchFeed({ query, remoteNode, workspaceQuery }: SearchFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const label = workspaceLabel(selectedWorkspace);
   const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
     '/search/dags',
     (pageIndex, previousPage) => {
@@ -215,10 +213,9 @@ function DAGSearchFeed({
         params: {
           query: {
             remoteNode,
-            workspace: selectedWorkspace || undefined,
             q: query,
-            labels: label,
             cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
+            ...workspaceQuery,
           },
         },
       };
@@ -279,11 +276,7 @@ function DAGSearchFeed({
   );
 }
 
-function DocSearchFeed({
-  query,
-  remoteNode,
-  selectedWorkspace,
-}: SearchFeedProps) {
+function DocSearchFeed({ query, remoteNode, workspaceQuery }: SearchFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
     '/search/docs',
@@ -299,9 +292,9 @@ function DocSearchFeed({
         params: {
           query: {
             remoteNode,
-            workspace: selectedWorkspace || undefined,
             q: query,
             cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
+            ...workspaceQuery,
           },
         },
       };
@@ -374,10 +367,15 @@ function Search() {
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const workspaceQuery = useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = JSON.stringify({
     remoteNode: remoteKey,
-    workspace: selectedWorkspace || null,
+    workspace: workspaceScopeKey,
   });
   const inputRef = useRef<HTMLInputElement>(null);
   const hydratedScopeRef = useRef<string | null>(null);
@@ -518,13 +516,13 @@ function Search() {
             <DocSearchFeed
               query={submittedQuery}
               remoteNode={remoteNode}
-              selectedWorkspace={selectedWorkspace}
+              workspaceQuery={workspaceQuery}
             />
           ) : (
             <DAGSearchFeed
               query={submittedQuery}
               remoteNode={remoteNode}
-              selectedWorkspace={selectedWorkspace}
+              workspaceQuery={workspaceQuery}
             />
           )}
         </div>

@@ -17,6 +17,8 @@ interface DAGRunsListParams {
   name?: string;
   dagRunId?: string;
   labels?: string;
+  workspace?: components['parameters']['Workspace'];
+  workspaceScope?: components['parameters']['WorkspaceScope'];
 }
 
 export function useDAGRunsListSSE(

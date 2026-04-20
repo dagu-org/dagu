@@ -1,5 +1,6 @@
 import React from 'react';
 import type { WorkspaceResponse } from './ConfigContext';
+import type { WorkspaceSelection } from '@/lib/workspace';
 
 type AppBarContextType = {
   title: string;
@@ -10,6 +11,8 @@ type AppBarContextType = {
   selectRemoteNode(val: string): void;
   workspaces?: WorkspaceResponse[];
   workspaceError?: Error | null;
+  workspaceSelection?: WorkspaceSelection;
+  selectWorkspaceScope?(selection: WorkspaceSelection): void;
   selectedWorkspace?: string;
   selectWorkspace?(val: string): void;
   createWorkspace?(name: string): Promise<void>;
@@ -25,6 +28,10 @@ export const AppBarContext = React.createContext<AppBarContextType>({
   remoteNodes: [],
   workspaces: [],
   workspaceError: null,
+  workspaceSelection: undefined,
+  selectWorkspaceScope: () => {
+    return;
+  },
   setRemoteNodes: () => {
     return;
   },

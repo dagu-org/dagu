@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 	"strings"
 
 	api "github.com/dagucloud/dagu/api/v1"
@@ -61,20 +60,8 @@ func optionalString(value string) *string {
 	return ptrOf(value)
 }
 
-func scopedDAGSearchLabels(labelsParam *string, workspaceParam *string) ([]string, error) {
-	labels := parseCommaSeparatedLabels(labelsParam)
-	workspaceName, err := validateDocWorkspace(workspaceParam)
-	if err != nil {
-		return nil, err
-	}
-	if workspaceName != "" {
-		workspaceLabel := strings.ToLower("workspace=" + workspaceName)
-		if slices.Contains(labels, workspaceLabel) {
-			return labels, nil
-		}
-		labels = append(labels, workspaceLabel)
-	}
-	return labels, nil
+func scopedDAGSearchLabels(labelsParam *string) []string {
+	return parseCommaSeparatedLabels(labelsParam)
 }
 
 func toSearchMatchItems(matches []*exec.Match) []api.SearchMatchItem {
@@ -154,7 +141,8 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 	if err != nil {
 		return nil, err
 	}
-	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	labels := scopedDAGSearchLabels(request.Params.Labels)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +153,7 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 		Query:           query,
 		MatchLimit:      searchPreviewMatchesLimit,
 		Labels:          labels,
-		WorkspaceFilter: a.workspaceFilterForContext(ctx),
+		WorkspaceFilter: workspaceFilter,
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {
@@ -191,16 +179,22 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 	if err != nil {
 		return nil, err
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	selection, err := parseWorkspaceScope(request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.requireWorkspaceVisible(ctx, workspaceName); err != nil {
-		return nil, err
+	if selection.scope == api.WorkspaceScopeWorkspace {
+		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
+			return nil, err
+		}
 	}
-	visibility, err := a.docWorkspaceVisibility(ctx)
+	visibility, err := a.docWorkspaceVisibilityForSelection(ctx, selection)
 	if err != nil {
 		return nil, err
+	}
+	workspaceName := ""
+	if selection.scope == api.WorkspaceScopeWorkspace {
+		workspaceName = selection.workspace
 	}
 
 	result, err := a.docStore.SearchCursor(ctx, agent.SearchDocsOptions{
@@ -236,7 +230,8 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 	if err != nil {
 		return nil, err
 	}
-	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	labels := scopedDAGSearchLabels(request.Params.Labels)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +241,7 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 		Limit:           normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
 		Query:           query,
 		Labels:          labels,
-		WorkspaceFilter: a.workspaceFilterForContext(ctx),
+		WorkspaceFilter: workspaceFilter,
 	})
 	if err != nil {
 		switch {
@@ -275,18 +270,24 @@ func (a *API) SearchDocMatches(ctx context.Context, request api.SearchDocMatches
 	if err := validateDocPath(request.Params.Path); err != nil {
 		return nil, err
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	selection, err := parseWorkspaceScope(request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.requireWorkspaceVisible(ctx, workspaceName); err != nil {
-		return nil, err
-	}
-	if workspaceName == "" {
-		visibility, err := a.docWorkspaceVisibility(ctx)
-		if err != nil {
+	if selection.scope == api.WorkspaceScopeWorkspace {
+		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
 			return nil, err
 		}
+	}
+	visibility, err := a.docWorkspaceVisibilityForSelection(ctx, selection)
+	if err != nil {
+		return nil, err
+	}
+	workspaceName := ""
+	if selection.scope == api.WorkspaceScopeWorkspace {
+		workspaceName = selection.workspace
+	}
+	if workspaceName == "" && !visibility.all {
 		if !visibility.visible(request.Params.Path) {
 			return nil, errDocNotFound
 		}

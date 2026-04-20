@@ -772,6 +772,8 @@ paths:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/Workspace"
         - name: "name"
           in: "query"
           required: false
@@ -1571,6 +1573,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
@@ -1615,6 +1618,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
@@ -1654,6 +1658,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
@@ -1704,6 +1709,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "path"
           in: "query"
@@ -1754,6 +1760,8 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
           description: "A successful response"
@@ -1778,6 +1786,8 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
           description: "A successful response"
@@ -1807,6 +1817,8 @@ paths:
         - $ref: "#/components/parameters/DAGRunListLimit"
         - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/Workspace"
         - name: "name"
           in: "query"
           required: false
@@ -2016,6 +2028,8 @@ paths:
         - $ref: "#/components/parameters/DAGRunListLimit"
         - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
           description: "A successful response"
@@ -6300,6 +6314,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
@@ -6351,6 +6366,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
@@ -6396,6 +6412,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: q
           in: query
@@ -6432,6 +6449,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6467,6 +6485,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6511,6 +6530,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6543,6 +6563,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6594,6 +6615,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
@@ -6977,11 +6999,19 @@ components:
     Workspace:
       name: workspace
       in: query
-      description: selected workspace scope
+      description: workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted
       required: false
       schema:
         type: string
         pattern: "^[A-Za-z0-9_-]+$"
+
+    WorkspaceScope:
+      name: workspaceScope
+      in: query
+      description: "Explicit workspace scope: accessible data, no-workspace data, or one named workspace"
+      required: false
+      schema:
+        $ref: "#/components/schemas/WorkspaceScope"
 
     SearchCursor:
       name: cursor
@@ -9535,6 +9565,14 @@ components:
       required:
         - all
         - grants
+
+    WorkspaceScope:
+      type: string
+      description: "Workspace scope selector for list and search APIs"
+      enum:
+        - accessible
+        - none
+        - workspace
 
     SetupRequest:
       type: object

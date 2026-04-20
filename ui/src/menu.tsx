@@ -493,6 +493,8 @@ export const mainListItems = React.forwardRef<
               selectedRemoteNode,
               selectRemoteNode,
               workspaces,
+              workspaceSelection,
+              selectWorkspaceScope,
               selectedWorkspace,
               selectWorkspace,
               createWorkspace,
@@ -504,6 +506,8 @@ export const mainListItems = React.forwardRef<
               <div className="space-y-2">
                 <WorkspaceSelector
                   workspaces={workspaces ?? []}
+                  workspaceSelection={workspaceSelection}
+                  onSelectScope={selectWorkspaceScope}
                   selectedWorkspace={selectedWorkspace ?? ''}
                   onSelect={selectWorkspace ?? (() => undefined)}
                   onCreate={(name) => void createWorkspace?.(name)}
