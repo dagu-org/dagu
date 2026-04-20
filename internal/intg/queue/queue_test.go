@@ -6,8 +6,10 @@ package queue_test
 import (
 	"fmt"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,14 +79,45 @@ name: sleep-dag
 queue: global-queue
 steps:
   - name: sleep
-    command: %s
-`, test.ShellQuote(test.Sleep(sleepDuration))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
+    %s
+`, directSleepStepYAML(t, sleepDuration)), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
 		Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(35 * time.Second)
 	f.WaitForAllStatuses(core.Succeeded, 20*time.Second)
 	f.Stop()
 	f.AssertConcurrent(maxDiff)
+}
+
+func directSleepStepYAML(t *testing.T, d time.Duration) string {
+	t.Helper()
+
+	if runtime.GOOS == "windows" {
+		commandPath, err := osexec.LookPath("ping")
+		require.NoError(t, err)
+
+		seconds := int((d + time.Second - 1) / time.Second)
+		if seconds < 1 {
+			seconds = 1
+		}
+
+		return fmt.Sprintf(
+			"exec:\n      command: %s\n      args: [%s, %s, %s]",
+			strconv.Quote(commandPath),
+			strconv.Quote("-n"),
+			strconv.Quote(strconv.Itoa(seconds+1)),
+			strconv.Quote("127.0.0.1"),
+		)
+	}
+
+	commandPath, err := osexec.LookPath("sleep")
+	require.NoError(t, err)
+
+	return fmt.Sprintf(
+		"exec:\n      command: %s\n      args: [%s]",
+		strconv.Quote(commandPath),
+		strconv.Quote(strconv.FormatFloat(d.Seconds(), 'f', -1, 64)),
+	)
 }
 
 func TestLocalQueueFIFOProcessing(t *testing.T) {
