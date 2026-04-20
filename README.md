@@ -605,21 +605,26 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development workflow and code stand
   </a>
 
   <h3>Supporters</h3>
-  <a href="https://github.com/disizmj">
-    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@disizmj" style="margin: 5px;">
-  </a>
-  <a href="https://github.com/Arvintian">
-    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@Arvintian" style="margin: 5px;">
-  </a>
-  <a href="https://github.com/yurivish">
-    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@yurivish" style="margin: 5px;">
-  </a>
-  <a href="https://github.com/jayjoshi64">
-    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@jayjoshi64" style="margin: 5px;">
-  </a>
-  <a href="https://github.com/alangrafu">
-    <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Falangrafu.png&w=128&h=128&fit=cover&mask=circle" width="50" height="50" alt="@alangrafu" style="margin: 5px;">
-  </a>
+  <p align="center">
+    <a href="https://github.com/gyger">
+      <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fgyger.png&w=128&h=128&fit=cover&mask=circle" width="50" alt="@gyger">
+    </a>
+    <a href="https://github.com/disizmj">
+      <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdisizmj.png&w=128&h=128&fit=cover&mask=circle" width="50" alt="@disizmj">
+    </a>
+    <a href="https://github.com/Arvintian">
+      <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="50" alt="@Arvintian">
+    </a>
+    <a href="https://github.com/yurivish">
+      <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyurivish.png&w=128&h=128&fit=cover&mask=circle" width="50" alt="@yurivish">
+    </a>
+    <a href="https://github.com/jayjoshi64">
+      <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjayjoshi64.png&w=128&h=128&fit=cover&mask=circle" width="50" alt="@jayjoshi64">
+    </a>
+    <a href="https://github.com/alangrafu">
+      <img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Falangrafu.png&w=128&h=128&fit=cover&mask=circle" width="50" alt="@alangrafu">
+    </a>
+  </p>
 
   <br/><br/>
 

@@ -23,7 +23,7 @@ import { components, NodeStatus, Status, Stream } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';
-import { toMermaidNodeId } from '../../../lib/utils';
+import { cn, toMermaidNodeId } from '../../../lib/utils';
 import BorderedBox from '../../../ui/BorderedBox';
 import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { DAGContext } from '../contexts/DAGContext';
@@ -44,9 +44,11 @@ type Props = {
   dagRun: components['schemas']['DAGRunDetails'];
   fileName: string;
   artifactEnabled?: boolean;
+  initialTab?: StatusTab;
+  fillHeight?: boolean;
 };
 
-type StatusTab =
+export type StatusTab =
   | 'status'
   | 'timeline'
   | 'outputs'
@@ -64,13 +66,19 @@ function isSubDAGRun(dagRun: components['schemas']['DAGRunDetails']): boolean {
   );
 }
 
-function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
+function DAGStatus({
+  dagRun,
+  fileName,
+  artifactEnabled = false,
+  initialTab = 'status',
+  fillHeight = false,
+}: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
   const navigate = useNavigate();
   const { showError } = useErrorModal();
   const [modal, setModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<StatusTab>('status');
+  const [activeTab, setActiveTab] = useState<StatusTab>(initialTab);
 
   // Flowchart direction preference stored in cookies
   const [cookie, setCookie] = useCookies(['flowchart']);
@@ -327,6 +335,10 @@ function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
   const hasWaitingSteps = waitingStepCount > 0;
   const hasArtifacts = artifactEnabled || !!dagRun.artifactsAvailable;
 
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [dagRun.dagRunId, initialTab]);
+
   // Reset to status tab if selected tab is not available
   useEffect(() => {
     if (activeTab === 'timeline' && !showTimeline) {
@@ -350,10 +362,19 @@ function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
     }
   }, [hasWaitingSteps]);
 
+  const scrollPaneClassName = fillHeight
+    ? 'min-h-0 flex-1 overflow-auto pr-1'
+    : '';
+
   return (
-    <div className="space-y-4">
+    <div
+      className={cn(
+        'space-y-4',
+        fillHeight && 'flex h-full min-h-0 flex-col gap-4 space-y-0'
+      )}
+    >
       {/* Status Detail Tabs */}
-      <Tabs className="whitespace-nowrap">
+      <Tabs className={cn('whitespace-nowrap', fillHeight && 'shrink-0')}>
         <Tab
           isActive={activeTab === 'status'}
           onClick={() => setActiveTab('status')}
@@ -425,7 +446,7 @@ function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
 
       {/* Status Tab Content */}
       {activeTab === 'status' && (
-        <div className="space-y-6">
+        <div className={cn('space-y-6', scrollPaneClassName)}>
           {/* DAG Graph Visualization */}
           {dagRun.nodes && dagRun.nodes.length > 0 && (
             <div className="flex flex-col">
@@ -523,36 +544,55 @@ function DAGStatus({ dagRun, fileName, artifactEnabled = false }: Props) {
 
       {/* Approval Tab Content */}
       {activeTab === 'approval' && hasWaitingSteps && (
-        <ApprovalTab dagRun={dagRun} dagName={fileName} />
+        <div className={scrollPaneClassName}>
+          <ApprovalTab dagRun={dagRun} dagName={fileName} />
+        </div>
       )}
 
       {/* Timeline Tab Content */}
       {activeTab === 'timeline' && showTimeline && (
-        <TimelineChart status={dagRun} />
+        <div className={scrollPaneClassName}>
+          <TimelineChart status={dagRun} />
+        </div>
       )}
 
       {/* Outputs Tab Content */}
       {activeTab === 'outputs' && (
-        <DAGRunOutputs dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
+        <div className={scrollPaneClassName}>
+          <DAGRunOutputs dagName={dagRun.name} dagRunId={dagRun.dagRunId} />
+        </div>
       )}
 
       {activeTab === 'artifacts' && hasArtifacts && (
-        <ArtifactsTab dagRun={dagRun} artifactEnabled={artifactEnabled} />
+        <ArtifactsTab
+          dagRun={dagRun}
+          artifactEnabled={artifactEnabled}
+          className={fillHeight ? 'min-h-0 flex-1' : undefined}
+          fillHeight={fillHeight}
+        />
       )}
 
       {/* Chat Tab Content */}
-      {activeTab === 'chat' && <ChatHistoryTab dagRun={dagRun} />}
+      {activeTab === 'chat' && (
+        <div className={scrollPaneClassName}>
+          <ChatHistoryTab dagRun={dagRun} />
+        </div>
+      )}
 
       {/* Spec Tab Content */}
       {activeTab === 'spec' && (
-        <DAGSpecReadOnly
-          dagName={isSubDAGRun(dagRun) ? dagRun.rootDAGRunName : dagRun.name}
-          dagRunId={isSubDAGRun(dagRun) ? dagRun.rootDAGRunId : dagRun.dagRunId}
-          subDAGRunId={isSubDAGRun(dagRun) ? dagRun.dagRunId : undefined}
-          sourceFileName={
-            isSubDAGRun(dagRun) ? undefined : dagRun.sourceFileName
-          }
-        />
+        <div className={scrollPaneClassName}>
+          <DAGSpecReadOnly
+            dagName={isSubDAGRun(dagRun) ? dagRun.rootDAGRunName : dagRun.name}
+            dagRunId={
+              isSubDAGRun(dagRun) ? dagRun.rootDAGRunId : dagRun.dagRunId
+            }
+            subDAGRunId={isSubDAGRun(dagRun) ? dagRun.dagRunId : undefined}
+            sourceFileName={
+              isSubDAGRun(dagRun) ? undefined : dagRun.sourceFileName
+            }
+          />
+        </div>
       )}
 
       <StatusUpdateModal

@@ -33,11 +33,13 @@ function getInitialTab(): ColumnKey {
 interface Props {
   columns: KanbanColumns;
   onCardClick: (run: DAGRunSummary) => void;
+  onArtifactsClick: (run: DAGRunSummary) => void;
 }
 
 export function MobileKanbanBoard({
   columns,
   onCardClick,
+  onArtifactsClick,
 }: Props): React.ReactElement {
   const [activeTab, setActiveTab] = useState<ColumnKey>(getInitialTab);
 
@@ -74,6 +76,7 @@ export function MobileKanbanBoard({
           title={COLUMN_LABELS[activeTab]}
           column={columns[activeTab]}
           onCardClick={onCardClick}
+          onArtifactsClick={onArtifactsClick}
           hideHeader
         />
       </div>

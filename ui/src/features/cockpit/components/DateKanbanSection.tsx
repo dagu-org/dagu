@@ -11,6 +11,7 @@ interface Props {
   todayStr: string;
   selectedWorkspace: string;
   onCardClick: (run: DAGRunSummary) => void;
+  onArtifactsClick: (run: DAGRunSummary) => void;
 }
 
 function formatDateHeader(date: string): string {
@@ -22,6 +23,7 @@ export function DateKanbanSection({
   todayStr,
   selectedWorkspace,
   onCardClick,
+  onArtifactsClick,
 }: Props): React.ReactElement {
   const yesterdayStr = useMemo(
     () => dayjs(todayStr).subtract(1, 'day').format('YYYY-MM-DD'),
@@ -44,10 +46,14 @@ export function DateKanbanSection({
         </h2>
       </div>
       {isLoading ? (
-        <div className="px-1 py-3 text-xs text-muted-foreground">Loading runs...</div>
+        <div className="px-1 py-3 text-xs text-muted-foreground">
+          Loading runs...
+        </div>
       ) : error ? (
         <div className="px-1 py-3 flex items-center gap-3 text-xs">
-          <span className="text-destructive">{error.message || 'Failed to load runs'}</span>
+          <span className="text-destructive">
+            {error.message || 'Failed to load runs'}
+          </span>
           <button
             type="button"
             onClick={() => void retry()}
@@ -59,7 +65,11 @@ export function DateKanbanSection({
       ) : isEmpty ? (
         <div className="px-1 py-3 text-xs text-muted-foreground">No runs</div>
       ) : (
-        <KanbanBoard columns={columns} onCardClick={onCardClick} />
+        <KanbanBoard
+          columns={columns}
+          onCardClick={onCardClick}
+          onArtifactsClick={onArtifactsClick}
+        />
       )}
     </div>
   );

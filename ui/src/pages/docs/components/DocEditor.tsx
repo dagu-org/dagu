@@ -2,12 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
-import { MermaidBlock } from '@/components/ui/mermaid-block';
+import { DocMarkdownPreview } from '@/components/ui/doc-markdown-preview';
 import { useSimpleToast } from '@/components/ui/simple-toast';
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import './DocPreview.css';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient, useQuery } from '@/hooks/api';
@@ -15,7 +11,6 @@ import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
-import { slugifyHeading } from '@/lib/text-utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import {
   Check,
@@ -28,16 +23,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
-
-function headingId(children: React.ReactNode): string {
-  const text =
-    typeof children === 'string'
-      ? children
-      : Array.isArray(children)
-        ? children.map((c) => (typeof c === 'string' ? c : '')).join('')
-        : String(children ?? '');
-  return slugifyHeading(text);
-}
 
 type Props = {
   tabId: string;
@@ -391,46 +376,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
           />
         ) : (
           <div className="h-full overflow-y-auto p-6">
-            <div className="doc-preview max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  h1: ({ children }) => (
-                    <h1 id={headingId(children)}>{children}</h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 id={headingId(children)}>{children}</h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 id={headingId(children)}>{children}</h3>
-                  ),
-                  h4: ({ children }) => (
-                    <h4 id={headingId(children)}>{children}</h4>
-                  ),
-                  h5: ({ children }) => (
-                    <h5 id={headingId(children)}>{children}</h5>
-                  ),
-                  h6: ({ children }) => (
-                    <h6 id={headingId(children)}>{children}</h6>
-                  ),
-                  code({ className: codeClassName, children }) {
-                    if (codeClassName === 'language-mermaid') {
-                      return <MermaidBlock code={String(children)} />;
-                    }
-                    return <code className={codeClassName}>{children}</code>;
-                  },
-                  pre({ children }) {
-                    const child = children as React.ReactElement;
-                    if (child?.type === MermaidBlock) {
-                      return <>{children}</>;
-                    }
-                    return <pre>{children}</pre>;
-                  },
-                }}
-              >
-                {currentValue}
-              </ReactMarkdown>
-            </div>
+            <DocMarkdownPreview content={currentValue} />
           </div>
         )}
       </div>
