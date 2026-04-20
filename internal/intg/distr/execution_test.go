@@ -535,6 +535,7 @@ steps:
 		f.startScheduler(30 * time.Second)
 
 		status := f.waitForStatus(core.Succeeded, waitTimeout)
+		f.waitForRunReleasedFromWorkers(status.DAGRunID, waitTimeout)
 		require.Eventually(t, func() bool {
 			latest, err := f.latestStoredStatus()
 			if err != nil || latest.Status != core.Succeeded || len(latest.Nodes) != 3 {

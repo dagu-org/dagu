@@ -590,6 +590,32 @@ func (f *testFixture) waitForStatusIn(expected []core.Status, timeout time.Durat
 	return status
 }
 
+func (f *testFixture) waitForRunReleasedFromWorkers(dagRunID string, timeout time.Duration) {
+	f.t.Helper()
+	timeout = distrTestTimeout(timeout)
+	var schedulerErr error
+	require.Eventually(f.t, func() bool {
+		schedulerErr = f.pollSchedulerErr()
+		if schedulerErr != nil {
+			return true
+		}
+
+		workers, err := f.coordinatorClient.GetWorkers(f.coord.Context)
+		if err != nil {
+			return false
+		}
+		for _, worker := range workers {
+			for _, task := range worker.RunningTasks {
+				if task != nil && task.DagRunId == dagRunID {
+					return false
+				}
+			}
+		}
+		return true
+	}, timeout, 100*time.Millisecond, "DAG run %s should be released from workers", dagRunID)
+	require.NoError(f.t, schedulerErr)
+}
+
 func (f *testFixture) pollSchedulerErr() error {
 	if f.schedulerErrSet {
 		return f.schedulerErr
