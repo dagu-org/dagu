@@ -5219,6 +5219,7 @@ export interface components {
             iconUrl?: string;
             description?: string;
             goal?: string;
+            clonedFrom?: string;
             standingInstruction?: string;
             schedule?: string[];
             tags?: string[];
@@ -5321,6 +5322,7 @@ export interface components {
             iconUrl?: string;
             description?: string;
             goal?: string;
+            clonedFrom?: string;
             tags?: string[];
             instruction?: string;
             state: components["schemas"]["AutomataLifecycleState"];

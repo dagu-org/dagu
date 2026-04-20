@@ -52,6 +52,8 @@ func validateDefinitionNode(node *yaml.Node) error {
 		"description":          {},
 		"purpose":              {},
 		"goal":                 {},
+		"clonedFrom":           {canonical: "cloned_from"},
+		"cloned_from":          {canonical: "cloned_from"},
 		"standingInstruction":  {canonical: "standing_instruction"},
 		"standing_instruction": {canonical: "standing_instruction"},
 		"tags": {
@@ -73,6 +75,71 @@ func validateDefinitionNode(node *yaml.Node) error {
 		},
 		"disabled": {},
 	})
+}
+
+func annotateClonedFromInSpec(spec, sourceName string) (string, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(spec), &doc); err != nil {
+		return "", fmt.Errorf("parse yaml: %w", err)
+	}
+	if len(doc.Content) == 0 || isNullNode(doc.Content[0]) {
+		return "", errors.New("definition is required")
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return "", errors.New("definition must be an object")
+	}
+	setMappingScalar(root, "cloned_from", sourceName, "clonedFrom")
+	data, err := yaml.Marshal(&doc)
+	if err != nil {
+		return "", fmt.Errorf("marshal yaml: %w", err)
+	}
+	return string(data), nil
+}
+
+func setMappingScalar(node *yaml.Node, key, value string, aliases ...string) {
+	matchingKeys := map[string]struct{}{key: {}}
+	for _, alias := range aliases {
+		matchingKeys[alias] = struct{}{}
+	}
+
+	insertAt := -1
+	nextContent := node.Content[:0]
+	for i := 0; i < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		if _, ok := matchingKeys[strings.TrimSpace(keyNode.Value)]; ok {
+			if insertAt == -1 {
+				insertAt = len(nextContent)
+			}
+			continue
+		}
+		nextContent = append(nextContent, keyNode, node.Content[i+1])
+	}
+	node.Content = nextContent
+
+	keyNode := &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!str",
+		Value: key,
+	}
+	valueNode := &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!str",
+		Value: value,
+	}
+	if insertAt == -1 {
+		insertAt = 0
+		for i := 0; i < len(node.Content); i += 2 {
+			if strings.TrimSpace(node.Content[i].Value) == "kind" {
+				insertAt = i + 2
+				break
+			}
+		}
+	}
+	node.Content = append(node.Content, nil, nil)
+	copy(node.Content[insertAt+2:], node.Content[insertAt:])
+	node.Content[insertAt] = keyNode
+	node.Content[insertAt+1] = valueNode
 }
 
 func validateScheduleNode(node *yaml.Node, path string) error {

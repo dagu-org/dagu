@@ -803,6 +803,9 @@ func TestServiceRenameMovesMemory(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, soul.Content, "Be precise.")
 	require.Contains(t, soul.Path, "/automata/software_ops/SOUL.md")
+	renamedSpec, err := svc.GetSpec(ctx, "software_ops")
+	require.NoError(t, err)
+	require.NotContains(t, renamedSpec, "cloned_from:")
 }
 
 func TestServiceDuplicateCopiesMemory(t *testing.T) {
@@ -820,6 +823,13 @@ func TestServiceDuplicateCopiesMemory(t *testing.T) {
 	err = svc.Duplicate(ctx, "software_dev", DuplicateRequest{NewName: "software_ops"})
 	require.NoError(t, err)
 
+	duplicateDef, err := svc.GetDefinition(ctx, "software_ops")
+	require.NoError(t, err)
+	require.Equal(t, "software_dev", duplicateDef.ClonedFrom)
+	duplicateSpec, err := svc.GetSpec(ctx, "software_ops")
+	require.NoError(t, err)
+	require.Contains(t, duplicateSpec, "cloned_from: software_dev")
+
 	original, err := svc.GetMemory(ctx, "software_dev")
 	require.NoError(t, err)
 	duplicate, err := svc.GetMemory(ctx, "software_ops")
@@ -830,6 +840,12 @@ func TestServiceDuplicateCopiesMemory(t *testing.T) {
 	duplicateSoul, err := svc.GetDocument(ctx, "software_ops", DocumentSoul)
 	require.NoError(t, err)
 	require.Equal(t, originalSoul.Content, duplicateSoul.Content)
+
+	err = svc.Duplicate(ctx, "software_ops", DuplicateRequest{NewName: "software_ops_next"})
+	require.NoError(t, err)
+	secondDuplicateDef, err := svc.GetDefinition(ctx, "software_ops_next")
+	require.NoError(t, err)
+	require.Equal(t, "software_ops", secondDuplicateDef.ClonedFrom)
 }
 
 func TestServiceDeleteRemovesMemory(t *testing.T) {

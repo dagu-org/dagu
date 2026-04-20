@@ -24,6 +24,34 @@ import {
 } from '@/features/automata/detail-utils';
 
 type MutationCallback = (() => void | Promise<void>) | undefined;
+const CLONE_NAME_SUFFIX_LENGTH = 6;
+const CLONE_NAME_SUFFIX_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+function randomCloneNameSuffix(): string {
+  const cryptoObj = globalThis.crypto;
+  const values =
+    cryptoObj && 'getRandomValues' in cryptoObj
+      ? cryptoObj.getRandomValues(new Uint8Array(CLONE_NAME_SUFFIX_LENGTH))
+      : undefined;
+
+  if (values) {
+    return Array.from(
+      values,
+      (value) =>
+        CLONE_NAME_SUFFIX_ALPHABET[value % CLONE_NAME_SUFFIX_ALPHABET.length]
+    ).join('');
+  }
+
+  return Array.from({ length: CLONE_NAME_SUFFIX_LENGTH }, () => {
+    const index = Math.floor(Math.random() * CLONE_NAME_SUFFIX_ALPHABET.length);
+    return CLONE_NAME_SUFFIX_ALPHABET[index];
+  }).join('');
+}
+
+function buildDefaultCloneName(name: string): string {
+  return `${name}_${randomCloneNameSuffix()}`;
+}
+
 type AutomataConfirmationState =
   | {
       kind: 'deleteTask';
@@ -561,38 +589,32 @@ export function useAutomataDetailController({
     refreshAfterAction,
   ]);
 
-  const onDuplicate = React.useCallback(async () => {
+  const onClone = React.useCallback(async () => {
     if (!name || !detail || busyAction) return;
-    const nextName = window.prompt(
-      'Enter the new name for the duplicate Automata.',
-      `${detail.definition.name}-copy`
-    );
-    if (nextName == null) return;
-    const trimmed = nextName.trim();
-    if (!trimmed) return;
+    const clonedName = buildDefaultCloneName(detail.definition.name);
     setActionError('');
-    setBusyAction('duplicate');
+    setBusyAction('clone');
     try {
       const { error: apiError } = await client.POST(
         '/automata/{name}/duplicate',
         {
           params: { path: { name } },
-          body: { newName: trimmed },
+          body: { newName: clonedName },
         }
       );
       if (apiError) {
-        throw new Error(apiError.message || 'Failed to duplicate automata');
+        throw new Error(apiError.message || 'Failed to clone automata');
       }
       await refreshAfterAction(() =>
         onSelectedNameChange
-          ? onSelectedNameChange(trimmed)
+          ? onSelectedNameChange(clonedName)
           : navigate(
-              `/cockpit?mode=automata&automata=${encodeURIComponent(trimmed)}`
+              `/cockpit?mode=automata&automata=${encodeURIComponent(clonedName)}`
             )
       );
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : 'Failed to duplicate automata'
+        err instanceof Error ? err.message : 'Failed to clone automata'
       );
     } finally {
       setBusyAction(null);
@@ -899,7 +921,7 @@ export function useAutomataDetailController({
     onSendOperatorMessage,
     onPauseResume,
     onRename,
-    onDuplicate,
+    onClone,
     onResetState,
     onDelete,
     dismissConfirmation,

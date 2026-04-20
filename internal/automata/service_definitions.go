@@ -48,6 +48,7 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 		return errors.New("definition is required")
 	}
 	def.normalizeGoal()
+	def.ClonedFrom = strings.TrimSpace(def.ClonedFrom)
 	def.Nickname = strings.TrimSpace(def.Nickname)
 	def.IconURL = strings.TrimSpace(def.IconURL)
 	def.StandingInstruction = strings.TrimSpace(def.StandingInstruction)
@@ -59,6 +60,11 @@ func (s *Service) validateDefinition(ctx context.Context, def *Definition) error
 	}
 	if err := validateName(def.Name); err != nil {
 		return err
+	}
+	if def.ClonedFrom != "" {
+		if err := validateName(def.ClonedFrom); err != nil {
+			return fmt.Errorf("invalid cloned_from: %w", err)
+		}
 	}
 	if err := validateNickname(def.Nickname); err != nil {
 		return err
@@ -295,6 +301,10 @@ func (s *Service) Duplicate(ctx context.Context, name string, req DuplicateReque
 	if err != nil {
 		return err
 	}
+	spec, err = annotateClonedFromInSpec(spec, name)
+	if err != nil {
+		return err
+	}
 	state, err := s.loadState(ctx, name)
 	if err != nil {
 		return err
@@ -348,6 +358,7 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			Description:   def.Description,
 			Purpose:       def.Purpose,
 			Goal:          def.Goal,
+			ClonedFrom:    def.ClonedFrom,
 			Tags:          append([]string(nil), def.Tags...),
 			Instruction:   state.Instruction,
 			State:         state.State,

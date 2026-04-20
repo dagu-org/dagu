@@ -112,11 +112,11 @@ export function AutomataDetailsModal({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => void detailController.onDuplicate()}
+                    onClick={() => void detailController.onClone()}
                     disabled={!!detailController.busyAction}
                   >
                     <Copy className="h-4 w-4" />
-                    Duplicate
+                    Clone
                   </Button>
                   <Button
                     variant="outline"

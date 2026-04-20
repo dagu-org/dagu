@@ -21,6 +21,7 @@ func TestToAPIAutomataSummaryIncludesDerivedStatusFields(t *testing.T) {
 		Nickname:      "Queue Butler",
 		IconURL:       "https://cdn.example.com/queue-butler.png",
 		Goal:          "Handle inbound work continuously.",
+		ClonedFrom:    "software_dev",
 		State:         automata.StateIdle,
 		DisplayStatus: automata.DisplayStatusRunning,
 		Busy:          false,
@@ -33,6 +34,8 @@ func TestToAPIAutomataSummaryIncludesDerivedStatusFields(t *testing.T) {
 	require.Equal(t, "Queue Butler", *resp.Nickname)
 	require.NotNil(t, resp.IconUrl)
 	require.Equal(t, "https://cdn.example.com/queue-butler.png", *resp.IconUrl)
+	require.NotNil(t, resp.ClonedFrom)
+	require.Equal(t, "software_dev", *resp.ClonedFrom)
 	require.NotNil(t, resp.DisplayStatus)
 	require.Equal(t, openapi.AutomataDisplayStatusRunning, *resp.DisplayStatus)
 	require.NotNil(t, resp.Busy)
@@ -46,11 +49,12 @@ func TestToAPIAutomataStateDerivesServiceDisplayFields(t *testing.T) {
 
 	now := time.Date(2026, time.April, 2, 12, 0, 0, 0, time.UTC)
 	def := &automata.Definition{
-		Name:     "queue_worker",
-		Kind:     automata.AutomataKindService,
-		Nickname: "Queue Butler",
-		IconURL:  "https://cdn.example.com/queue-butler.png",
-		Goal:     "Handle inbound work continuously.",
+		Name:       "queue_worker",
+		Kind:       automata.AutomataKindService,
+		Nickname:   "Queue Butler",
+		IconURL:    "https://cdn.example.com/queue-butler.png",
+		Goal:       "Handle inbound work continuously.",
+		ClonedFrom: "software_dev",
 	}
 	state := &automata.State{
 		State:       automata.StateIdle,
@@ -75,4 +79,6 @@ func TestToAPIAutomataStateDerivesServiceDisplayFields(t *testing.T) {
 	require.Equal(t, "Queue Butler", *defResp.Nickname)
 	require.NotNil(t, defResp.IconUrl)
 	require.Equal(t, "https://cdn.example.com/queue-butler.png", *defResp.IconUrl)
+	require.NotNil(t, defResp.ClonedFrom)
+	require.Equal(t, "software_dev", *defResp.ClonedFrom)
 }

@@ -118,6 +118,7 @@ type Definition struct {
 	Description         string       `json:"description,omitempty" yaml:"description,omitempty"`
 	Purpose             string       `json:"purpose,omitempty" yaml:"purpose,omitempty"`
 	Goal                string       `json:"goal" yaml:"goal"`
+	ClonedFrom          string       `json:"clonedFrom,omitempty" yaml:"cloned_from,omitempty"`
 	StandingInstruction string       `json:"standingInstruction,omitempty" yaml:"standing_instruction,omitempty"`
 	Tags                []string     `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Schedule            ScheduleList `json:"schedule,omitempty" yaml:"schedule,omitempty"`
@@ -231,6 +232,7 @@ type Summary struct {
 	Description         string         `json:"description,omitempty"`
 	Purpose             string         `json:"purpose"`
 	Goal                string         `json:"goal"`
+	ClonedFrom          string         `json:"clonedFrom,omitempty"`
 	Tags                []string       `json:"tags,omitempty"`
 	Instruction         string         `json:"instruction,omitempty"`
 	State               LifecycleState `json:"state"`
@@ -328,6 +330,8 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 		Description              string       `yaml:"description,omitempty"`
 		Purpose                  string       `yaml:"purpose"`
 		Goal                     string       `yaml:"goal"`
+		ClonedFrom               string       `yaml:"clonedFrom,omitempty"`
+		ClonedFromSnake          string       `yaml:"cloned_from,omitempty"`
 		StandingInstruction      string       `yaml:"standingInstruction,omitempty"`
 		StandingInstructionSnake string       `yaml:"standing_instruction,omitempty"`
 		Tags                     []string     `yaml:"tags"`
@@ -352,6 +356,10 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	d.Kind = normalizeAutomataKind(raw.Kind)
 	d.Purpose = strings.TrimSpace(raw.Purpose)
 	d.Goal = strings.TrimSpace(raw.Goal)
+	d.ClonedFrom = strings.TrimSpace(raw.ClonedFromSnake)
+	if d.ClonedFrom == "" {
+		d.ClonedFrom = strings.TrimSpace(raw.ClonedFrom)
+	}
 	d.StandingInstruction = strings.TrimSpace(raw.StandingInstructionSnake)
 	if d.StandingInstruction == "" {
 		d.StandingInstruction = strings.TrimSpace(raw.StandingInstruction)

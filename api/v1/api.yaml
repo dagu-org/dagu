@@ -12325,6 +12325,8 @@ components:
           type: string
         goal:
           type: string
+        clonedFrom:
+          type: string
         standingInstruction:
           type: string
         schedule:
@@ -12549,6 +12551,8 @@ components:
         description:
           type: string
         goal:
+          type: string
+        clonedFrom:
           type: string
         tags:
           type: array

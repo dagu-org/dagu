@@ -582,6 +582,7 @@ func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 			return &v
 		}(),
 		CurrentRun:    toAPIAutomataRunSummary(item.CurrentRun),
+		ClonedFrom:    ptrOf(item.ClonedFrom),
 		Description:   ptrOf(item.Description),
 		Disabled:      ptrOf(item.Disabled),
 		DisplayStatus: ptrOf(api.AutomataDisplayStatus(item.DisplayStatus)),
@@ -666,6 +667,7 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 		Kind:                api.AutomataKind(def.Kind),
 		Name:                def.Name,
 		Nickname:            ptrOf(def.Nickname),
+		ClonedFrom:          ptrOf(def.ClonedFrom),
 		AllowedDAGs:         toAPIAutomataAllowedDAGs(def.AllowedDAGs),
 		StandingInstruction: ptrOf(def.StandingInstruction),
 		Tags: func() *[]string {
