@@ -282,7 +282,7 @@ steps:
 steps:
   - name: batch-job
     type: kubernetes
-    config:
+    with:
       namespace: production
       image: my-registry/batch-processor:latest
       resources:
@@ -298,7 +298,7 @@ steps:
 steps:
   - name: deploy
     type: ssh
-    config:
+    with:
       host: prod-server.example.com
       user: deploy
       key: ~/.ssh/id_rsa

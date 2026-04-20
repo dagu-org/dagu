@@ -47,7 +47,7 @@ worker_selector:
 steps:
   - name: use-custom-step
     type: greet
-    config:
+    with:
       message: embedded-custom
 `, withLogPersistence(), withBaseConfigPath(baseConfigPath), withWorkerBaseConfigPath("/nonexistent/base.yaml"))
 	defer f.cleanup()
@@ -100,7 +100,7 @@ worker_selector:
 steps:
   - name: remote-greet
     type: greet
-    config:
+    with:
       message: propagated-custom
 `, withLogPersistence(), withBaseConfigPath(baseConfigPath), withWorkerBaseConfigPath("/nonexistent/base.yaml"), withLabels(map[string]string{"type": "test-worker"}))
 	defer f.cleanup()

@@ -737,6 +737,18 @@ func (*mergeTransformer) Transformer(
 		}
 	}
 
+	if typ == reflect.TypeFor[core.DAGRetryPolicy]() {
+		// DAG retry policies are configured as a single root object. Replace the
+		// inherited policy wholesale so limit: 0 can intentionally disable retries.
+		return func(dst, src reflect.Value) error {
+			if dst.CanSet() {
+				dst.Set(src)
+			}
+
+			return nil
+		}
+	}
+
 	if typ == reflect.TypeFor[core.KubernetesConfig]() {
 		return func(dst, src reflect.Value) error {
 			if !dst.CanSet() || !src.IsValid() || src.IsNil() {

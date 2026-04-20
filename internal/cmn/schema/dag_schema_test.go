@@ -392,6 +392,26 @@ steps:
 `,
 		},
 		{
+			name: "LimitZero",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 0
+steps:
+  - command: echo hi
+`,
+		},
+		{
+			name: "StringLimitZero",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: "0"
+steps:
+  - command: echo hi
+`,
+		},
+		{
 			name: "RejectsMissingLimit",
 			spec: `
 name: retryable-dag
@@ -415,12 +435,58 @@ steps:
 			wantErr: "retry_policy",
 		},
 		{
+			name: "RejectsNegativeLimit",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: -1
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsNegativeStringLimit",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: "-1"
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
 			name: "RejectsNonNumericStringInterval",
 			spec: `
 name: retryable-dag
 retry_policy:
   limit: 3
   interval_sec: later
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsZeroInterval",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 1
+  interval_sec: 0
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsZeroMaxInterval",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 1
+  max_interval_sec: 0
 steps:
   - command: echo hi
 `,
@@ -506,6 +572,67 @@ steps:
 	require.Contains(t, err.Error(), "steps")
 }
 
+func TestDAGSchemaStepWithFieldAndConfigAlias(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "CanonicalWith",
+			spec: `
+steps:
+  - type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+`,
+		},
+		{
+			name: "LegacyConfigAlias",
+			spec: `
+steps:
+  - type: http
+    command: GET https://example.com
+    config:
+      timeout: 30
+`,
+		},
+		{
+			name: "RejectBothWithAndConfig",
+			spec: `
+steps:
+  - type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+    config:
+      timeout: 60
+`,
+			wantErr: "steps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
 func TestDAGSchemaKubernetes(t *testing.T) {
 	t.Parallel()
 
@@ -526,7 +653,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `,
@@ -541,7 +668,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       cleanup_policy: keep
     command: echo hello
 `,
@@ -552,7 +679,7 @@ steps:
 steps:
   - id: report
     type: kubernetes
-    config:
+    with:
       image: alpine:3.20
       namespace: batch
       cleanup_policy: keep
@@ -580,7 +707,7 @@ kubernetes:
 steps:
   - id: report
     type: kubernetes
-    config:
+    with:
       image: alpine:3.20
       security_context:
         run_as_non_root: true
@@ -644,7 +771,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       affinity: {}
       pod_failure_policy: {}
@@ -660,7 +787,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `,
@@ -672,7 +799,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       env:
         - value: missing-name
@@ -686,7 +813,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       env_from:
         - prefix: APP_
@@ -700,7 +827,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       security_context:
         seccomp_profile:
@@ -715,7 +842,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       pod_failure_policy:
         rules:
@@ -733,7 +860,7 @@ steps:
 steps:
   - id: report
     type: kubernetes
-    config:
+    with:
       image: alpine:3.20
       unknown_field: true
     command: echo hello
@@ -746,7 +873,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       volumes:
         - name: data
@@ -801,7 +928,7 @@ steps:
 
   - type: harness
     command: Fix bugs
-    config:
+    with:
       model: opus
       effort: high
 `,
@@ -819,7 +946,7 @@ harnesses:
 steps:
   - type: harness
     command: Summarize the repository state
-    config:
+    with:
       provider: gemini
       model: gemini-2.5-pro
       yolo: true
@@ -836,7 +963,7 @@ harnesses:
 steps:
   - type: harness
     command: Summarize the repository state
-    config:
+    with:
       provider: gemini
 `,
 			wantErr: "harnesses",
@@ -853,7 +980,7 @@ harnesses:
 steps:
   - type: harness
     command: Summarize the repository state
-    config:
+    with:
       provider: gemini
 `,
 			wantErr: "harnesses",
@@ -877,7 +1004,7 @@ steps:
 steps:
   - type: harness
     command: Write tests
-    config:
+    with:
       provider: claude
       fallback:
         - provider: codex

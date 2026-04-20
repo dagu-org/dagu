@@ -229,7 +229,7 @@ steps:
 steps:
   - name: step-ssh-config
     type: ssh
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s

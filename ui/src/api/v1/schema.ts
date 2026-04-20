@@ -3364,7 +3364,7 @@ export interface components {
             targetType: string;
             /** @description Optional custom step description */
             description?: string;
-            /** @description Resolved JSON Schema object used to validate and document config input */
+            /** @description Resolved JSON Schema object used to validate and document with input */
             inputSchema: {
                 [key: string]: unknown;
             };

@@ -37,7 +37,7 @@ steps:
   - id: render
     depends: [fetch]
     type: template
-    config:
+    with:
       data:
         name: ${USER.name}
       output: report.txt

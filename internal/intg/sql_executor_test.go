@@ -25,7 +25,7 @@ type: graph
 steps:
   - name: init-db
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       transaction: true
     script: |
@@ -34,7 +34,7 @@ steps:
 
   - name: query-users
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       output_format: jsonl
     command: "SELECT id, name FROM users ORDER BY id"
@@ -68,7 +68,7 @@ type: graph
 steps:
   - name: setup
     type: sqlite
-    config:
+    with:
       dsn: "%s"
     script: |
       CREATE TABLE accounts (id INTEGER PRIMARY KEY, balance INTEGER NOT NULL);
@@ -76,7 +76,7 @@ steps:
 
   - name: transfer
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       transaction: true
     script: |
@@ -86,7 +86,7 @@ steps:
 
   - name: verify
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       output_format: jsonl
     command: "SELECT id, balance FROM accounts ORDER BY id"
@@ -121,7 +121,7 @@ type: graph
 steps:
   - name: setup
     type: sqlite
-    config:
+    with:
       dsn: "%s"
     script: |
       CREATE TABLE rollback_test (id INTEGER PRIMARY KEY, value INTEGER NOT NULL);
@@ -129,7 +129,7 @@ steps:
 
   - name: failed-transaction
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       transaction: true
     script: |
@@ -141,7 +141,7 @@ steps:
 
   - name: verify-rollback
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       output_format: jsonl
     command: "SELECT value FROM rollback_test WHERE id = 1"
@@ -171,7 +171,7 @@ func TestSQLExecutor_SQLite_NullValues(t *testing.T) {
 steps:
   - name: test-nulls
     type: sqlite
-    config:
+    with:
       dsn: ":memory:"
       output_format: jsonl
     command: "SELECT NULL as null_text, NULL as null_int, NULL as null_bool, 'not_null' as regular_text, 42 as regular_int"
@@ -235,7 +235,7 @@ func TestSQLExecutor_SQLite_OutputFormats(t *testing.T) {
 steps:
   - name: query
     type: sqlite
-    config:
+    with:
       dsn: ":memory:"
       output_format: %s
       headers: true
@@ -266,7 +266,7 @@ func TestSQLExecutor_SQLite_MaxRows(t *testing.T) {
 steps:
   - name: query-limited
     type: sqlite
-    config:
+    with:
       dsn: ":memory:"
       output_format: jsonl
       max_rows: 5
@@ -314,7 +314,7 @@ type: graph
 steps:
   - name: setup
     type: sqlite
-    config:
+    with:
       dsn: "%s"
     script: |
       CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT, price REAL);
@@ -322,7 +322,7 @@ steps:
 
   - name: query-with-params
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       output_format: jsonl
       params:
@@ -362,7 +362,7 @@ type: graph
 steps:
   - name: multi-statement
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       transaction: true
     script: |
@@ -372,7 +372,7 @@ steps:
 
   - name: verify
     type: sqlite
-    config:
+    with:
       dsn: "%s"
       output_format: jsonl
     command: "SELECT status FROM orders"
@@ -398,7 +398,7 @@ func TestSQLExecutor_SQLite_InMemory(t *testing.T) {
 steps:
   - name: sqlite-query
     type: sqlite
-    config:
+    with:
       dsn: ":memory:"
       output_format: jsonl
     script: |
@@ -431,7 +431,7 @@ func TestSQLExecutor_SQLite_TransactionSingleStep(t *testing.T) {
 steps:
   - name: sqlite-transaction
     type: sqlite
-    config:
+    with:
       dsn: ":memory:"
       transaction: true
       output_format: jsonl

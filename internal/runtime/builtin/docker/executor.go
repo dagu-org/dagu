@@ -34,7 +34,7 @@ var (
 steps:
  - name: exec-in-existing
    type: docker
-   config:
+   with:
      container_name: <container-name>
      auto_remove: true
      exec:
@@ -46,7 +46,7 @@ steps:
 
  - name: create-new
    type: docker
-   config:
+   with:
      image: alpine:latest
      auto_remove: true
    command: echo "Hello from new container"

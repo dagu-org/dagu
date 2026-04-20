@@ -14,15 +14,15 @@ Use `type: harness` to run AI coding agent CLIs as DAG steps. The harness execut
 
 The selected attempt's binary must be resolvable when it runs. Built-in providers use `PATH`; custom harnesses can use a binary name or an explicit path resolved from the step working directory.
 
-## How Config Works
+## How `with` Works
 
 Harness supports built-in providers and named custom harness definitions:
 
-- `config.provider` selects a built-in provider such as `claude`, `codex`, or `copilot`
+- `with.provider` selects a built-in provider such as `claude`, `codex`, or `copilot`
 - top-level `harnesses.<name>` defines how to invoke a custom harness CLI
-- `config.provider` can point at either a built-in provider or a custom `harnesses:` entry
+- `with.provider` can point at either a built-in provider or a custom `harnesses:` entry
 
-All non-reserved config keys are passed directly as CLI flags:
+All non-reserved `with` keys are passed directly as CLI flags:
 
 - `key: "value"` → `--key value`
 - `key: true` → `--key`
@@ -52,7 +52,7 @@ steps:
   - name: review
     type: harness
     command: "Review the current branch"
-    config:
+    with:
       provider: gemini
       model: gemini-2.5-pro
 ```
@@ -65,7 +65,7 @@ Custom harness definition fields:
 - `prompt_flag` — required when `prompt_mode: flag`
 - `prompt_position` — `before_flags` or `after_flags`
 - `flag_style` — `gnu_long` or `single_dash`
-- `option_flags` — per-option override from config key to exact flag token
+- `option_flags` — per-option override from `with` key to exact flag token
 
 ## DAG-Level Defaults and Fallback
 
@@ -89,14 +89,14 @@ steps:
 
   - name: step2
     command: "Fix bugs"
-    config:
+    with:
       model: opus
       effort: high
 
   - name: step3
     type: harness
     command: "Generate docs"
-    config:
+    with:
       provider: copilot
       fallback:
         - provider: claude
@@ -105,9 +105,9 @@ steps:
 
 Merge rules:
 
-- DAG-level primary config is the base
-- Step-level config overlays it
-- Step-level `fallback` replaces DAG-level `fallback`
+- DAG-level primary harness config is the base
+- Step-level `with` overlays it
+- Step-level `with.fallback` replaces DAG-level `fallback`
 - If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`
 
 ## Pattern 1: Single Agent Step
@@ -142,7 +142,7 @@ steps:
     name: research
     type: harness
     command: "Research every approach to: ${topic}. List all approaches with pros, cons, and when to use each."
-    config:
+    with:
       provider: claude
       model: sonnet
       bare: true
@@ -157,7 +157,7 @@ steps:
 
       ${RESEARCH}
     command: "Review the research provided on stdin for completeness and gaps"
-    config:
+    with:
       provider: codex
       full-auto: true
       skip-git-repo-check: true
@@ -174,7 +174,7 @@ steps:
       === Review Feedback ===
       ${REVIEW}
     command: "Refine this research incorporating the review feedback provided via stdin."
-    config:
+    with:
       provider: claude
       model: sonnet
       bare: true
@@ -196,7 +196,7 @@ steps:
   - name: agent
     type: harness
     command: "${PROMPT}"
-    config:
+    with:
       provider: "${PROVIDER}"
       model: "${MODEL}"
     output: RESULT
@@ -211,7 +211,7 @@ steps:
   - name: task
     type: harness
     command: "Write tests for the auth module"
-    config:
+    with:
       provider: claude
       model: sonnet
       effort: high
@@ -231,7 +231,7 @@ steps:
   - name: task
     type: harness
     command: "Fix failing tests in src/"
-    config:
+    with:
       provider: codex
       full-auto: true
       sandbox: workspace-write
@@ -247,7 +247,7 @@ steps:
   - name: task
     type: harness
     command: "Refactor the authentication middleware"
-    config:
+    with:
       provider: copilot
       autopilot: true
       yolo: true
@@ -264,7 +264,7 @@ steps:
   - name: task
     type: harness
     command: "Refactor the database layer"
-    config:
+    with:
       provider: opencode
       format: json
     timeout_sec: 300
@@ -277,7 +277,7 @@ steps:
   - name: task
     type: harness
     command: "Design a rate limiting middleware"
-    config:
+    with:
       provider: pi
       thinking: high
       tools: read,bash
@@ -293,4 +293,4 @@ steps:
 5. **Working directory** — Use `working_dir:` on the step. The CLI operates relative to this directory.
 6. **Output capture** — Use `output: VAR_NAME` for variable interpolation; use `${step_id.stdout}` for file-path-based access.
 7. **Exit codes** — 0 = success, 1 = CLI error, 124 = step timed out. Last 1KB of stderr is included in the error message on failure.
-8. **Fallback behavior** — If the primary harness config fails and the context is still active, fallback configs are tried in order. Failed-attempt stdout is discarded; stderr remains visible in logs.
+8. **Fallback behavior** — If the primary harness config fails and the context is still active, fallback entries are tried in order. Failed-attempt stdout is discarded; stderr remains visible in logs.

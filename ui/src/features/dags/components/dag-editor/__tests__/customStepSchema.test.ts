@@ -46,8 +46,13 @@ const baseSchema: JSONSchema = {
         type: {
           $ref: '#/definitions/executorType',
         },
+        with: {
+          type: 'object',
+        },
         config: {
           type: 'object',
+          deprecated: true,
+          doNotSuggest: true,
         },
       },
       allOf: [],
@@ -84,8 +89,13 @@ const baseSchemaWithExecutorObject: JSONSchema = {
         type: {
           $ref: '#/definitions/executorType',
         },
+        with: {
+          type: 'object',
+        },
         config: {
           type: 'object',
+          deprecated: true,
+          doNotSuggest: true,
         },
       },
       allOf: [],
@@ -99,8 +109,13 @@ const baseSchemaWithExecutorObject: JSONSchema = {
         type: {
           $ref: '#/definitions/executorType',
         },
+        with: {
+          type: 'object',
+        },
         config: {
           type: 'object',
+          deprecated: true,
+          doNotSuggest: true,
         },
         executor: {
           $ref: '#/definitions/executorObject',
@@ -168,8 +183,13 @@ const baseSchemaWithConditionalRules = dereferenceSchema({
           },
           then: {
             properties: {
+              with: {
+                $ref: '#/definitions/httpConfig',
+              },
               config: {
                 $ref: '#/definitions/httpConfig',
+                deprecated: true,
+                doNotSuggest: true,
               },
             },
           },
@@ -240,11 +260,11 @@ step_types:
     const schema = buildAugmentedDAGSchema(baseSchema, merged);
     const propertySchema = getSchemaAtPath(
       schema,
-      ['steps', '0', 'config', 'count'],
+      ['steps', '0', 'with', 'count'],
       `
 steps:
   - type: greet
-    config:
+    with:
       count: 1
 `
     );
@@ -252,7 +272,7 @@ steps:
     expect(propertySchema).toMatchObject({ type: 'integer' });
   });
 
-  it('augments dereferenced step schemas with custom config inference', () => {
+  it('augments dereferenced step schemas with custom with inference', () => {
     const schema = buildAugmentedDAGSchema(dereferencedBaseSchema, [
       {
         name: 'greet',
@@ -268,11 +288,11 @@ steps:
 
     const propertySchema = getSchemaAtPath(
       schema,
-      ['steps', '0', 'config', 'count'],
+      ['steps', '0', 'with', 'count'],
       `
 steps:
   - type: greet
-    config:
+    with:
       count: 1
 `
     );
@@ -376,11 +396,11 @@ steps:
 
     const propertySchema = getSchemaAtPath(
       schema,
-      ['steps', '0', 'config', 'profile', 'message'],
+      ['steps', '0', 'with', 'profile', 'message'],
       `
 steps:
   - type: greet
-    config:
+    with:
       profile:
         message: hello
 `
@@ -415,22 +435,22 @@ steps:
 
     const nestedTypeSchema = getSchemaAtPath(
       schema,
-      ['steps', '0', 'config', 'nested', 'type'],
+      ['steps', '0', 'with', 'nested', 'type'],
       `
 steps:
   - type: greet
-    config:
+    with:
       nested:
         type: internal
 `
     );
     const nestedConfigSchema = getSchemaAtPath(
       schema,
-      ['steps', '0', 'config', 'nested', 'config'],
+      ['steps', '0', 'with', 'nested', 'config'],
       `
 steps:
   - type: greet
-    config:
+    with:
       nested:
         config: value
 `
@@ -470,14 +490,14 @@ steps:
       const: 'http',
       doNotSuggest: true,
     });
-    expect(httpRule?.then?.properties?.config).toMatchObject({
+    expect(httpRule?.then?.properties?.with).toMatchObject({
       doNotSuggest: true,
     });
     expect(greetRule?.if?.properties?.type).toMatchObject({
       const: 'greet',
       doNotSuggest: true,
     });
-    expect(greetRule?.then?.properties?.config).toMatchObject({
+    expect(greetRule?.then?.properties?.with).toMatchObject({
       doNotSuggest: true,
     });
   });
@@ -529,7 +549,7 @@ step_types:
     type: command
 steps:
   - type: greet
-    config:
+    with:
       message: [unterminated
 `);
 

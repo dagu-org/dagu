@@ -42,7 +42,7 @@ exit 1
 	th.CreateDAGFile(t, "harness_codex_defaults.yaml", `
 steps:
   - type: harness
-    config:
+    with:
       provider: codex
     command: hello
     output: RESULT
@@ -83,7 +83,7 @@ harnesses:
 steps:
   - name: review
     type: harness
-    config:
+    with:
       provider: passthrough
     command: |
       hey
