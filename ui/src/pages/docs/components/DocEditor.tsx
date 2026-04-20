@@ -21,7 +21,14 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
 
 type Props = {
@@ -90,7 +97,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   currentValueRef.current = currentValue;
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
-  const scopedDraftKey = React.useMemo(
+  const scopedDraftKey = useMemo(
     () =>
       JSON.stringify({
         tabId,

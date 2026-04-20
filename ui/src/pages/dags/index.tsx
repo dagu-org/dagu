@@ -427,8 +427,15 @@ function DAGsContent() {
 
 // Wrap with TabProvider
 function DAGs() {
+  const appBarContext = React.useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const dagTabStorageKey = `dagu_dag_tabs:${JSON.stringify({
+    remoteNode,
+    workspace: appBarContext.selectedWorkspace || null,
+  })}`;
+
   return (
-    <TabProvider>
+    <TabProvider key={dagTabStorageKey} storageKey={dagTabStorageKey}>
       <DAGsContent />
     </TabProvider>
   );
