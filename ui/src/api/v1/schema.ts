@@ -3955,10 +3955,11 @@ export interface components {
          * @enum {string}
          */
         UserRole: UserRole;
+        /** @description Workspace name */
+        WorkspaceName: string;
         /** @description Role granted for a specific workspace */
         WorkspaceGrant: {
-            /** @description Workspace name */
-            workspace: string;
+            workspace: components["schemas"]["WorkspaceName"];
             role: components["schemas"]["UserRole"];
         };
         /** @description Workspace access policy. all=true grants the top-level role in every workspace. all=false requires explicit workspace grants and a top-level viewer role. */
@@ -4912,16 +4913,16 @@ export interface components {
             error?: string;
         };
         CreateWorkspaceRequest: {
-            name: string;
+            name: components["schemas"]["WorkspaceName"];
             description?: string;
         };
         UpdateWorkspaceRequest: {
-            name?: string;
+            name?: components["schemas"]["WorkspaceName"];
             description?: string;
         };
         WorkspaceResponse: {
             id: string;
-            name: string;
+            name: components["schemas"]["WorkspaceName"];
             description?: string;
             /** Format: date-time */
             createdAt?: string;
@@ -4943,7 +4944,7 @@ export interface components {
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
         /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
-        Workspace: string;
+        Workspace: components["schemas"]["WorkspaceName"];
         /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
         WorkspaceScope: components["schemas"]["WorkspaceScope"];
         /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
@@ -6970,8 +6971,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */

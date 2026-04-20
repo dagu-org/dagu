@@ -1658,7 +1658,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
@@ -7002,8 +7002,7 @@ components:
       description: workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted
       required: false
       schema:
-        type: string
-        pattern: "^[A-Za-z0-9_-]+$"
+        $ref: "#/components/schemas/WorkspaceName"
 
     WorkspaceScope:
       name: workspaceScope
@@ -9554,16 +9553,19 @@ components:
         - operator
         - viewer
 
+    WorkspaceName:
+      type: string
+      description: "Workspace name"
+      minLength: 1
+      maxLength: 64
+      pattern: "^[A-Za-z0-9_-]+$"
+
     WorkspaceGrant:
       type: object
       description: "Role granted for a specific workspace"
       properties:
         workspace:
-          type: string
-          description: "Workspace name"
-          minLength: 1
-          maxLength: 64
-          pattern: "^[A-Za-z0-9_-]+$"
+          $ref: "#/components/schemas/WorkspaceName"
         role:
           $ref: "#/components/schemas/UserRole"
       required:
@@ -11495,7 +11497,7 @@ components:
         - name
       properties:
         name:
-          type: string
+          $ref: "#/components/schemas/WorkspaceName"
         description:
           type: string
 
@@ -11503,7 +11505,7 @@ components:
       type: object
       properties:
         name:
-          type: string
+          $ref: "#/components/schemas/WorkspaceName"
         description:
           type: string
 
@@ -11516,7 +11518,7 @@ components:
         id:
           type: string
         name:
-          type: string
+          $ref: "#/components/schemas/WorkspaceName"
         description:
           type: string
         createdAt:

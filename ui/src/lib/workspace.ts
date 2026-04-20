@@ -181,7 +181,7 @@ export function workspaceDocumentSelectionQuery(
   );
 }
 
-export function workspaceDocumentQueryForWorkspace(
+export function workspaceMutationQueryForWorkspace(
   workspace?: string | null
 ): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
   const sanitized = sanitizeWorkspaceName(workspace ?? '');
@@ -192,6 +192,12 @@ export function workspaceDocumentQueryForWorkspace(
     workspaceScope: WorkspaceMutationScope.workspace,
     workspace: sanitized,
   };
+}
+
+export function workspaceDocumentQueryForWorkspace(
+  workspace?: string | null
+): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
+  return workspaceMutationQueryForWorkspace(workspace);
 }
 
 export function visibleDocumentPathForWorkspace(

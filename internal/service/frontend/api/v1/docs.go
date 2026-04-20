@@ -215,7 +215,7 @@ func parseWorkspaceMutationScope(scopeParam *api.WorkspaceMutationScope, workspa
 	switch selection.scope {
 	case api.WorkspaceScopeAccessible:
 		if selection.explicit {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=accessible cannot be used for single-document operations")
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=accessible cannot be used for single-resource operations")
 		}
 		selection.scope = api.WorkspaceScopeNone
 		return selection, nil
@@ -774,10 +774,11 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 		return nil, errDocStoreNotAvailable
 	}
 	path, queryString, hasQuery := strings.Cut(docID, "?")
-	workspaceName, visibility, err := a.docPointReadScopeForParams(ctx, nil, nil)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		workspaceName string
+		visibility    docWorkspaceVisibility
+		err           error
+	)
 	if hasQuery {
 		params, err := url.ParseQuery(queryString)
 		if err != nil {
@@ -785,6 +786,11 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 		}
 		scopeParam, workspaceParam := workspaceMutationScopeParamsFromValues(params)
 		workspaceName, visibility, err = a.docPointReadScopeForParams(ctx, scopeParam, workspaceParam)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		workspaceName, visibility, err = a.docPointReadScopeForParams(ctx, nil, nil)
 		if err != nil {
 			return nil, err
 		}
