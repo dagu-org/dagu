@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 
 	api "github.com/dagucloud/dagu/api/v1"
@@ -68,10 +69,8 @@ func scopedDAGSearchLabels(labelsParam *string, workspaceParam *string) ([]strin
 	}
 	if workspaceName != "" {
 		workspaceLabel := strings.ToLower("workspace=" + workspaceName)
-		for _, label := range labels {
-			if label == workspaceLabel {
-				return labels, nil
-			}
+		if slices.Contains(labels, workspaceLabel) {
+			return labels, nil
 		}
 		labels = append(labels, workspaceLabel)
 	}
