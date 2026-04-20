@@ -63,8 +63,9 @@ const (
 )
 
 var (
-	errNoAvailableWorkers = errors.New("no available workers")
-	errNoMatchingWorkers  = errors.New("no workers match the required selector")
+	errNoAvailableWorkers        = errors.New("no available workers")
+	errNoMatchingWorkers         = errors.New("no workers match the required selector")
+	errRunHeartbeatRepairSkipped = errors.New("run heartbeat repair skipped")
 )
 
 type preparedDispatchAttempt struct {
@@ -949,12 +950,127 @@ func (h *Handler) RunHeartbeat(ctx context.Context, req *coordinatorv1.RunHeartb
 			}
 			return nil, status.Error(codes.Internal, "failed to refresh run lease: "+err.Error())
 		}
+		h.repairStaleLeaseFailureFromRunHeartbeat(ctx, req.WorkerId, task, observedAt)
 	}
 
 	cancelledRuns = appendCancelledRuns(cancelledRuns, h.getCancelledRunsForWorker(ctx, &coordinatorv1.WorkerStats{
 		RunningTasks: req.RunningTasks,
 	}))
 	return &coordinatorv1.RunHeartbeatResponse{CancelledRuns: cancelledRuns}, nil
+}
+
+func (h *Handler) repairStaleLeaseFailureFromRunHeartbeat(
+	ctx context.Context,
+	workerID string,
+	task *coordinatorv1.RunningTask,
+	observedAt time.Time,
+) {
+	if h.dagRunStore == nil || h.dagRunLeaseStore == nil || task == nil || task.AttemptKey == "" {
+		return
+	}
+
+	lease, err := h.dagRunLeaseStore.Get(ctx, task.AttemptKey)
+	if err != nil {
+		if !errors.Is(err, exec.ErrDAGRunLeaseNotFound) {
+			logger.Warn(ctx, "Failed to read distributed lease after run heartbeat",
+				tag.AttemptKey(task.AttemptKey),
+				tag.Error(err),
+			)
+		}
+		return
+	}
+	if lease == nil || lease.AttemptID == "" || lease.WorkerID != workerID {
+		return
+	}
+
+	reason := staleDistributedLeaseReason(workerID)
+	storeCtx := context.WithoutCancel(ctx)
+	repairedStatus, swapped, err := h.dagRunStore.CompareAndSwapLatestAttemptStatus(
+		storeCtx,
+		lease.DAGRun,
+		lease.AttemptID,
+		core.Failed,
+		func(status *exec.DAGRunStatus) error {
+			if !h.canRepairStaleLeaseFailureFromRunHeartbeat(workerID, task, lease, status, reason, observedAt) {
+				return errRunHeartbeatRepairSkipped
+			}
+			restoreStaleLeaseFailure(status, lease, workerID, reason)
+			return nil
+		},
+	)
+	if err != nil {
+		if errors.Is(err, errRunHeartbeatRepairSkipped) {
+			return
+		}
+		logger.Warn(ctx, "Failed to repair stale distributed run failure after heartbeat",
+			tag.RunID(lease.DAGRun.ID),
+			tag.AttemptKey(task.AttemptKey),
+			tag.Error(err),
+		)
+		return
+	}
+	if !swapped {
+		return
+	}
+
+	h.upsertActiveDistributedRun(ctx, repairedStatus, workerID, lease.AttemptID)
+	logger.Info(ctx, "Repaired stale distributed run failure from fresh heartbeat",
+		tag.DAG(lease.DAGRun.Name),
+		tag.RunID(lease.DAGRun.ID),
+		tag.AttemptKey(task.AttemptKey),
+	)
+}
+
+func (h *Handler) canRepairStaleLeaseFailureFromRunHeartbeat(
+	workerID string,
+	task *coordinatorv1.RunningTask,
+	lease *exec.DAGRunLease,
+	status *exec.DAGRunStatus,
+	reason string,
+	observedAt time.Time,
+) bool {
+	if workerID == "" || task == nil || lease == nil || status == nil {
+		return false
+	}
+	if status.Status != core.Failed || status.Error != reason {
+		return false
+	}
+	if task.AttemptKey == "" || lease.AttemptKey != task.AttemptKey {
+		return false
+	}
+	if task.DagRunId != "" && lease.DAGRun.ID != "" && task.DagRunId != lease.DAGRun.ID {
+		return false
+	}
+	if task.DagName != "" && lease.DAGRun.Name != "" && task.DagName != lease.DAGRun.Name {
+		return false
+	}
+	if lease.WorkerID != "" && lease.WorkerID != workerID {
+		return false
+	}
+	return exec.LeaseMatchesStatus(lease, status, lease.AttemptID, observedAt, h.staleLeaseThreshold)
+}
+
+func restoreStaleLeaseFailure(status *exec.DAGRunStatus, lease *exec.DAGRunLease, workerID, reason string) {
+	status.Status = core.Running
+	status.Error = ""
+	status.FinishedAt = ""
+	status.WorkerID = workerID
+	status.AttemptID = lease.AttemptID
+	status.AttemptKey = lease.AttemptKey
+	for _, node := range status.Nodes {
+		if node == nil || node.Status != core.NodeFailed || node.Error != reason {
+			continue
+		}
+		if node.StartedAt != "" && node.StartedAt != "-" {
+			node.Status = core.NodeRunning
+			node.FinishedAt = ""
+		} else {
+			node.Status = core.NodeNotStarted
+			node.StartedAt = "-"
+			node.FinishedAt = "-"
+		}
+		node.Error = ""
+	}
 }
 
 func (h *Handler) listHealthyWorkers(ctx context.Context) ([]exec.WorkerHeartbeatRecord, error) {
