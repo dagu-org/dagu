@@ -322,6 +322,13 @@ steps:
   - name: step1
     command: echo needle
 `)))
+	require.NoError(t, store.Create(ctx, "bad-workspace-dag", []byte(`name: bad-workspace-dag
+labels:
+  - workspace=bad/name
+steps:
+  - name: step1
+    command: echo needle
+`)))
 
 	result, errs, err := store.SearchCursor(ctx, exec.SearchDAGsOptions{
 		Query:      "needle",
@@ -457,6 +464,10 @@ steps:
 		result.Items[0].FileName,
 		result.Items[1].FileName,
 	})
+	assert.Equal(t, []string{"", "ops"}, []string{
+		result.Items[0].Workspace,
+		result.Items[1].Workspace,
+	})
 
 	result, errs, err = store.SearchCursor(ctx, exec.SearchDAGsOptions{
 		Query:      "needle",
@@ -471,6 +482,7 @@ steps:
 	require.Empty(t, errs)
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "ops-dag", result.Items[0].FileName)
+	assert.Equal(t, "ops", result.Items[0].Workspace)
 }
 
 func TestSearchMatchesFiltersByLabels(t *testing.T) {

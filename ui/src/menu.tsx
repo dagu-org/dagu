@@ -20,6 +20,7 @@ import { useHasFeature } from '@/hooks/useLicense';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
 import { effectiveWorkspaceRole, roleAtLeast } from '@/lib/workspaceAccess';
+import { isMutableWorkspaceSelection } from '@/lib/workspace';
 import { UserRole } from '@/api/v1/schema';
 import {
   Activity,
@@ -410,6 +411,8 @@ export const mainListItems = React.forwardRef<
           effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
           UserRole.developer
         );
+  const canWriteScoped =
+    canWrite && isMutableWorkspaceSelection(appBarContext.workspaceSelection);
   const canAccessSystemStatus = useCanAccessSystemStatus();
   const canManageWebhooks = useCanManageWebhooks();
   const canViewEventLogs = useCanViewEventLogs();
@@ -626,7 +629,7 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {canWrite && config.agentEnabled && (
+            {canWriteScoped && config.agentEnabled && (
               <NavItem
                 to="/design"
                 text="Design"
@@ -652,7 +655,7 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {canWrite && (
+            {canWriteScoped && (
               <NavItem
                 to="/base-config"
                 text="Base Config"
@@ -662,7 +665,7 @@ export const mainListItems = React.forwardRef<
                 customColor={customColor}
               />
             )}
-            {canWrite && config.gitSyncEnabled && (
+            {canWriteScoped && config.gitSyncEnabled && (
               <NavItem
                 to="/git-sync"
                 text="Git Sync"
@@ -674,7 +677,7 @@ export const mainListItems = React.forwardRef<
             )}
           </div>
 
-          {(canWrite ||
+          {(canWriteScoped ||
             canAccessSystemStatus ||
             canManageWebhooks ||
             canViewEventLogs ||
@@ -735,39 +738,41 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              <NavGroup
-                groupKey="agent"
-                icon={<Bot size={18} />}
-                label="Agent"
-                isOpen={isOpen}
-                basePath="/agent-"
-                customColor={customColor}
-              >
-                <NavItem
-                  to="/agent-settings"
-                  text="Settings"
+              {canWriteScoped && config.agentEnabled && (
+                <NavGroup
+                  groupKey="agent"
                   icon={<Bot size={18} />}
+                  label="Agent"
                   isOpen={isOpen}
-                  onClick={onNavItemClick}
+                  basePath="/agent-"
                   customColor={customColor}
-                />
-                <NavItem
-                  to="/agent-memory"
-                  text="Memory"
-                  icon={<Brain size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-                <NavItem
-                  to="/agent-souls"
-                  text="Souls"
-                  icon={<Ghost size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              </NavGroup>
+                >
+                  <NavItem
+                    to="/agent-settings"
+                    text="Settings"
+                    icon={<Bot size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                  <NavItem
+                    to="/agent-memory"
+                    text="Memory"
+                    icon={<Brain size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                  <NavItem
+                    to="/agent-souls"
+                    text="Souls"
+                    icon={<Ghost size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                </NavGroup>
+              )}
             </div>
           )}
 

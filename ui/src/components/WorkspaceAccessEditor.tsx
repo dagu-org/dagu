@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { components, UserRole } from '@/api/v1/schema';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -22,6 +25,10 @@ const GRANT_ROLES = [
 
 export function defaultWorkspaceAccess(): WorkspaceAccess {
   return { all: true, grants: [] };
+}
+
+export function emptyWorkspaceAccess(): WorkspaceAccess {
+  return { all: false, grants: [] };
 }
 
 export function normalizeWorkspaceAccess(
@@ -86,7 +93,7 @@ export function WorkspaceAccessEditor({
       <div className="space-y-1.5">
         <Label className="text-sm">Workspace Access</Label>
         <Select value={value.all ? 'all' : 'scoped'} onValueChange={setMode}>
-          <SelectTrigger className="h-9">
+          <SelectTrigger className="h-7">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -126,7 +133,7 @@ export function WorkspaceAccessEditor({
                     }
                     disabled={!grant}
                   >
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-7 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

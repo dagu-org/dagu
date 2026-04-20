@@ -1,7 +1,10 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppBarContext } from './AppBarContext';
 import { useConfig } from './ConfigContext';
-import { components, UserRole } from '@/api/v1/schema';
+import { components, UserRole, WorkspaceScope } from '@/api/v1/schema';
 import { effectiveWorkspaceRole, roleAtLeast } from '@/lib/workspaceAccess';
 
 export type { UserRole } from '@/api/v1/schema';
@@ -173,6 +176,9 @@ export function useCanWrite(): boolean {
   const appBarContext = useContext(AppBarContext);
   if (config.authMode !== 'builtin') return config.permissions.writeDags;
   if (!user) return false;
+  if (appBarContext.workspaceSelection?.scope === WorkspaceScope.accessible) {
+    return false;
+  }
   return roleAtLeast(
     effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
     UserRole.developer
@@ -185,6 +191,9 @@ export function useCanExecute(): boolean {
   const appBarContext = useContext(AppBarContext);
   if (config.authMode !== 'builtin') return config.permissions.runDags;
   if (!user) return false;
+  if (appBarContext.workspaceSelection?.scope === WorkspaceScope.accessible) {
+    return false;
+  }
   return roleAtLeast(
     effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
     UserRole.operator

@@ -12,6 +12,7 @@ import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import {
   isMutableWorkspaceSelection,
+  workspaceMutationSelectionQuery,
   workspaceSelectionKey,
   workspaceSelectionQuery,
 } from '@/lib/workspace';
@@ -26,7 +27,7 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import {
+import React, {
   useCallback,
   useContext,
   useEffect,
@@ -52,9 +53,14 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
+  const workspaceMutationQuery = useMemo(
+    () => workspaceMutationSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
   const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
   const canWrite = useCanWrite();
-  const canEdit = canWrite && isMutableWorkspaceSelection(workspaceSelection);
+  const canEdit =
+    canWrite && isMutableWorkspaceSelection(workspaceSelection);
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
@@ -167,12 +173,19 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   }, [currentValue, onContentChange]);
 
   const handleSave = useCallback(async () => {
-    if (isSaving || !canEdit || !hasUnsavedChangesRef.current) return;
+    if (
+      isSaving ||
+      !canEdit ||
+      !workspaceMutationQuery ||
+      !hasUnsavedChangesRef.current
+    ) {
+      return;
+    }
     setIsSaving(true);
     try {
       const { error } = await client.PATCH('/docs/doc', {
         params: {
-          query: { remoteNode, path: docPath, ...workspaceQuery },
+          query: { remoteNode, path: docPath, ...workspaceMutationQuery },
         },
         body: { content: currentValueRef.current ?? '' },
       });
@@ -194,9 +207,9 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   }, [
     isSaving,
     canEdit,
+    workspaceMutationQuery,
     client,
     remoteNode,
-    workspaceQuery,
     docPath,
     markAsSaved,
     mutateDoc,

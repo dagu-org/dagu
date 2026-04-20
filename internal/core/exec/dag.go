@@ -102,6 +102,7 @@ type GrepDAGsResult struct {
 type SearchDAGResult struct {
 	Name              string
 	FileName          string
+	Workspace         string
 	Matches           []*Match
 	HasMoreMatches    bool
 	NextMatchesCursor string

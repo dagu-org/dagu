@@ -14,6 +14,7 @@ import {
 import SplitLayout from '@/components/SplitLayout';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useCanWrite } from '@/contexts/AuthContext';
 import { DocTabProvider, useDocTabContext } from '@/contexts/DocTabContext';
 import { usePageContext } from '@/contexts/PageContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
@@ -26,6 +27,7 @@ import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import {
   isMutableWorkspaceSelection,
+  workspaceMutationSelectionQuery,
   workspaceSelectionKey,
   workspaceSelectionQuery,
 } from '@/lib/workspace';
@@ -68,7 +70,13 @@ function DocsContent() {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
-  const canMutateDocs = isMutableWorkspaceSelection(workspaceSelection);
+  const workspaceMutationQuery = React.useMemo(
+    () => workspaceMutationSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const canWrite = useCanWrite();
+  const canMutateDocs =
+    canWrite && isMutableWorkspaceSelection(workspaceSelection);
 
   const { setContext } = usePageContext();
   const {
@@ -264,7 +272,7 @@ function DocsContent() {
   // Create handler
   const handleCreate = useCallback(
     async (path: string) => {
-      if (!canMutateDocs) {
+      if (!canMutateDocs || !workspaceMutationQuery) {
         setCreateError('Select a workspace or No workspace before creating.');
         return;
       }
@@ -272,7 +280,7 @@ function DocsContent() {
       setCreateError(null);
       try {
         const { error } = await client.POST('/docs', {
-          params: { query: { remoteNode, ...workspaceQuery } },
+          params: { query: { remoteNode, ...workspaceMutationQuery } },
           body: { id: path, content: '' },
         });
         if (error) {
@@ -293,7 +301,7 @@ function DocsContent() {
       canMutateDocs,
       client,
       remoteNode,
-      workspaceQuery,
+      workspaceMutationQuery,
       mutate,
       openDoc,
       showToast,
@@ -303,7 +311,7 @@ function DocsContent() {
   // Rename handler (from modal)
   const handleRenameModal = useCallback(
     async (newPath: string) => {
-      if (!canMutateDocs) {
+      if (!canMutateDocs || !workspaceMutationQuery) {
         setRenameError('Select a workspace or No workspace before renaming.');
         return;
       }
@@ -315,7 +323,7 @@ function DocsContent() {
             query: {
               remoteNode,
               path: renameDocPath,
-              ...workspaceQuery,
+              ...workspaceMutationQuery,
             },
           },
           body: { newPath },
@@ -351,7 +359,7 @@ function DocsContent() {
       client,
       canMutateDocs,
       remoteNode,
-      workspaceQuery,
+      workspaceMutationQuery,
       renameDocPath,
       mutate,
       tabs,
@@ -363,7 +371,7 @@ function DocsContent() {
   // Shared path-change handler for rename and move
   const handlePathChange = useCallback(
     async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
-      if (!canMutateDocs) {
+      if (!canMutateDocs || !workspaceMutationQuery) {
         showToast(
           'Select a workspace or No workspace before editing documents'
         );
@@ -372,7 +380,7 @@ function DocsContent() {
       try {
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
-            query: { remoteNode, path: oldPath, ...workspaceQuery },
+            query: { remoteNode, path: oldPath, ...workspaceMutationQuery },
           },
           body: { newPath },
         });
@@ -410,7 +418,7 @@ function DocsContent() {
       canMutateDocs,
       client,
       remoteNode,
-      workspaceQuery,
+      workspaceMutationQuery,
       mutate,
       tabs,
       updateTab,
@@ -441,7 +449,7 @@ function DocsContent() {
 
   // Delete handler (supports both files and directories)
   const handleDelete = useCallback(async () => {
-    if (!canMutateDocs) {
+    if (!canMutateDocs || !workspaceMutationQuery) {
       showToast('Select a workspace or No workspace before deleting documents');
       setDeleteConfirmOpen(false);
       return;
@@ -449,7 +457,7 @@ function DocsContent() {
     try {
       const { error } = await client.DELETE('/docs/doc', {
         params: {
-          query: { remoteNode, path: deleteDocPath, ...workspaceQuery },
+          query: { remoteNode, path: deleteDocPath, ...workspaceMutationQuery },
         },
       });
       if (error) {
@@ -478,7 +486,7 @@ function DocsContent() {
     client,
     canMutateDocs,
     remoteNode,
-    workspaceQuery,
+    workspaceMutationQuery,
     deleteDocPath,
     mutate,
     tabs,
@@ -490,7 +498,7 @@ function DocsContent() {
 
   // Batch delete handler
   const handleBatchDelete = useCallback(async () => {
-    if (!canMutateDocs) {
+    if (!canMutateDocs || !workspaceMutationQuery) {
       showToast('Select a workspace or No workspace before deleting documents');
       setBatchDeleteConfirmOpen(false);
       setBatchDeletePaths([]);
@@ -498,7 +506,7 @@ function DocsContent() {
     }
     try {
       const { data, error } = await client.POST('/docs/delete-batch', {
-        params: { query: { remoteNode, ...workspaceQuery } },
+        params: { query: { remoteNode, ...workspaceMutationQuery } },
         body: { paths: batchDeletePaths },
       });
       if (error) {
@@ -535,7 +543,7 @@ function DocsContent() {
     canMutateDocs,
     client,
     remoteNode,
-    workspaceQuery,
+    workspaceMutationQuery,
     mutate,
     tabs,
     closeTab,

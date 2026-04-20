@@ -1,9 +1,13 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useState, useEffect, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { components, UserRole } from '@/api/v1/schema';
 import {
   defaultWorkspaceAccess,
+  emptyWorkspaceAccess,
   normalizeWorkspaceAccess,
   WorkspaceAccessEditor,
 } from '@/components/WorkspaceAccessEditor';
@@ -76,7 +80,7 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
       setUsername('');
       setPassword('');
       setRole('viewer');
-      setWorkspaceAccess(defaultWorkspaceAccess());
+      setWorkspaceAccess(emptyWorkspaceAccess());
     }
     setError(null);
   }, [user, open]);

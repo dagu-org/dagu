@@ -107,8 +107,31 @@ type docWorkspaceVisibility struct {
 	known   map[string]struct{}
 }
 
+func (a *API) knownDocWorkspaceNames(ctx context.Context, required bool) (map[string]struct{}, error) {
+	if a.workspaceStore == nil {
+		if required {
+			return nil, workspaceStoreUnavailable()
+		}
+		return nil, nil
+	}
+	workspaces, err := a.workspaceStore.List(ctx)
+	if err != nil {
+		if required {
+			return nil, fmt.Errorf("failed to list workspaces: %w", err)
+		}
+		return nil, nil
+	}
+	known := make(map[string]struct{}, len(workspaces))
+	for _, ws := range workspaces {
+		known[ws.Name] = struct{}{}
+	}
+	return known, nil
+}
+
 func (a *API) docWorkspaceVisibility(ctx context.Context) (docWorkspaceVisibility, error) {
 	visibility := docWorkspaceVisibility{all: true}
+	known, _ := a.knownDocWorkspaceNames(ctx, false)
+	visibility.known = known
 	if a.authService == nil {
 		return visibility, nil
 	}
@@ -120,36 +143,23 @@ func (a *API) docWorkspaceVisibility(ctx context.Context) (docWorkspaceVisibilit
 	if access.All {
 		return visibility, nil
 	}
-	if a.workspaceStore == nil {
-		return visibility, workspaceStoreUnavailable()
-	}
-	workspaces, err := a.workspaceStore.List(ctx)
+	known, err := a.knownDocWorkspaceNames(ctx, true)
 	if err != nil {
-		return visibility, fmt.Errorf("failed to list workspaces: %w", err)
+		return visibility, err
 	}
 	visibility.all = false
 	visibility.allowed = make(map[string]struct{}, len(access.Grants))
-	visibility.known = make(map[string]struct{}, len(workspaces))
+	visibility.known = known
 	for _, grant := range access.Grants {
 		visibility.allowed[grant.Workspace] = struct{}{}
-	}
-	for _, ws := range workspaces {
-		visibility.known[ws.Name] = struct{}{}
 	}
 	return visibility, nil
 }
 
 func (a *API) noWorkspaceDocVisibility(ctx context.Context) (docWorkspaceVisibility, error) {
-	if a.workspaceStore == nil {
-		return docWorkspaceVisibility{}, workspaceStoreUnavailable()
-	}
-	workspaces, err := a.workspaceStore.List(ctx)
+	known, err := a.knownDocWorkspaceNames(ctx, true)
 	if err != nil {
-		return docWorkspaceVisibility{}, fmt.Errorf("failed to list workspaces: %w", err)
-	}
-	known := make(map[string]struct{}, len(workspaces))
-	for _, ws := range workspaces {
-		known[ws.Name] = struct{}{}
+		return docWorkspaceVisibility{}, err
 	}
 	return docWorkspaceVisibility{
 		allowed: make(map[string]struct{}),
@@ -192,8 +202,13 @@ func (a *API) docReadScopeForParams(
 	return "", visibility, nil
 }
 
-func docMutationScopeForParams(scopeParam *api.WorkspaceScope, workspaceParam *api.Workspace) (string, error) {
-	selection, err := parseWorkspaceScope(scopeParam, workspaceParam)
+func docMutationScopeForParams(scopeParam *api.WorkspaceMutationScope, workspaceParam *api.Workspace) (string, error) {
+	var readScope *api.WorkspaceScope
+	if scopeParam != nil {
+		converted := api.WorkspaceScope(*scopeParam)
+		readScope = &converted
+	}
+	selection, err := parseWorkspaceScope(readScope, workspaceParam)
 	if err != nil {
 		return "", err
 	}
@@ -210,6 +225,45 @@ func docMutationScopeForParams(scopeParam *api.WorkspaceScope, workspaceParam *a
 	default:
 		return "", badWorkspaceScopeError("invalid workspaceScope")
 	}
+}
+
+func (v docWorkspaceVisibility) knownWorkspace(name string) bool {
+	if name == "" {
+		return false
+	}
+	if v.known != nil {
+		_, ok := v.known[name]
+		return ok
+	}
+	if v.allowed != nil {
+		_, ok := v.allowed[name]
+		return ok
+	}
+	return false
+}
+
+func docWorkspaceNameForPath(path string, visibility docWorkspaceVisibility, includeWorkspaceRoot bool) string {
+	workspaceName, rest, hasSlash := strings.Cut(path, "/")
+	if workspaceName == "" {
+		return ""
+	}
+	if !hasSlash && !includeWorkspaceRoot {
+		return ""
+	}
+	if hasSlash && rest == "" {
+		return ""
+	}
+	if visibility.knownWorkspace(workspaceName) {
+		return workspaceName
+	}
+	return ""
+}
+
+func docWorkspaceValue(workspaceName, path string, visibility docWorkspaceVisibility, includeWorkspaceRoot bool) *string {
+	if workspaceName != "" {
+		return ptrOf(workspaceName)
+	}
+	return optionalString(docWorkspaceNameForPath(path, visibility, includeWorkspaceRoot))
 }
 
 func (v docWorkspaceVisibility) visible(path string) bool {
@@ -288,7 +342,9 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 
 		items := make([]api.DocMetadataResponse, 0, len(result.Items))
 		for _, m := range result.Items {
-			items = append(items, toDocMetadataResponse(m))
+			item := toDocMetadataResponse(m)
+			item.Workspace = docWorkspaceValue(workspaceName, m.ID, visibility, false)
+			items = append(items, item)
 		}
 		items = filterDocMetadataByWorkspace(items, visibility)
 
@@ -306,7 +362,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 
 	tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
 	for _, node := range result.Items {
-		tree = append(tree, toDocTreeResponse(node))
+		tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
 	}
 	tree = filterDocTreeByWorkspace(tree, visibility)
 
@@ -380,9 +436,12 @@ func (a *API) GetDoc(ctx context.Context, request api.GetDocRequestObject) (api.
 			return nil, errDocNotFound
 		}
 	}
+	rawID := doc.ID
 	doc.ID = visibleDocPath(workspaceName, doc.ID)
+	resp := toDocResponse(doc)
+	resp.Workspace = docWorkspaceValue(workspaceName, rawID, visibility, false)
 
-	return api.GetDoc200JSONResponse(toDocResponse(doc)), nil
+	return api.GetDoc200JSONResponse(resp), nil
 }
 
 // SearchDocs searches document content.
@@ -411,6 +470,7 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 
 	items := make([]api.DocSearchResultItem, 0, len(results))
 	for _, r := range results {
+		rawID := r.ID
 		if workspaceName != "" {
 			prefix := workspaceName + "/"
 			if !strings.HasPrefix(r.ID, prefix) {
@@ -421,8 +481,9 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 			continue
 		}
 		item := api.DocSearchResultItem{
-			Id:    r.ID,
-			Title: r.Title,
+			Id:        r.ID,
+			Title:     r.Title,
+			Workspace: docWorkspaceValue(workspaceName, rawID, visibility, false),
 		}
 		if len(r.Matches) > 0 {
 			matches := make([]api.SearchMatchItem, 0, len(r.Matches))
@@ -659,7 +720,7 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 
 	tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
 	for _, node := range result.Items {
-		tree = append(tree, toDocTreeResponse(node))
+		tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
 	}
 	tree = filterDocTreeByWorkspace(tree, visibility)
 
@@ -703,8 +764,11 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 			return nil, errDocNotFound
 		}
 	}
+	rawID := doc.ID
 	doc.ID = visibleDocPath(workspaceName, doc.ID)
-	return toDocResponse(doc), nil
+	resp := toDocResponse(doc)
+	resp.Workspace = docWorkspaceValue(workspaceName, rawID, visibility, false)
+	return resp, nil
 }
 
 func toDocResponse(doc *agent.Doc) api.DocResponse {
@@ -738,11 +802,20 @@ func toDocMetadataResponse(m agent.DocMetadata) api.DocMetadataResponse {
 }
 
 func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
+	return toDocTreeResponseWithWorkspace(node, "", docWorkspaceVisibility{})
+}
+
+func toDocTreeResponseWithWorkspace(
+	node *agent.DocTreeNode,
+	workspaceName string,
+	visibility docWorkspaceVisibility,
+) api.DocTreeNodeResponse {
 	resp := api.DocTreeNodeResponse{
-		Id:    node.ID,
-		Name:  node.Name,
-		Title: ptrOf(node.Title),
-		Type:  api.DocTreeNodeResponseType(node.Type),
+		Id:        node.ID,
+		Name:      node.Name,
+		Title:     ptrOf(node.Title),
+		Type:      api.DocTreeNodeResponseType(node.Type),
+		Workspace: docWorkspaceValue(workspaceName, node.ID, visibility, node.Type == "directory"),
 	}
 	if !node.ModTime.IsZero() {
 		t := node.ModTime
@@ -751,7 +824,7 @@ func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
 	if len(node.Children) > 0 {
 		children := make([]api.DocTreeNodeResponse, 0, len(node.Children))
 		for _, child := range node.Children {
-			children = append(children, toDocTreeResponse(child))
+			children = append(children, toDocTreeResponseWithWorkspace(child, workspaceName, visibility))
 		}
 		resp.Children = &children
 	}

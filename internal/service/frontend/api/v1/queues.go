@@ -393,7 +393,8 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string) (in
 			if err != nil {
 				continue
 			}
-			if _, err := a.fetchDAGRunSummary(ctx, *dagRunRef); err == nil {
+			summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
+			if err == nil && summary.Status != api.StatusRunning {
 				count++
 			}
 		}

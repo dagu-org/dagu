@@ -749,8 +749,9 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		}
 
 		filePath := filepath.Join(store.baseDir, entry.Name())
+		var dag *core.DAG
 		if len(opts.Labels) > 0 || opts.WorkspaceFilter != nil {
-			dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
+			dag, err = spec.Load(ctx, filePath, store.defaultLoadOptions(
 				spec.OnlyMetadata(),
 				spec.WithoutEval(),
 				spec.SkipSchemaValidation(),
@@ -788,6 +789,24 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 			continue
 		}
 
+		workspaceName := ""
+		if dag == nil {
+			dag, err = spec.Load(ctx, filePath, store.defaultLoadOptions(
+				spec.OnlyMetadata(),
+				spec.WithoutEval(),
+				spec.SkipSchemaValidation(),
+				spec.WithAllowBuildErrors(),
+			)...)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("reading %s metadata failed: %s", fileName, err))
+			}
+		}
+		if dag != nil {
+			if name, ok := exec.WorkspaceNameFromLabels(dag.Labels); ok {
+				workspaceName = name
+			}
+		}
+
 		if len(results) == limit {
 			hasMore = true
 			nextCursor = exec.EncodeSearchCursor(dagSearchCursor{
@@ -802,6 +821,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		item := exec.SearchDAGResult{
 			Name:           fileName,
 			FileName:       fileName,
+			Workspace:      workspaceName,
 			Matches:        window.Matches,
 			HasMoreMatches: window.HasMore,
 		}

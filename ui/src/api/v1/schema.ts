@@ -3135,6 +3135,8 @@ export interface components {
             group?: string;
             /** @description Logical name of the DAG */
             name: string;
+            /** @description Workspace label value for the DAG. Omitted for no-workspace DAGs and invalid workspace labels. */
+            workspace?: string;
             /** @description List of scheduling expressions defining when DAG-runs should be created from this DAG */
             schedule?: components["schemas"]["Schedule"][];
             /** @description Human-readable description of the DAG's purpose and behavior */
@@ -3429,6 +3431,8 @@ export interface components {
         DAGRunSummary: {
             dagRunId: components["schemas"]["DAGRunId"];
             name: components["schemas"]["DAGName"];
+            /** @description Workspace label value for the DAG-run. Omitted for no-workspace DAG-runs and invalid workspace labels. */
+            workspace?: string;
             status: components["schemas"]["Status"];
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description RFC 3339 timestamp when the DAG-run was queued */
@@ -3703,6 +3707,8 @@ export interface components {
             fileName: string;
             /** @description Display label for the DAG result; file-backed search currently mirrors fileName */
             name: string;
+            /** @description Workspace label value for the matching DAG. Omitted for no-workspace DAGs and invalid workspace labels. */
+            workspace?: string;
             /** @description Whether additional snippets are available beyond the preview */
             hasMoreMatches: boolean;
             /** @description Opaque cursor for loading more snippets for this DAG result */
@@ -3720,6 +3726,8 @@ export interface components {
         DocSearchPageItem: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for no-workspace documents. */
+            workspace?: string;
             /** @description Whether additional snippets are available beyond the preview */
             hasMoreMatches: boolean;
             /** @description Opaque cursor for loading more snippets for this document result */
@@ -3965,6 +3973,11 @@ export interface components {
          * @enum {string}
          */
         WorkspaceScope: WorkspaceScope;
+        /**
+         * @description Workspace scope selector for mutation APIs
+         * @enum {string}
+         */
+        WorkspaceMutationScope: WorkspaceMutationScope;
         /** @description Request body for initial admin account setup */
         SetupRequest: {
             /** @description Admin username */
@@ -4531,6 +4544,8 @@ export interface components {
         DocResponse: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for no-workspace documents. */
+            workspace?: string;
             /** @description Full file content including YAML frontmatter */
             content: string;
             /** @description Absolute file path of the document on disk */
@@ -4550,6 +4565,8 @@ export interface components {
         DocMetadataResponse: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for no-workspace documents. */
+            workspace?: string;
             /**
              * Format: date-time
              * @description Last modification time of the document file
@@ -4561,6 +4578,8 @@ export interface components {
             id: string;
             name: string;
             title?: string;
+            /** @description Workspace that owns this node. Omitted for no-workspace nodes. */
+            workspace?: string;
             /** @enum {string} */
             type: DocTreeNodeResponseType;
             children?: components["schemas"]["DocTreeNodeResponse"][];
@@ -4580,6 +4599,8 @@ export interface components {
         DocSearchResultItem: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for no-workspace documents. */
+            workspace?: string;
             matches?: components["schemas"]["SearchMatchItem"][];
         };
         /** @description Search results */
@@ -4925,6 +4946,8 @@ export interface components {
         Workspace: string;
         /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
         WorkspaceScope: components["schemas"]["WorkspaceScope"];
+        /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+        WorkspaceMutationScope: components["schemas"]["WorkspaceMutationScope"];
         /** @description Opaque cursor returned by the previous search response */
         SearchCursor: string;
         /** @description Number of search results to return (default 20, max 50) */
@@ -12948,8 +12971,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
             };
@@ -13102,8 +13125,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
@@ -13147,8 +13170,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
@@ -13200,8 +13223,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Current document or directory path (may include slashes for nested docs) */
@@ -13262,8 +13285,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
             };
@@ -13898,6 +13921,10 @@ export enum UserRole {
 }
 export enum WorkspaceScope {
     accessible = "accessible",
+    none = "none",
+    workspace = "workspace"
+}
+export enum WorkspaceMutationScope {
     none = "none",
     workspace = "workspace"
 }

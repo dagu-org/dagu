@@ -79,6 +79,7 @@ function DAGsContent() {
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
+  const previousWorkspaceScopeKeyRef = React.useRef(workspaceScopeKey);
 
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -107,6 +108,16 @@ function DAGsContent() {
 
   // Get selected DAG from tab context
   const selectedDAG = getActiveFileName();
+
+  React.useEffect(() => {
+    if (previousWorkspaceScopeKeyRef.current === workspaceScopeKey) {
+      return;
+    }
+    previousWorkspaceScopeKeyRef.current = workspaceScopeKey;
+    for (const tab of tabs) {
+      closeTab(tab.id);
+    }
+  }, [closeTab, tabs, workspaceScopeKey]);
 
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { WorkspaceScope } from '@/api/v1/schema';
+import { WorkspaceMutationScope, WorkspaceScope } from '@/api/v1/schema';
 
 export const WORKSPACE_LABEL_KEY = 'workspace';
 export const WORKSPACE_LABEL_PREFIX = `${WORKSPACE_LABEL_KEY}=`;
@@ -155,13 +155,43 @@ export function workspaceSelectionQuery(
   return { workspaceScope: sanitized.scope };
 }
 
+export function workspaceMutationSelectionQuery(
+  selection?: Partial<WorkspaceSelection> | null
+): { workspaceScope: WorkspaceMutationScope; workspace?: string } | null {
+  const sanitized = sanitizeWorkspaceSelection(selection);
+  if (sanitized.scope === WorkspaceScope.accessible) {
+    return null;
+  }
+  if (sanitized.scope === WorkspaceScope.workspace) {
+    return {
+      workspaceScope: WorkspaceMutationScope.workspace,
+      workspace: sanitized.workspace,
+    };
+  }
+  return { workspaceScope: WorkspaceMutationScope.none };
+}
+
 function parseStoredWorkspaceSelection(
   value: string
 ): WorkspaceSelection | null {
   try {
     const parsed = JSON.parse(value) as Partial<WorkspaceSelection>;
-    const sanitized = sanitizeWorkspaceSelection(parsed);
-    return sanitized;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    if (parsed.scope === WorkspaceScope.none) {
+      return { scope: WorkspaceScope.none };
+    }
+    if (parsed.scope === WorkspaceScope.workspace) {
+      const workspace = sanitizeWorkspaceName(parsed.workspace ?? '');
+      return workspace
+        ? { scope: WorkspaceScope.workspace, workspace }
+        : null;
+    }
+    if (parsed.scope === WorkspaceScope.accessible) {
+      return { scope: WorkspaceScope.accessible };
+    }
+    return null;
   } catch {
     return null;
   }

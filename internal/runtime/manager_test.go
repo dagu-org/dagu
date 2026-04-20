@@ -200,6 +200,53 @@ steps:
 		require.Equal(t, core.Failed, persisted.Status)
 		require.Equal(t, core.NodeFailed, persisted.Nodes[0].Status)
 	})
+	t.Run("GetLatestStatusKeepsRunAliveWithFreshRunHeartbeat", func(t *testing.T) {
+		dag := th.DAG(t, `steps:
+  - name: "1"
+    command: "exit 0"
+`)
+
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		now := time.Now()
+		ctx := th.Context
+
+		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
+		require.NoError(t, err)
+		require.NoError(t, att.Open(ctx))
+
+		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.AttemptID = att.ID()
+		runningStatus.AttemptKey = exec.GenerateAttemptKey(dag.Name, dagRunID, dag.Name, dagRunID, runningStatus.AttemptID)
+		staleAt := time.Now().Add(-3 * time.Second)
+		runningStatus.StartedAt = staleAt.UTC().Format(time.RFC3339)
+		runningStatus.CreatedAt = staleAt.UnixMilli()
+		require.NoError(t, att.Write(ctx, runningStatus))
+		require.NoError(t, att.Close(ctx))
+
+		proc, err := th.ProcStore.Acquire(ctx, dag.ProcGroup(), exec.ProcMeta{
+			StartedAt:    time.Now().Unix(),
+			Name:         dag.Name,
+			DAGRunID:     dagRunID,
+			AttemptID:    "fresh-other-attempt",
+			RootName:     dag.Name,
+			RootDAGRunID: dagRunID,
+		})
+		require.NoError(t, err)
+		defer func() {
+			_ = proc.Stop(ctx)
+		}()
+
+		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, latest.Status)
+		require.Equal(t, core.NodeRunning, latest.Nodes[0].Status)
+		require.Empty(t, latest.Error)
+
+		persisted, err := att.ReadStatus(ctx)
+		require.NoError(t, err)
+		require.Equal(t, core.Running, persisted.Status)
+		require.Equal(t, core.NodeRunning, persisted.Nodes[0].Status)
+	})
 	t.Run("GetSavedStatusRepairsStaleRun", func(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: "1"

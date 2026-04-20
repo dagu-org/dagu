@@ -28,6 +28,18 @@ func toSchedule(s core.Schedule) api.Schedule {
 	return schedule
 }
 
+func workspaceResponseNameFromLabels(labels core.Labels) *string {
+	workspaceName, ok := exec.WorkspaceNameFromLabels(labels)
+	if !ok {
+		return nil
+	}
+	return ptrOf(workspaceName)
+}
+
+func workspaceResponseNameFromLabelStrings(labels []string) *string {
+	return workspaceResponseNameFromLabels(core.NewLabels(labels))
+}
+
 func toDAG(dag *core.DAG) api.DAG {
 	schedules := make([]api.Schedule, len(dag.Schedule))
 	for i, s := range dag.Schedule {
@@ -37,6 +49,7 @@ func toDAG(dag *core.DAG) api.DAG {
 	return api.DAG{
 		Name:          dag.Name,
 		Group:         ptrOf(dag.Group),
+		Workspace:     workspaceResponseNameFromLabels(dag.Labels),
 		Description:   ptrOf(dag.Description),
 		Params:        ptrOf(dag.Params),
 		DefaultParams: ptrOf(dag.DefaultParams),
@@ -198,6 +211,7 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	return api.DAGRunSummary{
 		Name:               s.Name,
 		DagRunId:           s.DAGRunID,
+		Workspace:          workspaceResponseNameFromLabelStrings(s.Labels),
 		Params:             ptrOf(s.Params),
 		QueuedAt:           ptrOf(s.QueuedAt),
 		AutoRetryCount:     s.AutoRetryCount,
@@ -261,6 +275,7 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		Name:               s.Name,
 		Params:             ptrOf(s.Params),
 		DagRunId:           s.DAGRunID,
+		Workspace:          workspaceResponseNameFromLabelStrings(s.Labels),
 		QueuedAt:           ptrOf(s.QueuedAt),
 		AutoRetryCount:     s.AutoRetryCount,
 		AutoRetryLimit:     autoRetryLimit,

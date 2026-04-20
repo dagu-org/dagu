@@ -417,6 +417,18 @@ func (m *Manager) repairStaleLocalRunIfDead(
 		return st, nil
 	}
 
+	runAlive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), st.DAGRun())
+	if err != nil {
+		return nil, fmt.Errorf("check run alive: %w", err)
+	}
+	if runAlive {
+		logger.Debug(ctx, "Skipping stale local run repair because DAG run still has a fresh proc heartbeat",
+			tag.RunID(st.DAGRunID),
+			tag.AttemptID(st.AttemptID),
+		)
+		return st, nil
+	}
+
 	repaired, _, err := RepairStaleLocalRun(ctx, attempt, dag)
 	if err != nil {
 		return nil, fmt.Errorf("repair stale local run: %w", err)

@@ -25,6 +25,8 @@ type workspaceScopeSelection struct {
 	explicit  bool
 }
 
+const invalidWorkspaceLabelName = "\x00invalid-workspace-label"
+
 func toAPIWorkspaceAccess(access *auth.WorkspaceAccess) api.WorkspaceAccess {
 	normalized := auth.NormalizeWorkspaceAccess(access)
 	grants := make([]api.WorkspaceGrant, 0, len(normalized.Grants))
@@ -196,33 +198,48 @@ func dagWorkspaceName(dag *core.DAG) string {
 	if dag == nil {
 		return ""
 	}
-	workspaceName, ok := exec.WorkspaceNameFromLabels(dag.Labels)
-	if !ok {
+	workspaceName, state := exec.WorkspaceLabelFromLabels(dag.Labels)
+	switch state {
+	case exec.WorkspaceLabelValid:
+		return workspaceName
+	case exec.WorkspaceLabelInvalid:
+		return invalidWorkspaceLabelName
+	case exec.WorkspaceLabelMissing:
 		return ""
 	}
-	return workspaceName
+	return ""
 }
 
 func statusWorkspaceName(status *exec.DAGRunStatus) string {
 	if status == nil {
 		return ""
 	}
-	workspaceName, ok := exec.WorkspaceNameFromLabels(core.NewLabels(status.Labels))
-	if !ok {
+	workspaceName, state := exec.WorkspaceLabelFromLabels(core.NewLabels(status.Labels))
+	switch state {
+	case exec.WorkspaceLabelValid:
+		return workspaceName
+	case exec.WorkspaceLabelInvalid:
+		return invalidWorkspaceLabelName
+	case exec.WorkspaceLabelMissing:
 		return ""
 	}
-	return workspaceName
+	return ""
 }
 
 func workspaceNameFromLabelString(labels string) string {
 	if strings.TrimSpace(labels) == "" {
 		return ""
 	}
-	workspaceName, ok := exec.WorkspaceNameFromLabels(core.NewLabels(strings.Split(labels, ",")))
-	if !ok {
+	workspaceName, state := exec.WorkspaceLabelFromLabels(core.NewLabels(strings.Split(labels, ",")))
+	switch state {
+	case exec.WorkspaceLabelValid:
+		return workspaceName
+	case exec.WorkspaceLabelInvalid:
+		return invalidWorkspaceLabelName
+	case exec.WorkspaceLabelMissing:
 		return ""
 	}
-	return workspaceName
+	return ""
 }
 
 func runtimeWorkspaceName(dag *core.DAG, labels string) string {
@@ -352,7 +369,9 @@ func (a *API) workspaceNameForDAGRun(ctx context.Context, dagRun exec.DAGRunRef)
 func workspaceNameForAttempt(ctx context.Context, attempt exec.DAGRunAttempt) (string, error) {
 	status, err := attempt.ReadStatus(ctx)
 	if err == nil && status != nil {
-		return statusWorkspaceName(status), nil
+		if workspaceName := statusWorkspaceName(status); workspaceName != "" {
+			return workspaceName, nil
+		}
 	}
 	dag, dagErr := attempt.ReadDAG(ctx)
 	if dagErr != nil {

@@ -12,25 +12,46 @@ import (
 
 const WorkspaceLabelKey = "workspace"
 
+// WorkspaceLabelState describes whether labels contain a usable workspace.
+type WorkspaceLabelState int
+
+const (
+	// WorkspaceLabelMissing means no workspace label is present.
+	WorkspaceLabelMissing WorkspaceLabelState = iota
+	// WorkspaceLabelValid means exactly one valid workspace label value is present.
+	WorkspaceLabelValid
+	// WorkspaceLabelInvalid means a workspace label is present but malformed or ambiguous.
+	WorkspaceLabelInvalid
+)
+
 // WorkspaceNameFromLabels returns a valid single workspace label value.
 //
-// Missing, invalid, or conflicting workspace labels are treated as unscoped so
-// legacy and malformed DAGs remain visible to all users.
+// Missing, invalid, or conflicting workspace labels return ok=false. Use
+// WorkspaceLabelFromLabels when callers must distinguish missing from malformed
+// labels.
 func WorkspaceNameFromLabels(labels core.Labels) (string, bool) {
+	workspaceName, state := WorkspaceLabelFromLabels(labels)
+	return workspaceName, state == WorkspaceLabelValid
+}
+
+func WorkspaceLabelFromLabels(labels core.Labels) (string, WorkspaceLabelState) {
 	var workspaceName string
 	for _, value := range labels.Get(WorkspaceLabelKey) {
 		if value == "" {
-			continue
+			return "", WorkspaceLabelInvalid
 		}
 		if err := workspace.ValidateName(value); err != nil {
-			return "", false
+			return value, WorkspaceLabelInvalid
 		}
 		if workspaceName != "" && workspaceName != value {
-			return "", false
+			return workspaceName, WorkspaceLabelInvalid
 		}
 		workspaceName = value
 	}
-	return workspaceName, workspaceName != ""
+	if workspaceName == "" {
+		return "", WorkspaceLabelMissing
+	}
+	return workspaceName, WorkspaceLabelValid
 }
 
 // WorkspaceFilter restricts list/search results to allowed workspaces.
@@ -45,9 +66,15 @@ func (f *WorkspaceFilter) MatchesLabels(labels core.Labels) bool {
 	if f == nil || !f.Enabled {
 		return true
 	}
-	workspaceName, ok := WorkspaceNameFromLabels(labels)
-	if !ok {
+	workspaceName, state := WorkspaceLabelFromLabels(labels)
+	switch state {
+	case WorkspaceLabelMissing:
 		return f.IncludeUnlabelled
+	case WorkspaceLabelInvalid:
+		return false
+	case WorkspaceLabelValid:
+		return slices.Contains(f.Workspaces, workspaceName)
+	default:
+		return false
 	}
-	return slices.Contains(f.Workspaces, workspaceName)
 }

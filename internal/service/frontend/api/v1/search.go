@@ -93,6 +93,7 @@ func toDAGSearchPageItem(item exec.SearchDAGResult) api.DAGSearchPageItem {
 	return api.DAGSearchPageItem{
 		FileName:          item.FileName,
 		Name:              name,
+		Workspace:         optionalString(item.Workspace),
 		HasMoreMatches:    item.HasMoreMatches,
 		NextMatchesCursor: optionalString(item.NextMatchesCursor),
 		Matches:           toSearchMatchItems(item.Matches),
@@ -108,22 +109,34 @@ func toDAGSearchFeedResponse(result *exec.CursorResult[exec.SearchDAGResult]) ap
 	}
 }
 
-func toDocSearchPageItem(item agent.DocSearchResult) api.DocSearchPageItem {
+func toDocSearchPageItem(
+	item agent.DocSearchResult,
+	workspaceName string,
+	visibility docWorkspaceVisibility,
+) api.DocSearchPageItem {
 	return api.DocSearchPageItem{
 		Id:                item.ID,
 		Title:             item.Title,
+		Workspace:         docWorkspaceValue(workspaceName, item.ID, visibility, false),
 		HasMoreMatches:    item.HasMoreMatches,
 		NextMatchesCursor: optionalString(item.NextMatchesCursor),
 		Matches:           toSearchMatchItems(item.Matches),
 	}
 }
 
-func toDocSearchFeedResponse(result *exec.CursorResult[agent.DocSearchResult]) api.DocSearchFeedResponse {
-	items, hasMore, nextCursor := mapCursorItems(result, toDocSearchPageItem)
+func toDocSearchFeedResponse(
+	result *exec.CursorResult[agent.DocSearchResult],
+	workspaceName string,
+	visibility docWorkspaceVisibility,
+) api.DocSearchFeedResponse {
+	items := make([]api.DocSearchPageItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toDocSearchPageItem(item, workspaceName, visibility))
+	}
 	return api.DocSearchFeedResponse{
 		Results:    items,
-		HasMore:    hasMore,
-		NextCursor: nextCursor,
+		HasMore:    result.HasMore,
+		NextCursor: optionalString(result.NextCursor),
 	}
 }
 
@@ -221,7 +234,7 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 		result.Items = items
 	}
 
-	return api.SearchDocFeed200JSONResponse(toDocSearchFeedResponse(result)), nil
+	return api.SearchDocFeed200JSONResponse(toDocSearchFeedResponse(result, workspaceName, visibility)), nil
 }
 
 // SearchDagMatches returns cursor-based snippets for one DAG result.

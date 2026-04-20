@@ -6366,7 +6366,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
@@ -6485,7 +6485,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6530,7 +6530,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6563,7 +6563,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6615,7 +6615,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
@@ -7012,6 +7012,14 @@ components:
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceScope"
+
+    WorkspaceMutationScope:
+      name: workspaceScope
+      in: query
+      description: "Explicit mutable workspace scope: no-workspace data or one named workspace"
+      required: false
+      schema:
+        $ref: "#/components/schemas/WorkspaceMutationScope"
 
     SearchCursor:
       name: cursor
@@ -8004,6 +8012,9 @@ components:
         name:
           type: string
           description: "Logical name of the DAG"
+        workspace:
+          type: string
+          description: "Workspace label value for the DAG. Omitted for no-workspace DAGs and invalid workspace labels."
         schedule:
           type: array
           description: "List of scheduling expressions defining when DAG-runs should be created from this DAG"
@@ -8519,6 +8530,9 @@ components:
           $ref: "#/components/schemas/DAGRunId"
         name:
           $ref: "#/components/schemas/DAGName"
+        workspace:
+          type: string
+          description: "Workspace label value for the DAG-run. Omitted for no-workspace DAG-runs and invalid workspace labels."
         status:
           $ref: "#/components/schemas/Status"
         statusLabel:
@@ -9037,6 +9051,9 @@ components:
         name:
           type: string
           description: "Display label for the DAG result; file-backed search currently mirrors fileName"
+        workspace:
+          type: string
+          description: "Workspace label value for the matching DAG. Omitted for no-workspace DAGs and invalid workspace labels."
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
@@ -9078,6 +9095,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for no-workspace documents."
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
@@ -9571,6 +9591,13 @@ components:
       description: "Workspace scope selector for list and search APIs"
       enum:
         - accessible
+        - none
+        - workspace
+
+    WorkspaceMutationScope:
+      type: string
+      description: "Workspace scope selector for mutation APIs"
+      enum:
         - none
         - workspace
 
@@ -10675,6 +10702,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for no-workspace documents."
         content:
           type: string
           description: "Full file content including YAML frontmatter"
@@ -10701,6 +10731,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for no-workspace documents."
         modifiedAt:
           type: string
           format: date-time
@@ -10720,6 +10753,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this node. Omitted for no-workspace nodes."
         type:
           type: string
           enum:
@@ -10762,6 +10798,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for no-workspace documents."
         matches:
           type: array
           items:
