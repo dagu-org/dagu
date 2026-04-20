@@ -392,6 +392,26 @@ steps:
 `,
 		},
 		{
+			name: "LimitZero",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 0
+steps:
+  - command: echo hi
+`,
+		},
+		{
+			name: "StringLimitZero",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: "0"
+steps:
+  - command: echo hi
+`,
+		},
+		{
 			name: "RejectsMissingLimit",
 			spec: `
 name: retryable-dag
@@ -415,12 +435,58 @@ steps:
 			wantErr: "retry_policy",
 		},
 		{
+			name: "RejectsNegativeLimit",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: -1
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsNegativeStringLimit",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: "-1"
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
 			name: "RejectsNonNumericStringInterval",
 			spec: `
 name: retryable-dag
 retry_policy:
   limit: 3
   interval_sec: later
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsZeroInterval",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 1
+  interval_sec: 0
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsZeroMaxInterval",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 1
+  max_interval_sec: 0
 steps:
   - command: echo hi
 `,

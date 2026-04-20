@@ -892,7 +892,7 @@
             { "type": "integer" },
             { "type": "string" }
           ],
-          "description": "Maximum number of retry attempts"
+          "description": "Maximum number of retry attempts for a failed step. Use 0 to disable automatic retries for that step."
         },
         "interval_sec": {
           "oneOf": [
@@ -937,10 +937,10 @@
       "properties": {
         "limit": {
           "oneOf": [
-            { "type": "integer", "minimum": 1 },
-            { "type": "string", "pattern": "^0*[1-9][0-9]*$" }
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]+$" }
           ],
-          "description": "Maximum number of retry attempts"
+          "description": "Maximum number of scheduler-issued DAG retry attempts. Use 0 to disable DAG-level automatic retries."
         },
         "interval_sec": {
           "oneOf": [

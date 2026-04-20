@@ -1000,7 +1000,7 @@ func parseDAGRetryInterval(v any) (time.Duration, string, error) {
 	if v == nil {
 		return 60 * time.Second, "", nil
 	}
-	interval, intervalStr, err := parseConcreteDAGRetryInt("retry_policy.interval_sec", v)
+	interval, intervalStr, err := parseConcreteDAGRetryInt("retry_policy.interval_sec", v, false)
 	if err != nil {
 		return 0, "", err
 	}
@@ -1019,7 +1019,7 @@ func parseDAGRetryMaxInterval(v any) (time.Duration, error) {
 	if v == nil {
 		return time.Hour, nil
 	}
-	seconds, _, err := parseConcreteDAGRetryInt("retry_policy.max_interval_sec", v)
+	seconds, _, err := parseConcreteDAGRetryInt("retry_policy.max_interval_sec", v, false)
 	if err != nil {
 		return 0, err
 	}
@@ -1030,31 +1030,39 @@ func parseDAGRetryLimit(v any) (int, error) {
 	if v == nil {
 		return 0, core.NewValidationError("retry_policy.limit", nil, fmt.Errorf("limit is required when retry_policy is specified"))
 	}
-	limit, _, err := parseConcreteDAGRetryInt("retry_policy.limit", v)
+	limit, _, err := parseConcreteDAGRetryInt("retry_policy.limit", v, true)
 	if err != nil {
 		return 0, err
 	}
 	return limit, nil
 }
 
-func parseConcreteDAGRetryInt(fieldName string, val any) (int, string, error) {
+func parseConcreteDAGRetryInt(fieldName string, val any, allowZero bool) (int, string, error) {
+	invalidPositiveValue := func(value any) (int, string, error) {
+		operator := "> 0"
+		if allowZero {
+			operator = ">= 0"
+		}
+		return 0, "", core.NewValidationError(fieldName, value, fmt.Errorf("%s must be %s", retryFieldLabel(fieldName), operator))
+	}
+
 	switch v := val.(type) {
 	case int:
-		if v <= 0 {
-			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		if v < 0 || (!allowZero && v == 0) {
+			return invalidPositiveValue(v)
 		}
 		return v, "", nil
 	case int64:
-		if v <= 0 {
-			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		if v < 0 || (!allowZero && v == 0) {
+			return invalidPositiveValue(v)
 		}
 		if v > math.MaxInt {
 			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("value %d exceeds maximum int", v))
 		}
 		return int(v), "", nil
 	case uint64:
-		if v == 0 {
-			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		if !allowZero && v == 0 {
+			return invalidPositiveValue(v)
 		}
 		if v > math.MaxInt {
 			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("value %d exceeds maximum int", v))
@@ -1065,8 +1073,8 @@ func parseConcreteDAGRetryInt(fieldName string, val any) (int, string, error) {
 		if err != nil {
 			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be an integer or numeric string", retryFieldLabel(fieldName)))
 		}
-		if parsed <= 0 {
-			return 0, "", core.NewValidationError(fieldName, v, fmt.Errorf("%s must be > 0", retryFieldLabel(fieldName)))
+		if parsed < 0 || (!allowZero && parsed == 0) {
+			return invalidPositiveValue(v)
 		}
 		return parsed, v, nil
 	default:

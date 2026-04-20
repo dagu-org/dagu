@@ -1948,6 +1948,30 @@ steps:
 		require.Equal(t, 60*time.Second, dag.RetryPolicy.Interval)
 	})
 
+	t.Run("BaseConfigDAGRetryPolicyCanBeDisabledByChild", func(t *testing.T) {
+		t.Parallel()
+
+		base := createTempYAMLFile(t, `
+retry_policy:
+  limit: 3
+  interval_sec: 30
+  max_interval_sec: 300
+`)
+		child := createTempYAMLFile(t, `
+retry_policy:
+  limit: 0
+steps:
+  - name: step1
+    command: echo "test"
+`)
+		dag, err := spec.Load(context.Background(), child, spec.WithBaseConfig(base))
+		require.NoError(t, err)
+		require.NotNil(t, dag.RetryPolicy)
+		require.Equal(t, 0, dag.RetryPolicy.Limit)
+		require.Equal(t, 60*time.Second, dag.RetryPolicy.Interval)
+		require.Equal(t, time.Hour, dag.RetryPolicy.MaxInterval)
+	})
+
 	t.Run("DAGRetryPolicyNormalization", func(t *testing.T) {
 		t.Parallel()
 
@@ -1975,6 +1999,38 @@ steps:
 					IntervalSecStr: "60",
 					Backoff:        2.0,
 					MaxInterval:    300 * time.Second,
+				},
+			},
+			{
+				name: "LimitZeroDefaultsRetryIntervals",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 0
+steps:
+  - command: echo hi
+`,
+				wantPolicy: &core.DAGRetryPolicy{
+					Limit:       0,
+					Interval:    60 * time.Second,
+					Backoff:     0,
+					MaxInterval: time.Hour,
+				},
+			},
+			{
+				name: "StringLimitZeroDefaultsRetryIntervals",
+				spec: `
+name: retryable
+retry_policy:
+  limit: "0"
+steps:
+  - command: echo hi
+`,
+				wantPolicy: &core.DAGRetryPolicy{
+					Limit:       0,
+					Interval:    60 * time.Second,
+					Backoff:     0,
+					MaxInterval: time.Hour,
 				},
 			},
 			{
@@ -2008,12 +2064,58 @@ steps:
 				errContains: "retry_policy.limit",
 			},
 			{
+				name: "RejectsNegativeLimit",
+				spec: `
+name: retryable
+retry_policy:
+  limit: -1
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.limit",
+			},
+			{
+				name: "RejectsNegativeStringLimit",
+				spec: `
+name: retryable
+retry_policy:
+  limit: "-1"
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.limit",
+			},
+			{
 				name: "RejectsNonNumericStringInterval",
 				spec: `
 name: retryable
 retry_policy:
   limit: 3
   interval_sec: later
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.interval_sec",
+			},
+			{
+				name: "RejectsZeroInterval",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 1
+  interval_sec: 0
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.interval_sec",
+			},
+			{
+				name: "RejectsNegativeInterval",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 1
+  interval_sec: -1
 steps:
   - command: echo hi
 `,
@@ -2031,6 +2133,30 @@ steps:
   - command: echo hi
 `,
 				errContains: "retry_policy.backoff",
+			},
+			{
+				name: "RejectsZeroMaxInterval",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 1
+  max_interval_sec: 0
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.max_interval_sec",
+			},
+			{
+				name: "RejectsNegativeMaxInterval",
+				spec: `
+name: retryable
+retry_policy:
+  limit: 1
+  max_interval_sec: -1
+steps:
+  - command: echo hi
+`,
+				errContains: "retry_policy.max_interval_sec",
 			},
 		}
 
