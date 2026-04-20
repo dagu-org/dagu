@@ -96,10 +96,7 @@ func directSleepStepYAML(t *testing.T, d time.Duration) string {
 		commandPath, err := osexec.LookPath("ping")
 		require.NoError(t, err)
 
-		seconds := int((d + time.Second - 1) / time.Second)
-		if seconds < 1 {
-			seconds = 1
-		}
+		seconds := max(int((d+time.Second-1)/time.Second), 1)
 
 		return fmt.Sprintf(
 			"exec:\n      command: %s\n      args: [%s, %s, %s]",
