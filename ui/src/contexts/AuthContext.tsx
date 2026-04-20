@@ -176,7 +176,8 @@ export function useCanWrite(): boolean {
   const appBarContext = useContext(AppBarContext);
   if (config.authMode !== 'builtin') return config.permissions.writeDags;
   if (!user) return false;
-  if (appBarContext.workspaceSelection?.scope === WorkspaceScope.accessible) {
+  const scope = appBarContext.workspaceSelection?.scope;
+  if (scope === undefined || scope === WorkspaceScope.accessible) {
     return false;
   }
   return roleAtLeast(
@@ -191,7 +192,8 @@ export function useCanExecute(): boolean {
   const appBarContext = useContext(AppBarContext);
   if (config.authMode !== 'builtin') return config.permissions.runDags;
   if (!user) return false;
-  if (appBarContext.workspaceSelection?.scope === WorkspaceScope.accessible) {
+  const scope = appBarContext.workspaceSelection?.scope;
+  if (scope === undefined || scope === WorkspaceScope.accessible) {
     return false;
   }
   return roleAtLeast(

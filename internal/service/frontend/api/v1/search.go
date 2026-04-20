@@ -192,22 +192,9 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 	if err != nil {
 		return nil, err
 	}
-	selection, err := parseWorkspaceScope(request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
-	}
-	if selection.scope == api.WorkspaceScopeWorkspace {
-		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
-			return nil, err
-		}
-	}
-	visibility, err := a.docWorkspaceVisibilityForSelection(ctx, selection)
-	if err != nil {
-		return nil, err
-	}
-	workspaceName := ""
-	if selection.scope == api.WorkspaceScopeWorkspace {
-		workspaceName = selection.workspace
 	}
 
 	result, err := a.docStore.SearchCursor(ctx, agent.SearchDocsOptions{
@@ -283,22 +270,9 @@ func (a *API) SearchDocMatches(ctx context.Context, request api.SearchDocMatches
 	if err := validateDocPath(request.Params.Path); err != nil {
 		return nil, err
 	}
-	selection, err := parseWorkspaceScope(request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceName, visibility, err := a.docPointReadScopeForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
-	}
-	if selection.scope == api.WorkspaceScopeWorkspace {
-		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
-			return nil, err
-		}
-	}
-	visibility, err := a.docWorkspaceVisibilityForSelection(ctx, selection)
-	if err != nil {
-		return nil, err
-	}
-	workspaceName := ""
-	if selection.scope == api.WorkspaceScopeWorkspace {
-		workspaceName = selection.workspace
 	}
 	if workspaceName == "" && !visibility.all {
 		if !visibility.visible(request.Params.Path) {

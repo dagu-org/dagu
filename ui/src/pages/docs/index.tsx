@@ -27,9 +27,11 @@ import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import {
   isMutableWorkspaceSelection,
+  sanitizeWorkspaceName,
   workspaceMutationSelectionQuery,
   workspaceSelectionKey,
   workspaceSelectionQuery,
+  visibleDocumentPathForWorkspace,
 } from '@/lib/workspace';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { CreateDocModal } from './components/CreateDocModal';
@@ -41,17 +43,6 @@ import type { ContextAction } from './components/DocArboristNode';
 function titleFromPath(docPath: string): string {
   const segments = docPath.split('/');
   return segments[segments.length - 1] || docPath;
-}
-
-function normalizeDocPathForWorkspace(
-  docPath: string,
-  workspaceName: string
-): string {
-  if (!workspaceName) {
-    return docPath;
-  }
-  const prefix = `${workspaceName}/`;
-  return docPath.startsWith(prefix) ? docPath.slice(prefix.length) : docPath;
 }
 
 function DocsContent() {
@@ -191,13 +182,17 @@ function DocsContent() {
     if (isNavigatingRef.current) return;
     const docPath = location.pathname.replace(/^\/docs\/?/, '');
     if (docPath) {
-      const decodedPath = normalizeDocPathForWorkspace(
-        decodeURIComponent(docPath),
-        selectedWorkspace
+      const queryWorkspace = sanitizeWorkspaceName(
+        new URLSearchParams(location.search).get('workspace') ?? ''
       );
-      openDoc(decodedPath, titleFromPath(decodedPath));
+      const docWorkspace = queryWorkspace || selectedWorkspace || null;
+      const decodedPath = visibleDocumentPathForWorkspace(
+        decodeURIComponent(docPath),
+        docWorkspace
+      );
+      openDoc(decodedPath, titleFromPath(decodedPath), docWorkspace);
     }
-  }, [location.pathname, openDoc, selectedWorkspace]);
+  }, [location.pathname, location.search, openDoc, selectedWorkspace]);
 
   // Tab → URL (skip on initial mount — URL takes precedence)
   useEffect(() => {
@@ -211,9 +206,18 @@ function DocsContent() {
       : null;
     const docPath = activeTab?.docPath;
     const currentPath = location.pathname.replace(/^\/docs\/?/, '');
+    const targetSearch = activeTab?.workspace
+      ? `?workspace=${encodeURIComponent(activeTab.workspace)}`
+      : '';
     if (docPath && docPath !== decodeURIComponent(currentPath)) {
       isNavigatingRef.current = true;
-      navigate('/docs/' + docPath, { replace: true });
+      navigate('/docs/' + docPath + targetSearch, { replace: true });
+      requestAnimationFrame(() => {
+        isNavigatingRef.current = false;
+      });
+    } else if (docPath && location.search !== targetSearch) {
+      isNavigatingRef.current = true;
+      navigate('/docs/' + docPath + targetSearch, { replace: true });
       requestAnimationFrame(() => {
         isNavigatingRef.current = false;
       });
@@ -224,12 +228,13 @@ function DocsContent() {
         isNavigatingRef.current = false;
       });
     }
-  }, [activeTabId, tabs, navigate, location.pathname]);
+  }, [activeTabId, tabs, navigate, location.pathname, location.search]);
 
   // File selection handler
   const handleSelectFile = useCallback(
-    (docPath: string, title: string) => {
-      openDoc(docPath, title);
+    (docPath: string, title: string, workspace?: string | null) => {
+      const visiblePath = visibleDocumentPathForWorkspace(docPath, workspace);
+      openDoc(visiblePath, title, workspace ?? null);
       if (isMobile) setMobileView('editor');
     },
     [openDoc, isMobile]
@@ -288,7 +293,7 @@ function DocsContent() {
           return;
         }
         mutate();
-        openDoc(path, titleFromPath(path));
+        openDoc(path, titleFromPath(path), selectedWorkspace || null);
         showToast('Document created');
         setCreateModalOpen(false);
       } catch {
@@ -304,6 +309,7 @@ function DocsContent() {
       workspaceMutationQuery,
       mutate,
       openDoc,
+      selectedWorkspace,
       showToast,
     ]
   );

@@ -7035,8 +7035,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
@@ -13078,8 +13078,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope: accessible data, no-workspace data, or one named workspace */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Explicit mutable workspace scope: no-workspace data or one named workspace */
+                workspaceScope?: components["parameters"]["WorkspaceMutationScope"];
                 /** @description workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */

@@ -171,6 +171,41 @@ export function workspaceMutationSelectionQuery(
   return { workspaceScope: WorkspaceMutationScope.none };
 }
 
+export function workspaceDocumentSelectionQuery(
+  selection?: Partial<WorkspaceSelection> | null
+): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
+  return (
+    workspaceMutationSelectionQuery(selection) ?? {
+      workspaceScope: WorkspaceMutationScope.none,
+    }
+  );
+}
+
+export function workspaceDocumentQueryForWorkspace(
+  workspace?: string | null
+): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
+  const sanitized = sanitizeWorkspaceName(workspace ?? '');
+  if (!sanitized) {
+    return { workspaceScope: WorkspaceMutationScope.none };
+  }
+  return {
+    workspaceScope: WorkspaceMutationScope.workspace,
+    workspace: sanitized,
+  };
+}
+
+export function visibleDocumentPathForWorkspace(
+  docPath: string,
+  workspace?: string | null
+): string {
+  const sanitized = sanitizeWorkspaceName(workspace ?? '');
+  if (!sanitized) {
+    return docPath;
+  }
+  const prefix = `${sanitized}/`;
+  return docPath.startsWith(prefix) ? docPath.slice(prefix.length) : docPath;
+}
+
 function parseStoredWorkspaceSelection(
   value: string
 ): WorkspaceSelection | null {

@@ -12,9 +12,8 @@ import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import {
   isMutableWorkspaceSelection,
-  workspaceMutationSelectionQuery,
-  workspaceSelectionKey,
-  workspaceSelectionQuery,
+  workspaceDocumentQueryForWorkspace,
+  workspaceDocumentSelectionQuery,
 } from '@/lib/workspace';
 import { cn } from '@/lib/utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
@@ -40,27 +39,35 @@ import DocExternalChangeDialog from './DocExternalChangeDialog';
 type Props = {
   tabId: string;
   docPath: string;
+  workspace?: string | null;
   onDeleteDoc?: () => void;
   onContentChange?: (content: string | null) => void;
 };
 
-function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
+function DocEditor({
+  tabId,
+  docPath,
+  workspace,
+  onDeleteDoc,
+  onContentChange,
+}: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const workspaceSelection = appBarContext.workspaceSelection;
   const workspaceQuery = useMemo(
-    () => workspaceSelectionQuery(workspaceSelection),
-    [workspaceSelection]
+    () =>
+      workspace === undefined
+        ? workspaceDocumentSelectionQuery(workspaceSelection)
+        : workspaceDocumentQueryForWorkspace(workspace),
+    [workspace, workspaceSelection]
   );
-  const workspaceMutationQuery = useMemo(
-    () => workspaceMutationSelectionQuery(workspaceSelection),
-    [workspaceSelection]
+  const workspaceScopeKey = useMemo(
+    () => JSON.stringify(workspaceQuery),
+    [workspaceQuery]
   );
-  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
   const canWrite = useCanWrite();
-  const canEdit =
-    canWrite && isMutableWorkspaceSelection(workspaceSelection);
+  const canEdit = canWrite && isMutableWorkspaceSelection(workspaceSelection);
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
@@ -173,19 +180,14 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   }, [currentValue, onContentChange]);
 
   const handleSave = useCallback(async () => {
-    if (
-      isSaving ||
-      !canEdit ||
-      !workspaceMutationQuery ||
-      !hasUnsavedChangesRef.current
-    ) {
+    if (isSaving || !canEdit || !hasUnsavedChangesRef.current) {
       return;
     }
     setIsSaving(true);
     try {
       const { error } = await client.PATCH('/docs/doc', {
         params: {
-          query: { remoteNode, path: docPath, ...workspaceMutationQuery },
+          query: { remoteNode, path: docPath, ...workspaceQuery },
         },
         body: { content: currentValueRef.current ?? '' },
       });
@@ -207,7 +209,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   }, [
     isSaving,
     canEdit,
-    workspaceMutationQuery,
+    workspaceQuery,
     client,
     remoteNode,
     docPath,

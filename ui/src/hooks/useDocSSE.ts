@@ -11,7 +11,9 @@ export function useDocSSE(
   enabled: boolean = true,
   workspaceQuery: {
     workspace?: components['parameters']['Workspace'];
-    workspaceScope?: components['parameters']['WorkspaceScope'];
+    workspaceScope?:
+      | components['parameters']['WorkspaceScope']
+      | components['parameters']['WorkspaceMutationScope'];
   } = {},
   remoteNode: components['parameters']['RemoteNode'] = 'local'
 ): SSEState<DocResponse> {

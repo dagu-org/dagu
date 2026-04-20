@@ -1709,7 +1709,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "path"
           in: "query"
@@ -6449,7 +6449,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query

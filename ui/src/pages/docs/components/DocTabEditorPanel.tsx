@@ -115,6 +115,7 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
             key={activeTab.id}
             tabId={activeTab.id}
             docPath={activeTab.docPath}
+            workspace={activeTab.workspace}
             onDeleteDoc={onDeleteDoc ? () => onDeleteDoc(activeTab.docPath, activeTab.title) : undefined}
             onContentChange={onContentChange}
           />

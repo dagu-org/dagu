@@ -4,7 +4,11 @@
 import { Button } from '@/components/ui/button';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
-import { workspaceSelectionQuery } from '@/lib/workspace';
+import {
+  visibleDocumentPathForWorkspace,
+  workspaceDocumentQueryForWorkspace,
+  workspaceSelectionQuery,
+} from '@/lib/workspace';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
@@ -206,35 +210,47 @@ function SearchResult(props: Props) {
             };
           },
         }))
-      : results.map((result) => ({
-          key: `doc-${result.id}-${query}`,
-          kind: 'Doc' as const,
-          title: result.title,
-          link: `/docs/${encodeURI(result.id)}`,
-          initialMatches: result.matches ?? [],
-          initialHasMoreMatches: result.hasMoreMatches,
-          initialNextCursor: result.nextMatchesCursor,
-          loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
-            const response = await client.GET('/search/docs/matches', {
-              params: {
-                query: {
-                  remoteNode,
-                  path: result.id,
-                  q: query,
-                  cursor,
-                  ...workspaceQuery,
+      : results.map((result) => {
+          const docPath = visibleDocumentPathForWorkspace(
+            result.id,
+            result.workspace
+          );
+          const docWorkspaceQuery = workspaceDocumentQueryForWorkspace(
+            result.workspace
+          );
+          const linkSearch = result.workspace
+            ? `?workspace=${encodeURIComponent(result.workspace)}`
+            : '';
+          return {
+            key: `doc-${result.id}-${result.workspace ?? ''}-${query}`,
+            kind: 'Doc' as const,
+            title: result.title,
+            link: `/docs/${encodeURI(docPath)}${linkSearch}`,
+            initialMatches: result.matches ?? [],
+            initialHasMoreMatches: result.hasMoreMatches,
+            initialNextCursor: result.nextMatchesCursor,
+            loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
+              const response = await client.GET('/search/docs/matches', {
+                params: {
+                  query: {
+                    remoteNode,
+                    path: docPath,
+                    q: query,
+                    cursor,
+                    ...docWorkspaceQuery,
+                  },
                 },
-              },
-            });
+              });
 
-            return {
-              error: response.error?.message || undefined,
-              matches: response.data?.matches ?? [],
-              hasMore: response.data?.hasMore ?? false,
-              nextCursor: response.data?.nextCursor,
-            };
-          },
-        }));
+              return {
+                error: response.error?.message || undefined,
+                matches: response.data?.matches ?? [],
+                hasMore: response.data?.hasMore ?? false,
+                nextCursor: response.data?.nextCursor,
+              };
+            },
+          };
+        });
 
   return (
     <ul className="divide-y rounded-md border">

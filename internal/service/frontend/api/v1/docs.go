@@ -157,7 +157,7 @@ func (a *API) docWorkspaceVisibility(ctx context.Context) (docWorkspaceVisibilit
 }
 
 func (a *API) noWorkspaceDocVisibility(ctx context.Context) (docWorkspaceVisibility, error) {
-	known, err := a.knownDocWorkspaceNames(ctx, true)
+	known, err := a.knownDocWorkspaceNames(ctx, false)
 	if err != nil {
 		return docWorkspaceVisibility{}, err
 	}
@@ -202,7 +202,7 @@ func (a *API) docReadScopeForParams(
 	return "", visibility, nil
 }
 
-func docMutationScopeForParams(scopeParam *api.WorkspaceMutationScope, workspaceParam *api.Workspace) (string, error) {
+func parseWorkspaceMutationScope(scopeParam *api.WorkspaceMutationScope, workspaceParam *api.Workspace) (workspaceScopeSelection, error) {
 	var readScope *api.WorkspaceScope
 	if scopeParam != nil {
 		converted := api.WorkspaceScope(*scopeParam)
@@ -210,21 +210,59 @@ func docMutationScopeForParams(scopeParam *api.WorkspaceMutationScope, workspace
 	}
 	selection, err := parseWorkspaceScope(readScope, workspaceParam)
 	if err != nil {
-		return "", err
+		return workspaceScopeSelection{}, err
 	}
 	switch selection.scope {
 	case api.WorkspaceScopeAccessible:
 		if selection.explicit {
-			return "", badWorkspaceScopeError("workspaceScope=accessible cannot be used for document mutations")
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=accessible cannot be used for single-document operations")
 		}
-		return "", nil
+		selection.scope = api.WorkspaceScopeNone
+		return selection, nil
 	case api.WorkspaceScopeNone:
-		return "", nil
+		return selection, nil
 	case api.WorkspaceScopeWorkspace:
-		return selection.workspace, nil
+		return selection, nil
 	default:
-		return "", badWorkspaceScopeError("invalid workspaceScope")
+		return workspaceScopeSelection{}, badWorkspaceScopeError("invalid workspaceScope")
 	}
+}
+
+func (a *API) docPointReadScopeForParams(
+	ctx context.Context,
+	scopeParam *api.WorkspaceMutationScope,
+	workspaceParam *api.Workspace,
+) (string, docWorkspaceVisibility, error) {
+	selection, err := parseWorkspaceMutationScope(scopeParam, workspaceParam)
+	if err != nil {
+		return "", docWorkspaceVisibility{}, err
+	}
+	switch selection.scope {
+	case api.WorkspaceScopeNone:
+		visibility, err := a.noWorkspaceDocVisibility(ctx)
+		if err != nil {
+			return "", docWorkspaceVisibility{}, err
+		}
+		return "", visibility, nil
+	case api.WorkspaceScopeWorkspace:
+		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
+			return "", docWorkspaceVisibility{}, err
+		}
+		return selection.workspace, docWorkspaceVisibility{all: true}, nil
+	default:
+		return "", docWorkspaceVisibility{}, badWorkspaceScopeError("invalid workspaceScope")
+	}
+}
+
+func docMutationScopeForParams(scopeParam *api.WorkspaceMutationScope, workspaceParam *api.Workspace) (string, error) {
+	selection, err := parseWorkspaceMutationScope(scopeParam, workspaceParam)
+	if err != nil {
+		return "", err
+	}
+	if selection.scope == api.WorkspaceScopeWorkspace {
+		return selection.workspace, nil
+	}
+	return "", nil
 }
 
 func (v docWorkspaceVisibility) knownWorkspace(name string) bool {
@@ -416,7 +454,7 @@ func (a *API) GetDoc(ctx context.Context, request api.GetDocRequestObject) (api.
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceName, visibility, err := a.docPointReadScopeForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -736,7 +774,7 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 		return nil, errDocStoreNotAvailable
 	}
 	path, queryString, hasQuery := strings.Cut(docID, "?")
-	workspaceName, visibility, err := a.docReadScopeForParams(ctx, nil, nil)
+	workspaceName, visibility, err := a.docPointReadScopeForParams(ctx, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -745,8 +783,8 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 		if err != nil {
 			return nil, err
 		}
-		scopeParam, workspaceParam := workspaceScopeParamsFromValues(params)
-		workspaceName, visibility, err = a.docReadScopeForParams(ctx, scopeParam, workspaceParam)
+		scopeParam, workspaceParam := workspaceMutationScopeParamsFromValues(params)
+		workspaceName, visibility, err = a.docPointReadScopeForParams(ctx, scopeParam, workspaceParam)
 		if err != nil {
 			return nil, err
 		}

@@ -283,17 +283,26 @@ steps:
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
+		statusTime := now.UTC()
 		ctx := th.Context
+		mgr := runtime.NewManager(
+			th.DAGRunStore,
+			th.ProcStore,
+			th.Config,
+			runtime.WithManagerClock(func() time.Time { return statusTime }),
+		)
 
 		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.StartedAt = exec.FormatTime(statusTime)
+		runningStatus.CreatedAt = statusTime.UnixMilli()
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
 
-		latest, err := th.DAGRunMgr.GetLatestStatus(ctx, dag.DAG)
+		latest, err := mgr.GetLatestStatus(ctx, dag.DAG)
 		require.NoError(t, err)
 		require.Equal(t, core.Running, latest.Status)
 		require.Equal(t, core.NodeRunning, latest.Nodes[0].Status)
@@ -311,18 +320,27 @@ steps:
 
 		dagRunID := uuid.Must(uuid.NewV7()).String()
 		now := time.Now()
+		statusTime := now.UTC()
 		ctx := th.Context
 		ref := exec.NewDAGRunRef(dag.Name, dagRunID)
+		mgr := runtime.NewManager(
+			th.DAGRunStore,
+			th.ProcStore,
+			th.Config,
+			runtime.WithManagerClock(func() time.Time { return statusTime }),
+		)
 
 		att, err := th.DAGRunStore.CreateAttempt(ctx, dag.DAG, now, dagRunID, exec.NewDAGRunAttemptOptions{})
 		require.NoError(t, err)
 		require.NoError(t, att.Open(ctx))
 
 		runningStatus := testNewStatus(dag.DAG, dagRunID, core.Running, core.NodeRunning)
+		runningStatus.StartedAt = exec.FormatTime(statusTime)
+		runningStatus.CreatedAt = statusTime.UnixMilli()
 		require.NoError(t, att.Write(ctx, runningStatus))
 		require.NoError(t, att.Close(ctx))
 
-		saved, err := th.DAGRunMgr.GetSavedStatus(ctx, ref)
+		saved, err := mgr.GetSavedStatus(ctx, ref)
 		require.NoError(t, err)
 		require.Equal(t, core.Running, saved.Status)
 		require.Equal(t, core.NodeRunning, saved.Nodes[0].Status)

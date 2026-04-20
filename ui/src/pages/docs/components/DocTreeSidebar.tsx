@@ -48,7 +48,11 @@ type Props = {
   onRetry?: () => void;
   onContextAction: (action: ContextAction) => void;
   onCreateNew: () => void;
-  onSelectFile: (docPath: string, title: string) => void;
+  onSelectFile: (
+    docPath: string,
+    title: string,
+    workspace?: string | null
+  ) => void;
   onRename: (oldPath: string, newPath: string) => Promise<void>;
   onMove: (oldPath: string, newPath: string) => Promise<void>;
   onBatchDelete: (paths: string[]) => void;
@@ -301,7 +305,7 @@ function DocTreeSidebar({
     (node: NodeApi<DocTreeNodeResponse>) => {
       if (node.data.type !== DocTreeNodeResponseType.directory) {
         const displayTitle = node.data.title || node.data.name;
-        onSelectFile(node.id, displayTitle);
+        onSelectFile(node.id, displayTitle, node.data.workspace ?? null);
       }
     },
     [onSelectFile]

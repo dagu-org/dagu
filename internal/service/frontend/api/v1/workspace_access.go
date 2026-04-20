@@ -194,6 +194,20 @@ func workspaceScopeParamsFromValues(params url.Values) (*api.WorkspaceScope, *ap
 	return scopeParam, workspaceParam
 }
 
+func workspaceMutationScopeParamsFromValues(params url.Values) (*api.WorkspaceMutationScope, *api.Workspace) {
+	var scopeParam *api.WorkspaceMutationScope
+	if raw := params.Get("workspaceScope"); raw != "" {
+		scope := api.WorkspaceMutationScope(raw)
+		scopeParam = &scope
+	}
+	var workspaceParam *api.Workspace
+	if raw := params.Get("workspace"); raw != "" {
+		workspace := api.Workspace(raw)
+		workspaceParam = &workspace
+	}
+	return scopeParam, workspaceParam
+}
+
 func dagWorkspaceName(dag *core.DAG) string {
 	if dag == nil {
 		return ""
