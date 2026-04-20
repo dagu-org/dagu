@@ -285,11 +285,11 @@
       "default": "skip",
       "description": "Controls what happens when a catchup run is ready but the DAG is still running from a previous run. \"skip\" (default) drops the catchup run and moves to the next. \"all\" keeps it in the buffer and retries on the next scheduler tick. \"latest\" discards all but the most recent missed interval."
     },
-    "tags": {
+    "labels": {
       "oneOf": [
         {
           "type": "string",
-          "description": "Tags as a string. Can be comma-separated (\"tag1, tag2\") or space-separated key=value format (\"env=prod team=platform\")"
+          "description": "Labels as a string. Can be comma-separated (\"label1, label2\") or space-separated key=value format (\"env=prod team=platform\")"
         },
         {
           "type": "object",
@@ -300,7 +300,7 @@
               { "type": "boolean" }
             ]
           },
-          "description": "Tags as key-value pairs in map notation"
+          "description": "Labels as key-value pairs in map notation"
         },
         {
           "type": "array",
@@ -308,7 +308,7 @@
             "oneOf": [
               {
                 "type": "string",
-                "description": "Simple tag or key=value format"
+                "description": "Simple label or key=value format"
               },
               {
                 "type": "object",
@@ -324,10 +324,55 @@
               }
             ]
           },
-          "description": "Array of tags (strings or key-value objects)"
+          "description": "Array of labels (strings or key-value objects)"
         }
       ],
-      "description": "Tags for categorizing and filtering DAGs. Supports multiple formats: string (\"tag1, tag2\" or \"env=prod team=platform\"), map ({ env: prod }), or array ([\"tag1\", { env: prod }])"
+      "description": "Labels for categorizing and filtering DAGs. Supports multiple formats: string (\"label1, label2\" or \"env=prod team=platform\"), map ({ env: prod }), or array ([\"label1\", { env: prod }])"
+    },
+    "tags": {
+      "deprecated": true,
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Deprecated alias for labels. Can be comma-separated (\"label1, label2\") or space-separated key=value format (\"env=prod team=platform\")"
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" }
+            ]
+          },
+          "description": "Deprecated alias for labels as key-value pairs in map notation"
+        },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Deprecated alias for a simple label or key=value format"
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" }
+                  ]
+                },
+                "maxProperties": 1,
+                "description": "Deprecated alias for a single key-value pair"
+              }
+            ]
+          },
+          "description": "Deprecated alias for an array of labels (strings or key-value objects)"
+        }
+      ],
+      "description": "Deprecated alias for labels. Use labels for categorizing and filtering DAGs."
     },
     "type": {
       "type": "string",

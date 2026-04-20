@@ -1,6 +1,8 @@
 import React from 'react';
 import { components } from '../../../../api/v1/schema';
 import { DAGStatus } from '../../../../features/dags/components';
+import type { StatusTab } from '../../../../features/dags/components/DAGStatus';
+import { cn } from '../../../../lib/utils';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import DAGRunHeader from './DAGRunHeader';
 
@@ -9,6 +11,8 @@ type DAGRunDetailsContentProps = {
   dagRun: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   dagRunId?: string;
+  initialTab?: StatusTab;
+  fillHeight?: boolean;
 };
 
 const DAGRunDetailsContent: React.FC<DAGRunDetailsContentProps> = ({
@@ -16,6 +20,8 @@ const DAGRunDetailsContent: React.FC<DAGRunDetailsContentProps> = ({
   dagRun,
   refreshFn,
   dagRunId = 'latest',
+  initialTab = 'status',
+  fillHeight = false,
 }) => {
   return (
     <DAGRunContext.Provider
@@ -25,12 +31,19 @@ const DAGRunDetailsContent: React.FC<DAGRunDetailsContentProps> = ({
         dagRunId: dagRunId || '',
       }}
     >
-      <div className="w-full flex flex-col">
+      <div
+        className={cn('flex w-full flex-col', fillHeight && 'h-full min-h-0')}
+      >
         {/* Display breadcrumbs and DAG-run details in the header */}
         <DAGRunHeader dagRun={dagRun} refreshFn={refreshFn} />
 
-        <div className="flex-1">
-          <DAGStatus dagRun={dagRun} fileName={name || ''} />
+        <div className={cn('flex-1', fillHeight && 'min-h-0')}>
+          <DAGStatus
+            dagRun={dagRun}
+            fileName={name || ''}
+            initialTab={initialTab}
+            fillHeight={fillHeight}
+          />
         </div>
       </div>
     </DAGRunContext.Provider>

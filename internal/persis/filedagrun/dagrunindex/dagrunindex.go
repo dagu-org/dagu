@@ -47,7 +47,7 @@ type Entry struct {
 	Status               core.Status
 	StartedAtUnix        int64
 	FinishedAtUnix       int64
-	Tags                 []string
+	Labels               []string
 	Name                 string
 	WorkerID             string
 	LeaseAt              int64
@@ -140,7 +140,7 @@ func RebuildForDay(dayDir string, dagRunDirs []os.DirEntry) ([]Entry, bool, erro
 			Status:               status.Status,
 			StartedAtUnix:        startedAt,
 			FinishedAtUnix:       finishedAt,
-			Tags:                 status.Tags,
+			Labels:               status.Labels,
 			Name:                 status.Name,
 			WorkerID:             status.WorkerID,
 			LeaseAt:              status.LeaseAt,
@@ -260,7 +260,7 @@ func writeIndex(dayDir string, entries []Entry) error {
 			Status:               int32(e.Status), //nolint:gosec
 			StartedAt:            e.StartedAtUnix,
 			FinishedAt:           e.FinishedAtUnix,
-			Tags:                 e.Tags,
+			Labels:               e.Labels,
 			Name:                 e.Name,
 			WorkerId:             e.WorkerID,
 			Params:               e.Params,
@@ -305,7 +305,7 @@ func protoToEntries(protoEntries []*indexv1.DAGRunIndexEntry) []Entry {
 			Status:               core.Status(pe.Status),
 			StartedAtUnix:        pe.StartedAt,
 			FinishedAtUnix:       pe.FinishedAt,
-			Tags:                 pe.Tags,
+			Labels:               pe.Labels,
 			Name:                 pe.Name,
 			WorkerID:             pe.WorkerId,
 			Params:               pe.Params,

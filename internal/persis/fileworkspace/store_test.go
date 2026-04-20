@@ -102,23 +102,34 @@ func TestStore_DuplicateName(t *testing.T) {
 	assert.ErrorIs(t, err, workspace.ErrWorkspaceAlreadyExists)
 }
 
-func TestStore_CreateRejectsInvalidName(t *testing.T) {
+func TestStore_RejectsInvalidWorkspaceName(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	err := store.Create(ctx, workspace.NewWorkspace("ops-team", ""))
+	assert.ErrorIs(t, workspace.ValidateName(""), workspace.ErrInvalidWorkspaceName)
+	assert.ErrorIs(t, workspace.ValidateName("ops-team"), workspace.ErrInvalidWorkspaceName)
+
+	err := store.Create(ctx, workspace.NewWorkspace("", ""))
 	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
-}
 
-func TestStore_UpdateRejectsInvalidName(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
+	err = store.Create(ctx, workspace.NewWorkspace("bad/name", ""))
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+
+	err = store.Create(ctx, workspace.NewWorkspace("ops-team", ""))
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
 
 	ws := workspace.NewWorkspace("ops_team", "")
 	require.NoError(t, store.Create(ctx, ws))
 
 	ws.Name = "ops-team"
-	err := store.Update(ctx, ws)
+	err = store.Update(ctx, ws)
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+
+	ws.Name = ""
+	err = store.Update(ctx, ws)
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+
+	_, err = store.GetByName(ctx, "")
 	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
 }
 

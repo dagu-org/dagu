@@ -12,12 +12,22 @@ func IsQueuedCatchup(status *DAGRunStatus) bool {
 		status.TriggerType == core.TriggerTypeCatchUp
 }
 
+// IsQueuedAutomata reports whether the queued status belongs to an Automata run.
+func IsQueuedAutomata(status *DAGRunStatus) bool {
+	return status != nil &&
+		status.Status == core.Queued &&
+		status.TriggerType == core.TriggerTypeAutomata
+}
+
 // PreservedQueueTriggerType returns the trigger type that must be preserved
-// when consuming a queued item. Only catchup is preserved for now; all other
-// queued execution paths keep their existing behavior.
+// when consuming a queued item. All other queued execution paths keep their
+// existing behavior and execute as retries.
 func PreservedQueueTriggerType(status *DAGRunStatus) core.TriggerType {
 	if IsQueuedCatchup(status) {
 		return core.TriggerTypeCatchUp
+	}
+	if IsQueuedAutomata(status) {
+		return core.TriggerTypeAutomata
 	}
 	return core.TriggerTypeUnknown
 }

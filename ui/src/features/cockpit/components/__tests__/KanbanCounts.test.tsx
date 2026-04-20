@@ -20,16 +20,17 @@ vi.mock('framer-motion', () => ({
   motion: {
     div: ({
       children,
-      layoutId: _layoutId,
-      layout: _layout,
-      initial: _initial,
-      animate: _animate,
-      exit: _exit,
-      transition: _transition,
       ...props
-    }: React.ComponentProps<'div'> & Record<string, unknown>) => (
-      <div {...props}>{children}</div>
-    ),
+    }: React.ComponentProps<'div'> & Record<string, unknown>) => {
+      const divProps = { ...props };
+      delete divProps.layoutId;
+      delete divProps.layout;
+      delete divProps.initial;
+      delete divProps.animate;
+      delete divProps.exit;
+      delete divProps.transition;
+      return <div {...divProps}>{children}</div>;
+    },
   },
 }));
 
@@ -49,6 +50,7 @@ function createColumn(
         name: 'example',
         status: Status.Running,
         statusLabel: StatusLabel.running,
+        artifactsAvailable: false,
         autoRetryCount: 0,
         triggerType: TriggerType.manual,
         queuedAt: '',
@@ -61,6 +63,7 @@ function createColumn(
         name: 'example',
         status: Status.Running,
         statusLabel: StatusLabel.running,
+        artifactsAvailable: false,
         autoRetryCount: 0,
         triggerType: TriggerType.manual,
         queuedAt: '',
@@ -87,6 +90,7 @@ describe('cockpit count labels', () => {
         title="Running"
         column={createColumn({ hasMore: true })}
         onCardClick={() => {}}
+        onArtifactsClick={() => {}}
       />
     );
 
@@ -102,7 +106,13 @@ describe('cockpit count labels', () => {
       failed: createColumn({ runs: [] }),
     };
 
-    render(<MobileKanbanBoard columns={columns} onCardClick={() => {}} />);
+    render(
+      <MobileKanbanBoard
+        columns={columns}
+        onCardClick={() => {}}
+        onArtifactsClick={() => {}}
+      />
+    );
 
     expect(screen.getByRole('button', { name: /Running/ })).toHaveTextContent(
       'Running2+'
@@ -119,7 +129,11 @@ describe('cockpit count labels', () => {
     };
 
     const { container } = render(
-      <MobileKanbanBoard columns={columns} onCardClick={() => {}} />
+      <MobileKanbanBoard
+        columns={columns}
+        onCardClick={() => {}}
+        onArtifactsClick={() => {}}
+      />
     );
 
     const boardRoot = container.firstElementChild;

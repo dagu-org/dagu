@@ -1,6 +1,10 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Button } from '@/components/ui/button';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
+import { workspaceLabel } from '@/lib/workspace';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
@@ -52,9 +56,7 @@ function SearchSnippet({ match }: { match: SearchMatch }) {
             <span className="select-none text-[11px] text-muted-foreground">
               {lineNumber}
             </span>
-            <code className="font-mono text-foreground">
-              {line || ' '}
-            </code>
+            <code className="font-mono text-foreground">{line || ' '}</code>
           </div>
         );
       })}
@@ -165,6 +167,10 @@ function SearchResult(props: Props) {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const workspaceQuery = appBarContext.selectedWorkspace || undefined;
+  const workspaceLabelQuery = workspaceQuery
+    ? workspaceLabel(workspaceQuery)
+    : undefined;
 
   const items =
     type === 'dag'
@@ -177,16 +183,21 @@ function SearchResult(props: Props) {
           initialHasMoreMatches: result.hasMoreMatches,
           initialNextCursor: result.nextMatchesCursor,
           loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
-            const response = await client.GET('/search/dags/{fileName}/matches', {
-              params: {
-                path: { fileName: result.fileName },
-                query: {
-                  remoteNode,
-                  q: query,
-                  cursor,
+            const response = await client.GET(
+              '/search/dags/{fileName}/matches',
+              {
+                params: {
+                  path: { fileName: result.fileName },
+                  query: {
+                    remoteNode,
+                    workspace: workspaceQuery,
+                    q: query,
+                    labels: workspaceLabelQuery,
+                    cursor,
+                  },
                 },
-              },
-            });
+              }
+            );
 
             return {
               error: response.error?.message || undefined,
@@ -209,6 +220,7 @@ function SearchResult(props: Props) {
               params: {
                 query: {
                   remoteNode,
+                  workspace: workspaceQuery,
                   path: result.id,
                   q: query,
                   cursor,

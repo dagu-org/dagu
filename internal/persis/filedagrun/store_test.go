@@ -140,6 +140,29 @@ func TestJSONDB(t *testing.T) {
 		assert.Equal(t, "dagrun-id-1", dagRunStatus.DAGRunID)
 		assert.Equal(t, core.Running, dagRunStatus.Status)
 	})
+	t.Run("RemoveDAGRunRejectsActiveWhenRequested", func(t *testing.T) {
+		th := setupTestStore(t)
+		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		ref := exec.NewDAGRunRef("test_DAG", "active-id")
+
+		th.CreateAttempt(t, ts, ref.ID, core.Running)
+
+		err := th.Store.RemoveDAGRun(th.Context, ref, exec.WithRejectActiveDAGRun())
+		require.ErrorIs(t, err, exec.ErrDAGRunActive)
+
+		attempt, err := th.Store.FindAttempt(th.Context, ref)
+		require.NoError(t, err)
+		status, err := attempt.ReadStatus(th.Context)
+		require.NoError(t, err)
+		require.NotNil(t, status)
+		assert.Equal(t, core.Running, status.Status)
+
+		err = th.Store.RemoveDAGRun(th.Context, ref)
+		require.NoError(t, err)
+
+		_, err = th.Store.FindAttempt(th.Context, ref)
+		assert.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
+	})
 	t.Run("RemoveDAGRunRemovesArtifactDirsIncludingSubDAGRuns", func(t *testing.T) {
 		th := setupTestStore(t)
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -607,53 +630,53 @@ func TestListStatuses(t *testing.T) {
 		assert.Equal(t, "dagrun-id-1", statuses[2].DAGRunID)
 	})
 
-	t.Run("FilterByTags", func(t *testing.T) {
+	t.Run("FilterByLabels", func(t *testing.T) {
 		th := setupTestStore(t)
 
 		ts := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		// Create runs with different tags
+		// Create runs with different labels
 		run1 := th.DAG("dag1")
-		run1.Tags = core.NewTags([]string{"prod", "batch"})
+		run1.Labels = core.NewLabels([]string{"prod", "batch"})
 		th.CreateAttemptWithDAG(t, ts, "run-1", core.Succeeded, run1.DAG)
 
 		run2 := th.DAG("dag2")
-		run2.Tags = core.NewTags([]string{"prod", "api"})
+		run2.Labels = core.NewLabels([]string{"prod", "api"})
 		th.CreateAttemptWithDAG(t, ts, "run-2", core.Succeeded, run2.DAG)
 
 		run3 := th.DAG("dag3")
-		run3.Tags = core.NewTags([]string{"dev"})
+		run3.Labels = core.NewLabels([]string{"dev"})
 		th.CreateAttemptWithDAG(t, ts, "run-3", core.Succeeded, run3.DAG)
 
-		// Filter by tag "prod" (should match run-1 and run-2)
+		// Filter by label "prod" (should match run-1 and run-2)
 		statuses, err := th.Store.ListStatuses(th.Context,
-			exec.WithTags([]string{"prod"}),
+			exec.WithLabels([]string{"prod"}),
 			exec.WithFrom(exec.NewUTC(ts)),
 		)
 		require.NoError(t, err)
 		assert.Len(t, statuses, 2)
 
-		// Filter by tags "prod" AND "batch" (should match only run-1)
+		// Filter by labels "prod" AND "batch" (should match only run-1)
 		statuses, err = th.Store.ListStatuses(th.Context,
-			exec.WithTags([]string{"prod", "batch"}),
+			exec.WithLabels([]string{"prod", "batch"}),
 			exec.WithFrom(exec.NewUTC(ts)),
 		)
 		require.NoError(t, err)
 		assert.Len(t, statuses, 1)
 		assert.Equal(t, "run-1", statuses[0].DAGRunID)
 
-		// Filter by tag "dev" (should match only run-3)
+		// Filter by label "dev" (should match only run-3)
 		statuses, err = th.Store.ListStatuses(th.Context,
-			exec.WithTags([]string{"dev"}),
+			exec.WithLabels([]string{"dev"}),
 			exec.WithFrom(exec.NewUTC(ts)),
 		)
 		require.NoError(t, err)
 		assert.Len(t, statuses, 1)
 		assert.Equal(t, "run-3", statuses[0].DAGRunID)
 
-		// Filter by tag "nonexistent" (should match nothing)
+		// Filter by label "nonexistent" (should match nothing)
 		statuses, err = th.Store.ListStatuses(th.Context,
-			exec.WithTags([]string{"nonexistent"}),
+			exec.WithLabels([]string{"nonexistent"}),
 			exec.WithFrom(exec.NewUTC(ts)),
 		)
 		require.NoError(t, err)
@@ -835,7 +858,7 @@ func TestResolveStatus_FastPath(t *testing.T) {
 			Status:         core.Succeeded,
 			StartedAtUnix:  1705320000,
 			FinishedAtUnix: 1705320060,
-			Tags:           []string{"env=prod"},
+			Labels:         []string{"env=prod"},
 			WorkerID:       "worker-1",
 			Params:         "key=val",
 			QueuedAt:       "2024-01-15T12:00:00Z",
@@ -851,7 +874,7 @@ func TestResolveStatus_FastPath(t *testing.T) {
 	assert.Equal(t, "test-dag", status.Name)
 	assert.Equal(t, "test-run", status.DAGRunID)
 	assert.Equal(t, core.Succeeded, status.Status)
-	assert.Equal(t, []string{"env=prod"}, status.Tags)
+	assert.Equal(t, []string{"env=prod"}, status.Labels)
 	assert.Equal(t, "2024-01-15T12:00:00Z", status.StartedAt)
 	assert.Equal(t, "2024-01-15T12:01:00Z", status.FinishedAt)
 	assert.Equal(t, "worker-1", status.WorkerID)
@@ -878,19 +901,19 @@ func TestResolveStatus_FastPath_StatusFilterReject(t *testing.T) {
 	assert.Nil(t, status)
 }
 
-func TestResolveStatus_FastPath_TagFilterReject(t *testing.T) {
+func TestResolveStatus_FastPath_LabelFilterReject(t *testing.T) {
 	store := &Store{}
 	ctx := context.Background()
 
 	dagRun := &DAGRun{
 		summary: &DAGRunSummary{
 			Status: core.Succeeded,
-			Tags:   []string{"env=dev"},
+			Labels: []string{"env=dev"},
 		},
 	}
 
-	tagFilters := []core.TagFilter{core.ParseTagFilter("env=prod")}
-	status := store.resolveStatus(ctx, dagRun, tagFilters, nil, false)
+	labelFilters := []core.LabelFilter{core.ParseLabelFilter("env=prod")}
+	status := store.resolveStatus(ctx, dagRun, labelFilters, nil, false)
 	assert.Nil(t, status)
 }
 
@@ -899,7 +922,7 @@ func TestResolveStatus_StandardPath(t *testing.T) {
 
 	ts := time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC)
 	dag := th.DAG("std-path-dag")
-	dag.Tags = core.NewTags([]string{"env=prod"})
+	dag.Labels = core.NewLabels([]string{"env=prod"})
 	th.CreateAttemptWithDAG(t, ts, "std-run-1", core.Succeeded, dag.DAG)
 
 	store := th.Store.(*Store)
@@ -911,15 +934,15 @@ func TestResolveStatus_StandardPath(t *testing.T) {
 	dagRuns := root.listDAGRunsInRange(ctx, start, end, nil)
 	require.NotEmpty(t, dagRuns)
 
-	// Standard path (no summary) with matching tag filter.
-	tagFilters := []core.TagFilter{core.ParseTagFilter("env=prod")}
-	status := store.resolveStatus(ctx, dagRuns[0], tagFilters, nil, false)
-	require.NotNil(t, status, "should resolve status via standard path with matching tag")
+	// Standard path (no summary) with matching label filter.
+	labelFilters := []core.LabelFilter{core.ParseLabelFilter("env=prod")}
+	status := store.resolveStatus(ctx, dagRuns[0], labelFilters, nil, false)
+	require.NotNil(t, status, "should resolve status via standard path with matching label")
 
-	// Standard path with non-matching tag filter.
-	tagFilters = []core.TagFilter{core.ParseTagFilter("env=staging")}
-	status = store.resolveStatus(ctx, dagRuns[0], tagFilters, nil, false)
-	assert.Nil(t, status, "should reject via standard path when tag doesn't match")
+	// Standard path with non-matching label filter.
+	labelFilters = []core.LabelFilter{core.ParseLabelFilter("env=staging")}
+	status = store.resolveStatus(ctx, dagRuns[0], labelFilters, nil, false)
+	assert.Nil(t, status, "should reject via standard path when label doesn't match")
 
 	// Standard path with matching status filter.
 	statusFilter := map[core.Status]struct{}{core.Succeeded: {}}

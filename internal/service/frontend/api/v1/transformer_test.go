@@ -4,6 +4,8 @@
 package api
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,12 +16,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func writeArtifactFile(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	err := os.WriteFile(filepath.Join(dir, "artifact.txt"), []byte("artifact"), 0o600)
+	require.NoError(t, err)
+	return dir
+}
+
 func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 	status := exec.DAGRunStatus{
 		Name:           "test-dag",
 		DAGRunID:       "run-1",
 		AutoRetryCount: 2,
 		AutoRetryLimit: 5,
+		ArchiveDir:     writeArtifactFile(t),
 		Status:         core.Queued,
 		ScheduleTime:   "2026-03-13T00:00:00Z",
 	}
@@ -30,6 +42,7 @@ func TestToDAGRunSummaryIncludesScheduleTime(t *testing.T) {
 	assert.Equal(t, status.AutoRetryCount, summary.AutoRetryCount)
 	require.NotNil(t, summary.AutoRetryLimit)
 	assert.Equal(t, status.AutoRetryLimit, *summary.AutoRetryLimit)
+	assert.True(t, summary.ArtifactsAvailable)
 }
 
 func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
@@ -38,6 +51,7 @@ func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 		DAGRunID:       "run-1",
 		AutoRetryCount: 3,
 		AutoRetryLimit: 5,
+		ArchiveDir:     writeArtifactFile(t),
 		Status:         core.Queued,
 		QueuedAt:       "2026-03-13T00:01:00Z",
 		ScheduleTime:   "2026-03-13T00:00:00Z",
@@ -51,6 +65,7 @@ func TestToDAGRunDetailsIncludesScheduleTime(t *testing.T) {
 	assert.Equal(t, status.AutoRetryCount, details.AutoRetryCount)
 	require.NotNil(t, details.AutoRetryLimit)
 	assert.Equal(t, status.AutoRetryLimit, *details.AutoRetryLimit)
+	assert.True(t, details.ArtifactsAvailable)
 }
 
 func TestToDAGRunSummaryOmitsAutoRetryLimitWhenUnconfigured(t *testing.T) {
@@ -64,6 +79,7 @@ func TestToDAGRunSummaryOmitsAutoRetryLimitWhenUnconfigured(t *testing.T) {
 
 	summary := toDAGRunSummary(status)
 	assert.Nil(t, summary.AutoRetryLimit)
+	assert.False(t, summary.ArtifactsAvailable)
 }
 
 func TestToDAGRunDetailsOmitsAutoRetryLimitWhenUnconfigured(t *testing.T) {
@@ -77,6 +93,7 @@ func TestToDAGRunDetailsOmitsAutoRetryLimitWhenUnconfigured(t *testing.T) {
 
 	details := ToDAGRunDetails(status)
 	assert.Nil(t, details.AutoRetryLimit)
+	assert.False(t, details.ArtifactsAvailable)
 }
 
 func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {

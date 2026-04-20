@@ -82,6 +82,42 @@ func (s *Store) docFilePath(id string) (string, error) {
 	return s.safePath(filepath.Join(s.baseDir, id+".md"), id)
 }
 
+func cleanDocPathPrefix(prefix string) (string, error) {
+	prefix = strings.Trim(strings.TrimSpace(prefix), "/")
+	if prefix == "" {
+		return "", nil
+	}
+	if err := agent.ValidateDocID(prefix); err != nil {
+		return "", err
+	}
+	return prefix, nil
+}
+
+func (s *Store) scopedRoot(prefix string) (string, error) {
+	prefix, err := cleanDocPathPrefix(prefix)
+	if err != nil {
+		return "", err
+	}
+	if prefix == "" {
+		return s.baseDir, nil
+	}
+	return s.safePath(filepath.Join(s.baseDir, prefix), prefix)
+}
+
+func scopedDocID(prefix, id string) (string, error) {
+	prefix, err := cleanDocPathPrefix(prefix)
+	if err != nil {
+		return "", err
+	}
+	if prefix == "" {
+		return id, nil
+	}
+	if err := agent.ValidateDocID(id); err != nil {
+		return "", err
+	}
+	return prefix + "/" + id, nil
+}
+
 // parseDocFile parses a doc .md file into an agent.Doc.
 // The file format is optional YAML frontmatter between --- delimiters, followed by markdown body.
 // Content always contains the full file (including frontmatter); frontmatter is only parsed to extract the title.
@@ -132,7 +168,11 @@ func titleFromID(id string) string {
 // List returns a paginated tree of doc nodes.
 func (s *Store) List(ctx context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
 	sortField, sortOrder := normalizeSortParams(opts.Sort, opts.Order)
-	tree, err := s.buildTree(ctx, sortField, sortOrder)
+	rootDir, err := s.scopedRoot(opts.PathPrefix)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := s.buildTree(ctx, rootDir, sortField, sortOrder)
 	if err != nil {
 		return nil, err
 	}
@@ -155,12 +195,26 @@ type flatDocItem struct {
 // ListFlat returns a paginated flat list of doc metadata.
 func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[agent.DocMetadata], error) {
 	sortField, sortOrder := normalizeSortParams(opts.Sort, opts.Order)
+	rootDir, err := s.scopedRoot(opts.PathPrefix)
+	if err != nil {
+		return nil, err
+	}
+	if info, statErr := os.Stat(rootDir); statErr != nil {
+		if os.IsNotExist(statErr) {
+			pg := exec.NewPaginator(opts.Page, opts.PerPage)
+			result := exec.NewPaginatedResult([]agent.DocMetadata{}, 0, pg)
+			return &result, nil
+		}
+		return nil, fmt.Errorf("filedoc: failed to access docs directory: %w", statErr)
+	} else if !info.IsDir() {
+		return nil, fmt.Errorf("filedoc: docs path %s is not a directory", rootDir)
+	}
 
 	var items []flatDocItem
 
 	needMtime := sortField == "mtime"
 
-	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(rootDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -168,7 +222,7 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 			return nil
 		}
 
-		relPath, err := filepath.Rel(s.baseDir, path)
+		relPath, err := filepath.Rel(rootDir, path)
 		if err != nil {
 			return nil
 		}
@@ -616,16 +670,18 @@ func docSearchPattern(query string) string {
 }
 
 type docSearchCursor struct {
-	Version int    `json:"v"`
-	Query   string `json:"q"`
-	ID      string `json:"id,omitempty"`
+	Version    int    `json:"v"`
+	Query      string `json:"q"`
+	PathPrefix string `json:"prefix,omitempty"`
+	ID         string `json:"id,omitempty"`
 }
 
 type docMatchCursor struct {
-	Version int    `json:"v"`
-	Query   string `json:"q"`
-	ID      string `json:"id"`
-	Offset  int    `json:"offset"`
+	Version    int    `json:"v"`
+	Query      string `json:"q"`
+	PathPrefix string `json:"prefix,omitempty"`
+	ID         string `json:"id"`
+	Offset     int    `json:"offset"`
 }
 
 type docSearchCandidate struct {
@@ -634,23 +690,26 @@ type docSearchCandidate struct {
 	AbsPath string
 }
 
-func (s *Store) ensureSearchBaseDir() error {
-	info, err := os.Stat(s.baseDir)
+func ensureSearchRoot(rootDir string) (bool, error) {
+	info, err := os.Stat(rootDir)
 	if err != nil {
-		return fmt.Errorf("filedoc: failed to access docs directory %s: %w", s.baseDir, err)
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("filedoc: failed to access docs directory %s: %w", rootDir, err)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("filedoc: docs directory %s is not a directory", s.baseDir)
+		return false, fmt.Errorf("filedoc: docs directory %s is not a directory", rootDir)
 	}
-	if _, err := os.ReadDir(s.baseDir); err != nil {
-		return fmt.Errorf("filedoc: failed to read docs directory %s: %w", s.baseDir, err)
+	if _, err := os.ReadDir(rootDir); err != nil {
+		return false, fmt.Errorf("filedoc: failed to read docs directory %s: %w", rootDir, err)
 	}
-	return nil
+	return true, nil
 }
 
-func (s *Store) listSearchCandidates(ctx context.Context) ([]docSearchCandidate, error) {
+func listSearchCandidates(ctx context.Context, rootDir string) ([]docSearchCandidate, error) {
 	candidates := make([]docSearchCandidate, 0)
-	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(rootDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			logger.Warn(ctx, "Skipping unreadable doc search entry", tag.File(path), tag.Error(err))
 			return nil
@@ -662,7 +721,7 @@ func (s *Store) listSearchCandidates(ctx context.Context) ([]docSearchCandidate,
 			return nil
 		}
 
-		relPath, err := filepath.Rel(s.baseDir, path)
+		relPath, err := filepath.Rel(rootDir, path)
 		if err != nil {
 			logger.Warn(ctx, "Skipping doc with invalid relative path", tag.File(path), tag.Error(err))
 			return nil
@@ -690,7 +749,7 @@ func (s *Store) listSearchCandidates(ctx context.Context) ([]docSearchCandidate,
 	return candidates, nil
 }
 
-func decodeDocSearchCursor(raw, query string) (docSearchCursor, error) {
+func decodeDocSearchCursor(raw, query, pathPrefix string) (docSearchCursor, error) {
 	if raw == "" {
 		return docSearchCursor{}, nil
 	}
@@ -698,13 +757,13 @@ func decodeDocSearchCursor(raw, query string) (docSearchCursor, error) {
 	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return docSearchCursor{}, err
 	}
-	if cursor.Version != docSearchCursorVersion || cursor.Query != query {
+	if cursor.Version != docSearchCursorVersion || cursor.Query != query || cursor.PathPrefix != pathPrefix {
 		return docSearchCursor{}, exec.ErrInvalidCursor
 	}
 	return cursor, nil
 }
 
-func decodeDocMatchCursor(raw, query, id string) (docMatchCursor, error) {
+func decodeDocMatchCursor(raw, query, pathPrefix, id string) (docMatchCursor, error) {
 	if raw == "" {
 		return docMatchCursor{ID: id}, nil
 	}
@@ -712,7 +771,7 @@ func decodeDocMatchCursor(raw, query, id string) (docMatchCursor, error) {
 	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return docMatchCursor{}, err
 	}
-	if cursor.Version != docSearchCursorVersion || cursor.Query != query || cursor.ID != id || cursor.Offset < 0 {
+	if cursor.Version != docSearchCursorVersion || cursor.Query != query || cursor.PathPrefix != pathPrefix || cursor.ID != id || cursor.Offset < 0 {
 		return docMatchCursor{}, exec.ErrInvalidCursor
 	}
 	return cursor, nil
@@ -723,11 +782,23 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 	if opts.Query == "" {
 		return &exec.CursorResult[agent.DocSearchResult]{Items: []agent.DocSearchResult{}}, nil
 	}
-	if err := s.ensureSearchBaseDir(); err != nil {
+	pathPrefix, err := cleanDocPathPrefix(opts.PathPrefix)
+	if err != nil {
 		return nil, err
 	}
+	rootDir, err := s.scopedRoot(pathPrefix)
+	if err != nil {
+		return nil, err
+	}
+	exists, err := ensureSearchRoot(rootDir)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return &exec.CursorResult[agent.DocSearchResult]{Items: []agent.DocSearchResult{}}, nil
+	}
 
-	cursor, err := decodeDocSearchCursor(opts.Cursor, opts.Query)
+	cursor, err := decodeDocSearchCursor(opts.Cursor, opts.Query, pathPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -739,7 +810,7 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 	var hasMore bool
 	var nextCursor string
 
-	candidates, err := s.listSearchCandidates(ctx)
+	candidates, err := listSearchCandidates(ctx, rootDir)
 	if err != nil {
 		return nil, err
 	}
@@ -775,9 +846,10 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 		if len(results) == limit {
 			hasMore = true
 			nextCursor = exec.EncodeSearchCursor(docSearchCursor{
-				Version: docSearchCursorVersion,
-				Query:   opts.Query,
-				ID:      results[len(results)-1].ID,
+				Version:    docSearchCursorVersion,
+				Query:      opts.Query,
+				PathPrefix: pathPrefix,
+				ID:         results[len(results)-1].ID,
 			})
 			break
 		}
@@ -795,10 +867,11 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 		}
 		if window.HasMore {
 			item.NextMatchesCursor = exec.EncodeSearchCursor(docMatchCursor{
-				Version: docSearchCursorVersion,
-				Query:   opts.Query,
-				ID:      candidate.ID,
-				Offset:  window.NextOffset,
+				Version:    docSearchCursorVersion,
+				Query:      opts.Query,
+				PathPrefix: pathPrefix,
+				ID:         candidate.ID,
+				Offset:     window.NextOffset,
 			})
 		}
 		results = append(results, item)
@@ -819,13 +892,21 @@ func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDoc
 	if opts.Query == "" {
 		return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
 	}
-
-	cursor, err := decodeDocMatchCursor(opts.Cursor, opts.Query, id)
+	pathPrefix, err := cleanDocPathPrefix(opts.PathPrefix)
 	if err != nil {
 		return nil, err
 	}
 
-	path, err := s.docFilePath(id)
+	cursor, err := decodeDocMatchCursor(opts.Cursor, opts.Query, pathPrefix, id)
+	if err != nil {
+		return nil, err
+	}
+
+	storedID, err := scopedDocID(pathPrefix, id)
+	if err != nil {
+		return nil, err
+	}
+	path, err := s.docFilePath(storedID)
 	if err != nil {
 		return nil, err
 	}
@@ -857,10 +938,11 @@ func (s *Store) SearchMatches(_ context.Context, id string, opts agent.SearchDoc
 	}
 	if window.HasMore {
 		result.NextCursor = exec.EncodeSearchCursor(docMatchCursor{
-			Version: docSearchCursorVersion,
-			Query:   opts.Query,
-			ID:      id,
-			Offset:  window.NextOffset,
+			Version:    docSearchCursorVersion,
+			Query:      opts.Query,
+			PathPrefix: pathPrefix,
+			ID:         id,
+			Offset:     window.NextOffset,
 		})
 	}
 	return result, nil
@@ -886,20 +968,29 @@ func normalizeSortParams(sortField agent.DocSortField, sortOrder agent.DocSortOr
 }
 
 // buildTree builds a tree of DocTreeNode from the filesystem.
-func (s *Store) buildTree(ctx context.Context, sortField, sortOrder string) ([]*agent.DocTreeNode, error) {
+func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder string) ([]*agent.DocTreeNode, error) {
+	if info, err := os.Stat(rootDir); err != nil {
+		if os.IsNotExist(err) {
+			return []*agent.DocTreeNode{}, nil
+		}
+		return nil, fmt.Errorf("filedoc: failed to access docs directory: %w", err)
+	} else if !info.IsDir() {
+		return nil, fmt.Errorf("filedoc: docs path %s is not a directory", rootDir)
+	}
+
 	root := make(map[string]*agent.DocTreeNode)
 	var topLevel []*agent.DocTreeNode
 	needMtime := sortField == "mtime"
 
-	err := filepath.WalkDir(s.baseDir, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(rootDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		if path == s.baseDir {
+		if path == rootDir {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(s.baseDir, path)
+		relPath, err := filepath.Rel(rootDir, path)
 		if err != nil {
 			return nil
 		}

@@ -3,7 +3,7 @@
 
 //go:build tools
 
-package tools
+package dagu
 
 // This package keeps track of tool dependencies, see:
 // https://github.com/golang/go/issues/25922

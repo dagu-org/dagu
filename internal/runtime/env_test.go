@@ -398,6 +398,47 @@ func TestNewEnvForStep_WorkingDirectory(t *testing.T) {
 	}
 }
 
+func TestNewEnvForStep_ImplicitWorkingDirUsesDAGRunWorkDir(t *testing.T) {
+	t.Parallel()
+
+	staleSerializedDir := t.TempDir()
+	runWorkDir := t.TempDir()
+
+	dag := &core.DAG{
+		Name:       "test-dag",
+		WorkingDir: staleSerializedDir,
+	}
+	ctx := exec.NewContext(context.Background(), dag, "run-id", "", exec.WithWorkDir(runWorkDir))
+
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
+	assert.Equal(t, runWorkDir, env.WorkingDir)
+	pwd, _ := env.Scope.Get("PWD")
+	assert.Equal(t, runWorkDir, pwd)
+
+	env = runtime.NewEnv(ctx, core.Step{Name: "relative-step", Dir: "child"})
+	assert.Equal(t, filepath.Join(runWorkDir, "child"), env.WorkingDir)
+}
+
+func TestNewEnvForStep_ExplicitWorkingDirIgnoresDAGRunWorkDir(t *testing.T) {
+	t.Parallel()
+
+	explicitDir := t.TempDir()
+	runWorkDir := t.TempDir()
+
+	dag := &core.DAG{
+		Name:               "test-dag",
+		WorkingDir:         explicitDir,
+		WorkingDirExplicit: true,
+	}
+	ctx := exec.NewContext(context.Background(), dag, "run-id", "", exec.WithWorkDir(runWorkDir))
+
+	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
+	assert.Equal(t, explicitDir, env.WorkingDir)
+
+	env = runtime.NewEnv(ctx, core.Step{Name: "relative-step", Dir: "child"})
+	assert.Equal(t, filepath.Join(explicitDir, "child"), env.WorkingDir)
+}
+
 func TestNewEnvForStep_BasicFields(t *testing.T) {
 	t.Parallel()
 

@@ -277,7 +277,7 @@ export interface paths {
         };
         /**
          * List all available DAGs
-         * @description Retrieves DAG definitions with optional filtering by name and tags
+         * @description Retrieves DAG definitions with optional filtering by name and labels
          */
         get: operations["listDAGs"];
         put?: never;
@@ -629,6 +629,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dags/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all available DAG labels
+         * @description Retrieves all unique labels used across DAG definitions
+         */
+        get: operations["getAllDAGLabels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dags/tags": {
         parameters: {
             query?: never;
@@ -638,7 +658,8 @@ export interface paths {
         };
         /**
          * List all available DAG tags
-         * @description Retrieves all unique tags used across DAG definitions
+         * @deprecated
+         * @description Deprecated alias for /dags/labels. Retrieves all unique labels used across DAG definitions.
          */
         get: operations["getAllDAGTags"];
         put?: never;
@@ -735,7 +756,11 @@ export interface paths {
         get: operations["getDAGRunDetails"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a DAG-run
+         * @description Permanently removes a DAG-run record and its associated run data. Developer, manager, or admin only.
+         */
+        delete: operations["deleteDAGRun"];
         options?: never;
         head?: never;
         patch?: never;
@@ -775,6 +800,46 @@ export interface paths {
          * @description Launch a fresh DAG-run from a historic execution while reusing its stored parameters.
          */
         post: operations["rescheduleDAGRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/edit-retry/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview edited DAG-run retry
+         * @description Validates an edited DAG definition against a previous DAG-run and returns the default step skip selection.
+         */
+        post: operations["previewEditRetryDAGRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dag-runs/{name}/{dagRunId}/edit-retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run edited DAG retry
+         * @description Creates a new DAG-run from an edited DAG definition while preserving outputs from selected skipped steps.
+         */
+        post: operations["editRetryDAGRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3023,8 +3088,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec. */
+        /**
+         * @deprecated
+         * @description Deprecated alias for Labels. Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with `labels`; the server returns HTTP 400 if both are set.
+         */
         Tags: string[];
+        /** @description Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with deprecated `tags`; the server returns HTTP 400 if both are set. */
+        Labels: string[];
         /** @description A single audit log entry */
         AuditEntry: {
             /** @description Unique identifier for this entry */
@@ -3348,6 +3418,11 @@ export interface components {
          * @example latest
          */
         DAGRunId: string;
+        /**
+         * @description Unique identifier for a newly-created DAG-run. The special value 'latest' is not allowed.
+         * @example 20240101_120000
+         */
+        DAGRunCreateId: string;
         /** @description Response object for the health check endpoint */
         HealthResponse: {
             /**
@@ -3394,7 +3469,12 @@ export interface components {
             params?: string[];
             /** @description Default parameter values in JSON format if not specified at DAG-run creation */
             defaultParams?: string;
-            /** @description List of tags for categorizing and filtering DAGs */
+            /** @description List of labels for categorizing and filtering DAGs */
+            labels?: string[];
+            /**
+             * @deprecated
+             * @description Deprecated alias for labels. List of labels for categorizing and filtering DAGs
+             */
             tags?: string[];
             /** @description Name of the queue this DAG is assigned to. If not specified, the DAG name itself becomes the queue name */
             queue?: string;
@@ -3595,7 +3675,12 @@ export interface components {
             paramDefs?: components["schemas"]["ParamDef"][];
             /** @description Default parameter values in JSON format if not specified at DAG-run creation */
             defaultParams?: string;
-            /** @description List of tags for categorizing and filtering DAGs */
+            /** @description List of labels for categorizing and filtering DAGs */
+            labels?: string[];
+            /**
+             * @deprecated
+             * @description Deprecated alias for labels. List of labels for categorizing and filtering DAGs
+             */
             tags?: string[];
             runConfig?: components["schemas"]["RunConfig"];
         };
@@ -3693,12 +3778,19 @@ export interface components {
             startedAt: string;
             /** @description RFC 3339 timestamp when the DAG-run finished */
             finishedAt: string;
+            /** @description Whether artifact files are available for this DAG-run */
+            artifactsAvailable: boolean;
             /** @description Runtime parameters passed to the DAG-run in JSON format */
             params?: string;
             /** @description ID of the worker that executed this DAG-run ('local' for local execution) */
             workerId?: string;
             triggerType?: components["schemas"]["TriggerType"];
-            /** @description List of tags for categorizing and filtering DAG runs */
+            /** @description List of labels for categorizing and filtering DAG runs */
+            labels?: string[];
+            /**
+             * @deprecated
+             * @description Deprecated alias for labels. List of labels for categorizing and filtering DAG runs
+             */
             tags?: string[];
         };
         /** @description Detailed status of a DAG-run including sub DAG-run nodes */
@@ -3711,8 +3803,6 @@ export interface components {
             parentDAGRunId?: components["schemas"]["DAGRunId"] & unknown;
             /** @description Path to the log file */
             log: string;
-            /** @description Whether artifact endpoints are available for this DAG-run */
-            artifactsAvailable: boolean;
             /** @description Status of individual steps within the DAG-run */
             nodes: components["schemas"]["Node"][];
             onExit?: components["schemas"]["Node"];
@@ -4052,9 +4142,19 @@ export interface components {
             /** @description Arguments for the command */
             args?: string[];
         };
-        /** @description Response object for listing all tags */
+        /** @description Response object for listing all labels */
+        ListLabelResponse: {
+            /** @description List of unique labels */
+            labels: string[];
+            /** @description List of errors encountered during the request */
+            errors: string[];
+        };
+        /**
+         * @deprecated
+         * @description Deprecated response object for listing all labels
+         */
         ListTagResponse: {
-            /** @description List of unique tags */
+            /** @description List of unique labels */
             tags: string[];
             /** @description List of errors encountered during the request */
             errors: string[];
@@ -5383,6 +5483,8 @@ export interface components {
         APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
+        /** @description selected workspace scope */
+        Workspace: string;
         /** @description Opaque cursor returned by the previous search response */
         SearchCursor: string;
         /** @description Number of search results to return (default 20, max 50) */
@@ -5425,6 +5527,8 @@ export interface components {
         LogOffset: number;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
         DAGRunId: components["schemas"]["DAGRunId"];
+        /** @description ID of the DAG-run; must not be the special 'latest' alias */
+        DAGRunConcreteId: string & unknown;
         /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
         DAGRunIdSearch: components["schemas"]["DAGRunId"];
         /** @description name of the DAG-run */
@@ -6464,7 +6568,12 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAGs by name */
                 name?: string;
-                /** @description Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags. */
+                /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
+                labels?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAGs by labels (comma-separated).
+                 */
                 tags?: string;
                 /** @description Field to sort by:
                  *     - `name`: Sort alphabetically by DAG name (case-insensitive)
@@ -6722,6 +6831,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
+                    labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };
@@ -6738,7 +6850,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid request parameters or tags */
+            /** @description Invalid request parameters or labels */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6793,6 +6905,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
+                    labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                     /** @description Maximum seconds to wait for DAG execution to complete (required) */
                     timeout: number;
@@ -6811,7 +6926,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid request parameters or tags */
+            /** @description Invalid request parameters or labels */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6877,6 +6992,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
+                    labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };
@@ -6893,7 +7011,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid request parameters or tags */
+            /** @description Invalid request parameters or labels */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7285,8 +7403,12 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
+                /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. */
+                labels?: string;
                 /** @description Opaque cursor returned by the previous search response */
                 cursor?: components["parameters"]["SearchCursor"];
                 /** @description Number of search results to return (default 20, max 50) */
@@ -7332,6 +7454,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
                 /** @description Opaque cursor returned by the previous search response */
@@ -7379,8 +7503,12 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
+                /** @description Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels. */
+                labels?: string;
                 /** @description Opaque cursor returned by the previous search response */
                 cursor?: components["parameters"]["SearchCursor"];
                 /** @description Number of search match snippets to return (default 5, max 50) */
@@ -7438,6 +7566,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
                 /** @description A search query string */
@@ -7478,6 +7608,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getAllDAGLabels: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLabelResponse"];
                 };
             };
             /** @description Generic error response */
@@ -7542,7 +7704,12 @@ export interface operations {
                 remoteNode?: components["parameters"]["RemoteNode"];
                 /** @description Filter DAG-runs by name */
                 name?: string;
-                /** @description Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags. */
+                /** @description Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
+                labels?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAG-runs by DAG labels (comma-separated).
+                 */
                 tags?: string;
             };
             header?: never;
@@ -7605,6 +7772,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
+                    labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };
@@ -7677,6 +7847,9 @@ export interface operations {
                      * @default false
                      */
                     singleton?: boolean;
+                    /** @description Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
+                    labels?: components["schemas"]["Labels"];
+                    /** @description Deprecated alias for `labels`; mutually exclusive with `labels`. */
                     tags?: components["schemas"]["Tags"];
                 };
             };
@@ -7826,6 +7999,59 @@ export interface operations {
             };
         };
     };
+    deleteDAGRun: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run; must not be the special 'latest' alias */
+                dagRunId: components["parameters"]["DAGRunConcreteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAG-run successfully deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAG-run cannot be deleted */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description DAG-run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getDAGRunSpec: {
         parameters: {
             query?: {
@@ -7940,6 +8166,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    previewEditRetryDAGRun: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Edited DAG specification in YAML format. */
+                    spec: string;
+                    /** @description Optional DAG name override for the edited retry run. */
+                    dagName?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successfully previewed the edited retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Resolved DAG name for the edited retry. */
+                        dagName: string;
+                        /** @description Default steps selected to be skipped. */
+                        skippedSteps: string[];
+                        /** @description Steps that will be started if not skipped. */
+                        runnableSteps: string[];
+                        /** @description Resolved edited DAG steps in execution order for preview rendering. */
+                        steps: components["schemas"]["Step"][];
+                        /** @description Previous completed steps that cannot be skipped with the edited specification. */
+                        ineligibleSteps: {
+                            stepName: string;
+                            reason: string;
+                        }[];
+                        /** @description Validation errors that must be fixed before launching. */
+                        errors: string[];
+                        /** @description Non-blocking warnings for the edited retry. */
+                        warnings: string[];
+                    };
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    editRetryDAGRun: {
+        parameters: {
+            query?: {
+                /** @description name of the remote node */
+                remoteNode?: components["parameters"]["RemoteNode"];
+            };
+            header?: never;
+            path: {
+                /** @description name of the DAG */
+                name: components["parameters"]["DAGName"];
+                /** @description ID of the DAG-run or 'latest' to get the most recent DAG-run */
+                dagRunId: components["parameters"]["DAGRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Edited DAG specification in YAML format. */
+                    spec: string;
+                    dagRunId?: components["schemas"]["DAGRunCreateId"] & unknown;
+                    /** @description Optional DAG name override for the edited retry run. */
+                    dagName?: string;
+                    /** @description Steps to mark skipped while preserving their previous output variables. */
+                    skipSteps?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Successfully launched edited retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dagRunId: components["schemas"]["DAGRunId"];
+                        /** @description Indicates whether the run was queued instead of starting immediately. */
+                        queued: boolean;
+                        skippedSteps: string[];
+                        startedSteps: string[];
+                    };
                 };
             };
             /** @description Generic error response */
@@ -14335,6 +14680,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description page number of items to fetch (default is 1) */
                 page?: components["parameters"]["Page"];
                 /** @description number of items per page (default is 30, max is 100) */
@@ -14381,6 +14728,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;
@@ -14437,6 +14786,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Search query */
                 q: string;
             };
@@ -14480,6 +14831,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -14523,6 +14876,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -14564,6 +14919,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -14613,6 +14970,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Current document or directory path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
             };
@@ -14671,6 +15030,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;
@@ -14967,6 +15328,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceListResponse"];
+                };
+            };
+            /** @description Generic error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

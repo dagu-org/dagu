@@ -4,7 +4,10 @@
 package api
 
 import (
+	"os"
+
 	"github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 )
@@ -37,7 +40,8 @@ func toDAG(dag *core.DAG) api.DAG {
 		Description:   ptrOf(dag.Description),
 		Params:        ptrOf(dag.Params),
 		DefaultParams: ptrOf(dag.DefaultParams),
-		Tags:          ptrOf(dag.Tags.Strings()),
+		Labels:        ptrOf(dag.Labels.Strings()),
+		Tags:          ptrOf(dag.Labels.Strings()),
 		Schedule:      ptrOf(schedules),
 	}
 }
@@ -189,22 +193,25 @@ func toDAGRunSummary(s exec.DAGRunStatus) api.DAGRunSummary {
 	if s.AutoRetryLimit > 0 {
 		autoRetryLimit = ptrOf(s.AutoRetryLimit)
 	}
+	artifactsAvailable := hasArtifactEntries(s.ArchiveDir)
 
 	return api.DAGRunSummary{
-		Name:           s.Name,
-		DagRunId:       s.DAGRunID,
-		Params:         ptrOf(s.Params),
-		QueuedAt:       ptrOf(s.QueuedAt),
-		AutoRetryCount: s.AutoRetryCount,
-		AutoRetryLimit: autoRetryLimit,
-		ScheduleTime:   ptrOf(s.ScheduleTime),
-		StartedAt:      s.StartedAt,
-		FinishedAt:     s.FinishedAt,
-		Status:         api.Status(s.Status),
-		StatusLabel:    api.StatusLabel(s.Status.String()),
-		WorkerId:       ptrOf(s.WorkerID),
-		TriggerType:    toTriggerType(s.TriggerType),
-		Tags:           &s.Tags,
+		Name:               s.Name,
+		DagRunId:           s.DAGRunID,
+		Params:             ptrOf(s.Params),
+		QueuedAt:           ptrOf(s.QueuedAt),
+		AutoRetryCount:     s.AutoRetryCount,
+		AutoRetryLimit:     autoRetryLimit,
+		ScheduleTime:       ptrOf(s.ScheduleTime),
+		StartedAt:          s.StartedAt,
+		FinishedAt:         s.FinishedAt,
+		ArtifactsAvailable: artifactsAvailable,
+		Status:             api.Status(s.Status),
+		StatusLabel:        api.StatusLabel(s.Status.String()),
+		WorkerId:           ptrOf(s.WorkerID),
+		TriggerType:        toTriggerType(s.TriggerType),
+		Labels:             &s.Labels,
+		Tags:               &s.Labels,
 	}
 }
 
@@ -242,13 +249,14 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 	if s.AutoRetryLimit > 0 {
 		autoRetryLimit = ptrOf(s.AutoRetryLimit)
 	}
+	artifactsAvailable := hasArtifactEntries(s.ArchiveDir)
 
 	return api.DAGRunDetails{
 		RootDAGRunName:     s.Root.Name,
 		RootDAGRunId:       s.Root.ID,
 		ParentDAGRunName:   ptrOf(s.Parent.Name),
 		ParentDAGRunId:     ptrOf(s.Parent.ID),
-		ArtifactsAvailable: s.ArchiveDir != "",
+		ArtifactsAvailable: artifactsAvailable,
 		Log:                s.Log,
 		Name:               s.Name,
 		Params:             ptrOf(s.Params),
@@ -269,8 +277,32 @@ func ToDAGRunDetails(s exec.DAGRunStatus) api.DAGRunDetails {
 		OnFailure:          ptrOf(toNode(s.OnFailure)),
 		OnAbort:            ptrOf(toNode(s.OnAbort)),
 		OnExit:             ptrOf(toNode(s.OnExit)),
-		Tags:               &s.Tags,
+		Labels:             &s.Labels,
+		Tags:               &s.Labels,
 	}
+}
+
+func hasArtifactEntries(archiveDir string) bool {
+	if archiveDir == "" {
+		return false
+	}
+
+	info, err := os.Stat(archiveDir)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		return false
+	}
+
+	for _, entry := range entries {
+		if !fileutil.IsSymlinkDirEntry(entry) {
+			return true
+		}
+	}
+	return false
 }
 
 func toNode(node *exec.Node) api.Node {
@@ -383,7 +415,8 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
-		Tags:              ptrOf(dag.Tags.Strings()),
+		Labels:            ptrOf(dag.Labels.Strings()),
+		Tags:              ptrOf(dag.Labels.Strings()),
 		RunConfig:         runConfig,
 	}
 }

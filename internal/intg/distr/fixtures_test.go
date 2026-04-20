@@ -516,13 +516,13 @@ func (f *testFixture) enqueueCatchup(scheduleTime time.Time) (string, error) {
 
 func (f *testFixture) start() error {
 	f.t.Helper()
-	return f.startWithTags("")
+	return f.startWithLabels("")
 }
 
-func (f *testFixture) startWithTags(tags string) error {
+func (f *testFixture) startWithLabels(labels string) error {
 	f.t.Helper()
 	subCmdBuilder := runtime.NewSubCmdBuilder(f.coord.Config)
-	startSpec := subCmdBuilder.Start(f.dagWrapper.DAG, runtime.StartOptions{Quiet: true, Tags: tags})
+	startSpec := subCmdBuilder.Start(f.dagWrapper.DAG, runtime.StartOptions{Quiet: true, Labels: labels})
 	return runtime.Start(f.coord.Context, startSpec)
 }
 
@@ -588,6 +588,32 @@ func (f *testFixture) waitForStatusIn(expected []core.Status, timeout time.Durat
 	}, timeout, 100*time.Millisecond, "timeout waiting for status in %v", expected)
 	require.NoError(f.t, schedulerErr)
 	return status
+}
+
+func (f *testFixture) waitForRunReleasedFromWorkers(dagRunID string, timeout time.Duration) {
+	f.t.Helper()
+	timeout = distrTestTimeout(timeout)
+	var schedulerErr error
+	require.Eventually(f.t, func() bool {
+		schedulerErr = f.pollSchedulerErr()
+		if schedulerErr != nil {
+			return true
+		}
+
+		workers, err := f.coordinatorClient.GetWorkers(f.coord.Context)
+		if err != nil {
+			return false
+		}
+		for _, worker := range workers {
+			for _, task := range worker.RunningTasks {
+				if task != nil && task.DagRunId == dagRunID {
+					return false
+				}
+			}
+		}
+		return true
+	}, timeout, 100*time.Millisecond, "DAG run %s should be released from workers", dagRunID)
+	require.NoError(f.t, schedulerErr)
 }
 
 func (f *testFixture) pollSchedulerErr() error {

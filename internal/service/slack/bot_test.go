@@ -251,8 +251,14 @@ func TestDAGRunMonitor_FlushesSuccessDigestIntoSingleThreadAndSkipsReplay(t *tes
 
 	require.Eventually(t, func() bool {
 		service.mu.Lock()
-		defer service.mu.Unlock()
-		return len(service.appendMessages) == 1
+		appended := len(service.appendMessages) == 1
+		service.mu.Unlock()
+		val, exists := bot.chats.Load("C123:1")
+		if !exists {
+			return false
+		}
+		cs := val.(*chatState)
+		return appended && client.postCount() == 1 && bot.lastDeliveredSeq(cs) == 1
 	}, time.Second, 10*time.Millisecond)
 	assert.Equal(t, 1, client.postCount(), "digest should be delivered once as a single thread root")
 
@@ -314,8 +320,9 @@ func TestDAGRunMonitor_FlushesUrgentSingleIntoExistingDMSession(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		service.mu.Lock()
-		defer service.mu.Unlock()
-		return len(service.appendMessages) == 1
+		appended := len(service.appendMessages) == 1
+		service.mu.Unlock()
+		return appended && client.postCount() == 1 && bot.lastDeliveredSeq(cs) == 1
 	}, time.Second, 10*time.Millisecond)
 
 	service.mu.Lock()

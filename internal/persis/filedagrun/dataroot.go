@@ -762,7 +762,7 @@ func summaryFromIndexEntry(ie dagrunindex.Entry) *DAGRunSummary {
 		Status:               ie.Status,
 		StartedAtUnix:        ie.StartedAtUnix,
 		FinishedAtUnix:       ie.FinishedAtUnix,
-		Tags:                 ie.Tags,
+		Labels:               ie.Labels,
 		Name:                 ie.Name,
 		DagRunID:             ie.DagRunID,
 		WorkerID:             ie.WorkerID,

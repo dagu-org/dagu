@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { debounce } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
@@ -21,21 +24,25 @@ import {
   sseFallbackOptions,
   useSSECacheSync,
 } from '../../hooks/useSSECacheSync';
+import {
+  withoutWorkspaceLabels,
+  withWorkspaceLabel,
+} from '../../lib/workspace';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
   searchText: string;
-  searchTags: string[];
+  searchLabels: string[];
   page: number;
   sortField: string;
   sortOrder: string;
 };
 
-const areTagsEqual = (a: string[], b: string[]): boolean => {
+const areLabelsEqual = (a: string[], b: string[]): boolean => {
   if (a.length !== b.length) return false;
   const sortedA = [...a].sort();
   const sortedB = [...b].sort();
-  return sortedA.every((tag, i) => tag === sortedB[i]);
+  return sortedA.every((label, i) => label === sortedB[i]);
 };
 
 const areDAGDefinitionsFiltersEqual = (
@@ -43,7 +50,7 @@ const areDAGDefinitionsFiltersEqual = (
   b: DAGDefinitionsFilters
 ) =>
   a.searchText === b.searchText &&
-  areTagsEqual(a.searchTags, b.searchTags) &&
+  areLabelsEqual(a.searchLabels, b.searchLabels) &&
   a.page === b.page &&
   a.sortField === b.sortField &&
   a.sortOrder === b.sortOrder;
@@ -58,6 +65,11 @@ function DAGsContent() {
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const searchStateScope = JSON.stringify({
+    remoteNode,
+    workspace: selectedWorkspace || null,
+  });
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
@@ -65,7 +77,7 @@ function DAGsContent() {
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
       searchText: '',
-      searchTags: [],
+      searchLabels: [],
       page: 1,
       sortField: 'name',
       sortOrder: 'asc',
@@ -74,15 +86,15 @@ function DAGsContent() {
   );
 
   const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
-  const [searchTags, setSearchTags] = React.useState<string[]>(
-    defaultFilters.searchTags
+  const [searchLabels, setSearchLabels] = React.useState<string[]>(
+    defaultFilters.searchLabels
   );
   const [page, setPage] = React.useState<number>(defaultFilters.page);
   const [apiSearchText, setAPISearchText] = React.useState(
     defaultFilters.searchText
   );
-  const [apiSearchTags, setAPISearchTags] = React.useState<string[]>(
-    defaultFilters.searchTags
+  const [apiSearchLabels, setAPISearchLabels] = React.useState<string[]>(
+    defaultFilters.searchLabels
   );
   const [sortField, setSortField] = React.useState(defaultFilters.sortField);
   const [sortOrder, setSortOrder] = React.useState(defaultFilters.sortOrder);
@@ -93,12 +105,12 @@ function DAGsContent() {
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
       searchText,
-      searchTags,
+      searchLabels,
       page,
       sortField,
       sortOrder,
     }),
-    [searchText, searchTags, page, sortField, sortOrder]
+    [searchText, searchLabels, page, sortField, sortOrder]
   );
 
   const currentFiltersRef = React.useRef(currentFilters);
@@ -114,7 +126,7 @@ function DAGsContent() {
     const params = new URLSearchParams(location.search);
     const stored = searchState.readState<DAGDefinitionsFilters>(
       'dagDefinitions',
-      remoteNode
+      searchStateScope
     );
     const base: DAGDefinitionsFilters = {
       ...defaultFilters,
@@ -129,13 +141,14 @@ function DAGsContent() {
       hasUrlFilters = true;
     }
 
-    if (params.has('tags')) {
-      const tagsParam = params.get('tags') ?? '';
-      urlFilters.searchTags = tagsParam
-        ? tagsParam
+    if (params.has('labels') || params.has('tags')) {
+      const labelsParam = params.get('labels') ?? params.get('tags') ?? '';
+      urlFilters.searchLabels = labelsParam
+        ? labelsParam
             .split(',')
             .map((t) => t.trim().toLowerCase())
             .filter((t) => t !== '')
+            .filter((t) => withoutWorkspaceLabels([t]).length > 0)
         : [];
       hasUrlFilters = true;
     }
@@ -164,22 +177,22 @@ function DAGsContent() {
     if (current && areDAGDefinitionsFiltersEqual(current, next)) {
       if (hasUrlFilters) {
         lastPersistedFiltersRef.current = next;
-        searchState.writeState('dagDefinitions', remoteNode, next);
+        searchState.writeState('dagDefinitions', searchStateScope, next);
       }
       return;
     }
 
     setSearchText(next.searchText);
-    setSearchTags(next.searchTags);
+    setSearchLabels(next.searchLabels);
     setPage(next.page);
     setAPISearchText(next.searchText);
-    setAPISearchTags(next.searchTags);
+    setAPISearchLabels(next.searchLabels);
     setSortField(next.sortField);
     setSortOrder(next.sortOrder);
 
     lastPersistedFiltersRef.current = next;
-    searchState.writeState('dagDefinitions', remoteNode, next);
-  }, [defaultFilters, location.search, remoteNode, searchState]);
+    searchState.writeState('dagDefinitions', searchStateScope, next);
+  }, [defaultFilters, location.search, searchState, searchStateScope]);
 
   React.useEffect(() => {
     const persisted = lastPersistedFiltersRef.current;
@@ -188,27 +201,37 @@ function DAGsContent() {
     }
 
     lastPersistedFiltersRef.current = currentFilters;
-    searchState.writeState('dagDefinitions', remoteNode, currentFilters);
-  }, [currentFilters, remoteNode, searchState]);
+    searchState.writeState('dagDefinitions', searchStateScope, currentFilters);
+  }, [currentFilters, searchState, searchStateScope]);
 
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
 
+  const effectiveAPISearchLabels = React.useMemo(
+    () => withWorkspaceLabel(apiSearchLabels, selectedWorkspace),
+    [apiSearchLabels, selectedWorkspace]
+  );
+
   const queryParams = React.useMemo(
     () => ({
+      remoteNode,
       page,
       perPage: preferences.pageLimit || 200,
       name: apiSearchText || undefined,
-      tags: apiSearchTags.length > 0 ? apiSearchTags.join(',') : undefined,
+      labels:
+        effectiveAPISearchLabels.length > 0
+          ? effectiveAPISearchLabels.join(',')
+          : undefined,
       sort: sortField,
       order: sortOrder,
     }),
     [
+      remoteNode,
       page,
       preferences.pageLimit,
       apiSearchText,
-      apiSearchTags,
+      effectiveAPISearchLabels,
       sortField,
       sortOrder,
     ]
@@ -221,7 +244,6 @@ function DAGsContent() {
       params: {
         query: {
           ...queryParams,
-          remoteNode,
           sort: sortField as PathsDagsGetParametersQuerySort,
           order: sortOrder as PathsDagsGetParametersQueryOrder,
         },
@@ -238,6 +260,9 @@ function DAGsContent() {
 
   const addSearchParam = (key: string, value: string | string[]) => {
     const locationQuery = new URLSearchParams(window.location.search);
+    if (key === 'labels') {
+      locationQuery.delete('tags');
+    }
     if (Array.isArray(value)) {
       if (value.length > 0) {
         locationQuery.set(key, value.join(','));
@@ -279,10 +304,10 @@ function DAGsContent() {
     []
   );
 
-  const debouncedAPISearchTags = React.useMemo(
+  const debouncedAPISearchLabels = React.useMemo(
     () =>
-      debounce((tags: string[]) => {
-        setAPISearchTags(tags);
+      debounce((labels: string[]) => {
+        setAPISearchLabels(labels);
       }, 500),
     []
   );
@@ -294,11 +319,11 @@ function DAGsContent() {
     debouncedAPISearchText(searchText);
   };
 
-  const searchTagsChange = (tags: string[]) => {
-    addSearchParam('tags', tags);
-    setSearchTags(tags);
+  const searchLabelsChange = (labels: string[]) => {
+    addSearchParam('labels', labels);
+    setSearchLabels(labels);
     setPage(1);
-    debouncedAPISearchTags(tags);
+    debouncedAPISearchLabels(labels);
   };
 
   const handleSortChange = (field: string, order: string) => {
@@ -333,8 +358,8 @@ function DAGsContent() {
             refreshFn={refreshFn}
             searchText={searchText}
             handleSearchTextChange={searchTextChange}
-            searchTags={searchTags}
-            handleSearchTagsChange={searchTagsChange}
+            searchLabels={searchLabels}
+            handleSearchLabelsChange={searchLabelsChange}
             pagination={{
               totalPages: data.pagination.totalPages,
               page: page,
@@ -402,8 +427,15 @@ function DAGsContent() {
 
 // Wrap with TabProvider
 function DAGs() {
+  const appBarContext = React.useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const dagTabStorageKey = `dagu_dag_tabs:${JSON.stringify({
+    remoteNode,
+    workspace: appBarContext.selectedWorkspace || null,
+  })}`;
+
   return (
-    <TabProvider>
+    <TabProvider key={dagTabStorageKey} storageKey={dagTabStorageKey}>
       <DAGsContent />
     </TabProvider>
   );

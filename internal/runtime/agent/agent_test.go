@@ -134,13 +134,24 @@ func TestAgent_Run(t *testing.T) {
     command: %q
 `, waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
-		done := make(chan struct{})
+		runDone := false
+		runErr := make(chan error, 1)
 
 		go func() {
 			// Run the DAG in the background so that it is running
-			dagAgent.RunSuccess(t)
-			close(done)
+			runErr <- dagAgent.Run(dagAgent.Context)
 		}()
+		t.Cleanup(func() {
+			if runDone {
+				return
+			}
+			_ = os.WriteFile(releaseFile, []byte("cleanup"), 0600)
+			select {
+			case <-runErr:
+			case <-time.After(5 * time.Second):
+				dagAgent.Abort()
+			}
+		})
 
 		require.Eventually(t, func() bool {
 			status, err := th.DAGRunMgr.GetCurrentStatus(context.Background(), dag.DAG, "test-dag-run")
@@ -153,7 +164,23 @@ func TestAgent_Run(t *testing.T) {
 		require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 
 		// Wait for the DAG to finish
-		<-done
+		select {
+		case err := <-runErr:
+			runDone = true
+			require.NoError(t, err, "failed to run agent")
+		case <-time.After(5 * time.Second):
+			require.Fail(t, "DAG did not finish after release")
+		}
+
+		status := dagAgent.Status(context.Background())
+		st := status.Status
+		require.Equal(t, core.Succeeded.String(), st.String(), "expected status %q, got %q", core.Succeeded, st)
+		for _, node := range status.Nodes {
+			if node.Status == core.NodeSkipped || node.Status == core.NodeSucceeded {
+				continue
+			}
+			t.Errorf("expected node %q to be in success state, got %q", node.Step.Name, node.Status.String())
+		}
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)
@@ -571,10 +598,14 @@ steps:
 }
 
 func TestAgent_HandleHTTP(t *testing.T) {
-	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
 
 	t.Run("HTTPValid", func(t *testing.T) {
-		t.Parallel()
+		if runtime.GOOS != "windows" {
+			t.Parallel()
+		}
 		th := test.Setup(t)
 
 		releaseFile := filepath.Join(t.TempDir(), "http-valid.release")
@@ -611,7 +642,9 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPInvalidRequest", func(t *testing.T) {
-		t.Parallel()
+		if runtime.GOOS != "windows" {
+			t.Parallel()
+		}
 		th := test.Setup(t)
 
 		releaseFile := filepath.Join(t.TempDir(), "http-invalid.release")
@@ -644,7 +677,9 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPHandleCancel", func(t *testing.T) {
-		t.Parallel()
+		if runtime.GOOS != "windows" {
+			t.Parallel()
+		}
 		th := test.Setup(t)
 
 		releaseFile := filepath.Join(t.TempDir(), "http-cancel.release")

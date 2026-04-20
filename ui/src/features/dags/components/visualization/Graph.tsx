@@ -57,6 +57,8 @@ type Props = {
   steps?: Steps;
   /** Callback for node click events (double-click) */
   onClickNode?: onClickNode;
+  /** Whether a single click should invoke onClickNode */
+  selectOnClick?: boolean;
   /** Callback for node right-click events */
   onRightClickNode?: onRightClickNode;
   /** Whether to show status icons */
@@ -86,6 +88,7 @@ function Graph({
   onChangeFlowchart,
   type = 'status',
   onClickNode,
+  selectOnClick = false,
   onRightClickNode,
   showIcons = true,
   isExpandedView = false,
@@ -356,7 +359,10 @@ function Graph({
 
   return (
     <div
-      className={cn('relative', isExpandedView ? 'h-full flex flex-col' : '')}
+      className={cn(
+        'relative',
+        isExpandedView ? 'flex h-full min-h-0 flex-col' : ''
+      )}
       ref={containerRef}
     >
       <div className="absolute right-4 top-2 z-10 bg-card rounded-md shadow-sm border border-border/50">
@@ -436,9 +442,9 @@ function Graph({
 
       <div
         className={cn(
-          'overflow-auto custom-scrollbar',
+          'custom-scrollbar overflow-auto',
           isExpandedView
-            ? 'flex-1 rounded-lg border border-border/30 bg-muted/5'
+            ? 'min-h-0 flex-1 rounded-lg border border-border/30 bg-muted/5'
             : ''
         )}
       >
@@ -446,7 +452,7 @@ function Graph({
           style={mermaidStyle}
           def={graph}
           scale={scale}
-          onClick={onRightClickNode}
+          onClick={selectOnClick ? onClickNode : undefined}
           onDoubleClick={onClickNode}
           onRightClick={onRightClickNode}
         />
@@ -468,6 +474,7 @@ function Graph({
                 onChangeFlowchart={onChangeFlowchart}
                 type={type}
                 onClickNode={onClickNode}
+                selectOnClick={selectOnClick}
                 onRightClickNode={onRightClickNode}
                 showIcons={showIcons}
                 isExpandedView={true}

@@ -6,6 +6,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,12 +33,33 @@ func parseTriggerTypeParam(ctx *Context) (core.TriggerType, error) {
 	triggerType := core.ParseTriggerType(triggerTypeStr)
 	if triggerType == core.TriggerTypeUnknown {
 		return core.TriggerTypeUnknown, fmt.Errorf(
-			"invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry, catchup",
+			"invalid trigger-type %q: must be one of scheduler, manual, webhook, subdag, retry, catchup, automata",
 			triggerTypeStr,
 		)
 	}
 
 	return triggerType, nil
+}
+
+func labelsParam(ctx *Context) (string, error) {
+	labels, err := ctx.StringParam("labels")
+	if err != nil {
+		return "", fmt.Errorf("failed to get labels: %w", err)
+	}
+	tags, err := ctx.StringParam("tags")
+	if err != nil {
+		return "", fmt.Errorf("failed to get deprecated tags: %w", err)
+	}
+
+	labelsChanged := ctx.Command.Flags().Changed("labels")
+	tagsChanged := ctx.Command.Flags().Changed("tags")
+	if labelsChanged && tagsChanged {
+		return "", fmt.Errorf("labels and deprecated tags cannot both be set")
+	}
+	if labelsChanged {
+		return labels, nil
+	}
+	return tags, nil
 }
 
 // parseScheduleTimeParam reads and validates the --schedule-time flag.
@@ -110,13 +132,15 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 		loadOpts = append(loadOpts, spec.WithName(dag.Name))
 	}
 
+	persistedWorkingDir := dag.WorkingDir
+	persistedWorkingDirExplicit := dag.WorkingDirExplicit
 	fresh, err := spec.LoadYAML(ctx, dag.YamlData, loadOpts...)
 	if err != nil {
 		return nil, err
 	}
 
 	// Copy only fields excluded from JSON serialization (json:"-").
-	// All other fields (Queue, WorkerSelector, HandlerOn, Steps, Tags, etc.)
+	// All other fields (Queue, WorkerSelector, HandlerOn, Steps, Labels, etc.)
 	// are already correctly stored in dag.json and must be preserved.
 	dag.Env = fresh.Env
 	dag.Params = fresh.Params
@@ -129,11 +153,53 @@ func rebuildDAGFromYAML(ctx context.Context, dag *core.DAG) (*core.DAG, error) {
 	dag.Harnesses = fresh.Harnesses
 	dag.Kubernetes = fresh.Kubernetes
 	dag.RegistryAuths = fresh.RegistryAuths
-	dag.WorkingDirExplicit = fresh.WorkingDirExplicit
+	dag.WorkingDirExplicit = inferRestoredWorkingDirExplicit(
+		dag,
+		fresh,
+		persistedWorkingDir,
+		persistedWorkingDirExplicit,
+	)
 
 	core.InitializeDefaults(dag)
 
 	return dag, nil
+}
+
+func inferRestoredWorkingDirExplicit(
+	dag *core.DAG,
+	fresh *core.DAG,
+	persistedWorkingDir string,
+	persistedWorkingDirExplicit bool,
+) bool {
+	if persistedWorkingDirExplicit {
+		return true
+	}
+	if fresh != nil && fresh.WorkingDir != "" {
+		return true
+	}
+	if persistedWorkingDir == "" {
+		return false
+	}
+
+	sourceFile := ""
+	if dag != nil {
+		sourceFile = dag.SourceFile
+		if sourceFile == "" {
+			sourceFile = dag.Location
+		}
+	}
+	if sourceFile != "" && fresh != nil && fresh.WorkingDir == "" &&
+		sameCleanPath(persistedWorkingDir, filepath.Dir(sourceFile)) {
+		return false
+	}
+	if fresh == nil {
+		return true
+	}
+	return persistedWorkingDir != fresh.WorkingDir
+}
+
+func sameCleanPath(left, right string) bool {
+	return filepath.Clean(left) == filepath.Clean(right)
 }
 
 // extractDAGName extracts the DAG name from a file path or name.

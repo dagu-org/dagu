@@ -239,6 +239,21 @@ func TestListFlat(t *testing.T) {
 	assert.Equal(t, "sub/c-doc", result.Items[2].ID)
 }
 
+func TestListFlatWithPathPrefix(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "ops/runbook", "ops"))
+	require.NoError(t, store.Create(ctx, "prod/runbook", "prod"))
+
+	opts := defaultFlatOpts(1, 50)
+	opts.PathPrefix = "ops"
+	result, err := store.ListFlat(ctx, opts)
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "runbook", result.Items[0].ID)
+}
+
 func TestListTree(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -1137,6 +1152,32 @@ func TestSearchCursorUsesStableSortedIDsAcrossNestedDocs(t *testing.T) {
 	require.Len(t, secondPage.Items, 1)
 	assert.Equal(t, "a/b", secondPage.Items[0].ID)
 	assert.False(t, secondPage.HasMore)
+}
+
+func TestSearchCursorWithPathPrefix(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "ops/a", "needle"))
+	require.NoError(t, store.Create(ctx, "prod/a", "needle"))
+
+	result, err := store.SearchCursor(ctx, agent.SearchDocsOptions{
+		Query:      "needle",
+		Limit:      10,
+		MatchLimit: 1,
+		PathPrefix: "ops",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "a", result.Items[0].ID)
+
+	matches, err := store.SearchMatches(ctx, "a", agent.SearchDocMatchesOptions{
+		Query:      "needle",
+		Limit:      1,
+		PathPrefix: "ops",
+	})
+	require.NoError(t, err)
+	require.Len(t, matches.Items, 1)
 }
 
 func TestSearchMatchesRejectsInvalidDocID(t *testing.T) {

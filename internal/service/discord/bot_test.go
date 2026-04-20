@@ -461,7 +461,7 @@ func TestDAGRunMonitor_UsesDedicatedNotificationState(t *testing.T) {
 		Class: chatbridge.NotificationClassSuccessDigest,
 		Events: []chatbridge.NotificationEvent{
 			{
-				Status: &exec.DAGRunStatus{
+				DAGRun: &exec.DAGRunStatus{
 					Name:   "build",
 					Status: core.Succeeded,
 				},

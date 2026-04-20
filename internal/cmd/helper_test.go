@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -28,7 +29,7 @@ func TestRebuildDAGFromYAML_PreservesJSONSerializedFields(t *testing.T) {
 		MaxActiveRuns:  5,
 		MaxActiveSteps: 3,
 		LogDir:         "/custom/logs",
-		Tags:           core.NewTags([]string{"important", "production"}),
+		Labels:         core.NewLabels([]string{"important", "production"}),
 		Location:       "/path/to/dag.yaml",
 		YamlData:       []byte("steps:\n  - name: test\n    command: echo hello"),
 	}
@@ -42,7 +43,7 @@ func TestRebuildDAGFromYAML_PreservesJSONSerializedFields(t *testing.T) {
 	assert.Equal(t, 5, result.MaxActiveRuns)
 	assert.Equal(t, 3, result.MaxActiveSteps)
 	assert.Equal(t, "/custom/logs", result.LogDir)
-	assert.Equal(t, []string{"important", "production"}, result.Tags.Strings())
+	assert.Equal(t, []string{"important", "production"}, result.Labels.Strings())
 	assert.Equal(t, "/path/to/dag.yaml", result.Location)
 
 	// Verify the original DAG pointer is returned (not a new DAG)
@@ -187,6 +188,72 @@ func TestRebuildDAGFromYAML_RebuildEnvFromYAML(t *testing.T) {
 
 	assert.Equal(t, "Default", result.Queue)
 	assert.Contains(t, result.Env, "MY_VAR=my_value")
+}
+
+func TestRebuildDAGFromYAML_RestoresExplicitWorkingDirFromYAML(t *testing.T) {
+	t.Parallel()
+
+	explicitDir := t.TempDir()
+	sourceFile := filepath.Join(t.TempDir(), "dag.yaml")
+	dag := &core.DAG{
+		Name:       "test-dag",
+		WorkingDir: explicitDir,
+		SourceFile: sourceFile,
+		YamlData: []byte(`
+working_dir: ` + explicitDir + `
+steps:
+  - name: test
+    command: echo hello
+`),
+	}
+
+	result, err := rebuildDAGFromYAML(context.Background(), dag)
+	require.NoError(t, err)
+	assert.Equal(t, explicitDir, result.WorkingDir)
+	assert.True(t, result.WorkingDirExplicit)
+}
+
+func TestRebuildDAGFromYAML_KeepsFileDefaultWorkingDirImplicit(t *testing.T) {
+	t.Parallel()
+
+	dagDir := t.TempDir()
+	dag := &core.DAG{
+		Name:       "test-dag",
+		WorkingDir: dagDir,
+		SourceFile: filepath.Join(dagDir, "dag.yaml"),
+		YamlData: []byte(`
+steps:
+  - name: test
+    command: echo hello
+`),
+	}
+
+	result, err := rebuildDAGFromYAML(context.Background(), dag)
+	require.NoError(t, err)
+	assert.Equal(t, dagDir, result.WorkingDir)
+	assert.False(t, result.WorkingDirExplicit)
+}
+
+func TestRebuildDAGFromYAML_RestoresDefaultWorkingDirOverride(t *testing.T) {
+	t.Parallel()
+
+	dagDir := t.TempDir()
+	defaultDir := t.TempDir()
+	dag := &core.DAG{
+		Name:       "test-dag",
+		WorkingDir: defaultDir,
+		SourceFile: filepath.Join(dagDir, "dag.yaml"),
+		YamlData: []byte(`
+steps:
+  - name: test
+    command: echo hello
+`),
+	}
+
+	result, err := rebuildDAGFromYAML(context.Background(), dag)
+	require.NoError(t, err)
+	assert.Equal(t, defaultDir, result.WorkingDir)
+	assert.True(t, result.WorkingDirExplicit)
 }
 
 func TestRebuildDAGFromYAML_ReappliesBaseConfigContent(t *testing.T) {

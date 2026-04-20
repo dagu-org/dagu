@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
@@ -16,6 +17,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/service/audit"
+	"github.com/dagucloud/dagu/internal/workspace"
 )
 
 const (
@@ -63,19 +65,59 @@ func validateDocPath(path string) error {
 	return nil
 }
 
+func validateDocWorkspace(name *string) (string, error) {
+	if name == nil || *name == "" {
+		return "", nil
+	}
+	if err := workspace.ValidateName(*name); err != nil {
+		return "", &Error{
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "invalid workspace: must contain only letters, numbers, and underscores",
+			HTTPStatus: http.StatusBadRequest,
+		}
+	}
+	return *name, nil
+}
+
+func scopedDocPath(workspaceName, path string) (string, error) {
+	if err := validateDocPath(path); err != nil {
+		return "", err
+	}
+	if workspaceName == "" {
+		return path, nil
+	}
+	scoped := workspaceName + "/" + path
+	if err := validateDocPath(scoped); err != nil {
+		return "", err
+	}
+	return scoped, nil
+}
+
+func visibleDocPath(workspaceName, path string) string {
+	if workspaceName == "" {
+		return path
+	}
+	return strings.TrimPrefix(path, workspaceName+"/")
+}
+
 // ListDocs returns documents as tree or flat list.
 func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (api.ListDocsResponseObject, error) {
 	if err := a.requireDocManagement(); err != nil {
+		return nil, err
+	}
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
 		return nil, err
 	}
 
 	sortField, sortOrder := docSortParams(request.Params.Sort, request.Params.Order)
 
 	opts := agent.ListDocsOptions{
-		Page:    valueOf(request.Params.Page),
-		PerPage: valueOf(request.Params.PerPage),
-		Sort:    sortField,
-		Order:   sortOrder,
+		Page:       valueOf(request.Params.Page),
+		PerPage:    valueOf(request.Params.PerPage),
+		Sort:       sortField,
+		Order:      sortOrder,
+		PathPrefix: workspaceName,
 	}
 
 	flat := valueOf(request.Params.Flat)
@@ -126,13 +168,18 @@ func (a *API) CreateDoc(ctx context.Context, request api.CreateDocRequestObject)
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-
-	id := request.Body.Id
-	if err := validateDocPath(id); err != nil {
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := a.docStore.Create(ctx, id, request.Body.Content); err != nil {
+	id := request.Body.Id
+	scopedID, err := scopedDocPath(workspaceName, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.docStore.Create(ctx, scopedID, request.Body.Content); err != nil {
 		if errors.Is(err, agent.ErrDocAlreadyExists) {
 			return nil, errDocAlreadyExists
 		}
@@ -141,7 +188,8 @@ func (a *API) CreateDoc(ctx context.Context, request api.CreateDocRequestObject)
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionDocCreate, map[string]any{
-		"doc_id": id,
+		"doc_id":    id,
+		"workspace": workspaceName,
 	})
 
 	msg := fmt.Sprintf("Document %s created", id)
@@ -153,17 +201,22 @@ func (a *API) GetDoc(ctx context.Context, request api.GetDocRequestObject) (api.
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	if err := validateDocPath(request.Params.Path); err != nil {
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
 		return nil, err
 	}
-
-	doc, err := a.docStore.Get(ctx, request.Params.Path)
+	docID, err := scopedDocPath(workspaceName, request.Params.Path)
+	if err != nil {
+		return nil, err
+	}
+	doc, err := a.docStore.Get(ctx, docID)
 	if err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
 		}
 		return nil, internalError(err)
 	}
+	doc.ID = visibleDocPath(workspaceName, doc.ID)
 
 	return api.GetDoc200JSONResponse(toDocResponse(doc)), nil
 }
@@ -181,6 +234,10 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	results, err := a.docStore.Search(ctx, request.Params.Q)
 	if err != nil {
@@ -190,6 +247,13 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 
 	items := make([]api.DocSearchResultItem, 0, len(results))
 	for _, r := range results {
+		if workspaceName != "" {
+			prefix := workspaceName + "/"
+			if !strings.HasPrefix(r.ID, prefix) {
+				continue
+			}
+			r.ID = strings.TrimPrefix(r.ID, prefix)
+		}
 		item := api.DocSearchResultItem{
 			Id:    r.ID,
 			Title: r.Title,
@@ -224,11 +288,15 @@ func (a *API) UpdateDoc(ctx context.Context, request api.UpdateDocRequestObject)
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	if err := validateDocPath(request.Params.Path); err != nil {
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
 		return nil, err
 	}
-
-	if err := a.docStore.Update(ctx, request.Params.Path, request.Body.Content); err != nil {
+	docID, err := scopedDocPath(workspaceName, request.Params.Path)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.docStore.Update(ctx, docID, request.Body.Content); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
 		}
@@ -237,7 +305,8 @@ func (a *API) UpdateDoc(ctx context.Context, request api.UpdateDocRequestObject)
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionDocUpdate, map[string]any{
-		"doc_id": request.Params.Path,
+		"doc_id":    request.Params.Path,
+		"workspace": workspaceName,
 	})
 
 	msg := "Document updated"
@@ -252,11 +321,16 @@ func (a *API) DeleteDoc(ctx context.Context, request api.DeleteDocRequestObject)
 	if err := a.requireDAGWrite(ctx); err != nil {
 		return nil, err
 	}
-	if err := validateDocPath(request.Params.Path); err != nil {
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
+	docID, err := scopedDocPath(workspaceName, request.Params.Path)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := a.docStore.Delete(ctx, request.Params.Path); err != nil {
+	if err := a.docStore.Delete(ctx, docID); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
 		}
@@ -265,7 +339,8 @@ func (a *API) DeleteDoc(ctx context.Context, request api.DeleteDocRequestObject)
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionDocDelete, map[string]any{
-		"doc_id": request.Params.Path,
+		"doc_id":    request.Params.Path,
+		"workspace": workspaceName,
 	})
 
 	return api.DeleteDoc204Response{}, nil
@@ -282,14 +357,20 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	if err := validateDocPath(request.Params.Path); err != nil {
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateDocPath(request.Body.NewPath); err != nil {
+	oldPath, err := scopedDocPath(workspaceName, request.Params.Path)
+	if err != nil {
+		return nil, err
+	}
+	newPath, err := scopedDocPath(workspaceName, request.Body.NewPath)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := a.docStore.Rename(ctx, request.Params.Path, request.Body.NewPath); err != nil {
+	if err := a.docStore.Rename(ctx, oldPath, newPath); err != nil {
 		if errors.Is(err, agent.ErrDocNotFound) {
 			return nil, errDocNotFound
 		}
@@ -301,8 +382,9 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 	}
 
 	a.logAudit(ctx, audit.CategoryAgent, auditActionDocRename, map[string]any{
-		"old_path": request.Params.Path,
-		"new_path": request.Body.NewPath,
+		"old_path":  request.Params.Path,
+		"new_path":  request.Body.NewPath,
+		"workspace": workspaceName,
 	})
 
 	msg := fmt.Sprintf("Document renamed to %s", request.Body.NewPath)
@@ -331,35 +413,46 @@ func (a *API) DeleteDocBatch(ctx context.Context, request api.DeleteDocBatchRequ
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
+	scopedPaths := make([]string, 0, len(request.Body.Paths))
 	for _, p := range request.Body.Paths {
-		if err := validateDocPath(p); err != nil {
+		scoped, err := scopedDocPath(workspaceName, p)
+		if err != nil {
 			return nil, err
 		}
+		scopedPaths = append(scopedPaths, scoped)
 	}
 
-	deleted, failed, err := a.docStore.DeleteBatch(ctx, request.Body.Paths)
+	deleted, failed, err := a.docStore.DeleteBatch(ctx, scopedPaths)
 	if err != nil {
 		logger.Error(ctx, "Failed to batch delete docs", tag.Error(err))
 		return nil, internalError(err)
 	}
 
+	visibleDeleted := make([]string, 0, len(deleted))
 	for _, id := range deleted {
+		visibleID := visibleDocPath(workspaceName, id)
+		visibleDeleted = append(visibleDeleted, visibleID)
 		a.logAudit(ctx, audit.CategoryAgent, auditActionDocDelete, map[string]any{
-			"doc_id": id,
+			"doc_id":    visibleID,
+			"workspace": workspaceName,
 		})
 	}
 
 	failedItems := make([]api.DocDeleteBatchFailedItem, 0, len(failed))
 	for _, f := range failed {
 		failedItems = append(failedItems, api.DocDeleteBatchFailedItem{
-			Path:  f.ID,
+			Path:  visibleDocPath(workspaceName, f.ID),
 			Error: f.Error,
 		})
 	}
 
-	msg := fmt.Sprintf("Deleted %d, failed %d", len(deleted), len(failed))
+	msg := fmt.Sprintf("Deleted %d, failed %d", len(visibleDeleted), len(failed))
 	return api.DeleteDocBatch200JSONResponse{
-		Deleted: deleted,
+		Deleted: visibleDeleted,
 		Failed:  failedItems,
 		Message: msg,
 	}, nil
@@ -379,14 +472,21 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 
 	page := parseIntParam(params.Get("page"), 1)
 	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
+	workspaceName := params.Get("workspace")
+	if workspaceName != "" {
+		if _, err := validateDocWorkspace(&workspaceName); err != nil {
+			return nil, err
+		}
+	}
 
 	sortField, sortOrder := docSortParamsFromQuery(params)
 
 	result, err := a.docStore.List(ctx, agent.ListDocsOptions{
-		Page:    page,
-		PerPage: perPage,
-		Sort:    sortField,
-		Order:   sortOrder,
+		Page:       page,
+		PerPage:    perPage,
+		Sort:       sortField,
+		Order:      sortOrder,
+		PathPrefix: workspaceName,
 	})
 	if err != nil {
 		return nil, err
@@ -408,13 +508,29 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 	if a.docStore == nil {
 		return nil, errDocStoreNotAvailable
 	}
-	if err := validateDocPath(docID); err != nil {
-		return nil, err
+	path, queryString, hasQuery := strings.Cut(docID, "?")
+	workspaceName := ""
+	if hasQuery {
+		params, err := url.ParseQuery(queryString)
+		if err != nil {
+			return nil, err
+		}
+		workspaceName = params.Get("workspace")
+		if workspaceName != "" {
+			if _, err := validateDocWorkspace(&workspaceName); err != nil {
+				return nil, err
+			}
+		}
 	}
-	doc, err := a.docStore.Get(ctx, docID)
+	scopedID, err := scopedDocPath(workspaceName, path)
 	if err != nil {
 		return nil, err
 	}
+	doc, err := a.docStore.Get(ctx, scopedID)
+	if err != nil {
+		return nil, err
+	}
+	doc.ID = visibleDocPath(workspaceName, doc.ID)
 	return toDocResponse(doc), nil
 }
 

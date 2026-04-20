@@ -766,7 +766,7 @@ paths:
   /dags:
     get:
       summary: "List all available DAGs"
-      description: "Retrieves DAG definitions with optional filtering by name and tags"
+      description: "Retrieves DAG definitions with optional filtering by name and labels"
       operationId: "listDAGs"
       tags:
         - "dags"
@@ -780,12 +780,19 @@ paths:
           schema:
             type: "string"
           description: "Filter DAGs by name"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
         - name: "tags"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter DAGs by tags (comma-separated). Returns DAGs that have ALL specified tags."
+          deprecated: true
+          description: "Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAGs by labels (comma-separated)."
         - name: "sort"
           in: "query"
           required: false
@@ -1050,8 +1057,12 @@ paths:
                   type: boolean
                   description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
       responses:
         "200":
           description: "A successful response"
@@ -1065,7 +1076,7 @@ paths:
                 required:
                   - dagRunId
         "400":
-          description: "Invalid request parameters or tags"
+          description: "Invalid request parameters or labels"
           content:
             application/json:
               schema:
@@ -1121,8 +1132,12 @@ paths:
                   type: boolean
                   description: "If true, prevent starting if DAG is already running (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
                 timeout:
                   type: integer
                   minimum: 1
@@ -1141,7 +1156,7 @@ paths:
                   dagRun:
                     $ref: "#/components/schemas/DAGRunDetails"
         "400":
-          description: "Invalid request parameters or tags"
+          description: "Invalid request parameters or labels"
           content:
             application/json:
               schema:
@@ -1199,8 +1214,12 @@ paths:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
       responses:
         "200":
           description: "A successful response"
@@ -1214,7 +1233,7 @@ paths:
                 required:
                   - dagRunId
         "400":
-          description: "Invalid request parameters or tags"
+          description: "Invalid request parameters or labels"
           content:
             application/json:
               schema:
@@ -1554,12 +1573,19 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true
           schema:
             type: "string"
           description: "A search query string"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels."
         - $ref: "#/components/parameters/SearchCursor"
         - $ref: "#/components/parameters/SearchLimit"
       responses:
@@ -1591,6 +1617,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true
@@ -1629,12 +1656,19 @@ paths:
       parameters:
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true
           schema:
             type: "string"
           description: "A search query string"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels."
         - $ref: "#/components/parameters/SearchCursor"
         - $ref: "#/components/parameters/SearchMatchLimit"
       responses:
@@ -1672,6 +1706,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "path"
           in: "query"
           description: "Document path (may include slashes for nested docs)"
@@ -1712,11 +1747,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /dags/labels:
+    get:
+      summary: "List all available DAG labels"
+      description: "Retrieves all unique labels used across DAG definitions"
+      operationId: "getAllDAGLabels"
+      tags:
+        - "dags"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+      responses:
+        "200":
+          description: "A successful response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLabelResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /dags/tags:
     get:
       summary: "List all available DAG tags"
-      description: "Retrieves all unique tags used across DAG definitions"
+      description: "Deprecated alias for /dags/labels. Retrieves all unique labels used across DAG definitions."
       operationId: "getAllDAGTags"
+      deprecated: true
       tags:
         - "dags"
       parameters:
@@ -1756,12 +1815,19 @@ paths:
           schema:
             type: "string"
           description: "Filter DAG-runs by name"
+        - name: "labels"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+          description: "Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
         - name: "tags"
           in: "query"
           required: false
           schema:
             type: "string"
-          description: "Filter DAG-runs by DAG tags (comma-separated). Returns runs from DAGs that have ALL specified tags."
+          deprecated: true
+          description: "Deprecated alias for `labels`; mutually exclusive with `labels`. Filter DAG-runs by DAG labels (comma-separated)."
       responses:
         "200":
           description: "A successful response"
@@ -1818,8 +1884,12 @@ paths:
                   type: boolean
                   description: "If true, prevent starting if a DAG with the same name is already running (returns 409)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
               required:
                 - spec
       responses:
@@ -1893,8 +1963,12 @@ paths:
                   type: boolean
                   description: "If true, prevent enqueuing if DAG is already running or queued (returns 409 conflict)"
                   default: false
+                labels:
+                  $ref: "#/components/schemas/Labels"
+                  description: "Additional labels to apply to the DAG-run. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set."
                 tags:
                   $ref: "#/components/schemas/Tags"
+                  description: "Deprecated alias for `labels`; mutually exclusive with `labels`."
               required:
                 - spec
       responses:
@@ -1989,6 +2063,38 @@ paths:
                   - dagRunDetails
         "404":
           description: "DAGRun not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: "Delete a DAG-run"
+      description: "Permanently removes a DAG-run record and its associated run data. Developer, manager, or admin only."
+      operationId: "deleteDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunConcreteId"
+      responses:
+        "204":
+          description: "DAG-run successfully deleted"
+        "400":
+          description: "DAG-run cannot be deleted"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "DAG-run not found"
           content:
             application/json:
               schema:
@@ -2099,6 +2205,164 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/edit-retry/preview:
+    post:
+      summary: "Preview edited DAG-run retry"
+      description: "Validates an edited DAG definition against a previous DAG-run and returns the default step skip selection."
+      operationId: "previewEditRetryDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "Edited DAG specification in YAML format."
+                dagName:
+                  type: string
+                  description: "Optional DAG name override for the edited retry run."
+              required:
+                - spec
+      responses:
+        "200":
+          description: "Successfully previewed the edited retry"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagName:
+                    type: string
+                    description: "Resolved DAG name for the edited retry."
+                  skippedSteps:
+                    type: array
+                    description: "Default steps selected to be skipped."
+                    items:
+                      type: string
+                  runnableSteps:
+                    type: array
+                    description: "Steps that will be started if not skipped."
+                    items:
+                      type: string
+                  steps:
+                    type: array
+                    description: "Resolved edited DAG steps in execution order for preview rendering."
+                    items:
+                      $ref: "#/components/schemas/Step"
+                  ineligibleSteps:
+                    type: array
+                    description: "Previous completed steps that cannot be skipped with the edited specification."
+                    items:
+                      type: object
+                      properties:
+                        stepName:
+                          type: string
+                        reason:
+                          type: string
+                      required:
+                        - stepName
+                        - reason
+                  errors:
+                    type: array
+                    description: "Validation errors that must be fixed before launching."
+                    items:
+                      type: string
+                  warnings:
+                    type: array
+                    description: "Non-blocking warnings for the edited retry."
+                    items:
+                      type: string
+                required:
+                  - dagName
+                  - skippedSteps
+                  - runnableSteps
+                  - steps
+                  - ineligibleSteps
+                  - errors
+                  - warnings
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dag-runs/{name}/{dagRunId}/edit-retry:
+    post:
+      summary: "Run edited DAG retry"
+      description: "Creates a new DAG-run from an edited DAG definition while preserving outputs from selected skipped steps."
+      operationId: "editRetryDAGRun"
+      tags:
+        - "dag-runs"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGName"
+        - $ref: "#/components/parameters/DAGRunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spec:
+                  type: string
+                  description: "Edited DAG specification in YAML format."
+                dagRunId:
+                  allOf:
+                    - $ref: "#/components/schemas/DAGRunCreateId"
+                    - description: "Explicit run ID for the new DAG-run; if omitted a new ID is generated."
+                dagName:
+                  type: string
+                  description: "Optional DAG name override for the edited retry run."
+                skipSteps:
+                  type: array
+                  description: "Steps to mark skipped while preserving their previous output variables."
+                  items:
+                    type: string
+              required:
+                - spec
+      responses:
+        "200":
+          description: "Successfully launched edited retry"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dagRunId:
+                    $ref: "#/components/schemas/DAGRunId"
+                  queued:
+                    type: boolean
+                    description: "Indicates whether the run was queued instead of starting immediately."
+                  skippedSteps:
+                    type: array
+                    items:
+                      type: string
+                  startedSteps:
+                    type: array
+                    items:
+                      type: string
+                required:
+                  - dagRunId
+                  - queued
+                  - skippedSteps
+                  - startedSteps
         default:
           description: "Generic error response"
           content:
@@ -6903,6 +7167,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
         - name: flat
@@ -6953,6 +7218,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
         content:
@@ -6997,6 +7263,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: q
           in: query
           description: "Search query"
@@ -7032,6 +7299,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Document path (may include slashes for nested docs)"
@@ -7066,6 +7334,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Document path (may include slashes for nested docs)"
@@ -7109,6 +7378,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Document path (may include slashes for nested docs)"
@@ -7140,6 +7410,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
           description: "Current document or directory path (may include slashes for nested docs)"
@@ -7190,6 +7461,7 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
         content:
@@ -7394,6 +7666,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceListResponse"
+        default:
+          description: "Generic error response"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       summary: "Create a workspace"
       operationId: "createWorkspace"
@@ -7562,6 +7840,15 @@ components:
         minimum: 1
         maximum: 1000
         default: 50
+
+    Workspace:
+      name: workspace
+      in: query
+      description: selected workspace scope
+      required: false
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9_]+$"
 
     SearchCursor:
       name: cursor
@@ -7768,6 +8055,21 @@ components:
       schema:
         $ref: "#/components/schemas/DAGRunId"
 
+    DAGRunConcreteId:
+      name: dagRunId
+      in: path
+      description: ID of the DAG-run; must not be the special 'latest' alias
+      required: true
+      schema:
+        allOf:
+          - type: string
+            description: "Unique identifier for the DAG-run."
+            example: "20240101_120000"
+            pattern: "^[a-zA-Z0-9_-]+$"
+          - not:
+              enum:
+                - latest
+
     DAGRunIdSearch:
       name: dagRunId
       in: query
@@ -7904,7 +8206,14 @@ components:
       type: array
       items:
         type: string
-      description: "Additional tags to apply to the DAG-run (format: key=value or key-only). Merged with tags defined in the DAG spec."
+      deprecated: true
+      description: "Deprecated alias for Labels. Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with `labels`; the server returns HTTP 400 if both are set."
+
+    Labels:
+      type: array
+      items:
+        type: string
+      description: "Additional labels to apply to the DAG-run (format: key=value or key-only). Merged with labels defined in the DAG spec. Mutually exclusive with deprecated `tags`; the server returns HTTP 400 if both are set."
 
     AuditEntry:
       type: object
@@ -8483,6 +8792,15 @@ components:
       example: "latest"
       pattern: "^[a-zA-Z0-9_-]+$"
 
+    DAGRunCreateId:
+      type: string
+      description: "Unique identifier for a newly-created DAG-run. The special value 'latest' is not allowed."
+      example: "20240101_120000"
+      pattern: "^[a-zA-Z0-9_-]+$"
+      not:
+        enum:
+          - latest
+
     HealthResponse:
       type: object
       description: "Response object for the health check endpoint"
@@ -8565,9 +8883,15 @@ components:
         defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at DAG-run creation"
+        labels:
+          type: array
+          description: "List of labels for categorizing and filtering DAGs"
+          items:
+            type: string
         tags:
           type: array
-          description: "List of tags for categorizing and filtering DAGs"
+          description: "Deprecated alias for labels. List of labels for categorizing and filtering DAGs"
+          deprecated: true
           items:
             type: string
         queue:
@@ -8910,9 +9234,15 @@ components:
         defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at DAG-run creation"
+        labels:
+          type: array
+          description: "List of labels for categorizing and filtering DAGs"
+          items:
+            type: string
         tags:
           type: array
-          description: "List of tags for categorizing and filtering DAGs"
+          description: "Deprecated alias for labels. List of labels for categorizing and filtering DAGs"
+          deprecated: true
           items:
             type: string
         runConfig:
@@ -9094,6 +9424,9 @@ components:
         finishedAt:
           type: string
           description: "RFC 3339 timestamp when the DAG-run finished"
+        artifactsAvailable:
+          type: boolean
+          description: "Whether artifact files are available for this DAG-run"
         params:
           type: string
           description: "Runtime parameters passed to the DAG-run in JSON format"
@@ -9102,11 +9435,17 @@ components:
           description: "ID of the worker that executed this DAG-run ('local' for local execution)"
         triggerType:
           $ref: "#/components/schemas/TriggerType"
+        labels:
+          type: array
+          items:
+            type: string
+          description: "List of labels for categorizing and filtering DAG runs"
         tags:
           type: array
           items:
             type: string
-          description: "List of tags for categorizing and filtering DAG runs"
+          description: "Deprecated alias for labels. List of labels for categorizing and filtering DAG runs"
+          deprecated: true
       required:
         - dagRunId
         - name
@@ -9114,6 +9453,7 @@ components:
         - statusLabel
         - startedAt
         - finishedAt
+        - artifactsAvailable
         - autoRetryCount
 
     DAGRunDetails:
@@ -9141,9 +9481,6 @@ components:
             log:
               type: string
               description: "Path to the log file"
-            artifactsAvailable:
-              type: boolean
-              description: "Whether artifact endpoints are available for this DAG-run"
             nodes:
               type: array
               description: "Status of individual steps within the DAG-run"
@@ -9172,7 +9509,6 @@ components:
             - rootDAGRunName
             - rootDAGRunId
             - log
-            - artifactsAvailable
             - nodes
 
     ArtifactNodeType:
@@ -9806,13 +10142,32 @@ components:
       required:
         - command
 
+    ListLabelResponse:
+      type: object
+      description: "Response object for listing all labels"
+      properties:
+        labels:
+          type: array
+          description: "List of unique labels"
+          items:
+            type: string
+        errors:
+          type: array
+          description: "List of errors encountered during the request"
+          items:
+            type: string
+      required:
+        - labels
+        - errors
+
     ListTagResponse:
       type: object
-      description: "Response object for listing all tags"
+      description: "Deprecated response object for listing all labels"
+      deprecated: true
       properties:
         tags:
           type: array
-          description: "List of unique tags"
+          description: "List of unique labels"
           items:
             type: string
         errors:

@@ -23,6 +23,7 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/filedagrun"
 	"github.com/dagucloud/dagu/internal/runtime/transform"
 	"github.com/dagucloud/dagu/internal/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -251,27 +252,32 @@ func TestGetDAGRunSpecInline(t *testing.T) {
 	require.Contains(t, specBody.Spec, "echo inline_dag_test")
 }
 
-func TestGetDAGRunSpecInlineStartWithTagsDoesNotPatchSpec(t *testing.T) {
+func TestGetDAGRunSpecInlineStartWithLabelsDoesNotPatchSpec(t *testing.T) {
 	server := test.SetupServer(t)
 
 	inlineSpec := `steps:
   - name: inline_step
-    command: "echo inline_start_tags"`
-	name := "inline_spec_start_tags"
-	tags := []string{"env=prod", "team=backend"}
+    command: "echo inline_start_labels"`
+	name := "inline_spec_start_labels"
+	labels := []string{"env=prod", "team=backend"}
 
 	execResp := server.Client().Post("/api/v1/dag-runs", api.ExecuteDAGRunFromSpecJSONRequestBody{
-		Spec: inlineSpec,
-		Name: &name,
-		Tags: &tags,
+		Spec:   inlineSpec,
+		Name:   &name,
+		Labels: &labels,
 	}).ExpectStatus(http.StatusOK).Send(t)
 
 	var execBody api.ExecuteDAGRunFromSpec200JSONResponse
 	execResp.Unmarshal(t, &execBody)
 	require.NotEmpty(t, execBody.DagRunId)
 
+	details := requireDAGRunDetails(t, server, name, execBody.DagRunId)
+	require.NotNil(t, details.DagRunDetails.Labels)
+	assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
+
 	specBody := requireDAGRunSpec(t, server, name, execBody.DagRunId)
-	require.Contains(t, specBody.Spec, "echo inline_start_tags")
+	require.Contains(t, specBody.Spec, "echo inline_start_labels")
+	require.NotContains(t, specBody.Spec, "labels:")
 	require.NotContains(t, specBody.Spec, "tags:")
 	require.NotContains(t, specBody.Spec, "env=prod")
 	require.NotContains(t, specBody.Spec, "team=backend")
@@ -296,19 +302,38 @@ func requireDAGRunSpec(t *testing.T, server test.Server, dagName, dagRunID strin
 	return specBody
 }
 
-func TestGetDAGRunSpecInlineEnqueueWithTagsPatchesSpec(t *testing.T) {
+func requireDAGRunDetails(t *testing.T, server test.Server, dagName, dagRunID string) api.GetDAGRunDetails200JSONResponse {
+	t.Helper()
+
+	var details api.GetDAGRunDetails200JSONResponse
+	require.Eventually(t, func() bool {
+		resp := server.Client().Get(
+			fmt.Sprintf("/api/v1/dag-runs/%s/%s", dagName, dagRunID),
+		).Send(t)
+		if resp.Response.StatusCode() != http.StatusOK {
+			return false
+		}
+
+		resp.Unmarshal(t, &details)
+		return details.DagRunDetails.DagRunId == dagRunID
+	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+
+	return details
+}
+
+func TestGetDAGRunSpecInlineEnqueueWithLabelsPatchesSpec(t *testing.T) {
 	server := test.SetupServer(t)
 
 	inlineSpec := `steps:
   - name: inline_step
-    command: "echo inline_enqueue_tags"`
-	name := "inline_enqueue_tags"
-	tags := []string{"env=prod", "team=backend"}
+    command: "echo inline_enqueue_labels"`
+	name := "inline_enqueue_labels"
+	labels := []string{"env=prod", "team=backend"}
 
 	enqResp := server.Client().Post("/api/v1/dag-runs/enqueue", api.EnqueueDAGRunFromSpecJSONRequestBody{
-		Spec: inlineSpec,
-		Name: &name,
-		Tags: &tags,
+		Spec:   inlineSpec,
+		Name:   &name,
+		Labels: &labels,
 	}).ExpectStatus(http.StatusOK).Send(t)
 
 	var enqBody api.EnqueueDAGRunFromSpec200JSONResponse
@@ -330,6 +355,9 @@ func TestGetDAGRunSpecInlineEnqueueWithTagsPatchesSpec(t *testing.T) {
 			status == api.Status(core.Running) ||
 			status == api.Status(core.Succeeded)
 	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+	details := requireDAGRunDetails(t, server, name, enqBody.DagRunId)
+	require.NotNil(t, details.DagRunDetails.Labels)
+	assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
 
 	specResp := server.Client().Get(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/spec", name, enqBody.DagRunId),
@@ -337,20 +365,21 @@ func TestGetDAGRunSpecInlineEnqueueWithTagsPatchesSpec(t *testing.T) {
 
 	var specBody api.GetDAGRunSpec200JSONResponse
 	specResp.Unmarshal(t, &specBody)
-	require.Contains(t, specBody.Spec, "echo inline_enqueue_tags")
-	require.Contains(t, specBody.Spec, "tags:")
+	require.Contains(t, specBody.Spec, "echo inline_enqueue_labels")
+	require.Contains(t, specBody.Spec, "labels:")
+	require.NotContains(t, specBody.Spec, "tags:")
 	require.Contains(t, specBody.Spec, "env=prod")
 	require.Contains(t, specBody.Spec, "team=backend")
 }
 
-func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
+func TestGetDAGRunSpecFileEnqueueWithLabelsDoesNotPatchSpec(t *testing.T) {
 	server := test.SetupServer(t)
 
 	dagSpec := `steps:
   - name: main
-    command: "echo file_enqueue_tags"`
-	dagName := "file_enqueue_tags"
-	tags := []string{"env=staging", "priority=low"}
+    command: "echo file_enqueue_labels"`
+	dagName := "file_enqueue_labels"
+	labels := []string{"env=staging", "priority=low"}
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,
@@ -359,7 +388,7 @@ func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
 
 	enqResp := server.Client().Post(
 		fmt.Sprintf("/api/v1/dags/%s/enqueue", dagName),
-		api.EnqueueDAGDAGRunJSONRequestBody{Tags: &tags},
+		api.EnqueueDAGDAGRunJSONRequestBody{Labels: &labels},
 	).ExpectStatus(http.StatusOK).Send(t)
 
 	var enqBody api.EnqueueDAGDAGRun200JSONResponse
@@ -381,6 +410,9 @@ func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
 			status == api.Status(core.Running) ||
 			status == api.Status(core.Succeeded)
 	}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
+	details := requireDAGRunDetails(t, server, dagName, enqBody.DagRunId)
+	require.NotNil(t, details.DagRunDetails.Labels)
+	assert.ElementsMatch(t, labels, *details.DagRunDetails.Labels)
 
 	specResp := server.Client().Get(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/spec", dagName, enqBody.DagRunId),
@@ -388,7 +420,8 @@ func TestGetDAGRunSpecFileEnqueueWithTagsDoesNotPatchSpec(t *testing.T) {
 
 	var specBody api.GetDAGRunSpec200JSONResponse
 	specResp.Unmarshal(t, &specBody)
-	require.Contains(t, specBody.Spec, "echo file_enqueue_tags")
+	require.Contains(t, specBody.Spec, "echo file_enqueue_labels")
+	require.NotContains(t, specBody.Spec, "labels:")
 	require.NotContains(t, specBody.Spec, "tags:")
 	require.NotContains(t, specBody.Spec, "env=staging")
 	require.NotContains(t, specBody.Spec, "priority=low")
@@ -668,49 +701,40 @@ func TestApproveDAGRunStepNotWaiting(t *testing.T) {
 func TestRejectDAGRunStep(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := fmt.Sprintf(`type: graph
+	dag := server.DAG(t, `name: rejection_test_dag
+type: graph
 steps:
   - name: wait-step
-    command: %q
+    command: "exit 0"
     approval:
       prompt: "Please approve"
   - name: after-wait
     depends: [wait-step]
-    command: "echo should not run"`, "exit 0")
-
-	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "rejection_test_dag",
-		Spec: &dagSpec,
-	}).ExpectStatus(http.StatusCreated).Send(t)
-
-	startResp := server.Client().Post("/api/v1/dags/rejection_test_dag/start", api.ExecuteDAGJSONRequestBody{}).
-		ExpectStatus(http.StatusOK).Send(t)
-
-	var startBody api.ExecuteDAG200JSONResponse
-	startResp.Unmarshal(t, &startBody)
-	require.NotEmpty(t, startBody.DagRunId)
-
-	// Wait for DAG to enter Wait status
-	waitForStoredDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
-		return status.Status == core.Waiting
+    command: "echo should not run"`)
+	ref := seedLatestDAGRunStatus(t, server, dag.DAG, "reject-waiting-run", core.Waiting, seedDAGRunStatusOptions{
+		nodeStatuses: map[string]core.NodeStatus{
+			"wait-step": core.NodeWaiting,
+		},
 	})
 
 	// Reject the wait step
 	reason := "test rejection reason"
 	rejectResp := server.Client().Post(
-		fmt.Sprintf("/api/v1/dag-runs/rejection_test_dag/%s/steps/wait-step/reject", startBody.DagRunId),
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/steps/wait-step/reject", ref.Name, ref.ID),
 		api.RejectStepRequest{Reason: &reason},
 	).ExpectStatus(http.StatusOK).Send(t)
 
 	var rejectBody api.RejectDAGRunStep200JSONResponse
 	rejectResp.Unmarshal(t, &rejectBody)
-	require.Equal(t, startBody.DagRunId, rejectBody.DagRunId)
+	require.Equal(t, api.DAGRunId(ref.ID), rejectBody.DagRunId)
 	require.Equal(t, "wait-step", rejectBody.StepName)
 
 	// Verify DAG status is Rejected
-	waitForStoredDAGRunStatus(t, server, "rejection_test_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+	status := waitForStoredDAGRunStatus(t, server, ref.Name, ref.ID, 2*time.Second, func(status *exec.DAGRunStatus) bool {
 		return status.Status == core.Rejected
 	})
+	require.True(t, hasNodeWithStatus(status, "wait-step", core.NodeRejected))
+	require.Equal(t, reason, status.Nodes[0].RejectionReason)
 }
 
 func TestRejectDAGRunStepNotWaiting(t *testing.T) {
@@ -1296,6 +1320,7 @@ type seedDAGRunStatusOptions struct {
 	errorText      string
 	parentRef      exec.DAGRunRef
 	paramsList     []string
+	nodeStatuses   map[string]core.NodeStatus
 }
 
 func seedLatestDAGRunStatus(
@@ -1318,16 +1343,22 @@ func seedLatestDAGRunStatus(
 	require.NoError(t, err)
 
 	ref := exec.NewDAGRunRef(dag.Name, dagRunID)
+	statusOptions := []transform.StatusOption{
+		transform.WithAttemptID(attempt.ID()),
+		transform.WithHierarchyRefs(ref, opts.parentRef),
+		transform.WithAutoRetryCount(opts.autoRetryCount),
+		transform.WithError(opts.errorText),
+	}
+	if !status.IsActive() && status != core.NotStarted {
+		statusOptions = append(statusOptions, transform.WithFinishedAt(time.Now().Add(-time.Minute)))
+	}
+
 	dagRunStatus := transform.NewStatusBuilder(dag).Create(
 		dagRunID,
 		status,
 		0,
 		time.Now().Add(-2*time.Minute),
-		transform.WithAttemptID(attempt.ID()),
-		transform.WithHierarchyRefs(ref, opts.parentRef),
-		transform.WithFinishedAt(time.Now().Add(-time.Minute)),
-		transform.WithAutoRetryCount(opts.autoRetryCount),
-		transform.WithError(opts.errorText),
+		statusOptions...,
 	)
 	if len(opts.paramsList) > 0 {
 		dagRunStatus.ParamsList = append([]string(nil), opts.paramsList...)
@@ -1337,12 +1368,86 @@ func seedLatestDAGRunStatus(
 		dagRunStatus.Nodes[0].FinishedAt = exec.FormatTime(time.Now().Add(-time.Minute))
 		dagRunStatus.Nodes[0].Error = opts.errorText
 	}
+	for stepName, nodeStatus := range opts.nodeStatuses {
+		found := false
+		for _, node := range dagRunStatus.Nodes {
+			if node.Step.Name != stepName {
+				continue
+			}
+			node.Status = nodeStatus
+			found = true
+			break
+		}
+		require.Truef(t, found, "seeded DAG-run status step %q not found", stepName)
+	}
 
 	require.NoError(t, attempt.Open(server.Context))
 	require.NoError(t, attempt.Write(server.Context, dagRunStatus))
 	require.NoError(t, attempt.Close(server.Context))
 
 	return ref
+}
+
+func TestDeleteDAGRun(t *testing.T) {
+	server := test.SetupServer(t)
+	dag := &core.DAG{Name: "delete_run_dag"}
+	ref := seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		"delete-run-1",
+		core.Succeeded,
+		seedDAGRunStatusOptions{},
+	)
+
+	server.Client().Delete(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", ref.Name, ref.ID),
+	).ExpectStatus(http.StatusNoContent).Send(t)
+
+	_, err := server.DAGRunStore.FindAttempt(server.Context, ref)
+	require.ErrorIs(t, err, exec.ErrDAGRunIDNotFound)
+
+	server.Client().Get(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", ref.Name, ref.ID),
+	).ExpectStatus(http.StatusNotFound).Send(t)
+}
+
+func TestDeleteDAGRunRejectsLatestAlias(t *testing.T) {
+	server := test.SetupServer(t)
+
+	resp := server.Client().Delete(
+		"/api/v1/dag-runs/delete_run_dag/latest",
+	).ExpectStatus(http.StatusBadRequest).Send(t)
+
+	var body api.Error
+	resp.Unmarshal(t, &body)
+	require.Equal(t, api.ErrorCodeBadRequest, body.Code)
+	require.Contains(t, body.Message, "latest cannot be used")
+}
+
+func TestDeleteDAGRunRejectsActiveRun(t *testing.T) {
+	server := test.SetupServer(t)
+	dag := &core.DAG{Name: "delete_active_run_dag"}
+	ref := seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		"active-run-1",
+		core.Running,
+		seedDAGRunStatusOptions{},
+	)
+
+	resp := server.Client().Delete(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s", ref.Name, ref.ID),
+	).ExpectStatus(http.StatusBadRequest).Send(t)
+
+	var body api.Error
+	resp.Unmarshal(t, &body)
+	require.Equal(t, api.ErrorCodeBadRequest, body.Code)
+	require.Contains(t, body.Message, "stop or dequeue it before deleting")
+
+	_, err := server.DAGRunStore.FindAttempt(server.Context, ref)
+	require.NoError(t, err)
 }
 
 func indentCommandBlock(command string, spaces int) string {
@@ -1424,25 +1529,25 @@ func TestExecuteDAGSyncSingleton(t *testing.T) {
 	})
 }
 
-func TestListDAGRunsFilterByTags(t *testing.T) {
+func TestListDAGRunsFilterByLabels(t *testing.T) {
 	server := test.SetupServer(t)
 
-	// Create DAGs with different tags
-	dagSpecProd := `tags:
+	// Create DAGs with different labels
+	dagSpecProd := `labels:
   - prod
   - critical
 steps:
   - name: main
     command: "echo prod-critical"`
 
-	dagSpecDev := `tags:
+	dagSpecDev := `labels:
   - dev
   - critical
 steps:
   - name: main
     command: "echo dev-critical"`
 
-	dagSpecTest := `tags:
+	dagSpecTest := `labels:
   - test
 steps:
   - name: main
@@ -1450,35 +1555,35 @@ steps:
 
 	// Create the DAGs
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "tag_filter_prod",
+		Name: "label_filter_prod",
 		Spec: &dagSpecProd,
 	}).ExpectStatus(http.StatusCreated).Send(t)
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "tag_filter_dev",
+		Name: "label_filter_dev",
 		Spec: &dagSpecDev,
 	}).ExpectStatus(http.StatusCreated).Send(t)
 
 	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-		Name: "tag_filter_test",
+		Name: "label_filter_test",
 		Spec: &dagSpecTest,
 	}).ExpectStatus(http.StatusCreated).Send(t)
 
 	// Start DAG runs for each
 	var prodRunId, devRunId, testRunId string
 
-	startResp := server.Client().Post("/api/v1/dags/tag_filter_prod/start", api.ExecuteDAGJSONRequestBody{}).
+	startResp := server.Client().Post("/api/v1/dags/label_filter_prod/start", api.ExecuteDAGJSONRequestBody{}).
 		ExpectStatus(http.StatusOK).Send(t)
 	var startBody api.ExecuteDAG200JSONResponse
 	startResp.Unmarshal(t, &startBody)
 	prodRunId = startBody.DagRunId
 
-	startResp = server.Client().Post("/api/v1/dags/tag_filter_dev/start", api.ExecuteDAGJSONRequestBody{}).
+	startResp = server.Client().Post("/api/v1/dags/label_filter_dev/start", api.ExecuteDAGJSONRequestBody{}).
 		ExpectStatus(http.StatusOK).Send(t)
 	startResp.Unmarshal(t, &startBody)
 	devRunId = startBody.DagRunId
 
-	startResp = server.Client().Post("/api/v1/dags/tag_filter_test/start", api.ExecuteDAGJSONRequestBody{}).
+	startResp = server.Client().Post("/api/v1/dags/label_filter_test/start", api.ExecuteDAGJSONRequestBody{}).
 		ExpectStatus(http.StatusOK).Send(t)
 	startResp.Unmarshal(t, &startBody)
 	testRunId = startBody.DagRunId
@@ -1488,9 +1593,9 @@ steps:
 		name  string
 		runId string
 	}{
-		{"tag_filter_prod", prodRunId},
-		{"tag_filter_dev", devRunId},
-		{"tag_filter_test", testRunId},
+		{"label_filter_prod", prodRunId},
+		{"label_filter_dev", devRunId},
+		{"label_filter_test", testRunId},
 	} {
 		require.Eventually(t, func() bool {
 			url := fmt.Sprintf("/api/v1/dags/%s/dag-runs/%s", pair.name, pair.runId)
@@ -1504,8 +1609,8 @@ steps:
 		}, dagRunEventuallyTimeout(10*time.Second), 200*time.Millisecond)
 	}
 
-	fetchNamesByTags := func(tags string) map[string]bool {
-		listResp := server.Client().Get("/api/v1/dag-runs?tags=" + tags).
+	fetchNamesByLabels := func(labels string) map[string]bool {
+		listResp := server.Client().Get("/api/v1/dag-runs?labels=" + labels).
 			ExpectStatus(http.StatusOK).Send(t)
 		var listBody api.ListDAGRuns200JSONResponse
 		listResp.Unmarshal(t, &listBody)
@@ -1517,9 +1622,9 @@ steps:
 		return names
 	}
 
-	requireFilterEventually := func(tags string, wantPresent, wantAbsent []string) {
+	requireFilterEventually := func(labels string, wantPresent, wantAbsent []string) {
 		require.Eventually(t, func() bool {
-			names := fetchNamesByTags(tags)
+			names := fetchNamesByLabels(labels)
 			for _, name := range wantPresent {
 				if !names[name] {
 					return false
@@ -1534,11 +1639,11 @@ steps:
 		}, dagRunEventuallyTimeout(5*time.Second), 200*time.Millisecond)
 	}
 
-	requireFilterEventually("critical", []string{"tag_filter_prod", "tag_filter_dev"}, []string{"tag_filter_test"})
-	requireFilterEventually("prod,critical", []string{"tag_filter_prod"}, []string{"tag_filter_dev", "tag_filter_test"})
-	requireFilterEventually("nonexistent", nil, []string{"tag_filter_prod", "tag_filter_dev", "tag_filter_test"})
-	requireFilterEventually("test", []string{"tag_filter_test"}, []string{"tag_filter_prod", "tag_filter_dev"})
-	requireFilterEventually("CRITICAL", []string{"tag_filter_prod", "tag_filter_dev"}, []string{"tag_filter_test"})
+	requireFilterEventually("critical", []string{"label_filter_prod", "label_filter_dev"}, []string{"label_filter_test"})
+	requireFilterEventually("prod,critical", []string{"label_filter_prod"}, []string{"label_filter_dev", "label_filter_test"})
+	requireFilterEventually("nonexistent", nil, []string{"label_filter_prod", "label_filter_dev", "label_filter_test"})
+	requireFilterEventually("test", []string{"label_filter_test"}, []string{"label_filter_prod", "label_filter_dev"})
+	requireFilterEventually("CRITICAL", []string{"label_filter_prod", "label_filter_dev"}, []string{"label_filter_test"})
 }
 
 func TestListDAGRunsFilterByPartialName(t *testing.T) {
@@ -1548,24 +1653,20 @@ func TestListDAGRunsFilterByPartialName(t *testing.T) {
   - name: main
     command: "echo search"`
 
-	for _, dagName := range []string{
+	for idx, dagName := range []string{
 		"test-params-flag",
 		"other-dag",
 		"alpha-test-case",
 	} {
-		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-			Name: dagName,
-			Spec: &spec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		resp := server.Client().Post(
-			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
-			api.ExecuteDAGJSONRequestBody{},
-		).ExpectStatus(http.StatusOK).Send(t)
-
-		var body api.ExecuteDAG200JSONResponse
-		resp.Unmarshal(t, &body)
-		require.NotEmpty(t, body.DagRunId)
+		dag := server.DAG(t, fmt.Sprintf("name: %s\n%s", dagName, spec))
+		seedLatestDAGRunStatus(
+			t,
+			server,
+			dag.DAG,
+			fmt.Sprintf("search-run-%d", idx),
+			core.Succeeded,
+			seedDAGRunStatusOptions{},
+		)
 	}
 
 	resp := server.Client().Get("/api/v1/dag-runs?name=test").
@@ -1591,23 +1692,19 @@ func TestListDAGRunsByNameRemainsExact(t *testing.T) {
   - name: main
     command: "echo search"`
 
-	for _, dagName := range []string{
+	for idx, dagName := range []string{
 		"test-params-flag",
 		"alpha-test-case",
 	} {
-		_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
-			Name: dagName,
-			Spec: &spec,
-		}).ExpectStatus(http.StatusCreated).Send(t)
-
-		resp := server.Client().Post(
-			fmt.Sprintf("/api/v1/dags/%s/start", dagName),
-			api.ExecuteDAGJSONRequestBody{},
-		).ExpectStatus(http.StatusOK).Send(t)
-
-		var body api.ExecuteDAG200JSONResponse
-		resp.Unmarshal(t, &body)
-		require.NotEmpty(t, body.DagRunId)
+		dag := server.DAG(t, fmt.Sprintf("name: %s\n%s", dagName, spec))
+		seedLatestDAGRunStatus(
+			t,
+			server,
+			dag.DAG,
+			fmt.Sprintf("exact-run-%d", idx),
+			core.Succeeded,
+			seedDAGRunStatusOptions{},
+		)
 	}
 
 	resp := server.Client().Get("/api/v1/dag-runs/test-params-flag").

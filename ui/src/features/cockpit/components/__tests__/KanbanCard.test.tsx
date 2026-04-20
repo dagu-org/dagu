@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Status, StatusLabel, TriggerType } from '@/api/v1/schema';
 import { KanbanCard } from '../KanbanCard';
@@ -11,16 +11,17 @@ vi.mock('framer-motion', () => ({
   motion: {
     div: ({
       children,
-      layoutId: _layoutId,
-      layout: _layout,
-      initial: _initial,
-      animate: _animate,
-      exit: _exit,
-      transition: _transition,
       ...props
-    }: React.ComponentProps<'div'> & Record<string, unknown>) => (
-      <div {...props}>{children}</div>
-    ),
+    }: React.ComponentProps<'div'> & Record<string, unknown>) => {
+      const divProps = { ...props };
+      delete divProps.layoutId;
+      delete divProps.layout;
+      delete divProps.initial;
+      delete divProps.animate;
+      delete divProps.exit;
+      delete divProps.transition;
+      return <div {...divProps}>{children}</div>;
+    },
   },
 }));
 
@@ -33,6 +34,7 @@ describe('KanbanCard', () => {
           name: 'retry-dag',
           status: Status.Failed,
           statusLabel: StatusLabel.failed,
+          artifactsAvailable: false,
           autoRetryCount: 1,
           autoRetryLimit: 3,
           triggerType: TriggerType.manual,
@@ -56,6 +58,7 @@ describe('KanbanCard', () => {
           name: 'retry-dag',
           status: Status.Failed,
           statusLabel: StatusLabel.failed,
+          artifactsAvailable: false,
           autoRetryCount: 3,
           autoRetryLimit: 3,
           triggerType: TriggerType.manual,
@@ -69,5 +72,37 @@ describe('KanbanCard', () => {
     );
 
     expect(screen.getByText('auto retries exhausted')).toBeInTheDocument();
+  });
+
+  it('opens artifacts without opening the run details', () => {
+    const handleClick = vi.fn();
+    const handleArtifactsClick = vi.fn();
+
+    render(
+      <KanbanCard
+        run={{
+          dagRunId: 'run-3',
+          name: 'artifact-dag',
+          status: Status.Success,
+          statusLabel: StatusLabel.succeeded,
+          artifactsAvailable: true,
+          autoRetryCount: 0,
+          triggerType: TriggerType.manual,
+          queuedAt: '',
+          scheduleTime: '',
+          startedAt: '2026-03-16T00:00:00Z',
+          finishedAt: '2026-03-16T00:01:00Z',
+        }}
+        onClick={handleClick}
+        onArtifactsClick={handleArtifactsClick}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View artifacts for artifact-dag' })
+    );
+
+    expect(handleArtifactsClick).toHaveBeenCalledTimes(1);
+    expect(handleClick).not.toHaveBeenCalled();
   });
 });

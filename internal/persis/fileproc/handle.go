@@ -64,14 +64,15 @@ func NewProcHandler(file string, meta exec.ProcMeta, heartbeatInterval, syncInte
 
 // Stop implements models.Proc.
 func (p *ProcHandle) Stop(_ context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	if !p.started.Load() {
 		return fmt.Errorf("heartbeat not started")
 	}
 	if p.canceled.CompareAndSwap(false, true) {
-		if p.cancel != nil {
-			p.cancel()
+		p.mu.Lock()
+		cancel := p.cancel
+		p.mu.Unlock()
+		if cancel != nil {
+			cancel()
 		}
 		// Wait for the heartbeat goroutine to finish
 		p.wg.Wait()
@@ -106,7 +107,9 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 	}
 
 	hbCtx, cancel := context.WithCancel(ctx)
+	p.mu.Lock()
 	p.cancel = cancel
+	p.mu.Unlock()
 	p.canceled.Store(false)
 
 	p.wg.Add(1)
@@ -138,7 +141,9 @@ func (p *ProcHandle) startHeartbeat(ctx context.Context) error {
 				logger.Error(ctx, "Failed to remove heartbeat file",
 					tag.Error(err))
 			}
+			p.mu.Lock()
 			p.cancel = nil
+			p.mu.Unlock()
 			p.started.Store(false)
 			p.wg.Done()
 		}()
@@ -207,7 +212,10 @@ func writeHeartbeat(fd *os.File, heartbeatUnix int64) error {
 
 func (p *ProcHandle) openInitializedProcFile(heartbeatUnix int64) (*os.File, error) {
 	dir := filepath.Dir(p.fileName)
-	tmpFile, err := os.CreateTemp(dir, filepath.Base(p.fileName)+".*.tmp")
+	// Keep the temporary name short. Proc file names already include encoded
+	// run and attempt IDs, and deriving the temp name from them can exceed
+	// Windows path limits even when the final proc path is still valid.
+	tmpFile, err := os.CreateTemp(dir, ".proc-*.tmp")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp proc file: %w", err)
 	}

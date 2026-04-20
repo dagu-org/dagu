@@ -9,5 +9,6 @@ export * from './hooks/useAgentChat';
 
 // Components
 export * from './components/AgentChatModal';
+export * from './components/AgentChatPanel';
 export * from './components/ChatInput';
 export * from './components/ChatMessages';

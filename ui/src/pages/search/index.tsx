@@ -11,6 +11,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
+import { workspaceLabel } from '../../lib/workspace';
 import Title from '../../ui/Title';
 
 type SearchScope = 'dags' | 'docs';
@@ -39,6 +40,7 @@ type SearchFeedPanelProps = {
 type SearchFeedProps = {
   query: string;
   remoteNode: string;
+  selectedWorkspace: string;
 };
 
 function parseScope(value: string | null): SearchScope {
@@ -67,15 +69,14 @@ function getErrorStatus(error: unknown): number | undefined {
   return err?.status ?? err?.response?.status;
 }
 
-function getErrorMessage(
-  error: unknown,
-  unavailableMessage?: string
-): string {
+function getErrorMessage(error: unknown, unavailableMessage?: string): string {
   if (getErrorStatus(error) === 403 && unavailableMessage) {
     return unavailableMessage;
   }
 
-  return (error as { message?: string })?.message || 'Search failed. Try again.';
+  return (
+    (error as { message?: string })?.message || 'Search failed. Try again.'
+  );
 }
 
 function useAutoLoadMore(
@@ -134,7 +135,9 @@ function SearchFeedPanel({
   }
 
   if (initialErrorMessage && !hasResults) {
-    return <div className="text-sm text-destructive">{initialErrorMessage}</div>;
+    return (
+      <div className="text-sm text-destructive">{initialErrorMessage}</div>
+    );
   }
 
   if (!isLoading && !hasResults && !initialErrorMessage) {
@@ -191,8 +194,13 @@ function SearchFeedPanel({
   );
 }
 
-function DAGSearchFeed({ query, remoteNode }: SearchFeedProps) {
+function DAGSearchFeed({
+  query,
+  remoteNode,
+  selectedWorkspace,
+}: SearchFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const label = workspaceLabel(selectedWorkspace);
   const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
     '/search/dags',
     (pageIndex, previousPage) => {
@@ -207,7 +215,9 @@ function DAGSearchFeed({ query, remoteNode }: SearchFeedProps) {
         params: {
           query: {
             remoteNode,
+            workspace: selectedWorkspace || undefined,
             q: query,
+            labels: label,
             cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
           },
         },
@@ -269,7 +279,11 @@ function DAGSearchFeed({ query, remoteNode }: SearchFeedProps) {
   );
 }
 
-function DocSearchFeed({ query, remoteNode }: SearchFeedProps) {
+function DocSearchFeed({
+  query,
+  remoteNode,
+  selectedWorkspace,
+}: SearchFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { data, error, isLoading, isValidating, setSize, mutate } = useInfinite(
     '/search/docs',
@@ -285,6 +299,7 @@ function DocSearchFeed({ query, remoteNode }: SearchFeedProps) {
         params: {
           query: {
             remoteNode,
+            workspace: selectedWorkspace || undefined,
             q: query,
             cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,
           },
@@ -359,8 +374,13 @@ function Search() {
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const searchStateScope = JSON.stringify({
+    remoteNode: remoteKey,
+    workspace: selectedWorkspace || null,
+  });
   const inputRef = useRef<HTMLInputElement>(null);
-  const didHydrateFromSessionRef = useRef(false);
+  const hydratedScopeRef = useRef<string | null>(null);
 
   const queryParams = useMemo(
     () => new URLSearchParams(location.search),
@@ -383,9 +403,12 @@ function Search() {
 
   useEffect(() => {
     const hasUrlState = queryParams.has('q') || queryParams.has('scope');
-    if (!didHydrateFromSessionRef.current) {
-      didHydrateFromSessionRef.current = true;
-      const stored = searchState.readState<SearchFilters>('searchPage', remoteKey);
+    if (hydratedScopeRef.current !== searchStateScope) {
+      hydratedScopeRef.current = searchStateScope;
+      const stored = searchState.readState<SearchFilters>(
+        'searchPage',
+        searchStateScope
+      );
 
       if (!hasUrlState && stored) {
         setSearchParams(buildSearchParams(stored), { replace: true });
@@ -393,8 +416,14 @@ function Search() {
       }
     }
 
-    searchState.writeState('searchPage', remoteKey, currentFilters);
-  }, [currentFilters, queryParams, remoteKey, searchState, setSearchParams]);
+    searchState.writeState('searchPage', searchStateScope, currentFilters);
+  }, [
+    currentFilters,
+    queryParams,
+    searchState,
+    searchStateScope,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -486,9 +515,17 @@ function Search() {
 
         <div className="mt-4 space-y-4">
           {currentFilters.scope === 'docs' ? (
-            <DocSearchFeed query={submittedQuery} remoteNode={remoteNode} />
+            <DocSearchFeed
+              query={submittedQuery}
+              remoteNode={remoteNode}
+              selectedWorkspace={selectedWorkspace}
+            />
           ) : (
-            <DAGSearchFeed query={submittedQuery} remoteNode={remoteNode} />
+            <DAGSearchFeed
+              query={submittedQuery}
+              remoteNode={remoteNode}
+              selectedWorkspace={selectedWorkspace}
+            />
           )}
         </div>
       </div>

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseTag(t *testing.T) {
+func TestParseLabel(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -22,14 +22,14 @@ func TestParseTag(t *testing.T) {
 		wantStr string
 	}{
 		{
-			name:    "simple tag",
+			name:    "simple label",
 			input:   "production",
 			wantKey: "production",
 			wantVal: "",
 			wantStr: "production",
 		},
 		{
-			name:    "key=value tag",
+			name:    "key=value label",
 			input:   "env=prod",
 			wantKey: "env",
 			wantVal: "prod",
@@ -81,37 +81,37 @@ func TestParseTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tag := ParseTag(tt.input)
-			assert.Equal(t, tt.wantKey, tag.Key)
-			assert.Equal(t, tt.wantVal, tag.Value)
+			label := ParseLabel(tt.input)
+			assert.Equal(t, tt.wantKey, label.Key)
+			assert.Equal(t, tt.wantVal, label.Value)
 			if tt.wantKey != "" {
-				assert.Equal(t, tt.wantStr, tag.String())
+				assert.Equal(t, tt.wantStr, label.String())
 			}
 		})
 	}
 }
 
-func TestTag_IsZero(t *testing.T) {
+func TestLabel_IsZero(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		tag  Tag
-		want bool
+		name  string
+		label Label
+		want  bool
 	}{
-		{"empty tag", Tag{}, true},
-		{"key only", Tag{Key: "env"}, false},
-		{"key and value", Tag{Key: "env", Value: "prod"}, false},
+		{"empty label", Label{}, true},
+		{"key only", Label{Key: "env"}, false},
+		{"key and value", Label{Key: "env", Value: "prod"}, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.tag.IsZero())
+			assert.Equal(t, tt.want, tt.label.IsZero())
 		})
 	}
 }
 
-func TestNewTags(t *testing.T) {
+func TestNewLabels(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -121,7 +121,7 @@ func TestNewTags(t *testing.T) {
 		wantStrs []string
 	}{
 		{
-			name:     "mixed tags",
+			name:     "mixed labels",
 			input:    []string{"env=prod", "team=platform", "critical"},
 			wantLen:  3,
 			wantStrs: []string{"env=prod", "team=platform", "critical"},
@@ -148,81 +148,81 @@ func TestNewTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tags := NewTags(tt.input)
-			assert.Len(t, tags, tt.wantLen)
-			assert.Equal(t, tt.wantStrs, tags.Strings())
+			labels := NewLabels(tt.input)
+			assert.Len(t, labels, tt.wantLen)
+			assert.Equal(t, tt.wantStrs, labels.Strings())
 		})
 	}
 }
 
-func TestTags_Keys(t *testing.T) {
+func TestLabels_Keys(t *testing.T) {
 	t.Parallel()
 
-	tags := Tags{
+	labels := Labels{
 		{Key: "env", Value: "prod"},
 		{Key: "env", Value: "staging"},
 		{Key: "team", Value: "platform"},
 		{Key: "critical", Value: ""},
 	}
 
-	keys := tags.Keys()
+	keys := labels.Keys()
 	assert.Len(t, keys, 3)
 	assert.Contains(t, keys, "env")
 	assert.Contains(t, keys, "team")
 	assert.Contains(t, keys, "critical")
 }
 
-func TestTags_HasKey(t *testing.T) {
+func TestLabels_HasKey(t *testing.T) {
 	t.Parallel()
 
-	tags := Tags{
+	labels := Labels{
 		{Key: "env", Value: "prod"},
 		{Key: "team", Value: "platform"},
 	}
 
-	assert.True(t, tags.HasKey("env"))
-	assert.True(t, tags.HasKey("ENV"))
-	assert.True(t, tags.HasKey("team"))
-	assert.False(t, tags.HasKey("missing"))
+	assert.True(t, labels.HasKey("env"))
+	assert.True(t, labels.HasKey("ENV"))
+	assert.True(t, labels.HasKey("team"))
+	assert.False(t, labels.HasKey("missing"))
 }
 
-func TestTags_Get(t *testing.T) {
+func TestLabels_Get(t *testing.T) {
 	t.Parallel()
 
-	tags := Tags{
+	labels := Labels{
 		{Key: "env", Value: "prod"},
 		{Key: "env", Value: "staging"},
 		{Key: "team", Value: "platform"},
 		{Key: "critical", Value: ""},
 	}
 
-	envValues := tags.Get("env")
+	envValues := labels.Get("env")
 	assert.Len(t, envValues, 2)
 	assert.Contains(t, envValues, "prod")
 	assert.Contains(t, envValues, "staging")
 
-	teamValues := tags.Get("team")
+	teamValues := labels.Get("team")
 	assert.Len(t, teamValues, 1)
 	assert.Equal(t, "platform", teamValues[0])
 
-	criticalValues := tags.Get("critical")
+	criticalValues := labels.Get("critical")
 	assert.Len(t, criticalValues, 1)
 	assert.Equal(t, "", criticalValues[0])
 
-	missingValues := tags.Get("missing")
+	missingValues := labels.Get("missing")
 	assert.Nil(t, missingValues)
 }
 
-func TestTags_JSON(t *testing.T) {
+func TestLabels_JSON(t *testing.T) {
 	t.Parallel()
 
 	t.Run("marshal", func(t *testing.T) {
-		tags := Tags{
+		labels := Labels{
 			{Key: "env", Value: "prod"},
 			{Key: "critical", Value: ""},
 		}
 
-		data, err := json.Marshal(tags)
+		data, err := json.Marshal(labels)
 		require.NoError(t, err)
 		assert.JSONEq(t, `["env=prod","critical"]`, string(data))
 	})
@@ -230,22 +230,22 @@ func TestTags_JSON(t *testing.T) {
 	t.Run("unmarshal", func(t *testing.T) {
 		data := []byte(`["env=prod","team=platform","critical"]`)
 
-		var tags Tags
-		err := json.Unmarshal(data, &tags)
+		var labels Labels
+		err := json.Unmarshal(data, &labels)
 		require.NoError(t, err)
 
-		assert.Len(t, tags, 3)
-		assert.Equal(t, "env", tags[0].Key)
-		assert.Equal(t, "prod", tags[0].Value)
-		assert.Equal(t, "team", tags[1].Key)
-		assert.Equal(t, "platform", tags[1].Value)
-		assert.Equal(t, "critical", tags[2].Key)
-		assert.Equal(t, "", tags[2].Value)
+		assert.Len(t, labels, 3)
+		assert.Equal(t, "env", labels[0].Key)
+		assert.Equal(t, "prod", labels[0].Value)
+		assert.Equal(t, "team", labels[1].Key)
+		assert.Equal(t, "platform", labels[1].Value)
+		assert.Equal(t, "critical", labels[2].Key)
+		assert.Equal(t, "", labels[2].Value)
 	})
 
-	t.Run("nil tags marshal", func(t *testing.T) {
-		var tags Tags
-		data, err := json.Marshal(tags)
+	t.Run("nil labels marshal", func(t *testing.T) {
+		var labels Labels
+		data, err := json.Marshal(labels)
 		require.NoError(t, err)
 		assert.Equal(t, "null", string(data))
 	})
@@ -253,68 +253,68 @@ func TestTags_JSON(t *testing.T) {
 	t.Run("unmarshal invalid JSON", func(t *testing.T) {
 		// Use valid JSON but wrong type - this triggers the error path inside UnmarshalJSON
 		data := []byte(`{"key": "value"}`)
-		var tags Tags
-		err := json.Unmarshal(data, &tags)
+		var labels Labels
+		err := json.Unmarshal(data, &labels)
 		require.Error(t, err)
 	})
 }
 
-func TestParseTagFilter(t *testing.T) {
+func TestParseLabelFilter(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name      string
 		input     string
-		wantType  TagFilterType
+		wantType  LabelFilterType
 		wantKey   string
 		wantValue string
 	}{
 		{
 			name:      "key only",
 			input:     "env",
-			wantType:  TagFilterTypeKeyOnly,
+			wantType:  LabelFilterTypeKeyOnly,
 			wantKey:   "env",
 			wantValue: "",
 		},
 		{
 			name:      "exact match",
 			input:     "env=prod",
-			wantType:  TagFilterTypeExact,
+			wantType:  LabelFilterTypeExact,
 			wantKey:   "env",
 			wantValue: "prod",
 		},
 		{
 			name:      "negation",
 			input:     "!deprecated",
-			wantType:  TagFilterTypeNegation,
+			wantType:  LabelFilterTypeNegation,
 			wantKey:   "deprecated",
 			wantValue: "",
 		},
 		{
 			name:      "case normalized",
 			input:     "ENV=PROD",
-			wantType:  TagFilterTypeExact,
+			wantType:  LabelFilterTypeExact,
 			wantKey:   "env",
 			wantValue: "prod",
 		},
 		{
 			name:      "spaces trimmed",
 			input:     "  env = prod  ",
-			wantType:  TagFilterTypeExact,
+			wantType:  LabelFilterTypeExact,
 			wantKey:   "env",
 			wantValue: "prod",
 		},
 		{
 			name:      "negation with spaces",
 			input:     "! deprecated ",
-			wantType:  TagFilterTypeNegation,
+			wantType:  LabelFilterTypeNegation,
 			wantKey:   "deprecated",
 			wantValue: "",
 		},
 		{
 			name:      "empty string",
 			input:     "",
-			wantType:  TagFilterTypeKeyOnly,
+			wantType:  LabelFilterTypeKeyOnly,
 			wantKey:   "",
 			wantValue: "",
 		},
@@ -322,7 +322,7 @@ func TestParseTagFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter := ParseTagFilter(tt.input)
+			filter := ParseLabelFilter(tt.input)
 			assert.Equal(t, tt.wantType, filter.Type)
 			assert.Equal(t, tt.wantKey, filter.Key)
 			assert.Equal(t, tt.wantValue, filter.Value)
@@ -330,10 +330,10 @@ func TestParseTagFilter(t *testing.T) {
 	}
 }
 
-func TestTagFilter_MatchesTags(t *testing.T) {
+func TestLabelFilter_MatchesLabels(t *testing.T) {
 	t.Parallel()
 
-	tags := Tags{
+	labels := Labels{
 		{Key: "env", Value: "prod"},
 		{Key: "team", Value: "platform"},
 		{Key: "critical", Value: ""},
@@ -348,12 +348,12 @@ func TestTagFilter_MatchesTags(t *testing.T) {
 		{"key exists", "env", true},
 		{"key exists (uppercase)", "ENV", true},
 		{"key missing", "missing", false},
-		{"key-only tag exists", "critical", true},
+		{"key-only label exists", "critical", true},
 
 		// Exact match filters
 		{"exact match", "env=prod", true},
 		{"exact match (wrong value)", "env=staging", false},
-		{"exact match (key-only tag)", "critical=", true},
+		{"exact match (key-only label)", "critical=", true},
 		{"exact match (missing key)", "missing=value", false},
 
 		// Negation filters
@@ -363,24 +363,24 @@ func TestTagFilter_MatchesTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter := ParseTagFilter(tt.filter)
-			assert.Equal(t, tt.want, filter.MatchesTags(tags))
+			filter := ParseLabelFilter(tt.filter)
+			assert.Equal(t, tt.want, filter.MatchesLabels(labels))
 		})
 	}
 }
 
-func TestTagFilter_MatchesTags_InvalidType(t *testing.T) {
+func TestLabelFilter_MatchesLabels_InvalidType(t *testing.T) {
 	t.Parallel()
 
-	tags := Tags{{Key: "env", Value: "prod"}}
-	filter := TagFilter{Type: TagFilterType(999), Key: "env"}
-	assert.False(t, filter.MatchesTags(tags))
+	labels := Labels{{Key: "env", Value: "prod"}}
+	filter := LabelFilter{Type: LabelFilterType(999), Key: "env"}
+	assert.False(t, filter.MatchesLabels(labels))
 }
 
-func TestTags_MatchesFilters(t *testing.T) {
+func TestLabels_MatchesFilters(t *testing.T) {
 	t.Parallel()
 
-	tags := Tags{
+	labels := Labels{
 		{Key: "env", Value: "prod"},
 		{Key: "team", Value: "platform"},
 		{Key: "critical", Value: ""},
@@ -425,57 +425,57 @@ func TestTags_MatchesFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filters := make([]TagFilter, len(tt.filters))
+			filters := make([]LabelFilter, len(tt.filters))
 			for i, f := range tt.filters {
-				filters[i] = ParseTagFilter(f)
+				filters[i] = ParseLabelFilter(f)
 			}
-			assert.Equal(t, tt.want, tags.MatchesFilters(filters))
+			assert.Equal(t, tt.want, labels.MatchesFilters(filters))
 		})
 	}
 }
 
-func TestParseTagFilter_Wildcard(t *testing.T) {
+func TestParseLabelFilter_Wildcard(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name      string
 		input     string
-		wantType  TagFilterType
+		wantType  LabelFilterType
 		wantKey   string
 		wantValue string
 	}{
 		{
 			name:      "key wildcard star",
 			input:     "env*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "env*",
 			wantValue: "",
 		},
 		{
 			name:      "key wildcard question",
 			input:     "te?m",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "te?m",
 			wantValue: "",
 		},
 		{
 			name:      "value wildcard",
 			input:     "env=prod*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "env",
 			wantValue: "prod*",
 		},
 		{
 			name:      "both wildcard",
 			input:     "env*=prod*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "env*",
 			wantValue: "prod*",
 		},
 		{
 			name:      "match any value",
 			input:     "team=*",
-			wantType:  TagFilterTypeWildcard,
+			wantType:  LabelFilterTypeWildcard,
 			wantKey:   "team",
 			wantValue: "*",
 		},
@@ -483,7 +483,7 @@ func TestParseTagFilter_Wildcard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter := ParseTagFilter(tt.input)
+			filter := ParseLabelFilter(tt.input)
 			assert.Equal(t, tt.wantType, filter.Type)
 			assert.Equal(t, tt.wantKey, filter.Key)
 			assert.Equal(t, tt.wantValue, filter.Value)
@@ -491,10 +491,10 @@ func TestParseTagFilter_Wildcard(t *testing.T) {
 	}
 }
 
-func TestTagFilter_MatchesTags_Wildcard(t *testing.T) {
+func TestLabelFilter_MatchesLabels_Wildcard(t *testing.T) {
 	t.Parallel()
 
-	tags := Tags{
+	labels := Labels{
 		{Key: "env", Value: "prod"},
 		{Key: "env", Value: "production"},
 		{Key: "env", Value: "prod-us"},
@@ -514,7 +514,7 @@ func TestTagFilter_MatchesTags_Wildcard(t *testing.T) {
 		{"value question mark", "env=pro?", true},
 		{"value question mark no match", "env=pr?", false},
 		{"value any", "team=*", true},
-		{"value any empty tag", "critical=*", true}, // * matches empty string
+		{"value any empty label", "critical=*", true}, // * matches empty string
 
 		// Key wildcard patterns
 		{"key prefix match", "env*", true},
@@ -535,53 +535,53 @@ func TestTagFilter_MatchesTags_Wildcard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter := ParseTagFilter(tt.filter)
-			assert.Equal(t, tt.want, filter.MatchesTags(tags), "filter: %s", tt.filter)
+			filter := ParseLabelFilter(tt.filter)
+			assert.Equal(t, tt.want, filter.MatchesLabels(labels), "filter: %s", tt.filter)
 		})
 	}
 }
 
-func TestValidateTag(t *testing.T) {
+func TestValidateLabel(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		tag     Tag
+		label   Label
 		wantErr bool
 		errMsg  string
 	}{
-		// Valid tags
-		{"simple key", Tag{Key: "env"}, false, ""},
-		{"key with value", Tag{Key: "env", Value: "prod"}, false, ""},
-		{"key with dash", Tag{Key: "my-tag"}, false, ""},
-		{"key with underscore", Tag{Key: "my_tag"}, false, ""},
-		{"key with dot", Tag{Key: "my.tag"}, false, ""},
-		{"key starts with number", Tag{Key: "1env"}, false, ""},
-		{"value with slash", Tag{Key: "path", Value: "foo/bar"}, false, ""},
+		// Valid labels
+		{"simple key", Label{Key: "env"}, false, ""},
+		{"key with value", Label{Key: "env", Value: "prod"}, false, ""},
+		{"key with dash", Label{Key: "my-label"}, false, ""},
+		{"key with underscore", Label{Key: "my_tag"}, false, ""},
+		{"key with dot", Label{Key: "my.label"}, false, ""},
+		{"key starts with number", Label{Key: "1env"}, false, ""},
+		{"value with slash", Label{Key: "path", Value: "foo/bar"}, false, ""},
 
 		// Invalid keys
-		{"empty key", Tag{Key: ""}, true, "tag key cannot be empty"},
-		{"key starts with dash", Tag{Key: "-env"}, true, "invalid characters"},
-		{"key starts with underscore", Tag{Key: "_env"}, true, "invalid characters"},
-		{"key starts with dot", Tag{Key: ".env"}, true, "invalid characters"},
-		{"key with space", Tag{Key: "my env"}, true, "invalid characters"},
-		{"key with equals", Tag{Key: "my=env"}, true, "invalid characters"},
-		{"key with exclamation", Tag{Key: "my!env"}, true, "invalid characters"},
-		{"key with special char", Tag{Key: "my@env"}, true, "invalid characters"},
+		{"empty key", Label{Key: ""}, true, "label key cannot be empty"},
+		{"key starts with dash", Label{Key: "-env"}, true, "invalid characters"},
+		{"key starts with underscore", Label{Key: "_env"}, true, "invalid characters"},
+		{"key starts with dot", Label{Key: ".env"}, true, "invalid characters"},
+		{"key with space", Label{Key: "my env"}, true, "invalid characters"},
+		{"key with equals", Label{Key: "my=env"}, true, "invalid characters"},
+		{"key with exclamation", Label{Key: "my!env"}, true, "invalid characters"},
+		{"key with special char", Label{Key: "my@env"}, true, "invalid characters"},
 
 		// Invalid values
-		{"value starts with dash", Tag{Key: "env", Value: "-prod"}, true, "invalid characters"},
-		{"value with space", Tag{Key: "env", Value: "my prod"}, true, "invalid characters"},
-		{"value with special char", Tag{Key: "env", Value: "prod@test"}, true, "invalid characters"},
+		{"value starts with dash", Label{Key: "env", Value: "-prod"}, true, "invalid characters"},
+		{"value with space", Label{Key: "env", Value: "my prod"}, true, "invalid characters"},
+		{"value with special char", Label{Key: "env", Value: "prod@test"}, true, "invalid characters"},
 
 		// Length limits
-		{"key too long", Tag{Key: string(make([]byte, 64))}, true, "exceeds max length"},
-		{"value too long", Tag{Key: "env", Value: string(make([]byte, 256))}, true, "exceeds max length"},
+		{"key too long", Label{Key: string(make([]byte, 64))}, true, "exceeds max length"},
+		{"value too long", Label{Key: "env", Value: string(make([]byte, 256))}, true, "exceeds max length"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateTag(tt.tag)
+			err := ValidateLabel(tt.label)
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errMsg != "" {
@@ -594,42 +594,42 @@ func TestValidateTag(t *testing.T) {
 	}
 }
 
-func TestValidateTags(t *testing.T) {
+func TestValidateLabels(t *testing.T) {
 	t.Parallel()
 
 	t.Run("all valid", func(t *testing.T) {
-		tags := Tags{
+		labels := Labels{
 			{Key: "env", Value: "prod"},
 			{Key: "team", Value: "platform"},
 		}
-		err := ValidateTags(tags)
+		err := ValidateLabels(labels)
 		require.NoError(t, err)
 	})
 
 	t.Run("one invalid", func(t *testing.T) {
-		tags := Tags{
+		labels := Labels{
 			{Key: "env", Value: "prod"},
 			{Key: "invalid key", Value: "value"},
 		}
-		err := ValidateTags(tags)
+		err := ValidateLabels(labels)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid key")
 	})
 
 	t.Run("multiple invalid", func(t *testing.T) {
-		tags := Tags{
+		labels := Labels{
 			{Key: "", Value: "empty"},
 			{Key: "invalid key", Value: "value"},
 		}
-		err := ValidateTags(tags)
+		err := ValidateLabels(labels)
 		require.Error(t, err)
 		// Both errors should be present
 		assert.Contains(t, err.Error(), "cannot be empty")
 		assert.Contains(t, err.Error(), "invalid characters")
 	})
 
-	t.Run("empty tags", func(t *testing.T) {
-		err := ValidateTags(Tags{})
+	t.Run("empty labels", func(t *testing.T) {
+		err := ValidateLabels(Labels{})
 		require.NoError(t, err)
 	})
 }

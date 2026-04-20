@@ -245,7 +245,7 @@ func (m *mockDAGStore) LoadSpec(ctx context.Context, spec []byte, opts ...spec.L
 	return args.Get(0).(*core.DAG), args.Error(1)
 }
 
-func (m *mockDAGStore) TagList(ctx context.Context) ([]string, []string, error) {
+func (m *mockDAGStore) LabelList(ctx context.Context) ([]string, []string, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]string), args.Get(1).([]string), args.Error(2)
 }
@@ -268,7 +268,7 @@ type mockDAGRunStore struct {
 }
 
 // RemoveDAGRun implements models.DAGRunStore.
-func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef, _ ...exec.RemoveDAGRunOption) error {
 	panic("unimplemented")
 }
 

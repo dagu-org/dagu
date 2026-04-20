@@ -21,7 +21,7 @@ type Props = {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onClearSession: () => void;
-  onClose: () => void;
+  onClose?: () => void;
   dragHandlers?: ReturnType<typeof useResizableDraggable>['dragHandlers'];
   isMobile?: boolean;
 };
@@ -37,14 +37,16 @@ export function AgentChatModalHeader({
   isMobile,
 }: Props): ReactElement {
   const { preferences, updatePreference } = useUserPreferences();
+  const activeDragHandlers =
+    dragHandlers && !isMobile ? dragHandlers : undefined;
 
   return (
     <div
       className={cn(
         'flex items-center justify-between px-3 py-2 border-b border-border bg-secondary dark:bg-surface',
-        !isMobile && 'cursor-move'
+        activeDragHandlers && 'cursor-move'
       )}
-      {...(dragHandlers || {})}
+      {...(activeDragHandlers || {})}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <button
@@ -98,15 +100,17 @@ export function AgentChatModalHeader({
           >
             <Plus className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            title="Close"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </TooltipProvider>
     </div>

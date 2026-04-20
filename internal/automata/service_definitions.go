@@ -407,14 +407,14 @@ func (s *Service) resolveAllowedDAGSet(ctx context.Context, allowed AllowedDAGs)
 		seen[dag.Name] = AllowedDAGInfo{
 			Name:        dag.Name,
 			Description: dag.Description,
-			Tags:        dag.Tags.Strings(),
+			Tags:        dag.Labels.Strings(),
 		}
 	}
 	if len(allowed.Tags) > 0 {
 		pg := exec.NewPaginator(1, math.MaxInt)
 		result, _, err := s.dagStore.List(ctx, exec.ListDAGsOptions{
 			Paginator: &pg,
-			Tags:      allowed.Tags,
+			Labels:    allowed.Tags,
 		})
 		if err != nil {
 			return nil, err
@@ -423,7 +423,7 @@ func (s *Service) resolveAllowedDAGSet(ctx context.Context, allowed AllowedDAGs)
 			seen[dag.Name] = AllowedDAGInfo{
 				Name:        dag.Name,
 				Description: dag.Description,
-				Tags:        dag.Tags.Strings(),
+				Tags:        dag.Labels.Strings(),
 			}
 		}
 	}

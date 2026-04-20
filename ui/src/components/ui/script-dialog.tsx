@@ -58,14 +58,14 @@ export function ScriptDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-auto min-h-0 rounded-b-lg">
-          <div className="bg-code-bg min-h-full rounded-b-lg">
-            <pre className="font-mono text-xs text-code-text p-3">
+          <div className="min-h-full rounded-b-lg bg-slate-950">
+            <pre className="font-mono text-xs text-slate-100 p-3 selection:bg-sky-500/40 selection:text-white">
               {lines.map((line, index) => (
-                <div key={index} className="flex hover:bg-code-bg/80 px-1">
-                  <span className="text-muted-foreground mr-4 select-none w-8 text-right flex-shrink-0">
+                <div key={index} className="flex px-1 hover:bg-slate-900">
+                  <span className="mr-4 w-8 flex-shrink-0 select-none text-right text-slate-500">
                     {index + 1}
                   </span>
-                  <span className="whitespace-pre-wrap break-all flex-grow">
+                  <span className="whitespace-pre-wrap break-all flex-grow selection:bg-sky-500/40 selection:text-white">
                     {line || ' '}
                   </span>
                 </div>

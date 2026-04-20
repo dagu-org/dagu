@@ -922,6 +922,11 @@ func isReady(ctx context.Context, plan *Plan, node *Node) bool {
 			return false
 
 		case core.NodeSkipped:
+			if dep.State().SkippedByRetry {
+				logger.Debug(ctx, "Dependency skipped by retry",
+					tag.Step(node.Name()), tag.Dependency(dep.Name()))
+				continue
+			}
 			if dep.ShouldContinue(ctx) {
 				logger.Debug(ctx, "Dependency skipped but allowed to continue",
 					tag.Step(node.Name()), tag.Dependency(dep.Name()))

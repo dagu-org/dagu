@@ -86,7 +86,9 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function renderPage() {
+function renderPage({
+  selectedWorkspace = '',
+}: { selectedWorkspace?: string } = {}) {
   return render(
     <MemoryRouter initialEntries={['/dashboard']}>
       <ConfigContext.Provider value={makeConfig()}>
@@ -99,6 +101,11 @@ function renderPage() {
               setRemoteNodes: () => undefined,
               selectedRemoteNode: 'remote-a',
               selectRemoteNode: () => undefined,
+              workspaces: selectedWorkspace
+                ? [{ id: 'workspace-1', name: selectedWorkspace }]
+                : [],
+              selectedWorkspace,
+              selectWorkspace: () => undefined,
             }}
           >
             <DashboardPage />
@@ -181,5 +188,37 @@ describe('DashboardPage', () => {
       })
     );
     expect(latestQuery.status).not.toContain(Status.Queued);
+  });
+
+  it('scopes dashboard DAG and DAG-run requests by selected workspace', async () => {
+    renderPage({ selectedWorkspace: 'ops' });
+
+    await waitFor(() => {
+      expect(usePaginatedDAGRunsMock).toHaveBeenCalled();
+      expect(clientGetMock).toHaveBeenCalled();
+    });
+
+    const latestCall =
+      usePaginatedDAGRunsMock.mock.calls[
+        usePaginatedDAGRunsMock.mock.calls.length - 1
+      ]?.[0];
+    expect(latestCall?.query).toEqual(
+      expect.objectContaining({
+        remoteNode: 'remote-a',
+        labels: 'workspace=ops',
+      })
+    );
+
+    expect(clientGetMock).toHaveBeenCalledWith(
+      '/dags',
+      expect.objectContaining({
+        params: {
+          query: expect.objectContaining({
+            remoteNode: 'remote-a',
+            labels: 'workspace=ops',
+          }),
+        },
+      })
+    );
   });
 });

@@ -61,7 +61,7 @@ This command parses the DAG definition, resolves parameters, and initiates the D
 }
 
 // Command line flags for the start command
-var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, attemptIDFlag, triggerTypeFlag, scheduleTimeFlag, sourceFileFlag}
+var startFlags = []commandLineFlag{paramsFlag, nameFlag, dagRunIDFlag, fromRunIDFlag, parentDAGRunFlag, rootDAGRunFlag, labelsFlag, tagsFlag, defaultWorkingDirFlag, startWorkerIDFlag, attemptIDFlag, triggerTypeFlag, scheduleTimeFlag, sourceFileFlag}
 
 var fromRunIDFlag = commandLineFlag{
 	name:  "from-run-id",
@@ -77,7 +77,7 @@ var startWorkerIDFlag = commandLineFlag{
 // triggerTypeFlag identifies how this DAG run was initiated
 var triggerTypeFlag = commandLineFlag{
 	name:         "trigger-type",
-	usage:        "How this DAG run was initiated (scheduler, manual, webhook, subdag, retry, catchup)",
+	usage:        "How this DAG run was initiated (scheduler, manual, webhook, subdag, retry, catchup, automata)",
 	defaultValue: "manual",
 }
 
@@ -192,7 +192,7 @@ func runStart(ctx *Context, args []string) error {
 		}
 	}
 
-	if err := parseAndAppendTags(ctx, dag); err != nil {
+	if err := parseAndAppendLabels(ctx, dag); err != nil {
 		return err
 	}
 
@@ -353,18 +353,18 @@ func loadDAGWithParams(ctx *Context, args []string, isSubDAGRun bool) (*core.DAG
 	return dag, params, nil
 }
 
-// parseAndAppendTags parses the --tags flag and appends validated tags to the DAG.
-func parseAndAppendTags(ctx *Context, dag *core.DAG) error {
-	tagsStr, err := ctx.StringParam("tags")
+// parseAndAppendLabels parses the --labels flag and appends validated labels to the DAG.
+func parseAndAppendLabels(ctx *Context, dag *core.DAG) error {
+	labelsStr, err := labelsParam(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get tags: %w", err)
+		return err
 	}
-	if tagsStr != "" {
-		extraTags := core.NewTags(strings.Split(tagsStr, ","))
-		if err := core.ValidateTags(extraTags); err != nil {
-			return fmt.Errorf("invalid tags: %w", err)
+	if labelsStr != "" {
+		extraLabels := core.NewLabels(strings.Split(labelsStr, ","))
+		if err := core.ValidateLabels(extraLabels); err != nil {
+			return fmt.Errorf("invalid labels: %w", err)
 		}
-		dag.Tags = append(dag.Tags, extraTags...)
+		dag.Labels = append(dag.Labels, extraLabels...)
 	}
 	return nil
 }
@@ -569,8 +569,8 @@ func dispatchToCoordinatorAndWait(ctx *Context, d *core.DAG, dagRunID string, sc
 	if len(d.WorkerSelector) > 0 {
 		taskOpts = append(taskOpts, executor.WithWorkerSelector(d.WorkerSelector))
 	}
-	if len(d.Tags) > 0 {
-		taskOpts = append(taskOpts, executor.WithTags(strings.Join(d.Tags.Strings(), ",")))
+	if len(d.Labels) > 0 {
+		taskOpts = append(taskOpts, executor.WithLabels(strings.Join(d.Labels.Strings(), ",")))
 	}
 	if d.SourceFile != "" {
 		taskOpts = append(taskOpts, executor.WithSourceFile(d.SourceFile))

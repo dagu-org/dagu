@@ -4,7 +4,14 @@
 import { Theme } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
 import React from 'react';
-import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
 import { SWRConfig, mutate as globalMutate } from 'swr';
 
 import { Shield } from 'lucide-react';
@@ -13,7 +20,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useCanWrite } from './contexts/AuthContext';
 import {
   Config,
   ConfigContext,
@@ -30,7 +37,14 @@ import {
 import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
+import { getAuthHeaders } from './lib/authHeaders';
 import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
+import { useClient } from './hooks/api';
+import {
+  getStoredWorkspaceName,
+  persistWorkspaceName,
+  sanitizeWorkspaceName,
+} from './lib/workspace';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
@@ -46,6 +60,7 @@ import DAGRuns from './pages/dag-runs';
 import DAGRunDetails from './pages/dag-runs/dag-run';
 import DAGs from './pages/dags';
 import DAGDetails from './pages/dags/dag';
+import WorkflowDesignPage from './pages/design';
 import DocsPage from './pages/docs';
 import EventLogsPage from './pages/event-logs';
 import GitSyncPage from './pages/git-sync';
@@ -111,6 +126,34 @@ function DeveloperElement({
   return <ProtectedRoute requiredRole="developer">{children}</ProtectedRoute>;
 }
 
+function WriteElement({
+  children,
+}: {
+  children: React.ReactElement;
+}): React.ReactElement {
+  const canWrite = useCanWrite();
+  const config = React.useContext(ConfigContext);
+  if (!canWrite || !config.agentEnabled) return <Navigate to="/" replace />;
+  return children;
+}
+
+function AgentChatModalHost({
+  enabled,
+}: {
+  enabled: boolean;
+}): React.ReactElement | null {
+  const location = useLocation();
+  const isDesignWorkspace =
+    location.pathname === '/design' ||
+    location.pathname.startsWith('/design/') ||
+    location.pathname === '/agent' ||
+    location.pathname.startsWith('/agent/');
+  if (!enabled || isDesignWorkspace) {
+    return null;
+  }
+  return <AgentChatModal />;
+}
+
 function LicensedRoute({
   feature,
   children,
@@ -139,7 +182,9 @@ function LicensedRoute({
 }
 
 function AppInner({ config: initialConfig }: Props): React.ReactElement {
+  const client = useClient();
   const [config, setConfig] = React.useState(initialConfig);
+  const initialWorkspacesRef = React.useRef(initialConfig.initialWorkspaces);
   const updateConfig = React.useCallback((patch: Partial<Config>) => {
     setConfig((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -155,6 +200,36 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const [selectedRemoteNode, setSelectedRemoteNode] = React.useState<string>(
     () => getStoredRemoteNode(remoteNodes)
   );
+  const [workspaces, setWorkspaces] = React.useState(
+    () => config.initialWorkspaces ?? []
+  );
+  const [workspacesLoaded, setWorkspacesLoaded] = React.useState(false);
+  const [workspaceError, setWorkspaceError] = React.useState<Error | null>(
+    null
+  );
+  const [selectedWorkspace, setSelectedWorkspace] = React.useState<string>(() =>
+    getStoredWorkspaceName()
+  );
+  const workspaceFetchSeqRef = React.useRef(0);
+
+  const applyWorkspaces = React.useCallback(
+    (next: Config['initialWorkspaces']) => {
+      const sorted = [...next].sort((a, b) => a.name.localeCompare(b.name));
+      setWorkspaces(sorted);
+      updateConfig({ initialWorkspaces: sorted });
+    },
+    [updateConfig]
+  );
+
+  const handleSelectWorkspace = React.useCallback((name: string) => {
+    const sanitized = sanitizeWorkspaceName(name);
+    setSelectedWorkspace(sanitized);
+    persistWorkspaceName(sanitized);
+
+    // Workspace scopes are part of most active data keys. Clear cached responses
+    // so pages that do not remount still refetch with the new global scope.
+    globalMutate(() => true, undefined, { revalidate: false });
+  }, []);
 
   const handleSelectRemoteNode = React.useCallback(
     (node: string) => {
@@ -165,8 +240,108 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       // Clear SWR cache on node switch. Active hooks refetch automatically
       // since their keys include remoteNode.
       globalMutate(() => true, undefined, { revalidate: false });
+      setWorkspacesLoaded(false);
     },
     [remoteNodes]
+  );
+
+  const fetchWorkspaces = React.useCallback(async () => {
+    const requestSeq = workspaceFetchSeqRef.current + 1;
+    workspaceFetchSeqRef.current = requestSeq;
+    setWorkspaceError(null);
+    try {
+      const response = await client.GET('/workspaces', {
+        params: { query: { remoteNode: selectedRemoteNode } },
+      });
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to load workspaces');
+      }
+      applyWorkspaces(response.data?.workspaces || []);
+    } catch (error) {
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
+      const nextError =
+        error instanceof Error ? error : new Error('Failed to load workspaces');
+      setWorkspaceError(nextError);
+      if (selectedRemoteNode === 'local') {
+        applyWorkspaces(initialWorkspacesRef.current ?? []);
+      }
+    } finally {
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
+      setWorkspacesLoaded(true);
+    }
+  }, [applyWorkspaces, client, selectedRemoteNode]);
+
+  const handleCreateWorkspace = React.useCallback(
+    async (name: string) => {
+      const sanitized = sanitizeWorkspaceName(name);
+      if (!sanitized) return;
+      setWorkspaceError(null);
+      const response = await client.POST('/workspaces', {
+        params: { query: { remoteNode: selectedRemoteNode } },
+        body: { name: sanitized },
+      });
+      if (response.error || !response.data) {
+        const nextError = new Error(
+          response.error?.message || 'Failed to create workspace'
+        );
+        setWorkspaceError(nextError);
+        throw nextError;
+      }
+      applyWorkspaces([
+        ...workspaces.filter((workspace) => workspace.id !== response.data.id),
+        response.data,
+      ]);
+      handleSelectWorkspace(response.data.name);
+    },
+    [
+      applyWorkspaces,
+      client,
+      handleSelectWorkspace,
+      selectedRemoteNode,
+      workspaces,
+    ]
+  );
+
+  const handleDeleteWorkspace = React.useCallback(
+    async (id: string) => {
+      setWorkspaceError(null);
+      const response = await client.DELETE('/workspaces/{workspaceId}', {
+        params: {
+          path: { workspaceId: id },
+          query: { remoteNode: selectedRemoteNode },
+        },
+      });
+      if (response.error) {
+        const nextError = new Error(
+          response.error.message || 'Failed to delete workspace'
+        );
+        setWorkspaceError(nextError);
+        throw nextError;
+      }
+      applyWorkspaces(workspaces.filter((workspace) => workspace.id !== id));
+      const deletedSelected = workspaces.some(
+        (workspace) =>
+          workspace.id === id && workspace.name === selectedWorkspace
+      );
+      if (deletedSelected) {
+        handleSelectWorkspace('');
+      }
+    },
+    [
+      applyWorkspaces,
+      client,
+      handleSelectWorkspace,
+      selectedRemoteNode,
+      selectedWorkspace,
+      workspaces,
+    ]
   );
 
   // Fetch remote node names from the API on mount so the dropdown
@@ -207,6 +382,20 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   }, [remoteNodes, selectedRemoteNode, handleSelectRemoteNode]);
 
   React.useEffect(() => {
+    void fetchWorkspaces();
+  }, [fetchWorkspaces]);
+
+  React.useEffect(() => {
+    if (
+      workspacesLoaded &&
+      selectedWorkspace &&
+      !workspaces.some((workspace) => workspace.name === selectedWorkspace)
+    ) {
+      handleSelectWorkspace('');
+    }
+  }, [handleSelectWorkspace, selectedWorkspace, workspaces, workspacesLoaded]);
+
+  React.useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.style.backgroundColor = 'var(--background)';
   }, [theme]);
@@ -240,6 +429,12 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
             setRemoteNodes,
             selectedRemoteNode,
             selectRemoteNode: handleSelectRemoteNode,
+            workspaces,
+            workspaceError,
+            selectedWorkspace,
+            selectWorkspace: handleSelectWorkspace,
+            createWorkspace: handleCreateWorkspace,
+            deleteWorkspace: handleDeleteWorkspace,
           }}
         >
           <ConfigContext.Provider value={config}>
@@ -288,6 +483,20 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           <Route
                                             path="/dags/:fileName/"
                                             element={<DAGDetails />}
+                                          />
+                                          <Route
+                                            path="/design"
+                                            element={
+                                              <WriteElement>
+                                                <WorkflowDesignPage />
+                                              </WriteElement>
+                                            }
+                                          />
+                                          <Route
+                                            path="/agent"
+                                            element={
+                                              <Navigate to="/design" replace />
+                                            }
                                           />
                                           <Route
                                             path="/search/"
@@ -453,7 +662,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           />
                                         </Routes>
                                       </Layout>
-                                      {config.agentEnabled && <AgentChatModal />}
+                                      <AgentChatModalHost
+                                        enabled={config.agentEnabled}
+                                      />
                                     </PageContextProvider>
                                   </AgentChatProvider>
                                 </ProtectedRoute>

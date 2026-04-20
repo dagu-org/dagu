@@ -32,7 +32,7 @@ func TestToExecStatus_MapsRemoteFieldsExplicitly(t *testing.T) {
 		Log:            "/tmp/example.log",
 		Params:         new("P1=foo"),
 		WorkerId:       new("worker-a"),
-		Tags:           &[]string{"env=prod"},
+		Labels:         &[]string{"env=prod"},
 		Nodes: []api.Node{
 			{
 				Step: api.Step{
@@ -117,7 +117,7 @@ func TestEnrichRemoteHistoryStatusPopulatesErrorAndMetadata(t *testing.T) {
 		RootDAGRunId:   "run-1",
 		Status:         api.Status(core.Failed),
 		WorkerId:       new("worker-a"),
-		Tags:           &[]string{"env=prod"},
+		Labels:         &[]string{"env=prod"},
 		Nodes: []api.Node{
 			{
 				Step:   api.Step{Name: "step-1"},
@@ -128,7 +128,7 @@ func TestEnrichRemoteHistoryStatusPopulatesErrorAndMetadata(t *testing.T) {
 	}
 
 	require.NoError(t, enrichRemoteHistoryStatus(status, detail))
-	assert.Equal(t, []string{"env=prod"}, status.Tags)
+	assert.Equal(t, []string{"env=prod"}, status.Labels)
 	assert.Equal(t, "worker-a", status.WorkerID)
 	assert.Contains(t, status.Error, "boom")
 }

@@ -165,7 +165,8 @@ export function endpointToTopic(endpoint: string): string {
     return buildTopic('doctree', query);
   }
   if (segments.length >= 3 && segments[1] === 'docs') {
-    return buildTopic('doc', segments.slice(2).join('/'));
+    const identifier = segments.slice(2).join('/');
+    return buildTopic('doc', query ? `${identifier}?${query}` : identifier);
   }
 
   throw new Error(`Unsupported SSE endpoint: ${endpoint}`);

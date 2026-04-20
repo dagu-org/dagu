@@ -640,11 +640,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		return initErr
 	}
 
-	// Move to the working directory
-	if err := os.Chdir(a.evaluatedWorkingDir); err != nil {
-		initErr = fmt.Errorf("failed to change working directory: %w", err)
-		return initErr
-	}
+	// Do not change the process working directory here. Agent runs can execute
+	// concurrently in the same process, so step executors receive WorkingDir
+	// through the runtime context and set per-command working directories.
 
 	// Create a new container if the DAG has a container configuration.
 	if a.dag.Container != nil {
@@ -1701,6 +1699,18 @@ func (a *Agent) setupPlan(ctx context.Context) error {
 
 // setupRetryPlan sets up the plan for retry.
 func (a *Agent) setupRetryPlan(ctx context.Context) error {
+	if a.retryTarget.Status == core.Queued && len(a.retryTarget.Nodes) == 0 {
+		if a.stepRetry != "" {
+			return fmt.Errorf("cannot retry step %q: queued runs have no completed node state", a.stepRetry)
+		}
+		plan, err := runtime.NewPlan(a.dag.Steps...)
+		if err != nil {
+			return err
+		}
+		a.plan = plan
+		return nil
+	}
+
 	nodes := make([]*runtime.Node, 0, len(a.retryTarget.Nodes))
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, transform.ToNode(n))

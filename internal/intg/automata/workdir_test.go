@@ -36,6 +36,7 @@ func TestRunAllowedDAGDefaultsLocalWorkingDirToAutomataWorkspace(t *testing.T) {
 	f.startScheduler(10 * time.Second)
 	status := f.waitForStatus(ref, core.Succeeded, 20*time.Second)
 	require.Equal(t, core.Succeeded, status.Status)
+	require.Equal(t, core.TriggerTypeAutomata, status.TriggerType)
 
 	actualPath := filepath.Join(workspace, "actual_pwd.txt")
 	require.FileExists(t, actualPath)
@@ -67,6 +68,7 @@ func TestRunAllowedDAGKeepsExplicitWorkingDir(t *testing.T) {
 	f.startScheduler(10 * time.Second)
 	status := f.waitForStatus(ref, core.Succeeded, 20*time.Second)
 	require.Equal(t, core.Succeeded, status.Status)
+	require.Equal(t, core.TriggerTypeAutomata, status.TriggerType)
 
 	actualPath := filepath.Join(explicitDir, "actual_pwd.txt")
 	require.FileExists(t, actualPath)

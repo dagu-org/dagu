@@ -1,10 +1,9 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
-import { MermaidBlock } from '@/components/ui/mermaid-block';
+import { DocMarkdownPreview } from '@/components/ui/doc-markdown-preview';
 import { useSimpleToast } from '@/components/ui/simple-toast';
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import './DocPreview.css';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient, useQuery } from '@/hooks/api';
@@ -12,7 +11,6 @@ import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDocSSE } from '@/hooks/useDocSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import { cn } from '@/lib/utils';
-import { slugifyHeading } from '@/lib/text-utils';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import {
   Check,
@@ -23,18 +21,15 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import DocExternalChangeDialog from './DocExternalChangeDialog';
-
-function headingId(children: React.ReactNode): string {
-  const text =
-    typeof children === 'string'
-      ? children
-      : Array.isArray(children)
-        ? children.map((c) => (typeof c === 'string' ? c : '')).join('')
-        : String(children ?? '');
-  return slugifyHeading(text);
-}
 
 type Props = {
   tabId: string;
@@ -47,12 +42,14 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceQuery = selectedWorkspace || undefined;
   const canWrite = useCanWrite();
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
 
-  const docSSE = useDocSSE(docPath, !!docPath);
+  const docSSE = useDocSSE(docPath, !!docPath, workspaceQuery, remoteNode);
 
   // Fetch doc — SWR is the single source of truth, refreshed by live invalidations
   const { data: doc, mutate: mutateDoc } = useQuery(
@@ -61,6 +58,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
       params: {
         query: {
           remoteNode,
+          workspace: workspaceQuery,
           path: docPath,
         },
       },
@@ -80,7 +78,11 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     markAsSaved,
     discardChanges,
   } = useContentEditor({
-    key: `${docPath}:${remoteNode}`,
+    key: JSON.stringify({
+      docPath,
+      remoteNode,
+      workspace: selectedWorkspace || null,
+    }),
     serverContent,
   });
 
@@ -95,23 +97,33 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   currentValueRef.current = currentValue;
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
-  // Restore draft on mount
+  const scopedDraftKey = useMemo(
+    () =>
+      JSON.stringify({
+        tabId,
+        remoteNode,
+        workspace: selectedWorkspace || null,
+      }),
+    [remoteNode, selectedWorkspace, tabId]
+  );
+
+  // Restore drafts by document tab and selected scope.
   useEffect(() => {
-    const draft = getDraft(tabId);
+    const draft = getDraft(scopedDraftKey);
     if (draft !== undefined) {
       setCurrentValue(draft);
-      clearDraft(tabId);
+      clearDraft(scopedDraftKey);
     }
-  }, []); // Only on mount
+  }, [clearDraft, getDraft, scopedDraftKey, setCurrentValue]);
 
-  // Save draft on unmount (tab switch)
+  // Save draft on unmount or scope change.
   useEffect(() => {
     return () => {
       if (hasUnsavedChangesRef.current) {
-        setDraft(tabId, currentValueRef.current ?? '');
+        setDraft(scopedDraftKey, currentValueRef.current ?? '');
       }
     };
-  }, [tabId, setDraft]); // Only runs cleanup on tab change or unmount
+  }, [scopedDraftKey, setDraft]);
 
   // Sync unsaved state to tab context
   useEffect(() => {
@@ -149,7 +161,9 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     setIsSaving(true);
     try {
       const { error } = await client.PATCH('/docs/doc', {
-        params: { query: { remoteNode, path: docPath } },
+        params: {
+          query: { remoteNode, workspace: workspaceQuery, path: docPath },
+        },
         body: { content: currentValueRef.current ?? '' },
       });
       if (error) {
@@ -159,7 +173,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
         // Revalidate SWR cache from server as safety net
         mutateDoc();
         markTabSaved(tabId);
-        clearDraft(tabId);
+        clearDraft(scopedDraftKey);
         showToast('Document saved');
       }
     } catch {
@@ -171,12 +185,14 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     isSaving,
     client,
     remoteNode,
+    workspaceQuery,
     docPath,
     markAsSaved,
     mutateDoc,
     markTabSaved,
     clearDraft,
     tabId,
+    scopedDraftKey,
     showToast,
   ]);
 
@@ -316,7 +332,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
             type="button"
             onClick={() => {
               discardChanges();
-              clearDraft(tabId);
+              clearDraft(scopedDraftKey);
               markTabSaved(tabId);
             }}
             className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -367,46 +383,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
           />
         ) : (
           <div className="h-full overflow-y-auto p-6">
-            <div className="doc-preview max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  h1: ({ children }) => (
-                    <h1 id={headingId(children)}>{children}</h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 id={headingId(children)}>{children}</h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 id={headingId(children)}>{children}</h3>
-                  ),
-                  h4: ({ children }) => (
-                    <h4 id={headingId(children)}>{children}</h4>
-                  ),
-                  h5: ({ children }) => (
-                    <h5 id={headingId(children)}>{children}</h5>
-                  ),
-                  h6: ({ children }) => (
-                    <h6 id={headingId(children)}>{children}</h6>
-                  ),
-                  code({ className: codeClassName, children }) {
-                    if (codeClassName === 'language-mermaid') {
-                      return <MermaidBlock code={String(children)} />;
-                    }
-                    return <code className={codeClassName}>{children}</code>;
-                  },
-                  pre({ children }) {
-                    const child = children as React.ReactElement;
-                    if (child?.type === MermaidBlock) {
-                      return <>{children}</>;
-                    }
-                    return <pre>{children}</pre>;
-                  },
-                }}
-              >
-                {currentValue}
-              </ReactMarkdown>
-            </div>
+            <DocMarkdownPreview content={currentValue} />
           </div>
         )}
       </div>

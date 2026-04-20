@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import dayjs from 'dayjs';
 import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
@@ -13,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import { TagCombobox } from '../../components/ui/tag-combobox';
+import { LabelCombobox } from '../../components/ui/label-combobox';
 import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
@@ -26,6 +29,10 @@ import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunT
 import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
 import { useQuery } from '../../hooks/api';
 import { useBulkDAGRunSelection } from '../../features/dag-runs/hooks/useBulkDAGRunSelection';
+import {
+  withoutWorkspaceLabels,
+  withWorkspaceLabel,
+} from '../../lib/workspace';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -33,7 +40,7 @@ type DAGRunsFilters = {
   searchText: string;
   dagRunId: string;
   status: string;
-  tags: string[];
+  labels: string[];
   fromDate?: string;
   toDate?: string;
   dateRangeMode: 'preset' | 'specific' | 'custom';
@@ -42,11 +49,11 @@ type DAGRunsFilters = {
   specificValue: string;
 };
 
-const areTagsEqual = (a: string[], b: string[]): boolean => {
+const areLabelsEqual = (a: string[], b: string[]): boolean => {
   if (a.length !== b.length) return false;
   const sortedA = [...a].sort();
   const sortedB = [...b].sort();
-  return sortedA.every((tag, i) => tag === sortedB[i]);
+  return sortedA.every((label, i) => label === sortedB[i]);
 };
 
 const STATUS_CONFIG: Record<Status, string> = {
@@ -87,7 +94,7 @@ const areFiltersEqual = (a: DAGRunsFilters, b: DAGRunsFilters): boolean =>
   a.searchText === b.searchText &&
   a.dagRunId === b.dagRunId &&
   a.status === b.status &&
-  areTagsEqual(a.tags, b.tags) &&
+  areLabelsEqual(a.labels, b.labels) &&
   a.fromDate === b.fromDate &&
   a.toDate === b.toDate &&
   a.dateRangeMode === b.dateRangeMode &&
@@ -130,6 +137,11 @@ function DAGRuns() {
   const { preferences, updatePreference } = useUserPreferences();
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const searchStateScope = JSON.stringify({
+    remoteNode: remoteKey,
+    workspace: selectedWorkspace || null,
+  });
 
   // Extract short datetime format from URL if present
   const parseDateFromUrl = React.useCallback(
@@ -198,7 +210,7 @@ function DAGRuns() {
       searchText: '',
       dagRunId: '',
       status: 'all',
-      tags: [],
+      labels: [],
       fromDate: getDefaultFromDate(),
       toDate: undefined,
       dateRangeMode: 'preset',
@@ -209,12 +221,12 @@ function DAGRuns() {
     [getDefaultFromDate]
   );
 
-  // State for search input, dagRun ID, status, tags, and date ranges
+  // State for search input, dagRun ID, status, labels, and date ranges
   const [searchText, setSearchText] = React.useState(defaultFilters.searchText);
   const [dagRunId, setDagRunId] = React.useState(defaultFilters.dagRunId);
   const [status, setStatus] = React.useState<string>(defaultFilters.status);
-  const [selectedTags, setSelectedTags] = React.useState<string[]>(
-    defaultFilters.tags
+  const [selectedLabels, setSelectedLabels] = React.useState<string[]>(
+    defaultFilters.labels
   );
   const [fromDate, setFromDate] = React.useState<string | undefined>(
     defaultFilters.fromDate
@@ -229,7 +241,9 @@ function DAGRuns() {
   );
   const [apiDagRunId, setApiDagRunId] = React.useState(defaultFilters.dagRunId);
   const [apiStatus, setApiStatus] = React.useState(defaultFilters.status);
-  const [apiTags, setApiTags] = React.useState<string[]>(defaultFilters.tags);
+  const [apiLabels, setApiLabels] = React.useState<string[]>(
+    defaultFilters.labels
+  );
   const [apiFromDate, setApiFromDate] = React.useState<string | undefined>(
     defaultFilters.fromDate
   );
@@ -267,7 +281,7 @@ function DAGRuns() {
       searchText,
       dagRunId,
       status,
-      tags: selectedTags,
+      labels: selectedLabels,
       fromDate,
       toDate,
       dateRangeMode,
@@ -279,7 +293,7 @@ function DAGRuns() {
       searchText,
       dagRunId,
       status,
-      selectedTags,
+      selectedLabels,
       fromDate,
       toDate,
       dateRangeMode,
@@ -298,7 +312,10 @@ function DAGRuns() {
 
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const stored = searchState.readState<DAGRunsFilters>('dagRuns', remoteKey);
+    const stored = searchState.readState<DAGRunsFilters>(
+      'dagRuns',
+      searchStateScope
+    );
     const base: DAGRunsFilters = {
       ...defaultFilters,
       ...(stored ?? {}),
@@ -322,13 +339,14 @@ function DAGRuns() {
       hasUrlFilters = true;
     }
 
-    if (params.has('tags')) {
-      const tagsParam = params.get('tags') ?? '';
-      urlFilters.tags = tagsParam
-        ? tagsParam
+    if (params.has('labels') || params.has('tags')) {
+      const labelsParam = params.get('labels') ?? params.get('tags') ?? '';
+      urlFilters.labels = labelsParam
+        ? labelsParam
             .split(',')
             .map((t) => t.trim().toLowerCase())
             .filter((t) => t !== '')
+            .filter((t) => withoutWorkspaceLabels([t]).length > 0)
         : [];
       hasUrlFilters = true;
     }
@@ -380,7 +398,7 @@ function DAGRuns() {
     if (current && areFiltersEqual(current, next)) {
       if (hasUrlFilters) {
         lastPersistedFiltersRef.current = next;
-        searchState.writeState('dagRuns', remoteKey, next);
+        searchState.writeState('dagRuns', searchStateScope, next);
       }
       return;
     }
@@ -388,7 +406,7 @@ function DAGRuns() {
     setSearchText(next.searchText);
     setDagRunId(next.dagRunId);
     setStatus(next.status);
-    setSelectedTags(next.tags);
+    setSelectedLabels(next.labels);
     setFromDate(next.fromDate);
     setToDate(next.toDate);
     setDateRangeMode(next.dateRangeMode);
@@ -399,18 +417,18 @@ function DAGRuns() {
     setAPISearchText(next.searchText);
     setApiDagRunId(next.dagRunId);
     setApiStatus(next.status);
-    setApiTags(next.tags);
+    setApiLabels(next.labels);
     setApiFromDate(next.fromDate);
     setApiToDate(next.toDate);
 
     lastPersistedFiltersRef.current = next;
-    searchState.writeState('dagRuns', remoteKey, next);
+    searchState.writeState('dagRuns', searchStateScope, next);
   }, [
     defaultFilters,
     location.search,
     parseDateFromUrl,
-    remoteKey,
     searchState,
+    searchStateScope,
   ]);
 
   React.useEffect(() => {
@@ -419,16 +437,16 @@ function DAGRuns() {
       return;
     }
     lastPersistedFiltersRef.current = currentFilters;
-    searchState.writeState('dagRuns', remoteKey, currentFilters);
-  }, [currentFilters, remoteKey, searchState]);
+    searchState.writeState('dagRuns', searchStateScope, currentFilters);
+  }, [currentFilters, searchState, searchStateScope]);
 
   React.useEffect(() => {
     appBarContext.setTitle('DAG Runs');
   }, [appBarContext]);
 
-  // Fetch available tags for the filter dropdown
-  const { data: tagsData } = useQuery(
-    '/dags/tags',
+  // Fetch available labels for the filter dropdown
+  const { data: labelsData } = useQuery(
+    '/dags/labels',
     {
       params: {
         query: {
@@ -441,7 +459,15 @@ function DAGRuns() {
       revalidateIfStale: false,
     }
   );
-  const availableTags = tagsData?.tags ?? [];
+  const availableLabels = React.useMemo(
+    () => withoutWorkspaceLabels(labelsData?.labels ?? []),
+    [labelsData?.labels]
+  );
+
+  const effectiveApiLabels = React.useMemo(
+    () => withWorkspaceLabel(apiLabels, selectedWorkspace),
+    [apiLabels, selectedWorkspace]
+  );
 
   const dagRunQuery = React.useMemo(
     () => ({
@@ -449,7 +475,10 @@ function DAGRuns() {
       name: apiSearchText || undefined,
       dagRunId: apiDagRunId || undefined,
       status: apiStatus !== 'all' ? [parseInt(apiStatus)] : undefined,
-      tags: apiTags.length > 0 ? apiTags.join(',') : undefined,
+      labels:
+        effectiveApiLabels.length > 0
+          ? effectiveApiLabels.join(',')
+          : undefined,
       fromDate: formatDateForApi(apiFromDate),
       toDate: formatDateForApi(apiToDate),
       limit: 100,
@@ -459,7 +488,7 @@ function DAGRuns() {
       apiFromDate,
       apiSearchText,
       apiStatus,
-      apiTags,
+      effectiveApiLabels,
       apiToDate,
       appBarContext.selectedRemoteNode,
     ]
@@ -502,6 +531,9 @@ function DAGRuns() {
 
   const addSearchParam = (key: string, value: string | undefined) => {
     const locationQuery = new URLSearchParams(window.location.search);
+    if (key === 'labels') {
+      locationQuery.delete('tags');
+    }
     if (value && value.length > 0) {
       locationQuery.set(key, value);
     } else {
@@ -522,7 +554,7 @@ function DAGRuns() {
     setAPISearchText(searchText);
     setApiDagRunId(dagRunId);
     setApiStatus(statusToUse);
-    setApiTags(selectedTags);
+    setApiLabels(selectedLabels);
     setApiFromDate(fromDate);
     setApiToDate(toDate);
 
@@ -531,8 +563,8 @@ function DAGRuns() {
     addSearchParam('dagRunId', dagRunId);
     addSearchParam('status', statusToUse);
     addSearchParam(
-      'tags',
-      selectedTags.length > 0 ? selectedTags.join(',') : undefined
+      'labels',
+      selectedLabels.length > 0 ? selectedLabels.join(',') : undefined
     );
     addSearchParam('fromDate', fromDate);
     addSearchParam('toDate', toDate);
@@ -558,10 +590,13 @@ function DAGRuns() {
     handleSearch(value);
   };
 
-  const updateTags = (newTags: string[]) => {
-    setSelectedTags(newTags);
-    setApiTags(newTags);
-    addSearchParam('tags', newTags.length > 0 ? newTags.join(',') : undefined);
+  const updateLabels = (newLabels: string[]) => {
+    setSelectedLabels(newLabels);
+    setApiLabels(newLabels);
+    addSearchParam(
+      'labels',
+      newLabels.length > 0 ? newLabels.join(',') : undefined
+    );
   };
 
   const handleViewModeChange = (value: string) => {
@@ -804,12 +839,12 @@ function DAGRuns() {
                 ))}
               </SelectContent>
             </Select>
-            {/* Tags filter */}
-            <TagCombobox
-              selectedTags={selectedTags}
-              onTagsChange={updateTags}
-              availableTags={availableTags}
-              placeholder="Filter by tags..."
+            {/* Labels filter */}
+            <LabelCombobox
+              selectedLabels={selectedLabels}
+              onLabelsChange={updateLabels}
+              availableLabels={availableLabels}
+              placeholder="Filter by labels..."
               className="min-w-[180px] max-w-[300px] h-7"
             />
             <Button

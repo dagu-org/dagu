@@ -753,30 +753,7 @@ steps:
 func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
 	counterFile := filepath.Join(t.TempDir(), "test_retry_counter.txt")
 	t.Cleanup(func() { _ = os.Remove(counterFile) })
-
-	childScript := fmt.Sprintf(`
-      COUNTER_FILE=%q
-      if [ ! -f "$COUNTER_FILE" ]; then
-        echo "1" > "$COUNTER_FILE"
-        echo "First attempt"
-        exit 1
-      else
-        echo "Retry success"
-        exit 0
-      fi
-`, counterFile)
-	if runtime.GOOS == "windows" {
-		childScript = fmt.Sprintf(`
-      $counterFile = %q
-      if (-not (Test-Path $counterFile)) {
-        Set-Content -Path $counterFile -Value "1" -NoNewline
-        Write-Output "First attempt"
-        exit 1
-      }
-      Write-Output "Retry success"
-      exit 0
-`, counterFile)
-	}
+	childScript := retryOutputStepScript(counterFile)
 
 	th := test.Setup(t)
 	dag := th.DAG(t, fmt.Sprintf(`steps:
@@ -785,16 +762,16 @@ func TestParallelExecution_OutputCaptureWithRetry(t *testing.T) {
       items:
         - "item1"
     output: RESULTS
+    retry_policy:
+      limit: 1
+      interval_sec: 0
 ---
 name: child-retry-simple
 steps:
   - command: |
 %s
     output: OUTPUT
-    retry_policy:
-      limit: 1
-      interval_sec: 0
-`, strings.TrimPrefix(childScript, "\n")))
+`, indentCommandBlock(childScript, 6)))
 
 	agent := dag.Agent()
 	err := agent.Run(agent.Context)
@@ -820,9 +797,9 @@ steps:
 
 	outputs := collectOutputs(results.Outputs, "OUTPUT")
 	require.Len(t, outputs, 1)
-	require.Contains(t, outputs[0], "Retry success")
-	require.NotContains(t, outputs[0], "First attempt")
-	require.NotContains(t, raw, "First attempt")
+	require.Contains(t, outputs[0], "output_attempt_2_success")
+	require.NotContains(t, outputs[0], "output_attempt_1")
+	require.NotContains(t, raw, "output_attempt_1")
 }
 
 func TestParallelExecution_MinimalRetry(t *testing.T) {

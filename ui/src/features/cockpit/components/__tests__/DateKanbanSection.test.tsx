@@ -91,6 +91,7 @@ describe('DateKanbanSection live-update flags', () => {
         todayStr="2026-03-22"
         selectedWorkspace=""
         onCardClick={() => {}}
+        onArtifactsClick={() => {}}
       />
     );
 
@@ -111,6 +112,7 @@ describe('DateKanbanSection live-update flags', () => {
         todayStr="2026-03-22"
         selectedWorkspace=""
         onCardClick={() => {}}
+        onArtifactsClick={() => {}}
       />
     );
 
@@ -131,6 +133,7 @@ describe('DateKanbanSection live-update flags', () => {
         todayStr="2026-03-22"
         selectedWorkspace=""
         onCardClick={() => {}}
+        onArtifactsClick={() => {}}
       />
     );
 

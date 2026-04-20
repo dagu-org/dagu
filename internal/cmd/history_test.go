@@ -308,7 +308,7 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
-func TestParseTags(t *testing.T) {
+func TestParseLabels(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -317,22 +317,22 @@ func TestParseTags(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:     "single tag",
+			name:     "single label",
 			input:    "prod",
 			expected: []string{"prod"},
 		},
 		{
-			name:     "multiple tags",
+			name:     "multiple labels",
 			input:    "prod,critical",
 			expected: []string{"prod", "critical"},
 		},
 		{
-			name:     "tags with spaces",
+			name:     "labels with spaces",
 			input:    "prod, critical, backend",
 			expected: []string{"prod", "critical", "backend"},
 		},
 		{
-			name:     "tags with extra whitespace",
+			name:     "labels with extra whitespace",
 			input:    "  prod  ,  critical  ",
 			expected: []string{"prod", "critical"},
 		},
@@ -347,12 +347,12 @@ func TestParseTags(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "empty tags between commas",
+			name:     "empty labels between commas",
 			input:    "prod,,critical",
 			expected: []string{"prod", "critical"},
 		},
 		{
-			name:     "single tag with trailing comma",
+			name:     "single label with trailing comma",
 			input:    "prod,",
 			expected: []string{"prod"},
 		},
@@ -362,7 +362,7 @@ func TestParseTags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := parseTags(tt.input)
+			got := parseLabels(tt.input)
 			assert.Equal(t, tt.expected, got)
 		})
 	}

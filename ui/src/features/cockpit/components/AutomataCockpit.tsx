@@ -128,7 +128,7 @@ function workspaceSelectionToTag(
   selectedWorkspace: string
 ): string | undefined {
   const safeName = selectedWorkspace
-    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .replace(/[^a-zA-Z0-9_]/g, '')
     .trim()
     .toLowerCase();
   return safeName ? `workspace=${safeName}` : undefined;

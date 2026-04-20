@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import {
   Column,
   ColumnFiltersState,
@@ -74,7 +77,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
-import { TagCombobox } from '../../../../components/ui/tag-combobox';
+import { LabelCombobox } from '../../../../components/ui/label-combobox';
 import {
   Tooltip,
   TooltipContent,
@@ -89,7 +92,11 @@ import {
 } from '../../../../components/ui/select';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
-import { parseTagParts } from '../../../../lib/utils';
+import { parseLabelParts } from '../../../../lib/utils';
+import {
+  isWorkspaceLabel,
+  withoutWorkspaceLabels,
+} from '../../../../lib/workspace';
 
 // Threshold in pixels below which we switch to card view
 // Set higher than table's comfortable minimum width (~700px for all columns)
@@ -100,7 +107,7 @@ interface DAGCardProps {
   dag: components['schemas']['DAGFile'];
   isSelected: boolean;
   onSelect: (fileName: string, title: string) => void;
-  onTagClick: (tag: string) => void;
+  onLabelClick: (label: string) => void;
   refreshFn: () => void;
   className?: string;
 }
@@ -109,7 +116,7 @@ function DAGCard({
   dag,
   isSelected,
   onSelect,
-  onTagClick,
+  onLabelClick,
   refreshFn,
   className = '',
 }: DAGCardProps) {
@@ -117,7 +124,7 @@ function DAGCard({
   const title = dag.dag.name;
   const status = dag.latestDAGRun?.status;
   const statusLabel = dag.latestDAGRun?.statusLabel;
-  const tags = dag.dag.tags || [];
+  const labels = withoutWorkspaceLabels(dag.dag.labels ?? dag.dag.tags ?? []);
   const description = dag.dag.description;
   const schedules = dag.dag.schedule || [];
   const hasSchedule = schedules.length > 0;
@@ -190,23 +197,25 @@ function DAGCard({
         </div>
       )}
 
-      {/* Tags */}
-      {tags.length > 0 && (
+      {/* Labels */}
+      {labels.length > 0 && (
         <div className="flex flex-wrap gap-0.5 mb-1.5">
-          {[...tags].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map((tag) => (
-            <Badge
-              key={tag}
-              variant="outline"
-              className="text-xs px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTagClick(tag);
-              }}
-            >
-              <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-              {tag}
-            </Badge>
-          ))}
+          {[...labels]
+            .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+            .map((label) => (
+              <Badge
+                key={label}
+                variant="outline"
+                className="text-xs px-1 py-0 h-3 rounded-sm border-primary/30 bg-primary/10 text-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLabelClick(label);
+                }}
+              >
+                <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
+                {label}
+              </Badge>
+            ))}
         </div>
       )}
 
@@ -249,10 +258,10 @@ type Props = {
   searchText: string;
   /** Handler for search text changes */
   handleSearchTextChange: (searchText: string) => void;
-  /** Current tag filter (multi-select) */
-  searchTags: string[];
-  /** Handler for tag filter changes */
-  handleSearchTagsChange: (tags: string[]) => void;
+  /** Current label filter (multi-select) */
+  searchLabels: string[];
+  /** Handler for label filter changes */
+  handleSearchLabelsChange: (labels: string[]) => void;
   /** Loading state */
   isLoading?: boolean;
   /** Pagination props */
@@ -304,8 +313,8 @@ declare module '@tanstack/react-table' {
   interface TableMeta<TData extends RowData> {
     group: string;
     refreshFn: () => void;
-    // Add tag click handler to meta for direct access in cell
-    onTagClick?: (tag: string) => void;
+    // Add label click handler to meta for direct access in cell
+    onLabelClick?: (label: string) => void;
   }
 }
 
@@ -400,8 +409,10 @@ const defaultColumns = [
           </div>
         );
       } else {
-        // DAG Row: Render link with description and tags below
-        const tags = data.dag.dag.tags || [];
+        // DAG Row: Render link with description and labels below
+        const labels = withoutWorkspaceLabels(
+          data.dag.dag.labels ?? data.dag.dag.tags ?? []
+        );
         const description = data.dag.dag.description;
 
         return (
@@ -419,45 +430,51 @@ const defaultColumns = [
               </div>
             )}
 
-            {tags.length > 0 && (
+            {labels.length > 0 && (
               <div className="flex flex-wrap gap-0.5">
-                {[...tags].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map((tag) => {
-                  const { key, value } = parseTagParts(tag);
-                  return (
-                    <Badge
-                      key={tag}
-                      variant="outline"
-                      className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
+                {[...labels]
+                  .sort((a, b) =>
+                    a.toLowerCase().localeCompare(b.toLowerCase())
+                  )
+                  .map((label) => {
+                    const { key, value } = parseLabelParts(label);
+                    return (
+                      <Badge
+                        key={label}
+                        variant="outline"
+                        className="text-xs px-1 py-0 h-3.5 rounded-sm border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary transition-colors duration-200 cursor-pointer font-normal whitespace-normal break-words focus-visible:outline-none"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const handleLabelClick =
+                              table.options.meta?.onLabelClick;
+                            if (handleLabelClick) handleLabelClick(label);
+                          }
+                        }}
+                        onClick={(e) => {
                           e.stopPropagation();
-                          const handleTagClick = table.options.meta?.onTagClick;
-                          if (handleTagClick) handleTagClick(tag);
-                        }
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        const handleTagClick = table.options.meta?.onTagClick;
-                        if (handleTagClick) handleTagClick(tag);
-                      }}
-                    >
-                      <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
-                      {value !== null ? (
-                        <>
-                          <span className="font-medium">{key}</span>
-                          <span className="opacity-60">=</span>
-                          <span>{value}</span>
-                        </>
-                      ) : (
-                        key
-                      )}
-                    </Badge>
-                  );
-                })}
+                          e.preventDefault();
+                          const handleLabelClick =
+                            table.options.meta?.onLabelClick;
+                          if (handleLabelClick) handleLabelClick(label);
+                        }}
+                      >
+                        <div className="h-1 w-1 rounded-full bg-primary/70 mr-0.5"></div>
+                        {value !== null ? (
+                          <>
+                            <span className="font-medium">{key}</span>
+                            <span className="opacity-60">=</span>
+                            <span>{value}</span>
+                          </>
+                        ) : (
+                          key
+                        )}
+                      </Badge>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -474,43 +491,44 @@ const defaultColumns = [
         const name = data.dag.dag.name.toLowerCase();
         const fileName = data.dag.fileName.toLowerCase();
         const description = (data.dag.dag.description || '').toLowerCase();
-        const searchValue = Array.isArray(filterValue)
-          ? ''
-          : String(filterValue).toLowerCase();
+        const filterObject =
+          typeof filterValue === 'object' &&
+          filterValue !== null &&
+          !Array.isArray(filterValue)
+            ? (filterValue as { searchText?: string; labels?: string[] })
+            : undefined;
+        const searchValue = filterObject
+          ? (filterObject.searchText ?? '').toLowerCase()
+          : Array.isArray(filterValue)
+            ? ''
+            : String(filterValue ?? '').toLowerCase();
 
-        const tagFilters = Array.isArray(filterValue)
-          ? filterValue.map((t) => t.toLowerCase())
-          : [];
+        const labelFilters = (
+          filterObject?.labels ??
+          (Array.isArray(filterValue) ? filterValue : [])
+        ).map((label) => label.toLowerCase());
 
-        // Search in name and description
-        if (
-          !tagFilters.length && // Only search text if no tag filters
-          (fileName.includes(searchValue) ||
-            name.includes(searchValue) ||
-            description.includes(searchValue))
-        ) {
-          return true;
-        }
+        const labels = withoutWorkspaceLabels(
+          data.dag.dag.labels ?? data.dag.dag.tags ?? []
+        );
+        const rowLabels = labels.map((label) => label.toLowerCase());
 
-        // Also search in tags if needed
-        const tags = data.dag.dag.tags || [];
+        const matchesText =
+          searchValue === '' ||
+          fileName.includes(searchValue) ||
+          name.includes(searchValue) ||
+          description.includes(searchValue) ||
+          rowLabels.some((label) => label.includes(searchValue));
+        const matchesLabels =
+          labelFilters.length === 0 ||
+          labelFilters.every((label) => rowLabels.includes(label));
 
-        if (tagFilters.length > 0) {
-          const rowTags = tags.map((tag) => tag.toLowerCase());
-          // AND logic: all selected tags must be present
-          if (tagFilters.every((tag) => rowTags.includes(tag))) {
-            return true;
-          }
-        } else if (
-          tags.some((tag) => tag.toLowerCase().includes(searchValue))
-        ) {
-          return true;
-        }
+        return matchesText && matchesLabels;
       }
       return false;
     },
   }),
-  // Tags column removed as tags are now displayed under the name
+  // Labels column removed as labels are now displayed under the name
   // The filter functionality is preserved in the Name column
   columnHelper.accessor('kind', {
     id: 'Status',
@@ -637,9 +655,7 @@ const defaultColumns = [
         return (
           <div className="flex items-center gap-2">
             {liveSwitch}
-            <span className="text-xs text-muted-foreground">
-              No schedule
-            </span>
+            <span className="text-xs text-muted-foreground">No schedule</span>
           </div>
         );
       }
@@ -757,7 +773,9 @@ const cardSortOptions = [
 ] as const;
 
 function getCardSortLabel(sort: string): string {
-  return cardSortOptions.find((option) => option.value === sort)?.label ?? 'Name';
+  return (
+    cardSortOptions.find((option) => option.value === sort)?.label ?? 'Name'
+  );
 }
 
 function getDefaultSortOrder(field: string): string {
@@ -868,8 +886,8 @@ function DAGTable({
   refreshFn,
   searchText,
   handleSearchTextChange,
-  searchTags,
-  handleSearchTagsChange,
+  searchLabels,
+  handleSearchLabelsChange,
   isLoading = false,
   pagination,
   sortField = 'name',
@@ -927,15 +945,19 @@ function DAGTable({
   useEffect(() => {
     const nameFilter = columnFilters.find((f) => f.id === 'Name');
 
-    // Combine searchText and searchTags for the Name filter
+    // Combine searchText and searchLabels for the Name filter
     const combinedFilter =
-      searchTags.length > 0 ? searchTags.join(',') : searchText || '';
+      searchText || searchLabels.length > 0
+        ? { searchText, labels: searchLabels }
+        : '';
     const currentValue = nameFilter?.value || '';
+    const currentFilterKey = JSON.stringify(currentValue);
+    const combinedFilterKey = JSON.stringify(combinedFilter);
 
     let updated = false;
     const newFilters = [...columnFilters];
 
-    if (combinedFilter !== currentValue) {
+    if (combinedFilterKey !== currentFilterKey) {
       const idx = newFilters.findIndex((f) => f.id === 'Name');
       if (combinedFilter) {
         if (idx > -1) newFilters[idx] = { id: 'Name', value: combinedFilter };
@@ -949,22 +971,27 @@ function DAGTable({
     if (updated) {
       setColumnFilters(newFilters);
     }
-  }, [searchText, searchTags, columnFilters]);
+  }, [searchText, searchLabels, columnFilters]);
 
-  // Handler for clicking a tag to add it to the filter
-  const handleTagClick = useCallback(
-    (tag: string) => {
-      const normalizedTag = tag.toLowerCase();
-      if (!searchTags.includes(normalizedTag)) {
-        handleSearchTagsChange([...searchTags, normalizedTag]);
+  // Handler for clicking a label to add it to the filter
+  const handleLabelClick = useCallback(
+    (label: string) => {
+      const normalizedLabel = label.toLowerCase();
+      if (isWorkspaceLabel(normalizedLabel)) {
+        return;
+      }
+      if (!searchLabels.includes(normalizedLabel)) {
+        handleSearchLabelsChange([...searchLabels, normalizedLabel]);
       }
     },
-    [searchTags, handleSearchTagsChange]
+    [searchLabels, handleSearchLabelsChange]
   );
 
   // Helper function for client-side sorting comparison
   const getSortValue = useCallback(
-    (dag: components['schemas']['DAGFile']): string | components['schemas']['Status'] => {
+    (
+      dag: components['schemas']['DAGFile']
+    ): string | components['schemas']['Status'] => {
       if (clientSort === 'Status') {
         return dag.latestDAGRun?.status || '';
       }
@@ -977,7 +1004,10 @@ function DAGTable({
   );
 
   const compareDags = useCallback(
-    (a: components['schemas']['DAGFile'], b: components['schemas']['DAGFile']): number => {
+    (
+      a: components['schemas']['DAGFile'],
+      b: components['schemas']['DAGFile']
+    ): number => {
       let aValue = getSortValue(a);
       let bValue = getSortValue(b);
 
@@ -1114,7 +1144,7 @@ function DAGTable({
     meta: {
       group,
       refreshFn,
-      onTagClick: handleTagClick,
+      onLabelClick: handleLabelClick,
     },
   });
 
@@ -1125,13 +1155,14 @@ function DAGTable({
 
   const useCardView = panelWidth !== null && panelWidth < CARD_VIEW_THRESHOLD;
 
-  const { data: uniqueTags } = useQuery('/dags/tags', {
+  const { data: uniqueLabels } = useQuery('/dags/labels', {
     params: {
       query: {
         remoteNode: appBarContext?.selectedRemoteNode || 'local',
       },
     },
   });
+  const availableLabels = withoutWorkspaceLabels(uniqueLabels?.labels ?? []);
 
   return (
     <div className="space-y-2">
@@ -1178,12 +1209,12 @@ function DAGTable({
             )}
           </div>
 
-          {/* Tag filter */}
-          <TagCombobox
-            selectedTags={searchTags}
-            onTagsChange={handleSearchTagsChange}
-            availableTags={uniqueTags?.tags ?? []}
-            placeholder="Filter by tags..."
+          {/* Label filter */}
+          <LabelCombobox
+            selectedLabels={searchLabels}
+            onLabelsChange={handleSearchLabelsChange}
+            availableLabels={availableLabels}
+            placeholder="Filter by labels..."
             className="min-w-[180px] max-w-[300px] flex-shrink-0 h-8"
           />
 
@@ -1255,7 +1286,9 @@ function DAGTable({
                 ) : (
                   <ArrowDown className="h-3.5 w-3.5" />
                 )}
-                <span className="ml-1">{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+                <span className="ml-1">
+                  {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+                </span>
               </Button>
             </div>
           </div>
@@ -1389,7 +1422,7 @@ function DAGTable({
                     </h3>
                     <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
                       There are no DAGs matching your current filters. Try
-                      adjusting your search criteria or tags.
+                      adjusting your search criteria or labels.
                     </p>
                     <CreateDAGModal />
                   </div>
@@ -1451,7 +1484,7 @@ function DAGTable({
                               dag={dagRow.dag}
                               isSelected={selectedDAG === dagRow.dag.fileName}
                               onSelect={handleSelectDAG}
-                              onTagClick={handleTagClick}
+                              onLabelClick={handleLabelClick}
                               refreshFn={refreshFn}
                               className="ml-2"
                             />
@@ -1479,7 +1512,7 @@ function DAGTable({
                   dag={dagRow.dag}
                   isSelected={selectedDAG === dagRow.dag.fileName}
                   onSelect={handleSelectDAG}
-                  onTagClick={handleTagClick}
+                  onLabelClick={handleLabelClick}
                   refreshFn={refreshFn}
                 />
               );
@@ -1493,7 +1526,7 @@ function DAGTable({
             <h3 className="text-lg font-medium mb-2">No DAGs found</h3>
             <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
               There are no DAGs matching your current filters. Try adjusting
-              your search criteria or tags.
+              your search criteria or labels.
             </p>
             <CreateDAGModal />
           </div>

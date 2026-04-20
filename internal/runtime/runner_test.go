@@ -378,6 +378,53 @@ func TestRunner(t *testing.T) {
 		result.assertNodeStatus(t, "3", core.NodeSucceeded)
 		result.assertNodeStatus(t, "4", core.NodeSucceeded)
 	})
+	t.Run("SkippedByRetryDependencyAllowsDownstream", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t, withMaxActiveRuns(1))
+
+		plan, err := runtime.NewPlanFromNodes(
+			runtime.NewNode(successStep("1"), runtime.NodeState{
+				Status:         core.NodeSkipped,
+				SkippedByRetry: true,
+			}),
+			runtime.NewNode(successStep("2", "1"), runtime.NodeState{
+				Status: core.NodeNotStarted,
+			}),
+		)
+		require.NoError(t, err)
+
+		result := planHelper{
+			testHelper: r,
+			Plan:       plan,
+			workDir:    t.TempDir(),
+		}.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "1", core.NodeSkipped)
+		result.assertNodeStatus(t, "2", core.NodeSucceeded)
+	})
+	t.Run("OrdinarySkippedDependencyStillSkipsDownstream", func(t *testing.T) {
+		t.Parallel()
+		r := setupRunner(t, withMaxActiveRuns(1))
+
+		plan, err := runtime.NewPlanFromNodes(
+			runtime.NewNode(successStep("1"), runtime.NodeState{
+				Status: core.NodeSkipped,
+			}),
+			runtime.NewNode(successStep("2", "1"), runtime.NodeState{
+				Status: core.NodeNotStarted,
+			}),
+		)
+		require.NoError(t, err)
+
+		result := planHelper{
+			testHelper: r,
+			Plan:       plan,
+			workDir:    t.TempDir(),
+		}.assertRun(t, core.Succeeded)
+
+		result.assertNodeStatus(t, "1", core.NodeSkipped)
+		result.assertNodeStatus(t, "2", core.NodeSkipped)
+	})
 	t.Run("ComplexCommand", func(t *testing.T) {
 		t.Parallel()
 		r := setupRunner(t, withMaxActiveRuns(1))

@@ -56,7 +56,7 @@ type DAGRunSummary struct {
 	Status               core.Status
 	StartedAtUnix        int64
 	FinishedAtUnix       int64
-	Tags                 []string
+	Labels               []string
 	Name                 string
 	DagRunID             string
 	WorkerID             string

@@ -11,27 +11,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTagsValue_UnmarshalYAML_String(t *testing.T) {
+func TestLabelsValue_UnmarshalYAML_String(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
 		yaml    string
-		want    []TagEntry
+		want    []LabelEntry
 		wantErr bool
 	}{
 		{
 			name: "space-separated key=value",
 			yaml: `"env=prod team=platform"`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "env", value: "prod"},
 				{key: "team", value: "platform"},
 			},
 		},
 		{
-			name: "comma-separated simple tags (backward compatible)",
+			name: "comma-separated simple labels (backward compatible)",
 			yaml: `"production, critical, batch"`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "production", value: ""},
 				{key: "critical", value: ""},
 				{key: "batch", value: ""},
@@ -40,22 +40,22 @@ func TestTagsValue_UnmarshalYAML_String(t *testing.T) {
 		{
 			name: "comma-separated key=value",
 			yaml: `"env=prod,team=platform"`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "env", value: "prod"},
 				{key: "team", value: "platform"},
 			},
 		},
 		{
-			name: "single tag",
+			name: "single label",
 			yaml: `"production"`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "production", value: ""},
 			},
 		},
 		{
 			name: "single key=value",
 			yaml: `"env=prod"`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "env", value: "prod"},
 			},
 		},
@@ -68,7 +68,7 @@ func TestTagsValue_UnmarshalYAML_String(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var v TagsValue
+			var v LabelsValue
 			err := yaml.Unmarshal([]byte(tt.yaml), &v)
 
 			if tt.wantErr {
@@ -82,7 +82,18 @@ func TestTagsValue_UnmarshalYAML_String(t *testing.T) {
 	}
 }
 
-func TestTagsValue_UnmarshalYAML_Map(t *testing.T) {
+func TestLabelsValue_UnmarshalYAML_ResetState(t *testing.T) {
+	t.Parallel()
+
+	var v LabelsValue
+	require.NoError(t, yaml.Unmarshal([]byte(`"env=prod"`), &v))
+	assert.Equal(t, []LabelEntry{{key: "env", value: "prod"}}, v.Entries())
+
+	require.NoError(t, yaml.Unmarshal([]byte(`"team=platform"`), &v))
+	assert.Equal(t, []LabelEntry{{key: "team", value: "platform"}}, v.Entries())
+}
+
+func TestLabelsValue_UnmarshalYAML_Map(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -124,7 +135,7 @@ env: prod`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var v TagsValue
+			var v LabelsValue
 			err := yaml.Unmarshal([]byte(tt.yaml), &v)
 			require.NoError(t, err)
 
@@ -138,31 +149,31 @@ env: prod`,
 	}
 }
 
-func TestTagsValue_UnmarshalYAML_Array(t *testing.T) {
+func TestLabelsValue_UnmarshalYAML_Array(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		yaml string
-		want []TagEntry
+		want []LabelEntry
 	}{
 		{
 			name: "array of key=value strings",
 			yaml: `
 - env=prod
 - team=platform`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "env", value: "prod"},
 				{key: "team", value: "platform"},
 			},
 		},
 		{
-			name: "array of simple tags (backward compatible)",
+			name: "array of simple labels (backward compatible)",
 			yaml: `
 - production
 - critical
 - batch`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "production", value: ""},
 				{key: "critical", value: ""},
 				{key: "batch", value: ""},
@@ -174,7 +185,7 @@ func TestTagsValue_UnmarshalYAML_Array(t *testing.T) {
 - env=prod
 - critical
 - team=platform`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "env", value: "prod"},
 				{key: "critical", value: ""},
 				{key: "team", value: "platform"},
@@ -185,7 +196,7 @@ func TestTagsValue_UnmarshalYAML_Array(t *testing.T) {
 			yaml: `
 - env: prod
 - team: platform`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "env", value: "prod"},
 				{key: "team", value: "platform"},
 			},
@@ -199,7 +210,7 @@ func TestTagsValue_UnmarshalYAML_Array(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var v TagsValue
+			var v LabelsValue
 			err := yaml.Unmarshal([]byte(tt.yaml), &v)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, v.Entries())
@@ -207,29 +218,29 @@ func TestTagsValue_UnmarshalYAML_Array(t *testing.T) {
 	}
 }
 
-func TestTagsValue_UnmarshalYAML_Null(t *testing.T) {
+func TestLabelsValue_UnmarshalYAML_Null(t *testing.T) {
 	t.Parallel()
 
-	var v TagsValue
+	var v LabelsValue
 	err := yaml.Unmarshal([]byte(`null`), &v)
 	require.NoError(t, err)
 	assert.True(t, v.IsZero())
 	assert.Nil(t, v.Entries())
 }
 
-func TestTagsValue_UnmarshalYAML_NumericValues(t *testing.T) {
+func TestLabelsValue_UnmarshalYAML_NumericValues(t *testing.T) {
 	t.Parallel()
 
 	t.Run("numeric key in map gets stringified", func(t *testing.T) {
-		var v TagsValue
+		var v LabelsValue
 		err := yaml.Unmarshal([]byte(`
 456: value`), &v)
 		require.NoError(t, err)
-		assert.Equal(t, []TagEntry{{key: "456", value: "value"}}, v.Entries())
+		assert.Equal(t, []LabelEntry{{key: "456", value: "value"}}, v.Entries())
 	})
 
 	t.Run("array with numeric value returns error", func(t *testing.T) {
-		var v TagsValue
+		var v LabelsValue
 		err := yaml.Unmarshal([]byte(`
 - env=prod
 - 123`), &v)
@@ -238,47 +249,47 @@ func TestTagsValue_UnmarshalYAML_NumericValues(t *testing.T) {
 	})
 }
 
-func TestTagsValue_IsZero(t *testing.T) {
+func TestLabelsValue_IsZero(t *testing.T) {
 	t.Parallel()
 
 	t.Run("unset", func(t *testing.T) {
-		var v TagsValue
+		var v LabelsValue
 		assert.True(t, v.IsZero())
 	})
 
 	t.Run("set to empty", func(t *testing.T) {
-		var v TagsValue
+		var v LabelsValue
 		_ = yaml.Unmarshal([]byte(`""`), &v)
 		assert.False(t, v.IsZero())
 		assert.True(t, v.IsEmpty())
 	})
 
 	t.Run("set with values", func(t *testing.T) {
-		var v TagsValue
+		var v LabelsValue
 		_ = yaml.Unmarshal([]byte(`"env=prod"`), &v)
 		assert.False(t, v.IsZero())
 		assert.False(t, v.IsEmpty())
 	})
 }
 
-func TestTagsValue_Value(t *testing.T) {
+func TestLabelsValue_Value(t *testing.T) {
 	t.Parallel()
 
-	var v TagsValue
+	var v LabelsValue
 	_ = yaml.Unmarshal([]byte(`"env=prod team=platform"`), &v)
 
 	raw := v.Value()
 	assert.Equal(t, "env=prod team=platform", raw)
 }
 
-func TestTagsValue_BackwardCompatibility(t *testing.T) {
+func TestLabelsValue_BackwardCompatibility(t *testing.T) {
 	t.Parallel()
 
 	// Test that all existing YAML formats continue to work
 	tests := []struct {
 		name string
 		yaml string
-		want []TagEntry
+		want []LabelEntry
 	}{
 		{
 			name: "old format: simple string array",
@@ -286,7 +297,7 @@ func TestTagsValue_BackwardCompatibility(t *testing.T) {
 - production
 - staging
 - critical`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "production", value: ""},
 				{key: "staging", value: ""},
 				{key: "critical", value: ""},
@@ -295,16 +306,16 @@ func TestTagsValue_BackwardCompatibility(t *testing.T) {
 		{
 			name: "old format: comma-separated string",
 			yaml: `"production, staging, critical"`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "production", value: ""},
 				{key: "staging", value: ""},
 				{key: "critical", value: ""},
 			},
 		},
 		{
-			name: "old format: single tag",
+			name: "old format: single label",
 			yaml: `production`,
-			want: []TagEntry{
+			want: []LabelEntry{
 				{key: "production", value: ""},
 			},
 		},
@@ -312,7 +323,7 @@ func TestTagsValue_BackwardCompatibility(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var v TagsValue
+			var v LabelsValue
 			err := yaml.Unmarshal([]byte(tt.yaml), &v)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, v.Entries())
@@ -320,7 +331,7 @@ func TestTagsValue_BackwardCompatibility(t *testing.T) {
 	}
 }
 
-func TestTagsValue_Validation(t *testing.T) {
+func TestLabelsValue_Validation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -338,13 +349,13 @@ func TestTagsValue_Validation(t *testing.T) {
 		},
 		{
 			name:    "key with space",
-			yaml:    `"my tag"`,
+			yaml:    `"my label"`,
 			wantErr: true,
 			errMsg:  "invalid characters",
 		},
 		{
 			name:    "key with special char",
-			yaml:    `"my@tag"`,
+			yaml:    `"my@label"`,
 			wantErr: true,
 			errMsg:  "invalid characters",
 		},
@@ -388,7 +399,7 @@ env: my value`,
 		// Valid cases should still work
 		{
 			name:    "valid key with dash",
-			yaml:    `"my-tag"`,
+			yaml:    `"my-label"`,
 			wantErr: false,
 		},
 		{
@@ -398,7 +409,7 @@ env: my value`,
 		},
 		{
 			name:    "valid key with dot",
-			yaml:    `"my.tag"`,
+			yaml:    `"my.label"`,
 			wantErr: false,
 		},
 		{
@@ -410,7 +421,7 @@ env: my value`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var v TagsValue
+			var v LabelsValue
 			err := yaml.Unmarshal([]byte(tt.yaml), &v)
 
 			if tt.wantErr {

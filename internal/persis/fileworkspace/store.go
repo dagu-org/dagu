@@ -176,8 +176,8 @@ func (s *Store) GetByID(_ context.Context, id string) (*workspace.Workspace, err
 }
 
 func (s *Store) GetByName(ctx context.Context, name string) (*workspace.Workspace, error) {
-	if name == "" {
-		return nil, workspace.ErrInvalidWorkspaceName
+	if err := workspace.ValidateName(name); err != nil {
+		return nil, err
 	}
 
 	s.mu.RLock()

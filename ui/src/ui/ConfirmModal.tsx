@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,12 @@ type Props = {
   visible: boolean;
   dismissModal: () => void;
   onSubmit: () => void;
+  submitDisabled?: boolean;
+  fullscreen?: boolean;
+  contentClassName?: string;
+  headerClassName?: string;
+  bodyClassName?: string;
+  footerClassName?: string;
 };
 
 function ConfirmModal({
@@ -29,6 +36,12 @@ function ConfirmModal({
   visible,
   dismissModal,
   onSubmit,
+  submitDisabled = false,
+  fullscreen = false,
+  contentClassName,
+  headerClassName,
+  bodyClassName,
+  footerClassName,
 }: Props) {
   // Create refs for the buttons
   const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -75,6 +88,9 @@ function ConfirmModal({
         // If Submit button is focused, trigger submit
         if (activeElement === submitButtonRef.current) {
           e.preventDefault();
+          if (submitDisabled) {
+            return;
+          }
           onSubmit();
           return;
         }
@@ -86,6 +102,9 @@ function ConfirmModal({
 
         // If no specific element is focused, trigger the submit action as default
         e.preventDefault();
+        if (submitDisabled) {
+          return;
+        }
         onSubmit();
       }
     };
@@ -94,20 +113,26 @@ function ConfirmModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, onSubmit, dismissModal]);
+  }, [visible, onSubmit, dismissModal, submitDisabled]);
   return (
     <Dialog open={visible} onOpenChange={(open) => !open && dismissModal()}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent
+        fullscreen={fullscreen}
+        className={cn(
+          !fullscreen && !contentClassName && 'sm:max-w-[500px]',
+          contentClassName
+        )}
+      >
+        <DialogHeader className={headerClassName}>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">
             Confirm the requested action.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">{children}</div>
+        <div className={cn('py-4', bodyClassName)}>{children}</div>
 
-        <DialogFooter>
+        <DialogFooter className={footerClassName}>
           <Button ref={cancelButtonRef} variant="ghost" onClick={dismissModal}>
             <X className="h-4 w-4" />
             Cancel
@@ -115,6 +140,7 @@ function ConfirmModal({
           <Button
             ref={submitButtonRef}
             className="btn-3d-primary"
+            disabled={submitDisabled}
             onClick={onSubmit}
           >
             <Check className="h-4 w-4" />

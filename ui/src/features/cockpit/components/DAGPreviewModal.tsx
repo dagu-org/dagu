@@ -22,11 +22,11 @@ export function DAGPreviewModal({
 
   const handleEnqueue = React.useCallback(
     async (params: string, dagRunId?: string): Promise<string | void> => {
-      const tags: string[] = [];
+      const labels: string[] = [];
       if (selectedWorkspace) {
-        const safeName = selectedWorkspace.replace(/[^a-zA-Z0-9_-]/g, '');
+        const safeName = selectedWorkspace.replace(/[^a-zA-Z0-9_]/g, '');
         if (safeName) {
-          tags.push(`workspace=${safeName}`);
+          labels.push(`workspace=${safeName}`);
         }
       }
 
@@ -38,7 +38,7 @@ export function DAGPreviewModal({
         body: {
           params: params || undefined,
           dagRunId: dagRunId || undefined,
-          tags: tags.length > 0 ? tags : undefined,
+          labels: labels.length > 0 ? labels : undefined,
         },
       });
 

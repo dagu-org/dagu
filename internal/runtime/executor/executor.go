@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -41,7 +42,9 @@ type ExecutorFactory func(ctx context.Context, step core.Step) (Executor, error)
 
 // NewExecutor creates a new Executor based on the step's executor type.
 func NewExecutor(ctx context.Context, step core.Step) (Executor, error) {
+	executorRegistryMu.RLock()
 	factory, ok := executorRegistry[step.ExecutorConfig.Type]
+	executorRegistryMu.RUnlock()
 	if ok {
 		return factory(ctx, step)
 	}
@@ -55,14 +58,25 @@ func NewExecutor(ctx context.Context, step core.Step) (Executor, error) {
 
 // RegisterExecutor registers a new executor type with its factory, validator, and capabilities.
 func RegisterExecutor(executorType string, factory ExecutorFactory, validator core.StepValidator, caps core.ExecutorCapabilities) {
+	executorRegistryMu.Lock()
 	executorRegistry[executorType] = factory
+	executorRegistryMu.Unlock()
 	if validator != nil {
 		core.RegisterStepValidator(executorType, validator)
 	}
 	core.RegisterExecutorCapabilities(executorType, caps)
 }
 
+// UnregisterExecutor removes a registered executor type.
+func UnregisterExecutor(executorType string) {
+	executorRegistryMu.Lock()
+	defer executorRegistryMu.Unlock()
+	delete(executorRegistry, executorType)
+}
+
 var executorRegistry = make(map[string]ExecutorFactory)
+
+var executorRegistryMu sync.RWMutex
 
 // ExitCoder is an interface for executors that can return an exit code.
 type ExitCoder interface {

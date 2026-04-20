@@ -131,7 +131,7 @@ func Build(
 		entry.Name = dag.Name
 		entry.Group = dag.Group
 		entry.Description = dag.Description
-		entry.Tags = tagsToStrings(dag.Tags)
+		entry.Labels = labelsToStrings(dag.Labels)
 		entry.Schedule = scheduleToString(dag.Schedule)
 
 		if len(dag.BuildErrors) > 0 {
@@ -157,14 +157,14 @@ func Write(indexPath string, idx *indexv1.DAGIndex) error {
 }
 
 // DAGFromEntry reconstructs a minimal core.DAG from an index entry.
-// The returned DAG is suitable for List/TagList operations.
+// The returned DAG is suitable for List/LabelList operations.
 func DAGFromEntry(entry *indexv1.DAGIndexEntry, baseDir string) *core.DAG {
 	dag := &core.DAG{
 		Name:        entry.Name,
 		Location:    filepath.Join(baseDir, entry.FilePath),
 		Group:       entry.Group,
 		Description: entry.Description,
-		Tags:        core.NewTags(entry.Tags),
+		Labels:      core.NewLabels(entry.Labels),
 	}
 
 	if entry.LoadError != "" {
@@ -183,12 +183,12 @@ func SuspendFlagName(dagName string) string {
 	return fileutil.NormalizeFilename(dagName, "-") + ".suspend"
 }
 
-func tagsToStrings(tags core.Tags) []string {
-	if len(tags) == 0 {
+func labelsToStrings(labels core.Labels) []string {
+	if len(labels) == 0 {
 		return nil
 	}
-	strs := make([]string, len(tags))
-	for i, t := range tags {
+	strs := make([]string, len(labels))
+	for i, t := range labels {
 		strs[i] = t.String()
 	}
 	return strs

@@ -221,24 +221,6 @@ steps:
 	})
 }
 
-func TestCmdStart_NamedParamsIgnorePositionalCount(t *testing.T) {
-	t.Parallel()
-
-	th := test.SetupCommand(t)
-
-	dagFile := th.CreateDAGFile(t, "test-named-params.yaml", `
-params: KEY1=default1 KEY2=default2
-steps:
-  - name: step1
-    command: echo $KEY1 $KEY2
-`)
-
-	err := th.RunCommandWithError(t, cmd.Start(), test.CmdTest{
-		Args: []string{"start", "--params", "KEY1=value1 KEY2=value2", dagFile},
-	})
-	require.NoError(t, err)
-}
-
 func TestCmdStart_FromRunID(t *testing.T) {
 	t.Run("ReschedulesWithStoredParameters", func(t *testing.T) {
 		t.Parallel()

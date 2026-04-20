@@ -107,30 +107,11 @@ func resolveWorkingDir(ctx context.Context, step core.Step, rCtx Context) string
 
 	if step.Dir != "" {
 		expandedDir := expandStepDir(step.Dir, dag)
-		return resolveExpandedDir(ctx, expandedDir, step.Name, dag)
+		return resolveExpandedDir(ctx, expandedDir, step.Name, dag, rCtx)
 	}
 
-	if dag != nil && dag.WorkingDir != "" {
-		// Expand environment variables in WorkingDir at runtime
-		wd := dag.WorkingDir
-		if rCtx.EnvScope != nil {
-			wd = rCtx.EnvScope.Expand(wd)
-		} else {
-			wd = os.ExpandEnv(wd)
-		}
-		// Resolve ~ prefix after variable expansion
-		if strings.HasPrefix(wd, "~") {
-			resolved, err := fileutil.ResolvePath(wd)
-			if err != nil {
-				logger.Warn(ctx, "Failed to resolve working directory",
-					tag.Dir(wd),
-					tag.Error(err),
-				)
-			} else {
-				wd = resolved
-			}
-		}
-		return wd
+	if workDir := dagWorkingDir(ctx, dag, rCtx); workDir != "" {
+		return workDir
 	}
 
 	return fallbackWorkingDir(ctx, step.Name)
@@ -151,7 +132,7 @@ func expandStepDir(dir string, dag *core.DAG) string {
 }
 
 // resolveExpandedDir resolves an expanded directory path to an absolute path.
-func resolveExpandedDir(ctx context.Context, expandedDir, stepName string, dag *core.DAG) string {
+func resolveExpandedDir(ctx context.Context, expandedDir, stepName string, dag *core.DAG, rCtx Context) string {
 	if filepath.IsAbs(expandedDir) || strings.HasPrefix(expandedDir, "~") {
 		dir, err := fileutil.ResolvePath(expandedDir)
 		if err != nil {
@@ -165,8 +146,8 @@ func resolveExpandedDir(ctx context.Context, expandedDir, stepName string, dag *
 		return dir
 	}
 
-	if dag != nil && dag.WorkingDir != "" {
-		return filepath.Clean(filepath.Join(dag.WorkingDir, expandedDir))
+	if workDir := dagWorkingDir(ctx, dag, rCtx); workDir != "" {
+		return filepath.Clean(filepath.Join(workDir, expandedDir))
 	}
 
 	logger.Warn(ctx, "Failed to resolve working directory for step",
@@ -174,6 +155,51 @@ func resolveExpandedDir(ctx context.Context, expandedDir, stepName string, dag *
 		tag.Dir(expandedDir),
 	)
 	return expandedDir
+}
+
+func dagWorkingDir(ctx context.Context, dag *core.DAG, rCtx Context) string {
+	if dag != nil && dag.WorkingDirExplicit && dag.WorkingDir != "" {
+		return expandDAGWorkingDir(ctx, dag.WorkingDir, rCtx)
+	}
+	if workDir := dagRunWorkDir(rCtx); workDir != "" {
+		return workDir
+	}
+	if dag != nil && dag.WorkingDir != "" {
+		return expandDAGWorkingDir(ctx, dag.WorkingDir, rCtx)
+	}
+	return ""
+}
+
+func dagRunWorkDir(rCtx Context) string {
+	if rCtx.EnvScope == nil {
+		return ""
+	}
+	workDir, ok := rCtx.EnvScope.Get(exec.EnvKeyDAGRunWorkDir)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(workDir)
+}
+
+func expandDAGWorkingDir(ctx context.Context, workingDir string, rCtx Context) string {
+	wd := workingDir
+	if rCtx.EnvScope != nil {
+		wd = rCtx.EnvScope.Expand(wd)
+	} else {
+		wd = os.ExpandEnv(wd)
+	}
+	if strings.HasPrefix(wd, "~") {
+		resolved, err := fileutil.ResolvePath(wd)
+		if err != nil {
+			logger.Warn(ctx, "Failed to resolve working directory",
+				tag.Dir(wd),
+				tag.Error(err),
+			)
+		} else {
+			wd = resolved
+		}
+	}
+	return wd
 }
 
 // fallbackWorkingDir returns a fallback working directory when none is specified.

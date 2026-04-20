@@ -341,7 +341,7 @@ func (m *mockDAGRunStore) RenameDAGRuns(ctx context.Context, oldName, newName st
 	return args.Error(0)
 }
 
-func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef) error {
+func (m *mockDAGRunStore) RemoveDAGRun(ctx context.Context, dagRun exec.DAGRunRef, _ ...exec.RemoveDAGRunOption) error {
 	args := m.Called(ctx, dagRun)
 	return args.Error(0)
 }
