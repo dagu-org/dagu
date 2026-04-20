@@ -108,6 +108,9 @@ func (a *API) fetchDAGRunSummary(ctx context.Context, dagRun exec.DAGRunRef) (ap
 	if err != nil {
 		return api.DAGRunSummary{}, err
 	}
+	if !a.canAccessWorkspace(ctx, statusWorkspaceName(runStatus)) {
+		return api.DAGRunSummary{}, workspaceResourceNotFound()
+	}
 	return toDAGRunSummary(*runStatus), nil
 }
 
@@ -235,12 +238,15 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 			if err != nil {
 				continue
 			}
-			if queue == nil {
-				queue = getOrCreateQueue(queueMap, groupName, a.config)
-			}
 			runStatus, err := attempt.ReadStatus(ctx)
 			if err != nil {
 				continue
+			}
+			if !a.canAccessWorkspace(ctx, statusWorkspaceName(runStatus)) {
+				continue
+			}
+			if queue == nil {
+				queue = getOrCreateQueue(queueMap, groupName, a.config)
 			}
 			queue.running = append(queue.running, toDAGRunSummary(*runStatus))
 			localRunningIDs[dagRun.ID] = struct{}{}
@@ -257,7 +263,7 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 	}
 
 	if onlyQueue != "" {
-		count, err := a.queueStore.Len(ctx, onlyQueue)
+		count, err := a.countVisibleQueuedItems(ctx, onlyQueue)
 		if err != nil {
 			return nil, &Error{
 				Code:       api.ErrorCodeInternalError,
@@ -279,7 +285,7 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 			}
 		}
 		for _, queueName := range queueNames {
-			count, err := a.queueStore.Len(ctx, queueName)
+			count, err := a.countVisibleQueuedItems(ctx, queueName)
 			if err != nil {
 				logger.Warn(ctx, "Failed to get queue length",
 					tag.Queue(queueName),
@@ -342,6 +348,10 @@ func (a *API) listVisibleQueuedItems(ctx context.Context, queueName string, limi
 
 			summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
 			if err != nil {
+				var apiErr *Error
+				if errors.As(err, &apiErr) && apiErr.HTTPStatus == 404 {
+					continue
+				}
 				logger.Warn(ctx, "Failed to fetch queued DAG run summary",
 					tag.Queue(queueName),
 					tag.Error(err),
@@ -365,6 +375,33 @@ func (a *API) listVisibleQueuedItems(ctx context.Context, queueName string, limi
 	}
 
 	return items, currentCursor, nil
+}
+
+func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string) (int, error) {
+	if a.queueStore == nil {
+		return 0, nil
+	}
+	count := 0
+	cursor := ""
+	for {
+		page, err := a.queueStore.ListCursor(ctx, queueName, cursor, queueCursorScanBatch)
+		if err != nil {
+			return 0, err
+		}
+		for _, queuedItem := range page.Items {
+			dagRunRef, err := queuedItem.Data()
+			if err != nil {
+				continue
+			}
+			if _, err := a.fetchDAGRunSummary(ctx, *dagRunRef); err == nil {
+				count++
+			}
+		}
+		if !page.HasMore {
+			return count, nil
+		}
+		cursor = page.NextCursor
+	}
 }
 
 // GetQueuesListData returns queue list for SSE.
@@ -431,6 +468,9 @@ func (a *API) runningSummaryFromLease(ctx context.Context, lease exec.DAGRunLeas
 		return api.DAGRunSummary{}, false
 	}
 	if status.AttemptID != lease.AttemptID {
+		return api.DAGRunSummary{}, false
+	}
+	if !a.canAccessWorkspace(ctx, statusWorkspaceName(status)) {
 		return api.DAGRunSummary{}, false
 	}
 	switch status.Status {

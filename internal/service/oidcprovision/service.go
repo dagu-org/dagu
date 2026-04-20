@@ -157,14 +157,15 @@ func (s *Service) ProcessLogin(ctx context.Context, claims OIDCClaims) (*auth.Us
 		username = s.generateUniqueUsername(ctx, claims)
 
 		user = &auth.User{
-			ID:           uuid.New().String(),
-			Username:     username,
-			Role:         role,
-			AuthProvider: "oidc",
-			OIDCIssuer:   s.config.Issuer,
-			OIDCSubject:  claims.Subject,
-			CreatedAt:    now,
-			UpdatedAt:    now,
+			ID:              uuid.New().String(),
+			Username:        username,
+			Role:            role,
+			WorkspaceAccess: auth.AllWorkspaceAccess(),
+			AuthProvider:    "oidc",
+			OIDCIssuer:      s.config.Issuer,
+			OIDCSubject:     claims.Subject,
+			CreatedAt:       now,
+			UpdatedAt:       now,
 		}
 
 		if err := s.userStore.Create(ctx, user); err != nil {

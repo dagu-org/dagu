@@ -1,0 +1,148 @@
+import { components, UserRole } from '@/api/v1/schema';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+type WorkspaceAccess = components['schemas']['WorkspaceAccess'];
+type WorkspaceGrant = components['schemas']['WorkspaceGrant'];
+type Workspace = components['schemas']['WorkspaceResponse'];
+
+const GRANT_ROLES = [
+  { value: UserRole.manager, label: 'Manager' },
+  { value: UserRole.developer, label: 'Developer' },
+  { value: UserRole.operator, label: 'Operator' },
+  { value: UserRole.viewer, label: 'Viewer' },
+] as const;
+
+export function defaultWorkspaceAccess(): WorkspaceAccess {
+  return { all: true, grants: [] };
+}
+
+export function normalizeWorkspaceAccess(
+  access?: WorkspaceAccess
+): WorkspaceAccess {
+  if (!access || access.all) {
+    return defaultWorkspaceAccess();
+  }
+  return {
+    all: false,
+    grants: [...access.grants].sort((a, b) =>
+      a.workspace.localeCompare(b.workspace)
+    ),
+  };
+}
+
+export function WorkspaceAccessEditor({
+  value,
+  onChange,
+  workspaces,
+}: {
+  value: WorkspaceAccess;
+  onChange: (next: WorkspaceAccess) => void;
+  workspaces: Workspace[];
+}) {
+  const selected = new Map(value.grants.map((grant) => [grant.workspace, grant]));
+
+  const setMode = (mode: string) => {
+    if (mode === 'all') {
+      onChange(defaultWorkspaceAccess());
+      return;
+    }
+    onChange({ all: false, grants: value.grants });
+  };
+
+  const setGrant = (workspace: string, checked: boolean) => {
+    if (!checked) {
+      onChange({
+        all: false,
+        grants: value.grants.filter((grant) => grant.workspace !== workspace),
+      });
+      return;
+    }
+    onChange({
+      all: false,
+      grants: [
+        ...value.grants,
+        { workspace, role: UserRole.viewer },
+      ].sort((a, b) => a.workspace.localeCompare(b.workspace)),
+    });
+  };
+
+  const setGrantRole = (workspace: string, role: UserRole) => {
+    const grants = value.grants.map((grant): WorkspaceGrant =>
+      grant.workspace === workspace ? { ...grant, role } : grant
+    );
+    onChange({ all: false, grants });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label className="text-sm">Workspace Access</Label>
+        <Select value={value.all ? 'all' : 'scoped'} onValueChange={setMode}>
+          <SelectTrigger className="h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All workspaces</SelectItem>
+            <SelectItem value="scoped">Selected workspaces</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!value.all && (
+        <div className="max-h-56 overflow-auto rounded-md border border-border">
+          {workspaces.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              No workspaces available
+            </div>
+          ) : (
+            workspaces.map((workspace) => {
+              const grant = selected.get(workspace.name);
+              return (
+                <div
+                  key={workspace.id}
+                  className="grid grid-cols-[1fr_132px] items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                >
+                  <label className="flex min-w-0 items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={!!grant}
+                      onCheckedChange={(checked) =>
+                        setGrant(workspace.name, checked === true)
+                      }
+                    />
+                    <span className="truncate">{workspace.name}</span>
+                  </label>
+                  <Select
+                    value={grant?.role ?? UserRole.viewer}
+                    onValueChange={(role) =>
+                      setGrantRole(workspace.name, role as UserRole)
+                    }
+                    disabled={!grant}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GRANT_ROLES.map((role) => (
+                        <SelectItem key={role.value} value={role.value}>
+                          {role.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

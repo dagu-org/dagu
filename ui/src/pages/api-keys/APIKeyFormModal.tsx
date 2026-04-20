@@ -3,6 +3,11 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { TOKEN_KEY } from '@/contexts/AuthContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { components, UserRole } from '@/api/v1/schema';
+import {
+  defaultWorkspaceAccess,
+  normalizeWorkspaceAccess,
+  WorkspaceAccessEditor,
+} from '@/components/WorkspaceAccessEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +28,7 @@ import {
 import { Copy, Check } from 'lucide-react';
 
 type APIKey = components['schemas']['APIKey'];
+type WorkspaceAccess = components['schemas']['WorkspaceAccess'];
 
 interface APIKeyFormModalProps {
   open: boolean;
@@ -38,6 +44,9 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.viewer);
+  const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccess>(
+    defaultWorkspaceAccess()
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
@@ -49,10 +58,12 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
         setName(apiKey.name);
         setDescription(apiKey.description || '');
         setRole(apiKey.role);
+        setWorkspaceAccess(normalizeWorkspaceAccess(apiKey.workspaceAccess));
       } else {
         setName('');
         setDescription('');
         setRole(UserRole.viewer);
+        setWorkspaceAccess(defaultWorkspaceAccess());
       }
       setError(null);
       setCreatedKey(null);
@@ -64,6 +75,12 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    if (!workspaceAccess.all && workspaceAccess.grants.length === 0) {
+      setError('Select at least one workspace');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const token = localStorage.getItem(TOKEN_KEY);
@@ -81,7 +98,8 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
         body: JSON.stringify({
           name,
           description: description || undefined,
-          role,
+          role: workspaceAccess.all ? role : UserRole.viewer,
+          workspaceAccess,
         }),
       });
 
@@ -151,7 +169,7 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit API Key' : 'Create API Key'}</DialogTitle>
         </DialogHeader>
@@ -186,7 +204,11 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
 
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+              <Select
+                value={workspaceAccess.all ? role : UserRole.viewer}
+                onValueChange={(v) => setRole(v as UserRole)}
+                disabled={!workspaceAccess.all}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -199,6 +221,17 @@ export function APIKeyFormModal({ open, apiKey, onClose, onSuccess }: APIKeyForm
                 </SelectContent>
               </Select>
             </div>
+
+            <WorkspaceAccessEditor
+              value={workspaceAccess}
+              onChange={(next) => {
+                setWorkspaceAccess(next);
+                if (!next.all) {
+                  setRole(UserRole.viewer);
+                }
+              }}
+              workspaces={appBarContext.workspaces ?? []}
+            />
           </div>
 
           <DialogFooter>

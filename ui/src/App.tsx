@@ -20,7 +20,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
-import { AuthProvider, useCanWrite } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import {
   Config,
   ConfigContext,
@@ -45,6 +45,8 @@ import {
   persistWorkspaceName,
   sanitizeWorkspaceName,
 } from './lib/workspace';
+import { effectiveWorkspaceRole, roleAtLeast } from './lib/workspaceAccess';
+import { UserRole } from './api/v1/schema';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
@@ -106,7 +108,7 @@ function AdminElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole="admin">{children}</ProtectedRoute>;
+  return <ProtectedRoute requiredRole={UserRole.admin}>{children}</ProtectedRoute>;
 }
 
 function ManagerElement({
@@ -114,7 +116,7 @@ function ManagerElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole="manager">{children}</ProtectedRoute>;
+  return <ProtectedRoute requiredRole={UserRole.manager}>{children}</ProtectedRoute>;
 }
 
 function DeveloperElement({
@@ -122,7 +124,7 @@ function DeveloperElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole="developer">{children}</ProtectedRoute>;
+  return <ProtectedRoute requiredRole={UserRole.developer}>{children}</ProtectedRoute>;
 }
 
 function WriteElement({
@@ -130,8 +132,19 @@ function WriteElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  const canWrite = useCanWrite();
+  const { user } = useAuth();
   const config = React.useContext(ConfigContext);
+  const appBarContext = React.useContext(AppBarContext);
+  const canWrite =
+    config.authMode !== 'builtin'
+      ? config.permissions.writeDags
+      : roleAtLeast(
+          effectiveWorkspaceRole(
+            user,
+            appBarContext.selectedWorkspace || ''
+          ),
+          UserRole.developer
+        );
   if (!canWrite || !config.agentEnabled) return <Navigate to="/" replace />;
   return children;
 }

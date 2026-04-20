@@ -244,9 +244,10 @@ func (s *Service) GetUserFromToken(ctx context.Context, tokenString string) (*au
 
 // CreateUserInput contains the input for creating a user.
 type CreateUserInput struct {
-	Username string
-	Password string
-	Role     auth.Role
+	Username        string
+	Password        string
+	Role            auth.Role
+	WorkspaceAccess *auth.WorkspaceAccess
 }
 
 // CreateUser creates a new user.
@@ -258,6 +259,9 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*auth.
 	if !input.Role.Valid() {
 		return nil, fmt.Errorf("invalid role: %s", input.Role)
 	}
+	if err := auth.ValidateWorkspaceAccess(input.Role, input.WorkspaceAccess, nil); err != nil {
+		return nil, err
+	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(input.Password), s.config.BcryptCost)
 	if err != nil {
@@ -265,6 +269,7 @@ func (s *Service) CreateUser(ctx context.Context, input CreateUserInput) (*auth.
 	}
 
 	user := auth.NewUser(input.Username, string(passwordHash), input.Role)
+	user.WorkspaceAccess = auth.CloneWorkspaceAccess(input.WorkspaceAccess)
 	if err := s.store.Create(ctx, user); err != nil {
 		return nil, err
 	}
@@ -287,10 +292,11 @@ func (s *Service) ListUsers(ctx context.Context) ([]*auth.User, error) {
 // but the API handler intentionally omits it - password changes should
 // go through ChangePassword (user self-service) or ResetPassword (admin).
 type UpdateUserInput struct {
-	Username   *string
-	Role       *auth.Role
-	Password   *string
-	IsDisabled *bool
+	Username        *string
+	Role            *auth.Role
+	WorkspaceAccess *auth.WorkspaceAccess
+	Password        *string
+	IsDisabled      *bool
 }
 
 // UpdateUser updates an existing user.
@@ -309,6 +315,14 @@ func (s *Service) UpdateUser(ctx context.Context, id string, input UpdateUserInp
 			return nil, fmt.Errorf("invalid role: %s", *input.Role)
 		}
 		user.Role = *input.Role
+	}
+
+	if input.WorkspaceAccess != nil {
+		user.WorkspaceAccess = auth.CloneWorkspaceAccess(input.WorkspaceAccess)
+	}
+
+	if err := auth.ValidateWorkspaceAccess(user.Role, user.WorkspaceAccess, nil); err != nil {
+		return nil, err
 	}
 
 	if input.Password != nil && *input.Password != "" {
@@ -412,9 +426,10 @@ func (s *Service) validatePassword(password string) error {
 
 // CreateAPIKeyInput contains the input for creating an API key.
 type CreateAPIKeyInput struct {
-	Name        string
-	Description string
-	Role        auth.Role
+	Name            string
+	Description     string
+	Role            auth.Role
+	WorkspaceAccess *auth.WorkspaceAccess
 }
 
 // CreateAPIKeyResult contains the result of creating an API key.
@@ -436,6 +451,9 @@ func (s *Service) CreateAPIKey(ctx context.Context, input CreateAPIKeyInput, cre
 	if !input.Role.Valid() {
 		return nil, fmt.Errorf("invalid role: %s", input.Role)
 	}
+	if err := auth.ValidateWorkspaceAccess(input.Role, input.WorkspaceAccess, nil); err != nil {
+		return nil, err
+	}
 
 	if creatorID == "" {
 		return nil, ErrInvalidCreatorID
@@ -451,6 +469,7 @@ func (s *Service) CreateAPIKey(ctx context.Context, input CreateAPIKeyInput, cre
 	if err != nil {
 		return nil, err
 	}
+	apiKey.WorkspaceAccess = auth.CloneWorkspaceAccess(input.WorkspaceAccess)
 	if err := s.apiKeyStore.Create(ctx, apiKey); err != nil {
 		return nil, err
 	}
@@ -517,9 +536,10 @@ func (s *Service) ListAPIKeys(ctx context.Context) ([]*auth.APIKey, error) {
 
 // UpdateAPIKeyInput contains the input for updating an API key.
 type UpdateAPIKeyInput struct {
-	Name        *string
-	Description *string
-	Role        *auth.Role
+	Name            *string
+	Description     *string
+	Role            *auth.Role
+	WorkspaceAccess *auth.WorkspaceAccess
 }
 
 // UpdateAPIKey updates an existing API key.
@@ -546,6 +566,14 @@ func (s *Service) UpdateAPIKey(ctx context.Context, id string, input UpdateAPIKe
 			return nil, fmt.Errorf("invalid role: %s", *input.Role)
 		}
 		apiKey.Role = *input.Role
+	}
+
+	if input.WorkspaceAccess != nil {
+		apiKey.WorkspaceAccess = auth.CloneWorkspaceAccess(input.WorkspaceAccess)
+	}
+
+	if err := auth.ValidateWorkspaceAccess(apiKey.Role, apiKey.WorkspaceAccess, nil); err != nil {
+		return nil, err
 	}
 
 	apiKey.UpdatedAt = time.Now().UTC()

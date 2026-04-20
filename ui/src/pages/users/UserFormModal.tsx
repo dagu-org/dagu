@@ -1,7 +1,12 @@
 import { useState, useEffect, useContext } from 'react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { components } from '@/api/v1/schema';
+import { components, UserRole } from '@/api/v1/schema';
+import {
+  defaultWorkspaceAccess,
+  normalizeWorkspaceAccess,
+  WorkspaceAccessEditor,
+} from '@/components/WorkspaceAccessEditor';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +26,7 @@ import {
 import { AlertCircle, Check, UserPlus, X } from 'lucide-react';
 
 type User = components['schemas']['User'];
+type WorkspaceAccess = components['schemas']['WorkspaceAccess'];
 
 type UserFormModalProps = {
   open: boolean;
@@ -54,6 +60,9 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<string>('viewer');
+  const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccess>(
+    defaultWorkspaceAccess()
+  );
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -61,11 +70,13 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
     if (user) {
       setUsername(user.username);
       setRole(user.role);
+      setWorkspaceAccess(normalizeWorkspaceAccess(user.workspaceAccess));
       setPassword('');
     } else {
       setUsername('');
       setPassword('');
       setRole('viewer');
+      setWorkspaceAccess(defaultWorkspaceAccess());
     }
     setError(null);
   }, [user, open]);
@@ -78,6 +89,10 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
       setError('Password must be at least 8 characters');
       return;
     }
+    if (!workspaceAccess.all && workspaceAccess.grants.length === 0) {
+      setError('Select at least one workspace');
+      return;
+    }
 
     setIsLoading(true);
 
@@ -87,6 +102,12 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
         throw new Error('Not authenticated');
       }
       const remoteNode = encodeURIComponent(appBarContext.selectedRemoteNode || 'local');
+      const effectiveRole = workspaceAccess.all ? role : UserRole.viewer;
+      const payload = {
+        username,
+        role: effectiveRole,
+        workspaceAccess,
+      };
 
       if (isEditing) {
         // Update user
@@ -96,7 +117,7 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ username, role }),
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
@@ -111,7 +132,7 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ username, password, role }),
+          body: JSON.stringify({ ...payload, password }),
         });
 
         if (!response.ok) {
@@ -130,7 +151,7 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit User' : 'Create User'}</DialogTitle>
         </DialogHeader>
@@ -180,7 +201,11 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
             <Label htmlFor="role" className="text-sm">
               Role
             </Label>
-            <Select value={role} onValueChange={setRole}>
+            <Select
+              value={workspaceAccess.all ? role : UserRole.viewer}
+              onValueChange={setRole}
+              disabled={!workspaceAccess.all}
+            >
               <SelectTrigger className="h-9">
                 <SelectValue />
               </SelectTrigger>
@@ -196,6 +221,17 @@ export function UserFormModal({ open, user, onClose, onSuccess }: UserFormModalP
               </SelectContent>
             </Select>
           </div>
+
+          <WorkspaceAccessEditor
+            value={workspaceAccess}
+            onChange={(next) => {
+              setWorkspaceAccess(next);
+              if (!next.all) {
+                setRole(UserRole.viewer);
+              }
+            }}
+            workspaces={appBarContext.workspaces ?? []}
+          />
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>

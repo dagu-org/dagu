@@ -61,11 +61,16 @@ func (a *API) CreateUser(ctx context.Context, request api.CreateUserRequestObjec
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
+	workspaceAccess, err := a.parseAndValidateWorkspaceAccess(ctx, role, request.Body.WorkspaceAccess)
+	if err != nil {
+		return nil, err
+	}
 
 	user, err := a.authService.CreateUser(ctx, authservice.CreateUserInput{
-		Username: request.Body.Username,
-		Password: request.Body.Password,
-		Role:     role,
+		Username:        request.Body.Username,
+		Password:        request.Body.Password,
+		Role:            role,
+		WorkspaceAccess: workspaceAccess,
 	})
 	if err != nil {
 		if errors.Is(err, auth.ErrUserAlreadyExists) {
@@ -88,6 +93,9 @@ func (a *API) CreateUser(ctx context.Context, request api.CreateUserRequestObjec
 				Message:    "Password does not meet security requirements",
 				HTTPStatus: http.StatusBadRequest,
 			}
+		}
+		if errors.Is(err, auth.ErrInvalidWorkspaceAccess) {
+			return nil, badWorkspaceAccessError(err.Error())
 		}
 		return nil, err
 	}
@@ -164,6 +172,30 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 		}
 		input.Role = &role
 	}
+	if request.Body.WorkspaceAccess != nil {
+		roleForAccess := auth.RoleViewer
+		if input.Role != nil {
+			roleForAccess = *input.Role
+		} else {
+			currentUser, err := a.authService.GetUser(ctx, request.UserId)
+			if err != nil {
+				if errors.Is(err, auth.ErrUserNotFound) {
+					return nil, &Error{
+						Code:       api.ErrorCodeNotFound,
+						Message:    "User not found",
+						HTTPStatus: http.StatusNotFound,
+					}
+				}
+				return nil, err
+			}
+			roleForAccess = currentUser.Role
+		}
+		workspaceAccess, err := a.parseAndValidateWorkspaceAccess(ctx, roleForAccess, request.Body.WorkspaceAccess)
+		if err != nil {
+			return nil, err
+		}
+		input.WorkspaceAccess = workspaceAccess
+	}
 	if request.Body.IsDisabled != nil {
 		// Prevent self-disable
 		if *request.Body.IsDisabled {
@@ -202,6 +234,9 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 				HTTPStatus: http.StatusBadRequest,
 			}
 		}
+		if errors.Is(err, auth.ErrInvalidWorkspaceAccess) {
+			return nil, badWorkspaceAccessError(err.Error())
+		}
 		return nil, err
 	}
 
@@ -211,6 +246,9 @@ func (a *API) UpdateUser(ctx context.Context, request api.UpdateUserRequestObjec
 	}
 	if input.Role != nil {
 		changes["role"] = string(*input.Role)
+	}
+	if input.WorkspaceAccess != nil {
+		changes["workspace_access"] = toAPIWorkspaceAccess(input.WorkspaceAccess)
 	}
 	if input.IsDisabled != nil {
 		changes["is_disabled"] = *input.IsDisabled

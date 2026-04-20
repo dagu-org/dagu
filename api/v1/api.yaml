@@ -9504,6 +9504,38 @@ components:
         - operator
         - viewer
 
+    WorkspaceGrant:
+      type: object
+      description: "Role granted for a specific workspace"
+      properties:
+        workspace:
+          type: string
+          description: "Workspace name"
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z0-9_-]+$"
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - workspace
+        - role
+
+    WorkspaceAccess:
+      type: object
+      description: "Workspace access policy. all=true grants the top-level role in every workspace. all=false requires explicit workspace grants and a top-level viewer role."
+      properties:
+        all:
+          type: boolean
+          description: "Whether this identity can access all workspaces"
+        grants:
+          type: array
+          description: "Workspace-specific grants used when all=false"
+          items:
+            $ref: "#/components/schemas/WorkspaceGrant"
+      required:
+        - all
+        - grants
+
     SetupRequest:
       type: object
       description: "Request body for initial admin account setup"
@@ -9596,6 +9628,8 @@ components:
           minLength: 8
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
       required:
         - username
         - password
@@ -9612,6 +9646,8 @@ components:
           maxLength: 64
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
         isDisabled:
           type: boolean
           description: "Whether to disable the user account"
@@ -9628,6 +9664,8 @@ components:
           description: "User's username"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
         authProvider:
           type: string
           enum: [builtin, oidc]
@@ -9647,6 +9685,7 @@ components:
         - id
         - username
         - role
+        - workspaceAccess
         - createdAt
         - updatedAt
 
@@ -9685,6 +9724,8 @@ components:
           description: "Purpose description"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
         keyPrefix:
           type: string
           description: "First 8 characters for identification"
@@ -9708,6 +9749,7 @@ components:
         - id
         - name
         - role
+        - workspaceAccess
         - keyPrefix
         - createdAt
         - updatedAt
@@ -9748,6 +9790,8 @@ components:
           description: "Purpose description"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
       required:
         - name
         - role
@@ -9780,6 +9824,8 @@ components:
           description: "New description"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
 
     SuccessResponse:
       type: object

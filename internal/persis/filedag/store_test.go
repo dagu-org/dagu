@@ -335,6 +335,144 @@ steps:
 	assert.Equal(t, "ops-dag", result.Items[0].FileName)
 }
 
+func TestListDAGsFiltersByWorkspaceBeforePagination(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-list-workspace-filter")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "aaa-global", []byte(`name: aaa-global
+steps:
+  - name: step1
+    command: echo global
+`)))
+	require.NoError(t, store.Create(ctx, "bbb-ops", []byte(`name: bbb-ops
+labels:
+  - workspace=ops
+steps:
+  - name: step1
+    command: echo ops
+`)))
+	require.NoError(t, store.Create(ctx, "ccc-prod", []byte(`name: ccc-prod
+labels:
+  - workspace=prod
+steps:
+  - name: step1
+    command: echo prod
+`)))
+
+	firstPage := exec.NewPaginator(1, 1)
+	result, errs, err := store.List(ctx, exec.ListDAGsOptions{
+		Paginator: &firstPage,
+		WorkspaceFilter: &exec.WorkspaceFilter{
+			Enabled:           true,
+			Workspaces:        []string{"ops"},
+			IncludeUnlabelled: true,
+		},
+	})
+	require.NoError(t, err)
+	require.Empty(t, errs)
+	require.Equal(t, 2, result.TotalCount)
+	require.True(t, result.HasNextPage)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "aaa-global", result.Items[0].Name)
+
+	secondPage := exec.NewPaginator(2, 1)
+	result, errs, err = store.List(ctx, exec.ListDAGsOptions{
+		Paginator: &secondPage,
+		WorkspaceFilter: &exec.WorkspaceFilter{
+			Enabled:           true,
+			Workspaces:        []string{"ops"},
+			IncludeUnlabelled: true,
+		},
+	})
+	require.NoError(t, err)
+	require.Empty(t, errs)
+	require.Equal(t, 2, result.TotalCount)
+	require.False(t, result.HasNextPage)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "bbb-ops", result.Items[0].Name)
+
+	workspaceOnly := exec.NewPaginator(1, 10)
+	result, errs, err = store.List(ctx, exec.ListDAGsOptions{
+		Paginator: &workspaceOnly,
+		WorkspaceFilter: &exec.WorkspaceFilter{
+			Enabled:    true,
+			Workspaces: []string{"ops"},
+		},
+	})
+	require.NoError(t, err)
+	require.Empty(t, errs)
+	require.Equal(t, 1, result.TotalCount)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "bbb-ops", result.Items[0].Name)
+}
+
+func TestSearchCursorFiltersByWorkspace(t *testing.T) {
+	tmpDir := fileutil.MustTempDir("test-search-cursor-workspace")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	store := New(tmpDir, WithSkipExamples(true))
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "global-dag", []byte(`name: global-dag
+steps:
+  - name: step1
+    command: echo needle
+`)))
+	require.NoError(t, store.Create(ctx, "ops-dag", []byte(`name: ops-dag
+labels:
+  - workspace=ops
+steps:
+  - name: step1
+    command: echo needle
+`)))
+	require.NoError(t, store.Create(ctx, "prod-dag", []byte(`name: prod-dag
+labels:
+  - workspace=prod
+steps:
+  - name: step1
+    command: echo needle
+`)))
+
+	result, errs, err := store.SearchCursor(ctx, exec.SearchDAGsOptions{
+		Query:      "needle",
+		Limit:      10,
+		MatchLimit: 1,
+		WorkspaceFilter: &exec.WorkspaceFilter{
+			Enabled:           true,
+			Workspaces:        []string{"ops"},
+			IncludeUnlabelled: true,
+		},
+	})
+	require.NoError(t, err)
+	require.Empty(t, errs)
+	require.Len(t, result.Items, 2)
+	assert.Equal(t, []string{"global-dag", "ops-dag"}, []string{
+		result.Items[0].FileName,
+		result.Items[1].FileName,
+	})
+
+	result, errs, err = store.SearchCursor(ctx, exec.SearchDAGsOptions{
+		Query:      "needle",
+		Limit:      10,
+		MatchLimit: 1,
+		WorkspaceFilter: &exec.WorkspaceFilter{
+			Enabled:    true,
+			Workspaces: []string{"ops"},
+		},
+	})
+	require.NoError(t, err)
+	require.Empty(t, errs)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "ops-dag", result.Items[0].FileName)
+}
+
 func TestSearchMatchesFiltersByLabels(t *testing.T) {
 	tmpDir := fileutil.MustTempDir("test-search-matches-labels")
 	defer func() {

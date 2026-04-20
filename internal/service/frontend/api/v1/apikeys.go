@@ -58,6 +58,10 @@ func (a *API) CreateAPIKey(ctx context.Context, request api.CreateAPIKeyRequestO
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
+	workspaceAccess, err := a.parseAndValidateWorkspaceAccess(ctx, role, request.Body.WorkspaceAccess)
+	if err != nil {
+		return nil, err
+	}
 
 	// Get current user for createdBy
 	currentUser, ok := auth.UserFromContext(ctx)
@@ -70,9 +74,10 @@ func (a *API) CreateAPIKey(ctx context.Context, request api.CreateAPIKeyRequestO
 	}
 
 	result, err := a.authService.CreateAPIKey(ctx, authservice.CreateAPIKeyInput{
-		Name:        request.Body.Name,
-		Description: valueOf(request.Body.Description),
-		Role:        role,
+		Name:            request.Body.Name,
+		Description:     valueOf(request.Body.Description),
+		Role:            role,
+		WorkspaceAccess: workspaceAccess,
 	}, currentUser.ID)
 	if err != nil {
 		if errors.Is(err, auth.ErrAPIKeyAlreadyExists) {
@@ -88,6 +93,9 @@ func (a *API) CreateAPIKey(ctx context.Context, request api.CreateAPIKeyRequestO
 				Message:    "Invalid API key name",
 				HTTPStatus: http.StatusBadRequest,
 			}
+		}
+		if errors.Is(err, auth.ErrInvalidWorkspaceAccess) {
+			return nil, badWorkspaceAccessError(err.Error())
 		}
 		return nil, err
 	}
@@ -165,6 +173,30 @@ func (a *API) UpdateAPIKey(ctx context.Context, request api.UpdateAPIKeyRequestO
 		}
 		input.Role = &role
 	}
+	if request.Body.WorkspaceAccess != nil {
+		roleForAccess := auth.RoleViewer
+		if input.Role != nil {
+			roleForAccess = *input.Role
+		} else {
+			currentKey, err := a.authService.GetAPIKey(ctx, request.KeyId)
+			if err != nil {
+				if errors.Is(err, auth.ErrAPIKeyNotFound) {
+					return nil, &Error{
+						Code:       api.ErrorCodeNotFound,
+						Message:    "API key not found",
+						HTTPStatus: http.StatusNotFound,
+					}
+				}
+				return nil, err
+			}
+			roleForAccess = currentKey.Role
+		}
+		workspaceAccess, err := a.parseAndValidateWorkspaceAccess(ctx, roleForAccess, request.Body.WorkspaceAccess)
+		if err != nil {
+			return nil, err
+		}
+		input.WorkspaceAccess = workspaceAccess
+	}
 
 	key, err := a.authService.UpdateAPIKey(ctx, request.KeyId, input)
 	if err != nil {
@@ -189,6 +221,9 @@ func (a *API) UpdateAPIKey(ctx context.Context, request api.UpdateAPIKeyRequestO
 				HTTPStatus: http.StatusBadRequest,
 			}
 		}
+		if errors.Is(err, auth.ErrInvalidWorkspaceAccess) {
+			return nil, badWorkspaceAccessError(err.Error())
+		}
 		return nil, err
 	}
 
@@ -201,6 +236,9 @@ func (a *API) UpdateAPIKey(ctx context.Context, request api.UpdateAPIKeyRequestO
 	}
 	if input.Role != nil {
 		updateDetails["role"] = string(*input.Role)
+	}
+	if input.WorkspaceAccess != nil {
+		updateDetails["workspace_access"] = toAPIWorkspaceAccess(input.WorkspaceAccess)
 	}
 	a.logAudit(ctx, audit.CategoryAPIKey, "api_key_update", updateDetails)
 
@@ -257,15 +295,16 @@ func (a *API) requireAPIKeyManagement() error {
 // toAPIKey converts a core auth.APIKey into its API representation.
 func toAPIKey(key *auth.APIKey) api.APIKey {
 	return api.APIKey{
-		Id:          key.ID,
-		Name:        key.Name,
-		Description: ptrOf(key.Description),
-		Role:        api.UserRole(key.Role),
-		KeyPrefix:   key.KeyPrefix,
-		CreatedAt:   key.CreatedAt,
-		UpdatedAt:   key.UpdatedAt,
-		CreatedBy:   key.CreatedBy,
-		LastUsedAt:  key.LastUsedAt,
+		Id:              key.ID,
+		Name:            key.Name,
+		Description:     ptrOf(key.Description),
+		Role:            api.UserRole(key.Role),
+		WorkspaceAccess: toAPIWorkspaceAccess(key.WorkspaceAccess),
+		KeyPrefix:       key.KeyPrefix,
+		CreatedAt:       key.CreatedAt,
+		UpdatedAt:       key.UpdatedAt,
+		CreatedBy:       key.CreatedBy,
+		LastUsedAt:      key.LastUsedAt,
 	}
 }
 

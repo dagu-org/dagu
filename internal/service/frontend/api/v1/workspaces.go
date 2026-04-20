@@ -36,6 +36,9 @@ func (a *API) ListWorkspaces(ctx context.Context, _ api.ListWorkspacesRequestObj
 
 	response := make([]api.WorkspaceResponse, 0, len(wsList))
 	for _, ws := range wsList {
+		if !a.canAccessWorkspace(ctx, ws.Name) {
+			continue
+		}
 		response = append(response, toWorkspaceResponse(ws))
 	}
 

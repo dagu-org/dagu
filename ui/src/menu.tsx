@@ -12,12 +12,15 @@ import {
   useCanManageWebhooks,
   useCanViewAuditLogs,
   useCanWrite,
+  useAuth,
   useIsAdmin,
 } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useHasFeature } from '@/hooks/useLicense';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
+import { effectiveWorkspaceRole, roleAtLeast } from '@/lib/workspaceAccess';
+import { UserRole } from '@/api/v1/schema';
 import {
   Activity,
   BarChart2,
@@ -395,9 +398,18 @@ export const mainListItems = React.forwardRef<
 ) {
   const config = useConfig();
   const isAdmin = useIsAdmin();
+  const { user } = useAuth();
   const hasRbac = useHasFeature('rbac');
   const hasAudit = useHasFeature('audit');
-  const canWrite = useCanWrite();
+  const globalCanWrite = useCanWrite();
+  const appBarContext = React.useContext(AppBarContext);
+  const canWrite =
+    config.authMode !== 'builtin'
+      ? globalCanWrite
+      : roleAtLeast(
+          effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
+          UserRole.developer
+        );
   const canAccessSystemStatus = useCanAccessSystemStatus();
   const canManageWebhooks = useCanManageWebhooks();
   const canViewEventLogs = useCanViewEventLogs();

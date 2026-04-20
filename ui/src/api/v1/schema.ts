@@ -3947,6 +3947,19 @@ export interface components {
          * @enum {string}
          */
         UserRole: UserRole;
+        /** @description Role granted for a specific workspace */
+        WorkspaceGrant: {
+            /** @description Workspace name */
+            workspace: string;
+            role: components["schemas"]["UserRole"];
+        };
+        /** @description Workspace access policy. all=true grants the top-level role in every workspace. all=false requires explicit workspace grants and a top-level viewer role. */
+        WorkspaceAccess: {
+            /** @description Whether this identity can access all workspaces */
+            all: boolean;
+            /** @description Workspace-specific grants used when all=false */
+            grants: components["schemas"]["WorkspaceGrant"][];
+        };
         /** @description Request body for initial admin account setup */
         SetupRequest: {
             /** @description Admin username */
@@ -3991,12 +4004,14 @@ export interface components {
             /** @description User's password */
             password: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
         };
         /** @description Request body for updating a user */
         UpdateUserRequest: {
             /** @description New username (must be unique) */
             username?: string;
             role?: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
             /** @description Whether to disable the user account */
             isDisabled?: boolean;
         };
@@ -4007,6 +4022,7 @@ export interface components {
             /** @description User's username */
             username: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess: components["schemas"]["WorkspaceAccess"];
             /**
              * @description Authentication provider (builtin or oidc)
              * @enum {string}
@@ -4042,6 +4058,7 @@ export interface components {
             /** @description Purpose description */
             description?: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess: components["schemas"]["WorkspaceAccess"];
             /** @description First 8 characters for identification */
             keyPrefix: string;
             /**
@@ -4077,6 +4094,7 @@ export interface components {
             /** @description Purpose description */
             description?: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
         };
         /** @description Create API key response */
         CreateAPIKeyResponse: {
@@ -4091,6 +4109,7 @@ export interface components {
             /** @description New description */
             description?: string;
             role?: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
         };
         /** @description Generic success response */
         SuccessResponse: {

@@ -20,6 +20,9 @@ type User struct {
 	PasswordHash string `json:"-"`
 	// Role determines the user's permissions.
 	Role Role `json:"role"`
+	// WorkspaceAccess restricts access to selected workspaces.
+	// Nil is treated as all-workspaces for backward compatibility.
+	WorkspaceAccess *WorkspaceAccess `json:"workspace_access,omitempty"`
 	// CreatedAt is the timestamp when the user was created.
 	CreatedAt time.Time `json:"created_at"`
 	// UpdatedAt is the timestamp when the user was last modified.
@@ -42,59 +45,63 @@ type User struct {
 func NewUser(username string, passwordHash string, role Role) *User {
 	now := time.Now().UTC()
 	return &User{
-		ID:           uuid.New().String(),
-		Username:     username,
-		PasswordHash: passwordHash,
-		Role:         role,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:              uuid.New().String(),
+		Username:        username,
+		PasswordHash:    passwordHash,
+		Role:            role,
+		WorkspaceAccess: AllWorkspaceAccess(),
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 }
 
 // UserForStorage is used for JSON serialization to persistent storage.
 // It includes the password hash which is excluded from the regular User JSON.
 type UserForStorage struct {
-	ID           string    `json:"id"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"password_hash"`
-	Role         Role      `json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	AuthProvider string    `json:"auth_provider,omitempty"`
-	OIDCIssuer   string    `json:"oidc_issuer,omitempty"`
-	OIDCSubject  string    `json:"oidc_subject,omitempty"`
-	IsDisabled   bool      `json:"is_disabled,omitempty"`
+	ID              string           `json:"id"`
+	Username        string           `json:"username"`
+	PasswordHash    string           `json:"password_hash"`
+	Role            Role             `json:"role"`
+	WorkspaceAccess *WorkspaceAccess `json:"workspace_access,omitempty"`
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
+	AuthProvider    string           `json:"auth_provider,omitempty"`
+	OIDCIssuer      string           `json:"oidc_issuer,omitempty"`
+	OIDCSubject     string           `json:"oidc_subject,omitempty"`
+	IsDisabled      bool             `json:"is_disabled,omitempty"`
 }
 
 // ToStorage converts a User to UserForStorage for persistence.
 func (u *User) ToStorage() *UserForStorage {
 	return &UserForStorage{
-		ID:           u.ID,
-		Username:     u.Username,
-		PasswordHash: u.PasswordHash,
-		Role:         u.Role,
-		CreatedAt:    u.CreatedAt,
-		UpdatedAt:    u.UpdatedAt,
-		AuthProvider: u.AuthProvider,
-		OIDCIssuer:   u.OIDCIssuer,
-		OIDCSubject:  u.OIDCSubject,
-		IsDisabled:   u.IsDisabled,
+		ID:              u.ID,
+		Username:        u.Username,
+		PasswordHash:    u.PasswordHash,
+		Role:            u.Role,
+		WorkspaceAccess: CloneWorkspaceAccess(u.WorkspaceAccess),
+		CreatedAt:       u.CreatedAt,
+		UpdatedAt:       u.UpdatedAt,
+		AuthProvider:    u.AuthProvider,
+		OIDCIssuer:      u.OIDCIssuer,
+		OIDCSubject:     u.OIDCSubject,
+		IsDisabled:      u.IsDisabled,
 	}
 }
 
 // ToUser converts UserForStorage back to User.
 func (s *UserForStorage) ToUser() *User {
 	return &User{
-		ID:           s.ID,
-		Username:     s.Username,
-		PasswordHash: s.PasswordHash,
-		Role:         s.Role,
-		CreatedAt:    s.CreatedAt,
-		UpdatedAt:    s.UpdatedAt,
-		AuthProvider: s.AuthProvider,
-		OIDCIssuer:   s.OIDCIssuer,
-		OIDCSubject:  s.OIDCSubject,
-		IsDisabled:   s.IsDisabled,
+		ID:              s.ID,
+		Username:        s.Username,
+		PasswordHash:    s.PasswordHash,
+		Role:            s.Role,
+		WorkspaceAccess: CloneWorkspaceAccess(s.WorkspaceAccess),
+		CreatedAt:       s.CreatedAt,
+		UpdatedAt:       s.UpdatedAt,
+		AuthProvider:    s.AuthProvider,
+		OIDCIssuer:      s.OIDCIssuer,
+		OIDCSubject:     s.OIDCSubject,
+		IsDisabled:      s.IsDisabled,
 	}
 }
 
