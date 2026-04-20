@@ -892,7 +892,7 @@
             { "type": "integer" },
             { "type": "string" }
           ],
-          "description": "Maximum number of retry attempts"
+          "description": "Maximum number of scheduler-issued DAG retry attempts. Use 0 to disable DAG-level automatic retries."
         },
         "interval_sec": {
           "oneOf": [
