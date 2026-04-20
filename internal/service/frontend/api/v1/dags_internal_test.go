@@ -186,7 +186,7 @@ steps:
   - id: consume
     depends: [produce]
     type: repeat
-    config:
+    with:
       message: runtime value
       count: ${COUNT}
 `

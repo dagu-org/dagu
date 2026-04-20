@@ -8366,7 +8366,7 @@ components:
         inputSchema:
           type: object
           additionalProperties: true
-          description: "Resolved JSON Schema object used to validate and document config input"
+          description: "Resolved JSON Schema object used to validate and document with input"
       required:
         - name
         - targetType

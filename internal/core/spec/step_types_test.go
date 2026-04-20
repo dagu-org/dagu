@@ -43,7 +43,7 @@ step_types:
           - {$input: repeat}
 steps:
   - type: greet
-    config:
+    with:
       message: hello
 `))
 	require.NoError(t, err)
@@ -57,6 +57,64 @@ steps:
 	assert.Equal(t, []string{"hello", "3"}, step.Commands[0].Args)
 	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
 	assert.Equal(t, "Send a greeting", step.Description)
+}
+
+func TestCustomStepTypes_LegacyConfigAlias(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-legacy-config
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+steps:
+  - type: greet
+    config:
+      message: hello
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+	require.Len(t, dag.Steps[0].Commands, 1)
+	assert.Equal(t, []string{"hello"}, dag.Steps[0].Commands[0].Args)
+}
+
+func TestCustomStepTypes_RejectWithAndLegacyConfig(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-mixed-config
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ .input.message }}
+steps:
+  - type: greet
+    with:
+      message: hello
+    config:
+      message: goodbye
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `fields "with" and "config" cannot be used together`)
 }
 
 func TestCustomStepTypes_RuntimeVariableInputsDeferSchemaValidation(t *testing.T) {
@@ -91,7 +149,7 @@ step_types:
           - {$input: mode}
 steps:
   - type: run_with_inputs
-    config:
+    with:
       message: hello-${SUFFIX}
       count: ${COUNT}
       enabled: ${ENABLED}
@@ -127,7 +185,7 @@ step_types:
           - {$input: count}
 steps:
   - type: repeat
-    config:
+    with:
       count: count-${COUNT}
 `), WithoutEval())
 	require.Error(t, err)
@@ -155,7 +213,7 @@ step_types:
       command: echo {{ json .input.message }}
 steps:
   - type: greet
-    config:
+    with:
       message: hello-from-container
 `))
 	require.NoError(t, err)
@@ -187,7 +245,7 @@ step_types:
       command: echo {{ json .input.message }}
 steps:
   - type: greet
-    config:
+    with:
       message: hello-inline
 `))
 	require.NoError(t, err)
@@ -225,7 +283,7 @@ step_types:
 name: custom-step-base
 steps:
   - type: greet
-    config:
+    with:
       message: hello-from-base
 `), WithBaseConfigContent(baseYAML))
 	require.NoError(t, err)
@@ -263,7 +321,7 @@ step_types:
 name: custom-step-base-normalized
 steps:
   - type: greet
-    config:
+    with:
       message: hello-from-normalized-base
 `), WithBaseConfigContent(baseYAML))
 	require.NoError(t, err)
@@ -404,7 +462,7 @@ step_types:
 steps:
   - type: greet
     command: echo should-fail
-    config:
+    with:
       message: hello
 `))
 	require.Error(t, err)
@@ -434,7 +492,7 @@ step_types:
 handler_on:
   success:
     type: greet
-    config:
+    with:
       message: handler-ok
 steps:
   - command: echo run
@@ -473,7 +531,7 @@ step_types:
 handler_on:
   success:
     type: greet
-    config:
+    with:
       message: handler-ok
     timeout_sec: 0
     mail_on_error: false
@@ -693,7 +751,7 @@ step_types:
 handler_on:
   success:
     type: greet
-    config:
+    with:
       message: handler-ok
 steps:
   - command: echo run
@@ -882,7 +940,7 @@ func TestValidateCustomStepInput_DefersRuntimeExpressionLeaves(t *testing.T) {
 			t.Parallel()
 
 			schema := mustResolveCustomStepInputSchema(t, tt.schema)
-			_, err := validateCustomStepInput("test", schema, tt.input)
+			_, err := validateCustomStepInput("test", schema, "with", tt.input)
 			tt.assertErr(t, err)
 		})
 	}

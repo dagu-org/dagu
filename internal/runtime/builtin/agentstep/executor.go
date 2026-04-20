@@ -284,7 +284,7 @@ func (e *Executor) Run(ctx context.Context) error {
 }
 
 // buildTools creates the tool list for the agent step.
-// Tools are filtered first by global policy, then by step-level config.
+// Tools are filtered first by global policy, then by step-level agent config.
 func buildTools(ctx context.Context, dagCtx exec.Context, stepCfg *core.AgentStepConfig, globalPolicy agent.ToolPolicyConfig, stdout io.Writer) []*agent.AgentTool {
 	dagsDir := ""
 	if dagCtx.DAG != nil {
@@ -423,7 +423,7 @@ func mergeStepBashPolicy(global agent.ToolPolicyConfig, stepCfg *core.AgentStepC
 }
 
 // resolveWebSearch resolves the web search config for the agent step.
-// Step-level config overrides global agent config.
+// Step-level agent config overrides global agent config.
 func resolveWebSearch(stepCfg *core.AgentStepConfig, agentCfg *agent.Config) *llm.WebSearchRequest {
 	// Step-level override takes precedence.
 	if stepCfg != nil && stepCfg.WebSearch != nil {

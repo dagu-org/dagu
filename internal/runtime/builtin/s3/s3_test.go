@@ -106,7 +106,7 @@ func TestNewExecutor_DAGLevelConfigMerging(t *testing.T) {
 		assert.Equal(t, "dag-secret", impl.cfg.SecretAccessKey)
 		assert.True(t, impl.cfg.ForcePathStyle)
 
-		// Verify step-level config was also applied
+		// Verify step-level executor config was also applied.
 		assert.Equal(t, "/tmp/test.txt", impl.cfg.Source)
 		assert.Equal(t, "uploads/test.txt", impl.cfg.Key)
 	})
