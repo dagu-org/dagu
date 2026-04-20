@@ -107,6 +107,9 @@ type ExecFileSyncError = Error & {
 };
 
 const TOKEN_KEY = 'dagu_auth_token';
+const WORKSPACE_SCOPE_STORAGE_KEY = 'dagu-selected-workspace-scope';
+const LEGACY_WORKSPACE_STORAGE_KEY = 'dagu-selected-workspace';
+const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
 const repoRoot = path.resolve(__dirname, '../../..');
 const stackScriptPath = path.resolve(repoRoot, 'scripts/e2e/start-stack.sh');
 const stackFilePath =
@@ -166,6 +169,21 @@ export async function clearSession(page: Page): Promise<void> {
     localStorage.removeItem(tokenKey);
   }, TOKEN_KEY);
   await page.reload();
+}
+
+export async function useNoWorkspaceScope(page: Page): Promise<void> {
+  await page.evaluate(
+    ([scopeKey, legacyKey, cockpitLegacyKey]) => {
+      localStorage.setItem(scopeKey, JSON.stringify({ scope: 'none' }));
+      localStorage.removeItem(legacyKey);
+      localStorage.removeItem(cockpitLegacyKey);
+    },
+    [
+      WORKSPACE_SCOPE_STORAGE_KEY,
+      LEGACY_WORKSPACE_STORAGE_KEY,
+      LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
+    ]
+  );
 }
 
 export async function loginViaAPI(

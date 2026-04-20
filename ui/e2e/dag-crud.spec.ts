@@ -7,6 +7,7 @@ import {
   loginViaAPI,
   loginViaUI,
   uniqueName,
+  useNoWorkspaceScope,
   waitForDAGAvailable,
   writeLocalDAG,
 } from './helpers/e2e';
@@ -27,6 +28,7 @@ test.describe('DAG CRUD operations', () => {
   test('creates a new DAG from the UI', async ({ page }) => {
     const dagName = uniqueName('e2e-create');
 
+    await useNoWorkspaceScope(page);
     await page.goto('/dags/');
     await page.getByRole('button', { name: 'Create new DAG' }).click();
 
@@ -205,6 +207,7 @@ steps:
   });
 
   test('rejects DAG creation with invalid name', async ({ page }) => {
+    await useNoWorkspaceScope(page);
     await page.goto('/dags/');
     await page.getByRole('button', { name: 'Create new DAG' }).click();
 

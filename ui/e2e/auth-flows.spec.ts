@@ -9,6 +9,7 @@ import {
   loginViaAPI,
   loginViaUI,
   uniqueName,
+  useNoWorkspaceScope,
   waitForDAGAvailable,
   writeLocalDAG,
 } from './helpers/e2e';
@@ -79,6 +80,7 @@ test.describe('auth flows', () => {
 
     // Manager can create DAG via UI
     const dagName = uniqueName('e2e-mgr-dag');
+    await useNoWorkspaceScope(page);
     await page.goto('/dags/');
     await page.getByRole('button', { name: 'Create new DAG' }).click();
 
@@ -127,6 +129,7 @@ steps:
     await loginViaUI(page, operatorUser, operatorPass);
 
     // Operator should not see Create button
+    await useNoWorkspaceScope(page);
     await page.goto('/dags/');
     await expect(page.getByRole('button', { name: 'Create new DAG' })).toBeHidden();
 
