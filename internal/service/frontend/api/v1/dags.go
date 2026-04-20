@@ -1104,7 +1104,7 @@ func (a *API) waitForDAGCompletion(
 			return lastStatus, waitCtx.Err()
 
 		case <-ticker.C:
-			status, err := a.dagRunMgr.GetCurrentStatus(waitCtx, dag, dagRunId)
+			status, err := a.readDAGRunStatusForSync(waitCtx, dag, dagRunId)
 			if err != nil {
 				// Log error but continue polling - DAG might still be initializing
 				logger.Debug(waitCtx, "Error getting DAG status during wait", tag.Error(err))
@@ -1132,6 +1132,18 @@ func (a *API) waitForDAGCompletion(
 			}
 		}
 	}
+}
+
+func (a *API) readDAGRunStatusForSync(ctx context.Context, dag *core.DAG, dagRunID string) (*exec.DAGRunStatus, error) {
+	attempt, err := a.dagRunStore.FindAttempt(ctx, exec.NewDAGRunRef(dag.Name, dagRunID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dag-run attempt: %w", err)
+	}
+	status, err := attempt.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read dag-run status: %w", err)
+	}
+	return status, nil
 }
 
 func (a *API) startDAGRun(ctx context.Context, dag *core.DAG, params, dagRunID, nameOverride, labels string) error {
