@@ -83,13 +83,15 @@ export function KanbanCard({
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      <div className="relative rounded-md border border-border bg-card transition-colors hover:bg-accent/50">
+      <div
+        className={`relative rounded-md border border-border bg-card transition-colors hover:bg-accent/50 focus-within:ring-2 focus-within:ring-ring ${showArtifacts ? 'min-h-20' : ''}`}
+      >
         <div
           role="button"
           tabIndex={0}
           onClick={onClick}
           onKeyDown={handleKeyDown}
-          className={`w-full cursor-pointer rounded-md p-2 text-left focus:outline-none focus:ring-2 focus:ring-ring ${showArtifacts ? 'pr-10' : ''}`}
+          className="w-full cursor-pointer rounded-md p-2 text-left focus:outline-none"
         >
           <div className="mb-1 flex items-start justify-between gap-2">
             <span className="min-w-0 flex-1 truncate text-xs font-medium leading-tight">
@@ -111,23 +113,31 @@ export function KanbanCard({
             (run.status === Status.Running ? (
               <Ticker intervalMs={1000}>
                 {() => (
-                  <div className="text-[11px] text-muted-foreground">
+                  <div
+                    className={`text-[11px] text-muted-foreground ${showArtifacts ? 'pr-10' : ''}`}
+                  >
                     {formatElapsed(run)}
                   </div>
                 )}
               </Ticker>
             ) : (
-              <div className="text-[11px] text-muted-foreground">
+              <div
+                className={`text-[11px] text-muted-foreground ${showArtifacts ? 'pr-10' : ''}`}
+              >
                 {formatElapsed(run)}
               </div>
             ))}
           {scheduleTime && (
-            <div className="text-[11px] text-muted-foreground">
+            <div
+              className={`text-[11px] text-muted-foreground ${showArtifacts ? 'pr-10' : ''}`}
+            >
               Scheduled {scheduleTime}
             </div>
           )}
           {params && (
-            <div className="text-[11px] text-muted-foreground mt-0.5 truncate font-mono">
+            <div
+              className={`mt-0.5 truncate font-mono text-[11px] text-muted-foreground ${showArtifacts ? 'pr-10' : ''}`}
+            >
               {params}
             </div>
           )}
@@ -138,10 +148,10 @@ export function KanbanCard({
               <button
                 type="button"
                 aria-label={`View artifacts for ${run.name}`}
-                className="absolute right-2 top-2 inline-flex size-6 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary transition-colors hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="absolute bottom-2 right-2 inline-flex size-7 items-center justify-center rounded-md border border-border bg-background/80 text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                 onClick={() => onArtifactsClick?.()}
               >
-                <Archive className="h-3.5 w-3.5" />
+                <Archive className="h-4 w-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent>View artifacts</TooltipContent>

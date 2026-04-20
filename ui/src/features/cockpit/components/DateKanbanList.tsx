@@ -19,6 +19,7 @@ export function DateKanbanList({
   const { loadedDates, todayStr, hasMore, loadNextDate } =
     useInfiniteKanban(selectedWorkspace);
   const [selectedRun, setSelectedRun] = useState<DAGRunSummary | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [artifactRun, setArtifactRun] = useState<DAGRunSummary | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -26,10 +27,11 @@ export function DateKanbanList({
 
   const handleCardClick = useCallback((run: DAGRunSummary) => {
     setSelectedRun(run);
+    setIsDetailsOpen(true);
   }, []);
 
   const handleCloseModal = useCallback(() => {
-    setSelectedRun(null);
+    setIsDetailsOpen(false);
   }, []);
 
   const handleArtifactsClick = useCallback((run: DAGRunSummary) => {
@@ -112,14 +114,13 @@ export function DateKanbanList({
           </div>
         )}
       </div>
-      {selectedRun && (
-        <DAGRunDetailsModal
-          name={selectedRun.name}
-          dagRunId={selectedRun.dagRunId}
-          isOpen={!!selectedRun}
-          onClose={handleCloseModal}
-        />
-      )}
+      <DAGRunDetailsModal
+        name={selectedRun?.name ?? ''}
+        dagRunId={selectedRun?.dagRunId ?? ''}
+        isOpen={isDetailsOpen && !!selectedRun}
+        initialTab={selectedRun?.artifactsAvailable ? 'artifacts' : 'status'}
+        onClose={handleCloseModal}
+      />
       <ArtifactListModal
         run={artifactRun}
         isOpen={!!artifactRun}
