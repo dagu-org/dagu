@@ -16,7 +16,6 @@ import {
 } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useHasFeature } from '@/hooks/useLicense';
-import { AutomataSwarmIcon } from '@/components/icons/AutomataSwarmIcon';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
 import {
@@ -88,10 +87,6 @@ function getActiveIconStyle(customColor: boolean): string {
   return customColor ? 'text-foreground' : 'text-sidebar-primary';
 }
 
-function getIconWrapperStyle(customColor: boolean): string {
-  return customColor ? 'text-sidebar-foreground' : 'text-sidebar-foreground';
-}
-
 type RemoteNodeSelectContentProps = {
   nodes: string[];
 };
@@ -146,7 +141,6 @@ type SidebarButtonProps = {
   icon: React.ReactNode;
   label: string;
   isOpen: boolean;
-  customColor: boolean;
 };
 
 // GCP-Style Sidebar Button - Clean & Minimal
@@ -155,7 +149,6 @@ function SidebarButton({
   icon,
   label,
   isOpen,
-  customColor,
 }: SidebarButtonProps): React.ReactElement {
   return (
     <button
@@ -621,16 +614,6 @@ export const mainListItems = React.forwardRef<
                 customColor={customColor}
               />
             )}
-            {config.agentEnabled && config.automataEnabled && (
-              <NavItem
-                to="/automata"
-                text="Automata"
-                icon={<AutomataSwarmIcon size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
-            )}
             <NavItem
               to="/dag-runs"
               text="Runs"
@@ -830,7 +813,6 @@ export const mainListItems = React.forwardRef<
               icon={<Terminal size={18} />}
               label="Agent"
               isOpen={isOpen}
-              customColor={customColor}
             />
           )}
           <SidebarButton
@@ -838,7 +820,6 @@ export const mainListItems = React.forwardRef<
             icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
             isOpen={isOpen}
-            customColor={customColor}
           />
           <UserMenu isCollapsed={!isOpen} />
         </div>

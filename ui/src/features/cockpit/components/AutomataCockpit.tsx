@@ -1,20 +1,19 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Bot, PauseCircle, PlayCircle, Waypoints } from 'lucide-react';
-import {
-  AutomataDisplayStatus,
-  components,
-  Status,
-} from '@/api/v1/schema';
+import { Bot, PauseCircle, PlayCircle, Plus, Waypoints } from 'lucide-react';
+import { AutomataDisplayStatus, components, Status } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
-import { workspaceLabel } from '@/lib/workspace';
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import Title from '@/ui/Title';
 import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
+import { AutomataCreateModal } from '@/features/automata/components/AutomataCreateModal';
+import {
+  filterAutomataBySelectedWorkspace,
+  workspaceTagForAutomataSelection,
+} from '@/features/automata/workspace';
 import { AutomataDetailsModal } from './AutomataDetailsModal';
 
 type AutomataSummary = components['schemas']['AutomataSummary'];
@@ -22,12 +21,7 @@ type DAGRunSummary = components['schemas']['DAGRunSummary'];
 
 type LifecycleState = 'running' | 'paused' | 'idle' | 'finished';
 
-const STATE_ORDER: LifecycleState[] = [
-  'idle',
-  'running',
-  'paused',
-  'finished',
-];
+const STATE_ORDER: LifecycleState[] = ['idle', 'running', 'paused', 'finished'];
 
 const STATE_META: Record<
   LifecycleState,
@@ -125,12 +119,6 @@ function formatTimestamp(value?: string): string {
   return parsed.fromNow();
 }
 
-function workspaceSelectionToTag(
-  selectedWorkspace: string
-): string | undefined {
-  return workspaceLabel(selectedWorkspace);
-}
-
 type WorkspaceActivity = {
   count: number;
   latestRun?: DAGRunSummary;
@@ -193,14 +181,23 @@ function automataDisplayName(item: {
 
 export function AutomataCockpit({
   selectedWorkspace,
+  initialAutomataName,
+  onAutomataSelectionChange,
 }: {
   selectedWorkspace: string;
+  initialAutomataName?: string;
+  onAutomataSelectionChange?: (name: string | null) => void;
 }): React.ReactElement {
   const appBar = React.useContext(AppBarContext);
   const remoteNode = appBar.selectedRemoteNode || 'local';
+  const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [selectedAutomataName, setSelectedAutomataName] = React.useState<
     string | null
-  >(null);
+  >(initialAutomataName || null);
+
+  React.useEffect(() => {
+    setSelectedAutomataName(initialAutomataName || null);
+  }, [initialAutomataName]);
 
   const {
     data: automataData,
@@ -217,7 +214,7 @@ export function AutomataCockpit({
   );
 
   const workspaceTag = selectedWorkspace
-    ? workspaceSelectionToTag(selectedWorkspace)
+    ? workspaceTagForAutomataSelection(selectedWorkspace)
     : undefined;
   const {
     data: workspaceRunsData,
@@ -244,22 +241,31 @@ export function AutomataCockpit({
 
   const automata = React.useMemo(
     () =>
-      (automataData?.automata || []).filter((item) => {
-        if (selectedWorkspace && !workspaceTag) {
-          return false;
-        }
-        if (!workspaceTag) {
-          return true;
-        }
-        const normalizedWorkspaceTag = workspaceTag.toLowerCase();
-        return (
-          item.tags?.some(
-            (tag) => tag.toLowerCase() === normalizedWorkspaceTag
-          ) ?? false
-        );
-      }),
+      selectedWorkspace && !workspaceTag
+        ? []
+        : filterAutomataBySelectedWorkspace(
+            automataData?.automata || [],
+            selectedWorkspace
+          ),
     [automataData?.automata, selectedWorkspace, workspaceTag]
   );
+
+  const selectAutomata = React.useCallback(
+    (name: string | null) => {
+      setSelectedAutomataName(name);
+      onAutomataSelectionChange?.(name);
+    },
+    [onAutomataSelectionChange]
+  );
+
+  React.useEffect(() => {
+    if (!automataData || !selectedAutomataName) {
+      return;
+    }
+    if (!automata.some((item) => item.name === selectedAutomataName)) {
+      selectAutomata(null);
+    }
+  }, [automata, automataData, selectAutomata, selectedAutomataName]);
 
   const workspaceActivity = React.useMemo(
     () => buildWorkspaceActivity(workspaceRunsData?.dagRuns),
@@ -340,8 +346,13 @@ export function AutomataCockpit({
               : 'Idle, running, paused, and finished Automata across the workspace environment.'}
           </p>
         </div>
-        <Button asChild size="sm" variant="outline">
-          <Link to="/automata">Open Automata</Link>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowCreateDialog(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Create Automata
         </Button>
       </div>
 
@@ -373,9 +384,21 @@ export function AutomataCockpit({
         </div>
       ) : automata.length === 0 ? (
         <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
-          {selectedWorkspace
-            ? 'No Automata are tagged for the selected workspace.'
-            : 'No Automata defined yet.'}
+          <div>
+            {selectedWorkspace
+              ? 'No Automata are tagged for the selected workspace.'
+              : 'No Automata defined yet.'}
+          </div>
+          <div className="mt-4">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowCreateDialog(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Create Automata
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid min-h-0 gap-4 xl:grid-cols-5 md:grid-cols-2">
@@ -414,7 +437,7 @@ export function AutomataCockpit({
                         <button
                           type="button"
                           key={item.name}
-                          onClick={() => setSelectedAutomataName(item.name)}
+                          onClick={() => selectAutomata(item.name)}
                           className="block w-full rounded-md border p-3 text-left transition hover:bg-muted/40"
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -442,7 +465,9 @@ export function AutomataCockpit({
                             <span
                               className={cn(
                                 'rounded-full px-2 py-1 text-[11px] font-medium',
-                                getLifecycleClass(item.displayStatus || item.state)
+                                getLifecycleClass(
+                                  item.displayStatus || item.state
+                                )
                               )}
                             >
                               {item.displayStatus || item.state}
@@ -557,15 +582,30 @@ export function AutomataCockpit({
         <AutomataDetailsModal
           name={selectedAutomataName}
           isOpen={!!selectedAutomataName}
-          onClose={() => setSelectedAutomataName(null)}
+          onClose={() => selectAutomata(null)}
           onUpdated={async () => {
             await retryAutomata();
             if (selectedWorkspace) {
               await retryWorkspaceRuns();
             }
           }}
+          onSelectedNameChange={(nextName) => selectAutomata(nextName)}
+          onDeleted={() => selectAutomata(null)}
         />
       ) : null}
+      <AutomataCreateModal
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        selectedWorkspace={selectedWorkspace}
+        remoteNode={remoteNode}
+        onCreated={async (name) => {
+          await retryAutomata();
+          if (selectedWorkspace) {
+            await retryWorkspaceRuns();
+          }
+          selectAutomata(name);
+        }}
+      />
     </div>
   );
 }

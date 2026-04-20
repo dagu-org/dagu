@@ -53,10 +53,14 @@ export function useAutomataDetailController({
   name,
   enabled = true,
   onUpdated,
+  onSelectedNameChange,
+  onDeleted,
 }: {
   name?: string;
   enabled?: boolean;
   onUpdated?: () => void | Promise<void>;
+  onSelectedNameChange?: (name: string) => void | Promise<void>;
+  onDeleted?: () => void | Promise<void>;
 }) {
   const client = useClient();
   const navigate = useNavigate();
@@ -208,9 +212,7 @@ export function useAutomataDetailController({
     [scheduleDraft]
   );
   const canStartTask = serviceKind
-    ? runtimeControllerReady &&
-      lifecycleState === 'idle' &&
-      !serviceActivated
+    ? runtimeControllerReady && lifecycleState === 'idle' && !serviceActivated
     : runtimeControllerReady &&
       (lifecycleState === 'idle' || lifecycleState === 'finished');
   const canSendOperatorMessage =
@@ -250,14 +252,13 @@ export function useAutomataDetailController({
     standingInstructionChanged ||
     scheduleChanged ||
     modelChanged;
-  const metadataValidationError =
-    !isValidAutomataIconUrl(iconUrlDraft)
-      ? 'Icon URL must be an absolute http(s) URL or a root-relative path.'
-      : iconUrlDraft.trim().length > 2048
-        ? 'Icon URL must be 2048 characters or fewer.'
-        : serviceKind
-          ? validateAutomataScheduleExpressions(scheduleExpressions)
-          : null;
+  const metadataValidationError = !isValidAutomataIconUrl(iconUrlDraft)
+    ? 'Icon URL must be an absolute http(s) URL or a root-relative path.'
+    : iconUrlDraft.trim().length > 2048
+      ? 'Icon URL must be 2048 characters or fewer.'
+      : serviceKind
+        ? validateAutomataScheduleExpressions(scheduleExpressions)
+        : null;
   const metadataSaveDisabled =
     !name ||
     !detail ||
@@ -288,9 +289,7 @@ export function useAutomataDetailController({
     try {
       const { error: apiError } = await client.POST('/automata/{name}/start', {
         params: { path: { name } },
-        body: serviceKind
-          ? {}
-          : { instruction: instructionDraft || undefined },
+        body: serviceKind ? {} : { instruction: instructionDraft || undefined },
       });
       if (apiError) {
         throw new Error(apiError.message || 'Failed to start automata');
@@ -539,7 +538,11 @@ export function useAutomataDetailController({
         throw new Error(apiError.message || 'Failed to rename automata');
       }
       await refreshAfterAction(() =>
-        navigate(`/automata/${encodeURIComponent(trimmed)}`)
+        onSelectedNameChange
+          ? onSelectedNameChange(trimmed)
+          : navigate(
+              `/cockpit?mode=automata&automata=${encodeURIComponent(trimmed)}`
+            )
       );
     } catch (err) {
       setActionError(
@@ -548,7 +551,15 @@ export function useAutomataDetailController({
     } finally {
       setBusyAction(null);
     }
-  }, [busyAction, client, detail, name, navigate, refreshAfterAction]);
+  }, [
+    busyAction,
+    client,
+    detail,
+    name,
+    navigate,
+    onSelectedNameChange,
+    refreshAfterAction,
+  ]);
 
   const onDuplicate = React.useCallback(async () => {
     if (!name || !detail || busyAction) return;
@@ -573,7 +584,11 @@ export function useAutomataDetailController({
         throw new Error(apiError.message || 'Failed to duplicate automata');
       }
       await refreshAfterAction(() =>
-        navigate(`/automata/${encodeURIComponent(trimmed)}`)
+        onSelectedNameChange
+          ? onSelectedNameChange(trimmed)
+          : navigate(
+              `/cockpit?mode=automata&automata=${encodeURIComponent(trimmed)}`
+            )
       );
     } catch (err) {
       setActionError(
@@ -582,7 +597,15 @@ export function useAutomataDetailController({
     } finally {
       setBusyAction(null);
     }
-  }, [busyAction, client, detail, name, navigate, refreshAfterAction]);
+  }, [
+    busyAction,
+    client,
+    detail,
+    name,
+    navigate,
+    onSelectedNameChange,
+    refreshAfterAction,
+  ]);
 
   const onResetState = React.useCallback(async () => {
     if (!name || busyAction) return;
@@ -660,17 +683,24 @@ export function useAutomataDetailController({
       case 'reset':
         setBusyAction('reset');
         try {
-          const { error: apiError } = await client.POST('/automata/{name}/reset', {
-            params: { path: { name } },
-          });
+          const { error: apiError } = await client.POST(
+            '/automata/{name}/reset',
+            {
+              params: { path: { name } },
+            }
+          );
           if (apiError) {
-            throw new Error(apiError.message || 'Failed to reset automata state');
+            throw new Error(
+              apiError.message || 'Failed to reset automata state'
+            );
           }
           await refreshAfterAction();
           setConfirmation(null);
         } catch (err) {
           setActionError(
-            err instanceof Error ? err.message : 'Failed to reset automata state'
+            err instanceof Error
+              ? err.message
+              : 'Failed to reset automata state'
           );
         } finally {
           setBusyAction(null);
@@ -685,7 +715,9 @@ export function useAutomataDetailController({
           if (apiError) {
             throw new Error(apiError.message || 'Failed to delete automata');
           }
-          await refreshAfterAction(() => navigate('/automata'));
+          await refreshAfterAction(() =>
+            onDeleted ? onDeleted() : navigate('/cockpit?mode=automata')
+          );
           setConfirmation(null);
         } catch (err) {
           setActionError(
@@ -696,7 +728,15 @@ export function useAutomataDetailController({
         }
         return;
     }
-  }, [busyAction, client, confirmation, name, navigate, refreshAfterAction]);
+  }, [
+    busyAction,
+    client,
+    confirmation,
+    name,
+    navigate,
+    onDeleted,
+    refreshAfterAction,
+  ]);
 
   const onSaveSpec = React.useCallback(async () => {
     if (!name) return;
@@ -713,9 +753,7 @@ export function useAutomataDetailController({
       await refreshAfterAction();
       setIsEditingSpec(false);
     } catch (err) {
-      setSpecError(
-        err instanceof Error ? err.message : 'Failed to save spec'
-      );
+      setSpecError(err instanceof Error ? err.message : 'Failed to save spec');
     } finally {
       setIsSavingSpec(false);
     }

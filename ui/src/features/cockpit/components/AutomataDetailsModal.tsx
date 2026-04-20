@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Maximize2, X } from 'lucide-react';
+import { Copy, Pencil, RotateCcw, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { AutomataDetailSurface } from '@/features/automata/components/AutomataDetailSurface';
@@ -18,13 +17,16 @@ export function AutomataDetailsModal({
   isOpen,
   onClose,
   onUpdated,
+  onSelectedNameChange,
+  onDeleted,
 }: {
   name: string;
   isOpen: boolean;
   onClose: () => void;
   onUpdated?: () => void | Promise<void>;
+  onSelectedNameChange?: (name: string) => void | Promise<void>;
+  onDeleted?: () => void | Promise<void>;
 }): React.ReactElement | null {
-  const navigate = useNavigate();
   const [shouldRender, setShouldRender] = React.useState(isOpen);
   const [isVisible, setIsVisible] = React.useState(false);
   const stableNameRef = React.useRef(name);
@@ -60,18 +62,17 @@ export function AutomataDetailsModal({
       if (event.key === 'Escape') {
         onClose();
       }
-      if (event.key === 'f' || event.key === 'F') {
-        navigate(`/automata/${encodeURIComponent(stableName)}`);
-      }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, navigate, onClose, stableName]);
+  }, [isOpen, onClose]);
 
   const controller = useAutomataDetailController({
     name: stableName,
     enabled: isOpen && !!stableName,
     onUpdated,
+    onSelectedNameChange,
+    onDeleted,
   });
 
   if (!shouldRender) {
@@ -102,24 +103,38 @@ export function AutomataDetailsModal({
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => void detailController.onRename()}
+                    disabled={!!detailController.busyAction}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Rename
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void detailController.onDuplicate()}
+                    disabled={!!detailController.busyAction}
+                  >
+                    <Copy className="h-4 w-4" />
+                    Duplicate
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => void detailController.onResetState()}
                     disabled={!!detailController.busyAction}
                   >
+                    <RotateCcw className="h-4 w-4" />
                     Reset State
                   </Button>
                   <Button
                     variant="outline"
-                    size="icon-sm"
-                    onClick={() =>
-                      navigate(`/automata/${encodeURIComponent(stableName)}`)
-                    }
-                    title="Open full page (F)"
-                    className="relative group"
+                    size="sm"
+                    onClick={() => void detailController.onDelete()}
+                    disabled={!!detailController.busyAction}
                   >
-                    <Maximize2 className="h-4 w-4" />
-                    <span className="pointer-events-none absolute -top-7 right-0 rounded-sm border bg-muted px-1 text-xs font-medium whitespace-nowrap text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                      F
-                    </span>
+                    <Trash2 className="h-4 w-4" />
+                    Delete
                   </Button>
                   <Button
                     variant="outline"

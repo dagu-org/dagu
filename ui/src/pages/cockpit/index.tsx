@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { History } from 'lucide-react';
 import { AutomataSwarmIcon } from '@/components/icons/AutomataSwarmIcon';
 import { useCockpitState } from '@/features/cockpit/hooks/useCockpitState';
@@ -15,9 +16,15 @@ type CockpitMode = 'runs' | 'automata';
 export default function CockpitPage(): React.ReactElement {
   const { setTitle } = React.useContext(AppBarContext);
   const config = useConfig();
+  const [searchParams, setSearchParams] = useSearchParams();
   const automataFeatureEnabled = config.agentEnabled && config.automataEnabled;
+  const requestedAutomataName = searchParams.get('automata') || '';
+  const requestedMode = searchParams.get('mode');
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
   const [mode, setMode] = useState<CockpitMode>(() => {
+    if (requestedMode === 'automata' || requestedAutomataName) {
+      return 'automata';
+    }
     const stored = localStorage.getItem(COCKPIT_MODE_STORAGE_KEY);
     return stored === 'automata' ? 'automata' : 'runs';
   });
@@ -35,6 +42,16 @@ export default function CockpitPage(): React.ReactElement {
     }
   }, [automataFeatureEnabled, mode]);
 
+  useEffect(() => {
+    if (
+      automataFeatureEnabled &&
+      (requestedMode === 'automata' || requestedAutomataName)
+    ) {
+      setMode('automata');
+      localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, 'automata');
+    }
+  }, [automataFeatureEnabled, requestedAutomataName, requestedMode]);
+
   const effectiveMode: CockpitMode =
     automataFeatureEnabled && mode === 'automata' ? 'automata' : 'runs';
 
@@ -42,11 +59,33 @@ export default function CockpitPage(): React.ReactElement {
     const resolvedMode = automataFeatureEnabled ? nextMode : 'runs';
     setMode(resolvedMode);
     localStorage.setItem(COCKPIT_MODE_STORAGE_KEY, resolvedMode);
+    const nextParams = new URLSearchParams(searchParams);
+    if (resolvedMode === 'automata') {
+      nextParams.set('mode', 'automata');
+    } else {
+      nextParams.delete('mode');
+      nextParams.delete('automata');
+    }
+    setSearchParams(nextParams, { replace: true });
     if (resolvedMode !== 'runs') {
       selectTemplate('');
       setIsTemplateSelectorOpen(false);
     }
   };
+
+  const handleAutomataSelectionChange = React.useCallback(
+    (name: string | null) => {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('mode', 'automata');
+      if (name) {
+        nextParams.set('automata', name);
+      } else {
+        nextParams.delete('automata');
+      }
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const suspendBackgroundLoading =
     effectiveMode === 'runs' && (isTemplateSelectorOpen || !!selectedTemplate);
@@ -81,7 +120,9 @@ export default function CockpitPage(): React.ReactElement {
               aria-label="Automata cockpit"
               className="h-8 px-3"
             >
-              <span className="mr-1.5"><AutomataSwarmIcon size={16} /></span>
+              <span className="mr-1.5">
+                <AutomataSwarmIcon size={16} />
+              </span>
               Automata
             </ToggleButton>
           </ToggleGroup>
@@ -100,7 +141,11 @@ export default function CockpitPage(): React.ReactElement {
           suspendLoadMore={suspendBackgroundLoading}
         />
       ) : (
-        <AutomataCockpit selectedWorkspace={selectedWorkspace} />
+        <AutomataCockpit
+          selectedWorkspace={selectedWorkspace}
+          initialAutomataName={requestedAutomataName}
+          onAutomataSelectionChange={handleAutomataSelectionChange}
+        />
       )}
     </div>
   );

@@ -1,8 +1,9 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
@@ -86,27 +87,30 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
-function renderPage(config: Config) {
+function renderPage(config: Config, initialEntry = '/cockpit') {
   return render(
-    <ConfigContext.Provider value={config}>
-      <AppBarContext.Provider
-        value={{
-          title: '',
-          setTitle: () => undefined,
-          remoteNodes: ['local'],
-          setRemoteNodes: () => undefined,
-          selectedRemoteNode: 'local',
-          selectRemoteNode: () => undefined,
-        }}
-      >
-        <CockpitPage />
-      </AppBarContext.Provider>
-    </ConfigContext.Provider>
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <ConfigContext.Provider value={config}>
+        <AppBarContext.Provider
+          value={{
+            title: '',
+            setTitle: () => undefined,
+            remoteNodes: ['local'],
+            setRemoteNodes: () => undefined,
+            selectedRemoteNode: 'local',
+            selectRemoteNode: () => undefined,
+          }}
+        >
+          <CockpitPage />
+        </AppBarContext.Provider>
+      </ConfigContext.Provider>
+    </MemoryRouter>
   );
 }
 
 describe('CockpitPage', () => {
   afterEach(() => {
+    cleanup();
     localStorage.clear();
   });
 
@@ -123,6 +127,15 @@ describe('CockpitPage', () => {
     renderPage(makeConfig({ automataEnabled: true }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Automata cockpit' }));
+
+    expect(screen.getByTestId('automata-cockpit')).toBeInTheDocument();
+  });
+
+  it('opens Automata mode from query params', () => {
+    renderPage(
+      makeConfig({ automataEnabled: true }),
+      '/cockpit?mode=automata&automata=builder'
+    );
 
     expect(screen.getByTestId('automata-cockpit')).toBeInTheDocument();
   });

@@ -11,6 +11,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useParams,
 } from 'react-router-dom';
 import { SWRConfig, mutate as globalMutate } from 'swr';
 
@@ -37,7 +38,6 @@ import {
 import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
-import { getAuthHeaders } from './lib/authHeaders';
 import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
 import { useClient } from './hooks/api';
 import {
@@ -52,7 +52,6 @@ import AgentSettingsPage from './pages/agent-settings';
 import AgentSoulsPage from './pages/agent-souls';
 import SoulEditorPage from './pages/agent-souls/SoulEditorPage';
 import APIKeysPage from './pages/api-keys';
-import AutomataPage from './pages/automata';
 import APIDocsPage from './pages/api-docs';
 import AuditLogsPage from './pages/audit-logs';
 import BaseConfigPage from './pages/base-config';
@@ -181,6 +180,21 @@ function LicensedRoute({
   );
 }
 
+function AutomataCockpitRedirect({
+  enabled,
+}: {
+  enabled: boolean;
+}): React.ReactElement {
+  const { name } = useParams();
+  if (!enabled) {
+    return <Navigate to="/dags" replace />;
+  }
+  const target = name
+    ? `/cockpit?mode=automata&automata=${encodeURIComponent(name)}`
+    : '/cockpit?mode=automata';
+  return <Navigate to={target} replace />;
+}
+
 function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const client = useClient();
   const [config, setConfig] = React.useState(initialConfig);
@@ -271,10 +285,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
         applyWorkspaces(initialWorkspacesRef.current ?? []);
       }
     } finally {
-      if (workspaceFetchSeqRef.current !== requestSeq) {
-        return;
+      if (workspaceFetchSeqRef.current === requestSeq) {
+        setWorkspacesLoaded(true);
       }
-      setWorkspacesLoaded(true);
     }
   }, [applyWorkspaces, client, selectedRemoteNode]);
 
@@ -401,9 +414,6 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   }, [theme]);
 
   const automataFeatureEnabled = config.agentEnabled && config.automataEnabled;
-  const automataRouteElement = automataFeatureEnabled
-    ? <AutomataPage />
-    : <Navigate to="/dags" replace />;
 
   return (
     <Theme
@@ -516,11 +526,19 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           />
                                           <Route
                                             path="/automata"
-                                            element={automataRouteElement}
+                                            element={
+                                              <AutomataCockpitRedirect
+                                                enabled={automataFeatureEnabled}
+                                              />
+                                            }
                                           />
                                           <Route
                                             path="/automata/:name"
-                                            element={automataRouteElement}
+                                            element={
+                                              <AutomataCockpitRedirect
+                                                enabled={automataFeatureEnabled}
+                                              />
+                                            }
                                           />
                                           <Route
                                             path="/dag-runs"
