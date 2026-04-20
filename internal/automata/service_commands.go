@@ -282,7 +282,7 @@ func (s *Service) SetTaskDone(ctx context.Context, name, taskID string, done boo
 	})
 }
 
-func (s *Service) DeleteTask(ctx context.Context, name, taskID, requestedBy string) error {
+func (s *Service) DeleteTask(ctx context.Context, name, taskID string, _ string) error {
 	def, err := s.GetDefinition(ctx, name)
 	if err != nil {
 		return err

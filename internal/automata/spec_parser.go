@@ -89,6 +89,8 @@ func validateScheduleNode(node *yaml.Node, path string) error {
 			}
 		}
 		return nil
+	case yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode:
+		return fmt.Errorf("%s must be a string or list of strings", path)
 	default:
 		return fmt.Errorf("%s must be a string or list of strings", path)
 	}

@@ -1228,16 +1228,15 @@ func TestControllerRuntimeDefaultWorkingDirForDAGRun(t *testing.T) {
 	require.Equal(t, filepath.Join(svc.stateDir, "software_dev", "workspace"), dir)
 	require.DirExists(t, dir)
 
-	explicitDAG := *dag
-	explicitDAG.WorkingDirExplicit = true
-	dir, err = rt.defaultWorkingDirForDAGRun(&explicitDAG)
+	dag.WorkingDirExplicit = true
+	dir, err = rt.defaultWorkingDirForDAGRun(dag)
 	require.NoError(t, err)
 	require.Empty(t, dir)
+	dag.WorkingDirExplicit = false
 
-	distributedDAG := *dag
-	distributedDAG.WorkerSelector = map[string]string{"role": "worker"}
+	dag.WorkerSelector = map[string]string{"role": "worker"}
 	svc.coordinatorCli = &testCoordinatorCanceler{}
-	dir, err = rt.defaultWorkingDirForDAGRun(&distributedDAG)
+	dir, err = rt.defaultWorkingDirForDAGRun(dag)
 	require.NoError(t, err)
 	require.Empty(t, dir)
 }

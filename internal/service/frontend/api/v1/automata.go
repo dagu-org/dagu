@@ -521,6 +521,7 @@ func normalizeAutomataController(info *exec.AutomataControllerInfo) exec.Automat
 	normalized := *info
 	if normalized.Message == "" {
 		switch normalized.State {
+		case exec.AutomataControllerStateReady:
 		case exec.AutomataControllerStateDisabled:
 			normalized.Message = "Automata is disabled in agent settings"
 		case exec.AutomataControllerStateUnavailable:

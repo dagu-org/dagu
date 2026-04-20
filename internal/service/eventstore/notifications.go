@@ -144,7 +144,7 @@ func (s *NotificationAutomataSnapshot) Validate() error {
 	}
 	switch s.EventType {
 	case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished:
-	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
+	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
 		return errors.New("eventstore: invalid automata notification snapshot: unsupported event type")
 	default:
 		return errors.New("eventstore: invalid automata notification snapshot: unsupported event type")
@@ -272,7 +272,7 @@ func IsDAGRunEventType(kind EventKind, eventType EventType) bool {
 	switch eventType {
 	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 		return true
-	case TypeLLMUsageRecorded:
+	case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished, TypeLLMUsageRecorded:
 		return false
 	default:
 		return false
@@ -288,7 +288,7 @@ func IsNotificationEventType(kind EventKind, eventType EventType) bool {
 		switch eventType {
 		case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 			return true
-		case TypeDAGRunQueued, TypeDAGRunRunning, TypeLLMUsageRecorded:
+		case TypeDAGRunQueued, TypeDAGRunRunning, TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished, TypeLLMUsageRecorded:
 			return false
 		default:
 			return false

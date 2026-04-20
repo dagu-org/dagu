@@ -156,5 +156,5 @@ type MemoryContent struct {
 	AutomataMemory string // Contents of per-Automata MEMORY.md (truncated)
 	AutomataName   string // Name of the Automata (empty if no Automata context)
 	MemoryDir      string // Root memory directory path
-	ReadOnly     bool   // Memory is execution-scoped read-only context
+	ReadOnly       bool   // Memory is execution-scoped read-only context
 }

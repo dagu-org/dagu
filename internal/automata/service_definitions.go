@@ -500,8 +500,8 @@ func normalizeTags(tags *[]string) error {
 	if tags == nil {
 		return nil
 	}
-	parsed := core.NewTags(*tags)
-	if err := core.ValidateTags(parsed); err != nil {
+	parsed := core.NewLabels(*tags)
+	if err := core.ValidateLabels(parsed); err != nil {
 		return fmt.Errorf("invalid tags: %w", err)
 	}
 	*tags = parsed.Strings()

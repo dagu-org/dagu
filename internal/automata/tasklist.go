@@ -165,15 +165,6 @@ func findTaskIndex(tasks []Task, taskID string) int {
 	return -1
 }
 
-func hasOpenTask(tasks []Task) bool {
-	for _, task := range tasks {
-		if task.State == TaskStateOpen {
-			return true
-		}
-	}
-	return false
-}
-
 func buildTaskListSummary(tasks []Task) string {
 	if len(tasks) == 0 {
 		return "- no tasks"
