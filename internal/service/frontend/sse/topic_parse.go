@@ -54,7 +54,7 @@ func canonicalizeTopicIdentifier(topicType TopicType, identifier string) (string
 	case TopicTypeDAGRuns, TopicTypeQueues, TopicTypeDAGsList, TopicTypeDocTree:
 		identifier = strings.TrimPrefix(identifier, "?")
 		return parseAndSanitizeQuery(identifier)
-	case TopicTypeDAGRunLogs:
+	case TopicTypeDAGRunLogs, TopicTypeDoc:
 		pathPart, queryPart, hasQuery := strings.Cut(identifier, "?")
 		pathPart = strings.TrimSpace(pathPart)
 		if pathPart == "" {
@@ -79,7 +79,7 @@ func canonicalizeTopicIdentifier(topicType TopicType, identifier string) (string
 			return "", fmt.Errorf("invalid DAG file name: %w", err)
 		}
 		return identifier, nil
-	case TopicTypeDAGRun, TopicTypeSubDAGRun, TopicTypeStepLog, TopicTypeQueueItems, TopicTypeDoc:
+	case TopicTypeDAGRun, TopicTypeSubDAGRun, TopicTypeStepLog, TopicTypeQueueItems:
 		if identifier == "" {
 			return "", fmt.Errorf("topic %q requires an identifier", topicType)
 		}

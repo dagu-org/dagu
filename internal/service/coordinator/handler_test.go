@@ -3072,6 +3072,32 @@ func TestHandler_GetCancelledRunsForWorker_Full(t *testing.T) {
 		require.Len(t, result, 1)
 		assert.Equal(t, "attempt-key-1", result[0].AttemptKey)
 	})
+
+	t.Run("DoesNotReturnCancelledRunsForSuccessfulTerminalAttempts", func(t *testing.T) {
+		t.Parallel()
+
+		store := newMockDAGRunStore()
+		h := NewHandler(HandlerConfig{DAGRunStore: store})
+		ctx := context.Background()
+
+		ref := exec.DAGRunRef{Name: "test-dag", ID: "run-success"}
+		store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "test-dag",
+			DAGRunID:   "run-success",
+			AttemptID:  "attempt-1",
+			AttemptKey: "attempt-key-1",
+			Status:     core.Succeeded,
+		})
+
+		stats := &coordinatorv1.WorkerStats{
+			RunningTasks: []*coordinatorv1.RunningTask{
+				{DagRunId: "run-success", DagName: "test-dag", AttemptKey: "attempt-key-1"},
+			},
+		}
+
+		result := h.getCancelledRunsForWorker(ctx, stats)
+		assert.Empty(t, result)
+	})
 }
 
 func TestHandler_RequestCancel(t *testing.T) {

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
@@ -20,6 +23,7 @@ import {
 } from '../../../hooks/useSSECacheSync';
 import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
 import dayjs from '../../../lib/dayjs';
+import { workspaceLabel } from '../../../lib/workspace';
 
 type Params = {
   fileName: string;
@@ -44,6 +48,7 @@ function DAGDetails() {
     searchParams.get('remoteNode') ||
     appBarContext.selectedRemoteNode ||
     'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
   const fileName = params.fileName || '';
 
   // Set page context for agent chat
@@ -125,10 +130,18 @@ function DAGDetails() {
     sseFallbackOptions(dagSSE)
   );
   useSSECacheSync(dagSSE, mutateDag);
+  const selectedWorkspaceLabel = workspaceLabel(selectedWorkspace);
+  const dagMatchesWorkspace =
+    !selectedWorkspaceLabel ||
+    (dagData?.dag?.labels ?? dagData?.dag?.tags ?? []).includes(
+      selectedWorkspaceLabel
+    );
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
-  const dagRunQueryEnabled = Boolean(dagRunName && dagRunId && !subDAGRunId);
+  const dagRunQueryEnabled = Boolean(
+    dagRunName && dagRunId && !subDAGRunId && dagMatchesWorkspace
+  );
 
   // Fetch specific DAG-run data if dagRunId is provided
   const dagRunSSE = useDAGRunSSE(
@@ -153,7 +166,9 @@ function DAGDetails() {
   useSSECacheSync(dagRunSSE, mutateDagRun);
 
   // Fetch sub DAG-run data if needed
-  const subDAGRunQueryEnabled = Boolean(subDAGRunId && dagRunId && dagRunName);
+  const subDAGRunQueryEnabled = Boolean(
+    subDAGRunId && dagRunId && dagRunName && dagMatchesWorkspace
+  );
   const subDAGRunSSE = useSubDAGRunSSE(
     dagRunName,
     dagRunId || '',
@@ -231,7 +246,7 @@ function DAGDetails() {
           }}
         >
           <div className="max-w-7xl flex flex-col">
-            {dagData?.dag && (
+            {dagData?.dag && dagMatchesWorkspace && (
               <>
                 <DAGHeader
                   dag={dagData.dag}
@@ -261,6 +276,11 @@ function DAGDetails() {
                   editorHints={dagData?.editorHints}
                 />
               </>
+            )}
+            {dagData?.dag && !dagMatchesWorkspace && (
+              <div className="p-6 text-sm text-muted-foreground">
+                This DAG is not in the selected workspace.
+              </div>
             )}
           </div>
         </RootDAGRunContext.Provider>

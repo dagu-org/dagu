@@ -29,6 +29,10 @@ import DAGRunTable from '../../features/dag-runs/components/dag-run-list/DAGRunT
 import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
 import { useQuery } from '../../hooks/api';
 import { useBulkDAGRunSelection } from '../../features/dag-runs/hooks/useBulkDAGRunSelection';
+import {
+  withoutWorkspaceLabels,
+  withWorkspaceLabel,
+} from '../../lib/workspace';
 import StatusChip from '../../ui/StatusChip';
 import Title from '../../ui/Title';
 
@@ -133,6 +137,11 @@ function DAGRuns() {
   const { preferences, updatePreference } = useUserPreferences();
   const searchState = useSearchState();
   const remoteKey = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const searchStateScope = JSON.stringify({
+    remoteNode: remoteKey,
+    workspace: selectedWorkspace || null,
+  });
 
   // Extract short datetime format from URL if present
   const parseDateFromUrl = React.useCallback(
@@ -303,7 +312,10 @@ function DAGRuns() {
 
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const stored = searchState.readState<DAGRunsFilters>('dagRuns', remoteKey);
+    const stored = searchState.readState<DAGRunsFilters>(
+      'dagRuns',
+      searchStateScope
+    );
     const base: DAGRunsFilters = {
       ...defaultFilters,
       ...(stored ?? {}),
@@ -334,6 +346,7 @@ function DAGRuns() {
             .split(',')
             .map((t) => t.trim().toLowerCase())
             .filter((t) => t !== '')
+            .filter((t) => withoutWorkspaceLabels([t]).length > 0)
         : [];
       hasUrlFilters = true;
     }
@@ -385,7 +398,7 @@ function DAGRuns() {
     if (current && areFiltersEqual(current, next)) {
       if (hasUrlFilters) {
         lastPersistedFiltersRef.current = next;
-        searchState.writeState('dagRuns', remoteKey, next);
+        searchState.writeState('dagRuns', searchStateScope, next);
       }
       return;
     }
@@ -409,13 +422,13 @@ function DAGRuns() {
     setApiToDate(next.toDate);
 
     lastPersistedFiltersRef.current = next;
-    searchState.writeState('dagRuns', remoteKey, next);
+    searchState.writeState('dagRuns', searchStateScope, next);
   }, [
     defaultFilters,
     location.search,
     parseDateFromUrl,
-    remoteKey,
     searchState,
+    searchStateScope,
   ]);
 
   React.useEffect(() => {
@@ -424,8 +437,8 @@ function DAGRuns() {
       return;
     }
     lastPersistedFiltersRef.current = currentFilters;
-    searchState.writeState('dagRuns', remoteKey, currentFilters);
-  }, [currentFilters, remoteKey, searchState]);
+    searchState.writeState('dagRuns', searchStateScope, currentFilters);
+  }, [currentFilters, searchState, searchStateScope]);
 
   React.useEffect(() => {
     appBarContext.setTitle('DAG Runs');
@@ -446,7 +459,15 @@ function DAGRuns() {
       revalidateIfStale: false,
     }
   );
-  const availableLabels = labelsData?.labels ?? [];
+  const availableLabels = React.useMemo(
+    () => withoutWorkspaceLabels(labelsData?.labels ?? []),
+    [labelsData?.labels]
+  );
+
+  const effectiveApiLabels = React.useMemo(
+    () => withWorkspaceLabel(apiLabels, selectedWorkspace),
+    [apiLabels, selectedWorkspace]
+  );
 
   const dagRunQuery = React.useMemo(
     () => ({
@@ -454,7 +475,10 @@ function DAGRuns() {
       name: apiSearchText || undefined,
       dagRunId: apiDagRunId || undefined,
       status: apiStatus !== 'all' ? [parseInt(apiStatus)] : undefined,
-      labels: apiLabels.length > 0 ? apiLabels.join(',') : undefined,
+      labels:
+        effectiveApiLabels.length > 0
+          ? effectiveApiLabels.join(',')
+          : undefined,
       fromDate: formatDateForApi(apiFromDate),
       toDate: formatDateForApi(apiToDate),
       limit: 100,
@@ -464,7 +488,7 @@ function DAGRuns() {
       apiFromDate,
       apiSearchText,
       apiStatus,
-      apiLabels,
+      effectiveApiLabels,
       apiToDate,
       appBarContext.selectedRemoteNode,
     ]

@@ -1216,7 +1216,7 @@ func (h *Handler) isTaskCancelled(ctx context.Context, task *coordinatorv1.Runni
 	if task.AttemptKey != "" && runStatus.AttemptKey != "" && runStatus.AttemptKey != task.AttemptKey {
 		return true
 	}
-	if isTerminalRunStatus(runStatus.Status) {
+	if isCancellableTerminalRunStatus(runStatus.Status) {
 		return true
 	}
 
@@ -1314,6 +1314,10 @@ func (h *Handler) ReportStatus(ctx context.Context, req *coordinatorv1.ReportSta
 
 func isTerminalRunStatus(status core.Status) bool {
 	return status != core.NotStarted && !status.IsActive()
+}
+
+func isCancellableTerminalRunStatus(status core.Status) bool {
+	return isTerminalRunStatus(status) && !status.IsSuccess()
 }
 
 func sameAttemptStatus(current, incoming *exec.DAGRunStatus) bool {

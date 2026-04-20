@@ -24,6 +24,10 @@ import {
   sseFallbackOptions,
   useSSECacheSync,
 } from '../../hooks/useSSECacheSync';
+import {
+  withoutWorkspaceLabels,
+  withWorkspaceLabel,
+} from '../../lib/workspace';
 import LoadingIndicator from '../../ui/LoadingIndicator';
 
 type DAGDefinitionsFilters = {
@@ -61,6 +65,11 @@ function DAGsContent() {
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const searchStateScope = JSON.stringify({
+    remoteNode,
+    workspace: selectedWorkspace || null,
+  });
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
@@ -117,7 +126,7 @@ function DAGsContent() {
     const params = new URLSearchParams(location.search);
     const stored = searchState.readState<DAGDefinitionsFilters>(
       'dagDefinitions',
-      remoteNode
+      searchStateScope
     );
     const base: DAGDefinitionsFilters = {
       ...defaultFilters,
@@ -139,6 +148,7 @@ function DAGsContent() {
             .split(',')
             .map((t) => t.trim().toLowerCase())
             .filter((t) => t !== '')
+            .filter((t) => withoutWorkspaceLabels([t]).length > 0)
         : [];
       hasUrlFilters = true;
     }
@@ -167,7 +177,7 @@ function DAGsContent() {
     if (current && areDAGDefinitionsFiltersEqual(current, next)) {
       if (hasUrlFilters) {
         lastPersistedFiltersRef.current = next;
-        searchState.writeState('dagDefinitions', remoteNode, next);
+        searchState.writeState('dagDefinitions', searchStateScope, next);
       }
       return;
     }
@@ -181,8 +191,8 @@ function DAGsContent() {
     setSortOrder(next.sortOrder);
 
     lastPersistedFiltersRef.current = next;
-    searchState.writeState('dagDefinitions', remoteNode, next);
-  }, [defaultFilters, location.search, remoteNode, searchState]);
+    searchState.writeState('dagDefinitions', searchStateScope, next);
+  }, [defaultFilters, location.search, searchState, searchStateScope]);
 
   React.useEffect(() => {
     const persisted = lastPersistedFiltersRef.current;
@@ -191,12 +201,17 @@ function DAGsContent() {
     }
 
     lastPersistedFiltersRef.current = currentFilters;
-    searchState.writeState('dagDefinitions', remoteNode, currentFilters);
-  }, [currentFilters, remoteNode, searchState]);
+    searchState.writeState('dagDefinitions', searchStateScope, currentFilters);
+  }, [currentFilters, searchState, searchStateScope]);
 
   const handlePageLimitChange = (newLimit: number) => {
     updatePreference('pageLimit', newLimit);
   };
+
+  const effectiveAPISearchLabels = React.useMemo(
+    () => withWorkspaceLabel(apiSearchLabels, selectedWorkspace),
+    [apiSearchLabels, selectedWorkspace]
+  );
 
   const queryParams = React.useMemo(
     () => ({
@@ -205,7 +220,9 @@ function DAGsContent() {
       perPage: preferences.pageLimit || 200,
       name: apiSearchText || undefined,
       labels:
-        apiSearchLabels.length > 0 ? apiSearchLabels.join(',') : undefined,
+        effectiveAPISearchLabels.length > 0
+          ? effectiveAPISearchLabels.join(',')
+          : undefined,
       sort: sortField,
       order: sortOrder,
     }),
@@ -214,7 +231,7 @@ function DAGsContent() {
       page,
       preferences.pageLimit,
       apiSearchText,
-      apiSearchLabels,
+      effectiveAPISearchLabels,
       sortField,
       sortOrder,
     ]
@@ -410,8 +427,15 @@ function DAGsContent() {
 
 // Wrap with TabProvider
 function DAGs() {
+  const appBarContext = React.useContext(AppBarContext);
+  const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const dagTabStorageKey = `dagu_dag_tabs:${JSON.stringify({
+    remoteNode,
+    workspace: appBarContext.selectedWorkspace || null,
+  })}`;
+
   return (
-    <TabProvider>
+    <TabProvider key={dagTabStorageKey} storageKey={dagTabStorageKey}>
       <DAGsContent />
     </TabProvider>
   );

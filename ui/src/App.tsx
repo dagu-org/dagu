@@ -37,7 +37,14 @@ import {
 import { AgentChatModal, AgentChatProvider } from './features/agent';
 import Layout from './layouts/Layout';
 import fetchJson from './lib/fetchJson';
+import { getAuthHeaders } from './lib/authHeaders';
 import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
+import { useClient } from './hooks/api';
+import {
+  getStoredWorkspaceName,
+  persistWorkspaceName,
+  sanitizeWorkspaceName,
+} from './lib/workspace';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
@@ -174,7 +181,9 @@ function LicensedRoute({
 }
 
 function AppInner({ config: initialConfig }: Props): React.ReactElement {
+  const client = useClient();
   const [config, setConfig] = React.useState(initialConfig);
+  const initialWorkspacesRef = React.useRef(initialConfig.initialWorkspaces);
   const updateConfig = React.useCallback((patch: Partial<Config>) => {
     setConfig((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -190,6 +199,36 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const [selectedRemoteNode, setSelectedRemoteNode] = React.useState<string>(
     () => getStoredRemoteNode(remoteNodes)
   );
+  const [workspaces, setWorkspaces] = React.useState(
+    () => config.initialWorkspaces ?? []
+  );
+  const [workspacesLoaded, setWorkspacesLoaded] = React.useState(false);
+  const [workspaceError, setWorkspaceError] = React.useState<Error | null>(
+    null
+  );
+  const [selectedWorkspace, setSelectedWorkspace] = React.useState<string>(() =>
+    getStoredWorkspaceName()
+  );
+  const workspaceFetchSeqRef = React.useRef(0);
+
+  const applyWorkspaces = React.useCallback(
+    (next: Config['initialWorkspaces']) => {
+      const sorted = [...next].sort((a, b) => a.name.localeCompare(b.name));
+      setWorkspaces(sorted);
+      updateConfig({ initialWorkspaces: sorted });
+    },
+    [updateConfig]
+  );
+
+  const handleSelectWorkspace = React.useCallback((name: string) => {
+    const sanitized = sanitizeWorkspaceName(name);
+    setSelectedWorkspace(sanitized);
+    persistWorkspaceName(sanitized);
+
+    // Workspace scopes are part of most active data keys. Clear cached responses
+    // so pages that do not remount still refetch with the new global scope.
+    globalMutate(() => true, undefined, { revalidate: false });
+  }, []);
 
   const handleSelectRemoteNode = React.useCallback(
     (node: string) => {
@@ -200,8 +239,108 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       // Clear SWR cache on node switch. Active hooks refetch automatically
       // since their keys include remoteNode.
       globalMutate(() => true, undefined, { revalidate: false });
+      setWorkspacesLoaded(false);
     },
     [remoteNodes]
+  );
+
+  const fetchWorkspaces = React.useCallback(async () => {
+    const requestSeq = workspaceFetchSeqRef.current + 1;
+    workspaceFetchSeqRef.current = requestSeq;
+    setWorkspaceError(null);
+    try {
+      const response = await client.GET('/workspaces', {
+        params: { query: { remoteNode: selectedRemoteNode } },
+      });
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to load workspaces');
+      }
+      applyWorkspaces(response.data?.workspaces || []);
+    } catch (error) {
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
+      const nextError =
+        error instanceof Error ? error : new Error('Failed to load workspaces');
+      setWorkspaceError(nextError);
+      if (selectedRemoteNode === 'local') {
+        applyWorkspaces(initialWorkspacesRef.current ?? []);
+      }
+    } finally {
+      if (workspaceFetchSeqRef.current !== requestSeq) {
+        return;
+      }
+      setWorkspacesLoaded(true);
+    }
+  }, [applyWorkspaces, client, selectedRemoteNode]);
+
+  const handleCreateWorkspace = React.useCallback(
+    async (name: string) => {
+      const sanitized = sanitizeWorkspaceName(name);
+      if (!sanitized) return;
+      setWorkspaceError(null);
+      const response = await client.POST('/workspaces', {
+        params: { query: { remoteNode: selectedRemoteNode } },
+        body: { name: sanitized },
+      });
+      if (response.error || !response.data) {
+        const nextError = new Error(
+          response.error?.message || 'Failed to create workspace'
+        );
+        setWorkspaceError(nextError);
+        throw nextError;
+      }
+      applyWorkspaces([
+        ...workspaces.filter((workspace) => workspace.id !== response.data.id),
+        response.data,
+      ]);
+      handleSelectWorkspace(response.data.name);
+    },
+    [
+      applyWorkspaces,
+      client,
+      handleSelectWorkspace,
+      selectedRemoteNode,
+      workspaces,
+    ]
+  );
+
+  const handleDeleteWorkspace = React.useCallback(
+    async (id: string) => {
+      setWorkspaceError(null);
+      const response = await client.DELETE('/workspaces/{workspaceId}', {
+        params: {
+          path: { workspaceId: id },
+          query: { remoteNode: selectedRemoteNode },
+        },
+      });
+      if (response.error) {
+        const nextError = new Error(
+          response.error.message || 'Failed to delete workspace'
+        );
+        setWorkspaceError(nextError);
+        throw nextError;
+      }
+      applyWorkspaces(workspaces.filter((workspace) => workspace.id !== id));
+      const deletedSelected = workspaces.some(
+        (workspace) =>
+          workspace.id === id && workspace.name === selectedWorkspace
+      );
+      if (deletedSelected) {
+        handleSelectWorkspace('');
+      }
+    },
+    [
+      applyWorkspaces,
+      client,
+      handleSelectWorkspace,
+      selectedRemoteNode,
+      selectedWorkspace,
+      workspaces,
+    ]
   );
 
   // Fetch remote node names from the API on mount so the dropdown
@@ -242,6 +381,20 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   }, [remoteNodes, selectedRemoteNode, handleSelectRemoteNode]);
 
   React.useEffect(() => {
+    void fetchWorkspaces();
+  }, [fetchWorkspaces]);
+
+  React.useEffect(() => {
+    if (
+      workspacesLoaded &&
+      selectedWorkspace &&
+      !workspaces.some((workspace) => workspace.name === selectedWorkspace)
+    ) {
+      handleSelectWorkspace('');
+    }
+  }, [handleSelectWorkspace, selectedWorkspace, workspaces, workspacesLoaded]);
+
+  React.useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     document.documentElement.style.backgroundColor = 'var(--background)';
   }, [theme]);
@@ -270,6 +423,12 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
             setRemoteNodes,
             selectedRemoteNode,
             selectRemoteNode: handleSelectRemoteNode,
+            workspaces,
+            workspaceError,
+            selectedWorkspace,
+            selectWorkspace: handleSelectWorkspace,
+            createWorkspace: handleCreateWorkspace,
+            deleteWorkspace: handleDeleteWorkspace,
           }}
         >
           <ConfigContext.Provider value={config}>
@@ -329,7 +488,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
                                           />
                                           <Route
                                             path="/agent"
-                                            element={<Navigate to="/design" replace />}
+                                            element={
+                                              <Navigate to="/design" replace />
+                                            }
                                           />
                                           <Route
                                             path="/search/"

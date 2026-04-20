@@ -97,6 +97,7 @@ func TestNewContext_DAGDocsDir(t *testing.T) {
 		name      string
 		docsDir   string
 		dagName   string
+		labels    core.Labels
 		expected  string
 		expectSet bool
 	}{
@@ -104,6 +105,37 @@ func TestNewContext_DAGDocsDir(t *testing.T) {
 			name:      "ConfigHasDocsDir",
 			docsDir:   "/var/dagu/docs",
 			dagName:   "my-workflow",
+			expected:  filepath.Join("/var/dagu/docs", "my-workflow"),
+			expectSet: true,
+		},
+		{
+			name:    "WorkspaceLabelUsesWorkspaceScopedDocsDir",
+			docsDir: "/var/dagu/docs",
+			dagName: "my-workflow",
+			labels: core.Labels{
+				{Key: "workspace", Value: "ops"},
+			},
+			expected:  filepath.Join("/var/dagu/docs", "ops", "my-workflow"),
+			expectSet: true,
+		},
+		{
+			name:    "ConflictingWorkspaceLabelsUseLegacyDocsDir",
+			docsDir: "/var/dagu/docs",
+			dagName: "my-workflow",
+			labels: core.Labels{
+				{Key: "workspace", Value: "ops"},
+				{Key: "workspace", Value: "prod"},
+			},
+			expected:  filepath.Join("/var/dagu/docs", "my-workflow"),
+			expectSet: true,
+		},
+		{
+			name:    "InvalidWorkspaceLabelUsesLegacyDocsDir",
+			docsDir: "/var/dagu/docs",
+			dagName: "my-workflow",
+			labels: core.Labels{
+				{Key: "workspace", Value: "../shared"},
+			},
 			expected:  filepath.Join("/var/dagu/docs", "my-workflow"),
 			expectSet: true,
 		},
@@ -126,7 +158,7 @@ func TestNewContext_DAGDocsDir(t *testing.T) {
 				ctx = config.WithConfig(ctx, cfg)
 			}
 
-			dag := &core.DAG{Name: tt.dagName}
+			dag := &core.DAG{Name: tt.dagName, Labels: tt.labels}
 			ctx = exec.NewContext(ctx, dag, "run-1", "test.log")
 			rCtx := exec.GetContext(ctx)
 			result := rCtx.UserEnvsMap()

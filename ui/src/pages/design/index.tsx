@@ -46,6 +46,8 @@ import { whenEnabled } from '@/hooks/queryUtils';
 import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { validateDAGName } from '@/lib/dag-validation';
+import { ensureWorkspaceLabelInDAGSpec } from '@/lib/dagSpec';
+import { workspaceLabel } from '@/lib/workspace';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -109,6 +111,7 @@ function WorkflowDesignPage() {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const selectedWorkspace = appBarContext.selectedWorkspace || '';
   const { setContext } = usePageContext();
   const { schema: baseSchema } = useSchema();
   const { setHasUnsavedChanges } = useUnsavedChanges();
@@ -152,9 +155,34 @@ function WorkflowDesignPage() {
       query: {
         remoteNode,
         perPage: 200,
+        labels: workspaceLabel(selectedWorkspace),
       },
     },
   });
+  const selectedDagInWorkspace = React.useMemo(
+    () =>
+      !!selectedDagFile &&
+      (dagListQuery.data?.dags ?? []).some(
+        (dag) => dag.fileName === selectedDagFile
+      ),
+    [dagListQuery.data?.dags, selectedDagFile]
+  );
+
+  React.useEffect(() => {
+    if (!selectedDagFile || !dagListQuery.data) return;
+    if (selectedDagInWorkspace) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('dag');
+    next.delete('step');
+    setSearchParams(next, { replace: true });
+  }, [
+    dagListQuery.data,
+    searchParams,
+    selectedDagFile,
+    selectedDagInWorkspace,
+    setSearchParams,
+  ]);
 
   const {
     data: specData,
@@ -162,7 +190,7 @@ function WorkflowDesignPage() {
     mutate: mutateSpec,
   } = useQuery(
     '/dags/{fileName}/spec',
-    whenEnabled(!!selectedDagFile, {
+    whenEnabled(selectedDagInWorkspace, {
       params: {
         path: { fileName: selectedDagFile },
         query: { remoteNode },
@@ -170,7 +198,7 @@ function WorkflowDesignPage() {
     })
   );
 
-  const serverSpec = selectedDagFile ? (specData?.spec ?? null) : null;
+  const serverSpec = selectedDagInWorkspace ? (specData?.spec ?? null) : null;
   const {
     currentValue,
     setCurrentValue,
@@ -180,7 +208,11 @@ function WorkflowDesignPage() {
     markAsSaved,
     discardChanges,
   } = useContentEditor({
-    key: `${remoteNode}:${selectedDagFile || NEW_DAG_VALUE}`,
+    key: JSON.stringify({
+      remoteNode,
+      workspace: selectedWorkspace || null,
+      dag: selectedDagFile || NEW_DAG_VALUE,
+    }),
     serverContent: serverSpec,
   });
 
@@ -235,11 +267,15 @@ function WorkflowDesignPage() {
   }, [baseSchema, inheritedCustomStepTypes, effectiveLocalStepTypes]);
 
   const editorModelUri = React.useMemo(
-    () =>
-      selectedDagFile
-        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/design/${encodeURIComponent(selectedDagFile)}.yaml`
-        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/design/new.yaml`,
-    [remoteNode, selectedDagFile]
+    () => {
+      const workspaceSegment = encodeURIComponent(
+        JSON.stringify({ workspace: selectedWorkspace || null })
+      );
+      return selectedDagFile
+        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/${encodeURIComponent(selectedDagFile)}.yaml`
+        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/new.yaml`;
+    },
+    [remoteNode, selectedDagFile, selectedWorkspace]
   );
 
   const debouncedSpec = useDebouncedValue(editorValue, 500);
@@ -451,12 +487,15 @@ function WorkflowDesignPage() {
     }
 
     setIsSaving(true);
+    const specToSave = selectedWorkspace
+      ? ensureWorkspaceLabelInDAGSpec(newDraftSpec, selectedWorkspace)
+      : newDraftSpec;
     try {
       const { error } = await client.POST('/dags', {
         params: { query: { remoteNode } },
         body: {
           name: newDagName,
-          spec: newDraftSpec,
+          spec: specToSave,
         },
       });
       if (error) {
@@ -513,6 +552,7 @@ function WorkflowDesignPage() {
           newDagName: newDagName || undefined,
           stepName: selectedStepName || undefined,
           remoteNode,
+          selectedWorkspace,
           userPrompt: trimmed,
           draftSpec: selectedDagFile ? undefined : newDraftSpec,
           validationErrors: validation?.errors,
@@ -837,10 +877,14 @@ function useDesignPanelLayout() {
 
       if (event.key === 'ArrowLeft') {
         nextWidth =
-          side === 'left' ? currentWidth - resizeStep : currentWidth + resizeStep;
+          side === 'left'
+            ? currentWidth - resizeStep
+            : currentWidth + resizeStep;
       } else if (event.key === 'ArrowRight') {
         nextWidth =
-          side === 'left' ? currentWidth + resizeStep : currentWidth - resizeStep;
+          side === 'left'
+            ? currentWidth + resizeStep
+            : currentWidth - resizeStep;
       } else if (event.key === 'Home') {
         nextWidth = DESIGN_PANEL_LIMITS[side].minWidth;
       } else if (event.key === 'End') {
@@ -952,7 +996,8 @@ function DesignResizeHandle({
       <div
         className={cn(
           'h-8 w-1 rounded-full bg-muted-foreground/30 transition-all duration-200 group-hover:bg-primary group-focus-visible:bg-primary',
-          isDragging && 'scale-110 bg-primary shadow-[0_0_10px_var(--color-primary)]'
+          isDragging &&
+            'scale-110 bg-primary shadow-[0_0_10px_var(--color-primary)]'
         )}
       />
     </div>

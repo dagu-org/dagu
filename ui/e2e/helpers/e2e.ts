@@ -492,7 +492,9 @@ export async function enqueueRunFromUI(page: Page, fileName: string): Promise<st
 }
 
 export async function selectRemoteNode(page: Page, nodeName: string): Promise<void> {
-  const trigger = page.locator('aside').getByRole('combobox').first();
+  const trigger = page
+    .locator('aside')
+    .getByRole('combobox', { name: 'Remote node' });
   await trigger.click();
   await page.getByRole('option', { name: nodeName }).click();
   await expect(trigger).toContainText(nodeName);

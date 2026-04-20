@@ -7,6 +7,7 @@ export type BuildWorkflowDesignPromptInput = {
   newDagName?: string;
   stepName?: string;
   remoteNode: string;
+  selectedWorkspace?: string;
   userPrompt: string;
   draftSpec?: string;
   validationErrors?: string[];
@@ -20,6 +21,7 @@ export function buildWorkflowDesignPrompt({
   newDagName,
   stepName,
   remoteNode,
+  selectedWorkspace,
   userPrompt,
   draftSpec,
   validationErrors,
@@ -33,6 +35,7 @@ export function buildWorkflowDesignPrompt({
     '',
     `Mode: ${mode === 'update' ? 'Update existing DAG' : 'Create new DAG'}`,
     `Remote node: ${remoteNode}`,
+    `Workspace: ${selectedWorkspace || '(all workspaces)'}`,
     `Target DAG: ${target || '(not selected)'}`,
   ];
 
@@ -67,6 +70,9 @@ export function buildWorkflowDesignPrompt({
     '- Inspect the referenced DAG file before editing an existing DAG.',
     '- Make the file changes directly with the available tools; do not only suggest changes.',
     '- Keep edits focused on the requested workflow behavior and selected step when provided.',
+    selectedWorkspace
+      ? `- Keep the DAG labeled with workspace=${selectedWorkspace}.`
+      : '- Do not add a workspace label unless the user asks for one.',
     '- Validate the DAG after editing and fix validation errors before stopping.',
     `- When finished, summarize the changes and navigate to ${reviewUrl} so the user can review.`
   );

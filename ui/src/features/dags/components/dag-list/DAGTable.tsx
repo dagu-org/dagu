@@ -93,6 +93,10 @@ import {
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { parseLabelParts } from '../../../../lib/utils';
+import {
+  isWorkspaceLabel,
+  withoutWorkspaceLabels,
+} from '../../../../lib/workspace';
 
 // Threshold in pixels below which we switch to card view
 // Set higher than table's comfortable minimum width (~700px for all columns)
@@ -120,7 +124,7 @@ function DAGCard({
   const title = dag.dag.name;
   const status = dag.latestDAGRun?.status;
   const statusLabel = dag.latestDAGRun?.statusLabel;
-  const labels = dag.dag.labels ?? dag.dag.tags ?? [];
+  const labels = withoutWorkspaceLabels(dag.dag.labels ?? dag.dag.tags ?? []);
   const description = dag.dag.description;
   const schedules = dag.dag.schedule || [];
   const hasSchedule = schedules.length > 0;
@@ -406,7 +410,9 @@ const defaultColumns = [
         );
       } else {
         // DAG Row: Render link with description and labels below
-        const labels = data.dag.dag.labels ?? data.dag.dag.tags ?? [];
+        const labels = withoutWorkspaceLabels(
+          data.dag.dag.labels ?? data.dag.dag.tags ?? []
+        );
         const description = data.dag.dag.description;
 
         return (
@@ -502,7 +508,9 @@ const defaultColumns = [
           (Array.isArray(filterValue) ? filterValue : [])
         ).map((label) => label.toLowerCase());
 
-        const labels = data.dag.dag.labels ?? data.dag.dag.tags ?? [];
+        const labels = withoutWorkspaceLabels(
+          data.dag.dag.labels ?? data.dag.dag.tags ?? []
+        );
         const rowLabels = labels.map((label) => label.toLowerCase());
 
         const matchesText =
@@ -969,6 +977,9 @@ function DAGTable({
   const handleLabelClick = useCallback(
     (label: string) => {
       const normalizedLabel = label.toLowerCase();
+      if (isWorkspaceLabel(normalizedLabel)) {
+        return;
+      }
       if (!searchLabels.includes(normalizedLabel)) {
         handleSearchLabelsChange([...searchLabels, normalizedLabel]);
       }
@@ -1151,6 +1162,7 @@ function DAGTable({
       },
     },
   });
+  const availableLabels = withoutWorkspaceLabels(uniqueLabels?.labels ?? []);
 
   return (
     <div className="space-y-2">
@@ -1201,7 +1213,7 @@ function DAGTable({
           <LabelCombobox
             selectedLabels={searchLabels}
             onLabelsChange={handleSearchLabelsChange}
-            availableLabels={uniqueLabels?.labels ?? []}
+            availableLabels={availableLabels}
             placeholder="Filter by labels..."
             className="min-w-[180px] max-w-[300px] flex-shrink-0 h-8"
           />

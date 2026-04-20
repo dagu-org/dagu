@@ -77,6 +77,7 @@ type SearchDAGsOptions struct {
 	Limit      int
 	Query      string
 	MatchLimit int
+	Labels     []string
 }
 
 // SearchDAGMatchesOptions contains parameters for cursor-based snippet loading.
@@ -84,6 +85,7 @@ type SearchDAGMatchesOptions struct {
 	Cursor string
 	Limit  int
 	Query  string
+	Labels []string
 }
 
 // GrepDAGsResult represents the result of a pattern search within a DAG definition

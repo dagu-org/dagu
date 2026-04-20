@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 
 	api "github.com/dagucloud/dagu/api/v1"
@@ -58,6 +59,22 @@ func optionalString(value string) *string {
 		return nil
 	}
 	return ptrOf(value)
+}
+
+func scopedDAGSearchLabels(labelsParam *string, workspaceParam *string) ([]string, error) {
+	labels := parseCommaSeparatedLabels(labelsParam)
+	workspaceName, err := validateDocWorkspace(workspaceParam)
+	if err != nil {
+		return nil, err
+	}
+	if workspaceName != "" {
+		workspaceLabel := strings.ToLower("workspace=" + workspaceName)
+		if slices.Contains(labels, workspaceLabel) {
+			return labels, nil
+		}
+		labels = append(labels, workspaceLabel)
+	}
+	return labels, nil
 }
 
 func toSearchMatchItems(matches []*exec.Match) []api.SearchMatchItem {
@@ -137,12 +154,17 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 	if err != nil {
 		return nil, err
 	}
+	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	result, errs, err := a.dagStore.SearchCursor(ctx, exec.SearchDAGsOptions{
 		Cursor:     valueOf(request.Params.Cursor),
 		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
 		Query:      query,
 		MatchLimit: searchPreviewMatchesLimit,
+		Labels:     labels,
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {
@@ -168,12 +190,17 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 	if err != nil {
 		return nil, err
 	}
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := a.docStore.SearchCursor(ctx, agent.SearchDocsOptions{
 		Cursor:     valueOf(request.Params.Cursor),
 		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
 		Query:      query,
 		MatchLimit: searchPreviewMatchesLimit,
+		PathPrefix: workspaceName,
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {
@@ -192,11 +219,16 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 	if err != nil {
 		return nil, err
 	}
+	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := a.dagStore.SearchMatches(ctx, request.FileName, exec.SearchDAGMatchesOptions{
 		Cursor: valueOf(request.Params.Cursor),
 		Limit:  normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
 		Query:  query,
+		Labels: labels,
 	})
 	if err != nil {
 		switch {
@@ -225,6 +257,10 @@ func (a *API) SearchDocMatches(ctx context.Context, request api.SearchDocMatches
 	if err := validateDocPath(request.Params.Path); err != nil {
 		return nil, err
 	}
+	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	query, err := validateSearchQuery(request.Params.Q)
 	if err != nil {
@@ -232,9 +268,10 @@ func (a *API) SearchDocMatches(ctx context.Context, request api.SearchDocMatches
 	}
 
 	result, err := a.docStore.SearchMatches(ctx, request.Params.Path, agent.SearchDocMatchesOptions{
-		Cursor: valueOf(request.Params.Cursor),
-		Limit:  normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
-		Query:  query,
+		Cursor:     valueOf(request.Params.Cursor),
+		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
+		Query:      query,
+		PathPrefix: workspaceName,
 	})
 	if err != nil {
 		switch {

@@ -572,17 +572,33 @@ func dagSearchPattern(query string) string {
 type dagSearchCursor struct {
 	Version  int    `json:"v"`
 	Query    string `json:"q"`
+	Labels   string `json:"labels,omitempty"`
 	FileName string `json:"fileName,omitempty"`
 }
 
 type dagMatchCursor struct {
 	Version  int    `json:"v"`
 	Query    string `json:"q"`
+	Labels   string `json:"labels,omitempty"`
 	FileName string `json:"fileName"`
 	Offset   int    `json:"offset"`
 }
 
-func decodeDAGSearchCursor(raw, query string) (dagSearchCursor, error) {
+func normalizedDAGSearchLabels(labels []string) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	normalized := make([]string, 0, len(labels))
+	for _, label := range labels {
+		if trimmed := strings.TrimSpace(strings.ToLower(label)); trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	sort.Strings(normalized)
+	return strings.Join(normalized, ",")
+}
+
+func decodeDAGSearchCursor(raw, query, labels string) (dagSearchCursor, error) {
 	if raw == "" {
 		return dagSearchCursor{}, nil
 	}
@@ -590,13 +606,13 @@ func decodeDAGSearchCursor(raw, query string) (dagSearchCursor, error) {
 	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return dagSearchCursor{}, err
 	}
-	if cursor.Version != dagSearchCursorVersion || cursor.Query != query {
+	if cursor.Version != dagSearchCursorVersion || cursor.Query != query || cursor.Labels != labels {
 		return dagSearchCursor{}, exec.ErrInvalidCursor
 	}
 	return cursor, nil
 }
 
-func decodeDAGMatchCursor(raw, query, fileName string) (dagMatchCursor, error) {
+func decodeDAGMatchCursor(raw, query, labels, fileName string) (dagMatchCursor, error) {
 	if raw == "" {
 		return dagMatchCursor{FileName: fileName}, nil
 	}
@@ -604,7 +620,7 @@ func decodeDAGMatchCursor(raw, query, fileName string) (dagMatchCursor, error) {
 	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return dagMatchCursor{}, err
 	}
-	if cursor.Version != dagSearchCursorVersion || cursor.Query != query || cursor.FileName != fileName || cursor.Offset < 0 {
+	if cursor.Version != dagSearchCursorVersion || cursor.Query != query || cursor.Labels != labels || cursor.FileName != fileName || cursor.Offset < 0 {
 		return dagMatchCursor{}, exec.ErrInvalidCursor
 	}
 	return cursor, nil
@@ -680,7 +696,8 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		return nil, nil, fmt.Errorf("failed to create DAGs directory %s: %w", store.baseDir, err)
 	}
 
-	cursor, err := decodeDAGSearchCursor(opts.Cursor, opts.Query)
+	labelsKey := normalizedDAGSearchLabels(opts.Labels)
+	cursor, err := decodeDAGSearchCursor(opts.Cursor, opts.Query, labelsKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -713,6 +730,21 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		}
 
 		filePath := filepath.Join(store.baseDir, entry.Name())
+		if len(opts.Labels) > 0 {
+			dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
+				spec.OnlyMetadata(),
+				spec.WithoutEval(),
+				spec.SkipSchemaValidation(),
+				spec.WithAllowBuildErrors(),
+			)...)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fileName, err))
+				continue
+			}
+			if !containsAllLabels(dag.Labels, opts.Labels) {
+				continue
+			}
+		}
 		dat, err := os.ReadFile(filePath) //nolint:gosec
 		if err != nil {
 			logger.Error(ctx, "Failed to read DAG file", tag.File(entry.Name()), tag.Error(err))
@@ -739,6 +771,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 			nextCursor = exec.EncodeSearchCursor(dagSearchCursor{
 				Version:  dagSearchCursorVersion,
 				Query:    opts.Query,
+				Labels:   labelsKey,
 				FileName: results[len(results)-1].FileName,
 			})
 			break
@@ -754,6 +787,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 			item.NextMatchesCursor = exec.EncodeSearchCursor(dagMatchCursor{
 				Version:  dagSearchCursorVersion,
 				Query:    opts.Query,
+				Labels:   labelsKey,
 				FileName: fileName,
 				Offset:   window.NextOffset,
 			})
@@ -769,14 +803,15 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 }
 
 // SearchMatches returns cursor-based snippets for one DAG definition.
-func (store *Storage) SearchMatches(_ context.Context, fileName string, opts exec.SearchDAGMatchesOptions) (
+func (store *Storage) SearchMatches(ctx context.Context, fileName string, opts exec.SearchDAGMatchesOptions) (
 	*exec.CursorResult[*exec.Match], error,
 ) {
 	if opts.Query == "" {
 		return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
 	}
 
-	cursor, err := decodeDAGMatchCursor(opts.Cursor, opts.Query, fileName)
+	labelsKey := normalizedDAGSearchLabels(opts.Labels)
+	cursor, err := decodeDAGMatchCursor(opts.Cursor, opts.Query, labelsKey, fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -792,6 +827,20 @@ func (store *Storage) SearchMatches(_ context.Context, fileName string, opts exe
 			return nil, exec.ErrDAGNotFound
 		}
 		return nil, err
+	}
+	if len(opts.Labels) > 0 {
+		dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
+			spec.OnlyMetadata(),
+			spec.WithoutEval(),
+			spec.SkipSchemaValidation(),
+			spec.WithAllowBuildErrors(),
+		)...)
+		if err != nil {
+			return nil, err
+		}
+		if !containsAllLabels(dag.Labels, opts.Labels) {
+			return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+		}
 	}
 
 	window, err := grep.GrepWindow(dat, dagSearchPattern(opts.Query), grep.GrepOptions{
@@ -816,6 +865,7 @@ func (store *Storage) SearchMatches(_ context.Context, fileName string, opts exe
 		result.NextCursor = exec.EncodeSearchCursor(dagMatchCursor{
 			Version:  dagSearchCursorVersion,
 			Query:    opts.Query,
+			Labels:   labelsKey,
 			FileName: fileName,
 			Offset:   window.NextOffset,
 		})
