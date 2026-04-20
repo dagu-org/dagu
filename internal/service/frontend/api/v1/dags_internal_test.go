@@ -204,6 +204,97 @@ steps:
 	require.Empty(t, resp.Errors)
 }
 
+func TestUpdateDAGSpec_StepConfigAliasCompatibility(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "step-config-alias-api", []byte(`
+name: step-config-alias-api
+steps:
+  - command: echo original
+`))
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "step-config-alias-api",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: `
+name: step-config-alias-api
+steps:
+  - name: request
+    type: http
+    command: GET https://example.com
+    config:
+      timeout: 30
+`,
+		},
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.UpdateDAGSpec200JSONResponse)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+	require.Empty(t, resp.Errors)
+}
+
+func TestUpdateDAGSpec_RejectsStepWithAndLegacyConfigTogether(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "step-mixed-config-api", []byte(`
+name: step-mixed-config-api
+steps:
+  - command: echo original
+`))
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "step-mixed-config-api",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: `
+name: step-mixed-config-api
+steps:
+  - name: request
+    type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+    config:
+      timeout: 60
+`,
+		},
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.UpdateDAGSpec200JSONResponse)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+	require.NotEmpty(t, resp.Errors)
+	require.Contains(t, resp.Errors[0], `fields "with" and "config" cannot be used together`)
+}
+
 func TestGetDAGDetails_EditorHintsIncludeInheritedCustomStepTypes(t *testing.T) {
 	t.Parallel()
 

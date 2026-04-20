@@ -506,6 +506,36 @@ steps:
 	assert.Equal(t, []string{"handler-ok"}, dag.HandlerOn.Success.Commands[0].Args)
 }
 
+func TestCustomStepTypes_HandlerRejectsWithAndLegacyConfig(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-handler-mixed-config
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ .input.message }}
+handler_on:
+  success:
+    type: greet
+    with:
+      message: hello
+    config:
+      message: goodbye
+steps:
+  - command: echo run
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `fields "with" and "config" cannot be used together`)
+}
+
 func TestCustomStepTypes_HandlerAllowsExplicitZeroValueOverrides(t *testing.T) {
 	t.Parallel()
 

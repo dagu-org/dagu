@@ -416,7 +416,7 @@ The `command` field is the prompt. `with.provider` can reference either a built-
 
 Supported providers: `claude`, `codex`, `copilot`, `opencode`, `pi`.
 
-Top-level `harness:` acts as a DAG-wide default. Step-level `with` overlays the DAG-level primary harness config, and step-level `fallback` replaces the DAG-level `fallback`. If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`.
+Top-level `harness:` acts as a DAG-wide default. Step-level `with` overlays the DAG-level primary harness config, and step-level `with.fallback` replaces the DAG-level `fallback`. If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`.
 
 `provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
 

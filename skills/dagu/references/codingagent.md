@@ -65,7 +65,7 @@ Custom harness definition fields:
 - `prompt_flag` — required when `prompt_mode: flag`
 - `prompt_position` — `before_flags` or `after_flags`
 - `flag_style` — `gnu_long` or `single_dash`
-- `option_flags` — per-option override from config key to exact flag token
+- `option_flags` — per-option override from `with` key to exact flag token
 
 ## DAG-Level Defaults and Fallback
 
@@ -107,7 +107,7 @@ Merge rules:
 
 - DAG-level primary harness config is the base
 - Step-level `with` overlays it
-- Step-level `fallback` replaces DAG-level `fallback`
+- Step-level `with.fallback` replaces DAG-level `fallback`
 - If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`
 
 ## Pattern 1: Single Agent Step
