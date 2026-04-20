@@ -13,6 +13,7 @@ type DAGRunSummary = components['schemas']['DAGRunSummary'];
 interface Props {
   columns: KanbanColumns;
   onCardClick: (run: DAGRunSummary) => void;
+  onArtifactsClick: (run: DAGRunSummary) => void;
 }
 
 type ColumnEntry = {
@@ -23,6 +24,7 @@ type ColumnEntry = {
 export function KanbanBoard({
   columns,
   onCardClick,
+  onArtifactsClick,
 }: Props): React.ReactElement {
   const isMobile = useIsMobile();
   const columnEntries: ColumnEntry[] = [
@@ -34,7 +36,13 @@ export function KanbanBoard({
   ];
 
   if (isMobile) {
-    return <MobileKanbanBoard columns={columns} onCardClick={onCardClick} />;
+    return (
+      <MobileKanbanBoard
+        columns={columns}
+        onCardClick={onCardClick}
+        onArtifactsClick={onArtifactsClick}
+      />
+    );
   }
 
   return (
@@ -45,6 +53,7 @@ export function KanbanBoard({
           title={column.title}
           column={column.data}
           onCardClick={onCardClick}
+          onArtifactsClick={onArtifactsClick}
         />
       ))}
     </div>

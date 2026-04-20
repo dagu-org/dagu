@@ -10,6 +10,7 @@ interface Props {
   title: string;
   column: KanbanColumnData;
   onCardClick: (run: DAGRunSummary) => void;
+  onArtifactsClick: (run: DAGRunSummary) => void;
   hideHeader?: boolean;
 }
 
@@ -17,6 +18,7 @@ export function KanbanColumn({
   title,
   column,
   onCardClick,
+  onArtifactsClick,
   hideHeader,
 }: Props): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -99,6 +101,7 @@ export function KanbanColumn({
                     key={run.dagRunId}
                     run={run}
                     onClick={() => onCardClick(run)}
+                    onArtifactsClick={() => onArtifactsClick(run)}
                   />
                 ))}
               </AnimatePresence>

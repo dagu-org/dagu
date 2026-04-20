@@ -8473,6 +8473,9 @@ components:
         finishedAt:
           type: string
           description: "RFC 3339 timestamp when the DAG-run finished"
+        artifactsAvailable:
+          type: boolean
+          description: "Whether artifact files are available for this DAG-run"
         params:
           type: string
           description: "Runtime parameters passed to the DAG-run in JSON format"
@@ -8499,6 +8502,7 @@ components:
         - statusLabel
         - startedAt
         - finishedAt
+        - artifactsAvailable
         - autoRetryCount
 
     DAGRunDetails:
@@ -8526,9 +8530,6 @@ components:
             log:
               type: string
               description: "Path to the log file"
-            artifactsAvailable:
-              type: boolean
-              description: "Whether artifact endpoints are available for this DAG-run"
             nodes:
               type: array
               description: "Status of individual steps within the DAG-run"
@@ -8557,7 +8558,6 @@ components:
             - rootDAGRunName
             - rootDAGRunId
             - log
-            - artifactsAvailable
             - nodes
 
     ArtifactNodeType:
