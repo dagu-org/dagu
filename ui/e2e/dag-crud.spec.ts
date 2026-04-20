@@ -23,12 +23,12 @@ test.describe('DAG CRUD operations', () => {
   test.beforeEach(async ({ page }) => {
     const stack = await loadStack();
     await loginViaUI(page, stack.auth.adminUsername, stack.auth.adminPassword);
+    await useNoWorkspaceScope(page);
   });
 
   test('creates a new DAG from the UI', async ({ page }) => {
     const dagName = uniqueName('e2e-create');
 
-    await useNoWorkspaceScope(page);
     await page.goto('/dags/');
     await page.getByRole('button', { name: 'Create new DAG' }).click();
 
@@ -207,7 +207,6 @@ steps:
   });
 
   test('rejects DAG creation with invalid name', async ({ page }) => {
-    await useNoWorkspaceScope(page);
     await page.goto('/dags/');
     await page.getByRole('button', { name: 'Create new DAG' }).click();
 
