@@ -10,6 +10,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
+import { workspaceLabel } from '@/lib/workspace';
 import dayjs from '@/lib/dayjs';
 import StatusChip from '@/ui/StatusChip';
 import Title from '@/ui/Title';
@@ -127,11 +128,7 @@ function formatTimestamp(value?: string): string {
 function workspaceSelectionToTag(
   selectedWorkspace: string
 ): string | undefined {
-  const safeName = selectedWorkspace
-    .replace(/[^a-zA-Z0-9_]/g, '')
-    .trim()
-    .toLowerCase();
-  return safeName ? `workspace=${safeName}` : undefined;
+  return workspaceLabel(selectedWorkspace);
 }
 
 type WorkspaceActivity = {
@@ -254,7 +251,12 @@ export function AutomataCockpit({
         if (!workspaceTag) {
           return true;
         }
-        return item.tags?.includes(workspaceTag) ?? false;
+        const normalizedWorkspaceTag = workspaceTag.toLowerCase();
+        return (
+          item.tags?.some(
+            (tag) => tag.toLowerCase() === normalizedWorkspaceTag
+          ) ?? false
+        );
       }),
     [automataData?.automata, selectedWorkspace, workspaceTag]
   );

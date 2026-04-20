@@ -32,6 +32,12 @@ import { useClient, useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import LoadingIndicator from '@/ui/LoadingIndicator';
 import StatusChip from '@/ui/StatusChip';
+import {
+  applySelectedWorkspaceToAutomataTags,
+  automataMatchesSelectedWorkspace,
+  filterAutomataBySelectedWorkspace,
+  workspaceTagForAutomataSelection,
+} from './workspace';
 
 type AutomataSummary = components['schemas']['AutomataSummary'];
 type AutomataKindValue = components['schemas']['AutomataKind'];
@@ -435,6 +441,9 @@ function AutomataPage(): React.ReactElement {
   const client = useClient();
   const navigate = useNavigate();
   const { name } = useParams();
+  const selectedWorkspace = appBar.selectedWorkspace || '';
+  const selectedWorkspaceTag =
+    workspaceTagForAutomataSelection(selectedWorkspace);
 
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [createName, setCreateName] = React.useState('');
@@ -467,6 +476,7 @@ function AutomataPage(): React.ReactElement {
         query: {
           perPage: 500,
           remoteNode: appBar.selectedRemoteNode || undefined,
+          labels: selectedWorkspaceTag,
         },
       },
     },
@@ -486,7 +496,24 @@ function AutomataPage(): React.ReactElement {
       name: dag.dag?.name || dag.fileName,
     }));
   }, [dagListQuery.data?.dags]);
-  const listItems = (listQuery.data?.automata || []) as AutomataSummary[];
+  const listItems = React.useMemo(
+    () =>
+      filterAutomataBySelectedWorkspace(
+        (listQuery.data?.automata || []) as AutomataSummary[],
+        selectedWorkspace
+      ),
+    [listQuery.data?.automata, selectedWorkspace]
+  );
+  const detailMatchesSelectedWorkspace = React.useMemo(
+    () =>
+      detailController.detail
+        ? automataMatchesSelectedWorkspace(
+            detailController.detail.definition,
+            selectedWorkspace
+          )
+        : true,
+    [detailController.detail, selectedWorkspace]
+  );
 
   const resetCreateForm = () => {
     setCreateName('');
@@ -497,7 +524,7 @@ function AutomataPage(): React.ReactElement {
     setCreateGoal('');
     setCreateStandingInstruction('');
     setCreateSchedule('');
-    setCreateTags('');
+    setCreateTags(selectedWorkspaceTag || '');
     setCreateAllowedDAGNames([]);
     setCreateError('');
     setIsCreating(false);
@@ -548,7 +575,10 @@ function AutomataPage(): React.ReactElement {
             standingInstruction: createStandingInstruction,
             schedule: parsedSchedule,
             kind: createKind,
-            tags: parseTagInput(createTags),
+            tags: applySelectedWorkspaceToAutomataTags(
+              parseTagInput(createTags),
+              selectedWorkspace
+            ),
             allowedDAGNames: createAllowedDAGNames,
           }),
         },
@@ -587,7 +617,9 @@ function AutomataPage(): React.ReactElement {
               <div className="p-2 md:min-h-0 md:flex-1 md:overflow-y-auto md:pl-4 md:pr-2 md:pt-4 md:pb-6">
                 {listItems.length === 0 ? (
                   <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                    No Automata defined yet.
+                    {selectedWorkspace
+                      ? 'No Automata are tagged for the selected workspace.'
+                      : 'No Automata defined yet.'}
                     <div className="mt-3">
                       <Button size="sm" onClick={openCreateDialog}>
                         Create Automata
@@ -947,7 +979,7 @@ function AutomataPage(): React.ReactElement {
               </div>
             ) : detailController.isLoading ? (
               <LoadingIndicator />
-            ) : detailController.detail ? (
+            ) : detailController.detail && detailMatchesSelectedWorkspace ? (
               <div className="space-y-6 overflow-x-hidden p-4 md:h-full md:overflow-auto md:p-6">
                 <AutomataDetailSurface
                   key={name}
