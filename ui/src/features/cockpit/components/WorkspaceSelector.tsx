@@ -1,9 +1,7 @@
-import React, {
-  useCallback,
-  useRef,
-  useState,
-  type MutableRefObject,
-} from 'react';
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import React, { useCallback, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import ConfirmModal from '@/ui/ConfirmModal';
 import { Briefcase, Plus, Trash2 } from 'lucide-react';
@@ -46,7 +44,7 @@ export function WorkspaceSelector({
   const inputRef = useRef<HTMLInputElement>(null);
   const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>(
     'idle'
-  ) as MutableRefObject<'idle' | 'submitted' | 'cancelled'>;
+  );
 
   const handleCreate = useCallback(() => {
     if (createStateRef.current !== 'idle') return;

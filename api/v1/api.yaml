@@ -1571,6 +1571,7 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true
@@ -1653,6 +1654,7 @@ paths:
       parameters:
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true

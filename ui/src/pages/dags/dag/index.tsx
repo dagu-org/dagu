@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
@@ -136,7 +139,9 @@ function DAGDetails() {
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
-  const dagRunQueryEnabled = Boolean(dagRunName && dagRunId && !subDAGRunId);
+  const dagRunQueryEnabled = Boolean(
+    dagRunName && dagRunId && !subDAGRunId && dagMatchesWorkspace
+  );
 
   // Fetch specific DAG-run data if dagRunId is provided
   const dagRunSSE = useDAGRunSSE(
@@ -161,7 +166,9 @@ function DAGDetails() {
   useSSECacheSync(dagRunSSE, mutateDagRun);
 
   // Fetch sub DAG-run data if needed
-  const subDAGRunQueryEnabled = Boolean(subDAGRunId && dagRunId && dagRunName);
+  const subDAGRunQueryEnabled = Boolean(
+    subDAGRunId && dagRunId && dagRunName && dagMatchesWorkspace
+  );
   const subDAGRunSSE = useSubDAGRunSSE(
     dagRunName,
     dagRunId || '',

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
 import { MermaidBlock } from '@/components/ui/mermaid-block';
 import { useSimpleToast } from '@/components/ui/simple-toast';
@@ -102,23 +105,33 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
   currentValueRef.current = currentValue;
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   hasUnsavedChangesRef.current = hasUnsavedChanges;
-  // Restore draft on mount
+  const scopedDraftKey = React.useMemo(
+    () =>
+      JSON.stringify({
+        tabId,
+        remoteNode,
+        workspace: selectedWorkspace || null,
+      }),
+    [remoteNode, selectedWorkspace, tabId]
+  );
+
+  // Restore drafts by document tab and selected scope.
   useEffect(() => {
-    const draft = getDraft(tabId);
+    const draft = getDraft(scopedDraftKey);
     if (draft !== undefined) {
       setCurrentValue(draft);
-      clearDraft(tabId);
+      clearDraft(scopedDraftKey);
     }
-  }, []); // Only on mount
+  }, [clearDraft, getDraft, scopedDraftKey, setCurrentValue]);
 
-  // Save draft on unmount (tab switch)
+  // Save draft on unmount or scope change.
   useEffect(() => {
     return () => {
       if (hasUnsavedChangesRef.current) {
-        setDraft(tabId, currentValueRef.current ?? '');
+        setDraft(scopedDraftKey, currentValueRef.current ?? '');
       }
     };
-  }, [tabId, setDraft]); // Only runs cleanup on tab change or unmount
+  }, [scopedDraftKey, setDraft]);
 
   // Sync unsaved state to tab context
   useEffect(() => {
@@ -168,7 +181,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
         // Revalidate SWR cache from server as safety net
         mutateDoc();
         markTabSaved(tabId);
-        clearDraft(tabId);
+        clearDraft(scopedDraftKey);
         showToast('Document saved');
       }
     } catch {
@@ -187,6 +200,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
     markTabSaved,
     clearDraft,
     tabId,
+    scopedDraftKey,
     showToast,
   ]);
 
@@ -326,7 +340,7 @@ function DocEditor({ tabId, docPath, onDeleteDoc, onContentChange }: Props) {
             type="button"
             onClick={() => {
               discardChanges();
-              clearDraft(tabId);
+              clearDraft(scopedDraftKey);
               markTabSaved(tabId);
             }}
             className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

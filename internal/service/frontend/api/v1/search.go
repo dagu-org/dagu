@@ -60,6 +60,24 @@ func optionalString(value string) *string {
 	return ptrOf(value)
 }
 
+func scopedDAGSearchLabels(labelsParam *string, workspaceParam *string) ([]string, error) {
+	labels := parseCommaSeparatedLabels(labelsParam)
+	workspaceName, err := validateDocWorkspace(workspaceParam)
+	if err != nil {
+		return nil, err
+	}
+	if workspaceName != "" {
+		workspaceLabel := strings.ToLower("workspace=" + workspaceName)
+		for _, label := range labels {
+			if label == workspaceLabel {
+				return labels, nil
+			}
+		}
+		labels = append(labels, workspaceLabel)
+	}
+	return labels, nil
+}
+
 func toSearchMatchItems(matches []*exec.Match) []api.SearchMatchItem {
 	items := make([]api.SearchMatchItem, 0, len(matches))
 	for _, match := range matches {
@@ -137,7 +155,10 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 	if err != nil {
 		return nil, err
 	}
-	labels := parseCommaSeparatedLabels(request.Params.Labels)
+	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	result, errs, err := a.dagStore.SearchCursor(ctx, exec.SearchDAGsOptions{
 		Cursor:     valueOf(request.Params.Cursor),
@@ -199,7 +220,10 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 	if err != nil {
 		return nil, err
 	}
-	labels := parseCommaSeparatedLabels(request.Params.Labels)
+	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := a.dagStore.SearchMatches(ctx, request.FileName, exec.SearchDAGMatchesOptions{
 		Cursor: valueOf(request.Params.Cursor),

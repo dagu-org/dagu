@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import {
   components,
   PathsDocsGetParametersQueryOrder,
@@ -12,7 +15,7 @@ export function useDocTreeSSE(
     sort?: PathsDocsGetParametersQuerySort;
     order?: PathsDocsGetParametersQueryOrder;
     remoteNode?: components['parameters']['RemoteNode'];
-    workspace?: string;
+    workspace?: components['parameters']['Workspace'];
   } = {},
   enabled: boolean = true
 ): SSEState<DocListResponse> {

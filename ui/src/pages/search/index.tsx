@@ -215,6 +215,7 @@ function DAGSearchFeed({
         params: {
           query: {
             remoteNode,
+            workspace: selectedWorkspace || undefined,
             q: query,
             labels: label,
             cursor: pageIndex === 0 ? undefined : previousPage?.nextCursor,

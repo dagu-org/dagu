@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Button } from '@/components/ui/button';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
@@ -187,6 +190,7 @@ function SearchResult(props: Props) {
                   path: { fileName: result.fileName },
                   query: {
                     remoteNode,
+                    workspace: workspaceQuery,
                     q: query,
                     labels: workspaceLabelQuery,
                     cursor,

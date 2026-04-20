@@ -6813,6 +6813,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
                 /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. */
@@ -6911,6 +6913,8 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description selected workspace scope */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
                 /** @description Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels. */

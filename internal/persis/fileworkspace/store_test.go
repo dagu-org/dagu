@@ -106,7 +106,21 @@ func TestStore_RejectsInvalidWorkspaceName(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	err := store.Create(ctx, workspace.NewWorkspace("bad/name", ""))
+	assert.ErrorIs(t, workspace.ValidateName(""), workspace.ErrInvalidWorkspaceName)
+
+	err := store.Create(ctx, workspace.NewWorkspace("", ""))
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+
+	err = store.Create(ctx, workspace.NewWorkspace("bad/name", ""))
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+
+	ws := workspace.NewWorkspace("valid", "")
+	require.NoError(t, store.Create(ctx, ws))
+	ws.Name = ""
+	err = store.Update(ctx, ws)
+	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
+
+	_, err = store.GetByName(ctx, "")
 	assert.ErrorIs(t, err, workspace.ErrInvalidWorkspaceName)
 }
 

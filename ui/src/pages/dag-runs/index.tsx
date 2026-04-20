@@ -459,7 +459,10 @@ function DAGRuns() {
       revalidateIfStale: false,
     }
   );
-  const availableLabels = withoutWorkspaceLabels(labelsData?.labels ?? []);
+  const availableLabels = React.useMemo(
+    () => withoutWorkspaceLabels(labelsData?.labels ?? []),
+    [labelsData?.labels]
+  );
 
   const effectiveApiLabels = React.useMemo(
     () => withWorkspaceLabel(apiLabels, selectedWorkspace),

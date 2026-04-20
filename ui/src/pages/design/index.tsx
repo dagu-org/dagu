@@ -159,6 +159,30 @@ function WorkflowDesignPage() {
       },
     },
   });
+  const selectedDagInWorkspace = React.useMemo(
+    () =>
+      !!selectedDagFile &&
+      (dagListQuery.data?.dags ?? []).some(
+        (dag) => dag.fileName === selectedDagFile
+      ),
+    [dagListQuery.data?.dags, selectedDagFile]
+  );
+
+  React.useEffect(() => {
+    if (!selectedDagFile || !dagListQuery.data) return;
+    if (selectedDagInWorkspace) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('dag');
+    next.delete('step');
+    setSearchParams(next, { replace: true });
+  }, [
+    dagListQuery.data,
+    searchParams,
+    selectedDagFile,
+    selectedDagInWorkspace,
+    setSearchParams,
+  ]);
 
   const {
     data: specData,
@@ -166,7 +190,7 @@ function WorkflowDesignPage() {
     mutate: mutateSpec,
   } = useQuery(
     '/dags/{fileName}/spec',
-    whenEnabled(!!selectedDagFile, {
+    whenEnabled(selectedDagInWorkspace, {
       params: {
         path: { fileName: selectedDagFile },
         query: { remoteNode },
@@ -174,7 +198,7 @@ function WorkflowDesignPage() {
     })
   );
 
-  const serverSpec = selectedDagFile ? (specData?.spec ?? null) : null;
+  const serverSpec = selectedDagInWorkspace ? (specData?.spec ?? null) : null;
   const {
     currentValue,
     setCurrentValue,

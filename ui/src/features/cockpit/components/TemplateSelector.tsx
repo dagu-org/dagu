@@ -96,8 +96,7 @@ export function TemplateSelector({
       },
     })
   );
-  const dags = data?.dags ?? [];
-  const filteredDags = dags;
+  const dags = useMemo(() => data?.dags ?? [], [data?.dags]);
 
   const resetFilters = useCallback(() => {
     setSearchTerm('');
@@ -113,16 +112,16 @@ export function TemplateSelector({
       setSelectedDag(null);
       return;
     }
-    const found = filteredDags.find((d) => d.fileName === selectedTemplate);
+    const found = dags.find((d) => d.fileName === selectedTemplate);
     if (found) {
       setSelectedDag(found);
     }
-  }, [filteredDags, selectedTemplate]);
+  }, [dags, selectedTemplate]);
 
   // Group DAGs by group field
   const groupedDags = useMemo(() => {
     const groups = new Map<string, DAGFile[]>();
-    for (const dag of filteredDags) {
+    for (const dag of dags) {
       const group = dag.dag.group || '';
       const list = groups.get(group) || [];
       list.push(dag);
@@ -136,7 +135,7 @@ export function TemplateSelector({
       return a[0].localeCompare(b[0]);
     });
     return sorted;
-  }, [filteredDags]);
+  }, [dags]);
 
   // Flattened list for keyboard navigation
   const flatList = useMemo(() => {
@@ -186,13 +185,13 @@ export function TemplateSelector({
 
   const handleSelect = useCallback(
     (fileName: string) => {
-      const dag = filteredDags.find((d) => d.fileName === fileName);
+      const dag = dags.find((d) => d.fileName === fileName);
       if (dag) setSelectedDag(dag);
       setIsOpen(false);
       resetFilters();
       onSelect(fileName);
     },
-    [filteredDags, onSelect, resetFilters]
+    [dags, onSelect, resetFilters]
   );
 
   const toggleLabel = useCallback((label: string) => {
