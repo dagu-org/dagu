@@ -141,7 +141,7 @@ type dag struct {
 	// Steps can override this configuration by specifying their own llm field.
 	LLM *llmConfig `yaml:"llm,omitempty"`
 	// Redis is the default Redis configuration for all redis steps in this DAG.
-	// Steps can override this configuration by specifying their own config fields.
+	// Steps can override this configuration by specifying their own with fields.
 	Redis *redisConfig `yaml:"redis,omitempty"`
 	// Harnesses contains reusable custom harness definitions available to harness steps.
 	Harnesses map[string]any `yaml:"harnesses,omitempty"`
@@ -149,7 +149,7 @@ type dag struct {
 	// Steps can override primary config keys and replace fallback entirely.
 	Harness map[string]any `yaml:"harness,omitempty"`
 	// Kubernetes is the default Kubernetes configuration for explicit k8s steps in this DAG.
-	// Steps can override this configuration by specifying their own config fields.
+	// Steps can override this configuration by specifying their own with fields.
 	Kubernetes map[string]any `yaml:"kubernetes,omitempty"`
 	// Secrets contains references to external secrets.
 	Secrets []secretRef `yaml:"secrets,omitempty"`
@@ -370,7 +370,7 @@ type s3Config struct {
 }
 
 // redisConfig defines the default Redis configuration for all redis steps in the DAG.
-// Steps can override these settings by specifying their own config fields.
+// Steps can override these settings by specifying their own with fields.
 type redisConfig struct {
 	// URL is the Redis connection URL (redis://user:pass@host:port/db).
 	URL string `yaml:"url,omitempty"`

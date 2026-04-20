@@ -331,7 +331,7 @@ harnesses:
 steps:
   - type: harness
     command: Review this repository
-    config:
+    with:
       provider: gemini
 `)
 
@@ -390,7 +390,7 @@ harnesses:
 steps:
   - type: harness
     command: Review this repository
-    config:
+    with:
       provider: gemini
 `)
 
@@ -444,7 +444,7 @@ harnesses:
 steps:
   - type: harness
     command: Review the repository
-    config:
+    with:
       provider: passthrough
 `)
 

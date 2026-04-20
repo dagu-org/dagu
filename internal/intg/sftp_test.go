@@ -48,7 +48,7 @@ type: graph
 steps:
   - name: upload-file
     type: sftp
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s
@@ -59,7 +59,7 @@ steps:
       destination: /tmp/uploaded_file.txt
   - name: verify-upload
     type: ssh
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s
@@ -93,7 +93,7 @@ type: graph
 steps:
   - name: create-remote-file
     type: ssh
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s
@@ -104,7 +104,7 @@ steps:
       echo "sftp download test content" > /tmp/download_test.txt
   - name: download-file
     type: sftp
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s
@@ -147,7 +147,7 @@ type: graph
 steps:
   - name: upload-dir
     type: sftp
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s
@@ -158,7 +158,7 @@ steps:
       destination: /tmp/uploaded_dir
   - name: verify-upload
     type: ssh
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s
@@ -194,7 +194,7 @@ type: graph
 steps:
   - name: create-remote-dir
     type: ssh
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s
@@ -207,7 +207,7 @@ steps:
       echo "remote nested" > /tmp/remote_dir/subdir/nested.txt
   - name: download-dir
     type: sftp
-    config:
+    with:
       host: 127.0.0.1
       port: "%s"
       user: %s

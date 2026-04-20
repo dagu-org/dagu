@@ -85,7 +85,7 @@
 | `mail_on_error` | bool | — | Send mail on step error |
 | `container` | string or object | — | Step-level container config |
 | `type` | string | — | Executor type override |
-| `config` | map | — | Executor-specific config |
+| `with` | map | — | Executor-specific config. Legacy alias: `config`; do not specify both fields |
 | `call` | string | — | Sub-DAG name (for `dag` executor) |
 | `params` | string or map | — | Sub-DAG parameters |
 | `parallel` | object or array | — | Parallel execution: `{items, max_concurrent}` (default max_concurrent: 10) |

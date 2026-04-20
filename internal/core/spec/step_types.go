@@ -317,12 +317,12 @@ func isBuiltinStepTypeName(name string) bool {
 	return ok
 }
 
-func validateCustomStepInput(stepTypeName string, schema *jsonschema.Resolved, input map[string]any) (map[string]any, error) {
+func validateCustomStepInput(stepTypeName string, schema *jsonschema.Resolved, fieldName string, input map[string]any) (map[string]any, error) {
 	working := make(map[string]any, len(input))
 	maps.Copy(working, input)
 	if err := schema.ApplyDefaults(&working); err != nil {
 		return nil, core.NewValidationError(
-			"config",
+			fieldName,
 			input,
 			fmt.Errorf("failed to apply %q input defaults: %w", stepTypeName, err),
 		)
@@ -334,7 +334,7 @@ func validateCustomStepInput(stepTypeName string, schema *jsonschema.Resolved, i
 			}
 		}
 		return nil, core.NewValidationError(
-			"config",
+			fieldName,
 			input,
 			fmt.Errorf("invalid %q input: %w", stepTypeName, err),
 		)
@@ -696,10 +696,10 @@ func buildCustomStepFromSpec(
 	}
 
 	input := map[string]any{}
-	if callSite.Config != nil {
-		input = cloneMap(callSite.Config)
+	if config := callSite.executorConfig(); config != nil {
+		input = cloneMap(config)
 	}
-	validatedInput, err := validateCustomStepInput(customType.Name, customType.InputSchema, input)
+	validatedInput, err := validateCustomStepInput(customType.Name, customType.InputSchema, callSite.executorConfigFieldName(), input)
 	if err != nil {
 		return nil, err
 	}
@@ -754,7 +754,7 @@ func mergeCustomStepRaw(
 	}
 	for key, value := range callSiteRaw {
 		switch key {
-		case "config", "type":
+		case "config", "with", "type":
 			continue
 		case "env":
 			combined, err := mergeCustomStepEnvRaw(merged[key], value)
@@ -839,8 +839,11 @@ func envValueToRaw(value types.EnvValue) any {
 
 func validateCustomStepCallSiteFields(callSite *step, raw map[string]any) error {
 	if raw != nil {
+		if err := validateStepConfigAliasRaw(raw); err != nil {
+			return err
+		}
 		for key := range raw {
-			if key == "config" || key == "type" {
+			if key == "config" || key == "with" || key == "type" {
 				continue
 			}
 			if _, ok := customStepForbiddenCallSiteFields[key]; ok {
@@ -852,6 +855,9 @@ func validateCustomStepCallSiteFields(callSite *step, raw map[string]any) error 
 
 	if callSite == nil {
 		return nil
+	}
+	if err := validateStepConfigAliasStruct(callSite); err != nil {
+		return err
 	}
 	if callSite.WorkingDir != "" {
 		return core.NewValidationError("working_dir", callSite.WorkingDir, fmt.Errorf("field %q is not allowed when using a custom step type", "working_dir"))

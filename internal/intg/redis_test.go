@@ -42,7 +42,7 @@ redis:
 steps:
   - name: ping
     type: redis
-    config:
+    with:
       command: PING
     output: REDIS_OUT
 `, redisTestImage, port, port)
@@ -69,7 +69,7 @@ redis:
 steps:
   - name: set-value
     type: redis
-    config:
+    with:
       command: SET
       key: test-key
       value: hello
@@ -77,7 +77,7 @@ steps:
     depends:
       - set-value
     type: redis
-    config:
+    with:
       command: GET
       key: test-key
     output: REDIS_GET_OUT
@@ -106,7 +106,7 @@ redis:
 steps:
   - name: set-in-db1
     type: redis
-    config:
+    with:
       command: SET
       key: db-test-key
       value: in-db1
@@ -115,7 +115,7 @@ steps:
     depends:
       - set-in-db1
     type: redis
-    config:
+    with:
       command: GET
       key: db-test-key
       db: 1
@@ -143,7 +143,7 @@ redis:
 steps:
   - name: run-pipeline
     type: redis
-    config:
+    with:
       pipeline:
         - command: SET
           key: pipe-key1
@@ -177,7 +177,7 @@ redis:
 steps:
   - name: lpush-items
     type: redis
-    config:
+    with:
       command: LPUSH
       key: mylist
       values:
@@ -188,7 +188,7 @@ steps:
     depends:
       - lpush-items
     type: redis
-    config:
+    with:
       command: LLEN
       key: mylist
     output: LIST_LEN
@@ -216,7 +216,7 @@ redis:
 steps:
   - name: hset-fields
     type: redis
-    config:
+    with:
       command: HSET
       key: myhash
       fields:
@@ -226,7 +226,7 @@ steps:
     depends:
       - hset-fields
     type: redis
-    config:
+    with:
       command: HGET
       key: myhash
       field: field1
@@ -255,7 +255,7 @@ redis:
 steps:
   - name: set-with-ttl
     type: redis
-    config:
+    with:
       command: SET
       key: ttl-key
       value: ttl-value
@@ -264,7 +264,7 @@ steps:
     depends:
       - set-with-ttl
     type: redis
-    config:
+    with:
       command: EXISTS
       key: ttl-key
     output: EXISTS_OUT
