@@ -289,11 +289,14 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	if err := a.requireDAGWriteForWorkspace(ctx, dagWorkspaceName(currentDAG)); err != nil {
 		return nil, err
 	}
-	nextDAG, _ := a.dagStore.LoadSpec(ctx,
+	nextDAG, err := a.dagStore.LoadSpec(ctx,
 		[]byte(request.Body.Spec),
 		spec.WithName(request.FileName),
 		spec.WithAllowBuildErrors(),
 	)
+	if err != nil {
+		return nil, err
+	}
 	if nextDAG != nil {
 		if err := a.requireDAGWriteForWorkspace(ctx, dagWorkspaceName(nextDAG)); err != nil {
 			return nil, err

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components, WorkspaceScope } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
@@ -24,6 +24,7 @@ import {
 import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
 import dayjs from '../../../lib/dayjs';
 import {
+  sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
   workspaceNameFromLabels,
 } from '../../../lib/workspace';
@@ -51,9 +52,16 @@ function DAGDetails() {
     searchParams.get('remoteNode') ||
     appBarContext.selectedRemoteNode ||
     'local';
-  const workspaceSelection = sanitizeWorkspaceSelection(
-    appBarContext.workspaceSelection
+  const queryWorkspace = sanitizeWorkspaceName(
+    searchParams.get('workspace') ?? ''
   );
+  const appWorkspaceSelection = appBarContext.workspaceSelection;
+  const workspaceSelection = useMemo(() => {
+    if (queryWorkspace) {
+      return { scope: WorkspaceScope.workspace, workspace: queryWorkspace };
+    }
+    return sanitizeWorkspaceSelection(appWorkspaceSelection);
+  }, [appWorkspaceSelection, queryWorkspace]);
   const fileName = params.fileName || '';
 
   // Set page context for agent chat
@@ -95,12 +103,17 @@ function DAGDetails() {
   // Build URL with remote node parameter if needed
   const buildUrl = useCallback(
     (path: string) => {
+      const nextSearchParams = new URLSearchParams();
       if (remoteNode && remoteNode !== 'local') {
-        return `${path}?remoteNode=${encodeURIComponent(remoteNode)}`;
+        nextSearchParams.set('remoteNode', remoteNode);
       }
-      return path;
+      if (queryWorkspace) {
+        nextSearchParams.set('workspace', queryWorkspace);
+      }
+      const query = nextSearchParams.toString();
+      return query ? `${path}?${query}` : path;
     },
-    [remoteNode]
+    [queryWorkspace, remoteNode]
   );
 
   // Handle tab changes - navigates to the appropriate URL for the given tab

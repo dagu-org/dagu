@@ -178,11 +178,14 @@ function SearchResult(props: Props) {
           const dagWorkspaceQuery = workspaceMutationQueryForWorkspace(
             result.workspace
           );
+          const linkSearch = result.workspace
+            ? `?workspace=${encodeURIComponent(result.workspace)}`
+            : '';
           return {
             key: `dag-${result.fileName}-${result.workspace ?? ''}-${query}`,
             kind: 'DAG' as const,
             title: result.name,
-            link: `/dags/${encodeURI(result.fileName)}/spec`,
+            link: `/dags/${encodeURI(result.fileName)}/spec${linkSearch}`,
             initialMatches: result.matches ?? [],
             initialHasMoreMatches: result.hasMoreMatches,
             initialNextCursor: result.nextMatchesCursor,

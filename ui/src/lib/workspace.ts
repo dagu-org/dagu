@@ -261,7 +261,6 @@ export function getStoredWorkspaceSelection(): WorkspaceSelection {
         persistWorkspaceSelection(selection);
         return selection;
       }
-      return defaultWorkspaceSelection();
     }
 
     const cockpitLegacy = localStorage.getItem(
