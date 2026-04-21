@@ -61,6 +61,7 @@ export function WorkspaceSelector({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>('idle');
+  const supportsScopedSelection = Boolean(onSelectScope);
   const selection = sanitizeWorkspaceSelection(
     workspaceSelection ??
       (selectedWorkspace
@@ -218,9 +219,11 @@ export function WorkspaceSelector({
             <SelectItem value={ACCESSIBLE_VALUE}>
               {ACCESSIBLE_WORKSPACES_DISPLAY_NAME}
             </SelectItem>
-            <SelectItem value={NONE_VALUE}>
-              {NO_WORKSPACE_DISPLAY_NAME}
-            </SelectItem>
+            {supportsScopedSelection && (
+              <SelectItem value={NONE_VALUE}>
+                {NO_WORKSPACE_DISPLAY_NAME}
+              </SelectItem>
+            )}
             {workspaces.map((ws) => (
               <SelectItem
                 key={ws.id}

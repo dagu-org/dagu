@@ -46,6 +46,10 @@ function titleFromPath(docPath: string): string {
   return segments[segments.length - 1] || docPath;
 }
 
+function encodeDocPathForURL(docPath: string): string {
+  return docPath.split('/').map(encodeURIComponent).join('/');
+}
+
 function DocsContent() {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
@@ -210,15 +214,16 @@ function DocsContent() {
     const targetSearch = activeTab?.workspace
       ? `?workspace=${encodeURIComponent(activeTab.workspace)}`
       : '';
-    if (docPath && docPath !== decodeURIComponent(currentPath)) {
+    const encodedDocPath = docPath ? encodeDocPathForURL(docPath) : '';
+    if (docPath && encodedDocPath !== currentPath) {
       isNavigatingRef.current = true;
-      navigate('/docs/' + docPath + targetSearch, { replace: true });
+      navigate(`/docs/${encodedDocPath}${targetSearch}`, { replace: true });
       requestAnimationFrame(() => {
         isNavigatingRef.current = false;
       });
     } else if (docPath && location.search !== targetSearch) {
       isNavigatingRef.current = true;
-      navigate('/docs/' + docPath + targetSearch, { replace: true });
+      navigate(`/docs/${encodedDocPath}${targetSearch}`, { replace: true });
       requestAnimationFrame(() => {
         isNavigatingRef.current = false;
       });

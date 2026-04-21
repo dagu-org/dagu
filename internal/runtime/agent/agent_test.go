@@ -61,11 +61,22 @@ done
 `, test.PosixQuote(path), test.Sleep(pollInterval))
 }
 
+func signalFileThenWaitScript(signalPath, waitPath string, pollInterval time.Duration) string {
+	return fmt.Sprintf("%s\n%s", writeFileCommand(signalPath, "started"), waitForFileScript(waitPath, pollInterval))
+}
+
 func writeFileCommand(path, content string) string {
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf("Set-Content -Path %s -Value %s -NoNewline", test.PowerShellQuote(path), test.PowerShellQuote(content))
 	}
 	return fmt.Sprintf("printf '%%s' %s > %s", test.PosixQuote(content), test.PosixQuote(path))
+}
+
+func agentRunStartTimeout() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 30 * time.Second
+	}
+	return 5 * time.Second
 }
 
 func pwdCommand() string {
@@ -128,11 +139,13 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
-		releaseFile := filepath.Join(t.TempDir(), "release")
+		runDir := t.TempDir()
+		startedFile := filepath.Join(runDir, "started")
+		releaseFile := filepath.Join(runDir, "release")
 		dag := th.DAG(t, fmt.Sprintf(`steps:
   - name: wait-until-released
     command: %q
-`, waitForFileScript(releaseFile, 50*time.Millisecond)))
+`, signalFileThenWaitScript(startedFile, releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
 		runDone := false
 		runErr := make(chan error, 1)
@@ -154,12 +167,15 @@ func TestAgent_Run(t *testing.T) {
 		})
 
 		require.Eventually(t, func() bool {
+			if _, err := os.Stat(startedFile); err != nil {
+				return false
+			}
 			status, err := th.DAGRunMgr.GetCurrentStatus(context.Background(), dag.DAG, "test-dag-run")
 			if err != nil || status == nil || status.Status != core.Running {
 				return false
 			}
 			return th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, "test-dag-run")
-		}, 2*time.Second, 50*time.Millisecond, "DAG should be running")
+		}, agentRunStartTimeout(), 50*time.Millisecond, "DAG should be running after the blocking step starts")
 
 		require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 
