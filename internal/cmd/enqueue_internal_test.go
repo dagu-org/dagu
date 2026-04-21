@@ -211,6 +211,9 @@ func (s *enqueueObservingQueueStore) Enqueue(context.Context, string, exec.Queue
 	if !s.attempt.closed {
 		return errors.New("status attempt was not closed before queue enqueue")
 	}
+	if s.attempt.status == nil || s.attempt.status.Status != core.Queued {
+		return errors.New("queued status was not written before queue enqueue")
+	}
 	s.enqueued = true
 	return nil
 }
