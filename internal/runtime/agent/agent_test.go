@@ -168,6 +168,9 @@ func TestAgent_Run(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			if _, err := os.Stat(startedFile); err != nil {
+				if !os.IsNotExist(err) {
+					require.NoError(t, err, "failed to stat started marker")
+				}
 				return false
 			}
 			status, err := th.DAGRunMgr.GetCurrentStatus(context.Background(), dag.DAG, "test-dag-run")
