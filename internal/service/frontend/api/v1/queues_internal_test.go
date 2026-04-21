@@ -83,36 +83,50 @@ func TestGetQueueFallsBackToDAGNameWhenLeaseQueueIsEmpty(t *testing.T) {
 	assert.Equal(t, "fresh-run", queueResp.Running[0].DagRunId)
 }
 
-func TestGetQueueCountsFreshLeaseForQueuedAttemptAsRunning(t *testing.T) {
+func TestGetQueueCountsFreshLeaseForClaimedAttemptAsRunning(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	tmpDir := t.TempDir()
-	dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
-	leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
-	procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
-
-	createDistributedQueueRunWithStatus(t, ctx, dagRunStore, leaseStore, "lease-q", "claimed-run", "lease-q", time.Now(), core.Queued)
-
-	a := &API{
-		dagRunStore:         dagRunStore,
-		dagRunLeaseStore:    leaseStore,
-		procStore:           procStore,
-		config:              &config.Config{},
-		leaseStaleThreshold: time.Minute,
+	tests := []struct {
+		name   string
+		status core.Status
+	}{
+		{name: "Queued", status: core.Queued},
+		{name: "NotStarted", status: core.NotStarted},
 	}
 
-	resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{
-		Name: "lease-q",
-	})
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
-	require.True(t, ok)
-	require.Len(t, queueResp.Running, 1)
-	assert.Equal(t, 1, queueResp.RunningCount)
-	assert.Equal(t, "claimed-run", queueResp.Running[0].DagRunId)
-	assert.Equal(t, openapiv1.StatusRunning, queueResp.Running[0].Status)
+			ctx := context.Background()
+			tmpDir := t.TempDir()
+			dagRunStore := filedagrun.New(filepath.Join(tmpDir, "dag-runs"))
+			leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(tmpDir, "distributed"))
+			procStore := fileproc.New(filepath.Join(tmpDir, "proc"))
+
+			createDistributedQueueRunWithStatus(t, ctx, dagRunStore, leaseStore, "lease-q", "claimed-run", "lease-q", time.Now(), tt.status)
+
+			a := &API{
+				dagRunStore:         dagRunStore,
+				dagRunLeaseStore:    leaseStore,
+				procStore:           procStore,
+				config:              &config.Config{},
+				leaseStaleThreshold: time.Minute,
+			}
+
+			resp, err := a.GetQueue(ctx, openapiv1.GetQueueRequestObject{
+				Name: "lease-q",
+			})
+			require.NoError(t, err)
+
+			queueResp, ok := resp.(openapiv1.GetQueue200JSONResponse)
+			require.True(t, ok)
+			require.Len(t, queueResp.Running, 1)
+			assert.Equal(t, 1, queueResp.RunningCount)
+			assert.Equal(t, "claimed-run", queueResp.Running[0].DagRunId)
+			assert.Equal(t, openapiv1.StatusRunning, queueResp.Running[0].Status)
+		})
+	}
 }
 
 func TestGetQueueCountsQueuedItemsSeparatelyFromRunningItems(t *testing.T) {

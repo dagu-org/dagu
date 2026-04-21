@@ -675,6 +675,24 @@ steps:
 `,
 		},
 		{
+			name: "NumericPorts",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: 22
+      direction: upload
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+      bastion:
+        host: bastion.example.com
+        user: deploy
+        port: 2222
+`,
+		},
+		{
 			name: "LegacyConfigAlias",
 			spec: `
 steps:

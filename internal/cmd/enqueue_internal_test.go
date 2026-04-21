@@ -41,6 +41,34 @@ func TestEnqueueDAGRunClosesStatusBeforeQueuePublish(t *testing.T) {
 	assert.Equal(t, core.Queued, attempt.status.Status)
 }
 
+func TestEnqueueDAGRunPublishesQueueWhenCloseFails(t *testing.T) {
+	th := test.Setup(t)
+	th.Config.Queues.Enabled = true
+
+	attempt := &enqueueTrackingAttempt{
+		id:       "attempt-1",
+		closeErr: errors.New("sync failed"),
+	}
+	runStore := &enqueueTrackingDAGRunStore{attempt: attempt}
+	queueStore := &enqueueObservingQueueStore{attempt: attempt}
+	dag := th.DAG(t, `steps:
+  - name: "step"
+    command: "true"
+`).DAG
+
+	ctx := &Context{
+		Context:     th.Context,
+		Config:      th.Config,
+		DAGRunStore: runStore,
+		QueueStore:  queueStore,
+	}
+
+	require.NoError(t, enqueueDAGRun(ctx, dag, "run-1", core.TriggerTypeManual, ""))
+	assert.True(t, queueStore.enqueued)
+	require.NotNil(t, attempt.status)
+	assert.Equal(t, core.Queued, attempt.status.Status)
+}
+
 type enqueueTrackingDAGRunStore struct {
 	attempt *enqueueTrackingAttempt
 }
@@ -94,11 +122,12 @@ func (s *enqueueTrackingDAGRunStore) RemoveDAGRun(context.Context, exec.DAGRunRe
 }
 
 type enqueueTrackingAttempt struct {
-	id     string
-	dag    *core.DAG
-	open   bool
-	closed bool
-	status *exec.DAGRunStatus
+	id       string
+	dag      *core.DAG
+	open     bool
+	closed   bool
+	closeErr error
+	status   *exec.DAGRunStatus
 }
 
 func (a *enqueueTrackingAttempt) ID() string {
@@ -122,7 +151,7 @@ func (a *enqueueTrackingAttempt) Write(_ context.Context, status exec.DAGRunStat
 func (a *enqueueTrackingAttempt) Close(context.Context) error {
 	a.open = false
 	a.closed = true
-	return nil
+	return a.closeErr
 }
 
 func (a *enqueueTrackingAttempt) ReadStatus(context.Context) (*exec.DAGRunStatus, error) {

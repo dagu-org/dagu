@@ -5,10 +5,15 @@ worker_selector:
 steps:
   - name: hold-and-report
     command: |
+      set -e
       : "${DAGU_E2E_STATE_DIR:?DAGU_E2E_STATE_DIR is required}"
       release_file="${DAGU_E2E_STATE_DIR}/e2e-distributed-queue.release"
       release_gate="${DAGU_E2E_STATE_DIR}/e2e-distributed-queue.release.fifo"
       if [ ! -f "$release_file" ]; then
+        if [ ! -p "$release_gate" ]; then
+          echo "release gate is not a FIFO: $release_gate" >&2
+          exit 1
+        fi
         cat "$release_gate" >/dev/null
       fi
       echo "e2e distributed worker ok"

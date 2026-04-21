@@ -2600,7 +2600,7 @@
               "description": "Bastion host address."
             },
             "port": {
-              "type": "string",
+              "oneOf": [{ "type": "string" }, { "type": "integer" }],
               "description": "Bastion SSH port."
             },
             "user": {

@@ -168,13 +168,23 @@ func parseShellConfig(shell string, args []string) (string, []string, error) {
 	return strings.TrimSpace(parsedShell), allArgs, nil
 }
 
+func portValueSchema(description string) *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Description: description,
+		OneOf: []*jsonschema.Schema{
+			{Type: "string"},
+			{Type: "integer"},
+		},
+	}
+}
+
 var configSchema = &jsonschema.Schema{
 	Type: "object",
 	Properties: map[string]*jsonschema.Schema{
 		"user":            {Type: "string", Description: "SSH username"},
 		"host":            {Type: "string", Description: "SSH hostname"},
 		"ip":              {Type: "string", Description: "SSH host IP (alias for host)"},
-		"port":            {Type: "string", Description: "SSH port"},
+		"port":            portValueSchema("SSH port"),
 		"key":             {Type: "string", Description: "Path to private key file"},
 		"password":        {Type: "string", Description: "SSH password"},
 		"strict_host_key": {Type: "boolean", Description: "Enable strict host key checking"},
@@ -187,7 +197,7 @@ var configSchema = &jsonschema.Schema{
 			Description: "Bastion/jump host configuration",
 			Properties: map[string]*jsonschema.Schema{
 				"host":     {Type: "string", Description: "Bastion host address"},
-				"port":     {Type: "string", Description: "Bastion SSH port"},
+				"port":     portValueSchema("Bastion SSH port"),
 				"user":     {Type: "string", Description: "Bastion SSH username"},
 				"key":      {Type: "string", Description: "Path to bastion private key file"},
 				"password": {Type: "string", Description: "Bastion SSH password"},
@@ -202,7 +212,7 @@ var sftpConfigSchema = &jsonschema.Schema{
 		"user":            {Type: "string", Description: "SSH username"},
 		"host":            {Type: "string", Description: "SSH hostname"},
 		"ip":              {Type: "string", Description: "SSH host IP (alias for host)"},
-		"port":            {Type: "string", Description: "SSH port"},
+		"port":            portValueSchema("SSH port"),
 		"key":             {Type: "string", Description: "Path to private key file"},
 		"password":        {Type: "string", Description: "SSH password"},
 		"strict_host_key": {Type: "boolean", Description: "Enable strict host key checking"},
@@ -216,7 +226,7 @@ var sftpConfigSchema = &jsonschema.Schema{
 			Description: "Bastion/jump host configuration",
 			Properties: map[string]*jsonschema.Schema{
 				"host":     {Type: "string", Description: "Bastion host address"},
-				"port":     {Type: "string", Description: "Bastion SSH port"},
+				"port":     portValueSchema("Bastion SSH port"),
 				"user":     {Type: "string", Description: "Bastion SSH username"},
 				"key":      {Type: "string", Description: "Path to bastion private key file"},
 				"password": {Type: "string", Description: "Bastion SSH password"},

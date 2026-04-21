@@ -43,7 +43,7 @@ test('exercises the web UI against the real distributed shared-nothing worker st
   let completed = false;
   let releaseGateReady = false;
 
-  const releaseRuns = async () => {
+  const releaseRuns = async (): Promise<void> => {
     await fs.mkdir(path.dirname(releaseFile), { recursive: true });
     await fs.writeFile(releaseFile, 'release\n', 'utf8');
     await execFile(
