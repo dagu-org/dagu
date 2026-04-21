@@ -6990,7 +6990,7 @@ components:
     Workspace:
       name: workspace
       in: query
-      description: "Workspace name. For collection APIs, used when workspaceScope=workspace; for document target APIs, omitted means default."
+      description: "Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default."
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceName"
@@ -6998,7 +6998,7 @@ components:
     WorkspaceScope:
       name: workspaceScope
       in: query
-      description: "Explicit workspace scope: all data, default data, or one named workspace"
+      description: "Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required."
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceScope"
