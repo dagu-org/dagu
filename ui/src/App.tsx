@@ -86,6 +86,21 @@ type Props = {
 
 const REMOTE_NODE_STORAGE_KEY = 'dagu-selected-remote-node';
 
+function isWorkspaceScopedSWRKey(key: unknown): boolean {
+  if (!Array.isArray(key) || key.length < 3) {
+    return false;
+  }
+
+  const init = key[2];
+  if (!init || typeof init !== 'object') {
+    return false;
+  }
+
+  const query = (init as { params?: { query?: Record<string, unknown> } })
+    .params?.query;
+  return !!query && Object.prototype.hasOwnProperty.call(query, 'workspace');
+}
+
 function parseRemoteNodes(remoteNodesConfig: string): string[] {
   const nodes = remoteNodesConfig
     .split(',')
@@ -234,9 +249,9 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       setWorkspaceSelection(sanitized);
       persistWorkspaceSelection(sanitized);
 
-      // Workspace selection is part of most active data keys. Clear cached
-      // responses so pages that do not remount still refetch with the new value.
-      globalMutate(() => true, undefined, { revalidate: false });
+      // Revalidate active workspace-scoped queries without blanking unrelated
+      // cache entries, such as system status or worker lists.
+      void globalMutate(isWorkspaceScopedSWRKey);
     },
     []
   );

@@ -72,17 +72,37 @@ describe('workspace storage', () => {
     });
   });
 
-  it('drops deprecated stored legacy scope names', () => {
+  it('migrates deprecated stored legacy scope names', () => {
     localStorage.setItem(
       LEGACY_WORKSPACE_SCOPE_STORAGE_KEY,
       JSON.stringify({ scope: 'none' })
     );
 
     expect(getStoredWorkspaceSelection()).toEqual({
+      kind: WorkspaceKind.default,
+    });
+    expect(localStorage.getItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
+    expect(
+      JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? '')
+    ).toEqual({
+      kind: WorkspaceKind.default,
+    });
+
+    localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+    localStorage.setItem(
+      LEGACY_WORKSPACE_SCOPE_STORAGE_KEY,
+      JSON.stringify({ scope: 'accessible' })
+    );
+
+    expect(getStoredWorkspaceSelection()).toEqual({
       kind: WorkspaceKind.all,
     });
     expect(localStorage.getItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
-    expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBeNull();
+    expect(
+      JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? '')
+    ).toEqual({
+      kind: WorkspaceKind.all,
+    });
   });
 });
 

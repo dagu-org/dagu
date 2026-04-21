@@ -15,6 +15,7 @@ export const WorkspaceKind = {
   workspace: 'workspace',
 } as const;
 export type WorkspaceKind = (typeof WorkspaceKind)[keyof typeof WorkspaceKind];
+type StoredWorkspaceKind = WorkspaceKind | 'accessible' | 'none';
 
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -211,22 +212,41 @@ export function visibleDocumentPathForWorkspace(
   return docPath.startsWith(prefix) ? docPath.slice(prefix.length) : docPath;
 }
 
+function normalizeStoredWorkspaceKind(kind: unknown): WorkspaceKind | null {
+  switch (kind) {
+    case 'accessible':
+      return WorkspaceKind.all;
+    case 'none':
+      return WorkspaceKind.default;
+    case WorkspaceKind.all:
+    case WorkspaceKind.default:
+    case WorkspaceKind.workspace:
+      return kind;
+    default:
+      return null;
+  }
+}
+
 function parseStoredWorkspaceSelection(
   value: string
 ): WorkspaceSelection | null {
   try {
-    const parsed = JSON.parse(value) as Partial<WorkspaceSelection> & {
-      scope?: WorkspaceKind;
+    const parsed = JSON.parse(value) as {
+      kind?: StoredWorkspaceKind;
+      scope?: StoredWorkspaceKind;
+      workspace?: unknown;
     };
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return null;
     }
-    const kind = (parsed.kind ?? parsed.scope) as WorkspaceKind | undefined;
+    const kind = normalizeStoredWorkspaceKind(parsed.kind ?? parsed.scope);
     if (kind === WorkspaceKind.default) {
       return { kind: WorkspaceKind.default };
     }
     if (kind === WorkspaceKind.workspace) {
-      const workspace = sanitizeWorkspaceName(parsed.workspace ?? '');
+      const workspace = sanitizeWorkspaceName(
+        typeof parsed.workspace === 'string' ? parsed.workspace : ''
+      );
       return workspace ? { kind: WorkspaceKind.workspace, workspace } : null;
     }
     if (kind === WorkspaceKind.all) {
