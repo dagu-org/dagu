@@ -85,10 +85,27 @@ type Props = {
 };
 
 const REMOTE_NODE_STORAGE_KEY = 'dagu-selected-remote-node';
+const WORKSPACE_SENSITIVE_TARGET_PATH_PREFIXES = [
+  '/dags/{fileName}',
+  '/dag-runs/{name}/{dagRunId}',
+] as const;
+
+function isWorkspaceSensitiveTargetPath(path: unknown): boolean {
+  return (
+    typeof path === 'string' &&
+    WORKSPACE_SENSITIVE_TARGET_PATH_PREFIXES.some((prefix) =>
+      path.startsWith(prefix)
+    )
+  );
+}
 
 function isWorkspaceScopedSWRKey(key: unknown): boolean {
   if (!Array.isArray(key) || key.length < 3) {
     return false;
+  }
+
+  if (isWorkspaceSensitiveTargetPath(key[1])) {
+    return true;
   }
 
   const init = key[2];
