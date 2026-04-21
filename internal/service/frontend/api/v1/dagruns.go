@@ -3759,7 +3759,7 @@ func artifactPreviewLimit(kind api.ArtifactPreviewKind) int64 {
 // GetDAGRunsListData returns DAG runs list for SSE.
 // Identifier format: URL query string (e.g., "status=running&name=mydag")
 func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, error) {
-	opts, err := dagRunListOptionsFromQueryString(ctx, queryString)
+	opts, err := a.dagRunListOptionsFromQueryString(ctx, queryString)
 	if err != nil {
 		return nil, err
 	}
@@ -3775,7 +3775,7 @@ func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, 
 	return toDAGRunsPageResponse(page), nil
 }
 
-func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (dagRunListOptions, error) {
+func (a *API) dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (dagRunListOptions, error) {
 	params, err := url.ParseQuery(queryString)
 	if err != nil {
 		logger.Warn(ctx, "Failed to parse query string for DAG runs list",
@@ -3853,7 +3853,7 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 		cursor = &rawCursor
 	}
 
-	return buildDAGRunListOptions(dagRunListFilterInput{
+	opts := buildDAGRunListOptions(dagRunListFilterInput{
 		statuses: statusValues,
 		fromDate: fromDate,
 		toDate:   toDate,
@@ -3862,7 +3862,16 @@ func dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (
 		labels:   labels,
 		limit:    limit,
 		cursor:   cursor,
-	}), nil
+	})
+
+	scopeParam, workspaceParam := workspaceScopeParamsFromValues(params)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, scopeParam, workspaceParam)
+	if err != nil {
+		return dagRunListOptions{}, err
+	}
+	opts.query = append(opts.query, exec.WithWorkspaceFilter(workspaceFilter))
+
+	return opts, nil
 }
 
 func toCoreStatuses(statuses *api.StatusList) []core.Status {
