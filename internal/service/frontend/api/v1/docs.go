@@ -206,32 +206,6 @@ func (a *API) docReadScopeForParams(
 	return "", visibility, nil
 }
 
-func parseWorkspaceMutationScope(scopeParam *api.WorkspaceMutationScope, workspaceParam *api.Workspace) (workspaceScopeSelection, error) {
-	var readScope *api.WorkspaceScope
-	if scopeParam != nil {
-		converted := api.WorkspaceScope(*scopeParam)
-		readScope = &converted
-	}
-	selection, err := parseWorkspaceScope(readScope, workspaceParam)
-	if err != nil {
-		return workspaceScopeSelection{}, err
-	}
-	switch selection.scope {
-	case api.WorkspaceScopeAll:
-		if selection.explicit {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=all cannot be used for single-resource operations")
-		}
-		selection.scope = api.WorkspaceScopeDefault
-		return selection, nil
-	case api.WorkspaceScopeDefault:
-		return selection, nil
-	case api.WorkspaceScopeWorkspace:
-		return selection, nil
-	default:
-		return workspaceScopeSelection{}, badWorkspaceScopeError("invalid workspaceScope")
-	}
-}
-
 func (a *API) docPointReadScopeForParams(
 	ctx context.Context,
 	scopeParam *api.WorkspaceMutationScope,
@@ -778,9 +752,10 @@ func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) 
 		workspaceName string
 		visibility    docWorkspaceVisibility
 		err           error
+		params        url.Values
 	)
 	if hasQuery {
-		params, err := url.ParseQuery(queryString)
+		params, err = url.ParseQuery(queryString)
 		if err != nil {
 			return nil, err
 		}

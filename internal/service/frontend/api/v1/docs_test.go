@@ -6,6 +6,7 @@ package api_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"path"
 	"slices"
 	"sort"
@@ -713,6 +714,9 @@ func TestCreateDoc(t *testing.T) {
 			},
 		})
 		require.Error(t, err)
+		var apiErr *apiv1.Error
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusBadRequest, apiErr.HTTPStatus)
 		assert.NotContains(t, setup.store.docs, "ops/runbook")
 	})
 

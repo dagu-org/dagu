@@ -34,6 +34,7 @@ import {
   isMutableWorkspaceSelection,
   sanitizeWorkspaceName,
   workspaceMutationSelectionQuery,
+  workspaceMutationQueryForWorkspace,
   workspaceSelectionKey,
   workspaceSelectionQuery,
   visibleDocumentPathForWorkspace,
@@ -60,6 +61,30 @@ function workspaceSearchForDocTab(workspace?: string | null): string {
     return `?workspace=${encodeURIComponent(sanitized)}`;
   }
   return `?workspaceScope=${WorkspaceMutationScope.default}`;
+}
+
+function normalizedDocWorkspace(workspace?: string | null): string | null {
+  return sanitizeWorkspaceName(workspace ?? '') || null;
+}
+
+function docWorkspaceMatches(
+  left?: string | null,
+  right?: string | null
+): boolean {
+  return normalizedDocWorkspace(left) === normalizedDocWorkspace(right);
+}
+
+function docPathMatches(docPath: string, targetPath: string): boolean {
+  return docPath === targetPath || docPath.startsWith(targetPath + '/');
+}
+
+function mutationWorkspaceFromQuery(
+  query: { workspaceScope: WorkspaceMutationScope; workspace?: string } | null
+): string | null {
+  if (query?.workspaceScope !== WorkspaceMutationScope.workspace) {
+    return null;
+  }
+  return normalizedDocWorkspace(query.workspace);
 }
 
 function DocsContent() {
@@ -116,15 +141,20 @@ function DocsContent() {
 
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameDocPath, setRenameDocPath] = useState('');
+  const [renameWorkspace, setRenameWorkspace] = useState<string | null>(null);
   const [renameLoading, setRenameLoading] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteDocPath, setDeleteDocPath] = useState('');
   const [deleteDocTitle, setDeleteDocTitle] = useState('');
+  const [deleteWorkspace, setDeleteWorkspace] = useState<string | null>(null);
 
   // Batch delete state
   const [batchDeletePaths, setBatchDeletePaths] = useState<string[]>([]);
+  const [batchDeleteWorkspace, setBatchDeleteWorkspace] = useState<
+    string | null
+  >(null);
   const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
 
   // Sort preferences
@@ -277,21 +307,26 @@ function DocsContent() {
           break;
         case 'rename':
           setRenameDocPath(action.docPath);
+          setRenameWorkspace(mutationWorkspaceFromQuery(workspaceMutationQuery));
           setRenameError(null);
           setRenameModalOpen(true);
           break;
         case 'delete':
           setDeleteDocPath(action.docPath);
           setDeleteDocTitle(action.title);
+          setDeleteWorkspace(mutationWorkspaceFromQuery(workspaceMutationQuery));
           setDeleteConfirmOpen(true);
           break;
         case 'deleteBatch':
-          setBatchDeletePaths([...selectedIds]);
+          setBatchDeletePaths([...action.paths]);
+          setBatchDeleteWorkspace(
+            mutationWorkspaceFromQuery(workspaceMutationQuery)
+          );
           setBatchDeleteConfirmOpen(true);
           break;
       }
     },
-    [selectedIds]
+    [workspaceMutationQuery]
   );
 
   // Create handler
@@ -352,12 +387,13 @@ function DocsContent() {
       setRenameLoading(true);
       setRenameError(null);
       try {
+        const mutationQuery = workspaceMutationQueryForWorkspace(renameWorkspace);
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
             query: {
               remoteNode,
               path: renameDocPath,
-              ...workspaceMutationQuery,
+              ...mutationQuery,
             },
           },
           body: { newPath },
@@ -367,11 +403,11 @@ function DocsContent() {
           return;
         }
         mutate();
-        // Update all tabs under the renamed path (handles both file and directory renames).
+        // Update tabs under the renamed path in the mutated workspace only.
         for (const tab of tabs) {
           if (
-            tab.docPath === renameDocPath ||
-            tab.docPath.startsWith(renameDocPath + '/')
+            docWorkspaceMatches(tab.workspace, renameWorkspace) &&
+            docPathMatches(tab.docPath, renameDocPath)
           ) {
             const updatedPath =
               newPath + tab.docPath.slice(renameDocPath.length);
@@ -395,6 +431,7 @@ function DocsContent() {
       remoteNode,
       workspaceMutationQuery,
       renameDocPath,
+      renameWorkspace,
       mutate,
       tabs,
       updateTab,
@@ -411,6 +448,9 @@ function DocsContent() {
         );
         return;
       }
+      const mutationWorkspace = mutationWorkspaceFromQuery(
+        workspaceMutationQuery
+      );
       try {
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
@@ -427,11 +467,11 @@ function DocsContent() {
           return;
         }
         mutate();
-        // Update ALL tabs under the moved path (handles both file and directory moves).
+        // Update tabs under the moved path in the mutated workspace only.
         for (const tab of tabs) {
           if (
-            tab.docPath === oldPath ||
-            tab.docPath.startsWith(oldPath + '/')
+            docWorkspaceMatches(tab.workspace, mutationWorkspace) &&
+            docPathMatches(tab.docPath, oldPath)
           ) {
             const updatedPath = newPath + tab.docPath.slice(oldPath.length);
             updateTab(tab.id, {
@@ -491,9 +531,10 @@ function DocsContent() {
       return;
     }
     try {
+      const mutationQuery = workspaceMutationQueryForWorkspace(deleteWorkspace);
       const { error } = await client.DELETE('/docs/doc', {
         params: {
-          query: { remoteNode, path: deleteDocPath, ...workspaceMutationQuery },
+          query: { remoteNode, path: deleteDocPath, ...mutationQuery },
         },
       });
       if (error) {
@@ -504,8 +545,8 @@ function DocsContent() {
       // Close tabs for deleted path (exact match + prefix for directories)
       for (const tab of tabs) {
         if (
-          tab.docPath === deleteDocPath ||
-          tab.docPath.startsWith(deleteDocPath + '/')
+          docWorkspaceMatches(tab.workspace, deleteWorkspace) &&
+          docPathMatches(tab.docPath, deleteDocPath)
         ) {
           clearDraft(tab.id);
           markTabSaved(tab.id);
@@ -524,6 +565,7 @@ function DocsContent() {
     remoteNode,
     workspaceMutationQuery,
     deleteDocPath,
+    deleteWorkspace,
     mutate,
     tabs,
     closeTab,
@@ -543,8 +585,10 @@ function DocsContent() {
       return;
     }
     try {
+      const mutationQuery =
+        workspaceMutationQueryForWorkspace(batchDeleteWorkspace);
       const { data, error } = await client.POST('/docs/delete-batch', {
-        params: { query: { remoteNode, ...workspaceMutationQuery } },
+        params: { query: { remoteNode, ...mutationQuery } },
         body: { paths: batchDeletePaths },
       });
       if (error) {
@@ -556,8 +600,9 @@ function DocsContent() {
       const deletedSet = new Set(data.deleted);
       for (const tab of tabs) {
         const shouldClose =
-          deletedSet.has(tab.docPath) ||
-          [...deletedSet].some((dp) => tab.docPath.startsWith(dp + '/'));
+          docWorkspaceMatches(tab.workspace, batchDeleteWorkspace) &&
+          (deletedSet.has(tab.docPath) ||
+            [...deletedSet].some((dp) => tab.docPath.startsWith(dp + '/')));
         if (shouldClose) {
           clearDraft(tab.id);
           markTabSaved(tab.id);
@@ -578,6 +623,7 @@ function DocsContent() {
     }
   }, [
     batchDeletePaths,
+    batchDeleteWorkspace,
     canMutateDocs,
     client,
     remoteNode,
@@ -591,17 +637,25 @@ function DocsContent() {
   ]);
 
   // Batch delete from selection bar
-  const handleBatchDeleteFromBar = useCallback((paths: string[]) => {
-    setBatchDeletePaths(paths);
-    setBatchDeleteConfirmOpen(true);
-  }, []);
+  const handleBatchDeleteFromBar = useCallback(
+    (paths: string[]) => {
+      setBatchDeletePaths(paths);
+      setBatchDeleteWorkspace(mutationWorkspaceFromQuery(workspaceMutationQuery));
+      setBatchDeleteConfirmOpen(true);
+    },
+    [workspaceMutationQuery]
+  );
 
   // Delete triggered from tab menu or editor header
-  const handleDeleteFromTab = useCallback((docPath: string, title: string) => {
-    setDeleteDocPath(docPath);
-    setDeleteDocTitle(title);
-    setDeleteConfirmOpen(true);
-  }, []);
+  const handleDeleteFromTab = useCallback(
+    (docPath: string, title: string, workspace?: string | null) => {
+      setDeleteDocPath(docPath);
+      setDeleteDocTitle(title);
+      setDeleteWorkspace(normalizedDocWorkspace(workspace));
+      setDeleteConfirmOpen(true);
+    },
+    []
+  );
 
   const leftPanel = (
     <DocTreeSidebar
