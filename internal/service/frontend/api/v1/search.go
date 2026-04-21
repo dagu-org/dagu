@@ -198,11 +198,12 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 	}
 
 	result, err := a.docStore.SearchCursor(ctx, agent.SearchDocsOptions{
-		Cursor:     valueOf(request.Params.Cursor),
-		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
-		Query:      query,
-		MatchLimit: searchPreviewMatchesLimit,
-		PathPrefix: workspaceName,
+		Cursor:           valueOf(request.Params.Cursor),
+		Limit:            normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
+		Query:            query,
+		MatchLimit:       searchPreviewMatchesLimit,
+		PathPrefix:       workspaceName,
+		ExcludePathRoots: visibility.excludedPathRoots(),
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {

@@ -377,7 +377,14 @@ func (a *API) RenameDAG(ctx context.Context, request api.RenameDAGRequestObject)
 }
 
 func (a *API) GetDAGDAGRunHistory(ctx context.Context, request api.GetDAGDAGRunHistoryRequestObject) (api.GetDAGDAGRunHistoryResponseObject, error) {
-	dag, _ := a.dagStore.GetDetails(ctx, request.FileName, spec.WithAllowBuildErrors())
+	dag, err := a.dagStore.GetDetails(ctx, request.FileName, spec.WithAllowBuildErrors())
+	if err != nil {
+		return nil, &Error{
+			HTTPStatus: http.StatusNotFound,
+			Code:       api.ErrorCodeNotFound,
+			Message:    fmt.Sprintf("DAG %s not found", request.FileName),
+		}
+	}
 	if err := a.requireWorkspaceVisible(ctx, dagWorkspaceName(dag)); err != nil {
 		return nil, err
 	}
@@ -1706,6 +1713,14 @@ func (a *API) GetDAGDetailsData(ctx context.Context, fileName string) (any, erro
 // GetDAGHistoryData returns DAG execution history for SSE.
 // Identifier format: "fileName"
 func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, error) {
+	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
+	if err != nil {
+		return nil, err
+	}
+	if err := a.requireWorkspaceVisible(ctx, dagWorkspaceName(dag)); err != nil {
+		return nil, err
+	}
+
 	dagName := a.resolveDAGName(ctx, fileName)
 	recentHistory := a.dagRunMgr.ListRecentStatus(ctx, dagName, defaultHistoryLimit)
 
@@ -1713,8 +1728,6 @@ func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, erro
 	for _, status := range recentHistory {
 		dagRuns = append(dagRuns, ToDAGRunDetails(status))
 	}
-
-	dag, _ := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
 
 	gridData := a.readHistoryData(ctx, dag, recentHistory)
 	return api.GetDAGDAGRunHistory200JSONResponse{

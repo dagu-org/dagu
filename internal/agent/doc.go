@@ -76,11 +76,12 @@ type ListDocsOptions struct {
 
 // SearchDocsOptions configures a paginated document search query.
 type SearchDocsOptions struct {
-	Cursor     string
-	Limit      int
-	Query      string
-	MatchLimit int
-	PathPrefix string
+	Cursor           string
+	Limit            int
+	Query            string
+	MatchLimit       int
+	PathPrefix       string
+	ExcludePathRoots []string
 }
 
 // SearchDocMatchesOptions configures cursor-based snippet loading for one document.

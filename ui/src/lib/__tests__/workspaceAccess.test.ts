@@ -31,4 +31,13 @@ describe('workspace access', () => {
     ).toBe(true);
     expect(effectiveWorkspaceRole(user, 'sales')).toBeNull();
   });
+
+  it('treats missing grant arrays as no scoped grants', () => {
+    const user = {
+      role: UserRole.viewer,
+      workspaceAccess: { all: false },
+    } as Parameters<typeof effectiveWorkspaceRole>[0];
+
+    expect(effectiveWorkspaceRole(user, 'ops')).toBeNull();
+  });
 });

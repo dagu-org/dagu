@@ -19,7 +19,10 @@ export function normalizeAccess(access?: WorkspaceAccess): WorkspaceAccess {
   if (!access || access.all) {
     return { all: true, grants: [] };
   }
-  return access;
+  return {
+    ...access,
+    grants: Array.isArray(access.grants) ? access.grants : [],
+  };
 }
 
 export function effectiveWorkspaceRole(
