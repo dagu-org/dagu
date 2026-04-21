@@ -13,6 +13,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	runtimeagent "github.com/dagucloud/dagu/internal/runtime/agent"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -125,7 +126,26 @@ steps:
 `, test.ShellQuote(test.Sleep(1000*time.Second))), withLabels(map[string]string{"type": "test-worker"}))
 
 		runID := uuid.New().String()
-		agent := f.dagWrapper.Agent(test.WithDAGRunID(runID))
+		attemptID := uuid.New().String()
+		// The parent runs in-process in this test, so register its proc heartbeat
+		// before using the runtime manager to stop it.
+		proc, err := f.coord.ProcStore.Acquire(f.coord.Context, f.dagWrapper.ProcGroup(), exec.ProcMeta{
+			StartedAt:    time.Now().Unix(),
+			Name:         f.dagWrapper.Name,
+			DAGRunID:     runID,
+			AttemptID:    attemptID,
+			RootName:     f.dagWrapper.Name,
+			RootDAGRunID: runID,
+		})
+		require.NoError(t, err)
+		defer func() {
+			require.NoError(t, proc.Stop(f.coord.Context))
+		}()
+
+		agent := f.dagWrapper.Agent(
+			test.WithDAGRunID(runID),
+			test.WithAgentOptions(runtimeagent.Options{AttemptID: attemptID}),
+		)
 		ctx := agent.Context
 
 		errCh := make(chan error, 1)
