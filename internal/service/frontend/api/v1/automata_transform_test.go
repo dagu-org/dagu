@@ -17,11 +17,12 @@ func TestToAPIAutomataSummaryIncludesDerivedStatusFields(t *testing.T) {
 
 	summary := automata.Summary{
 		Name:          "queue_worker",
-		Kind:          automata.AutomataKindService,
+		Kind:          automata.AutomataKindWorkflow,
 		Nickname:      "Queue Butler",
 		IconURL:       "https://cdn.example.com/queue-butler.png",
 		Goal:          "Handle inbound work continuously.",
 		ClonedFrom:    "software_dev",
+		ResetOnFinish: true,
 		State:         automata.StateIdle,
 		DisplayStatus: automata.DisplayStatusRunning,
 		Busy:          false,
@@ -29,13 +30,15 @@ func TestToAPIAutomataSummaryIncludesDerivedStatusFields(t *testing.T) {
 	}
 
 	resp := toAPIAutomataSummary(summary)
-	require.Equal(t, openapi.AutomataKindService, resp.Kind)
+	require.Equal(t, openapi.AutomataKindWorkflow, resp.Kind)
 	require.NotNil(t, resp.Nickname)
 	require.Equal(t, "Queue Butler", *resp.Nickname)
 	require.NotNil(t, resp.IconUrl)
 	require.Equal(t, "https://cdn.example.com/queue-butler.png", *resp.IconUrl)
 	require.NotNil(t, resp.ClonedFrom)
 	require.Equal(t, "software_dev", *resp.ClonedFrom)
+	require.NotNil(t, resp.ResetOnFinish)
+	require.True(t, *resp.ResetOnFinish)
 	require.NotNil(t, resp.DisplayStatus)
 	require.Equal(t, openapi.AutomataDisplayStatusRunning, *resp.DisplayStatus)
 	require.NotNil(t, resp.Busy)
@@ -44,20 +47,20 @@ func TestToAPIAutomataSummaryIncludesDerivedStatusFields(t *testing.T) {
 	require.True(t, *resp.NeedsInput)
 }
 
-func TestToAPIAutomataStateDerivesServiceDisplayFields(t *testing.T) {
+func TestToAPIAutomataStateDerivesDisplayFields(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.April, 2, 12, 0, 0, 0, time.UTC)
 	def := &automata.Definition{
 		Name:       "queue_worker",
-		Kind:       automata.AutomataKindService,
+		Kind:       automata.AutomataKindWorkflow,
 		Nickname:   "Queue Butler",
 		IconURL:    "https://cdn.example.com/queue-butler.png",
 		Goal:       "Handle inbound work continuously.",
 		ClonedFrom: "software_dev",
 	}
 	state := &automata.State{
-		State:       automata.StateIdle,
+		State:       automata.StateWaiting,
 		ActivatedAt: now,
 		ActivatedBy: "tester",
 	}

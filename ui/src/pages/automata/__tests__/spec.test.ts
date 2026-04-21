@@ -11,6 +11,7 @@ const baseMetadata = {
   goal: '',
   model: '',
   standingInstruction: '',
+  resetOnFinish: false,
   schedule: [] as string[],
 };
 
@@ -212,7 +213,7 @@ describe('updateAutomataMetadataInSpec', () => {
     expect((parse(next) as { agent?: { model?: string } }).agent?.model).toBeUndefined();
   });
 
-  it('sets standing instruction for services', () => {
+  it('sets standing instruction', () => {
     const next = updateAutomataMetadataInSpec(
       'kind: "service"\nallowed_dags:\n  names:\n    - "build"\n',
       {
@@ -251,6 +252,38 @@ describe('updateAutomataMetadataInSpec', () => {
       allowed_dags: { names: ['build'] },
     });
     expect(parse(next)).not.toHaveProperty('standing_instruction');
+  });
+
+  it('writes reset on finish', () => {
+    const next = updateAutomataMetadataInSpec(
+      'allowed_dags:\n  names:\n    - "build"\n',
+      {
+        ...baseMetadata,
+        resetOnFinish: true,
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      reset_on_finish: true,
+    });
+  });
+
+  it('removes reset on finish when disabled', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'reset_on_finish: true',
+        'allowed_dags:',
+        '  names:',
+        '    - "build"',
+        '',
+      ].join('\n'),
+      {
+        ...baseMetadata,
+        resetOnFinish: false,
+      }
+    );
+
+    expect(parse(next)).not.toHaveProperty('reset_on_finish');
   });
 
   it('writes multi-line schedule expressions', () => {

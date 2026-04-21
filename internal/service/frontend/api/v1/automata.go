@@ -600,6 +600,7 @@ func toAPIAutomataSummary(item automata.Summary) api.AutomataSummary {
 		}(),
 		NextTaskDescription: ptrOf(item.NextTaskDescription),
 		OpenTaskCount:       ptrOf(item.OpenTaskCount),
+		ResetOnFinish:       ptrOf(item.ResetOnFinish),
 		State:               api.AutomataLifecycleState(item.State),
 		Tags: func() *[]string {
 			if len(item.Tags) == 0 {
@@ -669,6 +670,7 @@ func toAPIAutomataDefinition(def *automata.Definition) api.AutomataDefinition {
 		Nickname:            ptrOf(def.Nickname),
 		ClonedFrom:          ptrOf(def.ClonedFrom),
 		AllowedDAGs:         toAPIAutomataAllowedDAGs(def.AllowedDAGs),
+		ResetOnFinish:       ptrOf(def.ResetOnFinish),
 		StandingInstruction: ptrOf(def.StandingInstruction),
 		Tags: func() *[]string {
 			if len(def.Tags) == 0 {

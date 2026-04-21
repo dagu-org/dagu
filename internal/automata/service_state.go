@@ -163,18 +163,7 @@ func (s *Service) ensureState(ctx context.Context, def *Definition) (*State, err
 		state.TaskTemplates = cloneTaskTemplatesFromTasks(state.Tasks)
 		changed = true
 	}
-	if isService(def) {
-		if state.State == StateFinished {
-			state.State = StateIdle
-			state.FinishedAt = time.Time{}
-			changed = true
-		}
-		if state.ActivatedAt.IsZero() &&
-			(state.State == StateRunning || state.State == StateWaiting || state.State == StatePaused) {
-			state.ActivatedAt = firstNonZeroTime(state.StartRequestedAt, state.LastUpdatedAt, s.clock())
-			changed = true
-		}
-	} else if !state.ActivatedAt.IsZero() || state.ActivatedBy != "" {
+	if !state.ActivatedAt.IsZero() || state.ActivatedBy != "" {
 		state.ActivatedAt = time.Time{}
 		state.ActivatedBy = ""
 		changed = true

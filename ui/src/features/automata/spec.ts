@@ -11,6 +11,7 @@ export function updateAutomataMetadataInSpec(
     goal: string;
     model: string;
     standingInstruction: string;
+    resetOnFinish: boolean;
     schedule: string[];
   }
 ): string {
@@ -47,6 +48,13 @@ export function updateAutomataMetadataInSpec(
     nextSpec.standing_instruction = nextStandingInstruction;
   } else {
     delete nextSpec.standing_instruction;
+  }
+
+  if (metadata.resetOnFinish) {
+    nextSpec.reset_on_finish = true;
+  } else {
+    delete nextSpec.reset_on_finish;
+    delete nextSpec.resetOnFinish;
   }
 
   if (metadata.schedule.length === 1) {

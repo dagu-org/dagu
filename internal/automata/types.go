@@ -120,6 +120,7 @@ type Definition struct {
 	Goal                string       `json:"goal" yaml:"goal"`
 	ClonedFrom          string       `json:"clonedFrom,omitempty" yaml:"cloned_from,omitempty"`
 	StandingInstruction string       `json:"standingInstruction,omitempty" yaml:"standing_instruction,omitempty"`
+	ResetOnFinish       bool         `json:"resetOnFinish,omitempty" yaml:"reset_on_finish,omitempty"`
 	Tags                []string     `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Schedule            ScheduleList `json:"schedule,omitempty" yaml:"schedule,omitempty"`
 	AllowedDAGs         AllowedDAGs  `json:"allowedDAGs" yaml:"allowed_dags"`
@@ -233,6 +234,7 @@ type Summary struct {
 	Purpose             string         `json:"purpose"`
 	Goal                string         `json:"goal"`
 	ClonedFrom          string         `json:"clonedFrom,omitempty"`
+	ResetOnFinish       bool           `json:"resetOnFinish,omitempty"`
 	Tags                []string       `json:"tags,omitempty"`
 	Instruction         string         `json:"instruction,omitempty"`
 	State               LifecycleState `json:"state"`
@@ -334,6 +336,8 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 		ClonedFromSnake          string       `yaml:"cloned_from,omitempty"`
 		StandingInstruction      string       `yaml:"standingInstruction,omitempty"`
 		StandingInstructionSnake string       `yaml:"standing_instruction,omitempty"`
+		ResetOnFinish            bool         `yaml:"resetOnFinish,omitempty"`
+		ResetOnFinishSnake       bool         `yaml:"reset_on_finish,omitempty"`
 		Tags                     []string     `yaml:"tags"`
 		Schedule                 ScheduleList `yaml:"schedule,omitempty"`
 		AllowedDAGs              AllowedDAGs  `yaml:"allowedDAGs"`
@@ -364,6 +368,7 @@ func (d *Definition) UnmarshalYAML(value *yaml.Node) error {
 	if d.StandingInstruction == "" {
 		d.StandingInstruction = strings.TrimSpace(raw.StandingInstruction)
 	}
+	d.ResetOnFinish = raw.ResetOnFinish || raw.ResetOnFinishSnake
 	d.Tags = append([]string(nil), raw.Tags...)
 	d.normalizeGoal()
 	d.Schedule = raw.Schedule
@@ -391,9 +396,6 @@ func (d *Definition) normalizeGoal() {
 	}
 }
 
-func normalizeAutomataKind(kind AutomataKind) AutomataKind {
-	if kind == AutomataKindService {
-		return AutomataKindService
-	}
+func normalizeAutomataKind(_ AutomataKind) AutomataKind {
 	return AutomataKindWorkflow
 }

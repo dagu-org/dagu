@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tab, Tabs } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
 import { AutomataDocumentSection } from '@/features/automata/components/AutomataMemorySection';
@@ -440,28 +441,21 @@ function StatusTab({
   const hasTaskTemplates = (controller.detail?.taskTemplates?.length || 0) > 0;
   const hasStandingInstruction =
     !!controller.detail?.definition?.standingInstruction?.trim();
-  const workflowStartMode =
-    !controller.serviceKind &&
-    (controller.lifecycleState === 'idle' ||
-      controller.lifecycleState === 'finished');
-  const serviceActivationMode =
-    controller.serviceKind && !controller.serviceActivated;
-  const conversationDraft = workflowStartMode
+  const startMode =
+    controller.lifecycleState === 'idle' ||
+    controller.lifecycleState === 'finished';
+  const conversationDraft = startMode
     ? controller.instructionDraft
     : controller.operatorMessageDraft;
-  const canActivateService =
-    controller.canStartTask && hasTaskTemplates && hasStandingInstruction;
-  const canStartWorkflow =
+  const canStartCycle =
     controller.canStartTask &&
     hasTaskTemplates &&
-    !!controller.instructionDraft.trim();
-  const canSubmitConversation = serviceActivationMode
-    ? canActivateService
-    : workflowStartMode
-      ? canStartWorkflow
-      : !!controller.operatorMessageDraft.trim() &&
-        controller.canSendOperatorMessage &&
-        !controller.busyAction;
+    (!!controller.instructionDraft.trim() || hasStandingInstruction);
+  const canSubmitConversation = startMode
+    ? canStartCycle
+    : !!controller.operatorMessageDraft.trim() &&
+      controller.canSendOperatorMessage &&
+      !controller.busyAction;
 
   React.useEffect(() => {
     const node = conversationTextareaRef.current;
@@ -508,11 +502,9 @@ function StatusTab({
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
               {controller.scheduleConfigured
-                ? controller.serviceKind
-                  ? hasStandingInstruction && hasTaskTemplates
-                    ? 'Due schedule ticks can start a fresh service cycle automatically. Each scheduled cycle reopens the task template from Config.'
-                    : 'Schedule is configured, but it cannot start clean cycles until Standing Instruction and at least one task template are set in Config.'
-                  : 'Schedules are only active for service automata.'
+                ? hasStandingInstruction && hasTaskTemplates
+                  ? 'Due schedule ticks can start a fresh cycle automatically from the Config task template.'
+                  : 'Schedule is configured, but it cannot start clean cycles until Standing Instruction and at least one task template are set in Config.'
                 : 'No schedule is configured for this automata.'}
             </p>
             {controller.detail?.state.pendingPrompt ? (
@@ -610,7 +602,7 @@ function StatusTab({
       <div className="min-w-0 rounded-lg border p-4">
         <h2 className="mb-3 text-sm font-semibold">Conversation</h2>
         <div className="space-y-3">
-          {controller.serviceKind ? (
+          {hasStandingInstruction ? (
             <div className="space-y-3 rounded-md border bg-muted/20 p-3">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Standing Instruction
@@ -621,85 +613,60 @@ function StatusTab({
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
-                  No standing instruction is configured yet. Add one in the
-                  Config tab before activating this service or relying on
-                  schedule ticks.
+                  No standing instruction is configured yet.
                 </div>
               )}
             </div>
           ) : null}
 
-          {serviceActivationMode ? null : (
-            <Textarea
-              ref={conversationTextareaRef}
-              value={conversationDraft}
-              onChange={(event) => {
-                if (workflowStartMode) {
-                  controller.setInstructionDraft(event.target.value);
-                  return;
-                }
-                controller.setOperatorMessageDraft(event.target.value);
-              }}
-              className="min-h-24 overflow-hidden resize-none"
-              placeholder={
-                workflowStartMode
-                  ? 'Tell this Automata what task to work on.'
-                  : controller.serviceKind
-                    ? 'Add context, request work, or clarify what this service should handle.'
-                    : 'Add context, change priority, or clarify the current task.'
+          <Textarea
+            ref={conversationTextareaRef}
+            value={conversationDraft}
+            onChange={(event) => {
+              if (startMode) {
+                controller.setInstructionDraft(event.target.value);
+                return;
               }
-              disabled={
-                workflowStartMode
-                  ? !controller.canStartTask || !!controller.busyAction
-                  : !controller.canSendOperatorMessage ||
-                    !!controller.busyAction
-              }
-            />
-          )}
+              controller.setOperatorMessageDraft(event.target.value);
+            }}
+            className="min-h-24 overflow-hidden resize-none"
+            placeholder={
+              startMode
+                ? hasStandingInstruction
+                  ? 'Add an optional one-off instruction for this cycle.'
+                  : 'Tell this Automata what task to work on.'
+                : 'Add context, change priority, or clarify the current task.'
+            }
+            disabled={
+              startMode
+                ? !controller.canStartTask || !!controller.busyAction
+                : !controller.canSendOperatorMessage || !!controller.busyAction
+            }
+          />
 
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
-              {serviceActivationMode
-                ? !hasStandingInstruction
-                  ? 'Standing Instruction is required for service activation and scheduled cycles.'
-                  : !hasTaskTemplates
-                    ? 'Add at least one task template in Config before activating this service.'
-                    : controller.canStartTask
-                      ? controller.scheduleConfigured
-                        ? 'Activating starts a fresh cycle immediately. Future due schedule ticks can also start fresh cycles automatically from the saved task template.'
-                        : 'Activating starts a fresh cycle immediately. Without a schedule, future cycles start only from operator messages.'
-                      : controller.lifecycleState === 'paused'
-                        ? 'This service is paused. Resume it to put it back on standby.'
-                        : 'This service cannot be activated from the current lifecycle state.'
-                : workflowStartMode
+              {startMode
                   ? controller.canStartTask
                     ? hasTaskTemplates
-                      ? 'Starting creates a fresh workflow cycle from the Config task template.'
+                      ? hasStandingInstruction
+                        ? 'Starting creates a fresh cycle from the Config task template. The standing instruction is used unless you enter a one-off instruction.'
+                        : 'Starting creates a fresh cycle from the Config task template.'
                       : 'Add at least one task template in Config before starting.'
                     : 'Starting is gated by scheduler controller readiness.'
                   : controller.detail?.state.pendingPrompt
                     ? 'Respond to the pending prompt before sending a general operator message.'
                     : controller.canSendOperatorMessage
-                      ? controller.serviceKind
-                        ? controller.detail?.state.currentRunRef
-                          ? 'This records your message now and the service will pick it up after the current child DAG changes state.'
-                          : controller.detail?.state.busy
-                            ? 'This queues a user message into the active service turn.'
-                            : 'This wakes the service with a new operator message.'
-                        : controller.detail?.state.state === 'paused'
+                      ? controller.detail?.state.state === 'paused'
                           ? 'This records your message now, but the Automata will stay paused until you resume it.'
                           : controller.detail?.state.currentRunRef
                             ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
                             : 'This queues a user message into the active Automata task.'
-                      : controller.serviceKind
-                        ? controller.serviceActivated
-                          ? 'This service is paused. Resume it before sending a message.'
-                          : 'Activate this service before sending operator messages.'
-                        : 'Operator messages are only accepted while the Automata has an active task.'}
+                      : 'Operator messages are only accepted while the Automata has an active task.'}
             </div>
             <Button
               onClick={() => {
-                if (serviceActivationMode || workflowStartMode) {
+                if (startMode) {
                   void controller.onStart();
                   return;
                 }
@@ -707,9 +674,7 @@ function StatusTab({
               }}
               disabled={!canSubmitConversation || !!controller.busyAction}
             >
-              {serviceActivationMode
-                ? 'Activate'
-                : workflowStartMode
+              {startMode
                   ? controller.lifecycleState === 'finished'
                     ? 'Start New Task'
                     : 'Start'
@@ -764,11 +729,6 @@ function ConfigTab({
         <div className="min-w-0 rounded-lg border p-4">
           <h2 className="mb-3 text-sm font-semibold">Metadata</h2>
           <div className="space-y-3 text-sm">
-            <p>
-              <span className="font-medium">Kind:</span>{' '}
-              {controller.detail?.definition.kind}
-            </p>
-
             <div className="grid gap-2">
               <Label htmlFor="automata-detail-goal">Goal</Label>
               <Textarea
@@ -787,50 +747,59 @@ function ConfigTab({
               </div>
             </div>
 
-            {controller.serviceKind ? (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="automata-detail-standing-instruction">
-                    Standing Instruction
-                  </Label>
-                  <Textarea
-                    id="automata-detail-standing-instruction"
-                    value={controller.standingInstructionDraft}
-                    onChange={(event) => {
-                      controller.setStandingInstructionDraft(event.target.value);
-                      controller.setIsEditingMetadata(true);
-                    }}
-                    placeholder="Handle each scheduled service cycle and use the task list as the default operating checklist."
-                    disabled={metadataFieldDisabled}
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Required for service activation and scheduled cycles. This
-                    instruction is reused for every fresh service cycle.
-                  </div>
-                </div>
+            <div className="grid gap-2">
+              <Label htmlFor="automata-detail-standing-instruction">
+                Standing Instruction
+              </Label>
+              <Textarea
+                id="automata-detail-standing-instruction"
+                value={controller.standingInstructionDraft}
+                onChange={(event) => {
+                  controller.setStandingInstructionDraft(event.target.value);
+                  controller.setIsEditingMetadata(true);
+                }}
+                placeholder="Handle each scheduled cycle and use the task list as the default operating checklist."
+                disabled={metadataFieldDisabled}
+              />
+              <div className="text-xs text-muted-foreground">
+                Optional. Used as the default instruction for starts and
+                scheduled cycles.
+              </div>
+            </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="automata-detail-schedule">
-                    Schedule
-                  </Label>
-                  <Textarea
-                    id="automata-detail-schedule"
-                    value={controller.scheduleDraft}
-                    onChange={(event) => {
-                      controller.setScheduleDraft(event.target.value);
-                      controller.setIsEditingMetadata(true);
-                    }}
-                    placeholder={'0 * * * *\n30 9 * * 1-5'}
-                    disabled={metadataFieldDisabled}
-                    rows={3}
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Optional. Use one cron expression per line. Due ticks start
-                    a fresh cycle by reopening the Config task template.
-                  </div>
-                </div>
-              </>
-            ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="automata-detail-schedule">Schedule</Label>
+              <Textarea
+                id="automata-detail-schedule"
+                value={controller.scheduleDraft}
+                onChange={(event) => {
+                  controller.setScheduleDraft(event.target.value);
+                  controller.setIsEditingMetadata(true);
+                }}
+                placeholder={'0 * * * *\n30 9 * * 1-5'}
+                disabled={metadataFieldDisabled}
+                rows={3}
+              />
+              <div className="text-xs text-muted-foreground">
+                Optional. Use one cron expression per line. Due ticks start a
+                fresh cycle by reopening the Config task template.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2">
+              <Label htmlFor="automata-detail-reset-on-finish">
+                Reset on finish
+              </Label>
+              <Switch
+                id="automata-detail-reset-on-finish"
+                checked={controller.resetOnFinishDraft}
+                onCheckedChange={(checked) => {
+                  controller.setResetOnFinishDraft(checked);
+                  controller.setIsEditingMetadata(true);
+                }}
+                disabled={metadataFieldDisabled}
+              />
+            </div>
 
             <div className="grid gap-2">
               <Label htmlFor="automata-detail-icon-url">Image URL</Label>
@@ -1184,9 +1153,6 @@ export function AutomataDetailSurface({
               needs input
             </span>
           ) : null}
-          <span className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
-            {controller.automataKind}
-          </span>
           <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
             Tasks {controller.taskSummary.done}/
             {controller.taskSummary.done + controller.taskSummary.open}

@@ -359,6 +359,7 @@ func (s *Service) List(ctx context.Context) ([]Summary, error) {
 			Purpose:       def.Purpose,
 			Goal:          def.Goal,
 			ClonedFrom:    def.ClonedFrom,
+			ResetOnFinish: def.ResetOnFinish,
 			Tags:          append([]string(nil), def.Tags...),
 			Instruction:   state.Instruction,
 			State:         state.State,

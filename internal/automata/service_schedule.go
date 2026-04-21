@@ -16,7 +16,7 @@ func (s *Service) HandleScheduleTick(ctx context.Context, tickTime time.Time) er
 	}
 	tickTime = tickTime.Truncate(time.Minute)
 	for _, def := range defs {
-		if err := s.handleScheduledServiceTick(ctx, def, tickTime); err != nil {
+		if err := s.handleScheduledTick(ctx, def, tickTime); err != nil {
 			s.logger.Warn("automata schedule tick failed",
 				"automata", def.Name,
 				"error", err,
@@ -26,8 +26,8 @@ func (s *Service) HandleScheduleTick(ctx context.Context, tickTime time.Time) er
 	return nil
 }
 
-func (s *Service) handleScheduledServiceTick(ctx context.Context, def *Definition, tickTime time.Time) error {
-	if def == nil || def.Disabled || !isService(def) || len(def.Schedule) == 0 {
+func (s *Service) handleScheduledTick(ctx context.Context, def *Definition, tickTime time.Time) error {
+	if def == nil || def.Disabled || len(def.Schedule) == 0 {
 		return nil
 	}
 	state, err := s.ensureState(ctx, def)
@@ -45,10 +45,10 @@ func (s *Service) handleScheduledServiceTick(ctx context.Context, def *Definitio
 	}
 	state.LastScheduleMinute = tickTime
 	if strings.TrimSpace(def.StandingInstruction) == "" {
-		return s.recordScheduleConfigError(ctx, def, state, tickTime, "service automata schedule requires a standing instruction")
+		return s.recordScheduleConfigError(ctx, def, state, tickTime, "automata schedule requires a standing instruction")
 	}
 	if !hasTaskTemplates(state.TaskTemplates) {
-		return s.recordScheduleConfigError(ctx, def, state, tickTime, "service automata schedule requires at least one task template")
+		return s.recordScheduleConfigError(ctx, def, state, tickTime, "automata schedule requires at least one task template")
 	}
 	if state.PendingPrompt != nil || state.CurrentRunRef != nil || len(state.PendingTurnMessages) > 0 {
 		return s.saveState(ctx, def.Name, state)
@@ -57,7 +57,7 @@ func (s *Service) handleScheduledServiceTick(ctx context.Context, def *Definitio
 	if activity.Working || activity.HasPendingPrompt || activity.HasQueuedInput {
 		return s.saveState(ctx, def.Name, state)
 	}
-	if err := s.startServiceCycle(ctx, def, state, strings.TrimSpace(def.StandingInstruction), "schedule"); err != nil {
+	if err := s.startCycle(ctx, def, state, strings.TrimSpace(def.StandingInstruction), "schedule"); err != nil {
 		return err
 	}
 	queueTurnMessage(state, "scheduled_tick", s.buildScheduledTickMessage(def, state, tickTime), s.clock())

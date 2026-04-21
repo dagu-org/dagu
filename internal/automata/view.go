@@ -20,20 +20,6 @@ func validateAutomataKind(kind AutomataKind) error {
 	}
 }
 
-func isService(def *Definition) bool {
-	return def != nil && normalizeAutomataKind(def.Kind) == AutomataKindService
-}
-
-func isServiceActivated(state *State) bool {
-	if state == nil {
-		return false
-	}
-	if !state.ActivatedAt.IsZero() {
-		return true
-	}
-	return state.State == StateRunning || state.State == StateWaiting || state.State == StatePaused
-}
-
 func isBusyState(state *State) bool {
 	if state == nil {
 		return false
@@ -47,25 +33,13 @@ func isBusyState(state *State) bool {
 	return state.State == StateRunning
 }
 
-func DeriveView(def *Definition, state *State) ViewStatus {
+func DeriveView(_ *Definition, state *State) ViewStatus {
 	view := ViewStatus{
 		DisplayStatus: DisplayStatusIdle,
 		Busy:          isBusyState(state),
 		NeedsInput:    state != nil && state.PendingPrompt != nil,
 	}
 	if state == nil {
-		return view
-	}
-
-	if isService(def) {
-		switch {
-		case state.State == StatePaused:
-			view.DisplayStatus = DisplayStatusPaused
-		case isServiceActivated(state):
-			view.DisplayStatus = DisplayStatusRunning
-		default:
-			view.DisplayStatus = DisplayStatusIdle
-		}
 		return view
 	}
 

@@ -488,11 +488,11 @@ func TestServiceRequestStartRejectsWhenAllTasksDone(t *testing.T) {
 	require.Equal(t, TaskStateOpen, detail.State.Tasks[0].State)
 }
 
-func TestServiceRequestStartActivatesServiceWithoutOpenTasks(t *testing.T) {
+func TestServiceRequestStartAcceptsLegacyServiceSpec(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	svc, fixedTime := newTestService(t)
+	svc, _ := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
 	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
@@ -505,11 +505,11 @@ func TestServiceRequestStartActivatesServiceWithoutOpenTasks(t *testing.T) {
 
 	detail, err := svc.Detail(ctx, "queue_worker")
 	require.NoError(t, err)
-	require.Equal(t, AutomataKindService, detail.Definition.Kind)
+	require.Equal(t, AutomataKindWorkflow, detail.Definition.Kind)
 	require.Equal(t, StateRunning, detail.State.State)
 	require.Equal(t, "Handle inbound work continuously.", detail.State.Instruction)
-	require.Equal(t, fixedTime, detail.State.ActivatedAt)
-	require.Equal(t, "tester", detail.State.ActivatedBy)
+	require.True(t, detail.State.ActivatedAt.IsZero())
+	require.Empty(t, detail.State.ActivatedBy)
 	require.Len(t, detail.State.PendingTurnMessages, 1)
 	require.Len(t, detail.State.Tasks, 1)
 	require.Equal(t, TaskStateOpen, detail.State.Tasks[0].State)
@@ -517,13 +517,13 @@ func TestServiceRequestStartActivatesServiceWithoutOpenTasks(t *testing.T) {
 	items, err := svc.List(ctx)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
-	require.Equal(t, AutomataKindService, items[0].Kind)
+	require.Equal(t, AutomataKindWorkflow, items[0].Kind)
 	require.Equal(t, DisplayStatusRunning, items[0].DisplayStatus)
 	require.True(t, items[0].Busy)
 	require.False(t, items[0].NeedsInput)
 }
 
-func TestServiceRequestStartRejectsSecondServiceActivation(t *testing.T) {
+func TestServiceRequestStartRejectsSecondActiveCycle(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -540,7 +540,7 @@ func TestServiceRequestStartRejectsSecondServiceActivation(t *testing.T) {
 		RequestedBy: "tester",
 		Instruction: "Different instruction",
 	})
-	require.ErrorContains(t, err, "service automata is already active")
+	require.ErrorContains(t, err, "automata already has an active task")
 }
 
 func TestServiceSubmitOperatorMessageRequiresActiveTask(t *testing.T) {
@@ -935,11 +935,11 @@ func TestServiceResumePausedPromptReturnsWaiting(t *testing.T) {
 	require.Equal(t, WaitingReasonHuman, detail.State.WaitingReason)
 }
 
-func TestServicePauseAndResumeStandbyService(t *testing.T) {
+func TestServicePauseRejectsIdleAutomata(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	svc, fixedTime := newTestService(t)
+	svc, _ := newTestService(t)
 
 	require.NoError(t, svc.PutSpec(ctx, "queue_worker", serviceAutomataSpec("build-app")))
 	createTask(t, svc, ctx, "queue_worker", "Process the next queued request", "tester")
@@ -957,18 +957,9 @@ func TestServicePauseAndResumeStandbyService(t *testing.T) {
 	require.NoError(t, svc.saveState(ctx, def.Name, state))
 
 	err = svc.Pause(ctx, "queue_worker", "tester")
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "only active automata can be paused")
 
 	detail, err := svc.Detail(ctx, "queue_worker")
-	require.NoError(t, err)
-	require.Equal(t, StatePaused, detail.State.State)
-	require.Equal(t, fixedTime, detail.State.PausedAt)
-	require.Equal(t, "tester", detail.State.PausedBy)
-
-	err = svc.Resume(ctx, "queue_worker", "tester")
-	require.NoError(t, err)
-
-	detail, err = svc.Detail(ctx, "queue_worker")
 	require.NoError(t, err)
 	require.Equal(t, StateIdle, detail.State.State)
 	require.True(t, detail.State.PausedAt.IsZero())
@@ -1352,7 +1343,7 @@ func TestControllerRuntimeFinishRejectsActiveChildRun(t *testing.T) {
 	require.ErrorContains(t, err, "while a child DAG run is active")
 }
 
-func TestControllerRuntimeFinishRejectsServiceAutomata(t *testing.T) {
+func TestControllerRuntimeFinishAllowsLegacyServiceAutomata(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1365,8 +1356,10 @@ func TestControllerRuntimeFinishRejectsServiceAutomata(t *testing.T) {
 	require.NoError(t, err)
 
 	rt := &controllerRuntime{service: svc, def: def, state: state}
-	err = rt.Finish(ctx, "done")
-	require.ErrorContains(t, err, "cannot finish a service automata")
+	require.NoError(t, rt.Finish(ctx, "done"))
+
+	require.Equal(t, StateFinished, state.State)
+	require.Equal(t, "done", state.LastSummary)
 }
 
 func TestControllerRuntimeFinishEmitsEventAndAssignsCycleID(t *testing.T) {
@@ -1395,7 +1388,44 @@ func TestControllerRuntimeFinishEmitsEventAndAssignsCycleID(t *testing.T) {
 	require.Equal(t, "All checklist tasks are complete.", snapshot.Summary)
 }
 
-func TestServiceRuntimeOptionsExcludeFinishToolForService(t *testing.T) {
+func TestControllerRuntimeFinishResetsWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	svc, fixedTime, store := newTestServiceWithEventStore(t)
+
+	spec := automataSpec("build-app") + "reset_on_finish: true\n"
+	require.NoError(t, svc.PutSpec(ctx, "software_dev", spec))
+	createTask(t, svc, ctx, "software_dev", "Investigate the failing test", "tester")
+	require.NoError(t, svc.RequestStart(ctx, "software_dev", StartRequest{
+		RequestedBy: "tester",
+		Instruction: "Handle the current assigned task.",
+	}))
+	def, err := svc.GetDefinition(ctx, "software_dev")
+	require.NoError(t, err)
+	state, err := svc.ensureState(ctx, def)
+	require.NoError(t, err)
+	cycleID := state.CurrentCycleID
+
+	rt := &controllerRuntime{service: svc, def: def, state: state}
+	require.NoError(t, rt.Finish(ctx, "Ready for the next cycle."))
+
+	require.Equal(t, StateIdle, state.State)
+	require.Empty(t, state.CurrentCycleID)
+	require.Empty(t, state.Tasks)
+	require.Equal(t, fixedTime, state.FinishedAt)
+	require.Equal(t, "Ready for the next cycle.", state.LastSummary)
+	require.Len(t, store.events, 1)
+	event := store.events[0]
+	require.Equal(t, eventstore.TypeAutomataFinished, event.Type)
+	require.Equal(t, cycleID, event.AutomataCycleID)
+	snapshot, err := eventstore.NotificationAutomataFromEvent(event)
+	require.NoError(t, err)
+	require.Equal(t, "finished", snapshot.Status)
+	require.Equal(t, "Ready for the next cycle.", snapshot.Summary)
+}
+
+func TestServiceRuntimeOptionsIncludeFinishToolForLegacyService(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -1409,6 +1439,6 @@ func TestServiceRuntimeOptionsExcludeFinishToolForService(t *testing.T) {
 
 	opts, err := svc.runtimeOptions(ctx, def, state)
 	require.NoError(t, err)
-	require.NotContains(t, opts.AllowedTools, "finish_automata")
+	require.Contains(t, opts.AllowedTools, "finish_automata")
 	require.Contains(t, opts.AllowedTools, "request_human_input")
 }

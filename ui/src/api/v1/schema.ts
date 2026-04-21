@@ -2506,7 +2506,7 @@ export interface paths {
         put?: never;
         /**
          * Start automata task
-         * @description Starts a workflow Automata task or activates a service Automata.
+         * @description Starts an Automata task cycle.
          */
         post: operations["startAutomata"];
         delete?: never;
@@ -5155,7 +5155,7 @@ export interface components {
          */
         AutomataLifecycleState: AutomataLifecycleState;
         /**
-         * @description Automata kind
+         * @description Compatibility Automata kind. Runtime behavior is configured through explicit fields such as resetOnFinish.
          * @enum {string}
          */
         AutomataKind: AutomataKind;
@@ -5221,6 +5221,7 @@ export interface components {
             goal?: string;
             clonedFrom?: string;
             standingInstruction?: string;
+            resetOnFinish?: boolean;
             schedule?: string[];
             tags?: string[];
             allowedDAGs?: components["schemas"]["AutomataAllowedDAGs"];
@@ -5323,6 +5324,7 @@ export interface components {
             description?: string;
             goal?: string;
             clonedFrom?: string;
+            resetOnFinish?: boolean;
             tags?: string[];
             instruction?: string;
             state: components["schemas"]["AutomataLifecycleState"];

@@ -56,6 +56,8 @@ func validateDefinitionNode(node *yaml.Node) error {
 		"cloned_from":          {canonical: "cloned_from"},
 		"standingInstruction":  {canonical: "standing_instruction"},
 		"standing_instruction": {canonical: "standing_instruction"},
+		"resetOnFinish":        {canonical: "reset_on_finish"},
+		"reset_on_finish":      {canonical: "reset_on_finish"},
 		"tags": {
 			validate: validateStringListNode,
 		},

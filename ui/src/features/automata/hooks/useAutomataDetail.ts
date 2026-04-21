@@ -16,7 +16,6 @@ import {
   type AutomataTask,
   type AutomataTaskTemplate,
   formatAutomataScheduleText,
-  isServiceKind,
   isValidAutomataIconUrl,
   parseAutomataScheduleText,
   taskCounts,
@@ -127,6 +126,7 @@ export function useAutomataDetailController({
   const [goalDraft, setGoalDraft] = React.useState('');
   const [standingInstructionDraft, setStandingInstructionDraft] =
     React.useState('');
+  const [resetOnFinishDraft, setResetOnFinishDraft] = React.useState(false);
   const [scheduleDraft, setScheduleDraft] = React.useState('');
   const [modelDraft, setModelDraft] = React.useState('');
   const [isEditingMetadata, setIsEditingMetadata] = React.useState(false);
@@ -157,6 +157,7 @@ export function useAutomataDetailController({
       setStandingInstructionDraft(
         detail?.definition?.standingInstruction || ''
       );
+      setResetOnFinishDraft(!!detail?.definition?.resetOnFinish);
       setScheduleDraft(
         formatAutomataScheduleText(detail?.definition?.schedule)
       );
@@ -166,6 +167,7 @@ export function useAutomataDetailController({
     detail?.definition?.description,
     detail?.definition?.iconUrl,
     detail?.definition?.goal,
+    detail?.definition?.resetOnFinish,
     detail?.definition?.schedule,
     detail?.definition?.standingInstruction,
     detail?.definition?.agent?.model,
@@ -224,9 +226,6 @@ export function useAutomataDetailController({
   );
 
   const lifecycleState = detail?.state?.state ?? '';
-  const automataKind = detail?.definition?.kind;
-  const serviceKind = isServiceKind(automataKind);
-  const serviceActivated = serviceKind && !!detail?.state?.activatedAt;
   const automataController = detail?.automataController;
   const runtimeControllerReady = automataController?.state === 'ready';
   const displayStatus =
@@ -239,23 +238,19 @@ export function useAutomataDetailController({
     () => parseAutomataScheduleText(scheduleDraft),
     [scheduleDraft]
   );
-  const canStartTask = serviceKind
-    ? runtimeControllerReady && lifecycleState === 'idle' && !serviceActivated
-    : runtimeControllerReady &&
-      (lifecycleState === 'idle' || lifecycleState === 'finished');
+  const canStartTask =
+    runtimeControllerReady &&
+    (lifecycleState === 'idle' || lifecycleState === 'finished');
   const canSendOperatorMessage =
     !!detail &&
     runtimeControllerReady &&
     !detail.state.pendingPrompt &&
-    (serviceKind
-      ? serviceActivated && lifecycleState !== 'paused'
-      : lifecycleState === 'running' ||
-        lifecycleState === 'waiting' ||
-        lifecycleState === 'paused');
-  const canPause = serviceKind
-    ? runtimeControllerReady && serviceActivated && lifecycleState !== 'paused'
-    : runtimeControllerReady &&
-      (lifecycleState === 'running' || lifecycleState === 'waiting');
+    (lifecycleState === 'running' ||
+      lifecycleState === 'waiting' ||
+      lifecycleState === 'paused');
+  const canPause =
+    runtimeControllerReady &&
+    (lifecycleState === 'running' || lifecycleState === 'waiting');
   const canResume = runtimeControllerReady && lifecycleState === 'paused';
   const scheduleConfigured = (detail?.definition?.schedule?.length || 0) > 0;
 
@@ -268,6 +263,8 @@ export function useAutomataDetailController({
   const standingInstructionChanged =
     standingInstructionDraft.trim() !==
     (detail?.definition?.standingInstruction || '').trim();
+  const resetOnFinishChanged =
+    resetOnFinishDraft !== !!detail?.definition?.resetOnFinish;
   const scheduleChanged =
     formatAutomataScheduleText(scheduleExpressions) !==
     formatAutomataScheduleText(detail?.definition?.schedule);
@@ -278,15 +275,14 @@ export function useAutomataDetailController({
     iconUrlChanged ||
     goalChanged ||
     standingInstructionChanged ||
+    resetOnFinishChanged ||
     scheduleChanged ||
     modelChanged;
   const metadataValidationError = !isValidAutomataIconUrl(iconUrlDraft)
     ? 'Icon URL must be an absolute http(s) URL or a root-relative path.'
     : iconUrlDraft.trim().length > 2048
       ? 'Icon URL must be 2048 characters or fewer.'
-      : serviceKind
-        ? validateAutomataScheduleExpressions(scheduleExpressions)
-        : null;
+      : validateAutomataScheduleExpressions(scheduleExpressions);
   const metadataSaveDisabled =
     !name ||
     !detail ||
@@ -317,7 +313,7 @@ export function useAutomataDetailController({
     try {
       const { error: apiError } = await client.POST('/automata/{name}/start', {
         params: { path: { name } },
-        body: serviceKind ? {} : { instruction: instructionDraft || undefined },
+        body: { instruction: instructionDraft || undefined },
       });
       if (apiError) {
         throw new Error(apiError.message || 'Failed to start automata');
@@ -329,7 +325,7 @@ export function useAutomataDetailController({
         err instanceof Error ? err.message : 'Failed to start automata'
       );
     }
-  }, [client, instructionDraft, name, refreshAfterAction, serviceKind]);
+  }, [client, instructionDraft, name, refreshAfterAction]);
 
   const onCreateTask = React.useCallback(async () => {
     if (!name || !newTaskDescription.trim()) return;
@@ -798,6 +794,7 @@ export function useAutomataDetailController({
         goal: goalDraft,
         model: modelDraft,
         standingInstruction: standingInstructionDraft,
+        resetOnFinish: resetOnFinishDraft,
         schedule: scheduleExpressions,
       });
       const { error: apiError } = await client.PUT('/automata/{name}/spec', {
@@ -826,6 +823,7 @@ export function useAutomataDetailController({
     modelDraft,
     name,
     refreshAfterAction,
+    resetOnFinishDraft,
     scheduleExpressions,
     specQuery.data?.spec,
     standingInstructionDraft,
@@ -836,6 +834,7 @@ export function useAutomataDetailController({
     setIconUrlDraft(detail?.definition?.iconUrl || '');
     setGoalDraft(detail?.definition?.goal || '');
     setStandingInstructionDraft(detail?.definition?.standingInstruction || '');
+    setResetOnFinishDraft(!!detail?.definition?.resetOnFinish);
     setScheduleDraft(formatAutomataScheduleText(detail?.definition?.schedule));
     setModelDraft(detail?.definition?.agent?.model || '');
     setIsEditingMetadata(false);
@@ -844,6 +843,7 @@ export function useAutomataDetailController({
     detail?.definition?.description,
     detail?.definition?.goal,
     detail?.definition?.iconUrl,
+    detail?.definition?.resetOnFinish,
     detail?.definition?.schedule,
     detail?.definition?.standingInstruction,
   ]);
@@ -870,6 +870,8 @@ export function useAutomataDetailController({
     setGoalDraft,
     standingInstructionDraft,
     setStandingInstructionDraft,
+    resetOnFinishDraft,
+    setResetOnFinishDraft,
     scheduleDraft,
     setScheduleDraft,
     modelDraft,
@@ -896,9 +898,6 @@ export function useAutomataDetailController({
     queuedTurnMessages,
     threadItems,
     lifecycleState,
-    automataKind,
-    serviceKind,
-    serviceActivated,
     automataController,
     runtimeControllerReady,
     displayStatus,

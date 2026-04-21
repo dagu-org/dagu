@@ -27,9 +27,6 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 	if err != nil {
 		return err
 	}
-	if isService(def) {
-		return s.requestServiceStart(ctx, def, state, req)
-	}
 	if state.State == StateRunning || state.State == StateWaiting || state.State == StatePaused {
 		return errors.New("automata already has an active task")
 	}
@@ -38,36 +35,19 @@ func (s *Service) RequestStart(ctx context.Context, name string, req StartReques
 		instruction = strings.TrimSpace(state.Instruction)
 	}
 	if instruction == "" {
+		instruction = strings.TrimSpace(def.StandingInstruction)
+	}
+	if instruction == "" {
 		return errors.New("instruction is required before starting automata")
 	}
 	if !hasTaskTemplates(state.TaskTemplates) {
 		return errors.New("at least one task template is required before starting automata")
 	}
-	if err := s.startWorkflowCycle(ctx, def, state, instruction, req.RequestedBy); err != nil {
+	if err := s.startCycle(ctx, def, state, instruction, req.RequestedBy); err != nil {
 		return err
 	}
 	queueTurnMessage(state, "kickoff", s.buildKickoffMessage(def, state), s.clock())
 	return s.saveState(ctx, name, state)
-}
-
-func (s *Service) requestServiceStart(ctx context.Context, def *Definition, state *State, req StartRequest) error {
-	if isServiceActivated(state) {
-		return errors.New("service automata is already active")
-	}
-	instruction := strings.TrimSpace(def.StandingInstruction)
-	if instruction == "" {
-		return errors.New("standing instruction is required before activating service automata")
-	}
-	if !hasTaskTemplates(state.TaskTemplates) {
-		return errors.New("at least one task template is required before activating service automata")
-	}
-	if err := s.startServiceCycle(ctx, def, state, instruction, req.RequestedBy); err != nil {
-		return err
-	}
-	state.ActivatedAt = s.clock()
-	state.ActivatedBy = req.RequestedBy
-	queueTurnMessage(state, "kickoff", s.buildKickoffMessage(def, state), s.clock())
-	return s.saveState(ctx, def.Name, state)
 }
 
 func (s *Service) Pause(ctx context.Context, name, requestedBy string) error {
@@ -82,11 +62,7 @@ func (s *Service) Pause(ctx context.Context, name, requestedBy string) error {
 	if state.State == StatePaused {
 		return errors.New("automata is already paused")
 	}
-	if isService(def) {
-		if !isServiceActivated(state) {
-			return errors.New("service automata is not active")
-		}
-	} else if state.State != StateRunning && state.State != StateWaiting {
+	if state.State != StateRunning && state.State != StateWaiting {
 		return errors.New("only active automata can be paused")
 	}
 	state.PausedFromState = state.State
@@ -109,19 +85,12 @@ func (s *Service) Resume(ctx context.Context, name, requestedBy string) error {
 	if state.State != StatePaused {
 		return errors.New("automata is not paused")
 	}
-	pausedFromState := state.PausedFromState
 	state.PausedAt = time.Time{}
 	state.PausedBy = ""
 	state.PausedFromState = ""
 	if state.PendingPrompt != nil {
 		state.State = StateWaiting
 		state.WaitingReason = WaitingReasonHuman
-		return s.saveState(ctx, name, state)
-	}
-	if isService(def) && pausedFromState == StateIdle &&
-		state.CurrentRunRef == nil && len(state.PendingTurnMessages) == 0 {
-		state.State = StateIdle
-		state.WaitingReason = WaitingReasonNone
 		return s.saveState(ctx, name, state)
 	}
 	state.State = StateRunning
@@ -352,26 +321,7 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 	if message == "" {
 		return errors.New("message is required")
 	}
-	if isService(def) {
-		if !isServiceActivated(state) {
-			return errors.New("service automata is not active")
-		}
-		if state.State == StatePaused {
-			return errors.New("service automata is paused")
-		}
-		if state.State == StateIdle {
-			if !hasTaskTemplates(state.TaskTemplates) {
-				return errors.New("at least one task template is required before starting service automata cycle")
-			}
-			instruction := strings.TrimSpace(def.StandingInstruction)
-			if instruction == "" {
-				return errors.New("standing instruction is required before starting service automata cycle")
-			}
-			if err := s.startServiceCycle(ctx, def, state, instruction, "operator"); err != nil {
-				return err
-			}
-		}
-	} else if state.State != StateRunning && state.State != StateWaiting && state.State != StatePaused {
+	if state.State != StateRunning && state.State != StateWaiting && state.State != StatePaused {
 		return errors.New("automata is not running an active task")
 	}
 	if state.PendingPrompt != nil {
@@ -398,7 +348,7 @@ func (s *Service) SubmitOperatorMessage(ctx context.Context, name string, req Op
 	return s.saveState(ctx, name, state)
 }
 
-func (s *Service) startWorkflowCycle(ctx context.Context, def *Definition, state *State, instruction, requestedBy string) error {
+func (s *Service) startCycle(ctx context.Context, def *Definition, state *State, instruction, requestedBy string) error {
 	if err := s.cleanupRuntime(ctx, def.Name, true); err != nil {
 		return err
 	}
@@ -413,32 +363,6 @@ func (s *Service) startWorkflowCycle(ctx context.Context, def *Definition, state
 	state.InstructionUpdatedAt = now
 	state.InstructionUpdatedBy = requestedBy
 	state.StartRequestedAt = now
-	return nil
-}
-
-func (s *Service) startServiceCycle(ctx context.Context, def *Definition, state *State, instruction, requestedBy string) error {
-	if err := s.cleanupRuntime(ctx, def.Name, true); err != nil {
-		return err
-	}
-	activatedAt := state.ActivatedAt
-	activatedBy := state.ActivatedBy
-	clearCurrentCycleState(state)
-	now := s.clock()
-	state.Tasks = cloneTasksFromTemplates(state.TaskTemplates, now)
-	state.CurrentCycleID = nextCycleID()
-	state.LastTriggeredAt = now
-	state.State = StateRunning
-	state.WaitingReason = WaitingReasonNone
-	state.Instruction = instruction
-	state.InstructionUpdatedAt = now
-	state.InstructionUpdatedBy = requestedBy
-	state.StartRequestedAt = now
-	state.ActivatedAt = firstNonZeroTime(activatedAt, now)
-	if activatedBy != "" {
-		state.ActivatedBy = activatedBy
-	} else {
-		state.ActivatedBy = requestedBy
-	}
 	return nil
 }
 

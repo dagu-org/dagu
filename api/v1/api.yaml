@@ -6255,7 +6255,7 @@ paths:
   /automata/{name}/start:
     post:
       summary: "Start automata task"
-      description: "Starts a workflow Automata task or activates a service Automata."
+      description: "Starts an Automata task cycle."
       operationId: "startAutomata"
       tags:
         - "automata"
@@ -12202,7 +12202,7 @@ components:
 
     AutomataKind:
       type: string
-      description: "Automata kind"
+      description: "Compatibility Automata kind. Runtime behavior is configured through explicit fields such as resetOnFinish."
       enum:
         - workflow
         - service
@@ -12329,6 +12329,8 @@ components:
           type: string
         standingInstruction:
           type: string
+        resetOnFinish:
+          type: boolean
         schedule:
           type: array
           items:
@@ -12554,6 +12556,8 @@ components:
           type: string
         clonedFrom:
           type: string
+        resetOnFinish:
+          type: boolean
         tags:
           type: array
           items:

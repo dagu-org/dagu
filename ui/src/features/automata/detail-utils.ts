@@ -4,7 +4,6 @@
 import {
   AgentMessageType,
   AutomataDisplayStatus,
-  AutomataKind,
   Status,
   type components,
 } from '@/api/v1/schema';
@@ -19,7 +18,6 @@ export type AutomataRunSummary = components['schemas']['AutomataRunSummary'];
 export type AutomataTask = components['schemas']['AutomataTask'];
 export type AutomataTaskTemplate =
   components['schemas']['AutomataTaskTemplate'];
-export type AutomataKindValue = components['schemas']['AutomataKind'];
 export type AutomataDisplayState =
   components['schemas']['AutomataDisplayStatus'];
 
@@ -58,10 +56,6 @@ export function displayStatusClass(
     default:
       return 'bg-muted text-muted-foreground';
   }
-}
-
-export function isServiceKind(kind?: AutomataKindValue | string): boolean {
-  return kind === AutomataKind.service;
 }
 
 export function taskCounts(tasks?: AutomataTask[]): {

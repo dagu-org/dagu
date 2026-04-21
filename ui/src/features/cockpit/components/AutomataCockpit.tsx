@@ -29,7 +29,7 @@ const STATE_META: Record<
 > = {
   running: {
     label: 'Running',
-    description: 'Live and available, including standby services.',
+    description: 'Live cycles and active work.',
     icon: <PlayCircle size={16} />,
   },
   paused: {

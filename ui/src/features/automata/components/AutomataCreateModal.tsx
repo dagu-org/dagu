@@ -4,7 +4,6 @@
 import React from 'react';
 import { Search } from 'lucide-react';
 
-import { AutomataKind, type components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,13 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   isValidAutomataIconUrl,
@@ -35,10 +28,7 @@ import {
 } from '@/features/automata/workspace';
 import { useClient, useQuery } from '@/hooks/api';
 
-type AutomataKindValue = components['schemas']['AutomataKind'];
-
 const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
-const DEFAULT_AUTOMATA_KIND: AutomataKindValue = AutomataKind.workflow;
 const MAX_AUTOMATA_NICKNAME_LENGTH = 80;
 const MAX_AUTOMATA_ICON_URL_LENGTH = 2048;
 
@@ -63,12 +53,12 @@ function quoteYAML(value: string): string {
 }
 
 function buildAutomataSpec(input: {
-  kind: AutomataKindValue;
   nickname: string;
   iconUrl: string;
   description: string;
   goal: string;
   standingInstruction: string;
+  resetOnFinish: boolean;
   schedule: string[];
   tags: string[];
   allowedDAGNames: string[];
@@ -79,9 +69,6 @@ function buildAutomataSpec(input: {
   const standingInstruction = input.standingInstruction.trim();
   const lines: string[] = [];
 
-  if (input.kind !== DEFAULT_AUTOMATA_KIND) {
-    lines.push(`kind: ${input.kind}`);
-  }
   if (nickname) {
     lines.push(`nickname: ${quoteYAML(nickname)}`);
   }
@@ -94,12 +81,15 @@ function buildAutomataSpec(input: {
   if (input.goal.trim()) {
     lines.push(`goal: ${quoteYAML(input.goal)}`);
   }
-  if (input.kind === AutomataKind.service && standingInstruction) {
+  if (standingInstruction) {
     lines.push(`standing_instruction: ${quoteYAML(standingInstruction)}`);
   }
-  if (input.kind === AutomataKind.service && input.schedule.length === 1) {
+  if (input.resetOnFinish) {
+    lines.push('reset_on_finish: true');
+  }
+  if (input.schedule.length === 1) {
     lines.push(`schedule: ${quoteYAML(input.schedule[0] || '')}`);
-  } else if (input.kind === AutomataKind.service && input.schedule.length > 1) {
+  } else if (input.schedule.length > 1) {
     lines.push('schedule:');
     input.schedule.forEach((expression) => {
       lines.push(`  - ${quoteYAML(expression)}`);
@@ -129,7 +119,6 @@ function buildAutomataSpec(input: {
 }
 
 function validateAutomataCreateForm(input: {
-  kind: AutomataKindValue;
   name: string;
   nickname: string;
   iconUrl: string;
@@ -158,11 +147,9 @@ function validateAutomataCreateForm(input: {
   if (iconUrl.length > MAX_AUTOMATA_ICON_URL_LENGTH) {
     return `Icon URL must be ${MAX_AUTOMATA_ICON_URL_LENGTH} characters or fewer.`;
   }
-  if (input.kind === AutomataKind.service) {
-    const scheduleError = validateAutomataScheduleExpressions(input.schedule);
-    if (scheduleError) {
-      return scheduleError;
-    }
+  const scheduleError = validateAutomataScheduleExpressions(input.schedule);
+  if (scheduleError) {
+    return scheduleError;
   }
   if (input.allowedDAGNames.length === 0) {
     return 'Select at least one allowed DAG.';
@@ -297,15 +284,13 @@ export function AutomataCreateModal({
   const selectedWorkspaceTag =
     workspaceTagForAutomataSelection(selectedWorkspace);
   const [createName, setCreateName] = React.useState('');
-  const [createKind, setCreateKind] = React.useState<AutomataKindValue>(
-    DEFAULT_AUTOMATA_KIND
-  );
   const [createNickname, setCreateNickname] = React.useState('');
   const [createIconUrl, setCreateIconUrl] = React.useState('');
   const [createDescription, setCreateDescription] = React.useState('');
   const [createGoal, setCreateGoal] = React.useState('');
   const [createStandingInstruction, setCreateStandingInstruction] =
     React.useState('');
+  const [createResetOnFinish, setCreateResetOnFinish] = React.useState(false);
   const [createSchedule, setCreateSchedule] = React.useState('');
   const [createTags, setCreateTags] = React.useState('');
   const [createAllowedDAGNames, setCreateAllowedDAGNames] = React.useState<
@@ -339,12 +324,12 @@ export function AutomataCreateModal({
 
   const resetForm = React.useCallback(() => {
     setCreateName('');
-    setCreateKind(DEFAULT_AUTOMATA_KIND);
     setCreateNickname('');
     setCreateIconUrl('');
     setCreateDescription('');
     setCreateGoal('');
     setCreateStandingInstruction('');
+    setCreateResetOnFinish(false);
     setCreateSchedule('');
     setCreateTags(selectedWorkspaceTag || '');
     setCreateAllowedDAGNames([]);
@@ -368,7 +353,6 @@ export function AutomataCreateModal({
   const onCreate = async () => {
     const parsedSchedule = parseAutomataScheduleText(createSchedule);
     const validationError = validateAutomataCreateForm({
-      kind: createKind,
       name: createName,
       nickname: createNickname,
       iconUrl: createIconUrl,
@@ -394,8 +378,8 @@ export function AutomataCreateModal({
             description: createDescription,
             goal: createGoal,
             standingInstruction: createStandingInstruction,
+            resetOnFinish: createResetOnFinish,
             schedule: parsedSchedule,
-            kind: createKind,
             tags: applySelectedWorkspaceToAutomataTags(
               parseTagInput(createTags),
               selectedWorkspace
@@ -441,38 +425,15 @@ export function AutomataCreateModal({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="automata-create-kind">Kind</Label>
-              <Select
-                value={createKind}
-                onValueChange={(value) =>
-                  setCreateKind(value as AutomataKindValue)
-                }
-                disabled={isCreating}
-              >
-                <SelectTrigger id="automata-create-kind">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={AutomataKind.workflow}>
-                    Workflow
-                  </SelectItem>
-                  <SelectItem value={AutomataKind.service}>Service</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="automata-create-nickname">Nickname</Label>
-              <Input
-                id="automata-create-nickname"
-                value={createNickname}
-                onChange={(event) => setCreateNickname(event.target.value)}
-                placeholder="Build Captain"
-                disabled={isCreating}
-              />
-            </div>
+          <div className="grid gap-2">
+            <Label htmlFor="automata-create-nickname">Nickname</Label>
+            <Input
+              id="automata-create-nickname"
+              value={createNickname}
+              onChange={(event) => setCreateNickname(event.target.value)}
+              placeholder="Build Captain"
+              disabled={isCreating}
+            />
           </div>
 
           <div className="grid gap-2">
@@ -508,35 +469,45 @@ export function AutomataCreateModal({
             />
           </div>
 
-          {createKind === AutomataKind.service ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="automata-create-standing-instruction">
-                  Standing Instruction
-                </Label>
-                <Textarea
-                  id="automata-create-standing-instruction"
-                  value={createStandingInstruction}
-                  onChange={(event) =>
-                    setCreateStandingInstruction(event.target.value)
-                  }
-                  placeholder="Handle each service cycle and work through the task list."
-                  disabled={isCreating}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="automata-create-schedule">Schedule</Label>
-                <Textarea
-                  id="automata-create-schedule"
-                  value={createSchedule}
-                  onChange={(event) => setCreateSchedule(event.target.value)}
-                  placeholder={'0 * * * *\n30 9 * * 1-5'}
-                  disabled={isCreating}
-                  rows={4}
-                />
-              </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="automata-create-standing-instruction">
+                Standing Instruction
+              </Label>
+              <Textarea
+                id="automata-create-standing-instruction"
+                value={createStandingInstruction}
+                onChange={(event) =>
+                  setCreateStandingInstruction(event.target.value)
+                }
+                placeholder="Handle each cycle and work through the task list."
+                disabled={isCreating}
+              />
             </div>
-          ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="automata-create-schedule">Schedule</Label>
+              <Textarea
+                id="automata-create-schedule"
+                value={createSchedule}
+                onChange={(event) => setCreateSchedule(event.target.value)}
+                placeholder={'0 * * * *\n30 9 * * 1-5'}
+                disabled={isCreating}
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2">
+            <Label htmlFor="automata-create-reset-on-finish">
+              Reset on finish
+            </Label>
+            <Switch
+              id="automata-create-reset-on-finish"
+              checked={createResetOnFinish}
+              onCheckedChange={setCreateResetOnFinish}
+              disabled={isCreating}
+            />
+          </div>
 
           <div className="grid gap-2">
             <Label htmlFor="automata-create-tags">Tags</Label>
