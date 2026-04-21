@@ -315,11 +315,7 @@ steps:
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
 
-		select {
-		case <-done:
-		case <-time.After(30 * time.Second):
-			t.Fatal("timed out waiting for DAG cancellation")
-		}
+		waitForCancel(t, done, 30*time.Second)
 
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, core.Aborted)
@@ -645,16 +641,18 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		waitForTestFile(t, startedFile, 2*time.Minute)
 
 		// Get the status of the DAG
-		var mockResponseWriter = mockResponseWriter{}
-		dagAgent.HandleHTTP(ctx)(&mockResponseWriter, &http.Request{
-			Method: "GET", URL: &url.URL{Path: "/status"},
-		})
-		require.Equal(t, http.StatusOK, mockResponseWriter.status)
+		require.Eventually(t, func() bool {
+			var mockResponseWriter = mockResponseWriter{}
+			dagAgent.HandleHTTP(ctx)(&mockResponseWriter, &http.Request{
+				Method: "GET", URL: &url.URL{Path: "/status"},
+			})
+			if mockResponseWriter.status != http.StatusOK {
+				return false
+			}
 
-		// Check if the status is returned correctly
-		dagRunStatus, err := exec.StatusFromJSON(mockResponseWriter.body)
-		require.NoError(t, err)
-		require.Equal(t, core.Running, dagRunStatus.Status)
+			dagRunStatus, err := exec.StatusFromJSON(mockResponseWriter.body)
+			return err == nil && dagRunStatus.Status == core.Running
+		}, 10*time.Second, 50*time.Millisecond)
 
 		// Stop the DAG
 		dagAgent.Abort()
