@@ -8,7 +8,7 @@ import {
   getStoredWorkspaceSelection,
   hasWorkspaceLabel,
   LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
-  WORKSPACE_SCOPE_STORAGE_KEY,
+  LEGACY_WORKSPACE_SCOPE_STORAGE_KEY,
   WORKSPACE_STORAGE_KEY,
   WorkspaceScope,
   workspaceSelectionLabel,
@@ -44,28 +44,45 @@ describe('workspace storage', () => {
       scope: WorkspaceScope.workspace,
       workspace: 'team-a',
     });
-    expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBeNull();
     expect(
       localStorage.getItem(LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY)
     ).toBeNull();
     expect(
-      JSON.parse(localStorage.getItem(WORKSPACE_SCOPE_STORAGE_KEY) ?? '')
+      JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? '')
     ).toEqual({
       scope: WorkspaceScope.workspace,
       workspace: 'team-a',
     });
   });
 
+  it('migrates the deprecated workspace scope storage key', () => {
+    localStorage.setItem(
+      LEGACY_WORKSPACE_SCOPE_STORAGE_KEY,
+      JSON.stringify({ scope: WorkspaceScope.default })
+    );
+
+    expect(getStoredWorkspaceSelection()).toEqual({
+      scope: WorkspaceScope.default,
+    });
+    expect(localStorage.getItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
+    expect(
+      JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? '')
+    ).toEqual({
+      scope: WorkspaceScope.default,
+    });
+  });
+
   it('drops deprecated stored legacy scope names', () => {
     localStorage.setItem(
-      WORKSPACE_SCOPE_STORAGE_KEY,
+      LEGACY_WORKSPACE_SCOPE_STORAGE_KEY,
       JSON.stringify({ scope: 'none' })
     );
 
     expect(getStoredWorkspaceSelection()).toEqual({
       scope: WorkspaceScope.all,
     });
-    expect(localStorage.getItem(WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBeNull();
   });
 });
 

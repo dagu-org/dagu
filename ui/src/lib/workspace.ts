@@ -4,7 +4,8 @@
 export const WORKSPACE_LABEL_KEY = 'workspace';
 export const WORKSPACE_LABEL_PREFIX = `${WORKSPACE_LABEL_KEY}=`;
 export const WORKSPACE_STORAGE_KEY = 'dagu-selected-workspace';
-export const WORKSPACE_SCOPE_STORAGE_KEY = 'dagu-selected-workspace-scope';
+export const LEGACY_WORKSPACE_SCOPE_STORAGE_KEY =
+  'dagu-selected-workspace-scope';
 export const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
 export const ALL_WORKSPACES_DISPLAY_NAME = 'all';
 export const DEFAULT_WORKSPACE_DISPLAY_NAME = 'default';
@@ -238,18 +239,14 @@ function parseStoredWorkspaceSelection(
 
 export function getStoredWorkspaceSelection(): WorkspaceSelection {
   try {
-    const stored = localStorage.getItem(WORKSPACE_SCOPE_STORAGE_KEY);
+    const stored = localStorage.getItem(WORKSPACE_STORAGE_KEY);
     if (stored !== null) {
       const parsed = parseStoredWorkspaceSelection(stored);
       if (parsed) {
         return parsed;
       }
-      localStorage.removeItem(WORKSPACE_SCOPE_STORAGE_KEY);
-    }
 
-    const legacy = localStorage.getItem(WORKSPACE_STORAGE_KEY);
-    if (legacy !== null) {
-      const sanitized = sanitizeWorkspaceName(legacy);
+      const sanitized = sanitizeWorkspaceName(stored);
       localStorage.removeItem(WORKSPACE_STORAGE_KEY);
       if (sanitized) {
         const selection = {
@@ -258,6 +255,18 @@ export function getStoredWorkspaceSelection(): WorkspaceSelection {
         };
         persistWorkspaceSelection(selection);
         return selection;
+      }
+    }
+
+    const legacyScope = localStorage.getItem(
+      LEGACY_WORKSPACE_SCOPE_STORAGE_KEY
+    );
+    if (legacyScope !== null) {
+      const parsed = parseStoredWorkspaceSelection(legacyScope);
+      localStorage.removeItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY);
+      if (parsed) {
+        persistWorkspaceSelection(parsed);
+        return parsed;
       }
     }
 
@@ -285,11 +294,8 @@ export function getStoredWorkspaceSelection(): WorkspaceSelection {
 export function persistWorkspaceSelection(selection: WorkspaceSelection): void {
   try {
     const sanitized = sanitizeWorkspaceSelection(selection);
-    localStorage.setItem(
-      WORKSPACE_SCOPE_STORAGE_KEY,
-      JSON.stringify(sanitized)
-    );
-    localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+    localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(sanitized));
+    localStorage.removeItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY);
     localStorage.removeItem(LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY);
   } catch {
     // Ignore storage access errors.
