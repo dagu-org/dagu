@@ -651,7 +651,7 @@ steps:
     with:
       host: example.com
       user: deploy
-      port: 22
+      port: "22"
       direction: upload
       source: ./backup.tar.gz
       destination: /srv/backups/backup.tar.gz
@@ -675,9 +675,27 @@ steps:
 steps:
   - type: sftp
     with:
+      host: example.com
+      user: deploy
+      port: "22"
       source: ./backup.tar.gz
       destination: /srv/backups/backup.tar.gz
       direction: sync
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectEmptySource",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: "22"
+      direction: upload
+      source: ""
+      destination: /srv/backups/backup.tar.gz
 `,
 			wantErr: "steps",
 		},
@@ -687,6 +705,10 @@ steps:
 steps:
   - type: sftp
     with:
+      host: example.com
+      user: deploy
+      port: "22"
+      direction: upload
       source: ./backup.tar.gz
       destination: /srv/backups/backup.tar.gz
       unknown_field: true
