@@ -633,6 +633,84 @@ steps:
 	}
 }
 
+func TestDAGSchemaSFTPExecutor(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "WithConfig",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: 22
+      direction: upload
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+`,
+		},
+		{
+			name: "LegacyConfigAlias",
+			spec: `
+steps:
+  - type: sftp
+    config:
+      host: example.com
+      source: /srv/backups/backup.tar.gz
+      destination: ./backup.tar.gz
+      direction: download
+`,
+		},
+		{
+			name: "RejectInvalidDirection",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+      direction: sync
+`,
+			wantErr: "steps",
+		},
+		{
+			name: "RejectUnknownConfigField",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+      unknown_field: true
+`,
+			wantErr: "steps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
 func TestDAGSchemaKubernetes(t *testing.T) {
 	t.Parallel()
 
