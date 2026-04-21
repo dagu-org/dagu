@@ -198,12 +198,8 @@ export function workspaceMutationQueryForWorkspace(workspace?: string | null): {
   };
 }
 
-export function workspaceDocumentQueryForWorkspace(workspace?: string | null): {
-  workspaceScope: WorkspaceMutationScope;
-  workspace?: string;
-} {
-  return workspaceMutationQueryForWorkspace(workspace);
-}
+export const workspaceDocumentQueryForWorkspace =
+  workspaceMutationQueryForWorkspace;
 
 export function visibleDocumentPathForWorkspace(
   docPath: string,

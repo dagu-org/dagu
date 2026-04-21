@@ -45,11 +45,21 @@ func (m *mockWorkspaceStore) Create(context.Context, *workspacepkg.Workspace) er
 	return nil
 }
 
-func (m *mockWorkspaceStore) GetByID(context.Context, string) (*workspacepkg.Workspace, error) {
+func (m *mockWorkspaceStore) GetByID(_ context.Context, id string) (*workspacepkg.Workspace, error) {
+	for _, ws := range m.workspaces {
+		if ws.ID == id {
+			return ws, nil
+		}
+	}
 	return nil, workspacepkg.ErrWorkspaceNotFound
 }
 
-func (m *mockWorkspaceStore) GetByName(context.Context, string) (*workspacepkg.Workspace, error) {
+func (m *mockWorkspaceStore) GetByName(_ context.Context, name string) (*workspacepkg.Workspace, error) {
+	for _, ws := range m.workspaces {
+		if ws.Name == name {
+			return ws, nil
+		}
+	}
 	return nil, workspacepkg.ErrWorkspaceNotFound
 }
 
@@ -431,7 +441,7 @@ func newDocTestSetupWithWorkspaces(t *testing.T, names ...string) *docTestSetup 
 	store := &mockDocStore{docs: make(map[string]*agent.Doc)}
 	workspaces := make([]*workspacepkg.Workspace, 0, len(names))
 	for _, name := range names {
-		workspaces = append(workspaces, &workspacepkg.Workspace{Name: name})
+		workspaces = append(workspaces, &workspacepkg.Workspace{ID: name, Name: name})
 	}
 	return newDocTestSetupWithStore(t, store, &mockWorkspaceStore{workspaces: workspaces})
 }
@@ -1219,7 +1229,9 @@ func (m *mockDocStoreWithTree) List(_ context.Context, opts agent.ListDocsOption
 		}
 	}
 	pg := exec.NewPaginator(opts.Page, opts.PerPage)
-	result := exec.NewPaginatedResult(filtered, len(filtered), pg)
+	start := min(pg.Offset(), len(filtered))
+	end := min(start+pg.Limit(), len(filtered))
+	result := exec.NewPaginatedResult(filtered[start:end], len(filtered), pg)
 	return &result, nil
 }
 
