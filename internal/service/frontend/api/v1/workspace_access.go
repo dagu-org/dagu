@@ -457,13 +457,16 @@ func (a *API) requireDAGRunVisible(ctx context.Context, dagRun exec.DAGRunRef) e
 	return a.requireWorkspaceVisible(ctx, workspaceName)
 }
 
-func (a *API) requireDAGRunExecute(ctx context.Context, dagRun exec.DAGRunRef) error {
-	if a.authService == nil {
+func (a *API) requireDAGRunStatusVisible(ctx context.Context, status *exec.DAGRunStatus) error {
+	if status == nil {
 		return nil
 	}
-	workspaceName, err := a.workspaceNameForDAGRun(ctx, dagRun)
-	if err != nil {
-		return err
+	return a.requireWorkspaceVisible(ctx, statusWorkspaceName(status))
+}
+
+func (a *API) requireDAGRunStatusExecute(ctx context.Context, status *exec.DAGRunStatus) error {
+	if status == nil {
+		return nil
 	}
-	return a.requireExecuteForWorkspace(ctx, workspaceName)
+	return a.requireExecuteForWorkspace(ctx, statusWorkspaceName(status))
 }
