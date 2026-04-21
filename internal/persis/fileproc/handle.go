@@ -215,7 +215,7 @@ func (p *ProcHandle) openInitializedProcFile(heartbeatUnix int64) (*os.File, err
 	// Keep the temporary name short. Proc file names already include encoded
 	// run and attempt IDs, and deriving the temp name from them can exceed
 	// Windows path limits even when the final proc path is still valid.
-	tmpFile, err := os.CreateTemp(dir, ".proc-*.tmp")
+	tmpFile, err := createProcTempFile(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp proc file: %w", err)
 	}
@@ -248,4 +248,25 @@ func (p *ProcHandle) openInitializedProcFile(heartbeatUnix int64) (*os.File, err
 		return nil, fmt.Errorf("failed to reopen proc file: %w", err)
 	}
 	return fd, nil
+}
+
+func createProcTempFile(dir string) (*os.File, error) {
+	var err error
+	for range 2 {
+		if mkErr := os.MkdirAll(dir, 0750); mkErr != nil {
+			return nil, mkErr
+		}
+
+		var tmpFile *os.File
+		tmpFile, err = os.CreateTemp(dir, ".proc-*.tmp")
+		if err == nil {
+			return tmpFile, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		// Another proc can remove an empty DAG proc directory between
+		// MkdirAll and CreateTemp while a restart publishes its new heartbeat.
+	}
+	return nil, err
 }
