@@ -143,6 +143,9 @@ func validateWorkspaceParam(name string) (string, error) {
 func parseWorkspaceScope(scopeParam *api.WorkspaceScope, workspaceParam *api.Workspace) (workspaceScopeSelection, error) {
 	workspaceName := ""
 	if workspaceParam != nil {
+		if string(*workspaceParam) == "" {
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must not be empty")
+		}
 		var err error
 		workspaceName, err = validateWorkspaceParam(string(*workspaceParam))
 		if err != nil {

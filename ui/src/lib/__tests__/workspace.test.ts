@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   ALL_WORKSPACES_DISPLAY_NAME,
   getStoredWorkspaceSelection,
+  hasWorkspaceLabel,
   LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
   NO_WORKSPACE_DISPLAY_NAME,
   WORKSPACE_SCOPE_STORAGE_KEY,
@@ -21,6 +22,11 @@ describe('workspace labels', () => {
     expect(workspaceSelectionLabel({ scope: WorkspaceScope.none })).toBe(
       NO_WORKSPACE_DISPLAY_NAME
     );
+  });
+
+  it('detects malformed workspace labels as workspace-labelled', () => {
+    expect(hasWorkspaceLabel(['workspace=bad value'])).toBe(true);
+    expect(hasWorkspaceLabel(['team=ops'])).toBe(false);
   });
 });
 

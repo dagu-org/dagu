@@ -24,8 +24,10 @@ import {
 import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
 import dayjs from '../../../lib/dayjs';
 import {
+  hasWorkspaceLabel,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
+  workspaceDocumentSelectionQuery,
   workspaceNameFromLabels,
 } from '../../../lib/workspace';
 
@@ -62,6 +64,13 @@ function DAGDetails() {
     }
     return sanitizeWorkspaceSelection(appWorkspaceSelection);
   }, [appWorkspaceSelection, queryWorkspace]);
+  const scopedQuery = useMemo(
+    () => ({
+      remoteNode,
+      ...workspaceDocumentSelectionQuery(workspaceSelection),
+    }),
+    [remoteNode, workspaceSelection]
+  );
   const fileName = params.fileName || '';
 
   // Set page context for agent chat
@@ -141,20 +150,23 @@ function DAGDetails() {
     '/dags/{fileName}',
     {
       params: {
-        query: { remoteNode },
+        query: scopedQuery,
         path: { fileName },
       },
     },
     sseFallbackOptions(dagSSE)
   );
   useSSECacheSync(dagSSE, mutateDag);
-  const dagWorkspaceName = workspaceNameFromLabels([
+  const dagLabels = [
     ...(dagData?.dag?.labels ?? []),
     ...(dagData?.dag?.tags ?? []),
-  ]);
+  ];
+  const dagWorkspaceName = workspaceNameFromLabels(dagLabels);
+  const dagHasWorkspaceLabel = hasWorkspaceLabel(dagLabels);
   const dagMatchesWorkspace =
     workspaceSelection.scope === WorkspaceScope.all ||
-    (workspaceSelection.scope === WorkspaceScope.none && !dagWorkspaceName) ||
+    (workspaceSelection.scope === WorkspaceScope.none &&
+      !dagHasWorkspaceLabel) ||
     (workspaceSelection.scope === WorkspaceScope.workspace &&
       dagWorkspaceName === workspaceSelection.workspace);
 
@@ -179,7 +191,7 @@ function DAGDetails() {
           name: dagRunName,
           dagRunId: dagRunId || '',
         },
-        query: { remoteNode },
+        query: scopedQuery,
       },
     }),
     sseFallbackOptions(dagRunSSE)
@@ -206,7 +218,7 @@ function DAGDetails() {
           dagRunId: dagRunId || '',
           subDAGRunId: subDAGRunId || '',
         },
-        query: { remoteNode },
+        query: scopedQuery,
       },
     }),
     sseFallbackOptions(subDAGRunSSE)

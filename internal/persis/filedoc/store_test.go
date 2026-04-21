@@ -295,7 +295,7 @@ func TestListTreeExcludePathRootsBeforePagination(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	require.NoError(t, store.Create(ctx, "aaa/hidden", "hidden"))
+	require.NoError(t, store.Create(ctx, "aaa", "hidden"))
 	require.NoError(t, store.Create(ctx, "bbb", "visible"))
 
 	opts := defaultListOpts(1, 1)

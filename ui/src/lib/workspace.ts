@@ -40,6 +40,10 @@ export function isWorkspaceLabel(label: string): boolean {
   return label.toLowerCase().startsWith(WORKSPACE_LABEL_PREFIX);
 }
 
+export function hasWorkspaceLabel(labels: string[] = []): boolean {
+  return labels.some(isWorkspaceLabel);
+}
+
 export function withoutWorkspaceLabels(labels: string[] = []): string[] {
   return labels.filter((label) => !isWorkspaceLabel(label));
 }

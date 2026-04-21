@@ -33,14 +33,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const TOKEN_KEY = 'dagu_auth_token';
 
-const ROLE_HIERARCHY: Record<UserRole, number> = {
-  [UserRole.admin]: 5,
-  [UserRole.manager]: 4,
-  [UserRole.developer]: 3,
-  [UserRole.operator]: 2,
-  [UserRole.viewer]: 1,
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const config = useConfig();
   const [user, setUser] = useState<User | null>(null);
@@ -174,32 +166,32 @@ export function useCanWrite(): boolean {
   const { user } = useAuth();
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
-  const scope = appBarContext.workspaceSelection?.scope;
-  if (scope === undefined || scope === WorkspaceScope.all) {
+  const workspace = workspaceRoleTarget(
+    appBarContext.workspaceSelection?.scope,
+    appBarContext.selectedWorkspace
+  );
+  if (workspace === null) {
     return false;
   }
   if (config.authMode !== 'builtin') return config.permissions.writeDags;
   if (!user) return false;
-  return roleAtLeast(
-    effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
-    UserRole.developer
-  );
+  return roleAtLeast(effectiveWorkspaceRole(user, workspace), UserRole.developer);
 }
 
 export function useCanExecute(): boolean {
   const { user } = useAuth();
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
-  const scope = appBarContext.workspaceSelection?.scope;
-  if (scope === undefined || scope === WorkspaceScope.all) {
+  const workspace = workspaceRoleTarget(
+    appBarContext.workspaceSelection?.scope,
+    appBarContext.selectedWorkspace
+  );
+  if (workspace === null) {
     return false;
   }
   if (config.authMode !== 'builtin') return config.permissions.runDags;
   if (!user) return false;
-  return roleAtLeast(
-    effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
-    UserRole.operator
-  );
+  return roleAtLeast(effectiveWorkspaceRole(user, workspace), UserRole.operator);
 }
 
 export function useCanAccessSystemStatus(): boolean {
@@ -207,7 +199,7 @@ export function useCanAccessSystemStatus(): boolean {
   const config = useConfig();
   if (config.authMode !== 'builtin') return true;
   if (!user) return false;
-  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[UserRole.developer];
+  return roleAtLeast(user.role, UserRole.developer);
 }
 
 export function useCanManageWebhooks(): boolean {
@@ -216,7 +208,7 @@ export function useCanManageWebhooks(): boolean {
   // Webhooks require the builtin auth service (webhook token store).
   if (config.authMode !== 'builtin') return false;
   if (!user) return false;
-  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[UserRole.developer];
+  return roleAtLeast(user.role, UserRole.developer);
 }
 
 export function useCanViewAuditLogs(): boolean {
@@ -224,7 +216,7 @@ export function useCanViewAuditLogs(): boolean {
   const config = useConfig();
   if (config.authMode !== 'builtin') return true;
   if (!user) return false;
-  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[UserRole.manager];
+  return roleAtLeast(user.role, UserRole.manager);
 }
 
 export function useCanViewEventLogs(): boolean {
@@ -232,9 +224,22 @@ export function useCanViewEventLogs(): boolean {
   const config = useConfig();
   if (config.authMode !== 'builtin') return true;
   if (!user) return false;
-  return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY[UserRole.manager];
+  return roleAtLeast(user.role, UserRole.manager);
 }
 
 export function hasRole(userRole: UserRole, requiredRole: UserRole): boolean {
-  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
+  return roleAtLeast(userRole, requiredRole);
+}
+
+function workspaceRoleTarget(
+  scope: WorkspaceScope | undefined,
+  selectedWorkspace?: string | null
+): string | null {
+  if (scope === WorkspaceScope.none) {
+    return '';
+  }
+  if (scope === WorkspaceScope.workspace) {
+    return selectedWorkspace || null;
+  }
+  return null;
 }

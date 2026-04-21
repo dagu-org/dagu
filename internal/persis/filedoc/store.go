@@ -1006,14 +1006,11 @@ func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder str
 			return nil
 		}
 		relPath = filepath.ToSlash(relPath)
-		if docPathRootExcluded(relPath, excludedRoots) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
 
 		if d.IsDir() {
+			if docPathRootExcluded(relPath, excludedRoots) {
+				return filepath.SkipDir
+			}
 			var modTime time.Time
 			if needMtime {
 				if info, infoErr := d.Info(); infoErr == nil {
@@ -1043,6 +1040,9 @@ func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder str
 		}
 
 		id := strings.TrimSuffix(relPath, ".md")
+		if docPathRootExcluded(id, excludedRoots) {
+			return nil
+		}
 
 		if err := agent.ValidateDocID(id); err != nil {
 			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
