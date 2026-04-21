@@ -6968,6 +6968,10 @@ export interface operations {
                 q: string;
                 /** @description Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels. */
                 labels?: string;
+                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
+                workspaceScope?: components["parameters"]["WorkspaceScope"];
+                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Opaque cursor returned by the previous search response */
                 cursor?: components["parameters"]["SearchCursor"];
                 /** @description Number of search match snippets to return (default 5, max 50) */

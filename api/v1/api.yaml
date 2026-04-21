@@ -1670,6 +1670,8 @@ paths:
           schema:
             type: "string"
           description: "Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels."
+        - $ref: "#/components/parameters/WorkspaceScope"
+        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/SearchCursor"
         - $ref: "#/components/parameters/SearchMatchLimit"
       responses:

@@ -5,6 +5,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WorkspaceScope } from '@/api/v1/schema';
 import SearchResult from '../SearchResult';
 
 const { getMock } = vi.hoisted(() => ({
@@ -28,7 +29,7 @@ describe('SearchResult', () => {
     });
   });
 
-  it('loads more DAG matches without workspace target params', async () => {
+  it('loads more DAG matches without workspace query params when omitted', async () => {
     render(
       <MemoryRouter>
         <SearchResult
@@ -73,12 +74,16 @@ describe('SearchResult', () => {
     });
   });
 
-  it('loads more DAG matches from the result workspace', async () => {
+  it('loads more DAG matches with the feed workspace query', async () => {
     render(
       <MemoryRouter>
         <SearchResult
           type="dag"
           query="needle"
+          workspaceQuery={{
+            workspaceScope: WorkspaceScope.workspace,
+            workspace: 'team-a',
+          }}
           results={[
             {
               fileName: 'build',
@@ -114,6 +119,8 @@ describe('SearchResult', () => {
           remoteNode: 'local',
           q: 'needle',
           cursor: 'cursor-1',
+          workspaceScope: WorkspaceScope.workspace,
+          workspace: 'team-a',
         },
       },
     });

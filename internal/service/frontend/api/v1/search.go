@@ -231,9 +231,7 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 		return nil, err
 	}
 	labels := scopedDAGSearchLabels(request.Params.Labels)
-	workspaceFilter, err := a.workspaceFilterForSelection(ctx, workspaceScopeSelection{
-		scope: api.WorkspaceScopeAll,
-	})
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}

@@ -232,6 +232,51 @@ steps:
 	assert.False(t, secondPage.HasMore)
 }
 
+func TestSearchDagMatchesUsesWorkspaceScopeFromFeedCursor(t *testing.T) {
+	t.Parallel()
+
+	setup := newSearchTestSetup(t, false)
+	mustCreateDAG(t, setup, "ops-heavy", `name: ops-heavy
+labels:
+  - workspace=ops
+steps:
+  - command: echo "needle."
+  - command: echo "needle."
+  - command: echo "needle."`)
+
+	scope := apigen.WorkspaceScopeWorkspace
+	workspace := apigen.Workspace("ops")
+	feedResp, err := setup.api.SearchDAGFeed(adminCtx(), apigen.SearchDAGFeedRequestObject{
+		Params: apigen.SearchDAGFeedParams{
+			Q:              "needle.",
+			WorkspaceScope: &scope,
+			Workspace:      &workspace,
+		},
+	})
+	require.NoError(t, err)
+
+	feedPage := feedResp.(apigen.SearchDAGFeed200JSONResponse)
+	require.Len(t, feedPage.Results, 1)
+	require.NotNil(t, feedPage.Results[0].NextMatchesCursor)
+
+	limit := apigen.SearchMatchLimit(2)
+	matchesResp, err := setup.api.SearchDagMatches(adminCtx(), apigen.SearchDagMatchesRequestObject{
+		FileName: "ops-heavy",
+		Params: apigen.SearchDagMatchesParams{
+			Q:              "needle.",
+			Limit:          &limit,
+			Cursor:         feedPage.Results[0].NextMatchesCursor,
+			WorkspaceScope: &scope,
+			Workspace:      &workspace,
+		},
+	})
+	require.NoError(t, err)
+
+	matchesPage := matchesResp.(apigen.SearchDagMatches200JSONResponse)
+	assert.Len(t, matchesPage.Matches, 2)
+	assert.False(t, matchesPage.HasMore)
+}
+
 func TestSearchDocMatches(t *testing.T) {
 	t.Parallel()
 

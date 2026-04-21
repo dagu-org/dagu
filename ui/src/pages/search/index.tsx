@@ -271,7 +271,12 @@ function DAGSearchFeed({ query, remoteNode, workspaceQuery }: SearchFeedProps) {
       onRetryLoadMore={retryLoadMore}
       sentinelRef={sentinelRef}
     >
-      <SearchResult type="dag" query={query} results={results} />
+      <SearchResult
+        type="dag"
+        query={query}
+        results={results}
+        workspaceQuery={workspaceQuery}
+      />
     </SearchFeedPanel>
   );
 }
