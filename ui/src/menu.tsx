@@ -11,7 +11,6 @@ import {
   useCanViewEventLogs,
   useCanManageWebhooks,
   useCanViewAuditLogs,
-  useCanWrite,
   useAuth,
   useIsAdmin,
 } from '@/contexts/AuthContext';
@@ -19,8 +18,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { useHasFeature } from '@/hooks/useLicense';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
-import { effectiveWorkspaceRole, roleAtLeast } from '@/lib/workspaceAccess';
-import { isMutableWorkspaceSelection } from '@/lib/workspace';
+import { roleAtLeast } from '@/lib/workspaceAccess';
 import { UserRole } from '@/api/v1/schema';
 import {
   Activity,
@@ -402,17 +400,11 @@ export const mainListItems = React.forwardRef<
   const { user } = useAuth();
   const hasRbac = useHasFeature('rbac');
   const hasAudit = useHasFeature('audit');
-  const globalCanWrite = useCanWrite();
   const appBarContext = React.useContext(AppBarContext);
   const canWrite =
     config.authMode !== 'builtin'
-      ? globalCanWrite
-      : roleAtLeast(
-          effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
-          UserRole.developer
-        );
-  const canWriteScoped =
-    canWrite && isMutableWorkspaceSelection(appBarContext.workspaceSelection);
+      ? config.permissions.writeDags
+      : roleAtLeast(user?.role ?? null, UserRole.developer);
   const canAccessSystemStatus = useCanAccessSystemStatus();
   const canManageWebhooks = useCanManageWebhooks();
   const canViewEventLogs = useCanViewEventLogs();
@@ -629,7 +621,7 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {canWriteScoped && config.agentEnabled && (
+            {canWrite && config.agentEnabled && (
               <NavItem
                 to="/design"
                 text="Design"
@@ -655,7 +647,7 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {canWriteScoped && (
+            {canWrite && (
               <NavItem
                 to="/base-config"
                 text="Base Config"
@@ -665,7 +657,7 @@ export const mainListItems = React.forwardRef<
                 customColor={customColor}
               />
             )}
-            {canWriteScoped && config.gitSyncEnabled && (
+            {canWrite && config.gitSyncEnabled && (
               <NavItem
                 to="/git-sync"
                 text="Git Sync"
@@ -677,7 +669,7 @@ export const mainListItems = React.forwardRef<
             )}
           </div>
 
-          {(canWriteScoped ||
+          {(canWrite ||
             canAccessSystemStatus ||
             canManageWebhooks ||
             canViewEventLogs ||
@@ -738,7 +730,7 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              {canWriteScoped && config.agentEnabled && (
+              {canWrite && config.agentEnabled && (
                 <NavGroup
                   groupKey="agent"
                   icon={<Bot size={18} />}

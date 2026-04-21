@@ -18,7 +18,6 @@ import { Tab, Tabs } from '@/components/ui/tabs';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import { useCanWrite } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { usePageContext } from '@/contexts/PageContext';
 import { useSchema } from '@/contexts/SchemaContext';
@@ -71,7 +70,7 @@ import {
 } from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { buildWorkflowDesignPrompt } from './buildWorkflowDesignPrompt';
 
 type DAGDetails = components['schemas']['DAGDetails'];
@@ -110,7 +109,6 @@ const DESIGN_PANEL_LIMITS = {
 };
 
 function WorkflowDesignPage() {
-  const canWrite = useCanWrite();
   const config = useConfig();
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
@@ -373,10 +371,6 @@ function WorkflowDesignPage() {
     }
     wasAgentWorkingRef.current = agent.isWorking;
   }, [agent.isWorking, selectedDagFile, mutateSpec]);
-
-  if (!canWrite) {
-    return <Navigate to="/" replace />;
-  }
 
   const dagFiles = dagListQuery.data?.dags || [];
   const selectedDag = validation?.dag || specData?.dag;

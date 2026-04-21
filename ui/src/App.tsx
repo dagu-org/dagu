@@ -20,7 +20,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider, hasRole, useAuth } from './contexts/AuthContext';
 import {
   Config,
   ConfigContext,
@@ -42,14 +42,12 @@ import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
 import { useClient } from './hooks/api';
 import {
   getStoredWorkspaceSelection,
-  isMutableWorkspaceSelection,
   persistWorkspaceSelection,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
   workspaceNameForSelection,
   type WorkspaceSelection,
 } from './lib/workspace';
-import { effectiveWorkspaceRole, roleAtLeast } from './lib/workspaceAccess';
 import { UserRole, WorkspaceScope } from './api/v1/schema';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
@@ -146,20 +144,11 @@ function WriteElement({
 }): React.ReactElement {
   const { user } = useAuth();
   const config = React.useContext(ConfigContext);
-  const appBarContext = React.useContext(AppBarContext);
-  const workspaceSelection = sanitizeWorkspaceSelection(
-    appBarContext.workspaceSelection
-  );
-  const workspaceName = workspaceNameForSelection(workspaceSelection);
-  const hasMutableScope = isMutableWorkspaceSelection(workspaceSelection);
   const canWrite =
     config.authMode !== 'builtin'
       ? config.permissions.writeDags
-      : roleAtLeast(
-          effectiveWorkspaceRole(user, workspaceName),
-          UserRole.developer
-        );
-  if (!hasMutableScope || !canWrite || !config.agentEnabled) {
+      : hasRole(user?.role ?? UserRole.viewer, UserRole.developer);
+  if (!canWrite || !config.agentEnabled) {
     return <Navigate to="/" replace />;
   }
   return children;
