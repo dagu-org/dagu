@@ -14,16 +14,16 @@
   </p>
 </div>
 
-## Zero-invasive Lightweight Workflow Orchestration Engine
+## Lightweight Workflow Engine
 
-Dagu is a workflow orchestration engine that runs as a single binary with no external dependencies. Workflows are defined as DAGs (Directed Acyclic Graphs) in YAML. It supports local execution, cron scheduling, queue-based concurrency control, and distributed coordinator/worker execution across multiple machines over gRPC.
+Dagu runs workflows defined as DAGs (Directed Acyclic Graphs) in YAML. It is commonly used to schedule and operate existing scripts, commands, containers, and server jobs with dependencies, queues, retries, logs, history, notifications, API access, RBAC, workspaces, and optional distributed workers.
 
-It requires no external databases, no message brokers, and no language-specific runtimes. All state is stored in local files by default.
+It runs as a single binary with no required database, message broker, or language-specific runtime. Workflows are defined as DAGs (Directed Acyclic Graphs) in YAML, and all state is stored in local files by default.
 
 For a quick look at how workflows are defined, see the [examples](https://docs.dagu.sh/writing-workflows/examples).
 
 <div align="center">
-  <img src="./assets/images/dagu-demo.gif" alt="Demo" width="720">
+  <video src="./assets/images/dagu-demo.mp4" width="720" controls preload="metadata"></video>
 </div>
 
 | Cockpit (Kanban) | DAG Run Details |
@@ -31,6 +31,15 @@ For a quick look at how workflows are defined, see the [examples](https://docs.d
 | ![Cockpit](./assets/images/ui-cockpit.png) | ![DAG Run Details](./assets/images/ui-dag-run-details.png) |
 
 **Try it live:** [Live Demo](https://demo-instance.dagu.sh/) (credentials: `demouser` / `demouser`)
+
+## Production Operation Notes
+
+Dagu stores state in local files by default. How much it can run depends on the machine and the workload. CPU, disk speed, workflow duration, queue settings, and worker capacity all matter.
+
+- **Throughput:** On one machine, Dagu can run thousands of workflow runs per day when the hardware and workflow shape fit the workload.
+- **Load control:** Use [queues](https://docs.dagu.sh/server-admin/queues), concurrency limits, and optional [distributed workers](https://docs.dagu.sh/server-admin/distributed/) to decide how many runs execute at once and where they run.
+- **Scheduling and recovery:** Use [cron schedules and catchup](https://docs.dagu.sh/writing-workflows/scheduling), [durable automatic retries](https://docs.dagu.sh/writing-workflows/durable-execution), reruns, timeouts, [event handler scripts](https://docs.dagu.sh/writing-workflows/lifecycle-handlers), and [email notifications](https://docs.dagu.sh/writing-workflows/email-notifications) to keep scheduled jobs recoverable.
+- **Team operation:** Use [user management and RBAC](https://docs.dagu.sh/server-admin/authentication/builtin), [workspaces](https://docs.dagu.sh/web-ui/workspaces), approvals, secrets, the [REST API](https://docs.dagu.sh/web-ui/api), CLI, and webhooks when multiple people or systems operate workflows.
 
 ## Real-World Use Cases
 
@@ -50,7 +59,7 @@ Dagu is useful when scripts, containers, server jobs, or data tasks need visible
 
 **IoT and edge workflows.** Run sensor polling, local cleanup, offline sync, health checks, and device maintenance jobs on small devices. The single binary and file-backed state work well on edge devices while still providing visibility through the Web UI.
 
-**AI agent automation.** Use AI agents to write, update, debug, and repair workflows because the operational contract is plain YAML. Agent-generated changes stay reviewable and observable in the same workflow system humans already operate.
+**Optional AI-assisted operations.** Use AI agents to write, update, debug, and repair workflows because the operational contract is plain YAML. Agent-generated changes stay reviewable and observable in the same workflow system humans already operate.
 
 ## Why Dagu?
 
@@ -72,11 +81,11 @@ Dagu is useful when scripts, containers, server jobs, or data tasks need visible
 
 Dagu can run in three configurations:
 
-**Standalone** — A single `dagu start-all` process runs the HTTP server, scheduler, and executor. Suitable for single-machine deployments.
+**Standalone:** A single `dagu start-all` process runs the HTTP server, scheduler, and executor. Suitable for single-machine deployments.
 
-**Coordinator/Worker** — The scheduler enqueues jobs to a local file-based queue, then dispatches them to a coordinator over gRPC. Workers long-poll the coordinator for tasks, execute DAGs locally, and report status back. Workers can run on separate machines and are routed tasks based on labels.
+**Coordinator/Worker:** The scheduler enqueues jobs to a local file-based queue, then dispatches them to a coordinator over gRPC. Workers long-poll the coordinator for tasks, execute DAGs locally, and report status back. Workers can run on separate machines and are routed tasks based on labels.
 
-**Headless** — Run without the web UI (`DAGU_HEADLESS=true`). Useful for CI/CD environments or when Dagu is managed through the CLI or API only.
+**Headless:** Run without the web UI (`DAGU_HEADLESS=true`). Useful for CI/CD environments or when Dagu is managed through the CLI or API only.
 
 ```sh
 Standalone:
@@ -106,20 +115,18 @@ Distributed:
                     │  │ Store (pending/   │  │
                     │  │ claimed)          │  │
                     │  └───────────────────┘  │
-                    └────────┬────────────────┘
+                    └────────▲────────────────┘
                              │
-                   Poll (gRPC long-polling)
+                   Worker poll / task response
+                   Heartbeat / ReportStatus /
+                   StreamLogs (gRPC)
                              │
-               ┌─────────────┼─────────────┐
+               ┌─────────────┴─────────────┐
                │             │             │
-          ┌────▼───┐    ┌────▼───┐    ┌────▼───┐
+          ┌────┴───┐    ┌────┴───┐    ┌────┴───┐
           │Worker 1│    │Worker 2│    │Worker N│ Sandbox execution of DAGs
           │        │    │        │    │        │
-          └────┬───┘    └────┬───┘    └────┬───┘
-               │             │             │
-               └─────────────┴─────────────┘
-                 Heartbeat / ReportStatus /
-                 StreamLogs (gRPC)
+          └────────┘    └────────┘    └────────┘
 ```
 
 ## Quick Start
