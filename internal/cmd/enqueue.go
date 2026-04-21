@@ -135,12 +135,14 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType cor
 	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
 	}
-	defer func() {
-		_ = att.Close(ctx.Context)
-	}()
 
 	if err := att.Write(ctx.Context, dagStatus); err != nil {
+		_ = att.Close(ctx.Context)
 		return fmt.Errorf("failed to save status: %w", err)
+	}
+
+	if err := att.Close(ctx.Context); err != nil {
+		return fmt.Errorf("failed to close run: %w", err)
 	}
 
 	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.ProcGroup(), exec.QueuePriorityLow, dagRun); err != nil {

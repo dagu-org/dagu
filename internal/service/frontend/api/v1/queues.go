@@ -434,9 +434,15 @@ func (a *API) runningSummaryFromLease(ctx context.Context, lease exec.DAGRunLeas
 		return api.DAGRunSummary{}, false
 	}
 	switch status.Status {
-	case core.Running, core.NotStarted:
+	case core.Running:
 		return toDAGRunSummary(*status), true
-	case core.Failed, core.Aborted, core.Succeeded, core.Queued,
+	case core.NotStarted, core.Queued:
+		// A fresh lease means the worker owns the queue slot, even if the
+		// persisted status has not caught up to running yet.
+		summary := toDAGRunSummary(*status)
+		summary.Status = api.StatusRunning
+		return summary, true
+	case core.Failed, core.Aborted, core.Succeeded,
 		core.PartiallySucceeded, core.Waiting, core.Rejected:
 		return api.DAGRunSummary{}, false
 	}
