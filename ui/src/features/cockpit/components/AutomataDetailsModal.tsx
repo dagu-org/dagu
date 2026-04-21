@@ -19,6 +19,8 @@ export function AutomataDetailsModal({
   onUpdated,
   onSelectedNameChange,
   onDeleted,
+  selectedWorkspace = '',
+  remoteNode = '',
 }: {
   name: string;
   isOpen: boolean;
@@ -26,6 +28,8 @@ export function AutomataDetailsModal({
   onUpdated?: () => void | Promise<void>;
   onSelectedNameChange?: (name: string) => void | Promise<void>;
   onDeleted?: () => void | Promise<void>;
+  selectedWorkspace?: string;
+  remoteNode?: string;
 }): React.ReactElement | null {
   const [shouldRender, setShouldRender] = React.useState(isOpen);
   const [isVisible, setIsVisible] = React.useState(false);
@@ -73,6 +77,8 @@ export function AutomataDetailsModal({
     onUpdated,
     onSelectedNameChange,
     onDeleted,
+    selectedWorkspace,
+    remoteNode,
   });
 
   if (!shouldRender) {

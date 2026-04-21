@@ -210,7 +210,9 @@ describe('updateAutomataMetadataInSpec', () => {
         safeMode: true,
       },
     });
-    expect((parse(next) as { agent?: { model?: string } }).agent?.model).toBeUndefined();
+    expect(
+      (parse(next) as { agent?: { model?: string } }).agent?.model
+    ).toBeUndefined();
   });
 
   it('sets standing instruction', () => {
@@ -323,5 +325,84 @@ describe('updateAutomataMetadataInSpec', () => {
       allowed_dags: { names: ['build'] },
     });
     expect(parse(next)).not.toHaveProperty('schedule');
+  });
+
+  it('updates allowed DAG names while preserving tags', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'kind: "service"',
+        'allowed_dags:',
+        '  names:',
+        '    - "build"',
+        '  tags:',
+        '    - "team=platform"',
+        '',
+      ].join('\n'),
+      {
+        ...baseMetadata,
+        allowedDAGNames: ['deploy', 'build', 'deploy', ' '],
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      kind: 'service',
+      allowed_dags: {
+        names: ['deploy', 'build'],
+        tags: ['team=platform'],
+      },
+    });
+  });
+
+  it('normalizes camel-case allowed DAGs to the YAML spec field', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'allowedDAGs:',
+        '  names:',
+        '    - "build"',
+        '  tags:',
+        '    - "team=platform"',
+        '',
+      ].join('\n'),
+      {
+        ...baseMetadata,
+        allowedDAGNames: ['release'],
+      }
+    );
+    const parsed = parse(next);
+
+    expect(parsed).toMatchObject({
+      allowed_dags: {
+        names: ['release'],
+        tags: ['team=platform'],
+      },
+    });
+    expect(parsed).not.toHaveProperty('allowedDAGs');
+  });
+
+  it('removes allowed DAG names when only tag allowlist remains', () => {
+    const next = updateAutomataMetadataInSpec(
+      [
+        'allowed_dags:',
+        '  names:',
+        '    - "build"',
+        '  tags:',
+        '    - "team=platform"',
+        '',
+      ].join('\n'),
+      {
+        ...baseMetadata,
+        allowedDAGNames: [],
+      }
+    );
+
+    expect(parse(next)).toMatchObject({
+      allowed_dags: {
+        tags: ['team=platform'],
+      },
+    });
+    expect(
+      (parse(next) as { allowed_dags?: { names?: string[] } }).allowed_dags
+        ?.names
+    ).toBeUndefined();
   });
 });

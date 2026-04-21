@@ -165,17 +165,23 @@ func findTaskIndex(tasks []Task, taskID string) int {
 	return -1
 }
 
+func taskSummaryDescription(description string) string {
+	normalized := strings.ReplaceAll(strings.TrimSpace(description), "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	return strings.ReplaceAll(normalized, "\n", "\n   ")
+}
+
 func buildTaskListSummary(tasks []Task) string {
 	if len(tasks) == 0 {
 		return "- no tasks"
 	}
 	var sb strings.Builder
-	for _, task := range tasks {
+	for index, task := range tasks {
 		marker := "[ ]"
 		if task.State == TaskStateDone {
 			marker = "[x]"
 		}
-		fmt.Fprintf(&sb, "- %s %s\n", marker, task.Description)
+		fmt.Fprintf(&sb, "%d. %s %s\n", index+1, marker, taskSummaryDescription(task.Description))
 	}
 	return strings.TrimRight(sb.String(), "\n")
 }

@@ -31,8 +31,9 @@ import { useClient, useQuery } from '@/hooks/api';
 const AUTOMATA_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_]*$/;
 const MAX_AUTOMATA_NICKNAME_LENGTH = 80;
 const MAX_AUTOMATA_ICON_URL_LENGTH = 2048;
+const MAX_DAG_PICKER_MATCHES = 25;
 
-type DAGOption = {
+export type DAGOption = {
   fileName: string;
   name: string;
 };
@@ -157,33 +158,44 @@ function validateAutomataCreateForm(input: {
   return null;
 }
 
-function DAGNamePicker({
+export function DAGNamePicker({
   availableDAGs,
   selectedNames,
   onChange,
+  searchQuery,
+  onSearchQueryChange,
+  isLoading,
   disabled,
 }: {
   availableDAGs: DAGOption[];
   selectedNames: string[];
   onChange: (names: string[]) => void;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
+  isLoading?: boolean;
   disabled?: boolean;
 }): React.ReactElement {
-  const [searchQuery, setSearchQuery] = React.useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = React.useState('');
+  const currentSearchQuery = searchQuery ?? internalSearchQuery;
+  const setCurrentSearchQuery = onSearchQueryChange ?? setInternalSearchQuery;
   const selectedNameSet = React.useMemo(
     () => new Set(selectedNames),
     [selectedNames]
   );
+  const searchText = currentSearchQuery.trim();
   const filteredDAGs = React.useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = searchText.toLowerCase();
     if (!query) {
-      return availableDAGs;
+      return [];
     }
-    return availableDAGs.filter(
-      (dag) =>
-        dag.fileName.toLowerCase().includes(query) ||
-        dag.name.toLowerCase().includes(query)
-    );
-  }, [availableDAGs, searchQuery]);
+    return availableDAGs
+      .filter(
+        (dag) =>
+          dag.fileName.toLowerCase().includes(query) ||
+          dag.name.toLowerCase().includes(query)
+      )
+      .slice(0, MAX_DAG_PICKER_MATCHES);
+  }, [availableDAGs, searchText]);
 
   const toggleSelection = (fileName: string) => {
     if (selectedNameSet.has(fileName)) {
@@ -191,6 +203,7 @@ function DAGNamePicker({
       return;
     }
     onChange([...selectedNames, fileName]);
+    setCurrentSearchQuery('');
   };
 
   return (
@@ -222,47 +235,49 @@ function DAGNamePicker({
       <div className="relative">
         <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
         <Input
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
+          value={currentSearchQuery}
+          onChange={(event) => setCurrentSearchQuery(event.target.value)}
           placeholder="Search DAGs"
           disabled={disabled}
           className="pl-8"
         />
       </div>
-      <div className="max-h-64 overflow-y-auto rounded-md border p-1">
-        {filteredDAGs.length ? (
-          filteredDAGs.map((dag) => {
-            const selected = selectedNameSet.has(dag.fileName);
-            return (
-              <button
-                key={dag.fileName}
-                type="button"
-                onClick={() => toggleSelection(dag.fileName)}
-                disabled={disabled}
-                className={`flex w-full items-start justify-between gap-3 rounded px-3 py-2 text-left text-sm hover:bg-accent ${selected ? 'bg-accent' : ''}`}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block whitespace-normal break-words font-mono text-xs">
-                    {dag.fileName}
-                  </span>
-                  {dag.name && dag.name !== dag.fileName ? (
-                    <span className="mt-0.5 block whitespace-normal break-words text-xs text-muted-foreground">
-                      {dag.name}
+      {searchText ? (
+        <div className="max-h-64 overflow-y-auto rounded-md border p-1">
+          {filteredDAGs.length ? (
+            filteredDAGs.map((dag) => {
+              const selected = selectedNameSet.has(dag.fileName);
+              return (
+                <button
+                  key={dag.fileName}
+                  type="button"
+                  onClick={() => toggleSelection(dag.fileName)}
+                  disabled={disabled}
+                  className={`flex w-full items-start justify-between gap-3 rounded px-3 py-2 text-left text-sm hover:bg-accent ${selected ? 'bg-accent' : ''}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block whitespace-normal break-words font-mono text-xs">
+                      {dag.fileName}
                     </span>
+                    {dag.name && dag.name !== dag.fileName ? (
+                      <span className="mt-0.5 block whitespace-normal break-words text-xs text-muted-foreground">
+                        {dag.name}
+                      </span>
+                    ) : null}
+                  </span>
+                  {selected ? (
+                    <span className="shrink-0 text-primary">Selected</span>
                   ) : null}
-                </span>
-                {selected ? (
-                  <span className="shrink-0 text-primary">Selected</span>
-                ) : null}
-              </button>
-            );
-          })
-        ) : (
-          <div className="px-3 py-2 text-sm text-muted-foreground">
-            {searchQuery ? 'No DAGs found.' : 'No DAGs available.'}
-          </div>
-        )}
-      </div>
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              {isLoading ? 'Loading DAGs...' : 'No DAGs found.'}
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -296,18 +311,21 @@ export function AutomataCreateModal({
   const [createAllowedDAGNames, setCreateAllowedDAGNames] = React.useState<
     string[]
   >([]);
+  const [dagSearchQuery, setDagSearchQuery] = React.useState('');
   const [createError, setCreateError] = React.useState('');
   const [isCreating, setIsCreating] = React.useState(false);
+  const dagSearchName = dagSearchQuery.trim();
 
   const dagListQuery = useQuery(
     '/dags',
-    open
+    open && dagSearchName
       ? {
           params: {
             query: {
-              perPage: 500,
+              perPage: MAX_DAG_PICKER_MATCHES,
               remoteNode: remoteNode || undefined,
               labels: selectedWorkspaceTag,
+              name: dagSearchName,
             },
           },
         }
@@ -333,6 +351,7 @@ export function AutomataCreateModal({
     setCreateSchedule('');
     setCreateTags(selectedWorkspaceTag || '');
     setCreateAllowedDAGNames([]);
+    setDagSearchQuery('');
     setCreateError('');
     setIsCreating(false);
   }, [selectedWorkspaceTag]);
@@ -527,13 +546,16 @@ export function AutomataCreateModal({
               <span className="text-xs text-muted-foreground">
                 {dagListQuery.isLoading
                   ? 'Loading DAGs...'
-                  : `${availableDAGOptions.length} available`}
+                  : `${createAllowedDAGNames.length} selected`}
               </span>
             </div>
             <DAGNamePicker
               availableDAGs={availableDAGOptions}
               selectedNames={createAllowedDAGNames}
               onChange={setCreateAllowedDAGNames}
+              searchQuery={dagSearchQuery}
+              onSearchQueryChange={setDagSearchQuery}
+              isLoading={dagListQuery.isLoading}
               disabled={isCreating}
             />
           </div>

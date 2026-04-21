@@ -8,6 +8,7 @@ import { useAvailableModels } from '@/features/agent/hooks/useAvailableModels';
 import { useClient, useQuery } from '@/hooks/api';
 import { whenEnabled } from '@/hooks/queryUtils';
 import { updateAutomataMetadataInSpec } from '@/features/automata/spec';
+import { workspaceTagForAutomataSelection } from '@/features/automata/workspace';
 import {
   buildAutomataThread,
   type AutomataDetail,
@@ -25,6 +26,22 @@ import {
 type MutationCallback = (() => void | Promise<void>) | undefined;
 const CLONE_NAME_SUFFIX_LENGTH = 6;
 const CLONE_NAME_SUFFIX_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+const DAG_PICKER_SEARCH_LIMIT = 25;
+
+function normalizeDAGNameList(items?: string[]): string[] {
+  return Array.from(
+    new Set((items || []).map((item) => item.trim()).filter(Boolean))
+  );
+}
+
+function sameDAGNameList(a?: string[], b?: string[]): boolean {
+  const left = normalizeDAGNameList(a);
+  const right = normalizeDAGNameList(b);
+  return (
+    left.length === right.length &&
+    left.every((item, index) => item === right[index])
+  );
+}
 
 function randomCloneNameSuffix(): string {
   const cryptoObj = globalThis.crypto;
@@ -82,12 +99,16 @@ export function useAutomataDetailController({
   onUpdated,
   onSelectedNameChange,
   onDeleted,
+  selectedWorkspace = '',
+  remoteNode = '',
 }: {
   name?: string;
   enabled?: boolean;
   onUpdated?: () => void | Promise<void>;
   onSelectedNameChange?: (name: string) => void | Promise<void>;
   onDeleted?: () => void | Promise<void>;
+  selectedWorkspace?: string;
+  remoteNode?: string;
 }) {
   const client = useClient();
   const navigate = useNavigate();
@@ -128,6 +149,13 @@ export function useAutomataDetailController({
     React.useState('');
   const [resetOnFinishDraft, setResetOnFinishDraft] = React.useState(false);
   const [scheduleDraft, setScheduleDraft] = React.useState('');
+  const [allowedDAGNamesDraft, setAllowedDAGNamesDraft] = React.useState<
+    string[]
+  >([]);
+  const [allowedDAGSearchQuery, setAllowedDAGSearchQuery] = React.useState('');
+  const [taskEditDraft, setTaskEditDraft] =
+    React.useState<AutomataTaskTemplate | null>(null);
+  const [taskEditDescription, setTaskEditDescription] = React.useState('');
   const [modelDraft, setModelDraft] = React.useState('');
   const [isEditingMetadata, setIsEditingMetadata] = React.useState(false);
   const [freeTextResponse, setFreeTextResponse] = React.useState('');
@@ -141,11 +169,31 @@ export function useAutomataDetailController({
   const [specDraft, setSpecDraft] = React.useState('');
   const [specError, setSpecError] = React.useState('');
   const [isSavingSpec, setIsSavingSpec] = React.useState(false);
+  const selectedWorkspaceTag =
+    workspaceTagForAutomataSelection(selectedWorkspace);
+  const allowedDAGSearchName = allowedDAGSearchQuery.trim();
+  const dagListQuery = useQuery(
+    '/dags',
+    whenEnabled(enabled && !!allowedDAGSearchName, {
+      params: {
+        query: {
+          perPage: DAG_PICKER_SEARCH_LIMIT,
+          remoteNode: remoteNode || undefined,
+          labels: selectedWorkspaceTag,
+          name: allowedDAGSearchName,
+        },
+      },
+    }),
+    { refreshInterval: 15000 }
+  );
 
   React.useEffect(() => {
     setInstructionDraft('');
     setOperatorMessageDraft('');
     setNewTaskDescription('');
+    setAllowedDAGSearchQuery('');
+    setTaskEditDraft(null);
+    setTaskEditDescription('');
     setActionError('');
   }, [name]);
 
@@ -161,9 +209,13 @@ export function useAutomataDetailController({
       setScheduleDraft(
         formatAutomataScheduleText(detail?.definition?.schedule)
       );
+      setAllowedDAGNamesDraft(
+        normalizeDAGNameList(detail?.definition?.allowedDAGs?.names)
+      );
       setModelDraft(detail?.definition?.agent?.model || '');
     }
   }, [
+    detail?.definition?.allowedDAGs?.names,
     detail?.definition?.description,
     detail?.definition?.iconUrl,
     detail?.definition?.goal,
@@ -225,6 +277,15 @@ export function useAutomataDetailController({
     [detail?.messages, queuedTurnMessages]
   );
 
+  const availableDAGOptions = React.useMemo(
+    () =>
+      (dagListQuery.data?.dags || []).map((dag) => ({
+        fileName: dag.fileName,
+        name: dag.dag?.name || dag.fileName,
+      })),
+    [dagListQuery.data?.dags]
+  );
+
   const lifecycleState = detail?.state?.state ?? '';
   const automataController = detail?.automataController;
   const runtimeControllerReady = automataController?.state === 'ready';
@@ -268,6 +329,10 @@ export function useAutomataDetailController({
   const scheduleChanged =
     formatAutomataScheduleText(scheduleExpressions) !==
     formatAutomataScheduleText(detail?.definition?.schedule);
+  const allowedDAGNamesChanged = !sameDAGNameList(
+    allowedDAGNamesDraft,
+    detail?.definition?.allowedDAGs?.names
+  );
   const modelChanged =
     modelDraft.trim() !== (detail?.definition?.agent?.model || '').trim();
   const metadataChanged =
@@ -277,12 +342,22 @@ export function useAutomataDetailController({
     standingInstructionChanged ||
     resetOnFinishChanged ||
     scheduleChanged ||
+    allowedDAGNamesChanged ||
     modelChanged;
+  const allowedDAGNames = React.useMemo(
+    () => normalizeDAGNameList(allowedDAGNamesDraft),
+    [allowedDAGNamesDraft]
+  );
+  const allowedDAGTagsConfigured =
+    (detail?.definition?.allowedDAGs?.tags?.length || 0) > 0;
   const metadataValidationError = !isValidAutomataIconUrl(iconUrlDraft)
     ? 'Icon URL must be an absolute http(s) URL or a root-relative path.'
     : iconUrlDraft.trim().length > 2048
       ? 'Icon URL must be 2048 characters or fewer.'
-      : validateAutomataScheduleExpressions(scheduleExpressions);
+      : validateAutomataScheduleExpressions(scheduleExpressions) ||
+        (allowedDAGNames.length === 0 && !allowedDAGTagsConfigured
+          ? 'Select at least one allowed DAG, or configure allowed_dags.tags in raw spec.'
+          : null);
   const metadataSaveDisabled =
     !name ||
     !detail ||
@@ -328,12 +403,13 @@ export function useAutomataDetailController({
   }, [client, instructionDraft, name, refreshAfterAction]);
 
   const onCreateTask = React.useCallback(async () => {
-    if (!name || !newTaskDescription.trim()) return;
+    const description = newTaskDescription.trim();
+    if (!name || !description) return;
     setActionError('');
     try {
       const { error: apiError } = await client.POST('/automata/{name}/tasks', {
         params: { path: { name } },
-        body: { description: newTaskDescription },
+        body: { description },
       });
       if (apiError) {
         throw new Error(apiError.message || 'Failed to create task');
@@ -373,36 +449,62 @@ export function useAutomataDetailController({
   );
 
   const onEditTask = React.useCallback(
-    async (task: AutomataTaskTemplate) => {
-      if (!name) return;
-      const nextDescription = window.prompt(
-        'Update task description.',
-        task.description
-      );
-      if (nextDescription == null) return;
-      const trimmed = nextDescription.trim();
-      if (!trimmed || trimmed === task.description) return;
-      setActionError('');
-      try {
-        const { error: apiError } = await client.PATCH(
-          '/automata/{name}/tasks/{taskId}',
-          {
-            params: { path: { name, taskId: task.id } },
-            body: { description: trimmed },
-          }
-        );
-        if (apiError) {
-          throw new Error(apiError.message || 'Failed to update task');
-        }
-        await refreshAfterAction();
-      } catch (err) {
-        setActionError(
-          err instanceof Error ? err.message : 'Failed to update task'
-        );
-      }
+    (task: AutomataTaskTemplate) => {
+      if (!name || busyAction) return;
+      setTaskEditDraft(task);
+      setTaskEditDescription(task.description);
     },
-    [client, name, refreshAfterAction]
+    [busyAction, name]
   );
+
+  const onCancelTaskEdit = React.useCallback(() => {
+    if (busyAction) {
+      return;
+    }
+    setTaskEditDraft(null);
+    setTaskEditDescription('');
+  }, [busyAction]);
+
+  const onSaveTaskEdit = React.useCallback(async () => {
+    if (!name || !taskEditDraft || busyAction) return;
+    const trimmed = taskEditDescription.trim();
+    if (!trimmed) return;
+    if (trimmed === taskEditDraft.description.trim()) {
+      setTaskEditDraft(null);
+      setTaskEditDescription('');
+      return;
+    }
+    setActionError('');
+    setBusyAction('edit-task');
+    try {
+      const { error: apiError } = await client.PATCH(
+        '/automata/{name}/tasks/{taskId}',
+        {
+          params: { path: { name, taskId: taskEditDraft.id } },
+          body: { description: trimmed },
+        }
+      );
+      if (apiError) {
+        throw new Error(apiError.message || 'Failed to update task');
+      }
+      setTaskEditDraft(null);
+      setTaskEditDescription('');
+      await refreshAfterAction();
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to update task'
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }, [
+    busyAction,
+    client,
+    name,
+    refreshAfterAction,
+    taskEditDescription,
+    taskEditDraft,
+  ]);
 
   const onDeleteTask = React.useCallback(
     async (task: AutomataTaskTemplate) => {
@@ -796,6 +898,7 @@ export function useAutomataDetailController({
         standingInstruction: standingInstructionDraft,
         resetOnFinish: resetOnFinishDraft,
         schedule: scheduleExpressions,
+        allowedDAGNames,
       });
       const { error: apiError } = await client.PUT('/automata/{name}/spec', {
         params: { path: { name } },
@@ -824,6 +927,7 @@ export function useAutomataDetailController({
     name,
     refreshAfterAction,
     resetOnFinishDraft,
+    allowedDAGNames,
     scheduleExpressions,
     specQuery.data?.spec,
     standingInstructionDraft,
@@ -836,10 +940,14 @@ export function useAutomataDetailController({
     setStandingInstructionDraft(detail?.definition?.standingInstruction || '');
     setResetOnFinishDraft(!!detail?.definition?.resetOnFinish);
     setScheduleDraft(formatAutomataScheduleText(detail?.definition?.schedule));
+    setAllowedDAGNamesDraft(
+      normalizeDAGNameList(detail?.definition?.allowedDAGs?.names)
+    );
     setModelDraft(detail?.definition?.agent?.model || '');
     setIsEditingMetadata(false);
   }, [
     detail?.definition?.agent?.model,
+    detail?.definition?.allowedDAGs?.names,
     detail?.definition?.description,
     detail?.definition?.goal,
     detail?.definition?.iconUrl,
@@ -862,6 +970,9 @@ export function useAutomataDetailController({
     setOperatorMessageDraft,
     newTaskDescription,
     setNewTaskDescription,
+    taskEditDraft,
+    taskEditDescription,
+    setTaskEditDescription,
     iconUrlDraft,
     setIconUrlDraft,
     descriptionDraft,
@@ -874,6 +985,12 @@ export function useAutomataDetailController({
     setResetOnFinishDraft,
     scheduleDraft,
     setScheduleDraft,
+    allowedDAGNamesDraft,
+    setAllowedDAGNamesDraft,
+    allowedDAGSearchQuery,
+    setAllowedDAGSearchQuery,
+    availableDAGOptions,
+    dagListQuery,
     modelDraft,
     setModelDraft,
     isEditingMetadata,
@@ -914,6 +1031,8 @@ export function useAutomataDetailController({
     onCreateTask,
     onToggleTask,
     onEditTask,
+    onCancelTaskEdit,
+    onSaveTaskEdit,
     onDeleteTask,
     onMoveTask,
     onRespond,

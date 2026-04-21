@@ -591,6 +591,8 @@ export function AutomataCockpit({
           }}
           onSelectedNameChange={(nextName) => selectAutomata(nextName)}
           onDeleted={() => selectAutomata(null)}
+          selectedWorkspace={selectedWorkspace}
+          remoteNode={remoteNode}
         />
       ) : null}
       <AutomataCreateModal

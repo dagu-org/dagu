@@ -14,8 +14,15 @@ import { Label } from '@/components/ui/label';
 import { Tab, Tabs } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
+import { DAGNamePicker } from '@/features/automata/components/AutomataCreateModal';
 import { AutomataDocumentSection } from '@/features/automata/components/AutomataMemorySection';
 import type { AutomataDetailController } from '@/features/automata/hooks/useAutomataDetail';
 import {
@@ -80,9 +87,7 @@ function RunRow({
             </span>
           ) : null}
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          {run.dagRunId}
-        </div>
+        <div className="mt-1 text-xs text-muted-foreground">{run.dagRunId}</div>
       </div>
       <div>
         <StatusChip status={dagRunStatusToStatus(run.status)} size="xs">
@@ -144,7 +149,9 @@ function ThreadBubble({
           ) : null}
         </div>
         {message.content ? (
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          <div className="whitespace-pre-wrap break-words">
+            {message.content}
+          </div>
         ) : null}
         {message.userPrompt?.question ? (
           <div className="whitespace-pre-wrap break-words">
@@ -254,8 +261,14 @@ function TaskList({
   onCreateTask,
   onMoveTask,
   onEditTask,
+  editingTaskId,
+  taskEditDescription,
+  setTaskEditDescription,
+  onCancelTaskEdit,
+  onSaveTaskEdit,
   onDeleteTask,
   disabled,
+  busyAction,
 }: {
   tasks?: AutomataTaskTemplate[];
   newTaskDescription: string;
@@ -266,8 +279,14 @@ function TaskList({
     direction: -1 | 1
   ) => void | Promise<void>;
   onEditTask: (task: AutomataTaskTemplate) => void | Promise<void>;
+  editingTaskId?: string;
+  taskEditDescription: string;
+  setTaskEditDescription: (value: string) => void;
+  onCancelTaskEdit: () => void;
+  onSaveTaskEdit: () => void | Promise<void>;
   onDeleteTask: (task: AutomataTaskTemplate) => void | Promise<void>;
   disabled: boolean;
+  busyAction?: string | null;
 }): React.ReactElement {
   const items = tasks || [];
 
@@ -285,16 +304,19 @@ function TaskList({
         </span>
       </div>
 
-      <div className="mb-4 flex gap-2">
-        <Input
+      <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <Textarea
           value={newTaskDescription}
           onChange={(event) => setNewTaskDescription(event.target.value)}
           placeholder="Add a task description"
           disabled={disabled}
+          rows={3}
+          className="min-h-20"
         />
         <Button
           onClick={() => void onCreateTask()}
           disabled={!newTaskDescription.trim() || disabled}
+          className="sm:self-start"
         >
           Add Task
         </Button>
@@ -303,24 +325,62 @@ function TaskList({
       {items.length ? (
         <div className="space-y-2">
           {items.map((task, index) => {
+            const isEditing = editingTaskId === task.id;
+            const isEditingAnyTask = !!editingTaskId;
+            const editSaveDisabled =
+              !taskEditDescription.trim() || !!busyAction;
             return (
-              <div
-                key={task.id}
-                className="rounded-md border p-3"
-              >
+              <div key={task.id} className="rounded-md border p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-900 dark:bg-slate-800 dark:text-slate-100 inline-flex">
-                      template
+                      Task {index + 1}
                     </div>
-                    <div className="mt-2 break-words text-sm">{task.description}</div>
+                    {isEditing ? (
+                      <div className="mt-2 space-y-2">
+                        <Textarea
+                          value={taskEditDescription}
+                          onChange={(event) =>
+                            setTaskEditDescription(event.target.value)
+                          }
+                          rows={5}
+                          className="min-h-28 text-sm"
+                          disabled={!!busyAction}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={onCancelTaskEdit}
+                            disabled={!!busyAction}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => void onSaveTaskEdit()}
+                            disabled={editSaveDisabled}
+                          >
+                            {busyAction === 'edit-task'
+                              ? 'Saving...'
+                              : 'Save Task'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 whitespace-pre-wrap break-words text-sm">
+                        {task.description}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => void onMoveTask(task, -1)}
-                      disabled={disabled || index === 0}
+                      disabled={disabled || isEditingAnyTask || index === 0}
                     >
                       Up
                     </Button>
@@ -328,7 +388,11 @@ function TaskList({
                       variant="outline"
                       size="sm"
                       onClick={() => void onMoveTask(task, 1)}
-                      disabled={disabled || index === items.length - 1}
+                      disabled={
+                        disabled ||
+                        isEditingAnyTask ||
+                        index === items.length - 1
+                      }
                     >
                       Down
                     </Button>
@@ -336,7 +400,7 @@ function TaskList({
                       variant="outline"
                       size="sm"
                       onClick={() => void onEditTask(task)}
-                      disabled={disabled}
+                      disabled={disabled || isEditingAnyTask}
                     >
                       Edit
                     </Button>
@@ -344,7 +408,7 @@ function TaskList({
                       variant="outline"
                       size="sm"
                       onClick={() => void onDeleteTask(task)}
-                      disabled={disabled}
+                      disabled={disabled || isEditingAnyTask}
                     >
                       Delete
                     </Button>
@@ -372,7 +436,9 @@ function TaskProgress({
   summary: { open: number; done: number };
 }): React.ReactElement {
   const items = tasks || [];
-  const openTasks = items.filter((task) => task.state === 'open');
+  const openTasks = items
+    .map((task, index) => ({ task, number: index + 1 }))
+    .filter((item) => item.task.state === 'open');
 
   return (
     <div className="min-w-0 rounded-lg border p-4">
@@ -400,12 +466,17 @@ function TaskProgress({
             <>
               <div className="font-medium">Open tasks</div>
               <div className="space-y-2">
-                {openTasks.map((task) => (
+                {openTasks.map(({ task, number }) => (
                   <div
                     key={task.id}
-                    className="rounded-md border bg-muted/30 px-3 py-2 break-words"
+                    className="rounded-md border bg-muted/30 px-3 py-2"
                   >
-                    {task.description}
+                    <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Task {number}
+                    </div>
+                    <div className="whitespace-pre-wrap break-words">
+                      {task.description}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -534,7 +605,9 @@ function StatusTab({
 
       {controller.detail?.state.pendingPrompt ? (
         <div className="rounded-lg border border-amber-400/40 bg-amber-50/50 p-4 dark:bg-amber-950/20">
-          <h2 className="mb-2 text-sm font-semibold">Waiting For Human Input</h2>
+          <h2 className="mb-2 text-sm font-semibold">
+            Waiting For Human Input
+          </h2>
           <p className="mb-3 text-sm">
             {controller.detail.state.pendingPrompt.question}
           </p>
@@ -647,22 +720,22 @@ function StatusTab({
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
               {startMode
-                  ? controller.canStartTask
-                    ? hasTaskTemplates
-                      ? hasStandingInstruction
-                        ? 'Starting creates a fresh cycle from the Config task template. The standing instruction is used unless you enter a one-off instruction.'
-                        : 'Starting creates a fresh cycle from the Config task template.'
-                      : 'Add at least one task template in Config before starting.'
-                    : 'Starting is gated by scheduler controller readiness.'
-                  : controller.detail?.state.pendingPrompt
-                    ? 'Respond to the pending prompt before sending a general operator message.'
-                    : controller.canSendOperatorMessage
-                      ? controller.detail?.state.state === 'paused'
-                          ? 'This records your message now, but the Automata will stay paused until you resume it.'
-                          : controller.detail?.state.currentRunRef
-                            ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
-                            : 'This queues a user message into the active Automata task.'
-                      : 'Operator messages are only accepted while the Automata has an active task.'}
+                ? controller.canStartTask
+                  ? hasTaskTemplates
+                    ? hasStandingInstruction
+                      ? 'Starting creates a fresh cycle from the Config task template. The standing instruction is used unless you enter a one-off instruction.'
+                      : 'Starting creates a fresh cycle from the Config task template.'
+                    : 'Add at least one task template in Config before starting.'
+                  : 'Starting is gated by scheduler controller readiness.'
+                : controller.detail?.state.pendingPrompt
+                  ? 'Respond to the pending prompt before sending a general operator message.'
+                  : controller.canSendOperatorMessage
+                    ? controller.detail?.state.state === 'paused'
+                      ? 'This records your message now, but the Automata will stay paused until you resume it.'
+                      : controller.detail?.state.currentRunRef
+                        ? 'This records your message now and the Automata will pick it up after the current child DAG changes state.'
+                        : 'This queues a user message into the active Automata task.'
+                    : 'Operator messages are only accepted while the Automata has an active task.'}
             </div>
             <Button
               onClick={() => {
@@ -675,12 +748,12 @@ function StatusTab({
               disabled={!canSubmitConversation || !!controller.busyAction}
             >
               {startMode
-                  ? controller.lifecycleState === 'finished'
-                    ? 'Start New Task'
-                    : 'Start'
-                  : controller.busyAction === 'message'
-                    ? 'Sending...'
-                    : 'Send Message'}
+                ? controller.lifecycleState === 'finished'
+                  ? 'Start New Task'
+                  : 'Start'
+                : controller.busyAction === 'message'
+                  ? 'Sending...'
+                  : 'Send Message'}
             </Button>
           </div>
         </div>
@@ -721,7 +794,19 @@ function ConfigTab({
   onOpenDAG: (dagName: string) => void;
 }): React.ReactElement {
   const metadataFieldDisabled =
-    !!controller.busyAction || controller.isSavingSpec || controller.isEditingSpec;
+    !!controller.busyAction ||
+    controller.isSavingSpec ||
+    controller.isEditingSpec;
+  const allowedDAGTags = controller.detail?.definition.allowedDAGs?.tags || [];
+  const selectedAllowedDAGs = React.useMemo(() => {
+    const infoByName = new Map(
+      (controller.detail?.allowedDags || []).map((dag) => [dag.name, dag])
+    );
+    return controller.allowedDAGNamesDraft.map((name) => ({
+      name,
+      info: infoByName.get(name),
+    }));
+  }, [controller.allowedDAGNamesDraft, controller.detail?.allowedDags]);
 
   return (
     <div className="space-y-4">
@@ -843,7 +928,9 @@ function ConfigTab({
                     (model) =>
                       model.id === controller.detail?.definition.agent?.model
                   ) ? (
-                    <SelectItem value={controller.detail.definition.agent.model}>
+                    <SelectItem
+                      value={controller.detail.definition.agent.model}
+                    >
                       {controller.detail.definition.agent.model} (missing)
                     </SelectItem>
                   ) : null}
@@ -908,7 +995,9 @@ function ConfigTab({
                     variant="ghost"
                     size="sm"
                     onClick={controller.onCancelMetadata}
-                    disabled={!!controller.busyAction || controller.isSavingSpec}
+                    disabled={
+                      !!controller.busyAction || controller.isSavingSpec
+                    }
                   >
                     Cancel
                   </Button>
@@ -930,33 +1019,74 @@ function ConfigTab({
 
         <div className="min-w-0 rounded-lg border p-4">
           <h2 className="mb-3 text-sm font-semibold">Allowed DAGs</h2>
-          <div className="space-y-2 text-sm">
-            {controller.detail?.allowedDags.length ? (
-              controller.detail.allowedDags.map((dag) => (
-                <button
-                  key={dag.name}
-                  type="button"
-                  onClick={() => onOpenDAG(dag.name)}
-                  className="w-full rounded-md border p-3 text-left transition hover:bg-muted/50"
-                >
-                  <div className="font-medium">{dag.name}</div>
-                  {dag.description ? (
-                    <div className="text-xs text-muted-foreground">
-                      {dag.description}
-                    </div>
-                  ) : null}
-                  {dag.tags?.length ? (
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      {dag.tags.join(', ')}
-                    </div>
-                  ) : null}
-                </button>
-              ))
-            ) : (
-              <div className="rounded-md border border-dashed p-3 text-muted-foreground">
-                No DAGs are allowlisted for this automata.
+          <div className="space-y-4 text-sm">
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Allowed DAG names</Label>
+                <span className="text-xs text-muted-foreground">
+                  {controller.dagListQuery.isLoading
+                    ? 'Loading DAGs...'
+                    : `${controller.allowedDAGNamesDraft.length} selected`}
+                </span>
               </div>
-            )}
+              <DAGNamePicker
+                availableDAGs={controller.availableDAGOptions}
+                selectedNames={controller.allowedDAGNamesDraft}
+                onChange={(names) => {
+                  controller.setAllowedDAGNamesDraft(names);
+                  controller.setIsEditingMetadata(true);
+                }}
+                searchQuery={controller.allowedDAGSearchQuery}
+                onSearchQueryChange={controller.setAllowedDAGSearchQuery}
+                isLoading={controller.dagListQuery.isLoading}
+                disabled={metadataFieldDisabled}
+              />
+              {controller.dagListQuery.error ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {controller.dagListQuery.error instanceof Error
+                    ? controller.dagListQuery.error.message
+                    : 'Failed to load DAGs'}
+                </div>
+              ) : null}
+              {allowedDAGTags.length ? (
+                <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  The raw spec also allows DAGs matching tags:{' '}
+                  <span className="font-mono">{allowedDAGTags.join(', ')}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Selected DAGs
+              </div>
+              {selectedAllowedDAGs.length ? (
+                selectedAllowedDAGs.map(({ name, info }) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => onOpenDAG(name)}
+                    className="w-full rounded-md border p-3 text-left transition hover:bg-muted/50"
+                  >
+                    <div className="font-medium">{name}</div>
+                    {info?.description ? (
+                      <div className="text-xs text-muted-foreground">
+                        {info.description}
+                      </div>
+                    ) : null}
+                    {info?.tags?.length ? (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {info.tags.join(', ')}
+                      </div>
+                    ) : null}
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-md border border-dashed p-3 text-muted-foreground">
+                  No allowed DAG names are selected.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -968,8 +1098,14 @@ function ConfigTab({
         onCreateTask={controller.onCreateTask}
         onMoveTask={controller.onMoveTask}
         onEditTask={controller.onEditTask}
+        editingTaskId={controller.taskEditDraft?.id}
+        taskEditDescription={controller.taskEditDescription}
+        setTaskEditDescription={controller.setTaskEditDescription}
+        onCancelTaskEdit={controller.onCancelTaskEdit}
+        onSaveTaskEdit={controller.onSaveTaskEdit}
         onDeleteTask={controller.onDeleteTask}
         disabled={!!controller.busyAction}
+        busyAction={controller.busyAction}
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -994,7 +1130,9 @@ function ConfigTab({
                   variant="ghost"
                   onClick={() => {
                     controller.setIsEditingSpec(false);
-                    controller.setSpecDraft(controller.specQuery.data?.spec || '');
+                    controller.setSpecDraft(
+                      controller.specQuery.data?.spec || ''
+                    );
                     controller.setSpecError('');
                   }}
                   disabled={controller.isSavingSpec}
@@ -1014,7 +1152,9 @@ function ConfigTab({
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  controller.setSpecDraft(controller.specQuery.data?.spec || '');
+                  controller.setSpecDraft(
+                    controller.specQuery.data?.spec || ''
+                  );
                   controller.setSpecError('');
                   controller.setIsEditingSpec(true);
                 }}

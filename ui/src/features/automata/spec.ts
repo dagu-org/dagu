@@ -3,6 +3,16 @@
 
 import { parse, stringify } from 'yaml';
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+}
+
+function normalizeNameList(items: string[]): string[] {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+}
+
 export function updateAutomataMetadataInSpec(
   spec: string,
   metadata: {
@@ -13,6 +23,7 @@ export function updateAutomataMetadataInSpec(
     standingInstruction: string;
     resetOnFinish: boolean;
     schedule: string[];
+    allowedDAGNames?: string[];
   }
 ): string {
   const parsed = parse(spec);
@@ -63,6 +74,22 @@ export function updateAutomataMetadataInSpec(
     nextSpec.schedule = [...metadata.schedule];
   } else {
     delete nextSpec.schedule;
+  }
+
+  if (metadata.allowedDAGNames !== undefined) {
+    const allowedDAGNames = normalizeNameList(metadata.allowedDAGNames);
+    const allowedDAGs = asRecord(nextSpec.allowed_dags ?? nextSpec.allowedDAGs);
+    if (allowedDAGNames.length > 0) {
+      allowedDAGs.names = allowedDAGNames;
+    } else {
+      delete allowedDAGs.names;
+    }
+    if (Object.keys(allowedDAGs).length > 0) {
+      nextSpec.allowed_dags = allowedDAGs;
+    } else {
+      delete nextSpec.allowed_dags;
+    }
+    delete nextSpec.allowedDAGs;
   }
 
   const nextModel = metadata.model.trim();
