@@ -6,7 +6,6 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SearchResult from '../SearchResult';
-import { WorkspaceMutationScope } from '@/api/v1/schema';
 
 const { getMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
@@ -29,7 +28,7 @@ describe('SearchResult', () => {
     });
   });
 
-  it('loads more DAG matches with a non-aggregate workspace scope', async () => {
+  it('loads more DAG matches without workspace target params', async () => {
     render(
       <MemoryRouter>
         <SearchResult
@@ -67,7 +66,6 @@ describe('SearchResult', () => {
         path: { fileName: 'build' },
         query: {
           remoteNode: 'local',
-          workspaceScope: WorkspaceMutationScope.default,
           q: 'needle',
           cursor: 'cursor-1',
         },
@@ -114,8 +112,6 @@ describe('SearchResult', () => {
         path: { fileName: 'build' },
         query: {
           remoteNode: 'local',
-          workspaceScope: WorkspaceMutationScope.workspace,
-          workspace: 'team-a',
           q: 'needle',
           cursor: 'cursor-1',
         },

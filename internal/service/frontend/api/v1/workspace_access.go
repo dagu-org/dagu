@@ -184,32 +184,6 @@ func parseWorkspaceScope(scopeParam *api.WorkspaceScope, workspaceParam *api.Wor
 	return selection, nil
 }
 
-func parseWorkspaceMutationScope(scopeParam *api.WorkspaceMutationScope, workspaceParam *api.Workspace) (workspaceScopeSelection, error) {
-	var readScope *api.WorkspaceScope
-	if scopeParam != nil {
-		converted := api.WorkspaceScope(*scopeParam)
-		readScope = &converted
-	}
-	selection, err := parseWorkspaceScope(readScope, workspaceParam)
-	if err != nil {
-		return workspaceScopeSelection{}, err
-	}
-	switch selection.scope {
-	case api.WorkspaceScopeAll:
-		if selection.explicit {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=all cannot be used for single-resource operations")
-		}
-		selection.scope = api.WorkspaceScopeDefault
-		return selection, nil
-	case api.WorkspaceScopeDefault:
-		return selection, nil
-	case api.WorkspaceScopeWorkspace:
-		return selection, nil
-	default:
-		return workspaceScopeSelection{}, badWorkspaceScopeError("invalid workspaceScope")
-	}
-}
-
 func workspaceScopeParamsFromValues(params url.Values) (*api.WorkspaceScope, *api.Workspace) {
 	var scopeParam *api.WorkspaceScope
 	if rawValues, ok := params["workspaceScope"]; ok {
@@ -232,16 +206,7 @@ func workspaceScopeParamsFromValues(params url.Values) (*api.WorkspaceScope, *ap
 	return scopeParam, workspaceParam
 }
 
-func workspaceMutationScopeParamsFromValues(params url.Values) (*api.WorkspaceMutationScope, *api.Workspace) {
-	var scopeParam *api.WorkspaceMutationScope
-	if rawValues, ok := params["workspaceScope"]; ok {
-		raw := ""
-		if len(rawValues) > 0 {
-			raw = rawValues[0]
-		}
-		scope := api.WorkspaceMutationScope(raw)
-		scopeParam = &scope
-	}
+func workspaceParamFromValues(params url.Values) *api.Workspace {
 	var workspaceParam *api.Workspace
 	if rawValues, ok := params["workspace"]; ok {
 		raw := ""
@@ -251,7 +216,7 @@ func workspaceMutationScopeParamsFromValues(params url.Values) (*api.WorkspaceMu
 		workspace := api.Workspace(raw)
 		workspaceParam = &workspace
 	}
-	return scopeParam, workspaceParam
+	return workspaceParam
 }
 
 func dagWorkspaceName(dag *core.DAG) string {

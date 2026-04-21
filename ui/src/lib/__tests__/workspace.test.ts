@@ -12,6 +12,7 @@ import {
   WORKSPACE_SCOPE_STORAGE_KEY,
   WORKSPACE_STORAGE_KEY,
   workspaceSelectionLabel,
+  workspaceTargetSelectionQuery,
 } from '../workspace';
 
 describe('workspace labels', () => {
@@ -65,5 +66,22 @@ describe('workspace storage', () => {
       scope: WorkspaceScope.all,
     });
     expect(localStorage.getItem(WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('workspace target queries', () => {
+  it('uses omitted workspace for default targets and workspace for named targets', () => {
+    expect(workspaceTargetSelectionQuery({ scope: WorkspaceScope.all })).toBe(
+      null
+    );
+    expect(
+      workspaceTargetSelectionQuery({ scope: WorkspaceScope.default })
+    ).toEqual({});
+    expect(
+      workspaceTargetSelectionQuery({
+        scope: WorkspaceScope.workspace,
+        workspace: 'team-a',
+      })
+    ).toEqual({ workspace: 'team-a' });
   });
 });

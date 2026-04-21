@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import {
   visibleDocumentPathForWorkspace,
   workspaceDocumentQueryForWorkspace,
-  workspaceMutationQueryForWorkspace,
 } from '@/lib/workspace';
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -175,9 +174,6 @@ function SearchResult(props: Props) {
   const items =
     type === 'dag'
       ? results.map((result) => {
-          const dagWorkspaceQuery = workspaceMutationQueryForWorkspace(
-            result.workspace
-          );
           const linkSearch = result.workspace
             ? `?workspace=${encodeURIComponent(result.workspace)}`
             : '';
@@ -199,7 +195,6 @@ function SearchResult(props: Props) {
                       remoteNode,
                       q: query,
                       cursor,
-                      ...dagWorkspaceQuery,
                     },
                   },
                 }

@@ -954,8 +954,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -1011,8 +1009,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "204":
@@ -1039,8 +1035,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1114,8 +1108,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1197,8 +1189,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1270,8 +1260,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -1310,8 +1298,6 @@ paths:
       operationId: "getDAGDAGRunDetails"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -1342,8 +1328,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -1380,8 +1364,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1427,8 +1409,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1467,8 +1447,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -1513,8 +1491,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -1682,8 +1658,6 @@ paths:
       parameters:
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true
@@ -1733,7 +1707,6 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "path"
           in: "query"
@@ -2083,8 +2056,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -2120,8 +2091,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunConcreteId"
       responses:
@@ -2155,8 +2124,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -2194,8 +2161,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       requestBody:
@@ -2265,8 +2230,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       requestBody:
@@ -2357,8 +2320,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       requestBody:
@@ -2427,8 +2388,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "parentSubDAGRunId"
@@ -2473,8 +2432,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -2502,8 +2459,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/Tail"
@@ -2539,8 +2494,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -2577,8 +2530,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/ArtifactRecursive"
@@ -2611,8 +2562,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/ArtifactPath"
@@ -2645,8 +2594,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/ArtifactPath"
@@ -2685,8 +2632,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -2718,8 +2663,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       requestBody:
@@ -2757,8 +2700,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
       responses:
@@ -2780,8 +2721,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
@@ -2819,8 +2758,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
@@ -2859,8 +2796,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
@@ -2893,8 +2828,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
@@ -2940,8 +2873,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
@@ -2986,8 +2917,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
@@ -3032,8 +2961,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/StepName"
@@ -3078,8 +3005,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3122,8 +3047,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3167,8 +3090,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/Tail"
@@ -3210,8 +3131,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3254,8 +3173,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3294,8 +3211,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3334,8 +3249,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3380,8 +3293,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - $ref: "#/components/parameters/Tail"
@@ -3425,8 +3336,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3471,8 +3380,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3511,8 +3418,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3564,8 +3469,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3616,8 +3519,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -3668,8 +3569,6 @@ paths:
         - "dag-runs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGName"
         - $ref: "#/components/parameters/DAGRunId"
         - name: "subDAGRunId"
@@ -4061,8 +3960,6 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -4095,8 +3992,6 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "201":
@@ -4126,8 +4021,6 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "204":
@@ -4157,8 +4050,6 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       responses:
         "200":
@@ -4189,8 +4080,6 @@ paths:
         - "webhooks"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
-        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/DAGFileName"
       requestBody:
         required: true
@@ -6474,7 +6363,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
@@ -6557,7 +6445,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6593,7 +6480,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6638,7 +6524,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6671,7 +6556,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
         - name: path
           in: query
@@ -6723,7 +6607,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceMutationScope"
         - $ref: "#/components/parameters/Workspace"
       requestBody:
         required: true
@@ -7107,7 +6990,7 @@ components:
     Workspace:
       name: workspace
       in: query
-      description: workspace name used when workspaceScope=workspace
+      description: "Workspace name. For collection APIs, used when workspaceScope=workspace; for document target APIs, omitted means default."
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceName"
@@ -7119,14 +7002,6 @@ components:
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceScope"
-
-    WorkspaceMutationScope:
-      name: workspaceScope
-      in: query
-      description: "Explicit mutable workspace scope: default data or one named workspace"
-      required: false
-      schema:
-        $ref: "#/components/schemas/WorkspaceMutationScope"
 
     SearchCursor:
       name: cursor
@@ -9701,13 +9576,6 @@ components:
       description: "Workspace scope selector for list and search APIs"
       enum:
         - all
-        - default
-        - workspace
-
-    WorkspaceMutationScope:
-      type: string
-      description: "Workspace scope selector for mutation APIs"
-      enum:
         - default
         - workspace
 

@@ -69,14 +69,14 @@ function DocEditor({
         : workspaceDocumentQueryForWorkspace(workspace),
     [selectedWorkspaceQuery, workspace]
   );
-  const workspaceMutationQuery = useMemo(
+  const workspaceTargetQuery = useMemo(
     () =>
       workspace === undefined
         ? selectedWorkspaceQuery
         : workspaceDocumentQueryForWorkspace(workspace),
     [selectedWorkspaceQuery, workspace]
   );
-  const workspaceScopeKey = useMemo(
+  const workspaceQueryKey = useMemo(
     () => JSON.stringify(workspaceQuery),
     [workspaceQuery]
   );
@@ -86,7 +86,7 @@ function DocEditor({
     workspace === undefined ? canWriteSelectedScope : canWriteDocWorkspace;
   const canEdit =
     canWrite &&
-    !!workspaceMutationQuery &&
+    !!workspaceTargetQuery &&
     (workspace !== undefined || isMutableWorkspaceSelection(workspaceSelection));
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
@@ -124,7 +124,7 @@ function DocEditor({
     key: JSON.stringify({
       docPath,
       remoteNode,
-      workspace: workspaceScopeKey,
+      workspace: workspaceQueryKey,
     }),
     serverContent,
   });
@@ -145,9 +145,9 @@ function DocEditor({
       JSON.stringify({
         tabId,
         remoteNode,
-        workspace: workspaceScopeKey,
+        workspace: workspaceQueryKey,
       }),
-    [remoteNode, tabId, workspaceScopeKey]
+    [remoteNode, tabId, workspaceQueryKey]
   );
 
   // Restore drafts by document tab and selected scope.
@@ -203,7 +203,7 @@ function DocEditor({
     if (
       isSaving ||
       !canEdit ||
-      !workspaceMutationQuery ||
+      !workspaceTargetQuery ||
       !hasUnsavedChangesRef.current
     ) {
       return;
@@ -212,7 +212,7 @@ function DocEditor({
     try {
       const { error } = await client.PATCH('/docs/doc', {
         params: {
-          query: { remoteNode, path: docPath, ...workspaceMutationQuery },
+          query: { remoteNode, path: docPath, ...workspaceTargetQuery },
         },
         body: { content: currentValueRef.current ?? '' },
       });
@@ -234,7 +234,7 @@ function DocEditor({
   }, [
     isSaving,
     canEdit,
-    workspaceMutationQuery,
+    workspaceTargetQuery,
     client,
     remoteNode,
     docPath,

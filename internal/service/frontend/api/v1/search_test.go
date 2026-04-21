@@ -230,21 +230,6 @@ steps:
 	secondPage := secondResp.(apigen.SearchDagMatches200JSONResponse)
 	assert.Len(t, secondPage.Matches, 1)
 	assert.False(t, secondPage.HasMore)
-
-	aggregateScope := apigen.WorkspaceMutationScope("all")
-	aggregateResp, err := setup.api.SearchDagMatches(adminCtx(), apigen.SearchDagMatchesRequestObject{
-		FileName: "match-heavy",
-		Params: apigen.SearchDagMatchesParams{
-			Q:              "needle.",
-			WorkspaceScope: &aggregateScope,
-		},
-	})
-	require.Nil(t, aggregateResp)
-	require.Error(t, err)
-
-	apiErr, ok := err.(*apiv1.Error)
-	require.True(t, ok)
-	assert.Equal(t, 400, apiErr.HTTPStatus)
 }
 
 func TestSearchDocMatches(t *testing.T) {

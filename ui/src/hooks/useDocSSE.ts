@@ -11,18 +11,12 @@ export function useDocSSE(
   enabled: boolean = true,
   workspaceQuery: {
     workspace?: components['parameters']['Workspace'];
-    workspaceScope?:
-      | components['parameters']['WorkspaceScope']
-      | components['parameters']['WorkspaceMutationScope'];
   } = {},
   remoteNode: components['parameters']['RemoteNode'] = 'local'
 ): SSEState<DocResponse> {
   const encodedPath = docPath.split('/').map(encodeURIComponent).join('/');
   const params = new URLSearchParams();
   params.set('remoteNode', remoteNode);
-  if (workspaceQuery.workspaceScope) {
-    params.set('workspaceScope', workspaceQuery.workspaceScope);
-  }
   if (workspaceQuery.workspace) {
     params.set('workspace', workspaceQuery.workspace);
   }

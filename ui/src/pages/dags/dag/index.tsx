@@ -27,8 +27,6 @@ import {
   hasWorkspaceLabel,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
-  workspaceDocumentQueryForWorkspace,
-  workspaceDocumentSelectionQuery,
   workspaceNameFromLabels,
 } from '../../../lib/workspace';
 
@@ -68,10 +66,8 @@ function DAGDetails() {
   const scopedQuery = useMemo(
     () => ({
       remoteNode,
-      ...(workspaceDocumentSelectionQuery(workspaceSelection) ??
-        workspaceDocumentQueryForWorkspace(null)),
     }),
-    [remoteNode, workspaceSelection]
+    [remoteNode]
   );
   const fileName = params.fileName || '';
 

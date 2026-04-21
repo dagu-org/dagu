@@ -84,26 +84,10 @@ func TestWorkspaceScopeParamsFromValuesRejectsExplicitEmptyWorkspace(t *testing.
 	require.Error(t, err)
 }
 
-func TestWorkspaceMutationScopeParamsFromValuesPreservesExplicitEmptyScope(t *testing.T) {
-	params := url.Values{"workspaceScope": []string{""}}
-
-	scope, workspace := workspaceMutationScopeParamsFromValues(params)
-	require.NotNil(t, scope)
-	require.Empty(t, *scope)
-	require.Nil(t, workspace)
-
-	_, err := parseWorkspaceMutationScope(scope, workspace)
-	require.Error(t, err)
-}
-
-func TestWorkspaceMutationScopeParamsFromValuesRejectsExplicitEmptyWorkspace(t *testing.T) {
+func TestWorkspaceParamFromValuesPreservesExplicitEmptyWorkspace(t *testing.T) {
 	params := url.Values{"workspace": []string{""}}
 
-	scope, workspace := workspaceMutationScopeParamsFromValues(params)
-	require.Nil(t, scope)
+	workspace := workspaceParamFromValues(params)
 	require.NotNil(t, workspace)
 	require.Empty(t, *workspace)
-
-	_, err := parseWorkspaceMutationScope(scope, workspace)
-	require.Error(t, err)
 }

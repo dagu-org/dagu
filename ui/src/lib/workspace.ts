@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { WorkspaceMutationScope, WorkspaceScope } from '@/api/v1/schema';
+import { WorkspaceScope } from '@/api/v1/schema';
 
 export const WORKSPACE_LABEL_KEY = 'workspace';
 export const WORKSPACE_LABEL_PREFIX = `${WORKSPACE_LABEL_KEY}=`;
@@ -15,6 +15,10 @@ const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export type WorkspaceSelection = {
   scope: WorkspaceScope;
+  workspace?: string;
+};
+
+export type WorkspaceTargetQuery = {
   workspace?: string;
 };
 
@@ -157,44 +161,37 @@ export function workspaceSelectionQuery(
   return { workspaceScope: sanitized.scope };
 }
 
-export function workspaceMutationSelectionQuery(
+export function workspaceTargetSelectionQuery(
   selection?: Partial<WorkspaceSelection> | null
-): { workspaceScope: WorkspaceMutationScope; workspace?: string } | null {
+): WorkspaceTargetQuery | null {
   const sanitized = sanitizeWorkspaceSelection(selection);
   if (sanitized.scope === WorkspaceScope.all) {
     return null;
   }
   if (sanitized.scope === WorkspaceScope.workspace) {
-    return {
-      workspaceScope: WorkspaceMutationScope.workspace,
-      workspace: sanitized.workspace,
-    };
+    return { workspace: sanitized.workspace };
   }
-  return { workspaceScope: WorkspaceMutationScope.default };
+  return {};
 }
 
 export function workspaceDocumentSelectionQuery(
   selection?: Partial<WorkspaceSelection> | null
-): { workspaceScope: WorkspaceMutationScope; workspace?: string } | null {
-  return workspaceMutationSelectionQuery(selection);
+): WorkspaceTargetQuery | null {
+  return workspaceTargetSelectionQuery(selection);
 }
 
-export function workspaceMutationQueryForWorkspace(workspace?: string | null): {
-  workspaceScope: WorkspaceMutationScope;
-  workspace?: string;
-} {
+export function workspaceTargetQueryForWorkspace(
+  workspace?: string | null
+): WorkspaceTargetQuery {
   const sanitized = sanitizeWorkspaceName(workspace ?? '');
   if (!sanitized) {
-    return { workspaceScope: WorkspaceMutationScope.default };
+    return {};
   }
-  return {
-    workspaceScope: WorkspaceMutationScope.workspace,
-    workspace: sanitized,
-  };
+  return { workspace: sanitized };
 }
 
 export const workspaceDocumentQueryForWorkspace =
-  workspaceMutationQueryForWorkspace;
+  workspaceTargetQueryForWorkspace;
 
 export function visibleDocumentPathForWorkspace(
   docPath: string,

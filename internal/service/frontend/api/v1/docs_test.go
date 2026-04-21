@@ -700,14 +700,12 @@ func TestCreateDoc(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("no workspace scope rejects known workspace-prefixed path", func(t *testing.T) {
+	t.Run("omitted workspace rejects known workspace-prefixed path", func(t *testing.T) {
 		t.Parallel()
 
 		setup := newDocTestSetupWithWorkspaces(t, "ops")
-		scope := apigen.WorkspaceMutationScopeDefault
 
 		_, err := setup.api.CreateDoc(adminCtx(), apigen.CreateDocRequestObject{
-			Params: apigen.CreateDocParams{WorkspaceScope: &scope},
 			Body: &apigen.CreateDocJSONRequestBody{
 				Id:      "ops/runbook",
 				Content: "private",

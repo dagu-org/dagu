@@ -13,7 +13,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   PathsDocsGetParametersQueryOrder,
   PathsDocsGetParametersQuerySort,
-  WorkspaceMutationScope,
 } from '@/api/v1/schema';
 import SplitLayout from '@/components/SplitLayout';
 import { useSimpleToast } from '@/components/ui/simple-toast';
@@ -33,8 +32,9 @@ import {
   DEFAULT_WORKSPACE_DISPLAY_NAME,
   isMutableWorkspaceSelection,
   sanitizeWorkspaceName,
-  workspaceMutationSelectionQuery,
-  workspaceMutationQueryForWorkspace,
+  workspaceTargetSelectionQuery,
+  workspaceTargetQueryForWorkspace,
+  WorkspaceTargetQuery,
   workspaceSelectionKey,
   workspaceSelectionQuery,
   visibleDocumentPathForWorkspace,
@@ -60,7 +60,7 @@ function workspaceSearchForDocTab(workspace?: string | null): string {
   if (sanitized) {
     return `?workspace=${encodeURIComponent(sanitized)}`;
   }
-  return `?workspaceScope=${WorkspaceMutationScope.default}`;
+  return '';
 }
 
 function normalizedDocWorkspace(workspace?: string | null): string | null {
@@ -79,12 +79,9 @@ function docPathMatches(docPath: string, targetPath: string): boolean {
 }
 
 function mutationWorkspaceFromQuery(
-  query: { workspaceScope: WorkspaceMutationScope; workspace?: string } | null
+  query: WorkspaceTargetQuery | null
 ): string | null {
-  if (query?.workspaceScope !== WorkspaceMutationScope.workspace) {
-    return null;
-  }
-  return normalizedDocWorkspace(query.workspace);
+  return normalizedDocWorkspace(query?.workspace);
 }
 
 function DocsContent() {
@@ -103,8 +100,8 @@ function DocsContent() {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
-  const workspaceMutationQuery = React.useMemo(
-    () => workspaceMutationSelectionQuery(workspaceSelection),
+  const workspaceTargetQuery = React.useMemo(
+    () => workspaceTargetSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
   const canWrite = useCanWrite();
@@ -233,11 +230,7 @@ function DocsContent() {
       const queryWorkspace = sanitizeWorkspaceName(
         searchParams.get('workspace') ?? ''
       );
-      const isNoWorkspaceURL =
-        searchParams.get('workspaceScope') === WorkspaceMutationScope.default;
-      const docWorkspace = isNoWorkspaceURL
-        ? null
-        : queryWorkspace || selectedWorkspace || null;
+      const docWorkspace = queryWorkspace || null;
       const decodedPath = decodeURIComponent(docPath);
       openDoc(decodedPath, titleFromPath(decodedPath), docWorkspace);
     }
@@ -307,32 +300,32 @@ function DocsContent() {
           break;
         case 'rename':
           setRenameDocPath(action.docPath);
-          setRenameWorkspace(mutationWorkspaceFromQuery(workspaceMutationQuery));
+          setRenameWorkspace(mutationWorkspaceFromQuery(workspaceTargetQuery));
           setRenameError(null);
           setRenameModalOpen(true);
           break;
         case 'delete':
           setDeleteDocPath(action.docPath);
           setDeleteDocTitle(action.title);
-          setDeleteWorkspace(mutationWorkspaceFromQuery(workspaceMutationQuery));
+          setDeleteWorkspace(mutationWorkspaceFromQuery(workspaceTargetQuery));
           setDeleteConfirmOpen(true);
           break;
         case 'deleteBatch':
           setBatchDeletePaths([...action.paths]);
           setBatchDeleteWorkspace(
-            mutationWorkspaceFromQuery(workspaceMutationQuery)
+            mutationWorkspaceFromQuery(workspaceTargetQuery)
           );
           setBatchDeleteConfirmOpen(true);
           break;
       }
     },
-    [workspaceMutationQuery]
+    [workspaceTargetQuery]
   );
 
   // Create handler
   const handleCreate = useCallback(
     async (path: string) => {
-      if (!canMutateDocs || !workspaceMutationQuery) {
+      if (!canMutateDocs || !workspaceTargetQuery) {
         setCreateError(
           `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before creating.`
         );
@@ -342,7 +335,7 @@ function DocsContent() {
       setCreateError(null);
       try {
         const { error } = await client.POST('/docs', {
-          params: { query: { remoteNode, ...workspaceMutationQuery } },
+          params: { query: { remoteNode, ...workspaceTargetQuery } },
           body: { id: path, content: '' },
         });
         if (error) {
@@ -350,11 +343,9 @@ function DocsContent() {
           return;
         }
         mutate();
-        const createdWorkspace =
-          workspaceMutationQuery.workspaceScope ===
-          WorkspaceMutationScope.workspace
-            ? (workspaceMutationQuery.workspace ?? null)
-            : null;
+        const createdWorkspace = normalizedDocWorkspace(
+          workspaceTargetQuery.workspace
+        );
         openDoc(path, titleFromPath(path), createdWorkspace);
         showToast('Document created');
         setCreateModalOpen(false);
@@ -368,7 +359,7 @@ function DocsContent() {
       canMutateDocs,
       client,
       remoteNode,
-      workspaceMutationQuery,
+      workspaceTargetQuery,
       mutate,
       openDoc,
       showToast,
@@ -378,7 +369,7 @@ function DocsContent() {
   // Rename handler (from modal)
   const handleRenameModal = useCallback(
     async (newPath: string) => {
-      if (!canMutateDocs || !workspaceMutationQuery) {
+      if (!canMutateDocs || !workspaceTargetQuery) {
         setRenameError(
           `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before renaming.`
         );
@@ -387,7 +378,7 @@ function DocsContent() {
       setRenameLoading(true);
       setRenameError(null);
       try {
-        const mutationQuery = workspaceMutationQueryForWorkspace(renameWorkspace);
+        const mutationQuery = workspaceTargetQueryForWorkspace(renameWorkspace);
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
             query: {
@@ -429,7 +420,7 @@ function DocsContent() {
       client,
       canMutateDocs,
       remoteNode,
-      workspaceMutationQuery,
+      workspaceTargetQuery,
       renameDocPath,
       renameWorkspace,
       mutate,
@@ -442,19 +433,19 @@ function DocsContent() {
   // Shared path-change handler for rename and move
   const handlePathChange = useCallback(
     async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
-      if (!canMutateDocs || !workspaceMutationQuery) {
+      if (!canMutateDocs || !workspaceTargetQuery) {
         showToast(
           `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before editing documents`
         );
         return;
       }
       const mutationWorkspace = mutationWorkspaceFromQuery(
-        workspaceMutationQuery
+        workspaceTargetQuery
       );
       try {
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
-            query: { remoteNode, path: oldPath, ...workspaceMutationQuery },
+            query: { remoteNode, path: oldPath, ...workspaceTargetQuery },
           },
           body: { newPath },
         });
@@ -492,7 +483,7 @@ function DocsContent() {
       canMutateDocs,
       client,
       remoteNode,
-      workspaceMutationQuery,
+      workspaceTargetQuery,
       mutate,
       tabs,
       updateTab,
@@ -523,7 +514,7 @@ function DocsContent() {
 
   // Delete handler (supports both files and directories)
   const handleDelete = useCallback(async () => {
-    if (!canMutateDocs || !workspaceMutationQuery) {
+    if (!canMutateDocs || !workspaceTargetQuery) {
       showToast(
         `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before deleting documents`
       );
@@ -531,7 +522,7 @@ function DocsContent() {
       return;
     }
     try {
-      const mutationQuery = workspaceMutationQueryForWorkspace(deleteWorkspace);
+      const mutationQuery = workspaceTargetQueryForWorkspace(deleteWorkspace);
       const { error } = await client.DELETE('/docs/doc', {
         params: {
           query: { remoteNode, path: deleteDocPath, ...mutationQuery },
@@ -563,7 +554,7 @@ function DocsContent() {
     client,
     canMutateDocs,
     remoteNode,
-    workspaceMutationQuery,
+    workspaceTargetQuery,
     deleteDocPath,
     deleteWorkspace,
     mutate,
@@ -576,7 +567,7 @@ function DocsContent() {
 
   // Batch delete handler
   const handleBatchDelete = useCallback(async () => {
-    if (!canMutateDocs || !workspaceMutationQuery) {
+    if (!canMutateDocs || !workspaceTargetQuery) {
       showToast(
         `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before deleting documents`
       );
@@ -586,7 +577,7 @@ function DocsContent() {
     }
     try {
       const mutationQuery =
-        workspaceMutationQueryForWorkspace(batchDeleteWorkspace);
+        workspaceTargetQueryForWorkspace(batchDeleteWorkspace);
       const { data, error } = await client.POST('/docs/delete-batch', {
         params: { query: { remoteNode, ...mutationQuery } },
         body: { paths: batchDeletePaths },
@@ -627,7 +618,7 @@ function DocsContent() {
     canMutateDocs,
     client,
     remoteNode,
-    workspaceMutationQuery,
+    workspaceTargetQuery,
     mutate,
     tabs,
     closeTab,
@@ -640,10 +631,10 @@ function DocsContent() {
   const handleBatchDeleteFromBar = useCallback(
     (paths: string[]) => {
       setBatchDeletePaths(paths);
-      setBatchDeleteWorkspace(mutationWorkspaceFromQuery(workspaceMutationQuery));
+      setBatchDeleteWorkspace(mutationWorkspaceFromQuery(workspaceTargetQuery));
       setBatchDeleteConfirmOpen(true);
     },
-    [workspaceMutationQuery]
+    [workspaceTargetQuery]
   );
 
   // Delete triggered from tab menu or editor header
