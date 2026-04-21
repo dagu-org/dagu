@@ -174,12 +174,12 @@ export function useCanWrite(): boolean {
   const { user } = useAuth();
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
-  if (config.authMode !== 'builtin') return config.permissions.writeDags;
-  if (!user) return false;
   const scope = appBarContext.workspaceSelection?.scope;
   if (scope === undefined || scope === WorkspaceScope.all) {
     return false;
   }
+  if (config.authMode !== 'builtin') return config.permissions.writeDags;
+  if (!user) return false;
   return roleAtLeast(
     effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
     UserRole.developer
@@ -190,12 +190,12 @@ export function useCanExecute(): boolean {
   const { user } = useAuth();
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
-  if (config.authMode !== 'builtin') return config.permissions.runDags;
-  if (!user) return false;
   const scope = appBarContext.workspaceSelection?.scope;
   if (scope === undefined || scope === WorkspaceScope.all) {
     return false;
   }
+  if (config.authMode !== 'builtin') return config.permissions.runDags;
+  if (!user) return false;
   return roleAtLeast(
     effectiveWorkspaceRole(user, appBarContext.selectedWorkspace || ''),
     UserRole.operator

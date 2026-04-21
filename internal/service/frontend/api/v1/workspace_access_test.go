@@ -4,6 +4,7 @@
 package api
 
 import (
+	"net/url"
 	"testing"
 
 	api "github.com/dagucloud/dagu/api/v1"
@@ -58,4 +59,28 @@ func TestParseWorkspaceScope(t *testing.T) {
 		_, err := parseWorkspaceScope(&scope, &workspace)
 		require.Error(t, err)
 	})
+}
+
+func TestWorkspaceScopeParamsFromValuesPreservesExplicitEmptyScope(t *testing.T) {
+	params := url.Values{"workspaceScope": []string{""}}
+
+	scope, workspace := workspaceScopeParamsFromValues(params)
+	require.NotNil(t, scope)
+	require.Empty(t, *scope)
+	require.Nil(t, workspace)
+
+	_, err := parseWorkspaceScope(scope, workspace)
+	require.Error(t, err)
+}
+
+func TestWorkspaceMutationScopeParamsFromValuesPreservesExplicitEmptyScope(t *testing.T) {
+	params := url.Values{"workspaceScope": []string{""}}
+
+	scope, workspace := workspaceMutationScopeParamsFromValues(params)
+	require.NotNil(t, scope)
+	require.Empty(t, *scope)
+	require.Nil(t, workspace)
+
+	_, err := parseWorkspaceMutationScope(scope, workspace)
+	require.Error(t, err)
 }

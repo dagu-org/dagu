@@ -184,12 +184,20 @@ func parseWorkspaceScope(scopeParam *api.WorkspaceScope, workspaceParam *api.Wor
 
 func workspaceScopeParamsFromValues(params url.Values) (*api.WorkspaceScope, *api.Workspace) {
 	var scopeParam *api.WorkspaceScope
-	if raw := params.Get("workspaceScope"); raw != "" {
+	if rawValues, ok := params["workspaceScope"]; ok {
+		raw := ""
+		if len(rawValues) > 0 {
+			raw = rawValues[0]
+		}
 		scope := api.WorkspaceScope(raw)
 		scopeParam = &scope
 	}
 	var workspaceParam *api.Workspace
-	if raw := params.Get("workspace"); raw != "" {
+	if rawValues, ok := params["workspace"]; ok {
+		raw := ""
+		if len(rawValues) > 0 {
+			raw = rawValues[0]
+		}
 		workspace := api.Workspace(raw)
 		workspaceParam = &workspace
 	}
@@ -198,12 +206,20 @@ func workspaceScopeParamsFromValues(params url.Values) (*api.WorkspaceScope, *ap
 
 func workspaceMutationScopeParamsFromValues(params url.Values) (*api.WorkspaceMutationScope, *api.Workspace) {
 	var scopeParam *api.WorkspaceMutationScope
-	if raw := params.Get("workspaceScope"); raw != "" {
+	if rawValues, ok := params["workspaceScope"]; ok {
+		raw := ""
+		if len(rawValues) > 0 {
+			raw = rawValues[0]
+		}
 		scope := api.WorkspaceMutationScope(raw)
 		scopeParam = &scope
 	}
 	var workspaceParam *api.Workspace
-	if raw := params.Get("workspace"); raw != "" {
+	if rawValues, ok := params["workspace"]; ok {
+		raw := ""
+		if len(rawValues) > 0 {
+			raw = rawValues[0]
+		}
 		workspace := api.Workspace(raw)
 		workspaceParam = &workspace
 	}
@@ -293,6 +309,9 @@ func (a *API) workspaceFilterForSelection(ctx context.Context, selection workspa
 	case api.WorkspaceScopeAll:
 		return a.workspaceFilterForContext(ctx), nil
 	case api.WorkspaceScopeNone:
+		if err := a.requireWorkspaceVisible(ctx, ""); err != nil {
+			return nil, err
+		}
 		return &exec.WorkspaceFilter{
 			Enabled:           true,
 			IncludeUnlabelled: true,

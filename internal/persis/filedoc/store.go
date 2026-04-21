@@ -172,7 +172,7 @@ func (s *Store) List(ctx context.Context, opts agent.ListDocsOptions) (*exec.Pag
 	if err != nil {
 		return nil, err
 	}
-	tree, err := s.buildTree(ctx, rootDir, sortField, sortOrder)
+	tree, err := s.buildTree(ctx, rootDir, sortField, sortOrder, opts.ExcludePathRoots)
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +230,9 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 
 		if err := agent.ValidateDocID(id); err != nil {
 			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
+			return nil
+		}
+		if docPathRootExcluded(id, opts.ExcludePathRoots) {
 			return nil
 		}
 
@@ -292,6 +295,14 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 
 	result := exec.NewPaginatedResult(pageItems, total, pg)
 	return &result, nil
+}
+
+func docPathRootExcluded(id string, excludedRoots []string) bool {
+	if len(excludedRoots) == 0 {
+		return false
+	}
+	root, _, _ := strings.Cut(id, "/")
+	return slices.Contains(excludedRoots, root)
 }
 
 // Get retrieves a doc by its ID.
@@ -968,7 +979,7 @@ func normalizeSortParams(sortField agent.DocSortField, sortOrder agent.DocSortOr
 }
 
 // buildTree builds a tree of DocTreeNode from the filesystem.
-func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder string) ([]*agent.DocTreeNode, error) {
+func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder string, excludedRoots []string) ([]*agent.DocTreeNode, error) {
 	if info, err := os.Stat(rootDir); err != nil {
 		if os.IsNotExist(err) {
 			return []*agent.DocTreeNode{}, nil
@@ -995,6 +1006,12 @@ func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder str
 			return nil
 		}
 		relPath = filepath.ToSlash(relPath)
+		if docPathRootExcluded(relPath, excludedRoots) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
 		if d.IsDir() {
 			var modTime time.Time

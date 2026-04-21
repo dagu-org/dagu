@@ -66,11 +66,12 @@ const (
 
 // ListDocsOptions holds parameters for listing documents.
 type ListDocsOptions struct {
-	Page       int
-	PerPage    int
-	Sort       DocSortField
-	Order      DocSortOrder
-	PathPrefix string
+	Page             int
+	PerPage          int
+	Sort             DocSortField
+	Order            DocSortOrder
+	PathPrefix       string
+	ExcludePathRoots []string
 }
 
 // SearchDocsOptions configures a paginated document search query.

@@ -148,9 +148,10 @@ function DAGDetails() {
     sseFallbackOptions(dagSSE)
   );
   useSSECacheSync(dagSSE, mutateDag);
-  const dagWorkspaceName = workspaceNameFromLabels(
-    dagData?.dag?.labels ?? dagData?.dag?.tags ?? []
-  );
+  const dagWorkspaceName = workspaceNameFromLabels([
+    ...(dagData?.dag?.labels ?? []),
+    ...(dagData?.dag?.tags ?? []),
+  ]);
   const dagMatchesWorkspace =
     workspaceSelection.scope === WorkspaceScope.all ||
     (workspaceSelection.scope === WorkspaceScope.none && !dagWorkspaceName) ||

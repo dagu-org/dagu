@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -157,7 +158,7 @@ func (a *API) docWorkspaceVisibility(ctx context.Context) (docWorkspaceVisibilit
 }
 
 func (a *API) noWorkspaceDocVisibility(ctx context.Context) (docWorkspaceVisibility, error) {
-	known, err := a.knownDocWorkspaceNames(ctx, false)
+	known, err := a.knownDocWorkspaceNames(ctx, a.workspaceStore != nil)
 	if err != nil {
 		return docWorkspaceVisibility{}, err
 	}
@@ -265,6 +266,19 @@ func docMutationScopeForParams(scopeParam *api.WorkspaceMutationScope, workspace
 	return "", nil
 }
 
+func (a *API) scopedDocMutationPath(ctx context.Context, workspaceName, path string) (string, error) {
+	if workspaceName == "" {
+		known, err := a.knownDocWorkspaceNames(ctx, a.workspaceStore != nil)
+		if err != nil {
+			return "", err
+		}
+		if docWorkspaceNameForPath(path, docWorkspaceVisibility{known: known}, true) != "" {
+			return "", badWorkspaceScopeError("path targets a workspace; set workspaceScope=workspace")
+		}
+	}
+	return scopedDocPath(workspaceName, path)
+}
+
 func (v docWorkspaceVisibility) knownWorkspace(name string) bool {
 	if name == "" {
 		return false
@@ -319,34 +333,18 @@ func (v docWorkspaceVisibility) visible(path string) bool {
 	return ok
 }
 
-func filterDocMetadataByWorkspace(items []api.DocMetadataResponse, visibility docWorkspaceVisibility) []api.DocMetadataResponse {
-	if visibility.all {
-		return items
+func (v docWorkspaceVisibility) excludedPathRoots() []string {
+	if v.all || len(v.known) == 0 {
+		return nil
 	}
-	filtered := make([]api.DocMetadataResponse, 0, len(items))
-	for _, item := range items {
-		if visibility.visible(item.Id) {
-			filtered = append(filtered, item)
+	roots := make([]string, 0, len(v.known))
+	for name := range v.known {
+		if _, ok := v.allowed[name]; !ok {
+			roots = append(roots, name)
 		}
 	}
-	return filtered
-}
-
-func filterDocTreeByWorkspace(nodes []api.DocTreeNodeResponse, visibility docWorkspaceVisibility) []api.DocTreeNodeResponse {
-	if visibility.all {
-		return nodes
-	}
-	filtered := make([]api.DocTreeNodeResponse, 0, len(nodes))
-	for _, node := range nodes {
-		if node.Children != nil {
-			children := filterDocTreeByWorkspace(*node.Children, visibility)
-			node.Children = &children
-		}
-		if visibility.visible(node.Id) {
-			filtered = append(filtered, node)
-		}
-	}
-	return filtered
+	sort.Strings(roots)
+	return roots
 }
 
 // ListDocs returns documents as tree or flat list.
@@ -362,11 +360,12 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 	sortField, sortOrder := docSortParams(request.Params.Sort, request.Params.Order)
 
 	opts := agent.ListDocsOptions{
-		Page:       valueOf(request.Params.Page),
-		PerPage:    valueOf(request.Params.PerPage),
-		Sort:       sortField,
-		Order:      sortOrder,
-		PathPrefix: workspaceName,
+		Page:             valueOf(request.Params.Page),
+		PerPage:          valueOf(request.Params.PerPage),
+		Sort:             sortField,
+		Order:            sortOrder,
+		PathPrefix:       workspaceName,
+		ExcludePathRoots: visibility.excludedPathRoots(),
 	}
 
 	flat := valueOf(request.Params.Flat)
@@ -384,7 +383,6 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 			item.Workspace = docWorkspaceValue(workspaceName, m.ID, visibility, false)
 			items = append(items, item)
 		}
-		items = filterDocMetadataByWorkspace(items, visibility)
 
 		return api.ListDocs200JSONResponse{
 			Items:      &items,
@@ -402,7 +400,6 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 	for _, node := range result.Items {
 		tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
 	}
-	tree = filterDocTreeByWorkspace(tree, visibility)
 
 	return api.ListDocs200JSONResponse{
 		Tree:       &tree,
@@ -427,7 +424,7 @@ func (a *API) CreateDoc(ctx context.Context, request api.CreateDocRequestObject)
 	}
 
 	id := request.Body.Id
-	scopedID, err := scopedDocPath(workspaceName, id)
+	scopedID, err := a.scopedDocMutationPath(ctx, workspaceName, id)
 	if err != nil {
 		return nil, err
 	}
@@ -557,7 +554,7 @@ func (a *API) UpdateDoc(ctx context.Context, request api.UpdateDocRequestObject)
 	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
 		return nil, err
 	}
-	docID, err := scopedDocPath(workspaceName, request.Params.Path)
+	docID, err := a.scopedDocMutationPath(ctx, workspaceName, request.Params.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +587,7 @@ func (a *API) DeleteDoc(ctx context.Context, request api.DeleteDocRequestObject)
 	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
 		return nil, err
 	}
-	docID, err := scopedDocPath(workspaceName, request.Params.Path)
+	docID, err := a.scopedDocMutationPath(ctx, workspaceName, request.Params.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -626,11 +623,11 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
 		return nil, err
 	}
-	oldPath, err := scopedDocPath(workspaceName, request.Params.Path)
+	oldPath, err := a.scopedDocMutationPath(ctx, workspaceName, request.Params.Path)
 	if err != nil {
 		return nil, err
 	}
-	newPath, err := scopedDocPath(workspaceName, request.Body.NewPath)
+	newPath, err := a.scopedDocMutationPath(ctx, workspaceName, request.Body.NewPath)
 	if err != nil {
 		return nil, err
 	}
@@ -684,7 +681,7 @@ func (a *API) DeleteDocBatch(ctx context.Context, request api.DeleteDocBatchRequ
 	}
 	scopedPaths := make([]string, 0, len(request.Body.Paths))
 	for _, p := range request.Body.Paths {
-		scoped, err := scopedDocPath(workspaceName, p)
+		scoped, err := a.scopedDocMutationPath(ctx, workspaceName, p)
 		if err != nil {
 			return nil, err
 		}
@@ -746,11 +743,12 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 	sortField, sortOrder := docSortParamsFromQuery(params)
 
 	result, err := a.docStore.List(ctx, agent.ListDocsOptions{
-		Page:       page,
-		PerPage:    perPage,
-		Sort:       sortField,
-		Order:      sortOrder,
-		PathPrefix: workspaceName,
+		Page:             page,
+		PerPage:          perPage,
+		Sort:             sortField,
+		Order:            sortOrder,
+		PathPrefix:       workspaceName,
+		ExcludePathRoots: visibility.excludedPathRoots(),
 	})
 	if err != nil {
 		return nil, err
@@ -760,7 +758,6 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 	for _, node := range result.Items {
 		tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
 	}
-	tree = filterDocTreeByWorkspace(tree, visibility)
 
 	return api.ListDocs200JSONResponse{
 		Tree:       &tree,

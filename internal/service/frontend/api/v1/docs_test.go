@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/runtime"
 	apiv1 "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
+	workspacepkg "github.com/dagucloud/dagu/internal/workspace"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +34,38 @@ type mockDocStore struct {
 	docs         map[string]*agent.Doc
 	failAll      bool // when true, all operations return errForced
 	lastListOpts agent.ListDocsOptions
+}
+
+type mockWorkspaceStore struct {
+	workspaces []*workspacepkg.Workspace
+	err        error
+}
+
+func (m *mockWorkspaceStore) Create(context.Context, *workspacepkg.Workspace) error {
+	return nil
+}
+
+func (m *mockWorkspaceStore) GetByID(context.Context, string) (*workspacepkg.Workspace, error) {
+	return nil, workspacepkg.ErrWorkspaceNotFound
+}
+
+func (m *mockWorkspaceStore) GetByName(context.Context, string) (*workspacepkg.Workspace, error) {
+	return nil, workspacepkg.ErrWorkspaceNotFound
+}
+
+func (m *mockWorkspaceStore) List(context.Context) ([]*workspacepkg.Workspace, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.workspaces, nil
+}
+
+func (m *mockWorkspaceStore) Update(context.Context, *workspacepkg.Workspace) error {
+	return nil
+}
+
+func (m *mockWorkspaceStore) Delete(context.Context, string) error {
+	return nil
 }
 
 func (m *mockDocStore) Get(_ context.Context, id string) (*agent.Doc, error) {
@@ -325,6 +359,11 @@ func (m *mockDocStore) SearchMatches(_ context.Context, id string, opts agent.Se
 	return cursorResult, nil
 }
 
+func mockDocPathRootExcluded(id string, excludedRoots []string) bool {
+	root, _, _ := strings.Cut(id, "/")
+	return slices.Contains(excludedRoots, root)
+}
+
 func (m *mockDocStore) List(_ context.Context, opts agent.ListDocsOptions) (*exec.PaginatedResult[*agent.DocTreeNode], error) {
 	m.lastListOpts = opts
 	if m.failAll {
@@ -332,6 +371,9 @@ func (m *mockDocStore) List(_ context.Context, opts agent.ListDocsOptions) (*exe
 	}
 	nodes := make([]*agent.DocTreeNode, 0, len(m.docs))
 	for _, doc := range m.docs {
+		if mockDocPathRootExcluded(doc.ID, opts.ExcludePathRoots) {
+			continue
+		}
 		nodes = append(nodes, &agent.DocTreeNode{
 			ID:    doc.ID,
 			Name:  path.Base(doc.ID),
@@ -355,6 +397,9 @@ func (m *mockDocStore) ListFlat(_ context.Context, opts agent.ListDocsOptions) (
 	}
 	items := make([]agent.DocMetadata, 0, len(m.docs))
 	for _, doc := range m.docs {
+		if mockDocPathRootExcluded(doc.ID, opts.ExcludePathRoots) {
+			continue
+		}
 		items = append(items, agent.DocMetadata{
 			ID:    doc.ID,
 			Title: doc.Title,
@@ -378,16 +423,35 @@ type docTestSetup struct {
 func newDocTestSetup(t *testing.T) *docTestSetup {
 	t.Helper()
 	store := &mockDocStore{docs: make(map[string]*agent.Doc)}
+	return newDocTestSetupWithStore(t, store, nil)
+}
+
+func newDocTestSetupWithWorkspaces(t *testing.T, names ...string) *docTestSetup {
+	t.Helper()
+	store := &mockDocStore{docs: make(map[string]*agent.Doc)}
+	workspaces := make([]*workspacepkg.Workspace, 0, len(names))
+	for _, name := range names {
+		workspaces = append(workspaces, &workspacepkg.Workspace{Name: name})
+	}
+	return newDocTestSetupWithStore(t, store, &mockWorkspaceStore{workspaces: workspaces})
+}
+
+func newDocTestSetupWithStore(t *testing.T, store *mockDocStore, workspaceStore workspacepkg.Store) *docTestSetup {
+	t.Helper()
 	cfg := &config.Config{}
 	cfg.Server.Permissions = map[config.Permission]bool{
 		config.PermissionWriteDAGs: true,
+	}
+	options := []apiv1.APIOption{apiv1.WithDocStore(store)}
+	if workspaceStore != nil {
+		options = append(options, apiv1.WithWorkspaceStore(workspaceStore))
 	}
 	a := apiv1.New(
 		nil, nil, nil, nil, runtime.Manager{},
 		cfg, nil, nil,
 		prometheus.NewRegistry(),
 		nil,
-		apiv1.WithDocStore(store),
+		options...,
 	)
 	return &docTestSetup{api: a, store: store}
 }
@@ -436,6 +500,50 @@ func TestListDocs(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, listResp.Tree)
 		assert.Len(t, *listResp.Tree, 2)
+	})
+
+	t.Run("no workspace scope filters known workspace roots before pagination", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetupWithWorkspaces(t, "aaa")
+		setup.store.docs["aaa/hidden"] = &agent.Doc{ID: "aaa/hidden", Title: "hidden", Content: "private"}
+		setup.store.docs["bbb"] = &agent.Doc{ID: "bbb", Title: "bbb", Content: "public"}
+		flat := true
+		page := 1
+		perPage := 1
+		scope := apigen.WorkspaceScopeNone
+
+		resp, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
+			Params: apigen.ListDocsParams{
+				WorkspaceScope: &scope,
+				Flat:           &flat,
+				Page:           &page,
+				PerPage:        &perPage,
+			},
+		})
+		require.NoError(t, err)
+
+		listResp, ok := resp.(apigen.ListDocs200JSONResponse)
+		require.True(t, ok)
+		require.NotNil(t, listResp.Items)
+		require.NotNil(t, listResp.Pagination)
+		require.Len(t, *listResp.Items, 1)
+		assert.Equal(t, "bbb", (*listResp.Items)[0].Id)
+		assert.Equal(t, 1, listResp.Pagination.TotalRecords)
+		assert.Equal(t, 1, listResp.Pagination.TotalPages)
+	})
+
+	t.Run("no workspace scope fails closed when workspace names cannot be loaded", func(t *testing.T) {
+		t.Parallel()
+
+		store := &mockDocStore{docs: make(map[string]*agent.Doc)}
+		setup := newDocTestSetupWithStore(t, store, &mockWorkspaceStore{err: errForced})
+		scope := apigen.WorkspaceScopeNone
+
+		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
+			Params: apigen.ListDocsParams{WorkspaceScope: &scope},
+		})
+		require.Error(t, err)
 	})
 
 	t.Run("no doc store returns error", func(t *testing.T) {
@@ -566,6 +674,23 @@ func TestCreateDoc(t *testing.T) {
 			},
 		})
 		require.Error(t, err)
+	})
+
+	t.Run("no workspace scope rejects known workspace-prefixed path", func(t *testing.T) {
+		t.Parallel()
+
+		setup := newDocTestSetupWithWorkspaces(t, "ops")
+		scope := apigen.WorkspaceMutationScopeNone
+
+		_, err := setup.api.CreateDoc(adminCtx(), apigen.CreateDocRequestObject{
+			Params: apigen.CreateDocParams{WorkspaceScope: &scope},
+			Body: &apigen.CreateDocJSONRequestBody{
+				Id:      "ops/runbook",
+				Content: "private",
+			},
+		})
+		require.Error(t, err)
+		assert.NotContains(t, setup.store.docs, "ops/runbook")
 	})
 
 	t.Run("nil body", func(t *testing.T) {
@@ -1087,8 +1212,14 @@ func (m *mockDocStoreWithTree) List(_ context.Context, opts agent.ListDocsOption
 			},
 		},
 	}
+	filtered := nodes[:0]
+	for _, node := range nodes {
+		if !mockDocPathRootExcluded(node.ID, opts.ExcludePathRoots) {
+			filtered = append(filtered, node)
+		}
+	}
 	pg := exec.NewPaginator(opts.Page, opts.PerPage)
-	result := exec.NewPaginatedResult(nodes, len(nodes), pg)
+	result := exec.NewPaginatedResult(filtered, len(filtered), pg)
 	return &result, nil
 }
 
