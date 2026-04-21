@@ -4,8 +4,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppBarContext } from './AppBarContext';
 import { useConfig } from './ConfigContext';
-import { components, UserRole, WorkspaceScope } from '@/api/v1/schema';
-import { effectiveWorkspaceRole, roleAtLeast } from '@/lib/workspaceAccess';
+import { components, UserRole } from '@/api/v1/schema';
+import {
+  effectiveWorkspaceRole,
+  roleAtLeast,
+  workspaceRoleTarget,
+} from '@/lib/workspaceAccess';
 
 export type { UserRole } from '@/api/v1/schema';
 
@@ -170,12 +174,22 @@ export function useCanWrite(): boolean {
     appBarContext.workspaceSelection?.scope,
     appBarContext.selectedWorkspace
   );
-  if (workspace === null) {
-    return false;
-  }
   if (config.authMode !== 'builtin') return config.permissions.writeDags;
   if (!user) return false;
   return roleAtLeast(effectiveWorkspaceRole(user, workspace), UserRole.developer);
+}
+
+export function useCanWriteForWorkspace(
+  workspace?: string | null
+): boolean {
+  const { user } = useAuth();
+  const config = useConfig();
+  if (config.authMode !== 'builtin') return config.permissions.writeDags;
+  if (!user) return false;
+  return roleAtLeast(
+    effectiveWorkspaceRole(user, workspace ?? ''),
+    UserRole.developer
+  );
 }
 
 export function useCanExecute(): boolean {
@@ -186,12 +200,22 @@ export function useCanExecute(): boolean {
     appBarContext.workspaceSelection?.scope,
     appBarContext.selectedWorkspace
   );
-  if (workspace === null) {
-    return false;
-  }
   if (config.authMode !== 'builtin') return config.permissions.runDags;
   if (!user) return false;
   return roleAtLeast(effectiveWorkspaceRole(user, workspace), UserRole.operator);
+}
+
+export function useCanExecuteForWorkspace(
+  workspace?: string | null
+): boolean {
+  const { user } = useAuth();
+  const config = useConfig();
+  if (config.authMode !== 'builtin') return config.permissions.runDags;
+  if (!user) return false;
+  return roleAtLeast(
+    effectiveWorkspaceRole(user, workspace ?? ''),
+    UserRole.operator
+  );
 }
 
 export function useCanAccessSystemStatus(): boolean {
@@ -229,17 +253,4 @@ export function useCanViewEventLogs(): boolean {
 
 export function hasRole(userRole: UserRole, requiredRole: UserRole): boolean {
   return roleAtLeast(userRole, requiredRole);
-}
-
-function workspaceRoleTarget(
-  scope: WorkspaceScope | undefined,
-  selectedWorkspace?: string | null
-): string | null {
-  if (scope === WorkspaceScope.default) {
-    return '';
-  }
-  if (scope === WorkspaceScope.workspace) {
-    return selectedWorkspace || null;
-  }
-  return null;
 }

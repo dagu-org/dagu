@@ -4,7 +4,10 @@
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
 import { DocMarkdownPreview } from '@/components/ui/doc-markdown-preview';
 import { useSimpleToast } from '@/components/ui/simple-toast';
-import { useCanWrite } from '@/contexts/AuthContext';
+import {
+  useCanWrite,
+  useCanWriteForWorkspace,
+} from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { useContentEditor } from '@/hooks/useContentEditor';
@@ -77,11 +80,14 @@ function DocEditor({
     () => JSON.stringify(workspaceQuery),
     [workspaceQuery]
   );
-  const canWrite = useCanWrite();
+  const canWriteSelectedScope = useCanWrite();
+  const canWriteDocWorkspace = useCanWriteForWorkspace(workspace ?? '');
+  const canWrite =
+    workspace === undefined ? canWriteSelectedScope : canWriteDocWorkspace;
   const canEdit =
     canWrite &&
     !!workspaceMutationQuery &&
-    isMutableWorkspaceSelection(workspaceSelection);
+    (workspace !== undefined || isMutableWorkspaceSelection(workspaceSelection));
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();

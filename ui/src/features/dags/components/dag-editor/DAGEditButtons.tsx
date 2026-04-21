@@ -4,7 +4,7 @@
  * @module features/dags/components/dag-editor
  */
 import { useAgentChatContext } from '@/features/agent';
-import { useCanWrite } from '@/contexts/AuthContext';
+import { useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { Sparkles, PencilLine, Trash2 } from 'lucide-react';
@@ -29,14 +29,16 @@ type Props = {
   dagName?: string;
   /** Latest DAG run details for improvement context */
   latestDAGRun?: components['schemas']['DAGRunDetails'];
+  /** Workspace label value for the DAG; empty/null means default. */
+  workspace?: string | null;
 };
 
 /**
  * DAGEditButtons provides buttons for renaming and deleting a DAG
  */
-function DAGEditButtons({ fileName, dagName, latestDAGRun }: Props) {
+function DAGEditButtons({ fileName, dagName, latestDAGRun, workspace }: Props) {
   const appBarContext = React.useContext(AppBarContext);
-  const canWrite = useCanWrite();
+  const canWrite = useCanWriteForWorkspace(workspace);
   const client = useClient();
   const config = useConfig();
   const { preferences } = useUserPreferences();

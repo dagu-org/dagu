@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { components, UserRole } from '@/api/v1/schema';
+import { components, UserRole, WorkspaceScope } from '@/api/v1/schema';
 
 type WorkspaceAccess = components['schemas']['WorkspaceAccess'];
 type User = components['schemas']['User'];
@@ -44,4 +44,14 @@ export function canAccessWorkspace(
 export function roleAtLeast(role: UserRole | null, minimum: UserRole): boolean {
   if (!role) return false;
   return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minimum];
+}
+
+export function workspaceRoleTarget(
+  scope: WorkspaceScope | undefined,
+  selectedWorkspace?: string | null
+): string {
+  if (scope === WorkspaceScope.workspace) {
+    return selectedWorkspace || '';
+  }
+  return '';
 }

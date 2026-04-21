@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v1/schema';
+import { workspaceNameFromLabels } from '../../../../lib/workspace';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { LinkTab } from '../common';
@@ -84,6 +85,14 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     logType: 'execution',
     stepName: undefined,
   });
+  const dagWorkspaceName = React.useMemo(
+    () =>
+      workspaceNameFromLabels([
+        ...(dag.labels ?? []),
+        ...(dag.tags ?? []),
+      ]),
+    [dag.labels, dag.tags]
+  );
 
   const handleTabClick = (tab: string) => {
     if (onTabChange) {
@@ -128,6 +137,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             currentDAGRun={currentDAGRun}
             fileName={fileName || ''}
             filePath={filePath}
+            workspace={dagWorkspaceName}
             refreshFn={refreshFn}
             formatDuration={formatDuration}
             navigateToStatusTab={navigateToStatusTab}
@@ -341,6 +351,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
               fileName={fileName || ''}
               dagName={dag?.name || fileName || ''}
               latestDAGRun={latestDAGRun}
+              workspace={dagWorkspaceName}
             />
           </div>
         </div>
