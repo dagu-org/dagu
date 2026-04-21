@@ -108,7 +108,7 @@ function renderPage({
                     scope: WorkspaceScope.workspace,
                     workspace: selectedWorkspace,
                   }
-                : { scope: WorkspaceScope.accessible },
+                : { scope: WorkspaceScope.all },
               selectedWorkspace,
               selectWorkspace: () => undefined,
             }}

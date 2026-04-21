@@ -7115,7 +7115,7 @@ components:
     WorkspaceScope:
       name: workspaceScope
       in: query
-      description: "Explicit workspace scope: accessible data, no-workspace data, or one named workspace"
+      description: "Explicit workspace scope: all data, no-workspace data, or one named workspace"
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceScope"
@@ -9700,7 +9700,7 @@ components:
       type: string
       description: "Workspace scope selector for list and search APIs"
       enum:
-        - accessible
+        - all
         - none
         - workspace
 

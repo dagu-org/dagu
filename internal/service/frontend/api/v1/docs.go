@@ -169,7 +169,7 @@ func (a *API) noWorkspaceDocVisibility(ctx context.Context) (docWorkspaceVisibil
 
 func (a *API) docWorkspaceVisibilityForSelection(ctx context.Context, selection workspaceScopeSelection) (docWorkspaceVisibility, error) {
 	switch selection.scope {
-	case api.WorkspaceScopeAccessible:
+	case api.WorkspaceScopeAll:
 		return a.docWorkspaceVisibility(ctx)
 	case api.WorkspaceScopeNone:
 		return a.noWorkspaceDocVisibility(ctx)
@@ -213,9 +213,9 @@ func parseWorkspaceMutationScope(scopeParam *api.WorkspaceMutationScope, workspa
 		return workspaceScopeSelection{}, err
 	}
 	switch selection.scope {
-	case api.WorkspaceScopeAccessible:
+	case api.WorkspaceScopeAll:
 		if selection.explicit {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=accessible cannot be used for single-resource operations")
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=all cannot be used for single-resource operations")
 		}
 		selection.scope = api.WorkspaceScopeNone
 		return selection, nil

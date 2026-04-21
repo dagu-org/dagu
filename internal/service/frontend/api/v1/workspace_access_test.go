@@ -11,12 +11,21 @@ import (
 )
 
 func TestParseWorkspaceScope(t *testing.T) {
-	t.Run("defaults to accessible scope", func(t *testing.T) {
+	t.Run("defaults to all scope", func(t *testing.T) {
 		selection, err := parseWorkspaceScope(nil, nil)
 		require.NoError(t, err)
-		require.Equal(t, api.WorkspaceScopeAccessible, selection.scope)
+		require.Equal(t, api.WorkspaceScopeAll, selection.scope)
 		require.Empty(t, selection.workspace)
 		require.False(t, selection.explicit)
+	})
+
+	t.Run("accepts legacy accessible scope as all", func(t *testing.T) {
+		scope := api.WorkspaceScope("accessible")
+		selection, err := parseWorkspaceScope(&scope, nil)
+		require.NoError(t, err)
+		require.Equal(t, api.WorkspaceScopeAll, selection.scope)
+		require.Empty(t, selection.workspace)
+		require.True(t, selection.explicit)
 	})
 
 	t.Run("keeps legacy workspace parameter as concrete workspace scope", func(t *testing.T) {
@@ -44,7 +53,7 @@ func TestParseWorkspaceScope(t *testing.T) {
 	})
 
 	t.Run("rejects workspace name on aggregate scope", func(t *testing.T) {
-		scope := api.WorkspaceScopeAccessible
+		scope := api.WorkspaceScopeAll
 		workspace := api.Workspace("ops")
 		_, err := parseWorkspaceScope(&scope, &workspace)
 		require.Error(t, err)

@@ -267,7 +267,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       handleSelectWorkspaceScope(
         sanitized
           ? { scope: WorkspaceScope.workspace, workspace: sanitized }
-          : { scope: WorkspaceScope.accessible }
+          : { scope: WorkspaceScope.all }
       );
     },
     [handleSelectWorkspaceScope]

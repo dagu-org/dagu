@@ -177,7 +177,7 @@ export function useCanWrite(): boolean {
   if (config.authMode !== 'builtin') return config.permissions.writeDags;
   if (!user) return false;
   const scope = appBarContext.workspaceSelection?.scope;
-  if (scope === undefined || scope === WorkspaceScope.accessible) {
+  if (scope === undefined || scope === WorkspaceScope.all) {
     return false;
   }
   return roleAtLeast(
@@ -193,7 +193,7 @@ export function useCanExecute(): boolean {
   if (config.authMode !== 'builtin') return config.permissions.runDags;
   if (!user) return false;
   const scope = appBarContext.workspaceSelection?.scope;
-  if (scope === undefined || scope === WorkspaceScope.accessible) {
+  if (scope === undefined || scope === WorkspaceScope.all) {
     return false;
   }
   return roleAtLeast(

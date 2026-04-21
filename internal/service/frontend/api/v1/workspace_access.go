@@ -26,6 +26,7 @@ type workspaceScopeSelection struct {
 }
 
 const invalidWorkspaceLabelName = "\x00invalid-workspace-label"
+const legacyWorkspaceScopeAccessible api.WorkspaceScope = "accessible"
 
 func toAPIWorkspaceAccess(access *auth.WorkspaceAccess) api.WorkspaceAccess {
 	normalized := auth.NormalizeWorkspaceAccess(access)
@@ -156,15 +157,16 @@ func parseWorkspaceScope(scopeParam *api.WorkspaceScope, workspaceParam *api.Wor
 				workspace: workspaceName,
 			}, nil
 		}
-		return workspaceScopeSelection{scope: api.WorkspaceScopeAccessible}, nil
+		return workspaceScopeSelection{scope: api.WorkspaceScopeAll}, nil
 	}
 
 	selection := workspaceScopeSelection{scope: *scopeParam, explicit: true}
 	switch *scopeParam {
-	case api.WorkspaceScopeAccessible:
+	case api.WorkspaceScopeAll, legacyWorkspaceScopeAccessible:
 		if workspaceName != "" {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must be omitted when workspaceScope=accessible")
+			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must be omitted when workspaceScope=all")
 		}
+		selection.scope = api.WorkspaceScopeAll
 	case api.WorkspaceScopeNone:
 		if workspaceName != "" {
 			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must be omitted when workspaceScope=none")
@@ -288,7 +290,7 @@ func (a *API) workspaceFilterForContext(ctx context.Context) *exec.WorkspaceFilt
 
 func (a *API) workspaceFilterForSelection(ctx context.Context, selection workspaceScopeSelection) (*exec.WorkspaceFilter, error) {
 	switch selection.scope {
-	case api.WorkspaceScopeAccessible:
+	case api.WorkspaceScopeAll:
 		return a.workspaceFilterForContext(ctx), nil
 	case api.WorkspaceScopeNone:
 		return &exec.WorkspaceFilter{

@@ -20,7 +20,7 @@ const appBarValue = {
   setRemoteNodes: vi.fn(),
   selectedRemoteNode: 'local',
   selectRemoteNode: vi.fn(),
-  workspaceSelection: { scope: WorkspaceScope.accessible },
+  workspaceSelection: { scope: WorkspaceScope.all },
 };
 
 const mockDags = [
@@ -108,7 +108,7 @@ describe('TemplateSelector', () => {
         params: expect.objectContaining({
           query: {
             remoteNode: 'local',
-            workspaceScope: WorkspaceScope.accessible,
+            workspaceScope: WorkspaceScope.all,
           },
         }),
       })

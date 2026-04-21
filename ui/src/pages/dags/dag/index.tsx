@@ -152,7 +152,7 @@ function DAGDetails() {
     dagData?.dag?.labels ?? dagData?.dag?.tags ?? []
   );
   const dagMatchesWorkspace =
-    workspaceSelection.scope === WorkspaceScope.accessible ||
+    workspaceSelection.scope === WorkspaceScope.all ||
     (workspaceSelection.scope === WorkspaceScope.none && !dagWorkspaceName) ||
     (workspaceSelection.scope === WorkspaceScope.workspace &&
       dagWorkspaceName === workspaceSelection.workspace);

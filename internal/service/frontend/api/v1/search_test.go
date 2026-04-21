@@ -231,7 +231,7 @@ steps:
 	assert.Len(t, secondPage.Matches, 1)
 	assert.False(t, secondPage.HasMore)
 
-	aggregateScope := apigen.WorkspaceMutationScope("accessible")
+	aggregateScope := apigen.WorkspaceMutationScope("all")
 	aggregateResp, err := setup.api.SearchDagMatches(adminCtx(), apigen.SearchDagMatchesRequestObject{
 		FileName: "match-heavy",
 		Params: apigen.SearchDagMatchesParams{

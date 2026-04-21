@@ -8,10 +8,11 @@ export const WORKSPACE_LABEL_PREFIX = `${WORKSPACE_LABEL_KEY}=`;
 export const WORKSPACE_STORAGE_KEY = 'dagu-selected-workspace';
 export const WORKSPACE_SCOPE_STORAGE_KEY = 'dagu-selected-workspace-scope';
 export const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
-export const ACCESSIBLE_WORKSPACES_DISPLAY_NAME = 'all';
+export const ALL_WORKSPACES_DISPLAY_NAME = 'all';
 export const NO_WORKSPACE_DISPLAY_NAME = 'default';
 
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
+const LEGACY_ALL_WORKSPACE_SCOPE = 'accessible';
 
 export type WorkspaceSelection = {
   scope: WorkspaceScope;
@@ -73,7 +74,7 @@ export function workspaceNameFromLabels(labels: string[] = []): string {
 }
 
 export function defaultWorkspaceSelection(): WorkspaceSelection {
-  return { scope: WorkspaceScope.accessible };
+  return { scope: WorkspaceScope.all };
 }
 
 export function sanitizeWorkspaceSelection(
@@ -106,17 +107,13 @@ export function workspaceNameForSelection(
 export function isAggregateWorkspaceSelection(
   selection?: Partial<WorkspaceSelection> | null
 ): boolean {
-  return (
-    sanitizeWorkspaceSelection(selection).scope === WorkspaceScope.accessible
-  );
+  return sanitizeWorkspaceSelection(selection).scope === WorkspaceScope.all;
 }
 
 export function isMutableWorkspaceSelection(
   selection?: Partial<WorkspaceSelection> | null
 ): boolean {
-  return (
-    sanitizeWorkspaceSelection(selection).scope !== WorkspaceScope.accessible
-  );
+  return sanitizeWorkspaceSelection(selection).scope !== WorkspaceScope.all;
 }
 
 export function workspaceSelectionLabel(
@@ -128,9 +125,9 @@ export function workspaceSelectionLabel(
       return NO_WORKSPACE_DISPLAY_NAME;
     case WorkspaceScope.workspace:
       return sanitized.workspace ?? 'Workspace';
-    case WorkspaceScope.accessible:
+    case WorkspaceScope.all:
     default:
-      return ACCESSIBLE_WORKSPACES_DISPLAY_NAME;
+      return ALL_WORKSPACES_DISPLAY_NAME;
   }
 }
 
@@ -161,7 +158,7 @@ export function workspaceMutationSelectionQuery(
   selection?: Partial<WorkspaceSelection> | null
 ): { workspaceScope: WorkspaceMutationScope; workspace?: string } | null {
   const sanitized = sanitizeWorkspaceSelection(selection);
-  if (sanitized.scope === WorkspaceScope.accessible) {
+  if (sanitized.scope === WorkspaceScope.all) {
     return null;
   }
   if (sanitized.scope === WorkspaceScope.workspace) {
@@ -224,15 +221,19 @@ function parseStoredWorkspaceSelection(
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return null;
     }
-    if (parsed.scope === WorkspaceScope.none) {
+    const scope = parsed.scope as
+      | WorkspaceScope
+      | typeof LEGACY_ALL_WORKSPACE_SCOPE
+      | undefined;
+    if (scope === WorkspaceScope.none) {
       return { scope: WorkspaceScope.none };
     }
-    if (parsed.scope === WorkspaceScope.workspace) {
+    if (scope === WorkspaceScope.workspace) {
       const workspace = sanitizeWorkspaceName(parsed.workspace ?? '');
       return workspace ? { scope: WorkspaceScope.workspace, workspace } : null;
     }
-    if (parsed.scope === WorkspaceScope.accessible) {
-      return { scope: WorkspaceScope.accessible };
+    if (scope === WorkspaceScope.all || scope === LEGACY_ALL_WORKSPACE_SCOPE) {
+      return { scope: WorkspaceScope.all };
     }
     return null;
   } catch {

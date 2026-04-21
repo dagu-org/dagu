@@ -16,7 +16,7 @@ import { WorkspaceScope } from '@/api/v1/schema';
 import type { components } from '@/api/v1/schema';
 import { cn } from '@/lib/utils';
 import {
-  ACCESSIBLE_WORKSPACES_DISPLAY_NAME,
+  ALL_WORKSPACES_DISPLAY_NAME,
   defaultWorkspaceSelection,
   NO_WORKSPACE_DISPLAY_NAME,
   sanitizeWorkspaceName,
@@ -27,7 +27,7 @@ import {
 
 type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
 
-const ACCESSIBLE_VALUE = '__accessible__';
+const ALL_VALUE = '__all__';
 const NONE_VALUE = '__none__';
 const NEW_VALUE = '__new__';
 const WORKSPACE_VALUE_PREFIX = 'workspace:';
@@ -76,7 +76,7 @@ export function WorkspaceSelector({
       ? `${WORKSPACE_VALUE_PREFIX}${selection.workspace}`
       : selection.scope === WorkspaceScope.none
         ? NONE_VALUE
-        : ACCESSIBLE_VALUE;
+        : ALL_VALUE;
 
   const handleCreate = useCallback(() => {
     if (createStateRef.current !== 'idle') return;
@@ -156,8 +156,8 @@ export function WorkspaceSelector({
             if (v === NEW_VALUE) {
               createStateRef.current = 'idle';
               setIsCreating(true);
-            } else if (v === ACCESSIBLE_VALUE) {
-              handleSelect({ scope: WorkspaceScope.accessible });
+            } else if (v === ALL_VALUE) {
+              handleSelect({ scope: WorkspaceScope.all });
             } else if (v === NONE_VALUE) {
               handleSelect({ scope: WorkspaceScope.none });
             } else if (v.startsWith(WORKSPACE_VALUE_PREFIX)) {
@@ -166,7 +166,7 @@ export function WorkspaceSelector({
                 workspace: v.slice(WORKSPACE_VALUE_PREFIX.length),
               });
             } else {
-              handleSelect({ scope: WorkspaceScope.accessible });
+              handleSelect({ scope: WorkspaceScope.all });
             }
           }}
         >
@@ -216,8 +216,8 @@ export function WorkspaceSelector({
             )}
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ACCESSIBLE_VALUE}>
-              {ACCESSIBLE_WORKSPACES_DISPLAY_NAME}
+            <SelectItem value={ALL_VALUE}>
+              {ALL_WORKSPACES_DISPLAY_NAME}
             </SelectItem>
             {supportsScopedSelection && (
               <SelectItem value={NONE_VALUE}>
