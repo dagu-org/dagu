@@ -18,6 +18,7 @@ import { Tab, Tabs } from '@/components/ui/tabs';
 import { useErrorModal } from '@/components/ui/error-modal';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useCanWrite } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { usePageContext } from '@/contexts/PageContext';
 import { useSchema } from '@/contexts/SchemaContext';
@@ -109,6 +110,7 @@ const DESIGN_PANEL_LIMITS = {
 };
 
 function WorkflowDesignPage() {
+  const canWriteInSelectedScope = useCanWrite();
   const config = useConfig();
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
@@ -378,6 +380,7 @@ function WorkflowDesignPage() {
   const selectedStep = steps.find((step) => step.name === selectedStepName);
   const hasValidationErrors = !!validation?.errors?.length;
   const canSubmitDesignRequest =
+    canWriteInSelectedScope &&
     config.agentEnabled &&
     requestText.trim().length > 0 &&
     !isSendingDesignRequest &&
@@ -389,7 +392,9 @@ function WorkflowDesignPage() {
     !!newDagName &&
     !!validation?.valid &&
     newNameValidation?.isValid !== false;
-  const canSave = selectedDagFile ? !!canSaveExisting : canCreateNew;
+  const canSave =
+    canWriteInSelectedScope &&
+    (selectedDagFile ? !!canSaveExisting : canCreateNew);
 
   const updateSearch = (dagFile: string, stepName?: string) => {
     const next = new URLSearchParams(searchParams);
@@ -444,6 +449,13 @@ function WorkflowDesignPage() {
   };
 
   const handleSave = async () => {
+    if (!canWriteInSelectedScope) {
+      showError(
+        'Workspace is read-only',
+        'Select default or a writable workspace before changing a DAG.'
+      );
+      return;
+    }
     if (selectedDagFile) {
       if (!canSaveExisting || currentValue == null) return;
       setIsSaving(true);
@@ -521,6 +533,13 @@ function WorkflowDesignPage() {
   const handleSendDesignRequest = async () => {
     const trimmed = requestText.trim();
     if (!trimmed) return;
+    if (!canWriteInSelectedScope) {
+      showError(
+        'Workspace is read-only',
+        'Select default or a writable workspace before asking the agent to change a DAG.'
+      );
+      return;
+    }
     if (!config.agentEnabled) {
       showError(
         'Agent is disabled',
@@ -667,7 +686,7 @@ function WorkflowDesignPage() {
                   <DAGEditorWithDocs
                     value={editorValue}
                     onChange={handleEditorChange}
-                    readOnly={false}
+                    readOnly={!canWriteInSelectedScope}
                     className="h-[56vh] min-h-[420px]"
                     modelUri={editorModelUri}
                     schema={editorSchema}

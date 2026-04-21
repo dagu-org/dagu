@@ -730,7 +730,7 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              {canWrite && config.agentEnabled && (
+              {isAdmin && config.agentEnabled && (
                 <NavGroup
                   groupKey="agent"
                   icon={<Bot size={18} />}
