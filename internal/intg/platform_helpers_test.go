@@ -6,6 +6,7 @@ package intg_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/moby/moby/client"
+	"github.com/stretchr/testify/require"
 )
 
 func canonicalTestPath(path string) string {
@@ -64,6 +66,21 @@ func waitForFileCommand(path string) string {
 		fmt.Sprintf("while [ ! -f %s ]; do\n  sleep 0.05\ndone", test.PosixQuote(path)),
 		fmt.Sprintf("while (-not (Test-Path %s)) {\n  Start-Sleep -Milliseconds 50\n}", test.PowerShellQuote(path)),
 	)
+}
+
+func writeFileCommand(path string) string {
+	return test.ForOS(
+		fmt.Sprintf("printf '%%s\\n' started > %s", test.PosixQuote(path)),
+		fmt.Sprintf("Set-Content -Path %s -Value started", test.PowerShellQuote(path)),
+	)
+}
+
+func waitForTestFile(t *testing.T, path string, timeout time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(path)
+		return err == nil
+	}, timeout, 50*time.Millisecond)
 }
 
 func requireLinuxContainerRuntime(t *testing.T) {
