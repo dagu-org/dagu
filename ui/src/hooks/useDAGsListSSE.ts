@@ -22,7 +22,6 @@ interface DAGsListParams {
   order?: string;
   remoteNode?: string;
   workspace?: components['parameters']['Workspace'];
-  workspaceScope?: components['parameters']['WorkspaceScope'];
 }
 
 export function useDAGsListSSE(

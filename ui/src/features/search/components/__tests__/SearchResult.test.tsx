@@ -5,7 +5,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceScope } from '@/api/v1/schema';
 import SearchResult from '../SearchResult';
 
 const { getMock } = vi.hoisted(() => ({
@@ -81,7 +80,6 @@ describe('SearchResult', () => {
           type="dag"
           query="needle"
           workspaceQuery={{
-            workspaceScope: WorkspaceScope.workspace,
             workspace: 'team-a',
           }}
           results={[
@@ -119,7 +117,6 @@ describe('SearchResult', () => {
           remoteNode: 'local',
           q: 'needle',
           cursor: 'cursor-1',
-          workspaceScope: WorkspaceScope.workspace,
           workspace: 'team-a',
         },
       },
@@ -152,8 +149,6 @@ describe('SearchResult', () => {
     );
 
     const link = screen.getByRole('link', { name: /build/i });
-    expect(link.getAttribute('href')).toBe(
-      '/dags/build/spec?workspace=team-a'
-    );
+    expect(link.getAttribute('href')).toBe('/dags/build/spec?workspace=team-a');
   });
 });

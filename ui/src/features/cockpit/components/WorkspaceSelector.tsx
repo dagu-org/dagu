@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { WorkspaceScope } from '@/api/v1/schema';
 import type { components } from '@/api/v1/schema';
 import { cn } from '@/lib/utils';
 import {
@@ -21,6 +20,7 @@ import {
   defaultWorkspaceSelection,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
+  WorkspaceScope,
   workspaceSelectionLabel,
   type WorkspaceSelection,
 } from '@/lib/workspace';

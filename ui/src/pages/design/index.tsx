@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { components, WorkspaceScope } from '@/api/v1/schema';
+import { components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,7 @@ import {
   workspaceSelectionKey,
   workspaceSelectionQuery,
   workspaceSelectionLabel,
+  WorkspaceScope,
 } from '@/lib/workspace';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
@@ -121,7 +122,7 @@ function WorkflowDesignPage() {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
-  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
   const workspaceDescription = workspaceSelectionLabel(workspaceSelection);
   const { setContext } = usePageContext();
   const { schema: baseSchema } = useSchema();
@@ -221,7 +222,7 @@ function WorkflowDesignPage() {
   } = useContentEditor({
     key: JSON.stringify({
       remoteNode,
-      workspace: workspaceScopeKey,
+      workspace: workspaceKey,
       dag: selectedDagFile || NEW_DAG_VALUE,
     }),
     serverContent: serverSpec,
@@ -279,12 +280,12 @@ function WorkflowDesignPage() {
 
   const editorModelUri = React.useMemo(() => {
     const workspaceSegment = encodeURIComponent(
-      JSON.stringify({ workspace: workspaceScopeKey })
+      JSON.stringify({ workspace: workspaceKey })
     );
     return selectedDagFile
       ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/${encodeURIComponent(selectedDagFile)}.yaml`
       : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/new.yaml`;
-  }, [remoteNode, selectedDagFile, workspaceScopeKey]);
+  }, [remoteNode, selectedDagFile, workspaceKey]);
 
   const debouncedSpec = useDebouncedValue(editorValue, 500);
   const validationName = selectedDagFile || newDagName || 'designed-dag';

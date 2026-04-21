@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { components, UserRole, WorkspaceScope } from '@/api/v1/schema';
+import { components, UserRole } from '@/api/v1/schema';
+import { WorkspaceScope } from '@/lib/workspace';
 
 type WorkspaceAccess = components['schemas']['WorkspaceAccess'];
 type User = components['schemas']['User'];

@@ -1,8 +1,6 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { WorkspaceScope } from '@/api/v1/schema';
-
 export const WORKSPACE_LABEL_KEY = 'workspace';
 export const WORKSPACE_LABEL_PREFIX = `${WORKSPACE_LABEL_KEY}=`;
 export const WORKSPACE_STORAGE_KEY = 'dagu-selected-workspace';
@@ -10,6 +8,13 @@ export const WORKSPACE_SCOPE_STORAGE_KEY = 'dagu-selected-workspace-scope';
 export const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
 export const ALL_WORKSPACES_DISPLAY_NAME = 'all';
 export const DEFAULT_WORKSPACE_DISPLAY_NAME = 'default';
+export const WorkspaceScope = {
+  all: 'all',
+  default: 'default',
+  workspace: 'workspace',
+} as const;
+export type WorkspaceScope =
+  (typeof WorkspaceScope)[keyof typeof WorkspaceScope];
 
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -28,7 +33,11 @@ export function sanitizeWorkspaceName(name: string): string {
 }
 
 export function isValidWorkspaceName(name: string): boolean {
-  return WORKSPACE_NAME_PATTERN.test(name);
+  return (
+    WORKSPACE_NAME_PATTERN.test(name) &&
+    name.toLowerCase() !== WorkspaceScope.all &&
+    name.toLowerCase() !== WorkspaceScope.default
+  );
 }
 
 export function workspaceLabel(name: string): string | undefined {
@@ -150,15 +159,12 @@ export function workspaceSelectionKey(
 
 export function workspaceSelectionQuery(
   selection?: Partial<WorkspaceSelection> | null
-): { workspaceScope: WorkspaceScope; workspace?: string } {
+): { workspace: string } {
   const sanitized = sanitizeWorkspaceSelection(selection);
   if (sanitized.scope === WorkspaceScope.workspace) {
-    return {
-      workspaceScope: WorkspaceScope.workspace,
-      workspace: sanitized.workspace,
-    };
+    return { workspace: sanitized.workspace ?? WorkspaceScope.all };
   }
-  return { workspaceScope: sanitized.scope };
+  return { workspace: sanitized.scope };
 }
 
 export function workspaceTargetSelectionQuery(
@@ -171,7 +177,7 @@ export function workspaceTargetSelectionQuery(
   if (sanitized.scope === WorkspaceScope.workspace) {
     return { workspace: sanitized.workspace };
   }
-  return {};
+  return { workspace: WorkspaceScope.default };
 }
 
 export function workspaceDocumentSelectionQuery(
@@ -185,7 +191,7 @@ export function workspaceTargetQueryForWorkspace(
 ): WorkspaceTargetQuery {
   const sanitized = sanitizeWorkspaceName(workspace ?? '');
   if (!sanitized) {
-    return {};
+    return { workspace: WorkspaceScope.default };
   }
   return { workspace: sanitized };
 }

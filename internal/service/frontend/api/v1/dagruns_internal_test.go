@@ -301,7 +301,7 @@ func TestDAGRunListOptionsFromQueryStringIncludesWorkspaceFilter(t *testing.T) {
 
 		opts, err := api.dagRunListOptionsFromQueryString(
 			context.Background(),
-			"workspaceScope=workspace&workspace=ops",
+			"workspace=ops",
 		)
 		require.NoError(t, err)
 
@@ -321,7 +321,7 @@ func TestDAGRunListOptionsFromQueryStringIncludesWorkspaceFilter(t *testing.T) {
 
 		opts, err := api.dagRunListOptionsFromQueryString(
 			context.Background(),
-			"workspaceScope=default",
+			"workspace=default",
 		)
 		require.NoError(t, err)
 
@@ -341,7 +341,7 @@ func TestDAGRunListOptionsFromQueryStringIncludesWorkspaceFilter(t *testing.T) {
 
 		opts, err := api.dagRunListOptionsFromQueryString(
 			context.Background(),
-			"workspaceScope=all",
+			"workspace=all",
 		)
 		require.NoError(t, err)
 

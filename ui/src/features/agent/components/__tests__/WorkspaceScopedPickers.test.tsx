@@ -3,9 +3,9 @@
 
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WorkspaceScope } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
+import { WorkspaceScope } from '@/lib/workspace';
 import { DAGPicker } from '../DAGPicker';
 import { DocPicker } from '../DocPicker';
 
@@ -61,7 +61,6 @@ describe('agent context pickers', () => {
             query: {
               remoteNode: 'local',
               perPage: 100,
-              workspaceScope: WorkspaceScope.workspace,
               workspace: 'ops',
             },
           },
@@ -96,7 +95,6 @@ describe('agent context pickers', () => {
             remoteNode: 'local',
             flat: true,
             perPage: 200,
-            workspaceScope: WorkspaceScope.workspace,
             workspace: 'ops',
           },
         },

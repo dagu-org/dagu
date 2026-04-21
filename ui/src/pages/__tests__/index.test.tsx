@@ -5,10 +5,11 @@ import { render, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Status, WorkspaceScope } from '@/api/v1/schema';
+import { Status } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
+import { WorkspaceScope } from '@/lib/workspace';
 import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
 import { useClient } from '../../hooks/api';
 import DashboardPage from '../index';
@@ -210,7 +211,6 @@ describe('DashboardPage', () => {
     expect(latestCall?.query).toEqual(
       expect.objectContaining({
         remoteNode: 'remote-a',
-        workspaceScope: WorkspaceScope.workspace,
         workspace: 'ops',
       })
     );
@@ -221,7 +221,6 @@ describe('DashboardPage', () => {
         params: {
           query: expect.objectContaining({
             remoteNode: 'remote-a',
-            workspaceScope: WorkspaceScope.workspace,
             workspace: 'ops',
           }),
         },

@@ -49,9 +49,7 @@ export function TemplateSelector({
     () => workspaceSelectionQuery(appBarContext.workspaceSelection),
     [appBarContext.workspaceSelection]
   );
-  const workspaceScopeKey = workspaceSelectionKey(
-    appBarContext.workspaceSelection
-  );
+  const workspaceKey = workspaceSelectionKey(appBarContext.workspaceSelection);
 
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -183,7 +181,7 @@ export function TemplateSelector({
     setSelectedLabels([]);
     setHighlightedIndex(-1);
     setSelectedDag(null);
-  }, [remoteNode, workspaceScopeKey]);
+  }, [remoteNode, workspaceKey]);
 
   // Scroll highlighted item into view
   useEffect(() => {

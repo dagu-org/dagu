@@ -16,7 +16,6 @@ export function useDocTreeSSE(
     order?: PathsDocsGetParametersQueryOrder;
     remoteNode?: components['parameters']['RemoteNode'];
     workspace?: components['parameters']['Workspace'];
-    workspaceScope?: components['parameters']['WorkspaceScope'];
   } = {},
   enabled: boolean = true
 ): SSEState<DocListResponse> {

@@ -19,7 +19,6 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/service/audit"
-	"github.com/dagucloud/dagu/internal/workspace"
 )
 
 const (
@@ -65,28 +64,6 @@ func validateDocPath(path string) error {
 		}
 	}
 	return nil
-}
-
-func validateDocWorkspace(name *string) (string, error) {
-	if name == nil || *name == "" {
-		return "", nil
-	}
-	if err := workspace.ValidateName(*name); err != nil {
-		return "", &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "invalid workspace: must contain only letters, numbers, underscores, and hyphens",
-			HTTPStatus: http.StatusBadRequest,
-		}
-	}
-	return *name, nil
-}
-
-func validateDocWorkspaceParam(workspaceParam *api.Workspace) (string, error) {
-	if workspaceParam == nil {
-		return "", nil
-	}
-	workspaceName := string(*workspaceParam)
-	return validateDocWorkspace(&workspaceName)
 }
 
 func scopedDocPath(workspaceName, path string) (string, error) {
@@ -179,28 +156,27 @@ func (a *API) noWorkspaceDocVisibility(ctx context.Context) (docWorkspaceVisibil
 	}, nil
 }
 
-func (a *API) docWorkspaceVisibilityForSelection(ctx context.Context, selection workspaceScopeSelection) (docWorkspaceVisibility, error) {
-	switch selection.scope {
-	case api.WorkspaceScopeAll:
+func (a *API) docWorkspaceVisibilityForSelection(ctx context.Context, selection workspaceSelection) (docWorkspaceVisibility, error) {
+	switch selection.mode {
+	case workspaceSelectionAll:
 		return a.docWorkspaceVisibility(ctx)
-	case api.WorkspaceScopeDefault:
+	case workspaceSelectionDefault:
 		return a.noWorkspaceDocVisibility(ctx)
-	case api.WorkspaceScopeWorkspace:
+	case workspaceSelectionNamed:
 		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
 			return docWorkspaceVisibility{}, err
 		}
 		return docWorkspaceVisibility{all: true}, nil
 	default:
-		return docWorkspaceVisibility{}, badWorkspaceScopeError("invalid workspaceScope")
+		return docWorkspaceVisibility{}, badWorkspaceError("invalid workspace")
 	}
 }
 
 func (a *API) docReadScopeForParams(
 	ctx context.Context,
-	scopeParam *api.WorkspaceScope,
 	workspaceParam *api.Workspace,
 ) (string, docWorkspaceVisibility, error) {
-	selection, err := parseWorkspaceScope(scopeParam, workspaceParam)
+	selection, err := parseWorkspaceSelection(workspaceParam)
 	if err != nil {
 		return "", docWorkspaceVisibility{}, err
 	}
@@ -208,17 +184,35 @@ func (a *API) docReadScopeForParams(
 	if err != nil {
 		return "", docWorkspaceVisibility{}, err
 	}
-	if selection.scope == api.WorkspaceScopeWorkspace {
+	if selection.mode == workspaceSelectionNamed {
 		return selection.workspace, visibility, nil
 	}
 	return "", visibility, nil
+}
+
+func docTargetWorkspaceForParam(workspaceParam *api.Workspace) (string, error) {
+	if workspaceParam == nil {
+		return "", nil
+	}
+	raw := string(*workspaceParam)
+	if raw == "" {
+		return "", badWorkspaceError("workspace must not be empty")
+	}
+	switch raw {
+	case "all":
+		return "", badWorkspaceError("workspace=all cannot target a single document")
+	case "default":
+		return "", nil
+	default:
+		return validateWorkspaceParam(raw)
+	}
 }
 
 func (a *API) docPointReadScopeForParams(
 	ctx context.Context,
 	workspaceParam *api.Workspace,
 ) (string, docWorkspaceVisibility, error) {
-	workspaceName, err := validateDocWorkspaceParam(workspaceParam)
+	workspaceName, err := docTargetWorkspaceForParam(workspaceParam)
 	if err != nil {
 		return "", docWorkspaceVisibility{}, err
 	}
@@ -236,7 +230,7 @@ func (a *API) docPointReadScopeForParams(
 }
 
 func docMutationScopeForParams(workspaceParam *api.Workspace) (string, error) {
-	return validateDocWorkspaceParam(workspaceParam)
+	return docTargetWorkspaceForParam(workspaceParam)
 }
 
 func (a *API) scopedDocMutationPath(ctx context.Context, workspaceName, path string) (string, error) {
@@ -246,7 +240,7 @@ func (a *API) scopedDocMutationPath(ctx context.Context, workspaceName, path str
 			return "", err
 		}
 		if docWorkspaceNameForPath(path, docWorkspaceVisibility{known: known}, true) != "" {
-			return "", badWorkspaceScopeError("path targets a workspace; set workspace")
+			return "", badWorkspaceError("path targets a workspace; set workspace")
 		}
 	}
 	return scopedDocPath(workspaceName, path)
@@ -325,7 +319,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -465,7 +459,7 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
-	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -707,8 +701,8 @@ func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, erro
 
 	page := parseIntParam(params.Get("page"), 1)
 	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
-	scopeParam, workspaceParam := workspaceScopeParamsFromValues(params)
-	workspaceName, visibility, err := a.docReadScopeForParams(ctx, scopeParam, workspaceParam)
+	workspaceParam := workspaceParamFromValues(params)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, workspaceParam)
 	if err != nil {
 		return nil, err
 	}

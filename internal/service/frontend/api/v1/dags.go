@@ -716,7 +716,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 	}
 	pg := exec.NewPaginator(valueOf(request.Params.Page), valueOf(request.Params.PerPage))
 	labels := parseCommaSeparatedLabels(labelsParam)
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -735,7 +735,7 @@ func (a *API) ListDAGs(ctx context.Context, request api.ListDAGsRequestObject) (
 }
 
 func (a *API) GetAllDAGLabels(ctx context.Context, request api.GetAllDAGLabelsRequestObject) (api.GetAllDAGLabelsResponseObject, error) {
-	if filter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace); err != nil {
+	if filter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace); err != nil {
 		return nil, err
 	} else if filter != nil {
 		pg := exec.NewPaginator(1, int(^uint(0)>>1))
@@ -774,7 +774,7 @@ func (a *API) GetAllDAGLabels(ctx context.Context, request api.GetAllDAGLabelsRe
 }
 
 func (a *API) GetAllDAGTags(ctx context.Context, request api.GetAllDAGTagsRequestObject) (api.GetAllDAGTagsResponseObject, error) {
-	if filter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace); err != nil {
+	if filter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace); err != nil {
 		return nil, err
 	} else if filter != nil {
 		pg := exec.NewPaginator(1, int(^uint(0)>>1))
@@ -1760,8 +1760,8 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 	labels := parseCommaSeparatedLabels(labelQueryParam)
 
 	pg := exec.NewPaginator(page, perPage)
-	scopeParam, workspaceParam := workspaceScopeParamsFromValues(params)
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, scopeParam, workspaceParam)
+	workspaceParam := workspaceParamFromValues(params)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, workspaceParam)
 	if err != nil {
 		return nil, err
 	}

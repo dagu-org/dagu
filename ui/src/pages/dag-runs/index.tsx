@@ -143,10 +143,10 @@ function DAGRuns() {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
-  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = JSON.stringify({
     remoteNode: remoteKey,
-    workspace: workspaceScopeKey,
+    workspace: workspaceKey,
   });
 
   // Extract short datetime format from URL if present

@@ -772,7 +772,6 @@ paths:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "name"
           in: "query"
@@ -1573,7 +1572,6 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
@@ -1618,7 +1616,6 @@ paths:
         - "search"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
@@ -1670,7 +1667,6 @@ paths:
           schema:
             type: "string"
           description: "Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels."
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/SearchCursor"
         - $ref: "#/components/parameters/SearchMatchLimit"
@@ -1759,7 +1755,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
@@ -1785,7 +1780,6 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
@@ -1816,7 +1810,6 @@ paths:
         - $ref: "#/components/parameters/DAGRunListLimit"
         - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: "name"
           in: "query"
@@ -2027,7 +2020,6 @@ paths:
         - $ref: "#/components/parameters/DAGRunListLimit"
         - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
@@ -6313,7 +6305,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
@@ -6410,7 +6401,6 @@ paths:
         - "docs"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/WorkspaceScope"
         - $ref: "#/components/parameters/Workspace"
         - name: q
           in: query
@@ -6992,18 +6982,13 @@ components:
     Workspace:
       name: workspace
       in: query
-      description: "Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default."
+      description: "Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default."
       required: false
       schema:
-        $ref: "#/components/schemas/WorkspaceName"
-
-    WorkspaceScope:
-      name: workspaceScope
-      in: query
-      description: "Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required."
-      required: false
-      schema:
-        $ref: "#/components/schemas/WorkspaceScope"
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: "^[A-Za-z0-9_-]+$"
 
     SearchCursor:
       name: cursor
@@ -9540,7 +9525,7 @@ components:
 
     WorkspaceName:
       type: string
-      description: "Workspace name"
+      description: "Workspace name. The reserved names all and default are not allowed."
       minLength: 1
       maxLength: 64
       pattern: "^[A-Za-z0-9_-]+$"
@@ -9572,14 +9557,6 @@ components:
       required:
         - all
         - grants
-
-    WorkspaceScope:
-      type: string
-      description: "Workspace scope selector for list and search APIs"
-      enum:
-        - all
-        - default
-        - workspace
 
     SetupRequest:
       type: object

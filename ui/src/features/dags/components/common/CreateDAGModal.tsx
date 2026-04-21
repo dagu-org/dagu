@@ -9,8 +9,8 @@ import { defaultDAGSpec } from '../../../../lib/dagSpec';
 import {
   isMutableWorkspaceSelection,
   sanitizeWorkspaceSelection,
+  WorkspaceScope,
 } from '../../../../lib/workspace';
-import { WorkspaceScope } from '../../../../api/v1/schema';
 
 /**
  * CreateDAGModal displays a button that opens a modal to create a new DAG

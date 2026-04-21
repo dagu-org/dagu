@@ -522,14 +522,14 @@ func TestListDocs(t *testing.T) {
 		flat := true
 		page := 1
 		perPage := 1
-		scope := apigen.WorkspaceScopeDefault
+		workspace := apigen.Workspace("default")
 
 		resp, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
 			Params: apigen.ListDocsParams{
-				WorkspaceScope: &scope,
-				Flat:           &flat,
-				Page:           &page,
-				PerPage:        &perPage,
+				Workspace: &workspace,
+				Flat:      &flat,
+				Page:      &page,
+				PerPage:   &perPage,
 			},
 		})
 		require.NoError(t, err)
@@ -549,10 +549,10 @@ func TestListDocs(t *testing.T) {
 
 		store := &mockDocStore{docs: make(map[string]*agent.Doc)}
 		setup := newDocTestSetupWithStore(t, store, &mockWorkspaceStore{err: errForced})
-		scope := apigen.WorkspaceScopeDefault
+		workspace := apigen.Workspace("default")
 
 		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
-			Params: apigen.ListDocsParams{WorkspaceScope: &scope},
+			Params: apigen.ListDocsParams{Workspace: &workspace},
 		})
 		require.Error(t, err)
 	})
@@ -562,10 +562,10 @@ func TestListDocs(t *testing.T) {
 
 		store := &mockDocStore{docs: make(map[string]*agent.Doc)}
 		setup := newDocTestSetupWithStore(t, store, &mockWorkspaceStore{err: errForced})
-		scope := apigen.WorkspaceScopeAll
+		workspace := apigen.Workspace("all")
 
 		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
-			Params: apigen.ListDocsParams{WorkspaceScope: &scope},
+			Params: apigen.ListDocsParams{Workspace: &workspace},
 		})
 		require.Error(t, err)
 	})

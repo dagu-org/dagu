@@ -5,7 +5,7 @@ import { useContext, useMemo } from 'react';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
-import { components, Status, WorkspaceScope } from '@/api/v1/schema';
+import { components, Status } from '@/api/v1/schema';
 import { usePaginatedDAGRuns } from '@/features/dag-runs/hooks/dagRunPagination';
 import { workspaceSelectionQuery } from '@/lib/workspace';
 
@@ -54,7 +54,6 @@ function useKanbanBucket(
   query: {
     remoteNode: string;
     labels?: string;
-    workspaceScope?: WorkspaceScope;
     workspace?: string;
     fromDate: number;
     toDate: number;

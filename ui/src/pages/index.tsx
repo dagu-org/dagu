@@ -141,14 +141,14 @@ function Dashboard(): React.ReactElement | null {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
-  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = React.useMemo(
     () =>
       JSON.stringify({
         remoteNode,
-        workspace: workspaceScopeKey,
+        workspace: workspaceKey,
       }),
-    [remoteNode, workspaceScopeKey]
+    [remoteNode, workspaceKey]
   );
 
   const [modalDAGRun, setModalDAGRun] = React.useState<{

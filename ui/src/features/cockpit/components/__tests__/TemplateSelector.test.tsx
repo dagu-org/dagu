@@ -6,8 +6,8 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { WorkspaceScope } from '@/lib/workspace';
 import { TemplateSelector } from '../TemplateSelector';
-import { WorkspaceScope } from '@/api/v1/schema';
 
 vi.mock('@/hooks/api', () => ({
   useQuery: vi.fn(),
@@ -108,7 +108,7 @@ describe('TemplateSelector', () => {
         params: expect.objectContaining({
           query: {
             remoteNode: 'local',
-            workspaceScope: WorkspaceScope.all,
+            workspace: WorkspaceScope.all,
           },
         }),
       })

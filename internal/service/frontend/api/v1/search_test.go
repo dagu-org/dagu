@@ -232,7 +232,7 @@ steps:
 	assert.False(t, secondPage.HasMore)
 }
 
-func TestSearchDagMatchesUsesWorkspaceScopeFromFeedCursor(t *testing.T) {
+func TestSearchDagMatchesUsesWorkspaceFromFeedCursor(t *testing.T) {
 	t.Parallel()
 
 	setup := newSearchTestSetup(t, false)
@@ -244,13 +244,11 @@ steps:
   - command: echo "needle."
   - command: echo "needle."`)
 
-	scope := apigen.WorkspaceScopeWorkspace
 	workspace := apigen.Workspace("ops")
 	feedResp, err := setup.api.SearchDAGFeed(adminCtx(), apigen.SearchDAGFeedRequestObject{
 		Params: apigen.SearchDAGFeedParams{
-			Q:              "needle.",
-			WorkspaceScope: &scope,
-			Workspace:      &workspace,
+			Q:         "needle.",
+			Workspace: &workspace,
 		},
 	})
 	require.NoError(t, err)
@@ -263,11 +261,10 @@ steps:
 	matchesResp, err := setup.api.SearchDagMatches(adminCtx(), apigen.SearchDagMatchesRequestObject{
 		FileName: "ops-heavy",
 		Params: apigen.SearchDagMatchesParams{
-			Q:              "needle.",
-			Limit:          &limit,
-			Cursor:         feedPage.Results[0].NextMatchesCursor,
-			WorkspaceScope: &scope,
-			Workspace:      &workspace,
+			Q:         "needle.",
+			Limit:     &limit,
+			Cursor:    feedPage.Results[0].NextMatchesCursor,
+			Workspace: &workspace,
 		},
 	})
 	require.NoError(t, err)

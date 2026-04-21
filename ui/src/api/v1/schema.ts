@@ -3955,7 +3955,7 @@ export interface components {
          * @enum {string}
          */
         UserRole: UserRole;
-        /** @description Workspace name */
+        /** @description Workspace name. The reserved names all and default are not allowed. */
         WorkspaceName: string;
         /** @description Role granted for a specific workspace */
         WorkspaceGrant: {
@@ -3969,11 +3969,6 @@ export interface components {
             /** @description Workspace-specific grants used when all=false */
             grants: components["schemas"]["WorkspaceGrant"][];
         };
-        /**
-         * @description Workspace scope selector for list and search APIs
-         * @enum {string}
-         */
-        WorkspaceScope: WorkspaceScope;
         /** @description Request body for initial admin account setup */
         SetupRequest: {
             /** @description Admin username */
@@ -4938,10 +4933,8 @@ export interface components {
         APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
-        /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
-        Workspace: components["schemas"]["WorkspaceName"];
-        /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-        WorkspaceScope: components["schemas"]["WorkspaceScope"];
+        /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
+        Workspace: string;
         /** @description Opaque cursor returned by the previous search response */
         SearchCursor: string;
         /** @description Number of search results to return (default 20, max 50) */
@@ -6019,9 +6012,7 @@ export interface operations {
                 perPage?: components["parameters"]["PerPage"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Filter DAGs by name */
                 name?: string;
@@ -6860,9 +6851,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
@@ -6913,9 +6902,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
@@ -6968,9 +6955,7 @@ export interface operations {
                 q: string;
                 /** @description Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels. */
                 labels?: string;
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Opaque cursor returned by the previous search response */
                 cursor?: components["parameters"]["SearchCursor"];
@@ -7029,7 +7014,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -7089,9 +7074,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -7125,9 +7108,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -7173,9 +7154,7 @@ export interface operations {
                 cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Filter DAG-runs by name */
                 name?: string;
@@ -7387,9 +7366,7 @@ export interface operations {
                 cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -12913,9 +12890,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description page number of items to fetch (default is 1) */
                 page?: components["parameters"]["Page"];
@@ -12963,7 +12938,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -13021,9 +12996,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Explicit workspace scope for collection APIs: all accessible data, default data, or one named workspace. When set to workspace, the workspace query parameter is required. */
-                workspaceScope?: components["parameters"]["WorkspaceScope"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Search query */
                 q: string;
@@ -13068,7 +13041,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13113,7 +13086,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13156,7 +13129,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13207,7 +13180,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Current document or directory path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13267,7 +13240,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description Workspace name. For collection APIs, required when workspaceScope=workspace; when workspaceScope is omitted, a provided workspace preserves legacy named-workspace filtering. For document target APIs, omitted means default. */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -13898,11 +13871,6 @@ export enum UserRole {
     developer = "developer",
     operator = "operator",
     viewer = "viewer"
-}
-export enum WorkspaceScope {
-    all = "all",
-    default = "default",
-    workspace = "workspace"
 }
 export enum UserAuthProvider {
     builtin = "builtin",

@@ -10,14 +10,13 @@ import {
 } from '@/lib/workspace';
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { components, WorkspaceScope } from '../../../api/v1/schema';
+import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 
 type SearchMatch = components['schemas']['SearchMatchItem'];
 type DagResult = components['schemas']['DAGSearchPageItem'];
 type DocResult = components['schemas']['DocSearchPageItem'];
 type DAGWorkspaceQuery = {
-  workspaceScope?: WorkspaceScope;
   workspace?: string;
 };
 
@@ -179,8 +178,7 @@ function SearchResult(props: Props) {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const dagWorkspaceQuery =
-    type === 'dag' ? (props.workspaceQuery ?? {}) : {};
+  const dagWorkspaceQuery = type === 'dag' ? (props.workspaceQuery ?? {}) : {};
 
   const items =
     type === 'dag'

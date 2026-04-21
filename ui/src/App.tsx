@@ -45,10 +45,11 @@ import {
   persistWorkspaceSelection,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
+  WorkspaceScope,
   workspaceNameForSelection,
   type WorkspaceSelection,
 } from './lib/workspace';
-import { UserRole, WorkspaceScope } from './api/v1/schema';
+import { UserRole } from './api/v1/schema';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';

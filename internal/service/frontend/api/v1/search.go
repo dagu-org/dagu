@@ -155,7 +155,7 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 		return nil, err
 	}
 	labels := scopedDAGSearchLabels(request.Params.Labels)
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 	if err != nil {
 		return nil, err
 	}
-	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 		return nil, err
 	}
 	labels := scopedDAGSearchLabels(request.Params.Labels)
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}

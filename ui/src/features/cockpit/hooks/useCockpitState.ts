@@ -9,18 +9,16 @@ export function useCockpitState() {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const selectedWorkspace = appBarContext.selectedWorkspace || '';
-  const workspaceScopeKey = workspaceSelectionKey(
-    appBarContext.workspaceSelection
-  );
+  const workspaceKey = workspaceSelectionKey(appBarContext.workspaceSelection);
   const [selectedTemplate, setSelectedTemplate] = useState('');
 
   useEffect(() => {
     setSelectedTemplate('');
-  }, [remoteNode, workspaceScopeKey]);
+  }, [remoteNode, workspaceKey]);
 
   return {
     selectedWorkspace,
-    workspaceScopeKey,
+    workspaceKey,
     selectedTemplate,
     selectTemplate: setSelectedTemplate,
   };

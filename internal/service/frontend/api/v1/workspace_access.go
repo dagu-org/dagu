@@ -19,8 +19,16 @@ import (
 	"github.com/dagucloud/dagu/internal/workspace"
 )
 
-type workspaceScopeSelection struct {
-	scope     api.WorkspaceScope
+type workspaceSelectionMode int
+
+const (
+	workspaceSelectionAll workspaceSelectionMode = iota
+	workspaceSelectionDefault
+	workspaceSelectionNamed
+)
+
+type workspaceSelection struct {
+	mode      workspaceSelectionMode
 	workspace string
 	explicit  bool
 }
@@ -121,7 +129,7 @@ func workspaceResourceNotFound() *Error {
 	}
 }
 
-func badWorkspaceScopeError(message string) *Error {
+func badWorkspaceError(message string) *Error {
 	return &Error{
 		Code:       api.ErrorCodeBadRequest,
 		Message:    message,
@@ -134,76 +142,35 @@ func validateWorkspaceParam(name string) (string, error) {
 		return "", nil
 	}
 	if err := workspace.ValidateName(name); err != nil {
-		return "", badWorkspaceScopeError("invalid workspace: must contain only letters, numbers, underscores, and hyphens")
+		return "", badWorkspaceError(err.Error())
 	}
 	return name, nil
 }
 
-func parseWorkspaceScope(scopeParam *api.WorkspaceScope, workspaceParam *api.Workspace) (workspaceScopeSelection, error) {
-	workspaceName := ""
-	if workspaceParam != nil {
-		if string(*workspaceParam) == "" {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must not be empty")
-		}
-		var err error
-		workspaceName, err = validateWorkspaceParam(string(*workspaceParam))
-		if err != nil {
-			return workspaceScopeSelection{}, err
-		}
+func parseWorkspaceSelection(workspaceParam *api.Workspace) (workspaceSelection, error) {
+	if workspaceParam == nil {
+		return workspaceSelection{mode: workspaceSelectionAll}, nil
 	}
-
-	if scopeParam == nil {
-		if workspaceName != "" {
-			return workspaceScopeSelection{
-				scope:     api.WorkspaceScopeWorkspace,
-				workspace: workspaceName,
-			}, nil
-		}
-		return workspaceScopeSelection{scope: api.WorkspaceScopeAll}, nil
+	raw := string(*workspaceParam)
+	if raw == "" {
+		return workspaceSelection{}, badWorkspaceError("workspace must not be empty")
 	}
-
-	selection := workspaceScopeSelection{scope: *scopeParam, explicit: true}
-	switch *scopeParam {
-	case api.WorkspaceScopeAll:
-		if workspaceName != "" {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must be omitted when workspaceScope=all")
-		}
-		selection.scope = api.WorkspaceScopeAll
-	case api.WorkspaceScopeDefault:
-		if workspaceName != "" {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace must be omitted when workspaceScope=default")
-		}
-	case api.WorkspaceScopeWorkspace:
-		if workspaceName == "" {
-			return workspaceScopeSelection{}, badWorkspaceScopeError("workspace is required when workspaceScope=workspace")
-		}
-		selection.workspace = workspaceName
+	switch raw {
+	case "all":
+		return workspaceSelection{mode: workspaceSelectionAll, explicit: true}, nil
+	case "default":
+		return workspaceSelection{mode: workspaceSelectionDefault, explicit: true}, nil
 	default:
-		return workspaceScopeSelection{}, badWorkspaceScopeError("invalid workspaceScope")
-	}
-	return selection, nil
-}
-
-func workspaceScopeParamsFromValues(params url.Values) (*api.WorkspaceScope, *api.Workspace) {
-	var scopeParam *api.WorkspaceScope
-	if rawValues, ok := params["workspaceScope"]; ok {
-		raw := ""
-		if len(rawValues) > 0 {
-			raw = rawValues[0]
+		workspaceName, err := validateWorkspaceParam(raw)
+		if err != nil {
+			return workspaceSelection{}, err
 		}
-		scope := api.WorkspaceScope(raw)
-		scopeParam = &scope
+		return workspaceSelection{
+			mode:      workspaceSelectionNamed,
+			workspace: workspaceName,
+			explicit:  true,
+		}, nil
 	}
-	var workspaceParam *api.Workspace
-	if rawValues, ok := params["workspace"]; ok {
-		raw := ""
-		if len(rawValues) > 0 {
-			raw = rawValues[0]
-		}
-		workspace := api.Workspace(raw)
-		workspaceParam = &workspace
-	}
-	return scopeParam, workspaceParam
 }
 
 func workspaceParamFromValues(params url.Values) *api.Workspace {
@@ -297,11 +264,11 @@ func (a *API) workspaceFilterForContext(ctx context.Context) *exec.WorkspaceFilt
 	}
 }
 
-func (a *API) workspaceFilterForSelection(ctx context.Context, selection workspaceScopeSelection) (*exec.WorkspaceFilter, error) {
-	switch selection.scope {
-	case api.WorkspaceScopeAll:
+func (a *API) workspaceFilterForSelection(ctx context.Context, selection workspaceSelection) (*exec.WorkspaceFilter, error) {
+	switch selection.mode {
+	case workspaceSelectionAll:
 		return a.workspaceFilterForContext(ctx), nil
-	case api.WorkspaceScopeDefault:
+	case workspaceSelectionDefault:
 		if err := a.requireWorkspaceVisible(ctx, ""); err != nil {
 			return nil, err
 		}
@@ -309,7 +276,7 @@ func (a *API) workspaceFilterForSelection(ctx context.Context, selection workspa
 			Enabled:           true,
 			IncludeUnlabelled: true,
 		}, nil
-	case api.WorkspaceScopeWorkspace:
+	case workspaceSelectionNamed:
 		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
 			return nil, err
 		}
@@ -318,12 +285,12 @@ func (a *API) workspaceFilterForSelection(ctx context.Context, selection workspa
 			Workspaces: []string{selection.workspace},
 		}, nil
 	default:
-		return nil, badWorkspaceScopeError("invalid workspaceScope")
+		return nil, badWorkspaceError("invalid workspace")
 	}
 }
 
-func (a *API) workspaceFilterForParams(ctx context.Context, scopeParam *api.WorkspaceScope, workspaceParam *api.Workspace) (*exec.WorkspaceFilter, error) {
-	selection, err := parseWorkspaceScope(scopeParam, workspaceParam)
+func (a *API) workspaceFilterForParams(ctx context.Context, workspaceParam *api.Workspace) (*exec.WorkspaceFilter, error) {
+	selection, err := parseWorkspaceSelection(workspaceParam)
 	if err != nil {
 		return nil, err
 	}

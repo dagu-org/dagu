@@ -377,10 +377,10 @@ function Search() {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
-  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = JSON.stringify({
     remoteNode: remoteKey,
-    workspace: workspaceScopeKey,
+    workspace: workspaceKey,
   });
   const inputRef = useRef<HTMLInputElement>(null);
   const hydratedScopeRef = useRef<string | null>(null);

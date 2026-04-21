@@ -600,7 +600,7 @@ func (a *API) ListDAGRuns(ctx context.Context, request api.ListDAGRunsRequestObj
 		limit:    request.Params.Limit,
 		cursor:   request.Params.Cursor,
 	})
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -644,7 +644,7 @@ func (a *API) ListDAGRunsByName(ctx context.Context, request api.ListDAGRunsByNa
 		cursor:    request.Params.Cursor,
 		exactName: &request.Name,
 	})
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.WorkspaceScope, request.Params.Workspace)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -3925,8 +3925,8 @@ func (a *API) dagRunListOptionsFromQueryString(ctx context.Context, queryString 
 		cursor:   cursor,
 	})
 
-	scopeParam, workspaceParam := workspaceScopeParamsFromValues(params)
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, scopeParam, workspaceParam)
+	workspaceParam := workspaceParamFromValues(params)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, workspaceParam)
 	if err != nil {
 		return dagRunListOptions{}, err
 	}

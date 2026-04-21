@@ -11,76 +11,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseWorkspaceScope(t *testing.T) {
-	t.Run("defaults to all scope", func(t *testing.T) {
-		selection, err := parseWorkspaceScope(nil, nil)
+func TestParseWorkspaceSelection(t *testing.T) {
+	t.Run("defaults to all", func(t *testing.T) {
+		selection, err := parseWorkspaceSelection(nil)
 		require.NoError(t, err)
-		require.Equal(t, api.WorkspaceScopeAll, selection.scope)
+		require.Equal(t, workspaceSelectionAll, selection.mode)
 		require.Empty(t, selection.workspace)
 		require.False(t, selection.explicit)
 	})
 
-	t.Run("keeps legacy workspace parameter as concrete workspace scope", func(t *testing.T) {
+	t.Run("accepts named workspace", func(t *testing.T) {
 		workspace := api.Workspace("ops")
-		selection, err := parseWorkspaceScope(nil, &workspace)
+		selection, err := parseWorkspaceSelection(&workspace)
 		require.NoError(t, err)
-		require.Equal(t, api.WorkspaceScopeWorkspace, selection.scope)
+		require.Equal(t, workspaceSelectionNamed, selection.mode)
 		require.Equal(t, "ops", selection.workspace)
-		require.False(t, selection.explicit)
+		require.True(t, selection.explicit)
 	})
 
-	t.Run("accepts explicit default workspace scope", func(t *testing.T) {
-		scope := api.WorkspaceScopeDefault
-		selection, err := parseWorkspaceScope(&scope, nil)
+	t.Run("accepts all", func(t *testing.T) {
+		workspace := api.Workspace("all")
+		selection, err := parseWorkspaceSelection(&workspace)
 		require.NoError(t, err)
-		require.Equal(t, api.WorkspaceScopeDefault, selection.scope)
+		require.Equal(t, workspaceSelectionAll, selection.mode)
 		require.Empty(t, selection.workspace)
 		require.True(t, selection.explicit)
 	})
 
-	t.Run("rejects deprecated scope names", func(t *testing.T) {
-		for _, value := range []string{"none", "accessible"} {
-			scope := api.WorkspaceScope(value)
-			_, err := parseWorkspaceScope(&scope, nil)
-			require.Error(t, err)
-		}
-	})
-
-	t.Run("requires workspace name for concrete workspace scope", func(t *testing.T) {
-		scope := api.WorkspaceScopeWorkspace
-		_, err := parseWorkspaceScope(&scope, nil)
-		require.Error(t, err)
-	})
-
-	t.Run("rejects workspace name on aggregate scope", func(t *testing.T) {
-		scope := api.WorkspaceScopeAll
-		workspace := api.Workspace("ops")
-		_, err := parseWorkspaceScope(&scope, &workspace)
-		require.Error(t, err)
+	t.Run("accepts default", func(t *testing.T) {
+		workspace := api.Workspace("default")
+		selection, err := parseWorkspaceSelection(&workspace)
+		require.NoError(t, err)
+		require.Equal(t, workspaceSelectionDefault, selection.mode)
+		require.Empty(t, selection.workspace)
+		require.True(t, selection.explicit)
 	})
 }
 
-func TestWorkspaceScopeParamsFromValuesPreservesExplicitEmptyScope(t *testing.T) {
-	params := url.Values{"workspaceScope": []string{""}}
-
-	scope, workspace := workspaceScopeParamsFromValues(params)
-	require.NotNil(t, scope)
-	require.Empty(t, *scope)
-	require.Nil(t, workspace)
-
-	_, err := parseWorkspaceScope(scope, workspace)
-	require.Error(t, err)
-}
-
-func TestWorkspaceScopeParamsFromValuesRejectsExplicitEmptyWorkspace(t *testing.T) {
+func TestWorkspaceParamFromValuesRejectsExplicitEmptyWorkspace(t *testing.T) {
 	params := url.Values{"workspace": []string{""}}
 
-	scope, workspace := workspaceScopeParamsFromValues(params)
-	require.Nil(t, scope)
+	workspace := workspaceParamFromValues(params)
 	require.NotNil(t, workspace)
 	require.Empty(t, *workspace)
 
-	_, err := parseWorkspaceScope(scope, workspace)
+	_, err := parseWorkspaceSelection(workspace)
 	require.Error(t, err)
 }
 

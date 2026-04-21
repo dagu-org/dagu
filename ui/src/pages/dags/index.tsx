@@ -71,15 +71,15 @@ function DAGsContent() {
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
   );
-  const workspaceScopeKey = workspaceSelectionKey(workspaceSelection);
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = JSON.stringify({
     remoteNode,
-    workspace: workspaceScopeKey,
+    workspace: workspaceKey,
   });
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
-  const previousWorkspaceScopeKeyRef = React.useRef(workspaceScopeKey);
+  const previousWorkspaceKeyRef = React.useRef(workspaceKey);
 
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -110,14 +110,14 @@ function DAGsContent() {
   const selectedDAG = getActiveFileName();
 
   React.useEffect(() => {
-    if (previousWorkspaceScopeKeyRef.current === workspaceScopeKey) {
+    if (previousWorkspaceKeyRef.current === workspaceKey) {
       return;
     }
-    previousWorkspaceScopeKeyRef.current = workspaceScopeKey;
+    previousWorkspaceKeyRef.current = workspaceKey;
     for (const tab of tabs) {
       closeTab(tab.id);
     }
-  }, [closeTab, tabs, workspaceScopeKey]);
+  }, [closeTab, tabs, workspaceKey]);
 
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -441,12 +441,10 @@ function DAGsContent() {
 function DAGs() {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const workspaceScopeKey = workspaceSelectionKey(
-    appBarContext.workspaceSelection
-  );
+  const workspaceKey = workspaceSelectionKey(appBarContext.workspaceSelection);
   const dagTabStorageKey = `dagu_dag_tabs:${JSON.stringify({
     remoteNode,
-    workspace: workspaceScopeKey,
+    workspace: workspaceKey,
   })}`;
 
   return (

@@ -1,7 +1,6 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { WorkspaceScope } from '@/api/v1/schema';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   ALL_WORKSPACES_DISPLAY_NAME,
@@ -11,6 +10,7 @@ import {
   LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
   WORKSPACE_SCOPE_STORAGE_KEY,
   WORKSPACE_STORAGE_KEY,
+  WorkspaceScope,
   workspaceSelectionLabel,
   workspaceTargetSelectionQuery,
 } from '../workspace';
@@ -76,7 +76,7 @@ describe('workspace target queries', () => {
     );
     expect(
       workspaceTargetSelectionQuery({ scope: WorkspaceScope.default })
-    ).toEqual({});
+    ).toEqual({ workspace: WorkspaceScope.default });
     expect(
       workspaceTargetSelectionQuery({
         scope: WorkspaceScope.workspace,
