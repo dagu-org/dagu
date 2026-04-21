@@ -81,7 +81,7 @@ func waitForCancel(t *testing.T, done <-chan struct{}, timeout time.Duration) {
 	select {
 	case <-done:
 	case <-time.After(timeout):
-		t.Fatal("timed out waiting for DAG cancellation")
+		require.FailNow(t, "timed out waiting for DAG cancellation")
 	}
 }
 

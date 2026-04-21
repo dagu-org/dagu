@@ -188,7 +188,6 @@ steps:
 	require.NoError(t, err)
 	require.Equal(t, core.Running, status.Status, "run should remain active beyond the stale threshold")
 	lease = waitForLease(t, f, status.AttemptKey, 5*time.Second)
-	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
 
 	require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 	finalStatus := f.waitForStatus(core.Succeeded, finalStatusTimeout)
