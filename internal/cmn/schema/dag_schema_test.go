@@ -633,6 +633,23 @@ steps:
 	}
 }
 
+func TestDAGSchemaSSHExecutorPort(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+	doc := mustParseYAMLDocument(t, `
+steps:
+  - type: ssh
+    command: hostname
+    with:
+      host: example.com
+      user: deploy
+      port: 22
+`)
+
+	require.NoError(t, resolved.Validate(doc))
+}
+
 func TestDAGSchemaSFTPExecutor(t *testing.T) {
 	t.Parallel()
 

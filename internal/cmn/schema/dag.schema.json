@@ -2490,7 +2490,7 @@
           "description": "Alias for 'host'. IP address of the SSH server."
         },
         "port": {
-          "type": "string",
+          "oneOf": [{ "type": "string" }, { "type": "integer" }],
           "default": "22",
           "description": "SSH port number. Defaults to 22."
         },
