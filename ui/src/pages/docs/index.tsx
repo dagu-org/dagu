@@ -59,7 +59,7 @@ function workspaceSearchForDocTab(workspace?: string | null): string {
   if (sanitized) {
     return `?workspace=${encodeURIComponent(sanitized)}`;
   }
-  return `?workspaceScope=${WorkspaceMutationScope.none}`;
+  return `?workspaceScope=${WorkspaceMutationScope.default}`;
 }
 
 function DocsContent() {
@@ -204,7 +204,7 @@ function DocsContent() {
         searchParams.get('workspace') ?? ''
       );
       const isNoWorkspaceURL =
-        searchParams.get('workspaceScope') === WorkspaceMutationScope.none;
+        searchParams.get('workspaceScope') === WorkspaceMutationScope.default;
       const docWorkspace = isNoWorkspaceURL
         ? null
         : queryWorkspace || selectedWorkspace || null;

@@ -74,7 +74,7 @@ export function WorkspaceSelector({
   const selectedValue =
     selection.scope === WorkspaceScope.workspace && selection.workspace
       ? `${WORKSPACE_VALUE_PREFIX}${selection.workspace}`
-      : selection.scope === WorkspaceScope.none
+      : selection.scope === WorkspaceScope.default
         ? NONE_VALUE
         : ALL_VALUE;
 
@@ -159,7 +159,7 @@ export function WorkspaceSelector({
             } else if (v === ALL_VALUE) {
               handleSelect({ scope: WorkspaceScope.all });
             } else if (v === NONE_VALUE) {
-              handleSelect({ scope: WorkspaceScope.none });
+              handleSelect({ scope: WorkspaceScope.default });
             } else if (v.startsWith(WORKSPACE_VALUE_PREFIX)) {
               handleSelect({
                 scope: WorkspaceScope.workspace,

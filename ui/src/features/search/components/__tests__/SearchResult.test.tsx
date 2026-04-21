@@ -67,7 +67,7 @@ describe('SearchResult', () => {
         path: { fileName: 'build' },
         query: {
           remoteNode: 'local',
-          workspaceScope: WorkspaceMutationScope.none,
+          workspaceScope: WorkspaceMutationScope.default,
           q: 'needle',
           cursor: 'cursor-1',
         },

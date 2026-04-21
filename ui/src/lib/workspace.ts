@@ -12,7 +12,6 @@ export const ALL_WORKSPACES_DISPLAY_NAME = 'all';
 export const NO_WORKSPACE_DISPLAY_NAME = 'default';
 
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
-const LEGACY_ALL_WORKSPACE_SCOPE = 'accessible';
 
 export type WorkspaceSelection = {
   scope: WorkspaceScope;
@@ -87,8 +86,8 @@ export function sanitizeWorkspaceSelection(
   if (!selection) {
     return defaultWorkspaceSelection();
   }
-  if (selection.scope === WorkspaceScope.none) {
-    return { scope: WorkspaceScope.none };
+  if (selection.scope === WorkspaceScope.default) {
+    return { scope: WorkspaceScope.default };
   }
   if (selection.scope === WorkspaceScope.workspace) {
     const workspace = sanitizeWorkspaceName(selection.workspace ?? '');
@@ -125,7 +124,7 @@ export function workspaceSelectionLabel(
 ): string {
   const sanitized = sanitizeWorkspaceSelection(selection);
   switch (sanitized.scope) {
-    case WorkspaceScope.none:
+    case WorkspaceScope.default:
       return NO_WORKSPACE_DISPLAY_NAME;
     case WorkspaceScope.workspace:
       return sanitized.workspace ?? 'Workspace';
@@ -171,7 +170,7 @@ export function workspaceMutationSelectionQuery(
       workspace: sanitized.workspace,
     };
   }
-  return { workspaceScope: WorkspaceMutationScope.none };
+  return { workspaceScope: WorkspaceMutationScope.default };
 }
 
 export function workspaceDocumentSelectionQuery(
@@ -179,7 +178,7 @@ export function workspaceDocumentSelectionQuery(
 ): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
   return (
     workspaceMutationSelectionQuery(selection) ?? {
-      workspaceScope: WorkspaceMutationScope.none,
+      workspaceScope: WorkspaceMutationScope.default,
     }
   );
 }
@@ -190,7 +189,7 @@ export function workspaceMutationQueryForWorkspace(workspace?: string | null): {
 } {
   const sanitized = sanitizeWorkspaceName(workspace ?? '');
   if (!sanitized) {
-    return { workspaceScope: WorkspaceMutationScope.none };
+    return { workspaceScope: WorkspaceMutationScope.default };
   }
   return {
     workspaceScope: WorkspaceMutationScope.workspace,
@@ -221,18 +220,15 @@ function parseStoredWorkspaceSelection(
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return null;
     }
-    const scope = parsed.scope as
-      | WorkspaceScope
-      | typeof LEGACY_ALL_WORKSPACE_SCOPE
-      | undefined;
-    if (scope === WorkspaceScope.none) {
-      return { scope: WorkspaceScope.none };
+    const scope = parsed.scope as WorkspaceScope | undefined;
+    if (scope === WorkspaceScope.default) {
+      return { scope: WorkspaceScope.default };
     }
     if (scope === WorkspaceScope.workspace) {
       const workspace = sanitizeWorkspaceName(parsed.workspace ?? '');
       return workspace ? { scope: WorkspaceScope.workspace, workspace } : null;
     }
-    if (scope === WorkspaceScope.all || scope === LEGACY_ALL_WORKSPACE_SCOPE) {
+    if (scope === WorkspaceScope.all) {
       return { scope: WorkspaceScope.all };
     }
     return null;

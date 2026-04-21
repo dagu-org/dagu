@@ -165,7 +165,7 @@ function DAGDetails() {
   const dagHasWorkspaceLabel = hasWorkspaceLabel(dagLabels);
   const dagMatchesWorkspace =
     workspaceSelection.scope === WorkspaceScope.all ||
-    (workspaceSelection.scope === WorkspaceScope.none &&
+    (workspaceSelection.scope === WorkspaceScope.default &&
       !dagHasWorkspaceLabel) ||
     (workspaceSelection.scope === WorkspaceScope.workspace &&
       dagWorkspaceName === workspaceSelection.workspace);

@@ -172,7 +172,7 @@ func (a *API) docWorkspaceVisibilityForSelection(ctx context.Context, selection 
 	switch selection.scope {
 	case api.WorkspaceScopeAll:
 		return a.docWorkspaceVisibility(ctx)
-	case api.WorkspaceScopeNone:
+	case api.WorkspaceScopeDefault:
 		return a.noWorkspaceDocVisibility(ctx)
 	case api.WorkspaceScopeWorkspace:
 		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
@@ -218,9 +218,9 @@ func parseWorkspaceMutationScope(scopeParam *api.WorkspaceMutationScope, workspa
 		if selection.explicit {
 			return workspaceScopeSelection{}, badWorkspaceScopeError("workspaceScope=all cannot be used for single-resource operations")
 		}
-		selection.scope = api.WorkspaceScopeNone
+		selection.scope = api.WorkspaceScopeDefault
 		return selection, nil
-	case api.WorkspaceScopeNone:
+	case api.WorkspaceScopeDefault:
 		return selection, nil
 	case api.WorkspaceScopeWorkspace:
 		return selection, nil
@@ -239,7 +239,7 @@ func (a *API) docPointReadScopeForParams(
 		return "", docWorkspaceVisibility{}, err
 	}
 	switch selection.scope {
-	case api.WorkspaceScopeNone:
+	case api.WorkspaceScopeDefault:
 		visibility, err := a.noWorkspaceDocVisibility(ctx)
 		if err != nil {
 			return "", docWorkspaceVisibility{}, err

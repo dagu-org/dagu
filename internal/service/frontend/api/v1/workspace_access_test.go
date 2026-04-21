@@ -20,15 +20,6 @@ func TestParseWorkspaceScope(t *testing.T) {
 		require.False(t, selection.explicit)
 	})
 
-	t.Run("accepts legacy accessible scope as all", func(t *testing.T) {
-		scope := api.WorkspaceScope("accessible")
-		selection, err := parseWorkspaceScope(&scope, nil)
-		require.NoError(t, err)
-		require.Equal(t, api.WorkspaceScopeAll, selection.scope)
-		require.Empty(t, selection.workspace)
-		require.True(t, selection.explicit)
-	})
-
 	t.Run("keeps legacy workspace parameter as concrete workspace scope", func(t *testing.T) {
 		workspace := api.Workspace("ops")
 		selection, err := parseWorkspaceScope(nil, &workspace)
@@ -38,13 +29,21 @@ func TestParseWorkspaceScope(t *testing.T) {
 		require.False(t, selection.explicit)
 	})
 
-	t.Run("accepts explicit no workspace scope", func(t *testing.T) {
-		scope := api.WorkspaceScopeNone
+	t.Run("accepts explicit default workspace scope", func(t *testing.T) {
+		scope := api.WorkspaceScopeDefault
 		selection, err := parseWorkspaceScope(&scope, nil)
 		require.NoError(t, err)
-		require.Equal(t, api.WorkspaceScopeNone, selection.scope)
+		require.Equal(t, api.WorkspaceScopeDefault, selection.scope)
 		require.Empty(t, selection.workspace)
 		require.True(t, selection.explicit)
+	})
+
+	t.Run("rejects deprecated scope names", func(t *testing.T) {
+		for _, value := range []string{"none", "accessible"} {
+			scope := api.WorkspaceScope(value)
+			_, err := parseWorkspaceScope(&scope, nil)
+			require.Error(t, err)
+		}
 	})
 
 	t.Run("requires workspace name for concrete workspace scope", func(t *testing.T) {

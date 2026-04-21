@@ -521,7 +521,7 @@ func TestListDocs(t *testing.T) {
 		flat := true
 		page := 1
 		perPage := 1
-		scope := apigen.WorkspaceScopeNone
+		scope := apigen.WorkspaceScopeDefault
 
 		resp, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
 			Params: apigen.ListDocsParams{
@@ -548,7 +548,7 @@ func TestListDocs(t *testing.T) {
 
 		store := &mockDocStore{docs: make(map[string]*agent.Doc)}
 		setup := newDocTestSetupWithStore(t, store, &mockWorkspaceStore{err: errForced})
-		scope := apigen.WorkspaceScopeNone
+		scope := apigen.WorkspaceScopeDefault
 
 		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
 			Params: apigen.ListDocsParams{WorkspaceScope: &scope},
@@ -690,7 +690,7 @@ func TestCreateDoc(t *testing.T) {
 		t.Parallel()
 
 		setup := newDocTestSetupWithWorkspaces(t, "ops")
-		scope := apigen.WorkspaceMutationScopeNone
+		scope := apigen.WorkspaceMutationScopeDefault
 
 		_, err := setup.api.CreateDoc(adminCtx(), apigen.CreateDocRequestObject{
 			Params: apigen.CreateDocParams{WorkspaceScope: &scope},

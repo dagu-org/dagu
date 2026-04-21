@@ -19,7 +19,7 @@ describe('workspace labels', () => {
     expect(workspaceSelectionLabel({ scope: WorkspaceScope.all })).toBe(
       ALL_WORKSPACES_DISPLAY_NAME
     );
-    expect(workspaceSelectionLabel({ scope: WorkspaceScope.none })).toBe(
+    expect(workspaceSelectionLabel({ scope: WorkspaceScope.default })).toBe(
       NO_WORKSPACE_DISPLAY_NAME
     );
   });
@@ -55,14 +55,15 @@ describe('workspace storage', () => {
     });
   });
 
-  it('migrates the legacy accessible aggregate scope to all', () => {
+  it('drops deprecated stored no-workspace scope names', () => {
     localStorage.setItem(
       WORKSPACE_SCOPE_STORAGE_KEY,
-      JSON.stringify({ scope: 'accessible' })
+      JSON.stringify({ scope: 'none' })
     );
 
     expect(getStoredWorkspaceSelection()).toEqual({
       scope: WorkspaceScope.all,
     });
+    expect(localStorage.getItem(WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
   });
 });

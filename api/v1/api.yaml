@@ -7107,7 +7107,7 @@ components:
     Workspace:
       name: workspace
       in: query
-      description: workspace name used when workspaceScope=workspace, or legacy selected workspace scope when workspaceScope is omitted
+      description: workspace name used when workspaceScope=workspace
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceName"
@@ -7115,7 +7115,7 @@ components:
     WorkspaceScope:
       name: workspaceScope
       in: query
-      description: "Explicit workspace scope: all data, no-workspace data, or one named workspace"
+      description: "Explicit workspace scope: all data, default data, or one named workspace"
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceScope"
@@ -7123,7 +7123,7 @@ components:
     WorkspaceMutationScope:
       name: workspaceScope
       in: query
-      description: "Explicit mutable workspace scope: no-workspace data or one named workspace"
+      description: "Explicit mutable workspace scope: default data or one named workspace"
       required: false
       schema:
         $ref: "#/components/schemas/WorkspaceMutationScope"
@@ -8121,7 +8121,7 @@ components:
           description: "Logical name of the DAG"
         workspace:
           type: string
-          description: "Workspace label value for the DAG. Omitted for no-workspace DAGs and invalid workspace labels."
+          description: "Workspace label value for the DAG. Omitted for default DAGs and invalid workspace labels."
         schedule:
           type: array
           description: "List of scheduling expressions defining when DAG-runs should be created from this DAG"
@@ -8639,7 +8639,7 @@ components:
           $ref: "#/components/schemas/DAGName"
         workspace:
           type: string
-          description: "Workspace label value for the DAG-run. Omitted for no-workspace DAG-runs and invalid workspace labels."
+          description: "Workspace label value for the DAG-run. Omitted for default DAG-runs and invalid workspace labels."
         status:
           $ref: "#/components/schemas/Status"
         statusLabel:
@@ -9160,7 +9160,7 @@ components:
           description: "Display label for the DAG result; file-backed search currently mirrors fileName"
         workspace:
           type: string
-          description: "Workspace label value for the matching DAG. Omitted for no-workspace DAGs and invalid workspace labels."
+          description: "Workspace label value for the matching DAG. Omitted for default DAGs and invalid workspace labels."
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
@@ -9204,7 +9204,7 @@ components:
           type: string
         workspace:
           type: string
-          description: "Workspace that owns this document. Omitted for no-workspace documents."
+          description: "Workspace that owns this document. Omitted for default documents."
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
@@ -9701,14 +9701,14 @@ components:
       description: "Workspace scope selector for list and search APIs"
       enum:
         - all
-        - none
+        - default
         - workspace
 
     WorkspaceMutationScope:
       type: string
       description: "Workspace scope selector for mutation APIs"
       enum:
-        - none
+        - default
         - workspace
 
     SetupRequest:
@@ -10814,7 +10814,7 @@ components:
           type: string
         workspace:
           type: string
-          description: "Workspace that owns this document. Omitted for no-workspace documents."
+          description: "Workspace that owns this document. Omitted for default documents."
         content:
           type: string
           description: "Full file content including YAML frontmatter"
@@ -10843,7 +10843,7 @@ components:
           type: string
         workspace:
           type: string
-          description: "Workspace that owns this document. Omitted for no-workspace documents."
+          description: "Workspace that owns this document. Omitted for default documents."
         modifiedAt:
           type: string
           format: date-time
@@ -10865,7 +10865,7 @@ components:
           type: string
         workspace:
           type: string
-          description: "Workspace that owns this node. Omitted for no-workspace nodes."
+          description: "Workspace that owns this node. Omitted for default nodes."
         type:
           type: string
           enum:
@@ -10910,7 +10910,7 @@ components:
           type: string
         workspace:
           type: string
-          description: "Workspace that owns this document. Omitted for no-workspace documents."
+          description: "Workspace that owns this document. Omitted for default documents."
         matches:
           type: array
           items:

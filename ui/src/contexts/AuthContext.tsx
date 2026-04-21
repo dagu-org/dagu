@@ -235,7 +235,7 @@ function workspaceRoleTarget(
   scope: WorkspaceScope | undefined,
   selectedWorkspace?: string | null
 ): string | null {
-  if (scope === WorkspaceScope.none) {
+  if (scope === WorkspaceScope.default) {
     return '';
   }
   if (scope === WorkspaceScope.workspace) {
