@@ -17,8 +17,8 @@ import type { components } from '@/api/v1/schema';
 import { cn } from '@/lib/utils';
 import {
   ALL_WORKSPACES_DISPLAY_NAME,
+  DEFAULT_WORKSPACE_DISPLAY_NAME,
   defaultWorkspaceSelection,
-  NO_WORKSPACE_DISPLAY_NAME,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
   workspaceSelectionLabel,
@@ -28,7 +28,7 @@ import {
 type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
 
 const ALL_VALUE = '__all__';
-const NONE_VALUE = '__none__';
+const DEFAULT_VALUE = '__default__';
 const NEW_VALUE = '__new__';
 const WORKSPACE_VALUE_PREFIX = 'workspace:';
 
@@ -75,7 +75,7 @@ export function WorkspaceSelector({
     selection.scope === WorkspaceScope.workspace && selection.workspace
       ? `${WORKSPACE_VALUE_PREFIX}${selection.workspace}`
       : selection.scope === WorkspaceScope.default
-        ? NONE_VALUE
+        ? DEFAULT_VALUE
         : ALL_VALUE;
 
   const handleCreate = useCallback(() => {
@@ -158,7 +158,7 @@ export function WorkspaceSelector({
               setIsCreating(true);
             } else if (v === ALL_VALUE) {
               handleSelect({ scope: WorkspaceScope.all });
-            } else if (v === NONE_VALUE) {
+            } else if (v === DEFAULT_VALUE) {
               handleSelect({ scope: WorkspaceScope.default });
             } else if (v.startsWith(WORKSPACE_VALUE_PREFIX)) {
               handleSelect({
@@ -220,8 +220,8 @@ export function WorkspaceSelector({
               {ALL_WORKSPACES_DISPLAY_NAME}
             </SelectItem>
             {supportsScopedSelection && (
-              <SelectItem value={NONE_VALUE}>
-                {NO_WORKSPACE_DISPLAY_NAME}
+              <SelectItem value={DEFAULT_VALUE}>
+                {DEFAULT_WORKSPACE_DISPLAY_NAME}
               </SelectItem>
             )}
             {workspaces.map((ws) => (

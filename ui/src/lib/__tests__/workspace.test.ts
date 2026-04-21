@@ -5,10 +5,10 @@ import { WorkspaceScope } from '@/api/v1/schema';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   ALL_WORKSPACES_DISPLAY_NAME,
+  DEFAULT_WORKSPACE_DISPLAY_NAME,
   getStoredWorkspaceSelection,
   hasWorkspaceLabel,
   LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
-  NO_WORKSPACE_DISPLAY_NAME,
   WORKSPACE_SCOPE_STORAGE_KEY,
   WORKSPACE_STORAGE_KEY,
   workspaceSelectionLabel,
@@ -20,7 +20,7 @@ describe('workspace labels', () => {
       ALL_WORKSPACES_DISPLAY_NAME
     );
     expect(workspaceSelectionLabel({ scope: WorkspaceScope.default })).toBe(
-      NO_WORKSPACE_DISPLAY_NAME
+      DEFAULT_WORKSPACE_DISPLAY_NAME
     );
   });
 
@@ -55,7 +55,7 @@ describe('workspace storage', () => {
     });
   });
 
-  it('drops deprecated stored no-workspace scope names', () => {
+  it('drops deprecated stored legacy scope names', () => {
     localStorage.setItem(
       WORKSPACE_SCOPE_STORAGE_KEY,
       JSON.stringify({ scope: 'none' })

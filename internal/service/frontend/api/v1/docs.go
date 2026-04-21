@@ -131,7 +131,10 @@ func (a *API) knownDocWorkspaceNames(ctx context.Context, required bool) (map[st
 
 func (a *API) docWorkspaceVisibility(ctx context.Context) (docWorkspaceVisibility, error) {
 	visibility := docWorkspaceVisibility{all: true}
-	known, _ := a.knownDocWorkspaceNames(ctx, false)
+	known, err := a.knownDocWorkspaceNames(ctx, a.workspaceStore != nil)
+	if err != nil {
+		return visibility, err
+	}
 	visibility.known = known
 	if a.authService == nil {
 		return visibility, nil
@@ -144,7 +147,7 @@ func (a *API) docWorkspaceVisibility(ctx context.Context) (docWorkspaceVisibilit
 	if access.All {
 		return visibility, nil
 	}
-	known, err := a.knownDocWorkspaceNames(ctx, true)
+	known, err = a.knownDocWorkspaceNames(ctx, true)
 	if err != nil {
 		return visibility, err
 	}

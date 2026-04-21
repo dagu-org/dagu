@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -124,7 +124,7 @@ describe('SearchResult', () => {
   });
 
   it('links DAG results to the result workspace', () => {
-    const { container } = render(
+    render(
       <MemoryRouter>
         <SearchResult
           type="dag"
@@ -148,7 +148,7 @@ describe('SearchResult', () => {
       </MemoryRouter>
     );
 
-    const link = within(container).getByRole('link', { name: /build/i });
+    const link = screen.getByRole('link', { name: /build/i });
     expect(link.getAttribute('href')).toBe(
       '/dags/build/spec?workspace=team-a'
     );

@@ -55,19 +55,33 @@ function DocEditor({
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const workspaceSelection = appBarContext.workspaceSelection;
+  const selectedWorkspaceQuery = useMemo(
+    () => workspaceDocumentSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
   const workspaceQuery = useMemo(
     () =>
       workspace === undefined
-        ? workspaceDocumentSelectionQuery(workspaceSelection)
+        ? (selectedWorkspaceQuery ?? workspaceDocumentQueryForWorkspace(null))
         : workspaceDocumentQueryForWorkspace(workspace),
-    [workspace, workspaceSelection]
+    [selectedWorkspaceQuery, workspace]
+  );
+  const workspaceMutationQuery = useMemo(
+    () =>
+      workspace === undefined
+        ? selectedWorkspaceQuery
+        : workspaceDocumentQueryForWorkspace(workspace),
+    [selectedWorkspaceQuery, workspace]
   );
   const workspaceScopeKey = useMemo(
     () => JSON.stringify(workspaceQuery),
     [workspaceQuery]
   );
   const canWrite = useCanWrite();
-  const canEdit = canWrite && isMutableWorkspaceSelection(workspaceSelection);
+  const canEdit =
+    canWrite &&
+    !!workspaceMutationQuery &&
+    isMutableWorkspaceSelection(workspaceSelection);
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
@@ -180,14 +194,19 @@ function DocEditor({
   }, [currentValue, onContentChange]);
 
   const handleSave = useCallback(async () => {
-    if (isSaving || !canEdit || !hasUnsavedChangesRef.current) {
+    if (
+      isSaving ||
+      !canEdit ||
+      !workspaceMutationQuery ||
+      !hasUnsavedChangesRef.current
+    ) {
       return;
     }
     setIsSaving(true);
     try {
       const { error } = await client.PATCH('/docs/doc', {
         params: {
-          query: { remoteNode, path: docPath, ...workspaceQuery },
+          query: { remoteNode, path: docPath, ...workspaceMutationQuery },
         },
         body: { content: currentValueRef.current ?? '' },
       });
@@ -209,7 +228,7 @@ function DocEditor({
   }, [
     isSaving,
     canEdit,
-    workspaceQuery,
+    workspaceMutationQuery,
     client,
     remoteNode,
     docPath,

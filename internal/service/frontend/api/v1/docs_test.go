@@ -556,6 +556,19 @@ func TestListDocs(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("all scope fails closed when workspace names cannot be loaded", func(t *testing.T) {
+		t.Parallel()
+
+		store := &mockDocStore{docs: make(map[string]*agent.Doc)}
+		setup := newDocTestSetupWithStore(t, store, &mockWorkspaceStore{err: errForced})
+		scope := apigen.WorkspaceScopeAll
+
+		_, err := setup.api.ListDocs(adminCtx(), apigen.ListDocsRequestObject{
+			Params: apigen.ListDocsParams{WorkspaceScope: &scope},
+		})
+		require.Error(t, err)
+	})
+
 	t.Run("no doc store returns error", func(t *testing.T) {
 		t.Parallel()
 

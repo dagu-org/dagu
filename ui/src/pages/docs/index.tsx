@@ -30,7 +30,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import {
-  NO_WORKSPACE_DISPLAY_NAME,
+  DEFAULT_WORKSPACE_DISPLAY_NAME,
   isMutableWorkspaceSelection,
   sanitizeWorkspaceName,
   workspaceMutationSelectionQuery,
@@ -299,7 +299,7 @@ function DocsContent() {
     async (path: string) => {
       if (!canMutateDocs || !workspaceMutationQuery) {
         setCreateError(
-          `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before creating.`
+          `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before creating.`
         );
         return;
       }
@@ -315,7 +315,12 @@ function DocsContent() {
           return;
         }
         mutate();
-        openDoc(path, titleFromPath(path), selectedWorkspace || null);
+        const createdWorkspace =
+          workspaceMutationQuery.workspaceScope ===
+          WorkspaceMutationScope.workspace
+            ? (workspaceMutationQuery.workspace ?? null)
+            : null;
+        openDoc(path, titleFromPath(path), createdWorkspace);
         showToast('Document created');
         setCreateModalOpen(false);
       } catch {
@@ -331,7 +336,6 @@ function DocsContent() {
       workspaceMutationQuery,
       mutate,
       openDoc,
-      selectedWorkspace,
       showToast,
     ]
   );
@@ -341,7 +345,7 @@ function DocsContent() {
     async (newPath: string) => {
       if (!canMutateDocs || !workspaceMutationQuery) {
         setRenameError(
-          `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before renaming.`
+          `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before renaming.`
         );
         return;
       }
@@ -403,7 +407,7 @@ function DocsContent() {
     async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
       if (!canMutateDocs || !workspaceMutationQuery) {
         showToast(
-          `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before editing documents`
+          `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before editing documents`
         );
         return;
       }
@@ -481,7 +485,7 @@ function DocsContent() {
   const handleDelete = useCallback(async () => {
     if (!canMutateDocs || !workspaceMutationQuery) {
       showToast(
-        `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before deleting documents`
+        `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before deleting documents`
       );
       setDeleteConfirmOpen(false);
       return;
@@ -532,7 +536,7 @@ function DocsContent() {
   const handleBatchDelete = useCallback(async () => {
     if (!canMutateDocs || !workspaceMutationQuery) {
       showToast(
-        `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before deleting documents`
+        `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before deleting documents`
       );
       setBatchDeleteConfirmOpen(false);
       setBatchDeletePaths([]);

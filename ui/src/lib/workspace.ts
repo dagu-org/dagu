@@ -9,7 +9,7 @@ export const WORKSPACE_STORAGE_KEY = 'dagu-selected-workspace';
 export const WORKSPACE_SCOPE_STORAGE_KEY = 'dagu-selected-workspace-scope';
 export const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
 export const ALL_WORKSPACES_DISPLAY_NAME = 'all';
-export const NO_WORKSPACE_DISPLAY_NAME = 'default';
+export const DEFAULT_WORKSPACE_DISPLAY_NAME = 'default';
 
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -125,7 +125,7 @@ export function workspaceSelectionLabel(
   const sanitized = sanitizeWorkspaceSelection(selection);
   switch (sanitized.scope) {
     case WorkspaceScope.default:
-      return NO_WORKSPACE_DISPLAY_NAME;
+      return DEFAULT_WORKSPACE_DISPLAY_NAME;
     case WorkspaceScope.workspace:
       return sanitized.workspace ?? 'Workspace';
     case WorkspaceScope.all:
@@ -175,12 +175,8 @@ export function workspaceMutationSelectionQuery(
 
 export function workspaceDocumentSelectionQuery(
   selection?: Partial<WorkspaceSelection> | null
-): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
-  return (
-    workspaceMutationSelectionQuery(selection) ?? {
-      workspaceScope: WorkspaceMutationScope.default,
-    }
-  );
+): { workspaceScope: WorkspaceMutationScope; workspace?: string } | null {
+  return workspaceMutationSelectionQuery(selection);
 }
 
 export function workspaceMutationQueryForWorkspace(workspace?: string | null): {
