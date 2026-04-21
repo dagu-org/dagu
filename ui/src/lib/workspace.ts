@@ -8,6 +8,8 @@ export const WORKSPACE_LABEL_PREFIX = `${WORKSPACE_LABEL_KEY}=`;
 export const WORKSPACE_STORAGE_KEY = 'dagu-selected-workspace';
 export const WORKSPACE_SCOPE_STORAGE_KEY = 'dagu-selected-workspace-scope';
 export const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
+export const ACCESSIBLE_WORKSPACES_DISPLAY_NAME = 'all';
+export const NO_WORKSPACE_DISPLAY_NAME = 'default';
 
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -123,12 +125,12 @@ export function workspaceSelectionLabel(
   const sanitized = sanitizeWorkspaceSelection(selection);
   switch (sanitized.scope) {
     case WorkspaceScope.none:
-      return 'No workspace';
+      return NO_WORKSPACE_DISPLAY_NAME;
     case WorkspaceScope.workspace:
       return sanitized.workspace ?? 'Workspace';
     case WorkspaceScope.accessible:
     default:
-      return 'Accessible workspaces';
+      return ACCESSIBLE_WORKSPACES_DISPLAY_NAME;
   }
 }
 
@@ -181,9 +183,10 @@ export function workspaceDocumentSelectionQuery(
   );
 }
 
-export function workspaceMutationQueryForWorkspace(
-  workspace?: string | null
-): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
+export function workspaceMutationQueryForWorkspace(workspace?: string | null): {
+  workspaceScope: WorkspaceMutationScope;
+  workspace?: string;
+} {
   const sanitized = sanitizeWorkspaceName(workspace ?? '');
   if (!sanitized) {
     return { workspaceScope: WorkspaceMutationScope.none };
@@ -194,9 +197,10 @@ export function workspaceMutationQueryForWorkspace(
   };
 }
 
-export function workspaceDocumentQueryForWorkspace(
-  workspace?: string | null
-): { workspaceScope: WorkspaceMutationScope; workspace?: string } {
+export function workspaceDocumentQueryForWorkspace(workspace?: string | null): {
+  workspaceScope: WorkspaceMutationScope;
+  workspace?: string;
+} {
   return workspaceMutationQueryForWorkspace(workspace);
 }
 
@@ -225,9 +229,7 @@ function parseStoredWorkspaceSelection(
     }
     if (parsed.scope === WorkspaceScope.workspace) {
       const workspace = sanitizeWorkspaceName(parsed.workspace ?? '');
-      return workspace
-        ? { scope: WorkspaceScope.workspace, workspace }
-        : null;
+      return workspace ? { scope: WorkspaceScope.workspace, workspace } : null;
     }
     if (parsed.scope === WorkspaceScope.accessible) {
       return { scope: WorkspaceScope.accessible };

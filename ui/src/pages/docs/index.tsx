@@ -26,6 +26,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import {
+  NO_WORKSPACE_DISPLAY_NAME,
   isMutableWorkspaceSelection,
   sanitizeWorkspaceName,
   workspaceMutationSelectionQuery,
@@ -278,7 +279,9 @@ function DocsContent() {
   const handleCreate = useCallback(
     async (path: string) => {
       if (!canMutateDocs || !workspaceMutationQuery) {
-        setCreateError('Select a workspace or No workspace before creating.');
+        setCreateError(
+          `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before creating.`
+        );
         return;
       }
       setCreateLoading(true);
@@ -318,7 +321,9 @@ function DocsContent() {
   const handleRenameModal = useCallback(
     async (newPath: string) => {
       if (!canMutateDocs || !workspaceMutationQuery) {
-        setRenameError('Select a workspace or No workspace before renaming.');
+        setRenameError(
+          `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before renaming.`
+        );
         return;
       }
       setRenameLoading(true);
@@ -379,7 +384,7 @@ function DocsContent() {
     async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
       if (!canMutateDocs || !workspaceMutationQuery) {
         showToast(
-          'Select a workspace or No workspace before editing documents'
+          `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before editing documents`
         );
         return;
       }
@@ -456,7 +461,9 @@ function DocsContent() {
   // Delete handler (supports both files and directories)
   const handleDelete = useCallback(async () => {
     if (!canMutateDocs || !workspaceMutationQuery) {
-      showToast('Select a workspace or No workspace before deleting documents');
+      showToast(
+        `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before deleting documents`
+      );
       setDeleteConfirmOpen(false);
       return;
     }
@@ -505,7 +512,9 @@ function DocsContent() {
   // Batch delete handler
   const handleBatchDelete = useCallback(async () => {
     if (!canMutateDocs || !workspaceMutationQuery) {
-      showToast('Select a workspace or No workspace before deleting documents');
+      showToast(
+        `Select a workspace or ${NO_WORKSPACE_DISPLAY_NAME} before deleting documents`
+      );
       setBatchDeleteConfirmOpen(false);
       setBatchDeletePaths([]);
       return;

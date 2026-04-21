@@ -16,7 +16,9 @@ import { WorkspaceScope } from '@/api/v1/schema';
 import type { components } from '@/api/v1/schema';
 import { cn } from '@/lib/utils';
 import {
+  ACCESSIBLE_WORKSPACES_DISPLAY_NAME,
   defaultWorkspaceSelection,
+  NO_WORKSPACE_DISPLAY_NAME,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
   workspaceSelectionLabel,
@@ -214,9 +216,11 @@ export function WorkspaceSelector({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ACCESSIBLE_VALUE}>
-              Accessible workspaces
+              {ACCESSIBLE_WORKSPACES_DISPLAY_NAME}
             </SelectItem>
-            <SelectItem value={NONE_VALUE}>No workspace</SelectItem>
+            <SelectItem value={NONE_VALUE}>
+              {NO_WORKSPACE_DISPLAY_NAME}
+            </SelectItem>
             {workspaces.map((ws) => (
               <SelectItem
                 key={ws.id}

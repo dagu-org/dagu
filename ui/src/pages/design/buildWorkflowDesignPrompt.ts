@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { NO_WORKSPACE_DISPLAY_NAME } from '@/lib/workspace';
+
 export type BuildWorkflowDesignPromptInput = {
   mode: 'create' | 'update';
   dagFile?: string;
@@ -37,7 +39,7 @@ export function buildWorkflowDesignPrompt({
     '',
     `Mode: ${mode === 'update' ? 'Update existing DAG' : 'Create new DAG'}`,
     `Remote node: ${remoteNode}`,
-    `Workspace: ${workspaceDescription || selectedWorkspace || 'No workspace'}`,
+    `Workspace: ${workspaceDescription || selectedWorkspace || NO_WORKSPACE_DISPLAY_NAME}`,
     `Target DAG: ${target || '(not selected)'}`,
   ];
 

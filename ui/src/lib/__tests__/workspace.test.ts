@@ -4,11 +4,25 @@
 import { WorkspaceScope } from '@/api/v1/schema';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  ACCESSIBLE_WORKSPACES_DISPLAY_NAME,
   getStoredWorkspaceSelection,
   LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
+  NO_WORKSPACE_DISPLAY_NAME,
   WORKSPACE_SCOPE_STORAGE_KEY,
   WORKSPACE_STORAGE_KEY,
+  workspaceSelectionLabel,
 } from '../workspace';
+
+describe('workspace labels', () => {
+  it('uses concise labels for aggregate and default scopes', () => {
+    expect(workspaceSelectionLabel({ scope: WorkspaceScope.accessible })).toBe(
+      ACCESSIBLE_WORKSPACES_DISPLAY_NAME
+    );
+    expect(workspaceSelectionLabel({ scope: WorkspaceScope.none })).toBe(
+      NO_WORKSPACE_DISPLAY_NAME
+    );
+  });
+});
 
 describe('workspace storage', () => {
   beforeEach(() => {

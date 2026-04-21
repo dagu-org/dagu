@@ -136,14 +136,24 @@ function DAGDetailsSidePanel({
     isOpen || shouldRender ? stableFileNameRef.current : '';
 
   React.useEffect(() => {
+    let openFrame: number | undefined;
+    let visibleFrame: number | undefined;
+
     if (isOpen) {
       setShouldRender(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
+      openFrame = window.requestAnimationFrame(() => {
+        visibleFrame = window.requestAnimationFrame(() => {
           setIsVisible(true);
         });
       });
-      return;
+      return () => {
+        if (openFrame !== undefined) {
+          window.cancelAnimationFrame(openFrame);
+        }
+        if (visibleFrame !== undefined) {
+          window.cancelAnimationFrame(visibleFrame);
+        }
+      };
     }
 
     setIsVisible(false);
