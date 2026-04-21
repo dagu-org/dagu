@@ -17,10 +17,9 @@ import { cn } from '@/lib/utils';
 import {
   ALL_WORKSPACES_DISPLAY_NAME,
   DEFAULT_WORKSPACE_DISPLAY_NAME,
-  defaultWorkspaceSelection,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
-  WorkspaceScope,
+  WorkspaceKind,
   workspaceSelectionLabel,
   type WorkspaceSelection,
 } from '@/lib/workspace';
@@ -34,10 +33,8 @@ const WORKSPACE_VALUE_PREFIX = 'workspace:';
 
 interface Props {
   workspaces: WorkspaceResponse[];
-  workspaceSelection?: WorkspaceSelection;
-  onSelectScope?: (selection: WorkspaceSelection) => void;
-  selectedWorkspace?: string;
-  onSelect?: (name: string) => void;
+  workspaceSelection: WorkspaceSelection;
+  onSelectWorkspace: (selection: WorkspaceSelection) => void;
   onCreate: (name: string) => void;
   onDelete: (id: string) => void;
   canWrite?: boolean;
@@ -48,9 +45,7 @@ interface Props {
 export function WorkspaceSelector({
   workspaces,
   workspaceSelection,
-  onSelectScope,
-  selectedWorkspace,
-  onSelect,
+  onSelectWorkspace,
   onCreate,
   onDelete,
   canWrite = true,
@@ -61,20 +56,11 @@ export function WorkspaceSelector({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>('idle');
-  const supportsScopedSelection = Boolean(onSelectScope);
-  const selection = sanitizeWorkspaceSelection(
-    workspaceSelection ??
-      (selectedWorkspace
-        ? {
-            scope: WorkspaceScope.workspace,
-            workspace: selectedWorkspace,
-          }
-        : defaultWorkspaceSelection())
-  );
+  const selection = sanitizeWorkspaceSelection(workspaceSelection);
   const selectedValue =
-    selection.scope === WorkspaceScope.workspace && selection.workspace
+    selection.kind === WorkspaceKind.workspace && selection.workspace
       ? `${WORKSPACE_VALUE_PREFIX}${selection.workspace}`
-      : selection.scope === WorkspaceScope.default
+      : selection.kind === WorkspaceKind.default
         ? DEFAULT_VALUE
         : ALL_VALUE;
 
@@ -104,19 +90,11 @@ export function WorkspaceSelector({
   );
 
   const selectedWs =
-    selection.scope === WorkspaceScope.workspace
+    selection.kind === WorkspaceKind.workspace
       ? workspaces.find((ws) => ws.name === selection.workspace)
       : undefined;
   const handleSelect = (nextSelection: WorkspaceSelection) => {
-    const sanitized = sanitizeWorkspaceSelection(nextSelection);
-    onSelectScope?.(sanitized);
-    if (!onSelectScope) {
-      onSelect?.(
-        sanitized.scope === WorkspaceScope.workspace
-          ? (sanitized.workspace ?? '')
-          : ''
-      );
-    }
+    onSelectWorkspace(sanitizeWorkspaceSelection(nextSelection));
   };
 
   if (isCreating) {
@@ -157,16 +135,16 @@ export function WorkspaceSelector({
               createStateRef.current = 'idle';
               setIsCreating(true);
             } else if (v === ALL_VALUE) {
-              handleSelect({ scope: WorkspaceScope.all });
+              handleSelect({ kind: WorkspaceKind.all });
             } else if (v === DEFAULT_VALUE) {
-              handleSelect({ scope: WorkspaceScope.default });
+              handleSelect({ kind: WorkspaceKind.default });
             } else if (v.startsWith(WORKSPACE_VALUE_PREFIX)) {
               handleSelect({
-                scope: WorkspaceScope.workspace,
+                kind: WorkspaceKind.workspace,
                 workspace: v.slice(WORKSPACE_VALUE_PREFIX.length),
               });
             } else {
-              handleSelect({ scope: WorkspaceScope.all });
+              handleSelect({ kind: WorkspaceKind.all });
             }
           }}
         >
@@ -219,11 +197,9 @@ export function WorkspaceSelector({
             <SelectItem value={ALL_VALUE}>
               {ALL_WORKSPACES_DISPLAY_NAME}
             </SelectItem>
-            {supportsScopedSelection && (
-              <SelectItem value={DEFAULT_VALUE}>
-                {DEFAULT_WORKSPACE_DISPLAY_NAME}
-              </SelectItem>
-            )}
+            <SelectItem value={DEFAULT_VALUE}>
+              {DEFAULT_WORKSPACE_DISPLAY_NAME}
+            </SelectItem>
             {workspaces.map((ws) => (
               <SelectItem
                 key={ws.id}

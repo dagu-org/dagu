@@ -51,7 +51,8 @@ import {
   workspaceSelectionKey,
   workspaceSelectionQuery,
   workspaceSelectionLabel,
-  WorkspaceScope,
+  WorkspaceKind,
+  workspaceNameForSelection,
 } from '@/lib/workspace';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
@@ -116,8 +117,8 @@ function WorkflowDesignPage() {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
   const workspaceSelection = appBarContext.workspaceSelection;
+  const selectedWorkspace = workspaceNameForSelection(workspaceSelection);
   const workspaceQuery = React.useMemo(
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
@@ -503,8 +504,7 @@ function WorkflowDesignPage() {
 
     setIsSaving(true);
     const specToSave =
-      workspaceSelection?.scope === WorkspaceScope.workspace &&
-      selectedWorkspace
+      workspaceSelection?.kind === WorkspaceKind.workspace && selectedWorkspace
         ? ensureWorkspaceLabelInDAGSpec(newDraftSpec, selectedWorkspace)
         : newDraftSpec;
     try {

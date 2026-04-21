@@ -4,10 +4,7 @@
 import MarkdownEditor from '@/components/editors/MarkdownEditor';
 import { DocMarkdownPreview } from '@/components/ui/doc-markdown-preview';
 import { useSimpleToast } from '@/components/ui/simple-toast';
-import {
-  useCanWrite,
-  useCanWriteForWorkspace,
-} from '@/contexts/AuthContext';
+import { useCanWrite, useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { useContentEditor } from '@/hooks/useContentEditor';
@@ -87,7 +84,8 @@ function DocEditor({
   const canEdit =
     canWrite &&
     !!workspaceTargetQuery &&
-    (workspace !== undefined || isMutableWorkspaceSelection(workspaceSelection));
+    (workspace !== undefined ||
+      isMutableWorkspaceSelection(workspaceSelection));
   const { showToast } = useSimpleToast();
   const { getDraft, setDraft, clearDraft, markTabUnsaved, markTabSaved } =
     useDocTabContext();
@@ -150,7 +148,7 @@ function DocEditor({
     [remoteNode, tabId, workspaceQueryKey]
   );
 
-  // Restore drafts by document tab and selected scope.
+  // Restore drafts by document tab and selected workspace.
   useEffect(() => {
     const draft = getDraft(scopedDraftKey);
     if (draft !== undefined) {

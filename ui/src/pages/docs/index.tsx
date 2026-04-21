@@ -35,6 +35,7 @@ import {
   workspaceTargetSelectionQuery,
   workspaceTargetQueryForWorkspace,
   WorkspaceTargetQuery,
+  workspaceNameForSelection,
   workspaceSelectionKey,
   workspaceSelectionQuery,
   visibleDocumentPathForWorkspace,
@@ -94,8 +95,8 @@ function DocsContent() {
   const isMobile = useIsMobile();
 
   const { selectedTemplate, selectTemplate } = useCockpitState();
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
   const workspaceSelection = appBarContext.workspaceSelection;
+  const selectedWorkspace = workspaceNameForSelection(workspaceSelection);
   const workspaceQuery = React.useMemo(
     () => workspaceSelectionQuery(workspaceSelection),
     [workspaceSelection]
@@ -439,9 +440,8 @@ function DocsContent() {
         );
         return;
       }
-      const mutationWorkspace = mutationWorkspaceFromQuery(
-        workspaceTargetQuery
-      );
+      const mutationWorkspace =
+        mutationWorkspaceFromQuery(workspaceTargetQuery);
       try {
         const { error } = await client.POST('/docs/doc/rename', {
           params: {

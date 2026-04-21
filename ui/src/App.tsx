@@ -45,7 +45,7 @@ import {
   persistWorkspaceSelection,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
-  WorkspaceScope,
+  WorkspaceKind,
   workspaceNameForSelection,
   type WorkspaceSelection,
 } from './lib/workspace';
@@ -227,15 +227,15 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   );
   const [workspaceSelection, setWorkspaceSelection] =
     React.useState<WorkspaceSelection>(() => getStoredWorkspaceSelection());
-  const selectedWorkspace = workspaceNameForSelection(workspaceSelection);
-  const handleSelectWorkspaceScope = React.useCallback(
+  const selectedWorkspaceName = workspaceNameForSelection(workspaceSelection);
+  const handleSelectWorkspace = React.useCallback(
     (selection: WorkspaceSelection) => {
       const sanitized = sanitizeWorkspaceSelection(selection);
       setWorkspaceSelection(sanitized);
       persistWorkspaceSelection(sanitized);
 
-      // Workspace scopes are part of most active data keys. Clear cached responses
-      // so pages that do not remount still refetch with the new global scope.
+      // Workspace selection is part of most active data keys. Clear cached
+      // responses so pages that do not remount still refetch with the new value.
       globalMutate(() => true, undefined, { revalidate: false });
     },
     []
@@ -249,18 +249,6 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       updateConfig({ initialWorkspaces: sorted });
     },
     [updateConfig]
-  );
-
-  const handleSelectWorkspace = React.useCallback(
-    (name: string) => {
-      const sanitized = sanitizeWorkspaceName(name);
-      handleSelectWorkspaceScope(
-        sanitized
-          ? { scope: WorkspaceScope.workspace, workspace: sanitized }
-          : { scope: WorkspaceScope.all }
-      );
-    },
-    [handleSelectWorkspaceScope]
   );
 
   const handleSelectRemoteNode = React.useCallback(
@@ -330,7 +318,10 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
         ...workspaces.filter((workspace) => workspace.id !== response.data.id),
         response.data,
       ]);
-      handleSelectWorkspace(response.data.name);
+      handleSelectWorkspace({
+        kind: WorkspaceKind.workspace,
+        workspace: response.data.name,
+      });
     },
     [
       applyWorkspaces,
@@ -360,10 +351,10 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       applyWorkspaces(workspaces.filter((workspace) => workspace.id !== id));
       const deletedSelected = workspaces.some(
         (workspace) =>
-          workspace.id === id && workspace.name === selectedWorkspace
+          workspace.id === id && workspace.name === selectedWorkspaceName
       );
       if (deletedSelected) {
-        handleSelectWorkspace('');
+        handleSelectWorkspace({ kind: WorkspaceKind.all });
       }
     },
     [
@@ -371,7 +362,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       client,
       handleSelectWorkspace,
       selectedRemoteNode,
-      selectedWorkspace,
+      selectedWorkspaceName,
       workspaces,
     ]
   );
@@ -420,15 +411,15 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   React.useEffect(() => {
     if (
       workspacesLoaded &&
-      workspaceSelection.scope === WorkspaceScope.workspace &&
-      !workspaces.some((workspace) => workspace.name === selectedWorkspace)
+      workspaceSelection.kind === WorkspaceKind.workspace &&
+      !workspaces.some((workspace) => workspace.name === selectedWorkspaceName)
     ) {
-      handleSelectWorkspace('');
+      handleSelectWorkspace({ kind: WorkspaceKind.all });
     }
   }, [
     handleSelectWorkspace,
-    selectedWorkspace,
-    workspaceSelection.scope,
+    selectedWorkspaceName,
+    workspaceSelection.kind,
     workspaces,
     workspacesLoaded,
   ]);
@@ -465,8 +456,6 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
             workspaces,
             workspaceError,
             workspaceSelection,
-            selectWorkspaceScope: handleSelectWorkspaceScope,
-            selectedWorkspace,
             selectWorkspace: handleSelectWorkspace,
             createWorkspace: handleCreateWorkspace,
             deleteWorkspace: handleDeleteWorkspace,

@@ -6,7 +6,7 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
-import { WorkspaceScope } from '@/lib/workspace';
+import { WorkspaceKind } from '@/lib/workspace';
 import { TemplateSelector } from '../TemplateSelector';
 
 vi.mock('@/hooks/api', () => ({
@@ -20,7 +20,7 @@ const appBarValue = {
   setRemoteNodes: vi.fn(),
   selectedRemoteNode: 'local',
   selectRemoteNode: vi.fn(),
-  workspaceSelection: { scope: WorkspaceScope.all },
+  workspaceSelection: { kind: WorkspaceKind.all },
 };
 
 const mockDags = [
@@ -108,7 +108,7 @@ describe('TemplateSelector', () => {
         params: expect.objectContaining({
           query: {
             remoteNode: 'local',
-            workspace: WorkspaceScope.all,
+            workspace: WorkspaceKind.all,
           },
         }),
       })

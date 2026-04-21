@@ -10,17 +10,17 @@ import {
   LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
   LEGACY_WORKSPACE_SCOPE_STORAGE_KEY,
   WORKSPACE_STORAGE_KEY,
-  WorkspaceScope,
+  WorkspaceKind,
   workspaceSelectionLabel,
   workspaceTargetSelectionQuery,
 } from '../workspace';
 
 describe('workspace labels', () => {
-  it('uses concise labels for aggregate and default scopes', () => {
-    expect(workspaceSelectionLabel({ scope: WorkspaceScope.all })).toBe(
+  it('uses concise labels for aggregate and default selections', () => {
+    expect(workspaceSelectionLabel({ kind: WorkspaceKind.all })).toBe(
       ALL_WORKSPACES_DISPLAY_NAME
     );
-    expect(workspaceSelectionLabel({ scope: WorkspaceScope.default })).toBe(
+    expect(workspaceSelectionLabel({ kind: WorkspaceKind.default })).toBe(
       DEFAULT_WORKSPACE_DISPLAY_NAME
     );
   });
@@ -41,7 +41,7 @@ describe('workspace storage', () => {
     localStorage.setItem(LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY, 'team-a');
 
     expect(getStoredWorkspaceSelection()).toEqual({
-      scope: WorkspaceScope.workspace,
+      kind: WorkspaceKind.workspace,
       workspace: 'team-a',
     });
     expect(
@@ -50,25 +50,25 @@ describe('workspace storage', () => {
     expect(
       JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? '')
     ).toEqual({
-      scope: WorkspaceScope.workspace,
+      kind: WorkspaceKind.workspace,
       workspace: 'team-a',
     });
   });
 
-  it('migrates the deprecated workspace scope storage key', () => {
+  it('migrates the deprecated workspace storage shape', () => {
     localStorage.setItem(
       LEGACY_WORKSPACE_SCOPE_STORAGE_KEY,
-      JSON.stringify({ scope: WorkspaceScope.default })
+      JSON.stringify({ scope: WorkspaceKind.default })
     );
 
     expect(getStoredWorkspaceSelection()).toEqual({
-      scope: WorkspaceScope.default,
+      kind: WorkspaceKind.default,
     });
     expect(localStorage.getItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
     expect(
       JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) ?? '')
     ).toEqual({
-      scope: WorkspaceScope.default,
+      kind: WorkspaceKind.default,
     });
   });
 
@@ -79,7 +79,7 @@ describe('workspace storage', () => {
     );
 
     expect(getStoredWorkspaceSelection()).toEqual({
-      scope: WorkspaceScope.all,
+      kind: WorkspaceKind.all,
     });
     expect(localStorage.getItem(LEGACY_WORKSPACE_SCOPE_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(WORKSPACE_STORAGE_KEY)).toBeNull();
@@ -88,15 +88,15 @@ describe('workspace storage', () => {
 
 describe('workspace target queries', () => {
   it('uses omitted workspace for default targets and workspace for named targets', () => {
-    expect(workspaceTargetSelectionQuery({ scope: WorkspaceScope.all })).toBe(
+    expect(workspaceTargetSelectionQuery({ kind: WorkspaceKind.all })).toBe(
       null
     );
     expect(
-      workspaceTargetSelectionQuery({ scope: WorkspaceScope.default })
-    ).toEqual({ workspace: WorkspaceScope.default });
+      workspaceTargetSelectionQuery({ kind: WorkspaceKind.default })
+    ).toEqual({ workspace: WorkspaceKind.default });
     expect(
       workspaceTargetSelectionQuery({
-        scope: WorkspaceScope.workspace,
+        kind: WorkspaceKind.workspace,
         workspace: 'team-a',
       })
     ).toEqual({ workspace: 'team-a' });

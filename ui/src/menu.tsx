@@ -19,6 +19,7 @@ import { useHasFeature } from '@/hooks/useLicense';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
 import { roleAtLeast } from '@/lib/workspaceAccess';
+import { defaultWorkspaceSelection } from '@/lib/workspace';
 import { UserRole } from '@/api/v1/schema';
 import {
   Activity,
@@ -52,7 +53,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AppBarContext } from './contexts/AppBarContext';
 import { useUserPreferences } from './contexts/UserPreference';
 import { useAgentChatContext } from './features/agent';
-import { WorkspaceSelector } from './features/cockpit/components/WorkspaceSelector';
+import { WorkspaceSelector } from './components/workspace/WorkspaceSelector';
 
 type NavItemProps = {
   to: string;
@@ -489,8 +490,6 @@ export const mainListItems = React.forwardRef<
               selectRemoteNode,
               workspaces,
               workspaceSelection,
-              selectWorkspaceScope,
-              selectedWorkspace,
               selectWorkspace,
               createWorkspace,
               deleteWorkspace,
@@ -501,10 +500,12 @@ export const mainListItems = React.forwardRef<
               <div className="space-y-2">
                 <WorkspaceSelector
                   workspaces={workspaces ?? []}
-                  workspaceSelection={workspaceSelection}
-                  onSelectScope={selectWorkspaceScope}
-                  selectedWorkspace={selectedWorkspace ?? ''}
-                  onSelect={selectWorkspace ?? (() => undefined)}
+                  workspaceSelection={
+                    workspaceSelection ?? defaultWorkspaceSelection()
+                  }
+                  onSelectWorkspace={(selection) =>
+                    void selectWorkspace?.(selection)
+                  }
                   onCreate={(name) => void createWorkspace?.(name)}
                   onDelete={(id) => void deleteWorkspace?.(id)}
                   canWrite={canWrite && isOpen}

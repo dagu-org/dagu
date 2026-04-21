@@ -5,7 +5,7 @@ import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient, useQuery } from '@/hooks/api';
-import { WorkspaceScope } from '@/lib/workspace';
+import { WorkspaceKind } from '@/lib/workspace';
 import { DAGPicker } from '../DAGPicker';
 import { DocPicker } from '../DocPicker';
 
@@ -22,7 +22,7 @@ const appBarValue = {
   selectedRemoteNode: 'local',
   selectRemoteNode: vi.fn(),
   workspaceSelection: {
-    scope: WorkspaceScope.workspace,
+    kind: WorkspaceKind.workspace,
     workspace: 'ops',
   },
 };

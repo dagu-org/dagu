@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { components, UserRole } from '@/api/v1/schema';
-import { WorkspaceScope } from '@/lib/workspace';
+import {
+  WorkspaceKind,
+  type WorkspaceSelection,
+  sanitizeWorkspaceSelection,
+} from '@/lib/workspace';
 
 type WorkspaceAccess = components['schemas']['WorkspaceAccess'];
 type User = components['schemas']['User'];
@@ -51,11 +55,11 @@ export function roleAtLeast(role: UserRole | null, minimum: UserRole): boolean {
 }
 
 export function workspaceRoleTarget(
-  scope: WorkspaceScope | undefined,
-  selectedWorkspace?: string | null
+  selection?: Partial<WorkspaceSelection> | null
 ): string {
-  if (scope === WorkspaceScope.workspace) {
-    return selectedWorkspace || '';
+  const sanitized = sanitizeWorkspaceSelection(selection);
+  if (sanitized.kind === WorkspaceKind.workspace) {
+    return sanitized.workspace || '';
   }
   return '';
 }

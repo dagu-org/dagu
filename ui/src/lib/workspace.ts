@@ -9,18 +9,17 @@ export const LEGACY_WORKSPACE_SCOPE_STORAGE_KEY =
 export const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
 export const ALL_WORKSPACES_DISPLAY_NAME = 'all';
 export const DEFAULT_WORKSPACE_DISPLAY_NAME = 'default';
-export const WorkspaceScope = {
+export const WorkspaceKind = {
   all: 'all',
   default: 'default',
   workspace: 'workspace',
 } as const;
-export type WorkspaceScope =
-  (typeof WorkspaceScope)[keyof typeof WorkspaceScope];
+export type WorkspaceKind = (typeof WorkspaceKind)[keyof typeof WorkspaceKind];
 
 const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export type WorkspaceSelection = {
-  scope: WorkspaceScope;
+  kind: WorkspaceKind;
   workspace?: string;
 };
 
@@ -36,8 +35,8 @@ export function sanitizeWorkspaceName(name: string): string {
 export function isValidWorkspaceName(name: string): boolean {
   return (
     WORKSPACE_NAME_PATTERN.test(name) &&
-    name.toLowerCase() !== WorkspaceScope.all &&
-    name.toLowerCase() !== WorkspaceScope.default
+    name.toLowerCase() !== WorkspaceKind.all &&
+    name.toLowerCase() !== WorkspaceKind.default
   );
 }
 
@@ -91,7 +90,7 @@ export function workspaceNameFromLabels(labels: string[] = []): string {
 }
 
 export function defaultWorkspaceSelection(): WorkspaceSelection {
-  return { scope: WorkspaceScope.all };
+  return { kind: WorkspaceKind.all };
 }
 
 export function sanitizeWorkspaceSelection(
@@ -100,13 +99,13 @@ export function sanitizeWorkspaceSelection(
   if (!selection) {
     return defaultWorkspaceSelection();
   }
-  if (selection.scope === WorkspaceScope.default) {
-    return { scope: WorkspaceScope.default };
+  if (selection.kind === WorkspaceKind.default) {
+    return { kind: WorkspaceKind.default };
   }
-  if (selection.scope === WorkspaceScope.workspace) {
+  if (selection.kind === WorkspaceKind.workspace) {
     const workspace = sanitizeWorkspaceName(selection.workspace ?? '');
     return workspace
-      ? { scope: WorkspaceScope.workspace, workspace }
+      ? { kind: WorkspaceKind.workspace, workspace }
       : defaultWorkspaceSelection();
   }
   return defaultWorkspaceSelection();
@@ -116,7 +115,7 @@ export function workspaceNameForSelection(
   selection?: Partial<WorkspaceSelection> | null
 ): string {
   const sanitized = sanitizeWorkspaceSelection(selection);
-  return sanitized.scope === WorkspaceScope.workspace
+  return sanitized.kind === WorkspaceKind.workspace
     ? (sanitized.workspace ?? '')
     : '';
 }
@@ -124,25 +123,25 @@ export function workspaceNameForSelection(
 export function isAggregateWorkspaceSelection(
   selection?: Partial<WorkspaceSelection> | null
 ): boolean {
-  return sanitizeWorkspaceSelection(selection).scope === WorkspaceScope.all;
+  return sanitizeWorkspaceSelection(selection).kind === WorkspaceKind.all;
 }
 
 export function isMutableWorkspaceSelection(
   selection?: Partial<WorkspaceSelection> | null
 ): boolean {
-  return sanitizeWorkspaceSelection(selection).scope !== WorkspaceScope.all;
+  return sanitizeWorkspaceSelection(selection).kind !== WorkspaceKind.all;
 }
 
 export function workspaceSelectionLabel(
   selection?: Partial<WorkspaceSelection> | null
 ): string {
   const sanitized = sanitizeWorkspaceSelection(selection);
-  switch (sanitized.scope) {
-    case WorkspaceScope.default:
+  switch (sanitized.kind) {
+    case WorkspaceKind.default:
       return DEFAULT_WORKSPACE_DISPLAY_NAME;
-    case WorkspaceScope.workspace:
+    case WorkspaceKind.workspace:
       return sanitized.workspace ?? 'Workspace';
-    case WorkspaceScope.all:
+    case WorkspaceKind.all:
     default:
       return ALL_WORKSPACES_DISPLAY_NAME;
   }
@@ -152,33 +151,33 @@ export function workspaceSelectionKey(
   selection?: Partial<WorkspaceSelection> | null
 ): string {
   const sanitized = sanitizeWorkspaceSelection(selection);
-  if (sanitized.scope === WorkspaceScope.workspace) {
+  if (sanitized.kind === WorkspaceKind.workspace) {
     return `workspace:${sanitized.workspace}`;
   }
-  return `scope:${sanitized.scope}`;
+  return `workspace:${sanitized.kind}`;
 }
 
 export function workspaceSelectionQuery(
   selection?: Partial<WorkspaceSelection> | null
 ): { workspace: string } {
   const sanitized = sanitizeWorkspaceSelection(selection);
-  if (sanitized.scope === WorkspaceScope.workspace) {
-    return { workspace: sanitized.workspace ?? WorkspaceScope.all };
+  if (sanitized.kind === WorkspaceKind.workspace) {
+    return { workspace: sanitized.workspace ?? WorkspaceKind.all };
   }
-  return { workspace: sanitized.scope };
+  return { workspace: sanitized.kind };
 }
 
 export function workspaceTargetSelectionQuery(
   selection?: Partial<WorkspaceSelection> | null
 ): WorkspaceTargetQuery | null {
   const sanitized = sanitizeWorkspaceSelection(selection);
-  if (sanitized.scope === WorkspaceScope.all) {
+  if (sanitized.kind === WorkspaceKind.all) {
     return null;
   }
-  if (sanitized.scope === WorkspaceScope.workspace) {
+  if (sanitized.kind === WorkspaceKind.workspace) {
     return { workspace: sanitized.workspace };
   }
-  return { workspace: WorkspaceScope.default };
+  return { workspace: WorkspaceKind.default };
 }
 
 export function workspaceDocumentSelectionQuery(
@@ -192,7 +191,7 @@ export function workspaceTargetQueryForWorkspace(
 ): WorkspaceTargetQuery {
   const sanitized = sanitizeWorkspaceName(workspace ?? '');
   if (!sanitized) {
-    return { workspace: WorkspaceScope.default };
+    return { workspace: WorkspaceKind.default };
   }
   return { workspace: sanitized };
 }
@@ -216,20 +215,22 @@ function parseStoredWorkspaceSelection(
   value: string
 ): WorkspaceSelection | null {
   try {
-    const parsed = JSON.parse(value) as Partial<WorkspaceSelection>;
+    const parsed = JSON.parse(value) as Partial<WorkspaceSelection> & {
+      scope?: WorkspaceKind;
+    };
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return null;
     }
-    const scope = parsed.scope as WorkspaceScope | undefined;
-    if (scope === WorkspaceScope.default) {
-      return { scope: WorkspaceScope.default };
+    const kind = (parsed.kind ?? parsed.scope) as WorkspaceKind | undefined;
+    if (kind === WorkspaceKind.default) {
+      return { kind: WorkspaceKind.default };
     }
-    if (scope === WorkspaceScope.workspace) {
+    if (kind === WorkspaceKind.workspace) {
       const workspace = sanitizeWorkspaceName(parsed.workspace ?? '');
-      return workspace ? { scope: WorkspaceScope.workspace, workspace } : null;
+      return workspace ? { kind: WorkspaceKind.workspace, workspace } : null;
     }
-    if (scope === WorkspaceScope.all) {
-      return { scope: WorkspaceScope.all };
+    if (kind === WorkspaceKind.all) {
+      return { kind: WorkspaceKind.all };
     }
     return null;
   } catch {
@@ -250,7 +251,7 @@ export function getStoredWorkspaceSelection(): WorkspaceSelection {
       localStorage.removeItem(WORKSPACE_STORAGE_KEY);
       if (sanitized) {
         const selection = {
-          scope: WorkspaceScope.workspace,
+          kind: WorkspaceKind.workspace,
           workspace: sanitized,
         };
         persistWorkspaceSelection(selection);
@@ -278,7 +279,7 @@ export function getStoredWorkspaceSelection(): WorkspaceSelection {
       localStorage.removeItem(LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY);
       if (sanitized) {
         const selection = {
-          scope: WorkspaceScope.workspace,
+          kind: WorkspaceKind.workspace,
           workspace: sanitized,
         };
         persistWorkspaceSelection(selection);
@@ -300,17 +301,4 @@ export function persistWorkspaceSelection(selection: WorkspaceSelection): void {
   } catch {
     // Ignore storage access errors.
   }
-}
-
-export function getStoredWorkspaceName(): string {
-  return workspaceNameForSelection(getStoredWorkspaceSelection());
-}
-
-export function persistWorkspaceName(name: string): void {
-  const sanitized = sanitizeWorkspaceName(name);
-  persistWorkspaceSelection(
-    sanitized
-      ? { scope: WorkspaceScope.workspace, workspace: sanitized }
-      : defaultWorkspaceSelection()
-  );
 }

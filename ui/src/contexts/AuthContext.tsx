@@ -170,10 +170,7 @@ export function useCanWrite(): boolean {
   const { user } = useAuth();
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
-  const workspace = workspaceRoleTarget(
-    appBarContext.workspaceSelection?.scope,
-    appBarContext.selectedWorkspace
-  );
+  const workspace = workspaceRoleTarget(appBarContext.workspaceSelection);
   if (config.authMode !== 'builtin') return config.permissions.writeDags;
   if (!user) return false;
   return roleAtLeast(effectiveWorkspaceRole(user, workspace), UserRole.developer);
@@ -196,10 +193,7 @@ export function useCanExecute(): boolean {
   const { user } = useAuth();
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
-  const workspace = workspaceRoleTarget(
-    appBarContext.workspaceSelection?.scope,
-    appBarContext.selectedWorkspace
-  );
+  const workspace = workspaceRoleTarget(appBarContext.workspaceSelection);
   if (config.authMode !== 'builtin') return config.permissions.runDags;
   if (!user) return false;
   return roleAtLeast(effectiveWorkspaceRole(user, workspace), UserRole.operator);

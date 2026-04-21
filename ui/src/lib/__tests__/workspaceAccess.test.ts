@@ -3,7 +3,7 @@
 
 import { UserRole } from '@/api/v1/schema';
 import { describe, expect, it } from 'vitest';
-import { WorkspaceScope } from '../workspace';
+import { WorkspaceKind } from '../workspace';
 import {
   effectiveWorkspaceRole,
   roleAtLeast,
@@ -12,9 +12,11 @@ import {
 
 describe('workspace access', () => {
   it('keeps aggregate workspace selection out of resource permission checks', () => {
-    expect(workspaceRoleTarget(WorkspaceScope.all, 'ops')).toBe('');
-    expect(workspaceRoleTarget(WorkspaceScope.default)).toBe('');
-    expect(workspaceRoleTarget(WorkspaceScope.workspace, 'ops')).toBe('ops');
+    expect(workspaceRoleTarget({ kind: WorkspaceKind.all })).toBe('');
+    expect(workspaceRoleTarget({ kind: WorkspaceKind.default })).toBe('');
+    expect(
+      workspaceRoleTarget({ kind: WorkspaceKind.workspace, workspace: 'ops' })
+    ).toBe('ops');
   });
 
   it('uses workspace grants for concrete resources', () => {

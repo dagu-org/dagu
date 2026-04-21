@@ -9,7 +9,7 @@ import { Status } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
-import { WorkspaceScope } from '@/lib/workspace';
+import { WorkspaceKind } from '@/lib/workspace';
 import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
 import { useClient } from '../../hooks/api';
 import DashboardPage from '../index';
@@ -106,11 +106,10 @@ function renderPage({
                 : [],
               workspaceSelection: selectedWorkspace
                 ? {
-                    scope: WorkspaceScope.workspace,
+                    kind: WorkspaceKind.workspace,
                     workspace: selectedWorkspace,
                   }
-                : { scope: WorkspaceScope.all },
-              selectedWorkspace,
+                : { kind: WorkspaceKind.all },
               selectWorkspace: () => undefined,
             }}
           >

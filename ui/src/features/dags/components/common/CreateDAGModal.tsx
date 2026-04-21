@@ -9,7 +9,7 @@ import { defaultDAGSpec } from '../../../../lib/dagSpec';
 import {
   isMutableWorkspaceSelection,
   sanitizeWorkspaceSelection,
-  WorkspaceScope,
+  WorkspaceKind,
 } from '../../../../lib/workspace';
 
 /**
@@ -50,7 +50,7 @@ function CreateDAGModal() {
         body: {
           name,
           spec:
-            workspaceSelection.scope === WorkspaceScope.workspace &&
+            workspaceSelection.kind === WorkspaceKind.workspace &&
             workspaceSelection.workspace
               ? defaultDAGSpec(workspaceSelection.workspace)
               : undefined,

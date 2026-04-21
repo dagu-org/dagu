@@ -27,7 +27,7 @@ import {
   hasWorkspaceLabel,
   sanitizeWorkspaceName,
   sanitizeWorkspaceSelection,
-  WorkspaceScope,
+  WorkspaceKind,
   workspaceNameFromLabels,
 } from '../../../lib/workspace';
 
@@ -60,7 +60,7 @@ function DAGDetails() {
   const appWorkspaceSelection = appBarContext.workspaceSelection;
   const workspaceSelection = useMemo(() => {
     if (queryWorkspace) {
-      return { scope: WorkspaceScope.workspace, workspace: queryWorkspace };
+      return { kind: WorkspaceKind.workspace, workspace: queryWorkspace };
     }
     return sanitizeWorkspaceSelection(appWorkspaceSelection);
   }, [appWorkspaceSelection, queryWorkspace]);
@@ -163,10 +163,10 @@ function DAGDetails() {
   const dagWorkspaceName = workspaceNameFromLabels(dagLabels);
   const dagHasWorkspaceLabel = hasWorkspaceLabel(dagLabels);
   const dagMatchesWorkspace =
-    workspaceSelection.scope === WorkspaceScope.all ||
-    (workspaceSelection.scope === WorkspaceScope.default &&
+    workspaceSelection.kind === WorkspaceKind.all ||
+    (workspaceSelection.kind === WorkspaceKind.default &&
       !dagHasWorkspaceLabel) ||
-    (workspaceSelection.scope === WorkspaceScope.workspace &&
+    (workspaceSelection.kind === WorkspaceKind.workspace &&
       dagWorkspaceName === workspaceSelection.workspace);
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
