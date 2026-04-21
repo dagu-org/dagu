@@ -300,8 +300,8 @@ steps:
 		done := make(chan struct{})
 
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
-			close(done)
 		}()
 
 		require.Eventually(t, func() bool {
@@ -642,15 +642,15 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Get the status of the DAG
 		require.Eventually(t, func() bool {
-			var mockResponseWriter = mockResponseWriter{}
-			dagAgent.HandleHTTP(ctx)(&mockResponseWriter, &http.Request{
+			rw := mockResponseWriter{}
+			dagAgent.HandleHTTP(ctx)(&rw, &http.Request{
 				Method: "GET", URL: &url.URL{Path: "/status"},
 			})
-			if mockResponseWriter.status != http.StatusOK {
+			if rw.status != http.StatusOK {
 				return false
 			}
 
-			dagRunStatus, err := exec.StatusFromJSON(mockResponseWriter.body)
+			dagRunStatus, err := exec.StatusFromJSON(rw.body)
 			return err == nil && dagRunStatus.Status == core.Running
 		}, 10*time.Second, 50*time.Millisecond)
 
@@ -679,20 +679,20 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
-			close(done)
 		}()
 
 		waitForTestFile(t, startedFile, 2*time.Minute)
 
-		var mockResponseWriter = mockResponseWriter{}
+		rw := mockResponseWriter{}
 
 		// Request with an invalid path
-		dagAgent.HandleHTTP(th.Context)(&mockResponseWriter, &http.Request{
+		dagAgent.HandleHTTP(th.Context)(&rw, &http.Request{
 			Method: "GET",
 			URL:    &url.URL{Path: "/invalid-path"},
 		})
-		require.Equal(t, http.StatusNotFound, mockResponseWriter.status)
+		require.Equal(t, http.StatusNotFound, rw.status)
 
 		// Stop the DAG
 		dagAgent.Abort()
@@ -718,20 +718,20 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
-			close(done)
 		}()
 
 		waitForTestFile(t, startedFile, 2*time.Minute)
 
 		// Cancel the DAG
-		var mockResponseWriter = mockResponseWriter{}
-		dagAgent.HandleHTTP(th.Context)(&mockResponseWriter, &http.Request{
+		rw := mockResponseWriter{}
+		dagAgent.HandleHTTP(th.Context)(&rw, &http.Request{
 			Method: "POST",
 			URL:    &url.URL{Path: "/stop"},
 		})
-		require.Equal(t, http.StatusOK, mockResponseWriter.status)
-		require.Equal(t, "OK", mockResponseWriter.body)
+		require.Equal(t, http.StatusOK, rw.status)
+		require.Equal(t, "OK", rw.body)
 
 		// Wait for the DAG to stop
 		waitForCancel(t, done, 30*time.Second)
