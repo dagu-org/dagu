@@ -634,8 +634,8 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		ctx := th.Context
 		done := make(chan struct{})
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
-			close(done)
 		}()
 
 		waitForTestFile(t, startedFile, 2*time.Minute)
