@@ -10,6 +10,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   PathsDocsGetParametersQueryOrder,
   PathsDocsGetParametersQuerySort,
+  WorkspaceMutationScope,
 } from '@/api/v1/schema';
 import SplitLayout from '@/components/SplitLayout';
 import { useSimpleToast } from '@/components/ui/simple-toast';
@@ -48,6 +49,14 @@ function titleFromPath(docPath: string): string {
 
 function encodeDocPathForURL(docPath: string): string {
   return docPath.split('/').map(encodeURIComponent).join('/');
+}
+
+function workspaceSearchForDocTab(workspace?: string | null): string {
+  const sanitized = sanitizeWorkspaceName(workspace ?? '');
+  if (sanitized) {
+    return `?workspace=${encodeURIComponent(sanitized)}`;
+  }
+  return `?workspaceScope=${WorkspaceMutationScope.none}`;
 }
 
 function DocsContent() {
@@ -187,14 +196,16 @@ function DocsContent() {
     if (isNavigatingRef.current) return;
     const docPath = location.pathname.replace(/^\/docs\/?/, '');
     if (docPath) {
+      const searchParams = new URLSearchParams(location.search);
       const queryWorkspace = sanitizeWorkspaceName(
-        new URLSearchParams(location.search).get('workspace') ?? ''
+        searchParams.get('workspace') ?? ''
       );
-      const docWorkspace = queryWorkspace || selectedWorkspace || null;
-      const decodedPath = visibleDocumentPathForWorkspace(
-        decodeURIComponent(docPath),
-        docWorkspace
-      );
+      const isNoWorkspaceURL =
+        searchParams.get('workspaceScope') === WorkspaceMutationScope.none;
+      const docWorkspace = isNoWorkspaceURL
+        ? null
+        : queryWorkspace || selectedWorkspace || null;
+      const decodedPath = decodeURIComponent(docPath);
       openDoc(decodedPath, titleFromPath(decodedPath), docWorkspace);
     }
   }, [location.pathname, location.search, openDoc, selectedWorkspace]);
@@ -211,8 +222,8 @@ function DocsContent() {
       : null;
     const docPath = activeTab?.docPath;
     const currentPath = location.pathname.replace(/^\/docs\/?/, '');
-    const targetSearch = activeTab?.workspace
-      ? `?workspace=${encodeURIComponent(activeTab.workspace)}`
+    const targetSearch = activeTab
+      ? workspaceSearchForDocTab(activeTab.workspace)
       : '';
     const encodedDocPath = docPath ? encodeDocPathForURL(docPath) : '';
     if (docPath && encodedDocPath !== currentPath) {
