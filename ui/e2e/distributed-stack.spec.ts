@@ -187,7 +187,11 @@ test('exercises the web UI against the real distributed shared-nothing worker st
     completed = true;
   } finally {
     if (!released && releaseGateReady) {
-      await releaseRuns();
+      try {
+        await releaseRuns();
+      } catch {
+        // Preserve the original test failure while still running cleanup below.
+      }
     }
     if (completed) {
       await fs.rm(releaseFile, { force: true });

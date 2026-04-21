@@ -76,6 +76,15 @@ func waitForTestFile(t *testing.T, path string, timeout time.Duration) {
 	}, timeout, 50*time.Millisecond)
 }
 
+func waitForCancel(t *testing.T, done <-chan struct{}, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for DAG cancellation")
+	}
+}
+
 func pwdCommand() string {
 	return test.ForOS("pwd", "(Get-Location).Path")
 }
@@ -650,11 +659,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Stop the DAG
 		dagAgent.Abort()
 
-		select {
-		case <-done:
-		case <-time.After(30 * time.Second):
-			t.Fatal("timed out waiting for DAG cancellation")
-		}
+		waitForCancel(t, done, 30*time.Second)
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPInvalidRequest", func(t *testing.T) {
@@ -693,11 +698,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Stop the DAG
 		dagAgent.Abort()
-		select {
-		case <-done:
-		case <-time.After(30 * time.Second):
-			t.Fatal("timed out waiting for DAG cancellation")
-		}
+		waitForCancel(t, done, 30*time.Second)
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPHandleCancel", func(t *testing.T) {
@@ -735,11 +736,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, "OK", mockResponseWriter.body)
 
 		// Wait for the DAG to stop
-		select {
-		case <-done:
-		case <-time.After(30 * time.Second):
-			t.Fatal("timed out waiting for DAG cancellation")
-		}
+		waitForCancel(t, done, 30*time.Second)
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 }

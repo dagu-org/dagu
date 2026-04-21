@@ -17,37 +17,40 @@ import (
 )
 
 func TestEnqueueDAGRunClosesStatusBeforeQueuePublish(t *testing.T) {
-	th := test.Setup(t)
-	th.Config.Queues.Enabled = true
+	f := newEnqueueDAGRunFixture(t, nil)
 
-	attempt := &enqueueTrackingAttempt{id: "attempt-1"}
-	runStore := &enqueueTrackingDAGRunStore{attempt: attempt}
-	queueStore := &enqueueObservingQueueStore{attempt: attempt}
-	dag := th.DAG(t, `steps:
-  - name: "step"
-    command: "true"
-`).DAG
-
-	ctx := &Context{
-		Context:     th.Context,
-		Config:      th.Config,
-		DAGRunStore: runStore,
-		QueueStore:  queueStore,
-	}
-
-	require.NoError(t, enqueueDAGRun(ctx, dag, "run-1", core.TriggerTypeManual, ""))
-	assert.True(t, queueStore.enqueued)
-	require.NotNil(t, attempt.status)
-	assert.Equal(t, core.Queued, attempt.status.Status)
+	require.NoError(t, enqueueDAGRun(f.ctx, f.dag, "run-1", core.TriggerTypeManual, ""))
+	assert.True(t, f.queueStore.enqueued)
+	require.NotNil(t, f.attempt.status)
+	assert.Equal(t, core.Queued, f.attempt.status.Status)
 }
 
 func TestEnqueueDAGRunPublishesQueueWhenCloseFails(t *testing.T) {
+	f := newEnqueueDAGRunFixture(t, errors.New("sync failed"))
+
+	require.NoError(t, enqueueDAGRun(f.ctx, f.dag, "run-1", core.TriggerTypeManual, ""))
+	assert.True(t, f.queueStore.enqueued)
+	assert.True(t, f.attempt.closed, "attempt should be closed even when Close returns an error")
+	require.NotNil(t, f.attempt.status)
+	assert.Equal(t, core.Queued, f.attempt.status.Status)
+}
+
+type enqueueDAGRunFixture struct {
+	attempt    *enqueueTrackingAttempt
+	queueStore *enqueueObservingQueueStore
+	ctx        *Context
+	dag        *core.DAG
+}
+
+func newEnqueueDAGRunFixture(t *testing.T, closeErr error) enqueueDAGRunFixture {
+	t.Helper()
+
 	th := test.Setup(t)
 	th.Config.Queues.Enabled = true
 
 	attempt := &enqueueTrackingAttempt{
 		id:       "attempt-1",
-		closeErr: errors.New("sync failed"),
+		closeErr: closeErr,
 	}
 	runStore := &enqueueTrackingDAGRunStore{attempt: attempt}
 	queueStore := &enqueueObservingQueueStore{attempt: attempt}
@@ -63,10 +66,12 @@ func TestEnqueueDAGRunPublishesQueueWhenCloseFails(t *testing.T) {
 		QueueStore:  queueStore,
 	}
 
-	require.NoError(t, enqueueDAGRun(ctx, dag, "run-1", core.TriggerTypeManual, ""))
-	assert.True(t, queueStore.enqueued)
-	require.NotNil(t, attempt.status)
-	assert.Equal(t, core.Queued, attempt.status.Status)
+	return enqueueDAGRunFixture{
+		attempt:    attempt,
+		queueStore: queueStore,
+		ctx:        ctx,
+		dag:        dag,
+	}
 }
 
 type enqueueTrackingDAGRunStore struct {

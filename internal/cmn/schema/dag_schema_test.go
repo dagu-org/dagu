@@ -654,6 +654,7 @@ func TestDAGSchemaSFTPExecutor(t *testing.T) {
 	t.Parallel()
 
 	resolved := mustResolveDAGSchema(t)
+	sftpConfigSchema := mustResolveDAGSchemaDefinition(t, "sftpExecutorConfig")
 
 	tests := []struct {
 		name    string
@@ -717,7 +718,7 @@ steps:
       destination: /srv/backups/backup.tar.gz
       direction: sync
 `,
-			wantErr: "steps",
+			wantErr: "direction",
 		},
 		{
 			name: "RejectEmptySource",
@@ -732,7 +733,7 @@ steps:
       source: ""
       destination: /srv/backups/backup.tar.gz
 `,
-			wantErr: "steps",
+			wantErr: "source",
 		},
 		{
 			name: "RejectUnknownConfigField",
@@ -748,7 +749,7 @@ steps:
       destination: /srv/backups/backup.tar.gz
       unknown_field: true
 `,
-			wantErr: "steps",
+			wantErr: "unknown_field",
 		},
 	}
 
@@ -763,7 +764,10 @@ steps:
 				return
 			}
 			require.Error(t, err)
-			require.Contains(t, err.Error(), tt.wantErr)
+
+			configErr := sftpConfigSchema.Validate(firstStepConfig(t, doc))
+			require.Error(t, configErr)
+			require.Contains(t, configErr.Error(), tt.wantErr)
 		})
 	}
 }
@@ -1189,10 +1193,47 @@ func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {
 	return resolved
 }
 
+func mustResolveDAGSchemaDefinition(t *testing.T, name string) *jsonschema.Resolved {
+	t.Helper()
+
+	var root struct {
+		Definitions map[string]json.RawMessage `json:"definitions"`
+	}
+	require.NoError(t, json.Unmarshal(DAGSchemaJSON, &root))
+
+	definition, ok := root.Definitions[name]
+	require.True(t, ok, "schema definition %q should exist", name)
+
+	var schema jsonschema.Schema
+	require.NoError(t, json.Unmarshal(definition, &schema))
+
+	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{})
+	require.NoError(t, err)
+	return resolved
+}
+
 func mustParseYAMLDocument(t *testing.T, spec string) map[string]any {
 	t.Helper()
 
 	var doc map[string]any
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &doc))
 	return doc
+}
+
+func firstStepConfig(t *testing.T, doc map[string]any) map[string]any {
+	t.Helper()
+
+	steps, ok := doc["steps"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, steps)
+
+	step, ok := steps[0].(map[string]any)
+	require.True(t, ok)
+
+	if config, ok := step["with"].(map[string]any); ok {
+		return config
+	}
+	config, ok := step["config"].(map[string]any)
+	require.True(t, ok)
+	return config
 }
