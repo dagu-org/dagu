@@ -76,6 +76,8 @@ func artifactWriteCommand(content string, fail bool) string {
 	}
 	if fail {
 		commands = append(commands, "exit 1")
+	} else if runtime.GOOS == "windows" {
+		commands = append(commands, "exit 0")
 	}
 	return test.JoinLines(commands...)
 }

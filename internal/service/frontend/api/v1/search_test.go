@@ -17,6 +17,7 @@ import (
 	"github.com/dagucloud/dagu/internal/persis/filedoc"
 	"github.com/dagucloud/dagu/internal/runtime"
 	apiv1 "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
+	workspacepkg "github.com/dagucloud/dagu/internal/workspace"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,13 +29,14 @@ type searchTestSetup struct {
 	docStore agent.DocStore
 }
 
-func newSearchAPI(dagStore exec.DAGStore, docStore agent.DocStore) *apiv1.API {
+func newSearchAPI(dagStore exec.DAGStore, docStore agent.DocStore, extraOptions ...apiv1.APIOption) *apiv1.API {
 	cfg := &config.Config{}
 
 	options := []apiv1.APIOption{}
 	if docStore != nil {
 		options = append(options, apiv1.WithDocStore(docStore))
 	}
+	options = append(options, extraOptions...)
 
 	return apiv1.New(
 		dagStore,
@@ -189,6 +191,40 @@ func TestSearchDocFeed(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, 403, apiErr.HTTPStatus)
 	})
+
+	t.Run("filters hidden workspace docs before cursor pagination", func(t *testing.T) {
+		t.Parallel()
+
+		dagStore := filedag.New(t.TempDir(), filedag.WithSkipExamples(true))
+		docStore := filedoc.New(t.TempDir())
+		api := newSearchAPI(
+			dagStore,
+			docStore,
+			apiv1.WithWorkspaceStore(&mockWorkspaceStore{
+				workspaces: []*workspacepkg.Workspace{{ID: "workspace-1", Name: "ops"}},
+			}),
+		)
+		setup := &searchTestSetup{api: api, dagStore: dagStore, docStore: docStore}
+		mustCreateDoc(t, setup, "ops/hidden", "needle.")
+		mustCreateDoc(t, setup, "public", "needle.")
+
+		limit := apigen.SearchLimit(1)
+		workspace := apigen.Workspace("default")
+		resp, err := api.SearchDocFeed(adminCtx(), apigen.SearchDocFeedRequestObject{
+			Params: apigen.SearchDocFeedParams{
+				Q:         "needle.",
+				Limit:     &limit,
+				Workspace: &workspace,
+			},
+		})
+		require.NoError(t, err)
+
+		searchResp := resp.(apigen.SearchDocFeed200JSONResponse)
+		require.Len(t, searchResp.Results, 1)
+		assert.Equal(t, "public", searchResp.Results[0].Id)
+		assert.False(t, searchResp.HasMore)
+		assert.Nil(t, searchResp.NextCursor)
+	})
 }
 
 func TestSearchDagMatches(t *testing.T) {
@@ -230,6 +266,48 @@ steps:
 	secondPage := secondResp.(apigen.SearchDagMatches200JSONResponse)
 	assert.Len(t, secondPage.Matches, 1)
 	assert.False(t, secondPage.HasMore)
+}
+
+func TestSearchDagMatchesUsesWorkspaceFromFeedCursor(t *testing.T) {
+	t.Parallel()
+
+	setup := newSearchTestSetup(t, false)
+	mustCreateDAG(t, setup, "ops-heavy", `name: ops-heavy
+labels:
+  - workspace=ops
+steps:
+  - command: echo "needle."
+  - command: echo "needle."
+  - command: echo "needle."`)
+
+	workspace := apigen.Workspace("ops")
+	feedResp, err := setup.api.SearchDAGFeed(adminCtx(), apigen.SearchDAGFeedRequestObject{
+		Params: apigen.SearchDAGFeedParams{
+			Q:         "needle.",
+			Workspace: &workspace,
+		},
+	})
+	require.NoError(t, err)
+
+	feedPage := feedResp.(apigen.SearchDAGFeed200JSONResponse)
+	require.Len(t, feedPage.Results, 1)
+	require.NotNil(t, feedPage.Results[0].NextMatchesCursor)
+
+	limit := apigen.SearchMatchLimit(2)
+	matchesResp, err := setup.api.SearchDagMatches(adminCtx(), apigen.SearchDagMatchesRequestObject{
+		FileName: "ops-heavy",
+		Params: apigen.SearchDagMatchesParams{
+			Q:         "needle.",
+			Limit:     &limit,
+			Cursor:    feedPage.Results[0].NextMatchesCursor,
+			Workspace: &workspace,
+		},
+	})
+	require.NoError(t, err)
+
+	matchesPage := matchesResp.(apigen.SearchDagMatches200JSONResponse)
+	assert.Len(t, matchesPage.Matches, 2)
+	assert.False(t, matchesPage.HasMore)
 }
 
 func TestSearchDocMatches(t *testing.T) {

@@ -14,14 +14,27 @@ import {
 } from '@/components/ui/select';
 import type { components } from '@/api/v1/schema';
 import { cn } from '@/lib/utils';
-import { sanitizeWorkspaceName } from '@/lib/workspace';
+import {
+  ALL_WORKSPACES_DISPLAY_NAME,
+  DEFAULT_WORKSPACE_DISPLAY_NAME,
+  sanitizeWorkspaceName,
+  sanitizeWorkspaceSelection,
+  WorkspaceKind,
+  workspaceSelectionLabel,
+  type WorkspaceSelection,
+} from '@/lib/workspace';
 
 type WorkspaceResponse = components['schemas']['WorkspaceResponse'];
 
+const ALL_VALUE = '__all__';
+const DEFAULT_VALUE = '__default__';
+const NEW_VALUE = '__new__';
+const WORKSPACE_VALUE_PREFIX = 'workspace:';
+
 interface Props {
   workspaces: WorkspaceResponse[];
-  selectedWorkspace: string;
-  onSelect: (name: string) => void;
+  workspaceSelection: WorkspaceSelection;
+  onSelectWorkspace: (selection: WorkspaceSelection) => void;
   onCreate: (name: string) => void;
   onDelete: (id: string) => void;
   canWrite?: boolean;
@@ -31,8 +44,8 @@ interface Props {
 
 export function WorkspaceSelector({
   workspaces,
-  selectedWorkspace,
-  onSelect,
+  workspaceSelection,
+  onSelectWorkspace,
   onCreate,
   onDelete,
   canWrite = true,
@@ -42,9 +55,14 @@ export function WorkspaceSelector({
   const [isCreating, setIsCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>(
-    'idle'
-  );
+  const createStateRef = useRef<'idle' | 'submitted' | 'cancelled'>('idle');
+  const selection = sanitizeWorkspaceSelection(workspaceSelection);
+  const selectedValue =
+    selection.kind === WorkspaceKind.workspace && selection.workspace
+      ? `${WORKSPACE_VALUE_PREFIX}${selection.workspace}`
+      : selection.kind === WorkspaceKind.default
+        ? DEFAULT_VALUE
+        : ALL_VALUE;
 
   const handleCreate = useCallback(() => {
     if (createStateRef.current !== 'idle') return;
@@ -71,7 +89,13 @@ export function WorkspaceSelector({
     [handleCreate]
   );
 
-  const selectedWs = workspaces.find((ws) => ws.name === selectedWorkspace);
+  const selectedWs =
+    selection.kind === WorkspaceKind.workspace
+      ? workspaces.find((ws) => ws.name === selection.workspace)
+      : undefined;
+  const handleSelect = (nextSelection: WorkspaceSelection) => {
+    onSelectWorkspace(sanitizeWorkspaceSelection(nextSelection));
+  };
 
   if (isCreating) {
     return (
@@ -105,15 +129,22 @@ export function WorkspaceSelector({
         )}
       >
         <Select
-          value={selectedWorkspace || '__none__'}
+          value={selectedValue}
           onValueChange={(v) => {
-            if (v === '__new__') {
+            if (v === NEW_VALUE) {
               createStateRef.current = 'idle';
               setIsCreating(true);
-            } else if (v === '__none__') {
-              onSelect('');
+            } else if (v === ALL_VALUE) {
+              handleSelect({ kind: WorkspaceKind.all });
+            } else if (v === DEFAULT_VALUE) {
+              handleSelect({ kind: WorkspaceKind.default });
+            } else if (v.startsWith(WORKSPACE_VALUE_PREFIX)) {
+              handleSelect({
+                kind: WorkspaceKind.workspace,
+                workspace: v.slice(WORKSPACE_VALUE_PREFIX.length),
+              });
             } else {
-              onSelect(v);
+              handleSelect({ kind: WorkspaceKind.all });
             }
           }}
         >
@@ -138,9 +169,7 @@ export function WorkspaceSelector({
                   }
                 : undefined
             }
-            title={
-              collapsed ? selectedWorkspace || 'All workspaces' : undefined
-            }
+            title={collapsed ? workspaceSelectionLabel(selection) : undefined}
           >
             {variant === 'sidebar' ? (
               <div className="flex items-center gap-2 min-w-0">
@@ -165,14 +194,22 @@ export function WorkspaceSelector({
             )}
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__none__">All workspaces</SelectItem>
+            <SelectItem value={ALL_VALUE}>
+              {ALL_WORKSPACES_DISPLAY_NAME}
+            </SelectItem>
+            <SelectItem value={DEFAULT_VALUE}>
+              {DEFAULT_WORKSPACE_DISPLAY_NAME}
+            </SelectItem>
             {workspaces.map((ws) => (
-              <SelectItem key={ws.id} value={ws.name}>
+              <SelectItem
+                key={ws.id}
+                value={`${WORKSPACE_VALUE_PREFIX}${ws.name}`}
+              >
                 {ws.name}
               </SelectItem>
             ))}
             {canWrite && !collapsed && (
-              <SelectItem value="__new__">
+              <SelectItem value={NEW_VALUE}>
                 <span className="flex items-center gap-1 text-primary">
                   <Plus size={12} /> New workspace
                 </span>

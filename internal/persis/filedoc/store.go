@@ -172,7 +172,7 @@ func (s *Store) List(ctx context.Context, opts agent.ListDocsOptions) (*exec.Pag
 	if err != nil {
 		return nil, err
 	}
-	tree, err := s.buildTree(ctx, rootDir, sortField, sortOrder)
+	tree, err := s.buildTree(ctx, rootDir, sortField, sortOrder, opts.ExcludePathRoots)
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +230,9 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 
 		if err := agent.ValidateDocID(id); err != nil {
 			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))
+			return nil
+		}
+		if docPathRootExcluded(id, opts.ExcludePathRoots) {
 			return nil
 		}
 
@@ -292,6 +295,14 @@ func (s *Store) ListFlat(ctx context.Context, opts agent.ListDocsOptions) (*exec
 
 	result := exec.NewPaginatedResult(pageItems, total, pg)
 	return &result, nil
+}
+
+func docPathRootExcluded(id string, excludedRoots []string) bool {
+	if len(excludedRoots) == 0 {
+		return false
+	}
+	root, _, _ := strings.Cut(id, "/")
+	return slices.Contains(excludedRoots, root)
 }
 
 // Get retrieves a doc by its ID.
@@ -670,10 +681,11 @@ func docSearchPattern(query string) string {
 }
 
 type docSearchCursor struct {
-	Version    int    `json:"v"`
-	Query      string `json:"q"`
-	PathPrefix string `json:"prefix,omitempty"`
-	ID         string `json:"id,omitempty"`
+	Version       int      `json:"v"`
+	Query         string   `json:"q"`
+	PathPrefix    string   `json:"prefix,omitempty"`
+	ExcludedRoots []string `json:"exclude,omitempty"`
+	ID            string   `json:"id,omitempty"`
 }
 
 type docMatchCursor struct {
@@ -749,7 +761,16 @@ func listSearchCandidates(ctx context.Context, rootDir string) ([]docSearchCandi
 	return candidates, nil
 }
 
-func decodeDocSearchCursor(raw, query, pathPrefix string) (docSearchCursor, error) {
+func normalizeExcludedPathRoots(roots []string) []string {
+	if len(roots) == 0 {
+		return nil
+	}
+	normalized := slices.Clone(roots)
+	sort.Strings(normalized)
+	return slices.Compact(normalized)
+}
+
+func decodeDocSearchCursor(raw, query, pathPrefix string, excludedRoots []string) (docSearchCursor, error) {
 	if raw == "" {
 		return docSearchCursor{}, nil
 	}
@@ -757,7 +778,10 @@ func decodeDocSearchCursor(raw, query, pathPrefix string) (docSearchCursor, erro
 	if err := exec.DecodeSearchCursor(raw, &cursor); err != nil {
 		return docSearchCursor{}, err
 	}
-	if cursor.Version != docSearchCursorVersion || cursor.Query != query || cursor.PathPrefix != pathPrefix {
+	if cursor.Version != docSearchCursorVersion ||
+		cursor.Query != query ||
+		cursor.PathPrefix != pathPrefix ||
+		!slices.Equal(cursor.ExcludedRoots, excludedRoots) {
 		return docSearchCursor{}, exec.ErrInvalidCursor
 	}
 	return cursor, nil
@@ -786,6 +810,7 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 	if err != nil {
 		return nil, err
 	}
+	excludedRoots := normalizeExcludedPathRoots(opts.ExcludePathRoots)
 	rootDir, err := s.scopedRoot(pathPrefix)
 	if err != nil {
 		return nil, err
@@ -798,7 +823,7 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 		return &exec.CursorResult[agent.DocSearchResult]{Items: []agent.DocSearchResult{}}, nil
 	}
 
-	cursor, err := decodeDocSearchCursor(opts.Cursor, opts.Query, pathPrefix)
+	cursor, err := decodeDocSearchCursor(opts.Cursor, opts.Query, pathPrefix, excludedRoots)
 	if err != nil {
 		return nil, err
 	}
@@ -820,6 +845,9 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 			return nil, ctx.Err()
 		}
 		if cursor.ID != "" && candidate.ID <= cursor.ID {
+			continue
+		}
+		if docPathRootExcluded(candidate.ID, excludedRoots) {
 			continue
 		}
 
@@ -846,10 +874,11 @@ func (s *Store) SearchCursor(ctx context.Context, opts agent.SearchDocsOptions) 
 		if len(results) == limit {
 			hasMore = true
 			nextCursor = exec.EncodeSearchCursor(docSearchCursor{
-				Version:    docSearchCursorVersion,
-				Query:      opts.Query,
-				PathPrefix: pathPrefix,
-				ID:         results[len(results)-1].ID,
+				Version:       docSearchCursorVersion,
+				Query:         opts.Query,
+				PathPrefix:    pathPrefix,
+				ExcludedRoots: excludedRoots,
+				ID:            results[len(results)-1].ID,
 			})
 			break
 		}
@@ -968,7 +997,7 @@ func normalizeSortParams(sortField agent.DocSortField, sortOrder agent.DocSortOr
 }
 
 // buildTree builds a tree of DocTreeNode from the filesystem.
-func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder string) ([]*agent.DocTreeNode, error) {
+func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder string, excludedRoots []string) ([]*agent.DocTreeNode, error) {
 	if info, err := os.Stat(rootDir); err != nil {
 		if os.IsNotExist(err) {
 			return []*agent.DocTreeNode{}, nil
@@ -997,6 +1026,9 @@ func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder str
 		relPath = filepath.ToSlash(relPath)
 
 		if d.IsDir() {
+			if docPathRootExcluded(relPath, excludedRoots) {
+				return filepath.SkipDir
+			}
 			var modTime time.Time
 			if needMtime {
 				if info, infoErr := d.Info(); infoErr == nil {
@@ -1026,6 +1058,9 @@ func (s *Store) buildTree(ctx context.Context, rootDir, sortField, sortOrder str
 		}
 
 		id := strings.TrimSuffix(relPath, ".md")
+		if docPathRootExcluded(id, excludedRoots) {
+			return nil
+		}
 
 		if err := agent.ValidateDocID(id); err != nil {
 			logger.Debug(ctx, "Skipping non-conforming doc file", tag.File(relPath), tag.Reason(err.Error()))

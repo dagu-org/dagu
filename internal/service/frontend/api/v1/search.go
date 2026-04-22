@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 	"strings"
 
 	api "github.com/dagucloud/dagu/api/v1"
@@ -61,20 +60,8 @@ func optionalString(value string) *string {
 	return ptrOf(value)
 }
 
-func scopedDAGSearchLabels(labelsParam *string, workspaceParam *string) ([]string, error) {
-	labels := parseCommaSeparatedLabels(labelsParam)
-	workspaceName, err := validateDocWorkspace(workspaceParam)
-	if err != nil {
-		return nil, err
-	}
-	if workspaceName != "" {
-		workspaceLabel := strings.ToLower("workspace=" + workspaceName)
-		if slices.Contains(labels, workspaceLabel) {
-			return labels, nil
-		}
-		labels = append(labels, workspaceLabel)
-	}
-	return labels, nil
+func scopedDAGSearchLabels(labelsParam *string) []string {
+	return parseCommaSeparatedLabels(labelsParam)
 }
 
 func toSearchMatchItems(matches []*exec.Match) []api.SearchMatchItem {
@@ -106,6 +93,7 @@ func toDAGSearchPageItem(item exec.SearchDAGResult) api.DAGSearchPageItem {
 	return api.DAGSearchPageItem{
 		FileName:          item.FileName,
 		Name:              name,
+		Workspace:         optionalString(item.Workspace),
 		HasMoreMatches:    item.HasMoreMatches,
 		NextMatchesCursor: optionalString(item.NextMatchesCursor),
 		Matches:           toSearchMatchItems(item.Matches),
@@ -121,22 +109,34 @@ func toDAGSearchFeedResponse(result *exec.CursorResult[exec.SearchDAGResult]) ap
 	}
 }
 
-func toDocSearchPageItem(item agent.DocSearchResult) api.DocSearchPageItem {
+func toDocSearchPageItem(
+	item agent.DocSearchResult,
+	workspaceName string,
+	visibility docWorkspaceVisibility,
+) api.DocSearchPageItem {
 	return api.DocSearchPageItem{
 		Id:                item.ID,
 		Title:             item.Title,
+		Workspace:         docWorkspaceValue(workspaceName, item.ID, visibility, false),
 		HasMoreMatches:    item.HasMoreMatches,
 		NextMatchesCursor: optionalString(item.NextMatchesCursor),
 		Matches:           toSearchMatchItems(item.Matches),
 	}
 }
 
-func toDocSearchFeedResponse(result *exec.CursorResult[agent.DocSearchResult]) api.DocSearchFeedResponse {
-	items, hasMore, nextCursor := mapCursorItems(result, toDocSearchPageItem)
+func toDocSearchFeedResponse(
+	result *exec.CursorResult[agent.DocSearchResult],
+	workspaceName string,
+	visibility docWorkspaceVisibility,
+) api.DocSearchFeedResponse {
+	items := make([]api.DocSearchPageItem, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toDocSearchPageItem(item, workspaceName, visibility))
+	}
 	return api.DocSearchFeedResponse{
 		Results:    items,
-		HasMore:    hasMore,
-		NextCursor: nextCursor,
+		HasMore:    result.HasMore,
+		NextCursor: optionalString(result.NextCursor),
 	}
 }
 
@@ -154,17 +154,19 @@ func (a *API) SearchDAGFeed(ctx context.Context, request api.SearchDAGFeedReques
 	if err != nil {
 		return nil, err
 	}
-	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	labels := scopedDAGSearchLabels(request.Params.Labels)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
 
 	result, errs, err := a.dagStore.SearchCursor(ctx, exec.SearchDAGsOptions{
-		Cursor:     valueOf(request.Params.Cursor),
-		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
-		Query:      query,
-		MatchLimit: searchPreviewMatchesLimit,
-		Labels:     labels,
+		Cursor:          valueOf(request.Params.Cursor),
+		Limit:           normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
+		Query:           query,
+		MatchLimit:      searchPreviewMatchesLimit,
+		Labels:          labels,
+		WorkspaceFilter: workspaceFilter,
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {
@@ -190,17 +192,18 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 	if err != nil {
 		return nil, err
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
 
 	result, err := a.docStore.SearchCursor(ctx, agent.SearchDocsOptions{
-		Cursor:     valueOf(request.Params.Cursor),
-		Limit:      normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
-		Query:      query,
-		MatchLimit: searchPreviewMatchesLimit,
-		PathPrefix: workspaceName,
+		Cursor:           valueOf(request.Params.Cursor),
+		Limit:            normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultLimit),
+		Query:            query,
+		MatchLimit:       searchPreviewMatchesLimit,
+		PathPrefix:       workspaceName,
+		ExcludePathRoots: visibility.excludedPathRoots(),
 	})
 	if err != nil {
 		if errors.Is(err, exec.ErrInvalidCursor) {
@@ -209,8 +212,17 @@ func (a *API) SearchDocFeed(ctx context.Context, request api.SearchDocFeedReques
 		logger.Error(ctx, "Failed to search docs", tag.Error(err))
 		return nil, internalError(err)
 	}
+	if workspaceName == "" && !visibility.all {
+		items := result.Items[:0]
+		for _, item := range result.Items {
+			if visibility.visible(item.ID) {
+				items = append(items, item)
+			}
+		}
+		result.Items = items
+	}
 
-	return api.SearchDocFeed200JSONResponse(toDocSearchFeedResponse(result)), nil
+	return api.SearchDocFeed200JSONResponse(toDocSearchFeedResponse(result, workspaceName, visibility)), nil
 }
 
 // SearchDagMatches returns cursor-based snippets for one DAG result.
@@ -219,16 +231,18 @@ func (a *API) SearchDagMatches(ctx context.Context, request api.SearchDagMatches
 	if err != nil {
 		return nil, err
 	}
-	labels, err := scopedDAGSearchLabels(request.Params.Labels, request.Params.Workspace)
+	labels := scopedDAGSearchLabels(request.Params.Labels)
+	workspaceFilter, err := a.workspaceFilterForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
 
 	result, err := a.dagStore.SearchMatches(ctx, request.FileName, exec.SearchDAGMatchesOptions{
-		Cursor: valueOf(request.Params.Cursor),
-		Limit:  normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
-		Query:  query,
-		Labels: labels,
+		Cursor:          valueOf(request.Params.Cursor),
+		Limit:           normalizeSearchLimit(valueOf(request.Params.Limit), searchDefaultMatchLimit),
+		Query:           query,
+		Labels:          labels,
+		WorkspaceFilter: workspaceFilter,
 	})
 	if err != nil {
 		switch {
@@ -257,9 +271,14 @@ func (a *API) SearchDocMatches(ctx context.Context, request api.SearchDocMatches
 	if err := validateDocPath(request.Params.Path); err != nil {
 		return nil, err
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, visibility, err := a.docPointReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
+	}
+	if workspaceName == "" && !visibility.all {
+		if !visibility.visible(request.Params.Path) {
+			return nil, errDocNotFound
+		}
 	}
 
 	query, err := validateSearchQuery(request.Params.Q)

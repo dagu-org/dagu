@@ -4,7 +4,10 @@
 import { Button } from '@/components/ui/button';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
-import { workspaceLabel } from '@/lib/workspace';
+import {
+  visibleDocumentPathForWorkspace,
+  workspaceDocumentQueryForWorkspace,
+} from '@/lib/workspace';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
@@ -13,6 +16,9 @@ import { AppBarContext } from '../../../contexts/AppBarContext';
 type SearchMatch = components['schemas']['SearchMatchItem'];
 type DagResult = components['schemas']['DAGSearchPageItem'];
 type DocResult = components['schemas']['DocSearchPageItem'];
+type DAGWorkspaceQuery = {
+  workspace?: string;
+};
 
 type LoadMoreResponse = {
   error?: string;
@@ -22,7 +28,12 @@ type LoadMoreResponse = {
 };
 
 type Props =
-  | { type: 'dag'; query: string; results: DagResult[] }
+  | {
+      type: 'dag';
+      query: string;
+      results: DagResult[];
+      workspaceQuery?: DAGWorkspaceQuery;
+    }
   | { type: 'doc'; query: string; results: DocResult[] };
 
 type SearchResultItemProps = {
@@ -167,75 +178,88 @@ function SearchResult(props: Props) {
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const workspaceQuery = appBarContext.selectedWorkspace || undefined;
-  const workspaceLabelQuery = workspaceQuery
-    ? workspaceLabel(workspaceQuery)
-    : undefined;
+  const dagWorkspaceQuery = type === 'dag' ? (props.workspaceQuery ?? {}) : {};
 
   const items =
     type === 'dag'
-      ? results.map((result) => ({
-          key: `dag-${result.fileName}-${query}`,
-          kind: 'DAG' as const,
-          title: result.name,
-          link: `/dags/${encodeURI(result.fileName)}/spec`,
-          initialMatches: result.matches ?? [],
-          initialHasMoreMatches: result.hasMoreMatches,
-          initialNextCursor: result.nextMatchesCursor,
-          loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
-            const response = await client.GET(
-              '/search/dags/{fileName}/matches',
-              {
+      ? results.map((result) => {
+          const linkSearch = result.workspace
+            ? `?workspace=${encodeURIComponent(result.workspace)}`
+            : '';
+          return {
+            key: `dag-${result.fileName}-${result.workspace ?? ''}-${query}`,
+            kind: 'DAG' as const,
+            title: result.name,
+            link: `/dags/${encodeURI(result.fileName)}/spec${linkSearch}`,
+            initialMatches: result.matches ?? [],
+            initialHasMoreMatches: result.hasMoreMatches,
+            initialNextCursor: result.nextMatchesCursor,
+            loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
+              const response = await client.GET(
+                '/search/dags/{fileName}/matches',
+                {
+                  params: {
+                    path: { fileName: result.fileName },
+                    query: {
+                      remoteNode,
+                      q: query,
+                      cursor,
+                      ...dagWorkspaceQuery,
+                    },
+                  },
+                }
+              );
+
+              return {
+                error: response.error?.message || undefined,
+                matches: response.data?.matches ?? [],
+                hasMore: response.data?.hasMore ?? false,
+                nextCursor: response.data?.nextCursor,
+              };
+            },
+          };
+        })
+      : results.map((result) => {
+          const docPath = visibleDocumentPathForWorkspace(
+            result.id,
+            result.workspace
+          );
+          const docWorkspaceQuery = workspaceDocumentQueryForWorkspace(
+            result.workspace
+          );
+          const linkSearch = result.workspace
+            ? `?workspace=${encodeURIComponent(result.workspace)}`
+            : '';
+          return {
+            key: `doc-${result.id}-${result.workspace ?? ''}-${query}`,
+            kind: 'Doc' as const,
+            title: result.title,
+            link: `/docs/${encodeURI(docPath)}${linkSearch}`,
+            initialMatches: result.matches ?? [],
+            initialHasMoreMatches: result.hasMoreMatches,
+            initialNextCursor: result.nextMatchesCursor,
+            loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
+              const response = await client.GET('/search/docs/matches', {
                 params: {
-                  path: { fileName: result.fileName },
                   query: {
                     remoteNode,
-                    workspace: workspaceQuery,
+                    path: docPath,
                     q: query,
-                    labels: workspaceLabelQuery,
                     cursor,
+                    ...docWorkspaceQuery,
                   },
                 },
-              }
-            );
+              });
 
-            return {
-              error: response.error?.message || undefined,
-              matches: response.data?.matches ?? [],
-              hasMore: response.data?.hasMore ?? false,
-              nextCursor: response.data?.nextCursor,
-            };
-          },
-        }))
-      : results.map((result) => ({
-          key: `doc-${result.id}-${query}`,
-          kind: 'Doc' as const,
-          title: result.title,
-          link: `/docs/${encodeURI(result.id)}`,
-          initialMatches: result.matches ?? [],
-          initialHasMoreMatches: result.hasMoreMatches,
-          initialNextCursor: result.nextMatchesCursor,
-          loadMore: async (cursor?: string): Promise<LoadMoreResponse> => {
-            const response = await client.GET('/search/docs/matches', {
-              params: {
-                query: {
-                  remoteNode,
-                  workspace: workspaceQuery,
-                  path: result.id,
-                  q: query,
-                  cursor,
-                },
-              },
-            });
-
-            return {
-              error: response.error?.message || undefined,
-              matches: response.data?.matches ?? [],
-              hasMore: response.data?.hasMore ?? false,
-              nextCursor: response.data?.nextCursor,
-            };
-          },
-        }));
+              return {
+                error: response.error?.message || undefined,
+                matches: response.data?.matches ?? [],
+                hasMore: response.data?.hasMore ?? false,
+                nextCursor: response.data?.nextCursor,
+              };
+            },
+          };
+        });
 
   return (
     <ul className="divide-y rounded-md border">

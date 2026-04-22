@@ -47,7 +47,13 @@ import { useContentEditor } from '@/hooks/useContentEditor';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { validateDAGName } from '@/lib/dag-validation';
 import { ensureWorkspaceLabelInDAGSpec } from '@/lib/dagSpec';
-import { workspaceLabel } from '@/lib/workspace';
+import {
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+  workspaceSelectionLabel,
+  WorkspaceKind,
+  workspaceNameForSelection,
+} from '@/lib/workspace';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -67,7 +73,7 @@ import {
 } from 'lucide-react';
 import React from 'react';
 import { useCookies } from 'react-cookie';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { buildWorkflowDesignPrompt } from './buildWorkflowDesignPrompt';
 
 type DAGDetails = components['schemas']['DAGDetails'];
@@ -106,12 +112,19 @@ const DESIGN_PANEL_LIMITS = {
 };
 
 function WorkflowDesignPage() {
-  const canWrite = useCanWrite();
+  const canWriteInSelectedScope = useCanWrite();
   const config = useConfig();
   const client = useClient();
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const selectedWorkspace = workspaceNameForSelection(workspaceSelection);
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
+  const workspaceDescription = workspaceSelectionLabel(workspaceSelection);
   const { setContext } = usePageContext();
   const { schema: baseSchema } = useSchema();
   const { setHasUnsavedChanges } = useUnsavedChanges();
@@ -155,7 +168,7 @@ function WorkflowDesignPage() {
       query: {
         remoteNode,
         perPage: 200,
-        labels: workspaceLabel(selectedWorkspace),
+        ...workspaceQuery,
       },
     },
   });
@@ -210,7 +223,7 @@ function WorkflowDesignPage() {
   } = useContentEditor({
     key: JSON.stringify({
       remoteNode,
-      workspace: selectedWorkspace || null,
+      workspace: workspaceKey,
       dag: selectedDagFile || NEW_DAG_VALUE,
     }),
     serverContent: serverSpec,
@@ -266,17 +279,14 @@ function WorkflowDesignPage() {
     );
   }, [baseSchema, inheritedCustomStepTypes, effectiveLocalStepTypes]);
 
-  const editorModelUri = React.useMemo(
-    () => {
-      const workspaceSegment = encodeURIComponent(
-        JSON.stringify({ workspace: selectedWorkspace || null })
-      );
-      return selectedDagFile
-        ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/${encodeURIComponent(selectedDagFile)}.yaml`
-        : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/new.yaml`;
-    },
-    [remoteNode, selectedDagFile, selectedWorkspace]
-  );
+  const editorModelUri = React.useMemo(() => {
+    const workspaceSegment = encodeURIComponent(
+      JSON.stringify({ workspace: workspaceKey })
+    );
+    return selectedDagFile
+      ? `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/${encodeURIComponent(selectedDagFile)}.yaml`
+      : `inmemory://dagu/${encodeURIComponent(remoteNode)}/${workspaceSegment}/design/new.yaml`;
+  }, [remoteNode, selectedDagFile, workspaceKey]);
 
   const debouncedSpec = useDebouncedValue(editorValue, 500);
   const validationName = selectedDagFile || newDagName || 'designed-dag';
@@ -366,16 +376,13 @@ function WorkflowDesignPage() {
     wasAgentWorkingRef.current = agent.isWorking;
   }, [agent.isWorking, selectedDagFile, mutateSpec]);
 
-  if (!canWrite) {
-    return <Navigate to="/" replace />;
-  }
-
   const dagFiles = dagListQuery.data?.dags || [];
   const selectedDag = validation?.dag || specData?.dag;
   const steps = selectedDag?.steps || [];
   const selectedStep = steps.find((step) => step.name === selectedStepName);
   const hasValidationErrors = !!validation?.errors?.length;
   const canSubmitDesignRequest =
+    canWriteInSelectedScope &&
     config.agentEnabled &&
     requestText.trim().length > 0 &&
     !isSendingDesignRequest &&
@@ -387,7 +394,9 @@ function WorkflowDesignPage() {
     !!newDagName &&
     !!validation?.valid &&
     newNameValidation?.isValid !== false;
-  const canSave = selectedDagFile ? !!canSaveExisting : canCreateNew;
+  const canSave =
+    canWriteInSelectedScope &&
+    (selectedDagFile ? !!canSaveExisting : canCreateNew);
 
   const updateSearch = (dagFile: string, stepName?: string) => {
     const next = new URLSearchParams(searchParams);
@@ -442,6 +451,13 @@ function WorkflowDesignPage() {
   };
 
   const handleSave = async () => {
+    if (!canWriteInSelectedScope) {
+      showError(
+        'Workspace is read-only',
+        'Select default or a writable workspace before changing a DAG.'
+      );
+      return;
+    }
     if (selectedDagFile) {
       if (!canSaveExisting || currentValue == null) return;
       setIsSaving(true);
@@ -487,9 +503,10 @@ function WorkflowDesignPage() {
     }
 
     setIsSaving(true);
-    const specToSave = selectedWorkspace
-      ? ensureWorkspaceLabelInDAGSpec(newDraftSpec, selectedWorkspace)
-      : newDraftSpec;
+    const specToSave =
+      workspaceSelection?.kind === WorkspaceKind.workspace && selectedWorkspace
+        ? ensureWorkspaceLabelInDAGSpec(newDraftSpec, selectedWorkspace)
+        : newDraftSpec;
     try {
       const { error } = await client.POST('/dags', {
         params: { query: { remoteNode } },
@@ -517,6 +534,13 @@ function WorkflowDesignPage() {
   const handleSendDesignRequest = async () => {
     const trimmed = requestText.trim();
     if (!trimmed) return;
+    if (!canWriteInSelectedScope) {
+      showError(
+        'Workspace is read-only',
+        'Select default or a writable workspace before asking the agent to change a DAG.'
+      );
+      return;
+    }
     if (!config.agentEnabled) {
       showError(
         'Agent is disabled',
@@ -553,6 +577,7 @@ function WorkflowDesignPage() {
           stepName: selectedStepName || undefined,
           remoteNode,
           selectedWorkspace,
+          workspaceDescription,
           userPrompt: trimmed,
           draftSpec: selectedDagFile ? undefined : newDraftSpec,
           validationErrors: validation?.errors,
@@ -662,7 +687,7 @@ function WorkflowDesignPage() {
                   <DAGEditorWithDocs
                     value={editorValue}
                     onChange={handleEditorChange}
-                    readOnly={false}
+                    readOnly={!canWriteInSelectedScope}
                     className="h-[56vh] min-h-[420px]"
                     modelUri={editorModelUri}
                     schema={editorSchema}

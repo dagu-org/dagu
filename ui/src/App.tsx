@@ -20,7 +20,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorModalProvider } from './components/ui/error-modal';
 import { ToastProvider } from './components/ui/simple-toast';
 import { AppBarContext } from './contexts/AppBarContext';
-import { AuthProvider, useCanWrite } from './contexts/AuthContext';
+import { AuthProvider, hasRole, useAuth } from './contexts/AuthContext';
 import {
   Config,
   ConfigContext,
@@ -41,10 +41,15 @@ import { getAuthHeaders } from './lib/authHeaders';
 import { fetchWithTimeout, shouldRetryQueryError } from './lib/requestTimeout';
 import { useClient } from './hooks/api';
 import {
-  getStoredWorkspaceName,
-  persistWorkspaceName,
+  getStoredWorkspaceSelection,
+  persistWorkspaceSelection,
   sanitizeWorkspaceName,
+  sanitizeWorkspaceSelection,
+  WorkspaceKind,
+  workspaceNameForSelection,
+  type WorkspaceSelection,
 } from './lib/workspace';
+import { UserRole } from './api/v1/schema';
 import Dashboard from './pages';
 import CockpitPage from './pages/cockpit';
 import AgentMemoryPage from './pages/agent-memory';
@@ -80,6 +85,38 @@ type Props = {
 };
 
 const REMOTE_NODE_STORAGE_KEY = 'dagu-selected-remote-node';
+const WORKSPACE_SENSITIVE_TARGET_PATH_PREFIXES = [
+  '/dags/{fileName}',
+  '/dag-runs/{name}/{dagRunId}',
+] as const;
+
+function isWorkspaceSensitiveTargetPath(path: unknown): boolean {
+  return (
+    typeof path === 'string' &&
+    WORKSPACE_SENSITIVE_TARGET_PATH_PREFIXES.some((prefix) =>
+      path.startsWith(prefix)
+    )
+  );
+}
+
+function isWorkspaceScopedSWRKey(key: unknown): boolean {
+  if (!Array.isArray(key) || key.length < 3) {
+    return false;
+  }
+
+  if (isWorkspaceSensitiveTargetPath(key[1])) {
+    return true;
+  }
+
+  const init = key[2];
+  if (!init || typeof init !== 'object') {
+    return false;
+  }
+
+  const query = (init as { params?: { query?: Record<string, unknown> } })
+    .params?.query;
+  return !!query && Object.prototype.hasOwnProperty.call(query, 'workspace');
+}
 
 function parseRemoteNodes(remoteNodesConfig: string): string[] {
   const nodes = remoteNodesConfig
@@ -106,7 +143,9 @@ function AdminElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole="admin">{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute requiredRole={UserRole.admin}>{children}</ProtectedRoute>
+  );
 }
 
 function ManagerElement({
@@ -114,7 +153,9 @@ function ManagerElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole="manager">{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute requiredRole={UserRole.manager}>{children}</ProtectedRoute>
+  );
 }
 
 function DeveloperElement({
@@ -122,7 +163,11 @@ function DeveloperElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  return <ProtectedRoute requiredRole="developer">{children}</ProtectedRoute>;
+  return (
+    <ProtectedRoute requiredRole={UserRole.developer}>
+      {children}
+    </ProtectedRoute>
+  );
 }
 
 function WriteElement({
@@ -130,9 +175,15 @@ function WriteElement({
 }: {
   children: React.ReactElement;
 }): React.ReactElement {
-  const canWrite = useCanWrite();
+  const { user } = useAuth();
   const config = React.useContext(ConfigContext);
-  if (!canWrite || !config.agentEnabled) return <Navigate to="/" replace />;
+  const canWrite =
+    config.authMode !== 'builtin'
+      ? config.permissions.writeDags
+      : hasRole(user?.role ?? UserRole.viewer, UserRole.developer);
+  if (!canWrite || !config.agentEnabled) {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 
@@ -206,8 +257,20 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   const [workspaceError, setWorkspaceError] = React.useState<Error | null>(
     null
   );
-  const [selectedWorkspace, setSelectedWorkspace] = React.useState<string>(() =>
-    getStoredWorkspaceName()
+  const [workspaceSelection, setWorkspaceSelection] =
+    React.useState<WorkspaceSelection>(() => getStoredWorkspaceSelection());
+  const selectedWorkspaceName = workspaceNameForSelection(workspaceSelection);
+  const handleSelectWorkspace = React.useCallback(
+    (selection: WorkspaceSelection) => {
+      const sanitized = sanitizeWorkspaceSelection(selection);
+      setWorkspaceSelection(sanitized);
+      persistWorkspaceSelection(sanitized);
+
+      // Revalidate active workspace-scoped queries without blanking unrelated
+      // cache entries, such as system status or worker lists.
+      void globalMutate(isWorkspaceScopedSWRKey);
+    },
+    []
   );
   const workspaceFetchSeqRef = React.useRef(0);
 
@@ -219,16 +282,6 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
     },
     [updateConfig]
   );
-
-  const handleSelectWorkspace = React.useCallback((name: string) => {
-    const sanitized = sanitizeWorkspaceName(name);
-    setSelectedWorkspace(sanitized);
-    persistWorkspaceName(sanitized);
-
-    // Workspace scopes are part of most active data keys. Clear cached responses
-    // so pages that do not remount still refetch with the new global scope.
-    globalMutate(() => true, undefined, { revalidate: false });
-  }, []);
 
   const handleSelectRemoteNode = React.useCallback(
     (node: string) => {
@@ -297,7 +350,10 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
         ...workspaces.filter((workspace) => workspace.id !== response.data.id),
         response.data,
       ]);
-      handleSelectWorkspace(response.data.name);
+      handleSelectWorkspace({
+        kind: WorkspaceKind.workspace,
+        workspace: response.data.name,
+      });
     },
     [
       applyWorkspaces,
@@ -327,10 +383,10 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       applyWorkspaces(workspaces.filter((workspace) => workspace.id !== id));
       const deletedSelected = workspaces.some(
         (workspace) =>
-          workspace.id === id && workspace.name === selectedWorkspace
+          workspace.id === id && workspace.name === selectedWorkspaceName
       );
       if (deletedSelected) {
-        handleSelectWorkspace('');
+        handleSelectWorkspace({ kind: WorkspaceKind.all });
       }
     },
     [
@@ -338,7 +394,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
       client,
       handleSelectWorkspace,
       selectedRemoteNode,
-      selectedWorkspace,
+      selectedWorkspaceName,
       workspaces,
     ]
   );
@@ -387,12 +443,18 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
   React.useEffect(() => {
     if (
       workspacesLoaded &&
-      selectedWorkspace &&
-      !workspaces.some((workspace) => workspace.name === selectedWorkspace)
+      workspaceSelection.kind === WorkspaceKind.workspace &&
+      !workspaces.some((workspace) => workspace.name === selectedWorkspaceName)
     ) {
-      handleSelectWorkspace('');
+      handleSelectWorkspace({ kind: WorkspaceKind.all });
     }
-  }, [handleSelectWorkspace, selectedWorkspace, workspaces, workspacesLoaded]);
+  }, [
+    handleSelectWorkspace,
+    selectedWorkspaceName,
+    workspaceSelection.kind,
+    workspaces,
+    workspacesLoaded,
+  ]);
 
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -425,7 +487,7 @@ function AppInner({ config: initialConfig }: Props): React.ReactElement {
             selectRemoteNode: handleSelectRemoteNode,
             workspaces,
             workspaceError,
-            selectedWorkspace,
+            workspaceSelection,
             selectWorkspace: handleSelectWorkspace,
             createWorkspace: handleCreateWorkspace,
             deleteWorkspace: handleDeleteWorkspace,

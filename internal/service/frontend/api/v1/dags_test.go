@@ -91,6 +91,13 @@ func apiStatusOutputValue(t *testing.T, status *exec.DAGRunStatus, key string) s
 	return ""
 }
 
+func TestDAGRunHistoryReturnsNotFoundForMissingDAG(t *testing.T) {
+	server := test.SetupServer(t)
+
+	server.Client().Get("/api/v1/dags/missing-dag/dag-runs").
+		ExpectStatus(http.StatusNotFound).Send(t)
+}
+
 func TestDAGWritesDisabledInReadOnlyMode(t *testing.T) {
 	// Setup server with gitSync.enabled=true, pushEnabled=false (read-only mode)
 	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {

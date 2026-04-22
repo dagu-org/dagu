@@ -7,6 +7,7 @@ import {
   loginViaAPI,
   loginViaUI,
   uniqueName,
+  useDefaultWorkspaceScope,
   waitForDAGAvailable,
   writeLocalDAG,
 } from './helpers/e2e';
@@ -22,6 +23,7 @@ test.describe('DAG CRUD operations', () => {
   test.beforeEach(async ({ page }) => {
     const stack = await loadStack();
     await loginViaUI(page, stack.auth.adminUsername, stack.auth.adminPassword);
+    await useDefaultWorkspaceScope(page);
   });
 
   test('creates a new DAG from the UI', async ({ page }) => {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Button } from '@/components/ui/button';
-import { useCanWrite } from '@/contexts/AuthContext';
+import { useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import {
   Calendar,
@@ -27,6 +27,7 @@ interface DAGHeaderProps {
   currentDAGRun?: components['schemas']['DAGRunDetails'];
   fileName: string;
   filePath?: string;
+  workspace?: string | null;
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   navigateToStatusTab?: () => void;
@@ -37,13 +38,14 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
   currentDAGRun,
   fileName,
   filePath,
+  workspace,
   refreshFn,
   formatDuration,
   navigateToStatusTab,
 }) => {
   const navigate = useNavigate();
   const params = useParams<{ tab?: string }>();
-  const canWrite = useCanWrite();
+  const canWrite = useCanWriteForWorkspace(workspace);
   const config = useConfig();
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);

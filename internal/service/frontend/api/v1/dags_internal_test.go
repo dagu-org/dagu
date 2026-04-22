@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,9 @@ import (
 	"time"
 
 	openapi "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/spec"
 	localapi "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/dagucloud/dagu/internal/test"
@@ -27,6 +31,26 @@ func (s stubSchedulerStateStore) Load(context.Context) (*scheduler.SchedulerStat
 }
 
 func (stubSchedulerStateStore) Save(context.Context, *scheduler.SchedulerState) error {
+	return nil
+}
+
+var errLoadSpecFatal = errors.New("load spec fatal")
+
+type loadSpecErrorDAGStore struct {
+	exec.DAGStore
+	updateCalled bool
+}
+
+func (s *loadSpecErrorDAGStore) GetDetails(context.Context, string, ...spec.LoadOption) (*core.DAG, error) {
+	return &core.DAG{Name: "load-spec-error"}, nil
+}
+
+func (s *loadSpecErrorDAGStore) LoadSpec(context.Context, []byte, ...spec.LoadOption) (*core.DAG, error) {
+	return nil, errLoadSpecFatal
+}
+
+func (s *loadSpecErrorDAGStore) UpdateSpec(context.Context, string, []byte) error {
+	s.updateCalled = true
 	return nil
 }
 
@@ -293,6 +317,36 @@ steps:
 	require.True(t, ok, "expected 200 response, got %T", respObj)
 	require.NotEmpty(t, resp.Errors)
 	require.Contains(t, resp.Errors[0], `fields "with" and "config" cannot be used together`)
+}
+
+func TestUpdateDAGSpec_ReturnsFatalLoadSpecError(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	dagStore := &loadSpecErrorDAGStore{}
+	api := localapi.New(
+		dagStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "load-spec-error",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: "steps:\n  - command: echo updated\n",
+		},
+	})
+
+	require.ErrorIs(t, err, errLoadSpecFatal)
+	require.Nil(t, respObj)
+	require.False(t, dagStore.updateCalled)
 }
 
 func TestGetDAGDetails_EditorHintsIncludeInheritedCustomStepTypes(t *testing.T) {

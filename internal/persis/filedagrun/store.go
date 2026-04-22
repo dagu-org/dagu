@@ -146,6 +146,7 @@ func (store *Store) resolveStatus(
 	ctx context.Context,
 	dagRun *DAGRun,
 	labelFilters []core.LabelFilter,
+	workspaceFilter *exec.WorkspaceFilter,
 	statusesFilter map[core.Status]struct{},
 	hasStatusFilter bool,
 ) *exec.DAGRunStatus {
@@ -161,6 +162,9 @@ func (store *Store) resolveStatus(
 			if !summaryLabels.MatchesFilters(labelFilters) {
 				return nil
 			}
+		}
+		if !workspaceFilter.MatchesLabels(core.NewLabels(dagRun.summary.Labels)) {
+			return nil
 		}
 
 		// Passed filters — construct status directly from index.
@@ -211,6 +215,9 @@ func (store *Store) resolveStatus(
 		if !statusLabels.MatchesFilters(labelFilters) {
 			return nil
 		}
+	}
+	if !workspaceFilter.MatchesLabels(core.NewLabels(status.Labels)) {
+		return nil
 	}
 
 	if hasStatusFilter {

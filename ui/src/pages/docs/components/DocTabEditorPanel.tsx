@@ -6,7 +6,11 @@ import DocEditor from './DocEditor';
 import DocTabBar from './DocTabBar';
 
 type Props = {
-  onDeleteDoc?: (docPath: string, title: string) => void;
+  onDeleteDoc?: (
+    docPath: string,
+    title: string,
+    workspace?: string | null
+  ) => void;
   toolbar?: React.ReactNode;
   onContentChange?: (content: string | null) => void;
 };
@@ -115,7 +119,17 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
             key={activeTab.id}
             tabId={activeTab.id}
             docPath={activeTab.docPath}
-            onDeleteDoc={onDeleteDoc ? () => onDeleteDoc(activeTab.docPath, activeTab.title) : undefined}
+            workspace={activeTab.workspace}
+            onDeleteDoc={
+              onDeleteDoc
+                ? () =>
+                    onDeleteDoc(
+                      activeTab.docPath,
+                      activeTab.title,
+                      activeTab.workspace
+                    )
+                : undefined
+            }
             onContentChange={onContentChange}
           />
         ) : (

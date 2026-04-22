@@ -29,7 +29,10 @@ import DashboardTimeChart from '../features/dashboard/components/DashboardTimech
 import { optionalPositiveInt } from '../hooks/queryUtils';
 import PathsCard from '../features/system-status/components/PathsCard';
 import dayjs from '../lib/dayjs';
-import { workspaceLabel } from '../lib/workspace';
+import {
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+} from '../lib/workspace';
 import Title from '../ui/Title';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
@@ -79,7 +82,7 @@ function compareDAGNames(left: string, right: string): number {
 async function fetchAllDashboardDAGNames(
   client: ReturnType<typeof useClient>,
   remoteNode: string,
-  workspaceLabelQuery: string | undefined,
+  workspaceQuery: ReturnType<typeof workspaceSelectionQuery>,
   signal: AbortSignal
 ): Promise<string[]> {
   const names = new Set<string>();
@@ -92,9 +95,9 @@ async function fetchAllDashboardDAGNames(
           remoteNode,
           page,
           perPage: 100,
-          labels: workspaceLabelQuery,
           sort: PathsDagsGetParametersQuerySort.name,
           order: PathsDagsGetParametersQueryOrder.asc,
+          ...workspaceQuery,
         },
       },
       signal,
@@ -133,15 +136,19 @@ function Dashboard(): React.ReactElement | null {
   const config = useConfig();
   const searchState = useSearchState();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
-  const workspaceLabelQuery = workspaceLabel(selectedWorkspace);
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = React.useMemo(
     () =>
       JSON.stringify({
         remoteNode,
-        workspace: selectedWorkspace || null,
+        workspace: workspaceKey,
       }),
-    [remoteNode, selectedWorkspace]
+    [remoteNode, workspaceKey]
   );
 
   const [modalDAGRun, setModalDAGRun] = React.useState<{
@@ -269,7 +276,7 @@ function Dashboard(): React.ReactElement | null {
       toDate: dateRange.endDate,
       name: selectedDAGName,
       status: DASHBOARD_VISIBLE_STATUSES,
-      labels: workspaceLabelQuery,
+      ...workspaceQuery,
       ...(dashboardPageLimit !== undefined
         ? { limit: dashboardPageLimit }
         : {}),
@@ -280,7 +287,7 @@ function Dashboard(): React.ReactElement | null {
       dateRange.startDate,
       remoteNode,
       selectedDAGName,
-      workspaceLabelQuery,
+      workspaceQuery,
     ]
   );
 
@@ -343,7 +350,7 @@ function Dashboard(): React.ReactElement | null {
     void fetchAllDashboardDAGNames(
       client,
       remoteNode,
-      workspaceLabelQuery,
+      workspaceQuery,
       controller.signal
     )
       .then((names) => {
@@ -358,7 +365,7 @@ function Dashboard(): React.ReactElement | null {
       });
 
     return () => controller.abort();
-  }, [client, remoteNode, workspaceLabelQuery]);
+  }, [client, remoteNode, workspaceQuery]);
 
   React.useEffect(() => {
     lastWindowScrollYRef.current = window.scrollY;
