@@ -1758,13 +1758,19 @@ func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, err
 		page := parseIntParam(params.Get("page"), 1)
 		perPage := parseIntParam(params.Get("perPage"), 100)
 
-		sortField := params.Get("sort")
+		sortField := a.config.UI.DAGs.SortField
 		if sortField == "" {
 			sortField = "name"
 		}
-		sortOrder := params.Get("order")
+		if rawSort := params.Get("sort"); rawSort != "" {
+			sortField = rawSort
+		}
+		sortOrder := a.config.UI.DAGs.SortOrder
 		if sortOrder == "" {
 			sortOrder = "asc"
+		}
+		if rawOrder := params.Get("order"); rawOrder != "" {
+			sortOrder = rawOrder
 		}
 
 		var labelsParam, deprecatedTagsParam *string
