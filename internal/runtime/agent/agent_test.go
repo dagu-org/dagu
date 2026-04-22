@@ -72,6 +72,23 @@ func writeFileCommand(path, content string) string {
 	return fmt.Sprintf("printf '%%s' %s > %s", test.PosixQuote(content), test.PosixQuote(path))
 }
 
+func waitForTestFile(t *testing.T, path string, timeout time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(path)
+		return err == nil
+	}, timeout, 50*time.Millisecond)
+}
+
+func waitForCancel(t *testing.T, done <-chan struct{}, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		require.FailNow(t, "timed out waiting for DAG cancellation")
+	}
+}
+
 func agentRunStartTimeout() time.Duration {
 	if runtime.GOOS == "windows" {
 		return 30 * time.Second
@@ -302,8 +319,8 @@ steps:
 		done := make(chan struct{})
 
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
-			close(done)
 		}()
 
 		require.Eventually(t, func() bool {
@@ -317,11 +334,7 @@ steps:
 		// send a signal to cancel the DAG
 		dagAgent.Abort()
 
-		select {
-		case <-done:
-		case <-time.After(30 * time.Second):
-			t.Fatal("timed out waiting for DAG cancellation")
-		}
+		waitForCancel(t, done, 30*time.Second)
 
 		// wait for the DAG to be canceled
 		dag.AssertLatestStatus(t, core.Aborted)
@@ -627,37 +640,43 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}
 		th := test.Setup(t)
 
-		releaseFile := filepath.Join(t.TempDir(), "http-valid.release")
+		tmpDir := t.TempDir()
+		releaseFile := filepath.Join(tmpDir, "http-valid.release")
+		startedFile := filepath.Join(tmpDir, "http-valid.started")
 		t.Cleanup(func() {
 			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
 		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
-  - %q
-`, waitForFileScript(releaseFile, 50*time.Millisecond)))
+  - command: %q
+`, writeFileCommand(startedFile, "started")+"\n"+waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 		ctx := th.Context
+		done := make(chan struct{})
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
 		}()
 
-		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, core.Running)
+		waitForTestFile(t, startedFile, 2*time.Minute)
 
 		// Get the status of the DAG
-		var mockResponseWriter = mockResponseWriter{}
-		dagAgent.HandleHTTP(ctx)(&mockResponseWriter, &http.Request{
-			Method: "GET", URL: &url.URL{Path: "/status"},
-		})
-		require.Equal(t, http.StatusOK, mockResponseWriter.status)
+		require.Eventually(t, func() bool {
+			rw := mockResponseWriter{}
+			dagAgent.HandleHTTP(ctx)(&rw, &http.Request{
+				Method: "GET", URL: &url.URL{Path: "/status"},
+			})
+			if rw.status != http.StatusOK {
+				return false
+			}
 
-		// Check if the status is returned correctly
-		dagRunStatus, err := exec.StatusFromJSON(mockResponseWriter.body)
-		require.NoError(t, err)
-		require.Equal(t, core.Running, dagRunStatus.Status)
+			dagRunStatus, err := exec.StatusFromJSON(rw.body)
+			return err == nil && dagRunStatus.Status == core.Running
+		}, 10*time.Second, 50*time.Millisecond)
 
 		// Stop the DAG
 		dagAgent.Abort()
 
+		waitForCancel(t, done, 30*time.Second)
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPInvalidRequest", func(t *testing.T) {
@@ -666,33 +685,37 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}
 		th := test.Setup(t)
 
-		releaseFile := filepath.Join(t.TempDir(), "http-invalid.release")
+		tmpDir := t.TempDir()
+		releaseFile := filepath.Join(tmpDir, "http-invalid.release")
+		startedFile := filepath.Join(tmpDir, "http-invalid.started")
 		t.Cleanup(func() {
 			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
 		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
-  - %q
-`, waitForFileScript(releaseFile, 50*time.Millisecond)))
+  - command: %q
+`, writeFileCommand(startedFile, "started")+"\n"+waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 
+		done := make(chan struct{})
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
 		}()
 
-		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, core.Running)
+		waitForTestFile(t, startedFile, 2*time.Minute)
 
-		var mockResponseWriter = mockResponseWriter{}
+		rw := mockResponseWriter{}
 
 		// Request with an invalid path
-		dagAgent.HandleHTTP(th.Context)(&mockResponseWriter, &http.Request{
+		dagAgent.HandleHTTP(th.Context)(&rw, &http.Request{
 			Method: "GET",
 			URL:    &url.URL{Path: "/invalid-path"},
 		})
-		require.Equal(t, http.StatusNotFound, mockResponseWriter.status)
+		require.Equal(t, http.StatusNotFound, rw.status)
 
 		// Stop the DAG
 		dagAgent.Abort()
+		waitForCancel(t, done, 30*time.Second)
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 	t.Run("HTTPHandleCancel", func(t *testing.T) {
@@ -701,35 +724,36 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}
 		th := test.Setup(t)
 
-		releaseFile := filepath.Join(t.TempDir(), "http-cancel.release")
+		tmpDir := t.TempDir()
+		releaseFile := filepath.Join(tmpDir, "http-cancel.release")
+		startedFile := filepath.Join(tmpDir, "http-cancel.started")
 		t.Cleanup(func() {
 			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
 		})
 		dag := th.DAG(t, fmt.Sprintf(`steps:
-  - %q
-`, waitForFileScript(releaseFile, 50*time.Millisecond)))
+  - command: %q
+`, writeFileCommand(startedFile, "started")+"\n"+waitForFileScript(releaseFile, 50*time.Millisecond)))
 		dagAgent := dag.Agent()
 
 		done := make(chan struct{})
 		go func() {
+			defer close(done)
 			dagAgent.RunCancel(t)
-			close(done)
 		}()
 
-		// Wait for the DAG to start
-		dag.AssertLatestStatus(t, core.Running)
+		waitForTestFile(t, startedFile, 2*time.Minute)
 
 		// Cancel the DAG
-		var mockResponseWriter = mockResponseWriter{}
-		dagAgent.HandleHTTP(th.Context)(&mockResponseWriter, &http.Request{
+		rw := mockResponseWriter{}
+		dagAgent.HandleHTTP(th.Context)(&rw, &http.Request{
 			Method: "POST",
 			URL:    &url.URL{Path: "/stop"},
 		})
-		require.Equal(t, http.StatusOK, mockResponseWriter.status)
-		require.Equal(t, "OK", mockResponseWriter.body)
+		require.Equal(t, http.StatusOK, rw.status)
+		require.Equal(t, "OK", rw.body)
 
 		// Wait for the DAG to stop
-		<-done
+		waitForCancel(t, done, 30*time.Second)
 		dag.AssertLatestStatus(t, core.Aborted)
 	})
 }

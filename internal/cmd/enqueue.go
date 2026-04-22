@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -135,15 +136,25 @@ func enqueueDAGRun(ctx *Context, dag *core.DAG, dagRunID string, triggerType cor
 	if err := att.Open(ctx.Context); err != nil {
 		return fmt.Errorf("failed to open run: %w", err)
 	}
-	defer func() {
-		_ = att.Close(ctx.Context)
-	}()
 
 	if err := att.Write(ctx.Context, dagStatus); err != nil {
+		_ = att.Close(ctx.Context)
 		return fmt.Errorf("failed to save status: %w", err)
 	}
 
+	closeErr := att.Close(ctx.Context)
+	if closeErr != nil {
+		logger.Warn(ctx.Context, "Failed to close queued status before enqueue",
+			tag.Error(closeErr))
+	}
+
 	if err := ctx.QueueStore.Enqueue(ctx.Context, dag.ProcGroup(), exec.QueuePriorityLow, dagRun); err != nil {
+		if closeErr != nil {
+			return errors.Join(
+				fmt.Errorf("failed to close run: %w", closeErr),
+				fmt.Errorf("failed to enqueue dag-run: %w", err),
+			)
+		}
 		return fmt.Errorf("failed to enqueue dag-run: %w", err)
 	}
 
