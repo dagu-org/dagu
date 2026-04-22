@@ -173,12 +173,12 @@ func TestAgent_Run(t *testing.T) {
 				}
 				return false
 			}
-			status, err := th.DAGRunMgr.GetCurrentStatus(context.Background(), dag.DAG, "test-dag-run")
-			if err != nil || status == nil || status.Status != core.Running {
-				return false
-			}
 			return th.DAGRunMgr.IsRunning(context.Background(), dag.DAG, "test-dag-run")
 		}, agentRunStartTimeout(), 50*time.Millisecond, "DAG should be running after the blocking step starts")
+
+		alreadyRunningAgent := dag.Agent(test.WithDAGRunID("test-dag-run"))
+		err := alreadyRunningAgent.Run(alreadyRunningAgent.Context)
+		require.ErrorContains(t, err, "already running")
 
 		require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 
