@@ -78,6 +78,23 @@ func TestDeriveManualDAGRunStatusContinueOnMarkSuccessIsContinuable(t *testing.T
 	assert.Equal(t, core.PartiallySucceeded, status)
 }
 
+func TestDeriveManualDAGRunStatusMixedNotStartedAndSucceededIsNonRunning(t *testing.T) {
+	t.Parallel()
+
+	status := deriveManualDAGRunStatus([]*exec.Node{
+		{
+			Step:   core.Step{Name: "succeeded"},
+			Status: core.NodeSucceeded,
+		},
+		{
+			Step:   core.Step{Name: "reset"},
+			Status: core.NodeNotStarted,
+		},
+	}, core.Succeeded)
+
+	assert.Equal(t, core.PartiallySucceeded, status)
+}
+
 func TestApplyInlineEnqueueLabels_ArrayLabels(t *testing.T) {
 	t.Parallel()
 

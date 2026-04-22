@@ -1744,55 +1744,59 @@ func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, erro
 // GetDAGsListData returns DAGs list for SSE.
 // Identifier format: URL query string (e.g., "page=1&perPage=100&name=mydag")
 func (a *API) GetDAGsListData(ctx context.Context, queryString string) (any, error) {
-	params, err := url.ParseQuery(queryString)
-	if err != nil {
-		logger.Warn(ctx, "Failed to parse query string for DAGs list",
-			tag.Error(err),
-			slog.String("queryString", queryString),
-		)
-	}
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dags",
+	}, func(readCtx context.Context) (any, error) {
+		params, err := url.ParseQuery(queryString)
+		if err != nil {
+			logger.Warn(readCtx, "Failed to parse query string for DAGs list",
+				tag.Error(err),
+				slog.String("queryString", queryString),
+			)
+		}
 
-	page := parseIntParam(params.Get("page"), 1)
-	perPage := parseIntParam(params.Get("perPage"), 100)
+		page := parseIntParam(params.Get("page"), 1)
+		perPage := parseIntParam(params.Get("perPage"), 100)
 
-	sortField := params.Get("sort")
-	if sortField == "" {
-		sortField = "name"
-	}
-	sortOrder := params.Get("order")
-	if sortOrder == "" {
-		sortOrder = "asc"
-	}
+		sortField := params.Get("sort")
+		if sortField == "" {
+			sortField = "name"
+		}
+		sortOrder := params.Get("order")
+		if sortOrder == "" {
+			sortOrder = "asc"
+		}
 
-	var labelsParam, deprecatedTagsParam *string
-	if rawLabels := params.Get("labels"); rawLabels != "" {
-		labelsParam = &rawLabels
-	}
-	if rawTags := params.Get("tags"); rawTags != "" {
-		deprecatedTagsParam = &rawTags
-	}
-	labelQueryParam, labelErr := queryLabelsParam(labelsParam, deprecatedTagsParam)
-	if labelErr != nil {
-		return nil, labelErr
-	}
-	labels := parseCommaSeparatedLabels(labelQueryParam)
+		var labelsParam, deprecatedTagsParam *string
+		if rawLabels := params.Get("labels"); rawLabels != "" {
+			labelsParam = &rawLabels
+		}
+		if rawTags := params.Get("tags"); rawTags != "" {
+			deprecatedTagsParam = &rawTags
+		}
+		labelQueryParam, labelErr := queryLabelsParam(labelsParam, deprecatedTagsParam)
+		if labelErr != nil {
+			return nil, labelErr
+		}
+		labels := parseCommaSeparatedLabels(labelQueryParam)
 
-	pg := exec.NewPaginator(page, perPage)
-	workspaceParam := workspaceParamFromValues(params)
-	workspaceFilter, err := a.workspaceFilterForParams(ctx, workspaceParam)
-	if err != nil {
-		return nil, err
-	}
-	listOpts := exec.ListDAGsOptions{
-		Paginator:       &pg,
-		Name:            params.Get("name"),
-		Labels:          labels,
-		Sort:            sortField,
-		Order:           sortOrder,
-		WorkspaceFilter: workspaceFilter,
-	}
+		pg := exec.NewPaginator(page, perPage)
+		workspaceParam := workspaceParamFromValues(params)
+		workspaceFilter, err := a.workspaceFilterForParams(readCtx, workspaceParam)
+		if err != nil {
+			return nil, err
+		}
+		listOpts := exec.ListDAGsOptions{
+			Paginator:       &pg,
+			Name:            params.Get("name"),
+			Labels:          labels,
+			Sort:            sortField,
+			Order:           sortOrder,
+			WorkspaceFilter: workspaceFilter,
+		}
 
-	return a.listDAGsData(ctx, listOpts)
+		return a.listDAGsData(readCtx, listOpts)
+	})
 }
 
 func (a *API) listDAGsData(ctx context.Context, listOpts exec.ListDAGsOptions) (api.ListDAGs200JSONResponse, error) {

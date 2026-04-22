@@ -2381,7 +2381,7 @@ func deriveManualDAGRunStatus(nodes []*exec.Node, fallback core.Status) core.Sta
 	case hasNotStarted && !hasSuccess:
 		return core.NotStarted
 	case hasNotStarted:
-		return core.Running
+		return core.PartiallySucceeded
 	default:
 		return core.Succeeded
 	}
@@ -3923,20 +3923,24 @@ func artifactPreviewLimit(kind api.ArtifactPreviewKind) int64 {
 // GetDAGRunsListData returns DAG runs list for SSE.
 // Identifier format: URL query string (e.g., "status=running&name=mydag")
 func (a *API) GetDAGRunsListData(ctx context.Context, queryString string) (any, error) {
-	opts, err := a.dagRunListOptionsFromQueryString(ctx, queryString)
-	if err != nil {
-		return nil, err
-	}
-
-	page, err := a.dagRunStore.ListStatusesPage(ctx, opts.query...)
-	if err != nil {
-		if errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs",
+	}, func(readCtx context.Context) (any, error) {
+		opts, err := a.dagRunListOptionsFromQueryString(readCtx, queryString)
+		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("error listing dag-runs: %w", err)
-	}
 
-	return toDAGRunsPageResponse(page), nil
+		page, err := a.dagRunStore.ListStatusesPage(readCtx, opts.query...)
+		if err != nil {
+			if errors.Is(err, filedagrun.ErrInvalidQueryCursor) {
+				return nil, err
+			}
+			return nil, fmt.Errorf("error listing dag-runs: %w", err)
+		}
+
+		return toDAGRunsPageResponse(page), nil
+	})
 }
 
 func (a *API) dagRunListOptionsFromQueryString(ctx context.Context, queryString string) (dagRunListOptions, error) {
