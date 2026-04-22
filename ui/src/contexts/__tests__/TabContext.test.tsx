@@ -22,7 +22,7 @@ describe('TabProvider', () => {
     localStorage.clear();
   });
 
-  it('restores DAG tabs only from the active workspace scope', () => {
+  it('restores DAG tabs only from the active workspace', () => {
     const scopeA = 'dagu_dag_tabs:{"remoteNode":"local","workspace":"ops"}';
     const scopeB =
       'dagu_dag_tabs:{"remoteNode":"local","workspace":"platform"}';

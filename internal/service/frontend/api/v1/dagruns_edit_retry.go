@@ -63,9 +63,6 @@ func (a *API) PreviewEditRetryDAGRun(ctx context.Context, request api.PreviewEdi
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
-		return nil, err
-	}
 
 	opts, err := previewEditRetryOptions(request.Body)
 	if err != nil {
@@ -75,6 +72,14 @@ func (a *API) PreviewEditRetryDAGRun(ctx context.Context, request api.PreviewEdi
 	plan, validationErrors, err := a.buildEditRetryPlan(ctx, request.Name, request.DagRunId, opts)
 	if err != nil {
 		return nil, err
+	}
+	if plan != nil {
+		if err := a.requireDAGRunStatusExecute(ctx, plan.sourceStatus); err != nil {
+			return nil, err
+		}
+		if err := a.requireExecuteForWorkspace(ctx, dagWorkspaceName(plan.editedDAG)); err != nil {
+			return nil, err
+		}
 	}
 
 	dagName := request.Name
@@ -116,9 +121,6 @@ func (a *API) EditRetryDAGRun(ctx context.Context, request api.EditRetryDAGRunRe
 	if err := a.isAllowed(config.PermissionRunDAGs); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
-		return nil, err
-	}
 
 	opts, err := editRetryOptionsFromBody(request.Body)
 	if err != nil {
@@ -131,6 +133,14 @@ func (a *API) EditRetryDAGRun(ctx context.Context, request api.EditRetryDAGRunRe
 	}
 	if len(validationErrors) > 0 {
 		return nil, badEditRetryRequest(strings.Join(validationErrors, "; "))
+	}
+	if plan != nil {
+		if err := a.requireDAGRunStatusExecute(ctx, plan.sourceStatus); err != nil {
+			return nil, err
+		}
+		if err := a.requireExecuteForWorkspace(ctx, dagWorkspaceName(plan.editedDAG)); err != nil {
+			return nil, err
+		}
 	}
 
 	if plan.newDAGRunID == "" {

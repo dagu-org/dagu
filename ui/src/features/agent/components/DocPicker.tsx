@@ -14,6 +14,7 @@ import { FileText, Search, X } from 'lucide-react';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { cn } from '@/lib/utils';
+import { workspaceSelectionQuery } from '@/lib/workspace';
 
 export interface DocRef {
   id: string;
@@ -47,6 +48,10 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
   ) {
     const client = useClient();
     const appBarContext = useContext(AppBarContext);
+    const workspaceQuery = useMemo(
+      () => workspaceSelectionQuery(appBarContext?.workspaceSelection),
+      [appBarContext?.workspaceSelection]
+    );
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [docs, setDocs] = useState<DocEntry[]>([]);
     const [highlightIndex, setHighlightIndex] = useState(0);
@@ -59,7 +64,14 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
       async function fetchDocs() {
         try {
           const { data } = await client.GET('/docs', {
-            params: { query: { remoteNode, flat: true, perPage: 200 } },
+            params: {
+              query: {
+                remoteNode,
+                flat: true,
+                perPage: 200,
+                ...workspaceQuery,
+              },
+            },
             signal: controller.signal,
           });
           if (!data?.items) return;
@@ -76,7 +88,7 @@ export const DocPicker = forwardRef<DocPickerHandle, DocPickerProps>(
       fetchDocs();
 
       return () => controller.abort();
-    }, [client, appBarContext?.selectedRemoteNode]);
+    }, [client, appBarContext?.selectedRemoteNode, workspaceQuery]);
 
     // Click-outside handler
     useEffect(() => {

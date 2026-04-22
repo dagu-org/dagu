@@ -167,13 +167,6 @@ func (r *registry) Unregister(ctx context.Context) {
 			reg.cancel()
 		}
 
-		// Remove instance file
-		if err := removeInstanceFile(reg.fileName); err != nil {
-			logger.Error(ctx, "Failed to remove instance file",
-				tag.Error(err),
-				tag.File(reg.instanceInfo.ID))
-		}
-
 		// Wait for background goroutines with timeout
 		done := make(chan struct{})
 		go func() {
@@ -188,6 +181,14 @@ func (r *registry) Unregister(ctx context.Context) {
 			// Force shutdown after timeout
 			logger.Warn(ctx, "Timeout waiting for registry shutdown",
 				tag.Service(serviceName))
+		}
+
+		// Remove instance file after heartbeat stops so it cannot recreate the
+		// file during shutdown on Windows.
+		if err := removeInstanceFile(reg.fileName); err != nil {
+			logger.Error(ctx, "Failed to remove instance file",
+				tag.Error(err),
+				tag.File(reg.instanceInfo.ID))
 		}
 	}
 

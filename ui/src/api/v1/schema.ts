@@ -3135,6 +3135,8 @@ export interface components {
             group?: string;
             /** @description Logical name of the DAG */
             name: string;
+            /** @description Workspace label value for the DAG. Omitted for default DAGs and invalid workspace labels. */
+            workspace?: string;
             /** @description List of scheduling expressions defining when DAG-runs should be created from this DAG */
             schedule?: components["schemas"]["Schedule"][];
             /** @description Human-readable description of the DAG's purpose and behavior */
@@ -3429,6 +3431,8 @@ export interface components {
         DAGRunSummary: {
             dagRunId: components["schemas"]["DAGRunId"];
             name: components["schemas"]["DAGName"];
+            /** @description Workspace label value for the DAG-run. Omitted for default DAG-runs and invalid workspace labels. */
+            workspace?: string;
             status: components["schemas"]["Status"];
             statusLabel: components["schemas"]["StatusLabel"];
             /** @description RFC 3339 timestamp when the DAG-run was queued */
@@ -3703,6 +3707,8 @@ export interface components {
             fileName: string;
             /** @description Display label for the DAG result; file-backed search currently mirrors fileName */
             name: string;
+            /** @description Workspace label value for the matching DAG. Omitted for default DAGs and invalid workspace labels. */
+            workspace?: string;
             /** @description Whether additional snippets are available beyond the preview */
             hasMoreMatches: boolean;
             /** @description Opaque cursor for loading more snippets for this DAG result */
@@ -3720,6 +3726,8 @@ export interface components {
         DocSearchPageItem: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for default documents. */
+            workspace?: string;
             /** @description Whether additional snippets are available beyond the preview */
             hasMoreMatches: boolean;
             /** @description Opaque cursor for loading more snippets for this document result */
@@ -3947,6 +3955,20 @@ export interface components {
          * @enum {string}
          */
         UserRole: UserRole;
+        /** @description Workspace name. The reserved names all and default are not allowed. */
+        WorkspaceName: string;
+        /** @description Role granted for a specific workspace */
+        WorkspaceGrant: {
+            workspace: components["schemas"]["WorkspaceName"];
+            role: components["schemas"]["UserRole"];
+        };
+        /** @description Workspace access policy. all=true grants the top-level role in every workspace. all=false requires explicit workspace grants and a top-level viewer role. */
+        WorkspaceAccess: {
+            /** @description Whether this identity can access all workspaces */
+            all: boolean;
+            /** @description Workspace-specific grants used when all=false */
+            grants: components["schemas"]["WorkspaceGrant"][];
+        };
         /** @description Request body for initial admin account setup */
         SetupRequest: {
             /** @description Admin username */
@@ -3991,12 +4013,14 @@ export interface components {
             /** @description User's password */
             password: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
         };
         /** @description Request body for updating a user */
         UpdateUserRequest: {
             /** @description New username (must be unique) */
             username?: string;
             role?: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
             /** @description Whether to disable the user account */
             isDisabled?: boolean;
         };
@@ -4007,6 +4031,7 @@ export interface components {
             /** @description User's username */
             username: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess: components["schemas"]["WorkspaceAccess"];
             /**
              * @description Authentication provider (builtin or oidc)
              * @enum {string}
@@ -4042,6 +4067,7 @@ export interface components {
             /** @description Purpose description */
             description?: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess: components["schemas"]["WorkspaceAccess"];
             /** @description First 8 characters for identification */
             keyPrefix: string;
             /**
@@ -4077,6 +4103,7 @@ export interface components {
             /** @description Purpose description */
             description?: string;
             role: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
         };
         /** @description Create API key response */
         CreateAPIKeyResponse: {
@@ -4091,6 +4118,7 @@ export interface components {
             /** @description New description */
             description?: string;
             role?: components["schemas"]["UserRole"];
+            workspaceAccess?: components["schemas"]["WorkspaceAccess"];
         };
         /** @description Generic success response */
         SuccessResponse: {
@@ -4507,6 +4535,8 @@ export interface components {
         DocResponse: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for default documents. */
+            workspace?: string;
             /** @description Full file content including YAML frontmatter */
             content: string;
             /** @description Absolute file path of the document on disk */
@@ -4526,6 +4556,8 @@ export interface components {
         DocMetadataResponse: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for default documents. */
+            workspace?: string;
             /**
              * Format: date-time
              * @description Last modification time of the document file
@@ -4537,6 +4569,8 @@ export interface components {
             id: string;
             name: string;
             title?: string;
+            /** @description Workspace that owns this node. Omitted for default nodes. */
+            workspace?: string;
             /** @enum {string} */
             type: DocTreeNodeResponseType;
             children?: components["schemas"]["DocTreeNodeResponse"][];
@@ -4556,6 +4590,8 @@ export interface components {
         DocSearchResultItem: {
             id: string;
             title: string;
+            /** @description Workspace that owns this document. Omitted for default documents. */
+            workspace?: string;
             matches?: components["schemas"]["SearchMatchItem"][];
         };
         /** @description Search results */
@@ -4867,16 +4903,16 @@ export interface components {
             error?: string;
         };
         CreateWorkspaceRequest: {
-            name: string;
+            name: components["schemas"]["WorkspaceName"];
             description?: string;
         };
         UpdateWorkspaceRequest: {
-            name?: string;
+            name?: components["schemas"]["WorkspaceName"];
             description?: string;
         };
         WorkspaceResponse: {
             id: string;
-            name: string;
+            name: components["schemas"]["WorkspaceName"];
             description?: string;
             /** Format: date-time */
             createdAt?: string;
@@ -4897,7 +4933,7 @@ export interface components {
         APIKeyId: string;
         /** @description number of items per page (default is 30, max is 100) */
         PerPage: number;
-        /** @description selected workspace scope */
+        /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
         Workspace: string;
         /** @description Opaque cursor returned by the previous search response */
         SearchCursor: string;
@@ -5976,6 +6012,8 @@ export interface operations {
                 perPage?: components["parameters"]["PerPage"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Filter DAGs by name */
                 name?: string;
                 /** @description Filter DAGs by labels (comma-separated). Returns DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
@@ -6813,7 +6851,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
@@ -6864,7 +6902,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
@@ -6913,12 +6951,12 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
-                workspace?: components["parameters"]["Workspace"];
                 /** @description A search query string */
                 q: string;
                 /** @description Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels. */
                 labels?: string;
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Opaque cursor returned by the previous search response */
                 cursor?: components["parameters"]["SearchCursor"];
                 /** @description Number of search match snippets to return (default 5, max 50) */
@@ -6976,7 +7014,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -7036,6 +7074,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;
@@ -7068,6 +7108,8 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path?: never;
@@ -7112,6 +7154,8 @@ export interface operations {
                 cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
+                workspace?: components["parameters"]["Workspace"];
                 /** @description Filter DAG-runs by name */
                 name?: string;
                 /** @description Filter DAG-runs by DAG labels (comma-separated). Returns runs from DAGs that have ALL specified labels. Mutually exclusive with `tags`; the server returns HTTP 400 if both are set. */
@@ -7322,6 +7366,8 @@ export interface operations {
                 cursor?: components["parameters"]["DAGRunListCursor"];
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
+                workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
             path: {
@@ -12844,7 +12890,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description page number of items to fetch (default is 1) */
                 page?: components["parameters"]["Page"];
@@ -12892,7 +12938,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;
@@ -12950,7 +12996,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Search query */
                 q: string;
@@ -12995,7 +13041,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13040,7 +13086,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13083,7 +13129,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Document path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13134,7 +13180,7 @@ export interface operations {
             query: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
                 /** @description Current document or directory path (may include slashes for nested docs) */
                 path: components["schemas"]["DocPath"];
@@ -13194,7 +13240,7 @@ export interface operations {
             query?: {
                 /** @description name of the remote node */
                 remoteNode?: components["parameters"]["RemoteNode"];
-                /** @description selected workspace scope */
+                /** @description Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default. */
                 workspace?: components["parameters"]["Workspace"];
             };
             header?: never;

@@ -125,10 +125,9 @@ steps:
   - name: sleep
     command: %s
 `, test.ShellQuote(test.Sleep(time.Second)))).Enqueue(3).StartScheduler(30 * time.Second)
+	defer f.Stop()
 
 	f.WaitDrain(20 * time.Second)
-	f.Stop()
-
 	times := f.collectStartTimes()
 	require.Len(t, times, 3)
 	for i := 1; i < len(times); i++ {

@@ -6,9 +6,10 @@
  *
  * @module features/dags/components/dag-editor
  */
-import { useCanWrite } from '@/contexts/AuthContext';
+import { useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { StepDetails } from '@/features/dags/components/step-details';
 import { cn, toMermaidNodeId } from '@/lib/utils';
+import { workspaceNameFromLabels } from '@/lib/workspace';
 import BorderedBox from '@/ui/BorderedBox';
 import { AlertTriangle, MousePointerClick, Save, Undo2, X } from 'lucide-react';
 import React, { useEffect } from 'react';
@@ -63,7 +64,6 @@ type Props = {
 function DAGSpec({ fileName, localDags, editorHints }: Props) {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const editable = useCanWrite();
   const client = useClient();
   const { schema: baseSchema } = useSchema();
   const { showError } = useErrorModal();
@@ -144,8 +144,18 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
           dag: next.dag,
           errors: next.errors ?? [],
           spec: next.spec,
-        }
+      }
   );
+
+  const dagWorkspaceName = React.useMemo(
+    () =>
+      workspaceNameFromLabels([
+        ...(data?.dag?.labels ?? []),
+        ...(data?.dag?.tags ?? []),
+      ]),
+    [data?.dag?.labels, data?.dag?.tags]
+  );
+  const editable = useCanWriteForWorkspace(dagWorkspaceName);
 
   // Server spec — SWR cache stays current via live invalidations or polling fallback
   const serverSpec = data?.spec ?? null;

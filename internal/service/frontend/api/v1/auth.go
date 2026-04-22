@@ -245,12 +245,13 @@ func toAPIUser(user *auth.User) api.User {
 	authProvider := cmp.Or(user.AuthProvider, "builtin")
 
 	apiUser := api.User{
-		Id:           user.ID,
-		Username:     user.Username,
-		Role:         api.UserRole(user.Role),
-		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
-		AuthProvider: (*api.UserAuthProvider)(&authProvider),
+		Id:              user.ID,
+		Username:        user.Username,
+		Role:            api.UserRole(user.Role),
+		WorkspaceAccess: toAPIWorkspaceAccess(user.WorkspaceAccess),
+		CreatedAt:       user.CreatedAt,
+		UpdatedAt:       user.UpdatedAt,
+		AuthProvider:    (*api.UserAuthProvider)(&authProvider),
 	}
 
 	if user.IsDisabled {

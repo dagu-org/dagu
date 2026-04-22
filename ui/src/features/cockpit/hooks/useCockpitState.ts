@@ -3,19 +3,27 @@
 
 import { useContext, useEffect, useState } from 'react';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import {
+  workspaceNameForSelection,
+  workspaceSelectionKey,
+} from '@/lib/workspace';
 
 export function useCockpitState() {
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const selectedWorkspace = workspaceNameForSelection(
+    appBarContext.workspaceSelection
+  );
+  const workspaceKey = workspaceSelectionKey(appBarContext.workspaceSelection);
   const [selectedTemplate, setSelectedTemplate] = useState('');
 
   useEffect(() => {
     setSelectedTemplate('');
-  }, [remoteNode, selectedWorkspace]);
+  }, [remoteNode, workspaceKey]);
 
   return {
     selectedWorkspace,
+    workspaceKey,
     selectedTemplate,
     selectTemplate: setSelectedTemplate,
   };

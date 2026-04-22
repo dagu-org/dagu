@@ -14,6 +14,7 @@ import (
 
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	runtimeagent "github.com/dagucloud/dagu/internal/runtime/agent"
 	"github.com/dagucloud/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,37 @@ import (
 func assertEquivalentPath(t *testing.T, expected, actual string) {
 	t.Helper()
 	require.Equal(t, filepath.Clean(expected), filepath.Clean(filepath.FromSlash(actual)))
+}
+
+func dagAgentWithProc(t *testing.T, th test.Helper, dag test.DAG) *test.Agent {
+	t.Helper()
+
+	dagRunID, err := th.DAGRunMgr.GenDAGRunID(th.Context)
+	require.NoError(t, err)
+
+	compactRunID := strings.ReplaceAll(dagRunID, "-", "")
+	if len(compactRunID) > 12 {
+		compactRunID = compactRunID[:12]
+	}
+	attemptID := "attempt-" + compactRunID
+
+	proc, err := th.ProcStore.Acquire(th.Context, dag.ProcGroup(), exec.ProcMeta{
+		StartedAt:    time.Now().Unix(),
+		Name:         dag.Name,
+		DAGRunID:     dagRunID,
+		AttemptID:    attemptID,
+		RootName:     dag.Name,
+		RootDAGRunID: dagRunID,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = proc.Stop(th.Context)
+	})
+
+	return dag.Agent(
+		test.WithDAGRunID(dagRunID),
+		test.WithAgentOptions(runtimeagent.Options{AttemptID: attemptID}),
+	)
 }
 
 func TestHandlerOn(t *testing.T) {
@@ -300,7 +332,7 @@ steps:
 	require.NotNil(t, dag.HandlerOn.Abort)
 	require.Equal(t, "onAbort", dag.HandlerOn.Abort.Name)
 
-	dagAgent := dag.Agent()
+	dagAgent := dagAgentWithProc(t, th, dag)
 
 	done := make(chan struct{})
 	go func() {
@@ -603,7 +635,7 @@ steps:
 `+indentTestScript(writeFileCommand(startedFile), 6)+`
 `+indentTestScript(waitForFileCommand(releaseFile), 6)+`
 `)
-		dagAgent := dag.Agent()
+		dagAgent := dagAgentWithProc(t, th, dag)
 
 		done := make(chan struct{})
 		go func() {

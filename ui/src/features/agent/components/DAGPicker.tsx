@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
+import { workspaceSelectionQuery } from '@/lib/workspace';
 
 import { DAGContext } from '../types';
 
@@ -28,12 +29,17 @@ export function DAGPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext?.selectedRemoteNode || 'local';
+  const workspaceQuery = useMemo(
+    () => workspaceSelectionQuery(appBarContext?.workspaceSelection),
+    [appBarContext?.workspaceSelection]
+  );
 
   const { data } = useQuery('/dags', {
     params: {
       query: {
         remoteNode,
         perPage: 100,
+        ...workspaceQuery,
       },
     },
   });

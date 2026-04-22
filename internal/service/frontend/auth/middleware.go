@@ -148,9 +148,10 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 				apiKey, err := opts.APIKeyValidator.ValidateAPIKey(r.Context(), bearerToken)
 				if err == nil {
 					syntheticUser := &auth.User{
-						ID:       "apikey:" + apiKey.ID,
-						Username: "apikey:" + apiKey.Name,
-						Role:     apiKey.Role,
+						ID:              "apikey:" + apiKey.ID,
+						Username:        "apikey:" + apiKey.Name,
+						Role:            apiKey.Role,
+						WorkspaceAccess: auth.CloneWorkspaceAccess(apiKey.WorkspaceAccess),
 					}
 					ctx := auth.WithUser(r.Context(), syntheticUser)
 					next.ServeHTTP(w, r.WithContext(ctx))
@@ -165,9 +166,10 @@ func Middleware(opts Options) func(next http.Handler) http.Handler {
 					// Credentials were provided - must validate
 					if checkBasicAuth(user, pass, opts.Creds) {
 						basicUser := &auth.User{
-							ID:       user,
-							Username: user,
-							Role:     auth.RoleAdmin,
+							ID:              user,
+							Username:        user,
+							Role:            auth.RoleAdmin,
+							WorkspaceAccess: auth.AllWorkspaceAccess(),
 						}
 						ctx := auth.WithUser(r.Context(), basicUser)
 						next.ServeHTTP(w, r.WithContext(ctx))

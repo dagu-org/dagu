@@ -13,7 +13,11 @@ import React, { useCallback } from 'react';
 type Props = {
   className?: string;
   onCloseTabWithUnsaved?: (tabId: string) => void;
-  onDeleteDoc?: (docPath: string, title: string) => void;
+  onDeleteDoc?: (
+    docPath: string,
+    title: string,
+    workspace?: string | null
+  ) => void;
   onCloseAllTabs?: () => void;
   onCloseOtherTabs?: (keepTabId: string) => void;
 };
@@ -166,7 +170,7 @@ function DocTabBar({ className, onCloseTabWithUnsaved, onDeleteDoc, onCloseAllTa
                         className="text-destructive focus:text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDeleteDoc(tab.docPath, tab.title);
+                          onDeleteDoc(tab.docPath, tab.title, tab.workspace);
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5 mr-2" />

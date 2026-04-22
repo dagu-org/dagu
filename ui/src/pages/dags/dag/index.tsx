@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
@@ -23,7 +23,13 @@ import {
 } from '../../../hooks/useSSECacheSync';
 import { useSubDAGRunSSE } from '../../../hooks/useSubDAGRunSSE';
 import dayjs from '../../../lib/dayjs';
-import { workspaceLabel } from '../../../lib/workspace';
+import {
+  hasWorkspaceLabel,
+  sanitizeWorkspaceName,
+  sanitizeWorkspaceSelection,
+  WorkspaceKind,
+  workspaceNameFromLabels,
+} from '../../../lib/workspace';
 
 type Params = {
   fileName: string;
@@ -48,7 +54,22 @@ function DAGDetails() {
     searchParams.get('remoteNode') ||
     appBarContext.selectedRemoteNode ||
     'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const queryWorkspace = sanitizeWorkspaceName(
+    searchParams.get('workspace') ?? ''
+  );
+  const appWorkspaceSelection = appBarContext.workspaceSelection;
+  const workspaceSelection = useMemo(() => {
+    if (queryWorkspace) {
+      return { kind: WorkspaceKind.workspace, workspace: queryWorkspace };
+    }
+    return sanitizeWorkspaceSelection(appWorkspaceSelection);
+  }, [appWorkspaceSelection, queryWorkspace]);
+  const scopedQuery = useMemo(
+    () => ({
+      remoteNode,
+    }),
+    [remoteNode]
+  );
   const fileName = params.fileName || '';
 
   // Set page context for agent chat
@@ -90,12 +111,17 @@ function DAGDetails() {
   // Build URL with remote node parameter if needed
   const buildUrl = useCallback(
     (path: string) => {
+      const nextSearchParams = new URLSearchParams();
       if (remoteNode && remoteNode !== 'local') {
-        return `${path}?remoteNode=${encodeURIComponent(remoteNode)}`;
+        nextSearchParams.set('remoteNode', remoteNode);
       }
-      return path;
+      if (queryWorkspace) {
+        nextSearchParams.set('workspace', queryWorkspace);
+      }
+      const query = nextSearchParams.toString();
+      return query ? `${path}?${query}` : path;
     },
-    [remoteNode]
+    [queryWorkspace, remoteNode]
   );
 
   // Handle tab changes - navigates to the appropriate URL for the given tab
@@ -123,19 +149,25 @@ function DAGDetails() {
     '/dags/{fileName}',
     {
       params: {
-        query: { remoteNode },
+        query: scopedQuery,
         path: { fileName },
       },
     },
     sseFallbackOptions(dagSSE)
   );
   useSSECacheSync(dagSSE, mutateDag);
-  const selectedWorkspaceLabel = workspaceLabel(selectedWorkspace);
+  const dagLabels = [
+    ...(dagData?.dag?.labels ?? []),
+    ...(dagData?.dag?.tags ?? []),
+  ];
+  const dagWorkspaceName = workspaceNameFromLabels(dagLabels);
+  const dagHasWorkspaceLabel = hasWorkspaceLabel(dagLabels);
   const dagMatchesWorkspace =
-    !selectedWorkspaceLabel ||
-    (dagData?.dag?.labels ?? dagData?.dag?.tags ?? []).includes(
-      selectedWorkspaceLabel
-    );
+    workspaceSelection.kind === WorkspaceKind.all ||
+    (workspaceSelection.kind === WorkspaceKind.default &&
+      !dagHasWorkspaceLabel) ||
+    (workspaceSelection.kind === WorkspaceKind.workspace &&
+      dagWorkspaceName === workspaceSelection.workspace);
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
@@ -158,7 +190,7 @@ function DAGDetails() {
           name: dagRunName,
           dagRunId: dagRunId || '',
         },
-        query: { remoteNode },
+        query: scopedQuery,
       },
     }),
     sseFallbackOptions(dagRunSSE)
@@ -185,7 +217,7 @@ function DAGDetails() {
           dagRunId: dagRunId || '',
           subDAGRunId: subDAGRunId || '',
         },
-        query: { remoteNode },
+        query: scopedQuery,
       },
     }),
     sseFallbackOptions(subDAGRunSSE)

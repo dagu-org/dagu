@@ -638,22 +638,6 @@ func (a *API) requireDAGWrite(ctx context.Context) error {
 	return nil
 }
 
-// requireExecute checks if the current user can execute (run/stop) DAGs.
-// Returns nil if auth is not enabled (authService is nil).
-func (a *API) requireExecute(ctx context.Context) error {
-	if a.authService == nil {
-		return nil
-	}
-	user, ok := auth.UserFromContext(ctx)
-	if !ok {
-		return errAuthRequired
-	}
-	if !user.Role.CanExecute() {
-		return errInsufficientPermissions
-	}
-	return nil
-}
-
 // requireUserManagement checks if user management is enabled.
 func (a *API) requireUserManagement() error {
 	if a.authService == nil {

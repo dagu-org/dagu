@@ -23,14 +23,31 @@ import (
 
 const staleLocalRunStartupGrace = 2 * time.Second
 
+// ManagerOption configures a Manager.
+type ManagerOption func(*Manager)
+
+// WithManagerClock overrides the Manager clock.
+func WithManagerClock(now func() time.Time) ManagerOption {
+	return func(m *Manager) {
+		if now != nil {
+			m.nowFunc = now
+		}
+	}
+}
+
 // NewManager creates a new Manager instance.
 // The Manager is used to interact with the DAG.
-func NewManager(drs exec.DAGRunStore, ps exec.ProcStore, cfg *config.Config) Manager {
-	return Manager{
+func NewManager(drs exec.DAGRunStore, ps exec.ProcStore, cfg *config.Config, opts ...ManagerOption) Manager {
+	m := Manager{
 		dagRunStore:   drs,
 		procStore:     ps,
 		subCmdBuilder: NewSubCmdBuilder(cfg),
+		nowFunc:       time.Now,
 	}
+	for _, opt := range opts {
+		opt(&m)
+	}
+	return m
 }
 
 // Manager provides methods to interact with DAGs, including starting, stopping,
@@ -40,6 +57,7 @@ type Manager struct {
 	dagRunStore   exec.DAGRunStore // Store interface for persisting run data
 	procStore     exec.ProcStore   // Store interface for process management
 	subCmdBuilder *SubCmdBuilder   // Command builder for constructing command specs
+	nowFunc       func() time.Time
 }
 
 // Stop stops running DAG-runs and can cancel an explicit failed DAG-run that is
@@ -400,7 +418,7 @@ func (m *Manager) repairStaleLocalRunIfDead(
 	if !isLocalWorkerID(st.WorkerID) {
 		return st, nil
 	}
-	if shouldDelayStaleLocalRunRepair(st, time.Now()) {
+	if shouldDelayStaleLocalRunRepair(st, m.currentTime()) {
 		logger.Debug(ctx, "Skipping stale local run repair during startup grace window",
 			tag.RunID(st.DAGRunID),
 			slog.String("started-at", st.StartedAt),
@@ -414,6 +432,18 @@ func (m *Manager) repairStaleLocalRunIfDead(
 		return nil, fmt.Errorf("check alive: %w", err)
 	}
 	if alive {
+		return st, nil
+	}
+
+	runAlive, err := m.procStore.IsRunAlive(ctx, dag.ProcGroup(), st.DAGRun())
+	if err != nil {
+		return nil, fmt.Errorf("check run alive: %w", err)
+	}
+	if runAlive {
+		logger.Debug(ctx, "Skipping stale local run repair because DAG run still has a fresh proc heartbeat",
+			tag.RunID(st.DAGRunID),
+			tag.AttemptID(st.AttemptID),
+		)
 		return st, nil
 	}
 
@@ -441,6 +471,13 @@ func statusStartTime(st *exec.DAGRunStatus) (time.Time, bool) {
 		return time.UnixMilli(st.CreatedAt), true
 	}
 	return time.Time{}, false
+}
+
+func (m *Manager) currentTime() time.Time {
+	if m.nowFunc == nil {
+		return time.Now()
+	}
+	return m.nowFunc()
 }
 
 // ListRecentStatus retrieves the n most recent statuses for a DAG by name.

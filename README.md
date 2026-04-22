@@ -14,11 +14,11 @@
   </p>
 </div>
 
-## Lightweight Workflow Engine
+## Command-Native Workflow Engine
 
-Dagu runs workflows defined as DAGs (Directed Acyclic Graphs) in YAML. It is commonly used to schedule and operate existing scripts, commands, containers, and server jobs with dependencies, queues, retries, logs, history, notifications, API access, RBAC, workspaces, and optional distributed workers.
+Dagu is the command-native workflow engine AI agents need. It turns scripts, containers, server tasks, and agent CLIs into scheduled, observable, retryable production workflows.
 
-It runs as a single binary with no required database, message broker, or language-specific runtime. Workflows are defined as DAGs (Directed Acyclic Graphs) in YAML, and all state is stored in local files by default.
+It runs as a single self-hosted binary with no required database, message broker, or language-specific runtime. Workflows are defined as DAGs (Directed Acyclic Graphs) in YAML, and all state is stored in local files by default.
 
 For a quick look at how workflows are defined, see the [examples](https://docs.dagu.sh/writing-workflows/examples).
 
@@ -43,7 +43,7 @@ Dagu stores state in local files by default. How much it can run depends on the 
 
 ## Real-World Use Cases
 
-Dagu is useful when scripts, containers, server jobs, or data tasks need visible dependencies, schedules, logs, retries, and a simple way to operate them.
+Dagu is useful when scripts, containers, server jobs, data tasks, or agent-driven work need visible dependencies, schedules, logs, retries, and a simple way to operate them.
 
 **Cron and legacy script management.** Run existing shell scripts, Python scripts, HTTP calls, and scheduled jobs without rewriting them. Dependencies, run status, logs, retries, and history become visible in the Web UI instead of being hidden across crontabs and server log files.
 
@@ -59,7 +59,7 @@ Dagu is useful when scripts, containers, server jobs, or data tasks need visible
 
 **IoT and edge workflows.** Run sensor polling, local cleanup, offline sync, health checks, and device maintenance jobs on small devices. The single binary and file-backed state work well on edge devices while still providing visibility through the Web UI.
 
-**Optional AI-assisted operations.** Use AI agents to write, update, debug, and repair workflows because the operational contract is plain YAML. Agent-generated changes stay reviewable and observable in the same workflow system humans already operate.
+**AI agent workflows.** Run AI coding agents and agent CLIs as workflow steps, or use the built-in agent to write, update, debug, and repair workflows. Because the contract is commands plus plain YAML, agent-generated work stays scheduled, reviewable, observable, and retryable in the same system humans operate.
 
 ## Why Dagu?
 

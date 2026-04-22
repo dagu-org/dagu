@@ -11,13 +11,16 @@ import {
   useCanViewEventLogs,
   useCanManageWebhooks,
   useCanViewAuditLogs,
-  useCanWrite,
+  useAuth,
   useIsAdmin,
 } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useHasFeature } from '@/hooks/useLicense';
 import { cn } from '@/lib/utils';
 import { getResponsiveTitleClass } from '@/lib/text-utils';
+import { roleAtLeast } from '@/lib/workspaceAccess';
+import { defaultWorkspaceSelection } from '@/lib/workspace';
+import { UserRole } from '@/api/v1/schema';
 import {
   Activity,
   BarChart2,
@@ -50,7 +53,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AppBarContext } from './contexts/AppBarContext';
 import { useUserPreferences } from './contexts/UserPreference';
 import { useAgentChatContext } from './features/agent';
-import { WorkspaceSelector } from './features/cockpit/components/WorkspaceSelector';
+import { WorkspaceSelector } from './components/workspace/WorkspaceSelector';
 
 type NavItemProps = {
   to: string;
@@ -395,9 +398,14 @@ export const mainListItems = React.forwardRef<
 ) {
   const config = useConfig();
   const isAdmin = useIsAdmin();
+  const { user } = useAuth();
   const hasRbac = useHasFeature('rbac');
   const hasAudit = useHasFeature('audit');
-  const canWrite = useCanWrite();
+  const appBarContext = React.useContext(AppBarContext);
+  const canWrite =
+    config.authMode !== 'builtin'
+      ? config.permissions.writeDags
+      : roleAtLeast(user?.role ?? null, UserRole.developer);
   const canAccessSystemStatus = useCanAccessSystemStatus();
   const canManageWebhooks = useCanManageWebhooks();
   const canViewEventLogs = useCanViewEventLogs();
@@ -481,7 +489,7 @@ export const mainListItems = React.forwardRef<
               selectedRemoteNode,
               selectRemoteNode,
               workspaces,
-              selectedWorkspace,
+              workspaceSelection,
               selectWorkspace,
               createWorkspace,
               deleteWorkspace,
@@ -492,8 +500,12 @@ export const mainListItems = React.forwardRef<
               <div className="space-y-2">
                 <WorkspaceSelector
                   workspaces={workspaces ?? []}
-                  selectedWorkspace={selectedWorkspace ?? ''}
-                  onSelect={selectWorkspace ?? (() => undefined)}
+                  workspaceSelection={
+                    workspaceSelection ?? defaultWorkspaceSelection()
+                  }
+                  onSelectWorkspace={(selection) =>
+                    void selectWorkspace?.(selection)
+                  }
                   onCreate={(name) => void createWorkspace?.(name)}
                   onDelete={(id) => void deleteWorkspace?.(id)}
                   canWrite={canWrite && isOpen}
@@ -719,39 +731,41 @@ export const mainListItems = React.forwardRef<
                   customColor={customColor}
                 />
               )}
-              <NavGroup
-                groupKey="agent"
-                icon={<Bot size={18} />}
-                label="Agent"
-                isOpen={isOpen}
-                basePath="/agent-"
-                customColor={customColor}
-              >
-                <NavItem
-                  to="/agent-settings"
-                  text="Settings"
+              {isAdmin && config.agentEnabled && (
+                <NavGroup
+                  groupKey="agent"
                   icon={<Bot size={18} />}
+                  label="Agent"
                   isOpen={isOpen}
-                  onClick={onNavItemClick}
+                  basePath="/agent-"
                   customColor={customColor}
-                />
-                <NavItem
-                  to="/agent-memory"
-                  text="Memory"
-                  icon={<Brain size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-                <NavItem
-                  to="/agent-souls"
-                  text="Souls"
-                  icon={<Ghost size={18} />}
-                  isOpen={isOpen}
-                  onClick={onNavItemClick}
-                  customColor={customColor}
-                />
-              </NavGroup>
+                >
+                  <NavItem
+                    to="/agent-settings"
+                    text="Settings"
+                    icon={<Bot size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                  <NavItem
+                    to="/agent-memory"
+                    text="Memory"
+                    icon={<Brain size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                  <NavItem
+                    to="/agent-souls"
+                    text="Souls"
+                    icon={<Ghost size={18} />}
+                    isOpen={isOpen}
+                    onClick={onNavItemClick}
+                    customColor={customColor}
+                  />
+                </NavGroup>
+              )}
             </div>
           )}
 

@@ -62,6 +62,7 @@ type ListDAGsOptions struct {
 	Order             string                               // Optional sort order (asc, desc)
 	Time              *time.Time                           // Optional reference time for nextRun sorting/projection (defaults to time.Now())
 	NextRunProjection func(*core.DAG, time.Time) time.Time // Optional scheduler-aware nextRun projector used when Sort == "nextRun"
+	WorkspaceFilter   *WorkspaceFilter                     // Optional workspace visibility filter
 }
 
 // ListDAGsResult contains the result of a paginated DAG listing operation
@@ -73,19 +74,21 @@ type ListDAGsResult struct {
 
 // SearchDAGsOptions contains parameters for cursor-based DAG search.
 type SearchDAGsOptions struct {
-	Cursor     string
-	Limit      int
-	Query      string
-	MatchLimit int
-	Labels     []string
+	Cursor          string
+	Limit           int
+	Query           string
+	MatchLimit      int
+	Labels          []string
+	WorkspaceFilter *WorkspaceFilter
 }
 
 // SearchDAGMatchesOptions contains parameters for cursor-based snippet loading.
 type SearchDAGMatchesOptions struct {
-	Cursor string
-	Limit  int
-	Query  string
-	Labels []string
+	Cursor          string
+	Limit           int
+	Query           string
+	Labels          []string
+	WorkspaceFilter *WorkspaceFilter
 }
 
 // GrepDAGsResult represents the result of a pattern search within a DAG definition
@@ -99,6 +102,7 @@ type GrepDAGsResult struct {
 type SearchDAGResult struct {
 	Name              string
 	FileName          string
+	Workspace         string
 	Matches           []*Match
 	HasMoreMatches    bool
 	NextMatchesCursor string

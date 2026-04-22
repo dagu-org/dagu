@@ -37,6 +37,7 @@ import React, {
 import { Tree, TreeApi, NodeApi } from 'react-arborist';
 import DocArboristNode, { type ContextAction } from './DocArboristNode';
 import DocOutlinePanel from './DocOutlinePanel';
+import { workspaceSelectionQuery } from '@/lib/workspace';
 
 type DocTreeNodeResponse = components['schemas']['DocTreeNodeResponse'];
 
@@ -47,7 +48,11 @@ type Props = {
   onRetry?: () => void;
   onContextAction: (action: ContextAction) => void;
   onCreateNew: () => void;
-  onSelectFile: (docPath: string, title: string) => void;
+  onSelectFile: (
+    docPath: string,
+    title: string,
+    workspace?: string | null
+  ) => void;
   onRename: (oldPath: string, newPath: string) => Promise<void>;
   onMove: (oldPath: string, newPath: string) => Promise<void>;
   onBatchDelete: (paths: string[]) => void;
@@ -57,6 +62,7 @@ type Props = {
   sortField: DocSortField;
   sortOrder: DocSortOrder;
   onSortChange: (field: DocSortField, order: DocSortOrder) => void;
+  canMutate?: boolean;
 };
 
 function collectAncestors(path: string): string[] {
@@ -136,11 +142,17 @@ function DocTreeSidebar({
   sortField,
   sortOrder,
   onSortChange,
+  canMutate = true,
 }: Props) {
   const canWrite = useCanWrite();
+  const canEdit = canWrite && canMutate;
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const workspaceQuery = useMemo(
+    () => workspaceSelectionQuery(appBarContext.workspaceSelection),
+    [appBarContext.workspaceSelection]
+  );
   const { activeTabId, tabs } = useDocTabContext();
   const activeDocPath = activeTabId
     ? tabs.find((t) => t.id === activeTabId)?.docPath || null
@@ -214,7 +226,7 @@ function DocTreeSidebar({
       try {
         setSearchError(null);
         const { data, error } = await client.GET('/docs/search', {
-          params: { query: { remoteNode, q: searchQuery } },
+          params: { query: { remoteNode, q: searchQuery, ...workspaceQuery } },
         });
         if (cancelled) return;
         if (error) {
@@ -237,7 +249,7 @@ function DocTreeSidebar({
       cancelled = true;
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [searchQuery, client, remoteNode]);
+  }, [searchQuery, client, remoteNode, workspaceQuery]);
 
   // Compute filtered tree data
   const treeData = useMemo(() => {
@@ -293,7 +305,7 @@ function DocTreeSidebar({
     (node: NodeApi<DocTreeNodeResponse>) => {
       if (node.data.type !== DocTreeNodeResponseType.directory) {
         const displayTitle = node.data.title || node.data.name;
-        onSelectFile(node.id, displayTitle);
+        onSelectFile(node.id, displayTitle, node.data.workspace ?? null);
       }
     },
     [onSelectFile]
@@ -368,15 +380,15 @@ function DocTreeSidebar({
   // Disable drag when user has no write permission
   const disableDrag = useCallback(
     (_data: DocTreeNodeResponse) => {
-      return !canWrite;
+      return !canEdit;
     },
-    [canWrite]
+    [canEdit]
   );
 
   // Keyboard shortcuts: Delete and F2
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!canWrite) return;
+      if (!canEdit) return;
       const api = treeRef.current;
       if (!api) return;
 
@@ -411,7 +423,7 @@ function DocTreeSidebar({
         }
       }
     },
-    [canWrite, selectedIds, onBatchDelete, onContextAction]
+    [canEdit, selectedIds, onBatchDelete, onContextAction]
   );
 
   const hasDocuments = treeData && treeData.length > 0;
@@ -424,12 +436,12 @@ function DocTreeSidebar({
       <DocArboristNode
         {...props}
         onContextAction={onContextAction}
-        canWrite={canWrite}
+        canWrite={canEdit}
         activeDocPath={activeDocPath}
         selectedIds={selectedIds}
       />
     ),
-    [onContextAction, canWrite, activeDocPath, selectedIds]
+    [onContextAction, canEdit, activeDocPath, selectedIds]
   );
 
   return (
@@ -499,7 +511,7 @@ function DocTreeSidebar({
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          {canWrite && (
+          {canEdit && (
             <button
               type="button"
               onClick={onCreateNew}
@@ -517,7 +529,7 @@ function DocTreeSidebar({
         {/* Search input — always rendered to define the container height */}
         <div
           className={
-            selectedIds.length > 1 && canWrite ? 'invisible' : undefined
+            selectedIds.length > 1 && canEdit ? 'invisible' : undefined
           }
         >
           <div className="relative">
@@ -528,7 +540,7 @@ function DocTreeSidebar({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search docs..."
               className="w-full text-xs bg-muted/50 border border-border rounded px-2 py-1 pl-6 pr-6 outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60"
-              tabIndex={selectedIds.length > 1 && canWrite ? -1 : undefined}
+              tabIndex={selectedIds.length > 1 && canEdit ? -1 : undefined}
             />
             {searchQuery && (
               <button
@@ -558,7 +570,7 @@ function DocTreeSidebar({
             )}
         </div>
         {/* Selection bar — overlaid on top when multi-select is active */}
-        {selectedIds.length > 1 && canWrite && (
+        {selectedIds.length > 1 && canEdit && (
           <div className="absolute inset-0 flex items-center justify-between px-3">
             <span className="text-xs text-muted-foreground">
               {selectedIds.length} selected
@@ -645,7 +657,7 @@ function DocTreeSidebar({
               rowHeight={28}
               openByDefault={false}
               initialOpenState={initialOpenState}
-              disableEdit={!canWrite}
+              disableEdit={!canEdit}
               disableDrag={disableDrag}
               disableDrop={disableDrop}
               onActivate={handleActivate}
@@ -673,7 +685,7 @@ function DocTreeSidebar({
                 <p className="text-sm text-muted-foreground">
                   No documents yet.
                 </p>
-                {canWrite && (
+                {canEdit && (
                   <button
                     type="button"
                     onClick={onCreateNew}

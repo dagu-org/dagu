@@ -6,6 +6,7 @@ package workspace
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,6 +40,10 @@ func NewWorkspace(name, description string) *Workspace {
 func ValidateName(name string) error {
 	if name == "" {
 		return ErrInvalidWorkspaceName
+	}
+	switch strings.ToLower(name) {
+	case "all", "default":
+		return fmt.Errorf("%w: all and default are reserved names", ErrInvalidWorkspaceName)
 	}
 	if !workspaceNamePattern.MatchString(name) {
 		return fmt.Errorf("%w: must contain only letters, numbers, underscores, and hyphens", ErrInvalidWorkspaceName)
