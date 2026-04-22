@@ -7,8 +7,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '../../../../components/ui/card';
-import StatusChip from '../../../../ui/StatusChip';
+} from '@/components/ui/card';
+import StatusChip from '@/components/ui/status-chip';
 import AutoRetryBadge from '../common/AutoRetryBadge';
 import { DAGRunDetailsModal } from '../../components/dag-run-details';
 
@@ -37,13 +37,18 @@ function DAGRunCard({ dagRun, timezoneInfo }: DAGRunCardProps) {
     };
   }, [isModalOpen]);
   return (
-    <Card className={`h-full hover: ${dagRun.status === Status.Running ? 'animate-running-row' : ''}`}>
+    <Card
+      className={`h-full hover: ${dagRun.status === Status.Running ? 'animate-running-row' : ''}`}
+    >
       <div
         className="block h-full no-underline text-inherit cursor-pointer"
         onClick={(e) => {
           if (e.ctrlKey || e.metaKey) {
             // Open in new tab
-            window.open(`/dag-runs/${dagRun.name}/${dagRun.dagRunId}`, '_blank');
+            window.open(
+              `/dag-runs/${dagRun.name}/${dagRun.dagRunId}`,
+              '_blank'
+            );
           } else {
             // Open modal
             setIsModalOpen(true);

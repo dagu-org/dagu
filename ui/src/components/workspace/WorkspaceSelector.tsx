@@ -3,7 +3,7 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { Briefcase, Plus, Trash2 } from 'lucide-react';
 import {
   Select,

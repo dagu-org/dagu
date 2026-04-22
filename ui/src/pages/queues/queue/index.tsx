@@ -31,7 +31,7 @@ import {
 import { useQueuedItemsFeed } from '@/features/queues/hooks/useQueuedItemsFeed';
 import { useQueueSelection } from '@/features/queues/hooks/useQueueSelection';
 import { useQuery } from '@/hooks/api';
-import Title from '@/ui/Title';
+import Title from '@/components/ui/title';
 
 function useAutoLoadMore(
   sentinelRef: React.RefObject<HTMLDivElement | null>,

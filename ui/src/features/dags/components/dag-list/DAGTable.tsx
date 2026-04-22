@@ -39,9 +39,9 @@ import {
   getScheduleLabel,
   parseNextRun,
 } from '../../../../lib/dagSchedule';
-import StatusChip from '../../../../ui/StatusChip';
-import Ticker from '../../../../ui/Ticker';
-import VisuallyHidden from '../../../../ui/VisuallyHidden';
+import StatusChip from '@/components/ui/status-chip';
+import Ticker from '@/components/ui/ticker';
+import VisuallyHidden from '@/components/ui/visually-hidden';
 import { CreateDAGModal, DAGPagination } from '../common';
 import DAGActions from '../common/DAGActions';
 import LiveSwitch from '../common/LiveSwitch';
@@ -66,9 +66,9 @@ function formatMs(ms: number): string {
 
 // Import shadcn/ui components
 import { PanelWidthContext } from '../../../../components/SplitLayout';
-import { Badge } from '../../../../components/ui/badge';
-import { Button } from '../../../../components/ui/button';
-import { Input } from '../../../../components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -76,20 +76,20 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../../../components/ui/table';
-import { LabelCombobox } from '../../../../components/ui/label-combobox';
+} from '@/components/ui/table';
+import { LabelCombobox } from '@/components/ui/label-combobox';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '../../../../components/ui/tooltip';
+} from '@/components/ui/tooltip';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../../components/ui/select';
+} from '@/components/ui/select';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useQuery } from '../../../../hooks/api';
 import { parseLabelParts } from '../../../../lib/utils';
@@ -1398,7 +1398,7 @@ function DAGTable({
                     {row.getVisibleCells().map((cell, index) => (
                       <TableCell
                         key={cell.id}
-                        className={`py-1 overflow-hidden align-middle truncate ${index === 0 ? 'px-0' : 'px-2'}`}
+                        className={`py-1 align-middle ${cell.column.id === 'Status' ? 'overflow-visible whitespace-nowrap' : 'overflow-hidden truncate'} ${index === 0 ? 'px-0' : 'px-2'}`}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,

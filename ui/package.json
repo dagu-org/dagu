@@ -76,8 +76,6 @@
     "webpack-merge": "6.0.1"
   },
   "dependencies": {
-    "@emotion/react": "11.14.0",
-    "@emotion/styled": "11.14.1",
     "@milkdown/crepe": "7.18.0",
     "@milkdown/react": "7.18.0",
     "@monaco-editor/react": "4.7.0",
@@ -90,7 +88,6 @@
     "@radix-ui/react-switch": "1.2.6",
     "@radix-ui/react-tabs": "1.1.13",
     "@radix-ui/react-tooltip": "1.2.8",
-    "@radix-ui/themes": "3.2.1",
     "@scalar/api-reference-react": "0.6.31",
     "@tanstack/react-table": "8.21.3",
     "@types/lodash": "4.17.24",

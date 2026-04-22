@@ -23,11 +23,12 @@ import {
   useSSECacheSync,
 } from '../../../../hooks/useSSECacheSync';
 import { toMermaidNodeId } from '../../../../lib/utils';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
 import { updateDAGRunsNodeStatus } from '../../lib/nodeStatus';
 import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
+import { StepDetailsDrawer } from '../step-details';
 import { DAGGraph } from '../visualization';
 import { HistoryTable, LogViewer, StatusUpdateModal } from './';
 
@@ -244,6 +245,18 @@ function DAGHistoryTable({
   const [selectedStep, setSelectedStep] = React.useState<
     components['schemas']['Step'] | undefined
   >(undefined);
+  const [selectedDetailStep, setSelectedDetailStep] = React.useState<
+    components['schemas']['Step'] | undefined
+  >(undefined);
+  const [isStepDetailsOpen, setIsStepDetailsOpen] = React.useState(false);
+
+  const closeStepDetails = React.useCallback(() => {
+    setIsStepDetailsOpen(false);
+  }, []);
+
+  React.useEffect(() => {
+    closeStepDetails();
+  }, [idx, closeStepDetails]);
 
   /**
    * Close the status update modal
@@ -348,6 +361,26 @@ function DAGHistoryTable({
     [reversedDAGRuns, idx, navigate]
   );
 
+  const onInspectStepOnGraph = React.useCallback(
+    (id: string) => {
+      const dagRun = reversedDAGRuns[idx];
+      if (!dagRun) {
+        return;
+      }
+
+      const n = dagRun.nodes?.find(
+        (node) => toMermaidNodeId(node.step.name) == id
+      );
+      if (!n) {
+        return;
+      }
+
+      setSelectedDetailStep(n.step);
+      setIsStepDetailsOpen(true);
+    },
+    [reversedDAGRuns, idx]
+  );
+
   /**
    * Handle right-click on graph node (show status update modal)
    */
@@ -392,6 +425,7 @@ function DAGHistoryTable({
             <React.Fragment>
               <DAGGraph
                 dagRun={selectedDAGRun}
+                onClickStep={onInspectStepOnGraph}
                 onSelectStep={onSelectStepOnGraph}
                 onRightClickStep={onRightClickStepOnGraph}
               />
@@ -474,9 +508,7 @@ function DAGHistoryTable({
                   setLogViewer((prev) => ({ ...prev, isOpen: false }))
                 }
                 logType={logViewer.logType}
-                dagName={
-                  selectedDAGRun.name
-                }
+                dagName={selectedDAGRun.name}
                 dagRunId={logViewer.dagRunId}
                 stepName={logViewer.stepName}
                 dagRun={selectedDAGRun}
@@ -490,6 +522,13 @@ function DAGHistoryTable({
             step={selectedStep}
             dismissModal={dismissModal}
             onSubmit={onUpdateStatus}
+          />
+
+          <StepDetailsDrawer
+            dagName={selectedDAGRun?.name}
+            isOpen={isStepDetailsOpen}
+            step={selectedDetailStep}
+            onClose={closeStepDetails}
           />
         </div>
       )}

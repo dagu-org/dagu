@@ -8,14 +8,14 @@ import { useInfinite } from '@/hooks/api';
 import { Search as SearchIcon } from 'lucide-react';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import {
   workspaceSelectionKey,
   workspaceSelectionQuery,
 } from '../../lib/workspace';
-import Title from '../../ui/Title';
+import Title from '@/components/ui/title';
 
 type SearchScope = 'dags' | 'docs';
 

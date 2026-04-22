@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useIsAdmin } from '@/contexts/AuthContext';
 import { useClient } from '@/hooks/api';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 
 export default function AgentMemoryPage(): React.ReactNode {
   const client = useClient();
@@ -38,9 +38,12 @@ export default function AgentMemoryPage(): React.ReactNode {
   const fetchMemory = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error: apiError } = await client.GET('/settings/agent/memory', {
-        params: { query: { remoteNode } },
-      });
+      const { data, error: apiError } = await client.GET(
+        '/settings/agent/memory',
+        {
+          params: { query: { remoteNode } },
+        }
+      );
       if (apiError) throw new Error('Failed to fetch agent memory');
       setGlobalMemory(data.globalMemory ?? '');
       setDagNames(data.dagMemories ?? []);
@@ -65,7 +68,8 @@ export default function AgentMemoryPage(): React.ReactNode {
         params: { query: { remoteNode } },
         body: { content: globalMemory },
       });
-      if (apiError) throw new Error(apiError.message || 'Failed to save memory');
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to save memory');
       setSuccess('Global memory saved');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save memory');
@@ -76,10 +80,14 @@ export default function AgentMemoryPage(): React.ReactNode {
 
   async function handleDeleteGlobal(): Promise<void> {
     try {
-      const { error: apiError } = await client.DELETE('/settings/agent/memory', {
-        params: { query: { remoteNode } },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to clear memory');
+      const { error: apiError } = await client.DELETE(
+        '/settings/agent/memory',
+        {
+          params: { query: { remoteNode } },
+        }
+      );
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to clear memory');
       setGlobalMemory('');
       setDeletingGlobal(false);
       setSuccess('Global memory cleared');
@@ -93,13 +101,18 @@ export default function AgentMemoryPage(): React.ReactNode {
     setIsDagLoading(true);
     setError(null);
     try {
-      const { data, error: apiError } = await client.GET('/settings/agent/memory/dags/{dagName}', {
-        params: { path: { dagName }, query: { remoteNode } },
-      });
+      const { data, error: apiError } = await client.GET(
+        '/settings/agent/memory/dags/{dagName}',
+        {
+          params: { path: { dagName }, query: { remoteNode } },
+        }
+      );
       if (apiError) throw new Error('Failed to load DAG memory');
       setDagContent(data.content);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load DAG memory');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load DAG memory'
+      );
       setSelectedDAG(null);
     } finally {
       setIsDagLoading(false);
@@ -112,14 +125,20 @@ export default function AgentMemoryPage(): React.ReactNode {
     setError(null);
     setSuccess(null);
     try {
-      const { error: apiError } = await client.PUT('/settings/agent/memory/dags/{dagName}', {
-        params: { path: { dagName: selectedDAG }, query: { remoteNode } },
-        body: { content: dagContent },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to save DAG memory');
+      const { error: apiError } = await client.PUT(
+        '/settings/agent/memory/dags/{dagName}',
+        {
+          params: { path: { dagName: selectedDAG }, query: { remoteNode } },
+          body: { content: dagContent },
+        }
+      );
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to save DAG memory');
       setSuccess(`Memory for "${selectedDAG}" saved`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save DAG memory');
+      setError(
+        err instanceof Error ? err.message : 'Failed to save DAG memory'
+      );
     } finally {
       setIsDagSaving(false);
     }
@@ -128,10 +147,14 @@ export default function AgentMemoryPage(): React.ReactNode {
   async function handleDeleteDAG(): Promise<void> {
     if (!deletingDAG) return;
     try {
-      const { error: apiError } = await client.DELETE('/settings/agent/memory/dags/{dagName}', {
-        params: { path: { dagName: deletingDAG }, query: { remoteNode } },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to delete DAG memory');
+      const { error: apiError } = await client.DELETE(
+        '/settings/agent/memory/dags/{dagName}',
+        {
+          params: { path: { dagName: deletingDAG }, query: { remoteNode } },
+        }
+      );
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to delete DAG memory');
       setDagNames((prev) => prev.filter((n) => n !== deletingDAG));
       if (selectedDAG === deletingDAG) {
         setSelectedDAG(null);
@@ -140,7 +163,9 @@ export default function AgentMemoryPage(): React.ReactNode {
       setDeletingDAG(null);
       setSuccess(`Memory for "${deletingDAG}" deleted`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete DAG memory');
+      setError(
+        err instanceof Error ? err.message : 'Failed to delete DAG memory'
+      );
     }
   }
 
@@ -170,7 +195,9 @@ export default function AgentMemoryPage(): React.ReactNode {
           </div>
         )}
         {memoryDir && (
-          <p className="text-xs text-muted-foreground mt-1 font-mono">{memoryDir}</p>
+          <p className="text-xs text-muted-foreground mt-1 font-mono">
+            {memoryDir}
+          </p>
         )}
       </div>
 
@@ -251,7 +278,8 @@ export default function AgentMemoryPage(): React.ReactNode {
           </div>
         ) : dagNames.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            No DAG-specific memories yet. The agent will create these when working with specific DAGs.
+            No DAG-specific memories yet. The agent will create these when
+            working with specific DAGs.
           </p>
         ) : (
           <div className="space-y-2">
@@ -293,7 +321,10 @@ export default function AgentMemoryPage(): React.ReactNode {
               <div className="space-y-2 pt-2 border-t">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground">
-                    Memory for: <code className="bg-muted px-1.5 py-0.5 rounded">{selectedDAG}</code>
+                    Memory for:{' '}
+                    <code className="bg-muted px-1.5 py-0.5 rounded">
+                      {selectedDAG}
+                    </code>
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {dagContent.split('\n').length}/200 lines
@@ -346,7 +377,8 @@ export default function AgentMemoryPage(): React.ReactNode {
         onSubmit={handleDeleteGlobal}
       >
         <p>
-          Are you sure you want to clear the global agent memory? This action cannot be undone.
+          Are you sure you want to clear the global agent memory? This action
+          cannot be undone.
         </p>
       </ConfirmModal>
 

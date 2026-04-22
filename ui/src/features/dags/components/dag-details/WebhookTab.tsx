@@ -18,20 +18,20 @@ import {
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { components } from '../../../../api/v1/schema';
-import { Button } from '../../../../components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '../../../../components/ui/card';
-import { Switch } from '../../../../components/ui/switch';
+} from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import dayjs from '../../../../lib/dayjs';
-import ConfirmModal from '../../../../ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 
 type WebhookDetails = components['schemas']['WebhookDetails'];
 

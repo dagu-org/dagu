@@ -1,7 +1,7 @@
 import { useDocTabContext } from '@/contexts/DocTabContext';
 import { FileText } from 'lucide-react';
 import React, { useCallback, useState } from 'react';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import DocEditor from './DocEditor';
 import DocTabBar from './DocTabBar';
 
@@ -16,14 +16,22 @@ type Props = {
 };
 
 function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
-  const { tabs, activeTabId, closeTab, closeAllTabs, closeOtherTabs, clearDraft, markTabSaved, isTabUnsaved } =
-    useDocTabContext();
+  const {
+    tabs,
+    activeTabId,
+    closeTab,
+    closeAllTabs,
+    closeOtherTabs,
+    clearDraft,
+    markTabSaved,
+    isTabUnsaved,
+  } = useDocTabContext();
 
-  const [confirmCloseTabId, setConfirmCloseTabId] = useState<string | null>(null);
+  const [confirmCloseTabId, setConfirmCloseTabId] = useState<string | null>(
+    null
+  );
 
-  const activeTab = activeTabId
-    ? tabs.find((t) => t.id === activeTabId)
-    : null;
+  const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) : null;
 
   const handleCloseTabWithUnsaved = useCallback((tabId: string) => {
     setConfirmCloseTabId(tabId);
@@ -42,7 +50,7 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
   const [confirmCloseAll, setConfirmCloseAll] = useState(false);
 
   const handleCloseAllTabs = useCallback(() => {
-    if (tabs.some(t => isTabUnsaved(t.id))) {
+    if (tabs.some((t) => isTabUnsaved(t.id))) {
       setConfirmCloseAll(true);
     } else {
       closeAllTabs();
@@ -50,7 +58,7 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
   }, [tabs, isTabUnsaved, closeAllTabs]);
 
   const handleConfirmCloseAll = useCallback(() => {
-    tabs.forEach(t => {
+    tabs.forEach((t) => {
       clearDraft(t.id);
       markTabSaved(t.id);
     });
@@ -59,19 +67,24 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
   }, [tabs, closeAllTabs, clearDraft, markTabSaved]);
 
   // Close Other Tabs
-  const [confirmCloseOthersKeepId, setConfirmCloseOthersKeepId] = useState<string | null>(null);
+  const [confirmCloseOthersKeepId, setConfirmCloseOthersKeepId] = useState<
+    string | null
+  >(null);
 
-  const handleCloseOtherTabs = useCallback((keepTabId: string) => {
-    if (tabs.some(t => t.id !== keepTabId && isTabUnsaved(t.id))) {
-      setConfirmCloseOthersKeepId(keepTabId);
-    } else {
-      closeOtherTabs(keepTabId);
-    }
-  }, [tabs, isTabUnsaved, closeOtherTabs]);
+  const handleCloseOtherTabs = useCallback(
+    (keepTabId: string) => {
+      if (tabs.some((t) => t.id !== keepTabId && isTabUnsaved(t.id))) {
+        setConfirmCloseOthersKeepId(keepTabId);
+      } else {
+        closeOtherTabs(keepTabId);
+      }
+    },
+    [tabs, isTabUnsaved, closeOtherTabs]
+  );
 
   const handleConfirmCloseOthers = useCallback(() => {
     if (confirmCloseOthersKeepId) {
-      tabs.forEach(t => {
+      tabs.forEach((t) => {
         if (t.id !== confirmCloseOthersKeepId) {
           clearDraft(t.id);
           markTabSaved(t.id);
@@ -80,7 +93,13 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
       closeOtherTabs(confirmCloseOthersKeepId);
       setConfirmCloseOthersKeepId(null);
     }
-  }, [confirmCloseOthersKeepId, tabs, closeOtherTabs, clearDraft, markTabSaved]);
+  }, [
+    confirmCloseOthersKeepId,
+    tabs,
+    closeOtherTabs,
+    clearDraft,
+    markTabSaved,
+  ]);
 
   const confirmTab = confirmCloseTabId
     ? tabs.find((t) => t.id === confirmCloseTabId)
@@ -101,9 +120,7 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
     <div className="flex flex-col h-full">
       <div className="flex items-stretch border-b border-border">
         {toolbar && (
-          <div className="flex items-center shrink-0 px-2 gap-2">
-            {toolbar}
-          </div>
+          <div className="flex items-center shrink-0 px-2 gap-2">{toolbar}</div>
         )}
         <DocTabBar
           className="flex-1 min-w-0 border-b-0"
@@ -151,8 +168,10 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
       >
         <p className="text-sm text-muted-foreground">
           You have unsaved changes in{' '}
-          <strong>{confirmTab?.title || confirmTab?.docPath || 'this document'}</strong>.
-          Discard changes?
+          <strong>
+            {confirmTab?.title || confirmTab?.docPath || 'this document'}
+          </strong>
+          . Discard changes?
         </p>
       </ConfirmModal>
 
@@ -165,7 +184,8 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
         onSubmit={handleConfirmCloseAll}
       >
         <p className="text-sm text-muted-foreground">
-          Some tabs have unsaved changes. Discard all changes and close all tabs?
+          Some tabs have unsaved changes. Discard all changes and close all
+          tabs?
         </p>
       </ConfirmModal>
 
@@ -178,7 +198,8 @@ function DocTabEditorPanel({ onDeleteDoc, toolbar, onContentChange }: Props) {
         onSubmit={handleConfirmCloseOthers}
       >
         <p className="text-sm text-muted-foreground">
-          Some other tabs have unsaved changes. Discard their changes and close them?
+          Some other tabs have unsaved changes. Discard their changes and close
+          them?
         </p>
       </ConfirmModal>
     </div>

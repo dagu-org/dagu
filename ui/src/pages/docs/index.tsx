@@ -40,7 +40,7 @@ import {
   workspaceSelectionQuery,
   visibleDocumentPathForWorkspace,
 } from '@/lib/workspace';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
 import DocTreeSidebar from './components/DocTreeSidebar';

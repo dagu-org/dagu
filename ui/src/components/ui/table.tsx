@@ -1,126 +1,118 @@
-import { Table as RadixTable } from '@radix-ui/themes';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Table({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof RadixTable.Root>) {
-  return (
-    <div className="w-full overflow-hidden">
-      <RadixTable.Root
-        data-slot="table"
-        variant="ghost"
-        className={cn('w-full', className)}
-        {...props}
-      >
-        {children}
-      </RadixTable.Root>
-    </div>
-  );
-}
-
-function TableHeader({
-  className,
-  ...props
-}: React.ComponentProps<typeof RadixTable.Header>) {
-  return (
-    <RadixTable.Header
-      data-slot="table-header"
-      className={cn('bg-muted', className)}
+const Table = React.forwardRef<
+  HTMLTableElement,
+  React.HTMLAttributes<HTMLTableElement>
+>(({ className, ...props }, ref) => (
+  <div className="w-full overflow-auto rounded-md border border-border bg-card">
+    <table
+      ref={ref}
+      data-slot="table"
+      className={cn('w-full caption-bottom border-collapse text-sm', className)}
       {...props}
     />
-  );
-}
+  </div>
+));
+Table.displayName = 'Table';
 
-function TableBody({
-  className,
-  ...props
-}: React.ComponentProps<typeof RadixTable.Body>) {
-  return (
-    <RadixTable.Body
-      data-slot="table-body"
-      className={cn(className)}
-      {...props}
-    />
-  );
-}
+const TableHeader = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <thead
+    ref={ref}
+    data-slot="table-header"
+    className={cn('bg-surface-variant/70 [&_tr]:border-b', className)}
+    {...props}
+  />
+));
+TableHeader.displayName = 'TableHeader';
 
-function TableRow({
-  className,
-  ...props
-}: React.ComponentProps<typeof RadixTable.Row>) {
-  return (
-    <RadixTable.Row
-      data-slot="table-row"
-      className={cn(
-        'hover:bg-muted/50 transition-colors bg-surface',
-        className
-      )}
-      {...props}
-    />
-  );
-}
+const TableBody = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tbody
+    ref={ref}
+    data-slot="table-body"
+    className={cn('[&_tr:last-child]:border-0', className)}
+    {...props}
+  />
+));
+TableBody.displayName = 'TableBody';
 
-function TableHead({
-  className,
-  ...props
-}: React.ComponentProps<typeof RadixTable.ColumnHeaderCell>) {
-  return (
-    <RadixTable.ColumnHeaderCell
-      data-slot="table-head"
-      className={cn('h-8 py-1.5 px-3 text-xs font-medium text-muted-foreground', className)}
-      {...props}
-    />
-  );
-}
+const TableFooter = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tfoot
+    ref={ref}
+    data-slot="table-footer"
+    className={cn('bg-muted/50 border-t font-medium', className)}
+    {...props}
+  />
+));
+TableFooter.displayName = 'TableFooter';
 
-function TableCell({
-  className,
-  ...props
-}: React.ComponentProps<typeof RadixTable.Cell>) {
-  return (
-    <RadixTable.Cell
-      data-slot="table-cell"
-      className={cn('py-2 px-3 text-xs', className)}
-      {...props}
-    />
-  );
-}
+const TableRow = React.forwardRef<
+  HTMLTableRowElement,
+  React.HTMLAttributes<HTMLTableRowElement>
+>(({ className, ...props }, ref) => (
+  <tr
+    ref={ref}
+    data-slot="table-row"
+    className={cn(
+      'border-b border-border bg-card transition-colors hover:bg-muted/60 data-[state=selected]:bg-muted',
+      className
+    )}
+    {...props}
+  />
+));
+TableRow.displayName = 'TableRow';
 
-function TableCaption({
-  className,
-  ...props
-}: React.ComponentProps<'caption'>) {
-  return (
-    <caption
-      data-slot="table-caption"
-      className={cn('text-muted-foreground mt-4 text-sm', className)}
-      {...props}
-    />
-  );
-}
+const TableHead = React.forwardRef<
+  HTMLTableCellElement,
+  React.ThHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <th
+    ref={ref}
+    data-slot="table-head"
+    className={cn(
+      'h-9 px-3 py-2 text-left align-middle text-xs font-semibold text-text-secondary [&:has([role=checkbox])]:pr-0',
+      className
+    )}
+    {...props}
+  />
+));
+TableHead.displayName = 'TableHead';
 
-function TableFooter({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<'tfoot'>) {
-  return (
-    <tfoot
-      data-slot="table-footer"
-      className={cn(
-        'bg-muted/50 border-t font-medium [&>tr]:last:border-b-0',
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </tfoot>
-  );
-}
+const TableCell = React.forwardRef<
+  HTMLTableCellElement,
+  React.TdHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <td
+    ref={ref}
+    data-slot="table-cell"
+    className={cn('px-3 py-2 align-middle text-xs text-foreground', className)}
+    {...props}
+  />
+));
+TableCell.displayName = 'TableCell';
+
+const TableCaption = React.forwardRef<
+  HTMLTableCaptionElement,
+  React.HTMLAttributes<HTMLTableCaptionElement>
+>(({ className, ...props }, ref) => (
+  <caption
+    ref={ref}
+    data-slot="table-caption"
+    className={cn('mt-4 text-sm text-muted-foreground', className)}
+    {...props}
+  />
+));
+TableCaption.displayName = 'TableCaption';
 
 export {
   Table,

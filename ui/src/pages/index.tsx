@@ -33,7 +33,7 @@ import {
   workspaceSelectionKey,
   workspaceSelectionQuery,
 } from '../lib/workspace';
-import Title from '../ui/Title';
+import Title from '@/components/ui/title';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 

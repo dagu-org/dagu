@@ -1,5 +1,23 @@
-import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Loader2, MoreHorizontal, Pencil, Plus, Save, Shield, Star, Trash2 } from 'lucide-react';
+import {
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  Bot,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Save,
+  Shield,
+  Star,
+  Trash2,
+} from 'lucide-react';
 import {
   AgentBashPolicyDefaultBehavior,
   AgentBashPolicyDenyBehavior,
@@ -38,14 +56,15 @@ import { ProviderAuthCard } from '@/features/agent/components/ProviderAuthCard';
 import { useAgentAuthProviders } from '@/features/agent/hooks/useAgentAuthProviders';
 import { getAgentModelProviderLabel } from '@/features/agent/modelProviders';
 import { useClient } from '@/hooks/api';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { ModelFormModal } from './ModelFormModal';
 
 type ModelConfig = components['schemas']['ModelConfigResponse'];
 type ModelPreset = components['schemas']['ModelPreset'];
 type AgentToolPolicy = components['schemas']['AgentToolPolicy'];
 type AgentBashRule = components['schemas']['AgentBashRule'];
-type UpdateAgentConfigRequest = components['schemas']['UpdateAgentConfigRequest'];
+type UpdateAgentConfigRequest =
+  components['schemas']['UpdateAgentConfigRequest'];
 type AgentAuthProviderStatus = components['schemas']['AgentAuthProviderStatus'];
 
 type SoulOption = {
@@ -83,21 +102,28 @@ function createDefaultToolPolicy(tools: ToolMeta[]): AgentToolPolicy {
   };
 }
 
-function normalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: ToolMeta[]): AgentToolPolicy {
+function normalizeToolPolicy(
+  policy: AgentToolPolicy | undefined,
+  tools: ToolMeta[]
+): AgentToolPolicy {
   const defaults = createDefaultToolPolicy(tools);
   const merged = { ...defaults.tools, ...(policy?.tools || {}) };
   const bash = {
     rules: policy?.bash?.rules || defaults.bash?.rules || [],
-    defaultBehavior: policy?.bash?.defaultBehavior || defaults.bash?.defaultBehavior,
+    defaultBehavior:
+      policy?.bash?.defaultBehavior || defaults.bash?.defaultBehavior,
     denyBehavior: policy?.bash?.denyBehavior || defaults.bash?.denyBehavior,
   };
   return { tools: merged, bash };
 }
 
-function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: ToolMeta[]): AgentToolPolicy {
+function canonicalizeToolPolicy(
+  policy: AgentToolPolicy | undefined,
+  tools: ToolMeta[]
+): AgentToolPolicy {
   const normalized = normalizeToolPolicy(policy, tools);
-  const sortedToolsEntries = Object.entries(normalized.tools || {}).sort(([a], [b]) =>
-    a.localeCompare(b)
+  const sortedToolsEntries = Object.entries(normalized.tools || {}).sort(
+    ([a], [b]) => a.localeCompare(b)
   );
   const sortedTools = Object.fromEntries(sortedToolsEntries);
   const rules = (normalized.bash?.rules || []).map((rule) => ({
@@ -110,8 +136,11 @@ function canonicalizeToolPolicy(policy: AgentToolPolicy | undefined, tools: Tool
     tools: sortedTools,
     bash: {
       rules,
-      defaultBehavior: normalized.bash?.defaultBehavior || AgentBashPolicyDefaultBehavior.allow,
-      denyBehavior: normalized.bash?.denyBehavior || AgentBashPolicyDenyBehavior.ask_user,
+      defaultBehavior:
+        normalized.bash?.defaultBehavior ||
+        AgentBashPolicyDefaultBehavior.allow,
+      denyBehavior:
+        normalized.bash?.denyBehavior || AgentBashPolicyDenyBehavior.ask_user,
     },
   };
 }
@@ -138,7 +167,9 @@ export default function AgentSettingsPage(): ReactNode {
 
   const [enabled, setEnabled] = useState(false);
   const [defaultModelId, setDefaultModelId] = useState<string | undefined>();
-  const [toolPolicy, setToolPolicy] = useState<AgentToolPolicy>(() => createDefaultToolPolicy([]));
+  const [toolPolicy, setToolPolicy] = useState<AgentToolPolicy>(() =>
+    createDefaultToolPolicy([])
+  );
   const [savedConfig, setSavedConfig] = useState<SavedAgentConfig | null>(null);
   const [bashRuleIds, setBashRuleIds] = useState<string[]>([]);
   const [models, setModels] = useState<ModelConfig[]>([]);
@@ -146,7 +177,9 @@ export default function AgentSettingsPage(): ReactNode {
   const [souls, setSouls] = useState<SoulOption[]>([]);
   const [selectedSoulId, setSelectedSoulId] = useState<string | undefined>();
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [webSearchMaxUses, setWebSearchMaxUses] = useState<number | undefined>();
+  const [webSearchMaxUses, setWebSearchMaxUses] = useState<
+    number | undefined
+  >();
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -154,7 +187,9 @@ export default function AgentSettingsPage(): ReactNode {
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
 
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const codexProvider = (providerMap['openai-codex'] as AgentAuthProviderStatus | undefined) || null;
+  const codexProvider =
+    (providerMap['openai-codex'] as AgentAuthProviderStatus | undefined) ||
+    null;
   const bashRuleIdCounter = useRef(0);
 
   const nextBashRuleId = useCallback((): string => {
@@ -162,9 +197,12 @@ export default function AgentSettingsPage(): ReactNode {
     return `bash_rule_${bashRuleIdCounter.current}`;
   }, []);
 
-  const buildBashRuleIDs = useCallback((count: number): string[] => {
-    return Array.from({ length: count }, () => nextBashRuleId());
-  }, [nextBashRuleId]);
+  const buildBashRuleIDs = useCallback(
+    (count: number): string[] => {
+      return Array.from({ length: count }, () => nextBashRuleId());
+    },
+    [nextBashRuleId]
+  );
 
   useEffect(() => {
     appBarContext.setTitle('Agent Settings');
@@ -184,38 +222,48 @@ export default function AgentSettingsPage(): ReactNode {
     }
   }, [client, remoteNode]);
 
-  const fetchConfig = useCallback(async (tools: ToolMeta[]) => {
-    try {
-      const { data, error: apiError } = await client.GET('/settings/agent', {
-        params: { query: { remoteNode } },
-      });
-      if (apiError) throw new Error('Failed to fetch agent configuration');
-      const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
-      setEnabled(data.enabled ?? false);
-      setDefaultModelId(data.defaultModelId);
-      setSelectedSoulId(data.selectedSoulId ?? undefined);
-      setToolPolicy(normalizedPolicy);
-      setWebSearchEnabled(data.webSearch?.enabled ?? false);
-      setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
-      setSavedConfig({
-        enabled: data.enabled ?? false,
-        defaultModelId: data.defaultModelId,
-        selectedSoulId: data.selectedSoulId ?? undefined,
-        toolPolicy: normalizedPolicy,
-        webSearchEnabled: data.webSearch?.enabled ?? false,
-        webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
-      });
-      setBashRuleIds(buildBashRuleIDs(normalizedPolicy.bash?.rules?.length || 0));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load configuration');
-    }
-  }, [buildBashRuleIDs, client, remoteNode]);
+  const fetchConfig = useCallback(
+    async (tools: ToolMeta[]) => {
+      try {
+        const { data, error: apiError } = await client.GET('/settings/agent', {
+          params: { query: { remoteNode } },
+        });
+        if (apiError) throw new Error('Failed to fetch agent configuration');
+        const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
+        setEnabled(data.enabled ?? false);
+        setDefaultModelId(data.defaultModelId);
+        setSelectedSoulId(data.selectedSoulId ?? undefined);
+        setToolPolicy(normalizedPolicy);
+        setWebSearchEnabled(data.webSearch?.enabled ?? false);
+        setWebSearchMaxUses(data.webSearch?.maxUses ?? undefined);
+        setSavedConfig({
+          enabled: data.enabled ?? false,
+          defaultModelId: data.defaultModelId,
+          selectedSoulId: data.selectedSoulId ?? undefined,
+          toolPolicy: normalizedPolicy,
+          webSearchEnabled: data.webSearch?.enabled ?? false,
+          webSearchMaxUses: data.webSearch?.maxUses ?? undefined,
+        });
+        setBashRuleIds(
+          buildBashRuleIDs(normalizedPolicy.bash?.rules?.length || 0)
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to load configuration'
+        );
+      }
+    },
+    [buildBashRuleIDs, client, remoteNode]
+  );
 
   const fetchModels = useCallback(async () => {
     try {
-      const { data, error: apiError } = await client.GET('/settings/agent/models', {
-        params: { query: { remoteNode } },
-      });
+      const { data, error: apiError } = await client.GET(
+        '/settings/agent/models',
+        {
+          params: { query: { remoteNode } },
+        }
+      );
       if (apiError) throw new Error('Failed to fetch models');
       setModels(data.models || []);
       setDefaultModelId(data.defaultModelId);
@@ -253,7 +301,12 @@ export default function AgentSettingsPage(): ReactNode {
   useEffect(() => {
     async function load() {
       const tools = await fetchTools();
-      await Promise.all([fetchConfig(tools), fetchModels(), fetchPresets(), fetchSouls()]);
+      await Promise.all([
+        fetchConfig(tools),
+        fetchModels(),
+        fetchPresets(),
+        fetchSouls(),
+      ]);
       setIsLoading(false);
     }
     load();
@@ -266,8 +319,14 @@ export default function AgentSettingsPage(): ReactNode {
 
     try {
       const requestBody: UpdateAgentConfigRequest = {};
-      const currentPolicyCanonical = canonicalizeToolPolicy(toolPolicy, toolMetas);
-      const savedPolicyCanonical = canonicalizeToolPolicy(savedConfig?.toolPolicy, toolMetas);
+      const currentPolicyCanonical = canonicalizeToolPolicy(
+        toolPolicy,
+        toolMetas
+      );
+      const savedPolicyCanonical = canonicalizeToolPolicy(
+        savedConfig?.toolPolicy,
+        toolMetas
+      );
 
       if (!savedConfig || enabled !== savedConfig.enabled) {
         requestBody.enabled = enabled;
@@ -278,10 +337,18 @@ export default function AgentSettingsPage(): ReactNode {
       if (!savedConfig || selectedSoulId !== savedConfig.selectedSoulId) {
         requestBody.selectedSoulId = selectedSoulId;
       }
-      if (!savedConfig || JSON.stringify(currentPolicyCanonical) !== JSON.stringify(savedPolicyCanonical)) {
+      if (
+        !savedConfig ||
+        JSON.stringify(currentPolicyCanonical) !==
+          JSON.stringify(savedPolicyCanonical)
+      ) {
         requestBody.toolPolicy = currentPolicyCanonical;
       }
-      if (!savedConfig || webSearchEnabled !== savedConfig.webSearchEnabled || webSearchMaxUses !== savedConfig.webSearchMaxUses) {
+      if (
+        !savedConfig ||
+        webSearchEnabled !== savedConfig.webSearchEnabled ||
+        webSearchMaxUses !== savedConfig.webSearchMaxUses
+      ) {
         requestBody.webSearch = {
           enabled: webSearchEnabled,
           maxUses: webSearchMaxUses,
@@ -320,7 +387,9 @@ export default function AgentSettingsPage(): ReactNode {
       updateConfig({ agentEnabled: data.enabled ?? false });
       setSuccess('Configuration saved successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save configuration');
+      setError(
+        err instanceof Error ? err.message : 'Failed to save configuration'
+      );
     } finally {
       setIsSaving(false);
     }
@@ -329,25 +398,36 @@ export default function AgentSettingsPage(): ReactNode {
   async function handleSetDefault(modelId: string): Promise<void> {
     setError(null);
     try {
-      const { error: apiError } = await client.PUT('/settings/agent/default-model', {
-        params: { query: { remoteNode } },
-        body: { modelId },
-      });
+      const { error: apiError } = await client.PUT(
+        '/settings/agent/default-model',
+        {
+          params: { query: { remoteNode } },
+          body: { modelId },
+        }
+      );
       if (apiError) {
         throw new Error(apiError.message || 'Failed to set default model');
       }
       setDefaultModelId(modelId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to set default model');
+      setError(
+        err instanceof Error ? err.message : 'Failed to set default model'
+      );
     }
   }
 
   async function handleDeleteModel(): Promise<void> {
     if (!deletingModel) return;
     try {
-      const { error: apiError } = await client.DELETE('/settings/agent/models/{modelId}', {
-        params: { path: { modelId: deletingModel.id }, query: { remoteNode } },
-      });
+      const { error: apiError } = await client.DELETE(
+        '/settings/agent/models/{modelId}',
+        {
+          params: {
+            path: { modelId: deletingModel.id },
+            query: { remoteNode },
+          },
+        }
+      );
       if (apiError) {
         throw new Error(apiError.message || 'Failed to delete model');
       }
@@ -359,7 +439,10 @@ export default function AgentSettingsPage(): ReactNode {
     }
   }
 
-  const normalizedPolicy = useMemo(() => normalizeToolPolicy(toolPolicy, toolMetas), [toolPolicy, toolMetas]);
+  const normalizedPolicy = useMemo(
+    () => normalizeToolPolicy(toolPolicy, toolMetas),
+    [toolPolicy, toolMetas]
+  );
 
   useEffect(() => {
     const ruleCount = normalizedPolicy.bash?.rules?.length || 0;
@@ -387,10 +470,9 @@ export default function AgentSettingsPage(): ReactNode {
     });
   }
 
-  function updateBashPolicy<K extends keyof NonNullable<AgentToolPolicy['bash']>>(
-    key: K,
-    value: NonNullable<AgentToolPolicy['bash']>[K]
-  ): void {
+  function updateBashPolicy<
+    K extends keyof NonNullable<AgentToolPolicy['bash']>,
+  >(key: K, value: NonNullable<AgentToolPolicy['bash']>[K]): void {
     setToolPolicy((prev) => {
       const normalized = normalizeToolPolicy(prev, toolMetas);
       return {
@@ -557,22 +639,21 @@ export default function AgentSettingsPage(): ReactNode {
               Turn on the AI assistant feature
             </p>
           </div>
-          <Switch
-            id="enabled"
-            checked={enabled}
-            onCheckedChange={setEnabled}
-          />
+          <Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
         </div>
 
         {souls.length > 0 && (
           <div className="space-y-1">
             <Label className="text-sm font-medium">Agent Personality</Label>
             <p className="text-xs text-muted-foreground">
-              Select the soul that defines the agent&apos;s identity and communication style
+              Select the soul that defines the agent&apos;s identity and
+              communication style
             </p>
             <Select
               value={selectedSoulId || '__none__'}
-              onValueChange={(value) => setSelectedSoulId(value === '__none__' ? undefined : value)}
+              onValueChange={(value) =>
+                setSelectedSoulId(value === '__none__' ? undefined : value)
+              }
             >
               <SelectTrigger className="h-8 text-xs max-w-[300px]">
                 <SelectValue placeholder="Select soul" />
@@ -612,7 +693,9 @@ export default function AgentSettingsPage(): ReactNode {
 
         {webSearchEnabled && (
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Max Uses per Request</Label>
+            <Label className="text-xs text-muted-foreground">
+              Max Uses per Request
+            </Label>
             <Input
               type="number"
               min={1}
@@ -626,7 +709,9 @@ export default function AgentSettingsPage(): ReactNode {
                   return;
                 }
                 const parsed = parseInt(val, 10);
-                setWebSearchMaxUses(Number.isNaN(parsed) || parsed < 1 ? undefined : parsed);
+                setWebSearchMaxUses(
+                  Number.isNaN(parsed) || parsed < 1 ? undefined : parsed
+                );
               }}
             />
           </div>
@@ -656,7 +741,9 @@ export default function AgentSettingsPage(): ReactNode {
           />
         ) : (
           <div className="rounded-md border border-dashed border-border/80 px-3 py-6 text-sm text-muted-foreground">
-            {authLoading ? 'Loading provider connections...' : 'No subscription providers are available.'}
+            {authLoading
+              ? 'Loading provider connections...'
+              : 'No subscription providers are available.'}
           </div>
         )}
       </div>
@@ -676,11 +763,15 @@ export default function AgentSettingsPage(): ReactNode {
             >
               <div className="space-y-0.5 min-w-0">
                 <p className="text-sm font-medium">{tool.label}</p>
-                <p className="text-xs text-muted-foreground">{tool.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  {tool.description}
+                </p>
               </div>
               <Switch
                 checked={normalizedPolicy.tools?.[tool.name] ?? false}
-                onCheckedChange={(checked) => updateToolToggle(tool.name, checked)}
+                onCheckedChange={(checked) =>
+                  updateToolToggle(tool.name, checked)
+                }
               />
             </div>
           ))}
@@ -698,36 +789,58 @@ export default function AgentSettingsPage(): ReactNode {
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">No Match Behavior</Label>
+              <Label className="text-xs text-muted-foreground">
+                No Match Behavior
+              </Label>
               <Select
-                value={normalizedPolicy.bash?.defaultBehavior || AgentBashPolicyDefaultBehavior.deny}
+                value={
+                  normalizedPolicy.bash?.defaultBehavior ||
+                  AgentBashPolicyDefaultBehavior.deny
+                }
                 onValueChange={(value) =>
-                  updateBashPolicy('defaultBehavior', value as AgentBashPolicyDefaultBehavior)
+                  updateBashPolicy(
+                    'defaultBehavior',
+                    value as AgentBashPolicyDefaultBehavior
+                  )
                 }
               >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={AgentBashPolicyDefaultBehavior.allow}>Allow</SelectItem>
-                  <SelectItem value={AgentBashPolicyDefaultBehavior.deny}>Deny</SelectItem>
+                  <SelectItem value={AgentBashPolicyDefaultBehavior.allow}>
+                    Allow
+                  </SelectItem>
+                  <SelectItem value={AgentBashPolicyDefaultBehavior.deny}>
+                    Deny
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">On Deny</Label>
               <Select
-                value={normalizedPolicy.bash?.denyBehavior || AgentBashPolicyDenyBehavior.ask_user}
+                value={
+                  normalizedPolicy.bash?.denyBehavior ||
+                  AgentBashPolicyDenyBehavior.ask_user
+                }
                 onValueChange={(value) =>
-                  updateBashPolicy('denyBehavior', value as AgentBashPolicyDenyBehavior)
+                  updateBashPolicy(
+                    'denyBehavior',
+                    value as AgentBashPolicyDenyBehavior
+                  )
                 }
               >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={AgentBashPolicyDenyBehavior.ask_user}>Ask User</SelectItem>
-                  <SelectItem value={AgentBashPolicyDenyBehavior.block}>Block</SelectItem>
+                  <SelectItem value={AgentBashPolicyDenyBehavior.ask_user}>
+                    Ask User
+                  </SelectItem>
+                  <SelectItem value={AgentBashPolicyDenyBehavior.block}>
+                    Block
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -735,8 +848,15 @@ export default function AgentSettingsPage(): ReactNode {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Rules (ordered)</Label>
-              <Button size="sm" className="h-7 text-xs" variant="outline" onClick={addBashRule}>
+              <Label className="text-xs text-muted-foreground">
+                Rules (ordered)
+              </Label>
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                variant="outline"
+                onClick={addBashRule}
+              >
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Add Rule
               </Button>
@@ -749,61 +869,99 @@ export default function AgentSettingsPage(): ReactNode {
             ) : (
               <div className="space-y-2">
                 {(normalizedPolicy.bash?.rules || []).map((rule, index) => (
-                  <div key={bashRuleIds[index] || `bash_rule_fallback_${index}`} className="rounded-md border border-border/60 p-2 space-y-2">
+                  <div
+                    key={bashRuleIds[index] || `bash_rule_fallback_${index}`}
+                    className="rounded-md border border-border/60 p-2 space-y-2"
+                  >
                     <div className="grid gap-2 md:grid-cols-[1fr,2fr,150px,auto] items-end">
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Name</Label>
+                        <Label className="text-xs text-muted-foreground">
+                          Name
+                        </Label>
                         <Input
                           value={rule.name || ''}
-                          onChange={(e) => updateBashRule(index, { name: e.target.value })}
+                          onChange={(e) =>
+                            updateBashRule(index, { name: e.target.value })
+                          }
                           className="h-8 text-xs"
                           placeholder={`rule_${index + 1}`}
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Regex Pattern</Label>
+                        <Label className="text-xs text-muted-foreground">
+                          Regex Pattern
+                        </Label>
                         <Input
                           value={rule.pattern}
-                          onChange={(e) => updateBashRule(index, { pattern: e.target.value })}
+                          onChange={(e) =>
+                            updateBashRule(index, { pattern: e.target.value })
+                          }
                           className="h-8 text-xs font-mono"
                           placeholder="^git\\s+status$"
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Action</Label>
+                        <Label className="text-xs text-muted-foreground">
+                          Action
+                        </Label>
                         <Select
                           value={rule.action}
                           onValueChange={(value) =>
-                            updateBashRule(index, { action: value as AgentBashRuleAction })
+                            updateBashRule(index, {
+                              action: value as AgentBashRuleAction,
+                            })
                           }
                         >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={AgentBashRuleAction.allow}>Allow</SelectItem>
-                            <SelectItem value={AgentBashRuleAction.deny}>Deny</SelectItem>
+                            <SelectItem value={AgentBashRuleAction.allow}>
+                              Allow
+                            </SelectItem>
+                            <SelectItem value={AgentBashRuleAction.deny}>
+                              Deny
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="flex items-center justify-end gap-2">
                         <div className="flex items-center gap-2">
-                          <Label className="text-xs text-muted-foreground">Enabled</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            Enabled
+                          </Label>
                           <Switch
                             checked={rule.enabled ?? true}
-                            onCheckedChange={(checked) => updateBashRule(index, { enabled: checked })}
+                            onCheckedChange={(checked) =>
+                              updateBashRule(index, { enabled: checked })
+                            }
                           />
                         </div>
                       </div>
                     </div>
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => moveBashRule(index, -1)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => moveBashRule(index, -1)}
+                      >
                         Up
                       </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => moveBashRule(index, 1)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => moveBashRule(index, 1)}
+                      >
                         Down
                       </Button>
-                      <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => removeBashRule(index)}>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-7 text-xs"
+                        onClick={() => removeBashRule(index)}
+                      >
                         Remove
                       </Button>
                     </div>
@@ -905,7 +1063,9 @@ export default function AgentSettingsPage(): ReactNode {
                                 : 'Not connected'}
                         </span>
                       ) : (
-                        <span className={`text-xs ${m.apiKeyConfigured ? 'text-green-600' : 'text-muted-foreground'}`}>
+                        <span
+                          className={`text-xs ${m.apiKeyConfigured ? 'text-green-600' : 'text-muted-foreground'}`}
+                        >
                           {m.apiKeyConfigured ? 'Configured' : 'Not set'}
                         </span>
                       )}
@@ -931,7 +1091,9 @@ export default function AgentSettingsPage(): ReactNode {
                             Edit
                           </DropdownMenuItem>
                           {m.id !== defaultModelId && (
-                            <DropdownMenuItem onClick={() => handleSetDefault(m.id)}>
+                            <DropdownMenuItem
+                              onClick={() => handleSetDefault(m.id)}
+                            >
                               <Star className="h-4 w-4 mr-2" />
                               Set as Default
                             </DropdownMenuItem>

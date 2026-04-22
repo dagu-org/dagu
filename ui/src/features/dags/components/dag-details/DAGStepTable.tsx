@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../../../components/ui/table';
+} from '@/components/ui/table';
 import DAGStepTableRow from './DAGStepTableRow';
 
 /**
@@ -37,24 +37,12 @@ function DAGStepTable({ steps }: Props) {
       <Table>
         <TableHeader>
           <TableRow className="h-8">
-            <TableHead className="w-[4%] text-center">
-              No
-            </TableHead>
-            <TableHead className="w-[20%]">
-              Step Details
-            </TableHead>
-            <TableHead className="w-[22%]">
-              Execution
-            </TableHead>
-            <TableHead className="w-[18%]">
-              Dependencies
-            </TableHead>
-            <TableHead className="w-[18%]">
-              Configuration
-            </TableHead>
-            <TableHead className="w-[18%]">
-              Conditions
-            </TableHead>
+            <TableHead className="w-[4%] text-center">No</TableHead>
+            <TableHead className="w-[20%]">Step Details</TableHead>
+            <TableHead className="w-[22%]">Execution</TableHead>
+            <TableHead className="w-[18%]">Dependencies</TableHead>
+            <TableHead className="w-[18%]">Configuration</TableHead>
+            <TableHead className="w-[18%]">Conditions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

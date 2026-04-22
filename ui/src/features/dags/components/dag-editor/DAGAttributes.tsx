@@ -6,7 +6,7 @@
 import dayjs from '@/lib/dayjs';
 import { Calendar, CheckSquare, Settings, Tag } from 'lucide-react';
 import { components } from '../../../../api/v1/schema';
-import { Badge } from '../../../../components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import {
   getScheduleKey,
   getScheduleLabel,
@@ -30,14 +30,10 @@ function DAGAttributes({ dag }: Props) {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-foreground mb-4">
-        {dag.name}
-      </h2>
+      <h2 className="text-xl font-semibold text-foreground mb-4">{dag.name}</h2>
 
       {dag.description && (
-        <p className="text-muted-foreground mb-6">
-          {dag.description}
-        </p>
+        <p className="text-muted-foreground mb-6">{dag.description}</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -59,7 +55,11 @@ function DAGAttributes({ dag }: Props) {
                   <Badge
                     key={getScheduleKey(schedule, index)}
                     variant="outline"
-                    title={schedule.kind === 'at' ? schedule.at || undefined : schedule.expression || undefined}
+                    title={
+                      schedule.kind === 'at'
+                        ? schedule.at || undefined
+                        : schedule.expression || undefined
+                    }
                     className="max-w-full justify-start bg-primary/10 px-2.5 py-1 text-primary border-primary/30 whitespace-nowrap normal-case tracking-normal"
                   >
                     {getScheduleLabel(schedule)}
@@ -131,9 +131,7 @@ function DAGAttributes({ dag }: Props) {
                     {c.condition}
                   </span>
                   <span className="text-muted-foreground">=&gt;</span>
-                  <span className="text-foreground/90">
-                    {c.expected}
-                  </span>
+                  <span className="text-foreground/90">{c.expected}</span>
                 </div>
               ))}
             </div>

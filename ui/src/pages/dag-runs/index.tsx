@@ -6,18 +6,18 @@ import { Layers, List, Search } from 'lucide-react';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Status } from '../../api/v1/schema';
-import { Button } from '../../components/ui/button';
-import { DateRangePicker } from '../../components/ui/date-range-picker';
-import { Input } from '../../components/ui/input';
+import { Button } from '@/components/ui/button';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
-import { LabelCombobox } from '../../components/ui/label-combobox';
-import { ToggleButton, ToggleGroup } from '../../components/ui/toggle-group';
+} from '@/components/ui/select';
+import { LabelCombobox } from '@/components/ui/label-combobox';
+import { ToggleButton, ToggleGroup } from '@/components/ui/toggle-group';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
@@ -34,8 +34,8 @@ import {
   workspaceSelectionKey,
   workspaceSelectionQuery,
 } from '../../lib/workspace';
-import StatusChip from '../../ui/StatusChip';
-import Title from '../../ui/Title';
+import StatusChip from '@/components/ui/status-chip';
+import Title from '@/components/ui/title';
 
 type DAGRunsFilters = {
   searchText: string;

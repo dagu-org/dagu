@@ -1,7 +1,7 @@
 import { TableCell } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { components, Status } from '../../../../api/v1/schema';
-import StyledTableRow from '../../../../ui/StyledTableRow';
+import StyledTableRow from '@/components/ui/styled-table-row';
 
 /**
  * Props for the HistoryTableRow component

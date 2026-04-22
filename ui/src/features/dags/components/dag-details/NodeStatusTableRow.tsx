@@ -26,7 +26,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import {
   AlertCircle,
   ChevronDown,
@@ -45,7 +45,7 @@ import {
   Status,
   Stream,
 } from '../../../../api/v1/schema';
-import StyledTableRow from '../../../../ui/StyledTableRow';
+import StyledTableRow from '@/components/ui/styled-table-row';
 import { DAGContext } from '../../contexts/DAGContext';
 import { NodeStatusChip } from '../common';
 import { InlineLogViewer } from '../common/InlineLogViewer';
@@ -725,7 +725,7 @@ function NodeStatusTableRow({
                   node.status !== NodeStatus.Rejected && (
                     <Button
                       size="icon-sm"
-                      className="btn-3d-secondary"
+                      variant="secondary"
                       title="Retry from this step"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -857,7 +857,6 @@ function NodeStatusTableRow({
           step={node.step}
           onSubmit={handleStatusUpdate}
         />
-
       </>
     );
   }
@@ -1179,7 +1178,6 @@ function NodeStatusTableRow({
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
         </div>
       )}
     </div>

@@ -16,7 +16,7 @@ import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
-import LoadingIndicator from '@/ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import type { components } from '@/api/v1/schema';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
@@ -417,10 +417,7 @@ function DAGDetailsSidePanel({
     return panel;
   }
 
-  return createPortal(
-    panel,
-    document.querySelector('.radix-themes') || document.body
-  );
+  return createPortal(panel, document.body);
 }
 
 export default DAGDetailsSidePanel;

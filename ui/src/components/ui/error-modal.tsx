@@ -5,7 +5,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import { AlertTriangle, X } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
 import type { FC, ReactNode } from 'react';

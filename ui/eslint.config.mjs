@@ -32,6 +32,29 @@ export default defineConfig([
 
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@/ui/*',
+                '../ui/*',
+                '../../ui/*',
+                '../../../ui/*',
+                '../../../../ui/*',
+                './components/ui/*',
+                '../components/ui/*',
+                '../../components/ui/*',
+                '../../../components/ui/*',
+                '../../../../components/ui/*',
+              ],
+              message:
+                'Use the canonical component library import style: @/components/ui/*.',
+            },
+          ],
+        },
+      ],
     },
     ignores: ['node_modules', 'dist', 'build', 'coverage', '**/*.js'],
   },

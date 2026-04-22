@@ -76,22 +76,30 @@ function getTitleInitial(title: string): string {
   return title.charAt(0).toUpperCase();
 }
 
-// GCP-Style Active States - Clean & Minimal
-function getActiveIndicatorStyle(customColor: boolean): string {
-  return customColor ? 'bg-white' : 'bg-sidebar-primary';
+function getActiveIndicatorStyle(): string {
+  return 'bg-sidebar-primary';
 }
 
-function getActiveLinkStyle(customColor: boolean): string {
-  return customColor ? 'bg-sidebar-active' : 'bg-sidebar-active';
+function getActiveLinkStyle(): string {
+  return 'bg-sidebar-active';
 }
 
 function getActiveIconStyle(customColor: boolean): string {
-  return customColor ? 'text-foreground' : 'text-sidebar-primary';
+  return customColor ? 'text-sidebar-foreground' : 'text-sidebar-primary';
 }
 
-function getIconWrapperStyle(customColor: boolean): string {
-  return customColor ? 'text-sidebar-foreground' : 'text-sidebar-foreground';
-}
+const sidebarItemBaseClassName =
+  'transition-[background-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring';
+
+const sidebarItemClassName = cn(
+  sidebarItemBaseClassName,
+  'hover:bg-sidebar-hover hover:shadow-[inset_3px_0_0_0_var(--sidebar-primary),inset_0_0_0_1px_var(--sidebar-border)] active:bg-sidebar-active'
+);
+
+const sidebarItemActiveClassName = cn(
+  sidebarItemBaseClassName,
+  'bg-sidebar-active shadow-[inset_3px_0_0_0_var(--sidebar-primary),inset_0_0_0_1px_var(--sidebar-border)]'
+);
 
 type RemoteNodeSelectContentProps = {
   nodes: string[];
@@ -118,7 +126,7 @@ type SectionLabelProps = {
   customColor?: boolean;
 };
 
-// GCP-Style Section Labels - Subtle & Professional
+// Developer-tool Section Labels - Subtle & Professional
 function SectionLabel({
   label,
   isOpen,
@@ -147,29 +155,29 @@ type SidebarButtonProps = {
   icon: React.ReactNode;
   label: string;
   isOpen: boolean;
-  customColor: boolean;
 };
 
-// GCP-Style Sidebar Button - Clean & Minimal
+// Developer-tool Sidebar Button - Clean & Minimal
 function SidebarButton({
   onClick,
   icon,
   label,
   isOpen,
-  customColor,
 }: SidebarButtonProps): React.ReactElement {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 w-full p-2 rounded-md hover:bg-sidebar-hover group focus-visible:ring-1 focus-visible:ring-ring"
-      style={{ transition: 'background-color 150ms ease' }}
+      className={cn(
+        'flex items-center gap-3 w-full p-2 rounded-md group',
+        sidebarItemClassName
+      )}
       title={isOpen ? '' : label}
     >
-      <div className="flex items-center justify-center flex-shrink-0 text-sidebar-foreground group-hover:text-foreground">
+      <div className="flex items-center justify-center flex-shrink-0 text-sidebar-foreground">
         {icon}
       </div>
       <span
-        className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground whitespace-nowrap overflow-hidden"
+        className="text-sm font-medium text-sidebar-foreground whitespace-nowrap overflow-hidden"
         style={{
           transition:
             'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -184,7 +192,7 @@ function SidebarButton({
   );
 }
 
-// GCP-Style Navigation Item - Clean Active States with Left Border
+// Developer-tool Navigation Item - Clean Active States with Left Border
 function NavItem({
   to,
   icon,
@@ -201,16 +209,15 @@ function NavItem({
   const linkClassName = cn(
     'flex items-center rounded-md px-2 group relative',
     'h-9 gap-3',
+    'text-sidebar-foreground',
     isActive
-      ? getActiveLinkStyle(customColor)
-      : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+      ? cn(getActiveLinkStyle(), sidebarItemActiveClassName)
+      : sidebarItemClassName
   );
 
   const iconClassName = cn(
     'flex items-center justify-center flex-shrink-0',
-    isActive
-      ? getActiveIconStyle(customColor)
-      : 'text-sidebar-foreground group-hover:text-foreground'
+    isActive ? getActiveIconStyle(customColor) : 'text-sidebar-foreground'
   );
 
   return (
@@ -221,13 +228,12 @@ function NavItem({
         className={linkClassName}
         aria-current={isActive ? 'page' : undefined}
         title={isOpen ? '' : text}
-        style={{ transition: 'background-color 150ms ease, color 150ms ease' }}
       >
         {isActive && (
           <div
             className={cn(
               'absolute left-0 w-[3px] h-6 rounded-r-sm',
-              getActiveIndicatorStyle(customColor)
+              getActiveIndicatorStyle()
             )}
             style={{ transition: 'opacity 200ms ease' }}
           />
@@ -236,9 +242,7 @@ function NavItem({
         <span
           className={cn(
             'text-sm font-medium whitespace-nowrap overflow-hidden',
-            isActive
-              ? 'text-foreground'
-              : 'text-sidebar-foreground group-hover:text-foreground'
+            isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
           )}
           style={{
             transition:
@@ -307,16 +311,15 @@ function NavGroup({
   const headerClassName = cn(
     'flex items-center rounded-md px-2 group relative w-full',
     'h-9 gap-3',
+    'text-sidebar-foreground',
     isChildActive && !effectivelyExpanded
-      ? getActiveLinkStyle(customColor)
-      : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+      ? cn(getActiveLinkStyle(), sidebarItemActiveClassName)
+      : sidebarItemClassName
   );
 
   const iconClassName = cn(
     'flex items-center justify-center flex-shrink-0',
-    isChildActive
-      ? getActiveIconStyle(customColor)
-      : 'text-sidebar-foreground group-hover:text-foreground'
+    isChildActive ? getActiveIconStyle(customColor) : 'text-sidebar-foreground'
   );
 
   return (
@@ -327,15 +330,12 @@ function NavGroup({
           className={headerClassName}
           title={isOpen ? '' : label}
           aria-expanded={effectivelyExpanded}
-          style={{
-            transition: 'background-color 150ms ease, color 150ms ease',
-          }}
         >
           {isChildActive && (
             <div
               className={cn(
                 'absolute left-0 w-[3px] h-6 rounded-r-sm',
-                getActiveIndicatorStyle(customColor)
+                getActiveIndicatorStyle()
               )}
               style={{ transition: 'opacity 200ms ease' }}
             />
@@ -345,8 +345,8 @@ function NavGroup({
             className={cn(
               'text-sm font-medium whitespace-nowrap overflow-hidden',
               isChildActive
-                ? 'text-foreground'
-                : 'text-sidebar-foreground group-hover:text-foreground'
+                ? 'text-sidebar-foreground'
+                : 'text-sidebar-foreground'
             )}
             style={{
               transition:
@@ -421,17 +421,15 @@ export const mainListItems = React.forwardRef<
 
   return (
     <div ref={ref} className="flex flex-col h-full">
-      {/* GCP-Style Header - Clean & Minimal */}
+      {/* Developer-tool Header - Clean & Minimal */}
       <div className="h-14 relative mb-4 flex items-center border-b border-sidebar-border px-1">
         <button
           onClick={onToggle}
           className={cn(
             'h-9 px-2 rounded-md flex-shrink-0 flex items-center justify-center',
-            customColor
-              ? 'hover:opacity-70'
-              : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+            'text-sidebar-foreground',
+            sidebarItemClassName
           )}
-          style={{ transition: 'background-color 150ms ease' }}
           aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
         >
           {/* Expand icon (character) - visible when collapsed */}
@@ -463,7 +461,7 @@ export const mainListItems = React.forwardRef<
         </button>
         <span
           className={cn(
-            'font-semibold tracking-tight text-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
+            'font-semibold tracking-tight text-sidebar-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
             getResponsiveTitleClass(title, 'sidebar-expanded')
           )}
           style={{
@@ -478,7 +476,7 @@ export const mainListItems = React.forwardRef<
         </span>
       </div>
 
-      {/* GCP-Style Navigation - Compact Spacing */}
+      {/* Developer-tool Navigation - Compact Spacing */}
       <nav className="flex-1 flex flex-col gap-4">
         <AppBarContext.Consumer>
           {(context) => {
@@ -807,7 +805,7 @@ export const mainListItems = React.forwardRef<
         </div>
       </nav>
 
-      {/* GCP-Style Footer - Clean Controls */}
+      {/* Developer-tool Footer - Clean Controls */}
       <div className="mt-auto pt-3 border-t border-sidebar-border flex flex-col gap-2">
         <div
           className={cn(
@@ -821,7 +819,6 @@ export const mainListItems = React.forwardRef<
               icon={<Terminal size={18} />}
               label="Agent"
               isOpen={isOpen}
-              customColor={customColor}
             />
           )}
           <SidebarButton
@@ -829,7 +826,6 @@ export const mainListItems = React.forwardRef<
             icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
             isOpen={isOpen}
-            customColor={customColor}
           />
           <UserMenu isCollapsed={!isOpen} />
         </div>

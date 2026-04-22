@@ -60,6 +60,11 @@ function getContrastColor(input?: string): string {
   return luminance > 0.4 ? '#000' : '#fff';
 }
 
+function getSidebarOverlayColor(foreground: string, alpha: number): string {
+  const channel = foreground === '#000' ? '0, 0, 0' : '255, 255, 255';
+  return `rgba(${channel}, ${alpha})`;
+}
+
 // Constants
 
 type LayoutProps = {
@@ -93,6 +98,17 @@ function Content({ navbarColor, children }: LayoutProps) {
         backgroundColor: navbarColor,
         color: contrastColor,
         '--sidebar-foreground': contrastColor,
+        '--sidebar-primary': contrastColor,
+        '--sidebar-ring': contrastColor,
+        '--sidebar-hover': getSidebarOverlayColor(contrastColor ?? '#fff', 0.1),
+        '--sidebar-active': getSidebarOverlayColor(
+          contrastColor ?? '#fff',
+          0.16
+        ),
+        '--sidebar-border': getSidebarOverlayColor(
+          contrastColor ?? '#fff',
+          0.18
+        ),
       } as React.CSSProperties)
     : undefined;
   // Sidebar state with localStorage persistence
@@ -129,7 +145,7 @@ function Content({ navbarColor, children }: LayoutProps) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar - Desktop - GCP Style */}
+      {/* Sidebar - Desktop - Developer-tool */}
       <aside
         className={cn(
           'hidden md:block h-full border-r border-border z-20',
@@ -153,7 +169,7 @@ function Content({ navbarColor, children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main Content Area - GCP Style */}
+      {/* Main Content Area - Developer-tool */}
       <div className="flex flex-col flex-1 h-full overflow-hidden relative bg-background">
         {/* Mobile Header Bar - Minimal Design */}
         <header
@@ -200,7 +216,7 @@ function Content({ navbarColor, children }: LayoutProps) {
         </main>
       </div>
 
-      {/* Mobile Sidebar - Overlay - GCP Style */}
+      {/* Mobile Sidebar - Overlay - Developer-tool */}
       {isMobileSidebarOpen && (
         <div
           className="fixed inset-0 bg-background/60 z-50 md:hidden flex backdrop-blur-sm"
@@ -219,7 +235,10 @@ function Content({ navbarColor, children }: LayoutProps) {
               <span
                 className={cn(
                   'font-semibold whitespace-normal leading-tight',
-                  getResponsiveTitleClass(config.title || 'Dagu', 'sidebar-mobile')
+                  getResponsiveTitleClass(
+                    config.title || 'Dagu',
+                    'sidebar-mobile'
+                  )
                 )}
               >
                 {config.title || 'Dagu'}
