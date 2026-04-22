@@ -37,6 +37,7 @@ import ArtifactsTab from './artifacts/ArtifactsTab';
 import { ChatHistoryTab } from './chat-history';
 import { DAGStatusOverview, NodeStatusTable } from './dag-details';
 import { DAGSpecReadOnly } from './dag-editor';
+import { StepDetailsDrawer } from './step-details';
 import {
   LogViewer,
   ParallelExecutionModal,
@@ -101,6 +102,20 @@ function DAGStatus({
   const [selectedStep, setSelectedStep] = useState<
     components['schemas']['Step'] | undefined
   >(undefined);
+  const [selectedDetailStep, setSelectedDetailStep] = useState<
+    components['schemas']['Step'] | undefined
+  >(undefined);
+  const [isStepDetailsOpen, setIsStepDetailsOpen] = useState(false);
+
+  const closeStepDetails = React.useCallback(() => {
+    setIsStepDetailsOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'status') {
+      closeStepDetails();
+    }
+  }, [activeTab, closeStepDetails]);
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -235,6 +250,20 @@ function DAGStatus({
       }
     },
     [displayDAGRun, navigate, fileName]
+  );
+
+  const onInspectStepOnGraph = React.useCallback(
+    (id: string) => {
+      const n = displayDAGRun.nodes?.find(
+        (node) => toMermaidNodeId(node.step.name) == id
+      );
+      if (!n) {
+        return;
+      }
+      setSelectedDetailStep(n.step);
+      setIsStepDetailsOpen(true);
+    },
+    [displayDAGRun]
   );
 
   // Helper function to navigate to a specific sub DAG run
@@ -480,15 +509,16 @@ function DAGStatus({
                 <div className="flex justify-end mb-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="flex items-center text-xs text-muted-foreground bg-muted px-2 py-1 rounded cursor-help">
-                        <MousePointerClick className="h-3 w-3 mr-1" />
-                        {config.permissions.runDags
-                          ? 'Double-click to navigate / Right-click to change status'
-                          : 'Double-click to navigate'}
+                      <div
+                        className="flex h-7 w-7 items-center justify-center rounded bg-muted text-muted-foreground cursor-help"
+                        aria-label="Graph interactions"
+                      >
+                        <MousePointerClick className="h-3.5 w-3.5" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="space-y-1">
+                        <p>Click: Inspect step details</p>
                         <p>Double-click: Navigate to sub dagRun</p>
                         {config.permissions.runDags && (
                           <p>Right-click: Update node status</p>
@@ -503,7 +533,9 @@ function DAGStatus({
                     type="status"
                     flowchart={flowchart}
                     onChangeFlowchart={onChangeFlowchart}
-                    onClickNode={onSelectStepOnGraph}
+                    onClickNode={onInspectStepOnGraph}
+                    selectOnClick
+                    onDoubleClickNode={onSelectStepOnGraph}
                     onRightClickNode={
                       config.permissions.runDags
                         ? onRightClickStepOnGraph
@@ -641,6 +673,13 @@ function DAGStatus({
         step={selectedStep}
         dismissModal={dismissModal}
         onSubmit={onUpdateStatus}
+      />
+
+      <StepDetailsDrawer
+        dagName={displayDAGRun.name}
+        isOpen={isStepDetailsOpen}
+        step={selectedDetailStep}
+        onClose={closeStepDetails}
       />
 
       {/* Log viewer modal */}

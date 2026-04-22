@@ -55,10 +55,12 @@ type Props = {
   onChangeFlowchart?: (value: FlowchartType) => void;
   /** Steps or nodes to visualize */
   steps?: Steps;
-  /** Callback for node click events (double-click) */
+  /** Callback for node click events */
   onClickNode?: onClickNode;
   /** Whether a single click should invoke onClickNode */
   selectOnClick?: boolean;
+  /** Callback for node double-click events */
+  onDoubleClickNode?: onClickNode;
   /** Callback for node right-click events */
   onRightClickNode?: onRightClickNode;
   /** Whether to show status icons */
@@ -89,6 +91,7 @@ function Graph({
   type = 'status',
   onClickNode,
   selectOnClick = false,
+  onDoubleClickNode,
   onRightClickNode,
   showIcons = true,
   isExpandedView = false,
@@ -300,7 +303,6 @@ function Graph({
     // Use theme-appropriate colors for light/dark modes
     const nodeFill = isDarkMode ? '#161a3d' : '#ffffff'; // --card for dark, white for light
     const nodeColor = isDarkMode ? '#f1f5f9' : '#0f1129'; // --foreground for dark, --background for light
-    const strokeDefault = isDarkMode ? '#2d336d' : '#94a3b8';
 
     // Unified status colors
     const statusColors = {
@@ -454,7 +456,7 @@ function Graph({
           def={graph}
           scale={scale}
           onClick={selectOnClick ? onClickNode : undefined}
-          onDoubleClick={onClickNode}
+          onDoubleClick={onDoubleClickNode ?? onClickNode}
           onRightClick={onRightClickNode}
         />
       </div>
@@ -476,6 +478,7 @@ function Graph({
                 type={type}
                 onClickNode={onClickNode}
                 selectOnClick={selectOnClick}
+                onDoubleClickNode={onDoubleClickNode}
                 onRightClickNode={onRightClickNode}
                 showIcons={showIcons}
                 isExpandedView={true}

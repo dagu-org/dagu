@@ -93,6 +93,7 @@ function Mermaid({
   const mermaidRef = React.useRef<HTMLDivElement>(null); // Ref for the inner div holding the SVG
   const scrollContainerRef = React.useRef<HTMLDivElement>(null); // Ref for the outer scrollable div
   const scrollPosRef = React.useRef({ top: 0, left: 0 }); // Ref to store scroll position
+  const handlersRef = React.useRef({ onClick, onDoubleClick, onRightClick });
   const clickTimeoutsRef = React.useRef<
     Map<string, ReturnType<typeof setTimeout>>
   >(new Map()); // Persistent timeout storage
@@ -121,6 +122,10 @@ function Mermaid({
     padding: '2em',
     minHeight: '100%', // Ensure inner div also takes full height
   };
+
+  React.useEffect(() => {
+    handlersRef.current = { onClick, onDoubleClick, onRightClick };
+  }, [onClick, onDoubleClick, onRightClick]);
 
   const render = async () => {
     if (!mermaidRef.current) {
@@ -197,7 +202,7 @@ function Mermaid({
                   // Set timeout to allow double-click to cancel
                   const timeout = setTimeout(() => {
                     clickTimeoutsRef.current.delete(nodeId);
-                    onClick(nodeId);
+                    handlersRef.current.onClick?.(nodeId);
                   }, 250);
                   clickTimeoutsRef.current.set(nodeId, timeout);
                 });
@@ -213,7 +218,7 @@ function Mermaid({
                     clearTimeout(existingTimeout);
                     clickTimeoutsRef.current.delete(nodeId);
                   }
-                  onDoubleClick(nodeId);
+                  handlersRef.current.onDoubleClick?.(nodeId);
                 });
               }
 
@@ -227,7 +232,7 @@ function Mermaid({
                     clearTimeout(existingTimeout);
                     clickTimeoutsRef.current.delete(nodeId);
                   }
-                  onRightClick(nodeId);
+                  handlersRef.current.onRightClick?.(nodeId);
                 });
               }
 

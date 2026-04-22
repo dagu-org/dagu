@@ -28,6 +28,8 @@ import { FlowchartType, Graph, TimelineChart } from './';
 type Props = {
   /** DAG dagRun details containing execution information */
   dagRun: components['schemas']['DAGRunDetails'];
+  /** Callback for when a step is inspected in the graph (click) */
+  onClickStep?: (id: string) => void;
   /** Callback for when a step is selected in the graph (double-click) */
   onSelectStep?: (id: string) => void;
   /** Callback for when a step is right-clicked in the graph */
@@ -38,7 +40,12 @@ type Props = {
  * DAGGraph component provides a tabbed interface for visualizing DAG dagRuns
  * with options to switch between graph and timeline views
  */
-function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
+function DAGGraph({
+  dagRun,
+  onClickStep,
+  onSelectStep,
+  onRightClickStep,
+}: Props) {
   // Active tab state (0 = Graph, 1 = Timeline)
   const [sub, setSub] = React.useState('0');
   const config = useConfig();
@@ -47,6 +54,7 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
   const [graphHeight, setGraphHeight] = React.useState(380);
+  const hasStepInspector = Boolean(onClickStep);
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -108,15 +116,16 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
           <div className="flex justify-end mb-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center text-xs text-muted-foreground bg-muted px-2 py-1 rounded cursor-help">
-                  <MousePointerClick className="h-3 w-3 mr-1" />
-                  {config.permissions.runDags
-                    ? 'Double-click to navigate / Right-click to change status'
-                    : 'Double-click to navigate'}
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded bg-muted text-muted-foreground cursor-help"
+                  aria-label="Graph interactions"
+                >
+                  <MousePointerClick className="h-3.5 w-3.5" />
                 </div>
               </TooltipTrigger>
               <TooltipContent>
                 <div className="space-y-1">
+                  {hasStepInspector && <p>Click: Inspect step details</p>}
                   <p>Double-click: Navigate to sub dagRun</p>
                   {config.permissions.runDags && (
                     <p>Right-click: Update node status</p>
@@ -133,7 +142,9 @@ function DAGGraph({ dagRun, onSelectStep, onRightClickStep }: Props) {
               type="status"
               flowchart={flowchart}
               onChangeFlowchart={onChangeFlowchart}
-              onClickNode={onSelectStep}
+              onClickNode={onClickStep ?? onSelectStep}
+              selectOnClick={hasStepInspector}
+              onDoubleClickNode={hasStepInspector ? onSelectStep : undefined}
               onRightClickNode={
                 config.permissions.runDags ? onRightClickStep : undefined
               }

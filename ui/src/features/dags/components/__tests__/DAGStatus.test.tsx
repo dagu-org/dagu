@@ -43,14 +43,19 @@ vi.mock('react-cookie', () => ({
 
 vi.mock('../visualization', () => ({
   Graph: ({
+    onClickNode,
     onRightClickNode,
     steps,
   }: {
+    onClickNode?: (id: string) => void;
     onRightClickNode?: (id: string) => void;
     steps?: components['schemas']['Node'][];
   }) => (
     <div>
       <div>Graph status: {steps?.[0]?.status}</div>
+      <button type="button" onClick={() => onClickNode?.('step')}>
+        Open step details
+      </button>
       <button type="button" onClick={() => onRightClickNode?.('step')}>
         Open status modal
       </button>
@@ -143,6 +148,35 @@ afterEach(() => {
 });
 
 describe('DAGStatus', () => {
+  it('opens step details from a status graph click', async () => {
+    vi.mocked(useClient).mockReturnValue({
+      PATCH: patchMock,
+    } as unknown as ReturnType<typeof useClient>);
+
+    render(
+      <MemoryRouter>
+        <AppBarContext.Provider value={appBarValue}>
+          <DAGContext.Provider
+            value={{
+              refresh: vi.fn(),
+              name: 'example',
+              fileName: 'example.yaml',
+            }}
+          >
+            <DAGStatus dagRun={dagRun} fileName="example.yaml" />
+          </DAGContext.Provider>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open step details' }));
+
+    expect(await screen.findByRole('dialog', { name: 'step' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Mark failed' })
+    ).not.toBeInTheDocument();
+  });
+
   it('updates the rendered graph immediately after graph status updates succeed', async () => {
     const refresh = vi.fn();
     vi.mocked(useClient).mockReturnValue({
@@ -165,12 +199,8 @@ describe('DAGStatus', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Open status modal' })
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Mark failed' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open status modal' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark failed' }));
 
     await waitFor(() => {
       expect(patchMock).toHaveBeenCalledWith(
@@ -212,12 +242,8 @@ describe('DAGStatus', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Open status modal' })
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Mark failed' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open status modal' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark failed' }));
 
     await waitFor(() => {
       expect(patchMock).toHaveBeenCalledWith(

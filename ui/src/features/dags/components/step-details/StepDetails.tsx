@@ -241,17 +241,17 @@ function ShellCodeBlock({ value }: { value: string }) {
   const lines = value.split('\n');
 
   return (
-    <BorderedBox className="max-h-72 overflow-auto !border-slate-700 !bg-slate-950 p-0">
-      <pre className="m-0 min-w-max text-xs leading-5 text-slate-100 selection:bg-sky-500/40 selection:text-white">
+    <BorderedBox className="max-h-72 overflow-auto bg-muted/30 p-0 dark:border-slate-700 dark:bg-slate-950">
+      <pre className="m-0 min-w-max text-xs leading-5 text-foreground selection:bg-primary/20 dark:text-slate-100 dark:selection:bg-sky-500/40 dark:selection:text-white">
         {lines.map((line, index) => (
           <div
             key={`${index}-${line}`}
-            className="grid grid-cols-[3rem_minmax(0,1fr)] border-b border-slate-800 last:border-b-0"
+            className="grid grid-cols-[3rem_minmax(0,1fr)] border-b border-border/70 last:border-b-0 dark:border-slate-800"
           >
-            <span className="select-none bg-slate-900 px-2 py-0.5 text-right text-slate-500">
+            <span className="select-none bg-muted px-2 py-0.5 text-right text-muted-foreground dark:bg-slate-900 dark:text-slate-500">
               {index + 1}
             </span>
-            <code className="whitespace-pre px-3 py-0.5 font-mono text-slate-100 selection:bg-sky-500/40 selection:text-white">
+            <code className="whitespace-pre px-3 py-0.5 font-mono text-foreground selection:bg-primary/20 dark:text-slate-100 dark:selection:bg-sky-500/40 dark:selection:text-white">
               {line ? highlightShellLine(line) : '\u00a0'}
             </code>
           </div>
@@ -287,7 +287,10 @@ function highlightShellLine(line: string): React.ReactNode[] {
   return splitShellSegments(line).flatMap((segment, segmentIndex) => {
     if (segment.type === 'comment') {
       return (
-        <span key={`${segmentIndex}-comment`} className="text-slate-500">
+        <span
+          key={`${segmentIndex}-comment`}
+          className="text-muted-foreground dark:text-slate-500"
+        >
           {segment.text}
         </span>
       );
@@ -295,7 +298,10 @@ function highlightShellLine(line: string): React.ReactNode[] {
 
     if (segment.type === 'string') {
       return (
-        <span key={`${segmentIndex}-string`} className="text-emerald-300">
+        <span
+          key={`${segmentIndex}-string`}
+          className="text-emerald-700 dark:text-emerald-300"
+        >
           {segment.text}
         </span>
       );
@@ -387,12 +393,13 @@ function highlightShellPlainSegment(
 }
 
 function getShellTokenClassName(token: string): string {
-  if (token.startsWith('$')) return 'text-cyan-300';
-  if (SHELL_KEYWORDS.has(token)) return 'font-medium text-purple-300';
-  if (/^--?/.test(token)) return 'text-sky-300';
-  if (/^[|&;()<>]/.test(token)) return 'text-orange-300';
-  if (/^\d+$/.test(token)) return 'text-amber-300';
-  return 'text-slate-100';
+  if (token.startsWith('$')) return 'text-cyan-700 dark:text-cyan-300';
+  if (SHELL_KEYWORDS.has(token))
+    return 'font-medium text-purple-700 dark:text-purple-300';
+  if (/^--?/.test(token)) return 'text-sky-700 dark:text-sky-300';
+  if (/^[|&;()<>]/.test(token)) return 'text-orange-700 dark:text-orange-300';
+  if (/^\d+$/.test(token)) return 'text-amber-700 dark:text-amber-300';
+  return 'text-foreground dark:text-slate-100';
 }
 
 function hasMeaningfulValue(value: unknown): boolean {
