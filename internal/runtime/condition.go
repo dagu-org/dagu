@@ -20,7 +20,7 @@ var (
 	ErrConditionNotMet = fmt.Errorf("condition was not met")
 )
 
-// Error message for the case not all condition was not met
+// Error message for when not all conditions are met
 const ErrMsgOtherConditionNotMet = "other condition was not met"
 
 // EvalConditions evaluates a list of conditions and checks the results.
