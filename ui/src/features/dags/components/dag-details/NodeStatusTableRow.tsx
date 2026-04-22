@@ -46,6 +46,7 @@ import {
   Stream,
 } from '../../../../api/v1/schema';
 import StyledTableRow from '../../../../ui/StyledTableRow';
+import { DAGContext } from '../../contexts/DAGContext';
 import { NodeStatusChip } from '../common';
 import { InlineLogViewer } from '../common/InlineLogViewer';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
@@ -68,6 +69,8 @@ type Props = {
     dagRunId: string,
     node?: components['schemas']['Node']
   ) => void;
+  /** Function called after this row's status update succeeds */
+  onNodeStatusUpdated?: (stepName: string, status: NodeStatus) => void;
   /** Full dagRun details (optional) - used to determine if this is a sub dagRun */
   dagRun: components['schemas']['DAGRunDetails'];
   /** View mode: desktop or mobile */
@@ -131,6 +134,7 @@ function NodeStatusTableRow({
   rownum,
   node,
   onViewLog,
+  onNodeStatusUpdated,
   dagRun,
   view = 'desktop',
 }: Props) {
@@ -138,6 +142,7 @@ function NodeStatusTableRow({
   const navigate = useNavigate();
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
+  const dagContext = useContext(DAGContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const { showError } = useErrorModal();
   // State to store the current duration for running tasks
@@ -367,6 +372,8 @@ function NodeStatusTableRow({
       return;
     }
 
+    onNodeStatusUpdated?.(step.name, status);
+    dagContext.refresh();
     setShowStatusModal(false);
   };
 

@@ -1,7 +1,14 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
@@ -50,6 +57,8 @@ function DAGDetails() {
   const stepName = searchParams.get('step');
   const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
+  const [trackedDagRunId, setTrackedDagRunId] = useState<string>();
+  const previousURLDagRunId = useRef<string | null>(dagRunId);
   const remoteNode =
     searchParams.get('remoteNode') ||
     appBarContext.selectedRemoteNode ||
@@ -171,14 +180,15 @@ function DAGDetails() {
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
+  const effectiveDAGRunId = trackedDagRunId || dagRunId;
   const dagRunQueryEnabled = Boolean(
-    dagRunName && dagRunId && !subDAGRunId && dagMatchesWorkspace
+    dagRunName && effectiveDAGRunId && !subDAGRunId && dagMatchesWorkspace
   );
 
   // Fetch specific DAG-run data if dagRunId is provided
   const dagRunSSE = useDAGRunSSE(
     dagRunName,
-    dagRunId || '',
+    effectiveDAGRunId || '',
     dagRunQueryEnabled,
     remoteNode
   );
@@ -188,7 +198,7 @@ function DAGDetails() {
       params: {
         path: {
           name: dagRunName,
-          dagRunId: dagRunId || '',
+          dagRunId: effectiveDAGRunId || '',
         },
         query: scopedQuery,
       },
@@ -229,7 +239,7 @@ function DAGDetails() {
     if (subDAGRunId) {
       return subDAGRunResponse?.dagRunDetails;
     }
-    if (dagRunId) {
+    if (effectiveDAGRunId) {
       return dagRunResponse?.dagRunDetails;
     }
     return dagData?.latestDAGRun;
@@ -254,10 +264,57 @@ function DAGDetails() {
     mutateDag();
     if (subDAGRunId) {
       mutateSubDagRun();
-    } else if (dagRunId) {
+    } else if (effectiveDAGRunId) {
       mutateDagRun();
     }
-  }, [mutateDag, mutateDagRun, mutateSubDagRun, dagRunId, subDAGRunId]);
+  }, [
+    mutateDag,
+    mutateDagRun,
+    mutateSubDagRun,
+    effectiveDAGRunId,
+    subDAGRunId,
+  ]);
+
+  const handleRunStarted = useCallback(
+    (nextDAGRunId: string) => {
+      setTrackedDagRunId(nextDAGRunId);
+      const nextSearchParams = new URLSearchParams();
+      nextSearchParams.set('dagRunId', nextDAGRunId);
+      nextSearchParams.set('dagRunName', dagData?.dag?.name || dagRunName);
+      if (remoteNode && remoteNode !== 'local') {
+        nextSearchParams.set('remoteNode', remoteNode);
+      }
+      if (queryWorkspace) {
+        nextSearchParams.set('workspace', queryWorkspace);
+      }
+      navigate(`/dags/${fileName}?${nextSearchParams.toString()}`);
+      void mutateDag();
+    },
+    [
+      dagData?.dag?.name,
+      dagRunName,
+      fileName,
+      mutateDag,
+      navigate,
+      queryWorkspace,
+      remoteNode,
+    ]
+  );
+
+  useEffect(() => {
+    const previous = previousURLDagRunId.current;
+    previousURLDagRunId.current = dagRunId;
+    if (!dagRunId || dagRunId === trackedDagRunId) {
+      return;
+    }
+    if (previous !== dagRunId) {
+      setTrackedDagRunId(undefined);
+    }
+  }, [dagRunId, trackedDagRunId]);
+
+  useEffect(() => {
+    setTrackedDagRunId(undefined);
+  }, [fileName, remoteNode]);
 
   // Determine which DAG-run to display - fallback to latest when specific run is loading
   const displayDAGRun = currentDAGRun || dagData?.latestDAGRun;
@@ -306,6 +363,7 @@ function DAGDetails() {
                   skipHeader={true}
                   localDags={dagData?.localDags}
                   editorHints={dagData?.editorHints}
+                  onRunStarted={handleRunStarted}
                 />
               </>
             )}

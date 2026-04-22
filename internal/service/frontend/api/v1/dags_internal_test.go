@@ -117,6 +117,56 @@ steps:
 	require.True(t, listResp.Dags[0].NextRun.Equal(*sseResp.Dags[0].NextRun))
 }
 
+func TestGetDAGsListDataUsesConfiguredListDefaults(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.Config.UI.DAGs.SortField = "name"
+	helper.Config.UI.DAGs.SortOrder = "desc"
+	helper.DAG(t, `
+name: sse-sort-alpha
+steps:
+  - command: echo alpha
+`)
+	helper.DAG(t, `
+name: sse-sort-zulu
+steps:
+  - command: echo zulu
+`)
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	listRespObj, err := api.ListDAGs(context.Background(), openapi.ListDAGsRequestObject{
+		Params: openapi.ListDAGsParams{},
+	})
+	require.NoError(t, err)
+
+	listResp, ok := listRespObj.(*openapi.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, listResp.Dags, 2)
+	require.Equal(t, "sse-sort-zulu", listResp.Dags[0].Dag.Name)
+
+	sseRespAny, err := api.GetDAGsListData(context.Background(), "")
+	require.NoError(t, err)
+
+	sseResp, ok := sseRespAny.(openapi.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, sseResp.Dags, 2)
+	require.Equal(t, listResp.Dags[0].Dag.Name, sseResp.Dags[0].Dag.Name)
+	require.Equal(t, listResp.Dags[1].Dag.Name, sseResp.Dags[1].Dag.Name)
+}
+
 func TestGetDAGDetails_InvalidYAML_Returns200WithErrors(t *testing.T) {
 	t.Parallel()
 

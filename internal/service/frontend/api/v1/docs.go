@@ -690,94 +690,102 @@ func (a *API) DeleteDocBatch(ctx context.Context, request api.DeleteDocBatchRequ
 // GetDocTreeData is the SSE data method for the doc tree.
 // Identifier format: URL query string (e.g., "page=1&perPage=200")
 func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, error) {
-	if a.docStore == nil {
-		return nil, errDocStoreNotAvailable
-	}
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/docs/tree",
+	}, func(readCtx context.Context) (any, error) {
+		if a.docStore == nil {
+			return nil, errDocStoreNotAvailable
+		}
 
-	params, err := url.ParseQuery(queryString)
-	if err != nil {
-		params = url.Values{}
-	}
+		params, err := url.ParseQuery(queryString)
+		if err != nil {
+			params = url.Values{}
+		}
 
-	page := parseIntParam(params.Get("page"), 1)
-	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
-	workspaceParam := workspaceParamFromValues(params)
-	workspaceName, visibility, err := a.docReadScopeForParams(ctx, workspaceParam)
-	if err != nil {
-		return nil, err
-	}
+		page := parseIntParam(params.Get("page"), 1)
+		perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
+		workspaceParam := workspaceParamFromValues(params)
+		workspaceName, visibility, err := a.docReadScopeForParams(readCtx, workspaceParam)
+		if err != nil {
+			return nil, err
+		}
 
-	sortField, sortOrder := docSortParamsFromQuery(params)
+		sortField, sortOrder := docSortParamsFromQuery(params)
 
-	result, err := a.docStore.List(ctx, agent.ListDocsOptions{
-		Page:             page,
-		PerPage:          perPage,
-		Sort:             sortField,
-		Order:            sortOrder,
-		PathPrefix:       workspaceName,
-		ExcludePathRoots: visibility.excludedPathRoots(),
+		result, err := a.docStore.List(readCtx, agent.ListDocsOptions{
+			Page:             page,
+			PerPage:          perPage,
+			Sort:             sortField,
+			Order:            sortOrder,
+			PathPrefix:       workspaceName,
+			ExcludePathRoots: visibility.excludedPathRoots(),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
+		for _, node := range result.Items {
+			tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
+		}
+
+		return api.ListDocs200JSONResponse{
+			Tree:       &tree,
+			Pagination: toPagination(*result),
+		}, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
-	for _, node := range result.Items {
-		tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
-	}
-
-	return api.ListDocs200JSONResponse{
-		Tree:       &tree,
-		Pagination: toPagination(*result),
-	}, nil
 }
 
 // GetDocContentData is the SSE data method for doc content.
 func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) {
-	if a.docStore == nil {
-		return nil, errDocStoreNotAvailable
-	}
-	path, queryString, hasQuery := strings.Cut(docID, "?")
-	var (
-		workspaceName string
-		visibility    docWorkspaceVisibility
-		err           error
-		params        url.Values
-	)
-	if hasQuery {
-		params, err = url.ParseQuery(queryString)
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/docs/{docID}",
+	}, func(readCtx context.Context) (any, error) {
+		if a.docStore == nil {
+			return nil, errDocStoreNotAvailable
+		}
+		path, queryString, hasQuery := strings.Cut(docID, "?")
+		var (
+			workspaceName string
+			visibility    docWorkspaceVisibility
+			err           error
+			params        url.Values
+		)
+		if hasQuery {
+			params, err = url.ParseQuery(queryString)
+			if err != nil {
+				return nil, err
+			}
+			workspaceParam := workspaceParamFromValues(params)
+			workspaceName, visibility, err = a.docPointReadScopeForParams(readCtx, workspaceParam)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			workspaceName, visibility, err = a.docPointReadScopeForParams(readCtx, nil)
+			if err != nil {
+				return nil, err
+			}
+		}
+		scopedID, err := scopedDocPath(workspaceName, path)
 		if err != nil {
 			return nil, err
 		}
-		workspaceParam := workspaceParamFromValues(params)
-		workspaceName, visibility, err = a.docPointReadScopeForParams(ctx, workspaceParam)
+		doc, err := a.docStore.Get(readCtx, scopedID)
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		workspaceName, visibility, err = a.docPointReadScopeForParams(ctx, nil)
-		if err != nil {
-			return nil, err
+		if workspaceName == "" && !visibility.all {
+			if !visibility.visible(doc.ID) {
+				return nil, errDocNotFound
+			}
 		}
-	}
-	scopedID, err := scopedDocPath(workspaceName, path)
-	if err != nil {
-		return nil, err
-	}
-	doc, err := a.docStore.Get(ctx, scopedID)
-	if err != nil {
-		return nil, err
-	}
-	if workspaceName == "" && !visibility.all {
-		if !visibility.visible(doc.ID) {
-			return nil, errDocNotFound
-		}
-	}
-	rawID := doc.ID
-	doc.ID = visibleDocPath(workspaceName, doc.ID)
-	resp := toDocResponse(doc)
-	resp.Workspace = docWorkspaceValue(workspaceName, rawID, visibility, false)
-	return resp, nil
+		rawID := doc.ID
+		doc.ID = visibleDocPath(workspaceName, doc.ID)
+		resp := toDocResponse(doc)
+		resp.Workspace = docWorkspaceValue(workspaceName, rawID, visibility, false)
+		return resp, nil
+	})
 }
 
 func toDocResponse(doc *agent.Doc) api.DocResponse {
