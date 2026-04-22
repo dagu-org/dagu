@@ -67,6 +67,24 @@ func TestWorkspaceAccessEffectiveRole(t *testing.T) {
 	assert.Equal(t, RoleManager, role)
 }
 
+func TestWorkspaceAccessDefaultWorkspaceUsesGlobalRole(t *testing.T) {
+	scoped := &WorkspaceAccess{
+		Grants: []WorkspaceGrant{
+			{Workspace: "foo", Role: RoleDeveloper},
+		},
+	}
+
+	defaultRole, ok := EffectiveRole(RoleViewer, scoped, "")
+	require.True(t, ok)
+	require.Equal(t, RoleViewer, defaultRole)
+	require.False(t, defaultRole.CanWrite())
+
+	fooRole, ok := EffectiveRole(RoleViewer, scoped, "foo")
+	require.True(t, ok)
+	require.Equal(t, RoleDeveloper, fooRole)
+	require.True(t, fooRole.CanWrite())
+}
+
 func TestValidateWorkspaceAccess(t *testing.T) {
 	workspaceExists := func(name string) bool {
 		return name == "ops" || name == "prod"
