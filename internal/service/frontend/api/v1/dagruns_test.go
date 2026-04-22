@@ -631,40 +631,41 @@ steps:
 func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := fmt.Sprintf(`type: graph
-steps:
-  - name: wait-step
-    command: %q
-    approval:
-      prompt: "Please provide reason"
-      input:
-        - reason
-      required:
-        - reason
-  - name: after-wait
-    depends: [wait-step]
-    command: "echo done"`, "exit 0")
-
-	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+	dag := &core.DAG{
 		Name: "approval_required_dag",
-		Spec: &dagSpec,
-	}).ExpectStatus(http.StatusCreated).Send(t)
-
-	// Start the DAG
-	startResp := server.Client().Post("/api/v1/dags/approval_required_dag/start", api.ExecuteDAGJSONRequestBody{}).
-		ExpectStatus(http.StatusOK).Send(t)
-
-	var startBody api.ExecuteDAG200JSONResponse
-	startResp.Unmarshal(t, &startBody)
-
-	// Wait for DAG to enter Wait status
-	waitForStoredDAGRunStatus(t, server, "approval_required_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
-		return status.Status == core.Waiting && hasNodeWithStatus(status, "wait-step", core.NodeWaiting)
-	})
+		Type: core.TypeGraph,
+		Steps: []core.Step{
+			{
+				Name: "wait-step",
+				Approval: &core.ApprovalConfig{
+					Prompt:   "Please provide reason",
+					Input:    []string{"reason"},
+					Required: []string{"reason"},
+				},
+			},
+			{
+				Name:    "after-wait",
+				Depends: []string{"wait-step"},
+			},
+		},
+	}
+	dagRunID := "approval-required-run"
+	seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		dagRunID,
+		core.Waiting,
+		seedDAGRunStatusOptions{
+			nodeStatuses: map[string]core.NodeStatus{
+				"wait-step": core.NodeWaiting,
+			},
+		},
+	)
 
 	// Try to approve without required input - should fail
 	_ = server.Client().Post(
-		fmt.Sprintf("/api/v1/dag-runs/approval_required_dag/%s/steps/wait-step/approve", startBody.DagRunId),
+		fmt.Sprintf("/api/v1/dag-runs/approval_required_dag/%s/steps/wait-step/approve", dagRunID),
 		api.ApproveStepRequest{},
 	).ExpectStatus(http.StatusBadRequest).Send(t)
 }

@@ -126,3 +126,23 @@ func TestWriteJSONAtomic(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to create temp file")
 	})
 }
+
+func TestReplaceFileWithRetryReplacesExistingFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source.tmp")
+	target := filepath.Join(dir, "target.txt")
+
+	require.NoError(t, os.WriteFile(source, []byte("new"), 0600))
+	require.NoError(t, os.WriteFile(target, []byte("old"), 0600))
+
+	require.NoError(t, ReplaceFileWithRetry(source, target))
+
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("new"), data)
+
+	_, err = os.Stat(source)
+	assert.True(t, os.IsNotExist(err))
+}

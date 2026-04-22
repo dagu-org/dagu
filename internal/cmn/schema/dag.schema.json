@@ -1747,6 +1747,19 @@
           }
         },
         {
+          "if": { "properties": { "type": { "const": "sftp" } } },
+          "then": {
+            "properties": {
+              "with": { "$ref": "#/definitions/sftpExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/sftpExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
+            }
+          }
+        },
+        {
           "if": {
             "properties": { "type": { "enum": ["docker", "container"] } }
           },
@@ -2517,6 +2530,96 @@
         }
       },
       "description": "SSH executor configuration for remote command execution."
+    },
+    "sftpExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "destination"],
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "SSH username for authentication. Required."
+        },
+        "host": {
+          "type": "string",
+          "description": "Hostname or IP address of the SSH server. Required."
+        },
+        "ip": {
+          "type": "string",
+          "description": "Alias for 'host'. IP address of the SSH server."
+        },
+        "port": {
+          "oneOf": [{ "type": "string" }, { "type": "integer" }],
+          "default": "22",
+          "description": "SSH port number. Defaults to 22."
+        },
+        "key": {
+          "type": "string",
+          "description": "Path to SSH private key file. If not specified, defaults are tried: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, ~/.ssh/id_dsa."
+        },
+        "password": {
+          "type": "string",
+          "description": "SSH password for authentication. Not recommended; prefer key-based authentication."
+        },
+        "strict_host_key": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable strict host key checking. When true (default), verifies server's host key against known_hosts."
+        },
+        "known_host_file": {
+          "type": "string",
+          "default": "~/.ssh/known_hosts",
+          "description": "Path to known_hosts file for host key verification."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Connection timeout such as '30s' or '1m'."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["upload", "download"],
+          "default": "upload",
+          "description": "Transfer direction. Defaults to upload."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source path. For upload, this is a local path; for download, this is a remote path."
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Destination path. For upload, this is a remote path; for download, this is a local path."
+        },
+        "bastion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "host": {
+              "type": "string",
+              "description": "Bastion host address."
+            },
+            "port": {
+              "oneOf": [{ "type": "string" }, { "type": "integer" }],
+              "description": "Bastion SSH port."
+            },
+            "user": {
+              "type": "string",
+              "description": "Bastion SSH username."
+            },
+            "key": {
+              "type": "string",
+              "description": "Path to bastion private key file."
+            },
+            "password": {
+              "type": "string",
+              "description": "Bastion SSH password."
+            }
+          },
+          "description": "Bastion/jump host configuration."
+        }
+      },
+      "description": "SFTP executor configuration for file transfers over SSH."
     },
     "dockerExecutorConfig": {
       "type": "object",
@@ -5031,6 +5134,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sftp" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sftpExecutorConfig" }
             }
           }
         },

@@ -1336,6 +1336,24 @@ func TestBuildStepExecutor(t *testing.T) {
 			expected: core.ExecutorConfig{Type: "http", Config: make(map[string]any)},
 		},
 		{
+			name: "SFTPTypeAndWith",
+			step: &step{
+				Type: "sftp",
+				With: map[string]any{
+					"source":      "./backup.tar.gz",
+					"destination": "/srv/backups/backup.tar.gz",
+				},
+			},
+			ctx: testStepBuildContext(),
+			expected: core.ExecutorConfig{
+				Type: "sftp",
+				Config: map[string]any{
+					"source":      "./backup.tar.gz",
+					"destination": "/srv/backups/backup.tar.gz",
+				},
+			},
+		},
+		{
 			name: "TypeAndWith",
 			step: &step{
 				Type: "docker",

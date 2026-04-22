@@ -258,6 +258,8 @@ func createTempProcFile(dir string) (*os.File, error) {
 	if err == nil || !errors.Is(err, os.ErrNotExist) {
 		return tmpFile, err
 	}
+	// Another proc can remove an empty DAG proc directory between MkdirAll and
+	// CreateTemp while a restart publishes its new heartbeat.
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, err
 	}

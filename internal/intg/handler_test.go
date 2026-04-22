@@ -310,7 +310,9 @@ func TestHandlerOn_Abort(t *testing.T) {
 	t.Parallel()
 
 	th := test.Setup(t)
-	releaseFile := filepath.Join(t.TempDir(), "abort.release")
+	tmpDir := t.TempDir()
+	releaseFile := filepath.Join(tmpDir, "abort.release")
+	startedFile := filepath.Join(tmpDir, "abort.started")
 	t.Cleanup(func() {
 		_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
 	})
@@ -322,6 +324,7 @@ handler_on:
 steps:
   - name: long-running
     command: |
+`+indentTestScript(writeFileCommand(startedFile), 6)+`
 `+indentTestScript(waitForFileCommand(releaseFile), 6)+`
 `)
 
@@ -337,14 +340,17 @@ steps:
 		close(done)
 	}()
 
-	// Wait for the DAG to start running
-	dag.AssertLatestStatus(t, core.Running)
+	waitForTestFile(t, startedFile, intgTestTimeout(10*time.Second))
 
 	// Abort the DAG
 	dagAgent.Abort()
 
 	// Wait for completion
-	<-done
+	select {
+	case <-done:
+	case <-time.After(intgTestTimeout(30 * time.Second)):
+		t.Fatal("timed out waiting for aborted DAG run to finish")
+	}
 
 	// Verify the abort handler was executed
 	status := dagAgent.Status(th.Context)
@@ -609,7 +615,9 @@ steps:
 	t.Run("AbortHandler_AllEnvVars", func(t *testing.T) {
 		t.Parallel()
 		th := test.Setup(t)
-		releaseFile := filepath.Join(t.TempDir(), "abort-env.release")
+		tmpDir := t.TempDir()
+		releaseFile := filepath.Join(tmpDir, "abort-env.release")
+		startedFile := filepath.Join(tmpDir, "abort-env.started")
 		t.Cleanup(func() {
 			_ = os.WriteFile(releaseFile, []byte("ok"), 0600)
 		})
@@ -624,6 +632,7 @@ handler_on:
 steps:
   - name: long-running
     command: |
+`+indentTestScript(writeFileCommand(startedFile), 6)+`
 `+indentTestScript(waitForFileCommand(releaseFile), 6)+`
 `)
 		dagAgent := dagAgentWithProc(t, th, dag)
@@ -634,9 +643,13 @@ steps:
 			close(done)
 		}()
 
-		dag.AssertLatestStatus(t, core.Running)
+		waitForTestFile(t, startedFile, intgTestTimeout(10*time.Second))
 		dagAgent.Abort()
-		<-done
+		select {
+		case <-done:
+		case <-time.After(intgTestTimeout(30 * time.Second)):
+			t.Fatal("timed out waiting for aborted DAG run to finish")
+		}
 
 		status := dagAgent.Status(th.Context)
 		require.NotNil(t, status.OnAbort, "abort handler should have been executed")

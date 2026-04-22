@@ -667,6 +667,17 @@ func TestFromMapConfig_WithBastion(t *testing.T) {
 			expectedUser:     "bastionuser",
 		},
 		{
+			name: "NumericPort",
+			bastion: map[string]any{
+				"host":     "bastion.example.com",
+				"port":     2222,
+				"user":     "bastionuser",
+				"password": "bastionpass",
+			},
+			expectedHostPort: "bastion.example.com:2222",
+			expectedUser:     "bastionuser",
+		},
+		{
 			name: "DefaultPort",
 			bastion: map[string]any{
 				"host":     "bastion.example.com",
