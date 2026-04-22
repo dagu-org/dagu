@@ -7,9 +7,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	openapi "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/automata"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/persis/filedag"
@@ -158,4 +161,57 @@ func TestAutomataDocumentEndpoints(t *testing.T) {
 	soulGetOK, ok := soulGetResp.(openapi.GetAutomataDocument200JSONResponse)
 	require.True(t, ok)
 	require.Contains(t, soulGetOK.Content, "Be precise.")
+}
+
+func TestParseAutomataMemoryReflection(t *testing.T) {
+	t.Parallel()
+
+	proposed, rationale, err := parseAutomataMemoryReflection("```json\n{\"proposedContent\":\"# Memory\\n\\nKeep deployments small.\",\"rationale\":\"Added deployment preference.\"}\n```")
+	require.NoError(t, err)
+	require.Equal(t, "# Memory\n\nKeep deployments small.", proposed)
+	require.Equal(t, "Added deployment preference.", rationale)
+
+	_, _, err = parseAutomataMemoryReflection(`{"proposedContent":"   ","rationale":"empty"}`)
+	require.Error(t, err)
+}
+
+func TestBuildAutomataMemoryReflectionPrompt(t *testing.T) {
+	t.Parallel()
+
+	detail := &automata.Detail{
+		Definition: &automata.Definition{
+			Name:                "software_dev",
+			Goal:                "Maintain the product",
+			StandingInstruction: "Prefer small changes",
+		},
+		State: &automata.State{
+			Instruction: "Fix the broken build",
+			Tasks: []automata.Task{
+				{Description: "Update API schema", State: automata.TaskStateOpen},
+				{Description: "Run focused tests", State: automata.TaskStateDone},
+			},
+		},
+		Messages: []agent.Message{
+			{
+				Type:       agent.MessageTypeUser,
+				SequenceID: 1,
+				Content:    "Please avoid broad DAG listings.",
+				CreatedAt:  time.Unix(100, 0),
+			},
+			{
+				Type:       agent.MessageTypeAssistant,
+				SequenceID: 2,
+				Content:    strings.Repeat("a", automataMemoryReflectionMaxMessageChars+20),
+				CreatedAt:  time.Unix(101, 0),
+			},
+		},
+	}
+
+	prompt := buildAutomataMemoryReflectionPrompt(detail, "# Memory\n\nExisting rule.")
+	require.Contains(t, prompt, "Automata: software_dev")
+	require.Contains(t, prompt, "Goal: Maintain the product")
+	require.Contains(t, prompt, "1. [open] Update API schema")
+	require.Contains(t, prompt, "Please avoid broad DAG listings.")
+	require.Contains(t, prompt, "# Memory\n\nExisting rule.")
+	require.Contains(t, prompt, "[truncated]")
 }

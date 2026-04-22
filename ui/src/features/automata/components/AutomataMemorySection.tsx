@@ -1,5 +1,12 @@
 import React from 'react';
-import { Brain, Loader2, Save, Sparkles, Trash2 } from 'lucide-react';
+import {
+  Brain,
+  Loader2,
+  RotateCcw,
+  Save,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
 
 import { AutomataDocument, type components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
@@ -10,6 +17,8 @@ import ConfirmModal from '@/ui/ConfirmModal';
 
 type AutomataDocumentResponse =
   components['schemas']['AutomataDocumentResponse'];
+type AutomataMemoryReflectionResponse =
+  components['schemas']['AutomataMemoryReflectionResponse'];
 
 type AutomataDocumentSectionProps = {
   automataName: string;
@@ -73,15 +82,19 @@ export function AutomataDocumentSection({
   const canWrite = useCanWrite();
   const copy = documentCopy[document];
   const Icon = document === AutomataDocument.SOUL_md ? Sparkles : Brain;
+  const isMemoryDocument = document === AutomataDocument.MEMORY_md;
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isReflecting, setIsReflecting] = React.useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
   const [content, setContent] = React.useState('');
   const [documentPath, setDocumentPath] = React.useState('');
+  const [reflectionDraft, setReflectionDraft] =
+    React.useState<AutomataMemoryReflectionResponse | null>(null);
 
   const loadDocument = React.useCallback(async () => {
     setIsLoading(true);
@@ -99,6 +112,7 @@ export function AutomataDocumentSection({
       const item = data as AutomataDocumentResponse;
       setContent(item.content ?? '');
       setDocumentPath(item.path ?? '');
+      setReflectionDraft(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : copy.loadError);
     } finally {
@@ -128,6 +142,7 @@ export function AutomataDocumentSection({
       const item = data as AutomataDocumentResponse;
       setContent(item.content ?? '');
       setDocumentPath(item.path ?? documentPath);
+      setReflectionDraft(null);
       setSuccess(copy.saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : copy.saveError);
@@ -151,6 +166,7 @@ export function AutomataDocumentSection({
         throw new Error(apiError.message || copy.clearError);
       }
       setContent('');
+      setReflectionDraft(null);
       setShowDeleteConfirm(false);
       setSuccess(copy.cleared);
     } catch (err) {
@@ -158,6 +174,47 @@ export function AutomataDocumentSection({
     } finally {
       setIsDeleting(false);
     }
+  }
+
+  async function handleReflect(): Promise<void> {
+    if (!isMemoryDocument) {
+      return;
+    }
+    setIsReflecting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const { data, error: apiError } = await client.POST(
+        '/automata/{name}/memory/reflect',
+        {
+          params: { path: { name: automataName } },
+        }
+      );
+      if (apiError) {
+        throw new Error(
+          apiError.message || 'Failed to reflect automata memory'
+        );
+      }
+      const draft = data as AutomataMemoryReflectionResponse;
+      setReflectionDraft(draft);
+      setContent(draft.proposedContent ?? '');
+      setSuccess('Reflection draft generated');
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to reflect automata memory'
+      );
+    } finally {
+      setIsReflecting(false);
+    }
+  }
+
+  function handleRevertReflection(): void {
+    if (!reflectionDraft) {
+      return;
+    }
+    setContent(reflectionDraft.currentContent ?? '');
+    setReflectionDraft(null);
+    setSuccess(null);
   }
 
   const lineCount = content ? content.split('\n').length : 0;
@@ -211,11 +268,21 @@ export function AutomataDocumentSection({
               className="min-h-56 font-mono text-sm"
               placeholder={copy.placeholder}
             />
+            {reflectionDraft?.rationale ? (
+              <div className="rounded-md bg-muted px-3 py-2 text-sm">
+                <div className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+                  Reflection rationale
+                </div>
+                <p className="whitespace-pre-wrap text-muted-foreground">
+                  {reflectionDraft.rationale}
+                </p>
+              </div>
+            ) : null}
             {canWrite ? (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => void handleSave()}
-                  disabled={isSaving}
+                  disabled={isSaving || isReflecting}
                   size="sm"
                 >
                   {isSaving ? (
@@ -234,11 +301,42 @@ export function AutomataDocumentSection({
                   variant="outline"
                   size="sm"
                   onClick={() => setShowDeleteConfirm(true)}
-                  disabled={!content || isDeleting}
+                  disabled={!content || isDeleting || isReflecting}
                 >
                   <Trash2 className="mr-1.5 h-4 w-4" />
                   Clear
                 </Button>
+                {isMemoryDocument ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleReflect()}
+                    disabled={isReflecting || isSaving || isDeleting}
+                  >
+                    {isReflecting ? (
+                      <>
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        Reflecting...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-1.5 h-4 w-4" />
+                        Reflect
+                      </>
+                    )}
+                  </Button>
+                ) : null}
+                {reflectionDraft ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRevertReflection}
+                    disabled={isSaving || isReflecting}
+                  >
+                    <RotateCcw className="mr-1.5 h-4 w-4" />
+                    Revert draft
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </div>

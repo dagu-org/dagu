@@ -6252,6 +6252,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /automata/{name}/memory/reflect:
+    post:
+      summary: "Reflect automata memory"
+      description: "Generates a proposed MEMORY.md update from the Automata's current session transcript. The proposal is not saved automatically."
+      operationId: "reflectAutomataMemory"
+      tags:
+        - "automata"
+      parameters:
+        - $ref: "#/components/parameters/AutomataName"
+      responses:
+        "200":
+          description: "Automata memory reflection proposal"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomataMemoryReflectionResponse"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: "Forbidden"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "Automata or agent feature not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /automata/{name}/start:
     post:
       summary: "Start automata task"
@@ -11792,6 +11839,27 @@ components:
           type: string
         path:
           type: string
+
+    AutomataMemoryReflectionResponse:
+      type: object
+      required:
+        - name
+        - currentContent
+        - proposedContent
+        - rationale
+      description: "Generated Automata MEMORY.md update proposal"
+      properties:
+        name:
+          type: string
+        currentContent:
+          type: string
+          description: "Current MEMORY.md content before applying the reflection"
+        proposedContent:
+          type: string
+          description: "Full proposed replacement content for MEMORY.md"
+        rationale:
+          type: string
+          description: "Short explanation of what the reflection changed"
 
     UpdateAgentMemoryRequest:
       type: object

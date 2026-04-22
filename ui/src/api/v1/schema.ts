@@ -2495,6 +2495,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/automata/{name}/memory/reflect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reflect automata memory
+         * @description Generates a proposed MEMORY.md update from the Automata's current session transcript. The proposal is not saved automatically.
+         */
+        post: operations["reflectAutomataMemory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/automata/{name}/start": {
         parameters: {
             query?: never;
@@ -4977,6 +4997,16 @@ export interface components {
             document: components["schemas"]["AutomataDocument"];
             content: string;
             path: string;
+        };
+        /** @description Generated Automata MEMORY.md update proposal */
+        AutomataMemoryReflectionResponse: {
+            name: string;
+            /** @description Current MEMORY.md content before applying the reflection */
+            currentContent: string;
+            /** @description Full proposed replacement content for MEMORY.md */
+            proposedContent: string;
+            /** @description Short explanation of what the reflection changed */
+            rationale: string;
         };
         /** @description Request to update memory content */
         UpdateAgentMemoryRequest: {
@@ -13389,6 +13419,74 @@ export interface operations {
                 };
             };
             /** @description Automata not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reflectAutomataMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Automata name */
+                name: components["parameters"]["AutomataName"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Automata memory reflection proposal */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomataMemoryReflectionResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Automata or agent feature not found */
             404: {
                 headers: {
                     [name: string]: unknown;
