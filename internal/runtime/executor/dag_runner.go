@@ -437,6 +437,11 @@ func (e *SubDAGExecutor) Retry(ctx context.Context, runParams RunParams, stepNam
 	rCtx := exec.GetContext(ctx)
 	if e.shouldDispatchToCoordinator(rCtx.DefaultExecMode) {
 		logger.Info(ctx, "Retrying sub DAG via distributed execution", tag.Step(stepName))
+
+		e.mu.Lock()
+		e.distributedRuns[runParams.RunID] = true
+		e.mu.Unlock()
+
 		if err := e.dispatchRetryToCoordinator(ctx, runParams, stepName); err != nil {
 			return nil, fmt.Errorf("distributed step retry failed: %w", err)
 		}
