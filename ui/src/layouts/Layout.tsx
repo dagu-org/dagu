@@ -60,6 +60,11 @@ function getContrastColor(input?: string): string {
   return luminance > 0.4 ? '#000' : '#fff';
 }
 
+function getSidebarOverlayColor(foreground: string, alpha: number): string {
+  const channel = foreground === '#000' ? '0, 0, 0' : '255, 255, 255';
+  return `rgba(${channel}, ${alpha})`;
+}
+
 // Constants
 
 type LayoutProps = {
@@ -93,6 +98,17 @@ function Content({ navbarColor, children }: LayoutProps) {
         backgroundColor: navbarColor,
         color: contrastColor,
         '--sidebar-foreground': contrastColor,
+        '--sidebar-primary': contrastColor,
+        '--sidebar-ring': contrastColor,
+        '--sidebar-hover': getSidebarOverlayColor(contrastColor ?? '#fff', 0.1),
+        '--sidebar-active': getSidebarOverlayColor(
+          contrastColor ?? '#fff',
+          0.16
+        ),
+        '--sidebar-border': getSidebarOverlayColor(
+          contrastColor ?? '#fff',
+          0.18
+        ),
       } as React.CSSProperties)
     : undefined;
   // Sidebar state with localStorage persistence
