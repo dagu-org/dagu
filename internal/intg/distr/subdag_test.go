@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,6 +34,46 @@ steps:
 		agent := f.dagWrapper.Agent()
 		agent.RunSuccess(t)
 		f.dagWrapper.AssertLatestStatus(t, core.Succeeded)
+	})
+}
+
+func TestSubDAG_CallStepWorkerSelector(t *testing.T) {
+	t.Run("immediateParentDispatchesChildUsingCallStepSelector", func(t *testing.T) {
+		f := newTestFixture(t, `
+steps:
+  - name: run-child-on-selected-worker
+    call: selected-child
+    worker_selector:
+      host: serverA
+
+---
+name: selected-child
+steps:
+  - name: child-task
+    command: echo "child executed on selected worker"
+`, withLabels(map[string]string{"host": "serverA"}))
+		defer f.cleanup()
+
+		agent := f.dagWrapper.Agent()
+		agent.RunSuccess(t)
+
+		parentStatus := agent.Status(f.coord.Context)
+		require.Len(t, parentStatus.Nodes, 1)
+		require.Len(t, parentStatus.Nodes[0].SubRuns, 1)
+
+		subRunID := parentStatus.Nodes[0].SubRuns[0].DAGRunID
+		subAttempt, err := f.coord.DAGRunStore.FindSubAttempt(
+			f.coord.Context,
+			exec.NewDAGRunRef(parentStatus.Name, parentStatus.DAGRunID),
+			subRunID,
+		)
+		require.NoError(t, err)
+
+		childStatus, err := subAttempt.ReadStatus(f.coord.Context)
+		require.NoError(t, err)
+		require.NotNil(t, childStatus)
+		require.Equal(t, core.Succeeded, childStatus.Status)
+		require.Equal(t, "worker-1", childStatus.WorkerID)
 	})
 }
 
