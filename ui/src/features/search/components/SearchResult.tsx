@@ -57,18 +57,20 @@ function SearchSnippet({ match }: { match: SearchMatch }) {
         const isHit = lineNumber === match.lineNumber;
 
         return (
-          <div
+          <span
             key={`${match.startLine}-${lineNumber}-${index}`}
             className={cn(
-              'grid grid-cols-[auto,1fr] gap-3 px-1',
+              'grid min-w-full w-max grid-cols-[max-content_minmax(0,max-content)] gap-3 px-1',
               isHit && 'rounded bg-primary/10'
             )}
           >
-            <span className="select-none text-[11px] text-muted-foreground">
+            <span className="w-8 select-none text-right text-[11px] tabular-nums text-muted-foreground">
               {lineNumber}
             </span>
-            <code className="font-mono text-foreground">{line || ' '}</code>
-          </div>
+            <code className="whitespace-pre font-mono text-foreground">
+              {line || ' '}
+            </code>
+          </span>
         );
       })}
     </pre>
