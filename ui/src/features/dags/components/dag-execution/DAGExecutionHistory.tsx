@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * DAGExecutionHistory component displays the execution history of a DAG.
  *
@@ -82,6 +85,7 @@ function DAGExecutionHistory({
       fileName={fileName}
       dagRuns={data.dagRuns}
       gridData={data.gridData}
+      refreshHistory={() => void mutate()}
     />
   );
 }
@@ -96,12 +100,19 @@ type HistoryTableProps = {
   gridData: components['schemas']['DAGGridItem'][] | null;
   /** List of DAG dagRuns */
   dagRuns: components['schemas']['DAGRunDetails'][] | null;
+  /** Refresh execution history list */
+  refreshHistory: () => void;
 };
 
 /**
  * DAGHistoryTable displays detailed execution history with interactive elements
  */
-function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
+function DAGHistoryTable({
+  fileName,
+  gridData,
+  dagRuns,
+  refreshHistory,
+}: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
   const dagContext = React.useContext(DAGContext);
   const client = useClient();
@@ -286,6 +297,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
         status
       )
     );
+    refreshHistory();
     dagContext.refresh();
     dismissModal();
   };

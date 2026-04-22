@@ -1713,27 +1713,32 @@ func (a *API) GetDAGDetailsData(ctx context.Context, fileName string) (any, erro
 // GetDAGHistoryData returns DAG execution history for SSE.
 // Identifier format: "fileName"
 func (a *API) GetDAGHistoryData(ctx context.Context, fileName string) (any, error) {
-	dag, err := a.dagStore.GetDetails(ctx, fileName, spec.WithAllowBuildErrors())
-	if err != nil {
-		return nil, err
-	}
-	if err := a.requireWorkspaceVisible(ctx, dagWorkspaceName(dag)); err != nil {
-		return nil, err
-	}
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dags/{fileName}/dag-runs",
+		dagName:  fileName,
+	}, func(readCtx context.Context) (api.GetDAGDAGRunHistory200JSONResponse, error) {
+		dag, err := a.dagStore.GetDetails(readCtx, fileName, spec.WithAllowBuildErrors())
+		if err != nil {
+			return api.GetDAGDAGRunHistory200JSONResponse{}, err
+		}
+		if err := a.requireWorkspaceVisible(readCtx, dagWorkspaceName(dag)); err != nil {
+			return api.GetDAGDAGRunHistory200JSONResponse{}, err
+		}
 
-	dagName := a.resolveDAGName(ctx, fileName)
-	recentHistory := a.dagRunMgr.ListRecentStatus(ctx, dagName, defaultHistoryLimit)
+		dagName := a.resolveDAGName(readCtx, fileName)
+		recentHistory := a.dagRunMgr.ListRecentStatus(readCtx, dagName, defaultHistoryLimit)
 
-	var dagRuns []api.DAGRunDetails
-	for _, status := range recentHistory {
-		dagRuns = append(dagRuns, ToDAGRunDetails(status))
-	}
+		var dagRuns []api.DAGRunDetails
+		for _, status := range recentHistory {
+			dagRuns = append(dagRuns, ToDAGRunDetails(status))
+		}
 
-	gridData := a.readHistoryData(ctx, dag, recentHistory)
-	return api.GetDAGDAGRunHistory200JSONResponse{
-		DagRuns:  dagRuns,
-		GridData: gridData,
-	}, nil
+		gridData := a.readHistoryData(readCtx, dag, recentHistory)
+		return api.GetDAGDAGRunHistory200JSONResponse{
+			DagRuns:  dagRuns,
+			GridData: gridData,
+		}, nil
+	})
 }
 
 // GetDAGsListData returns DAGs list for SSE.

@@ -29,9 +29,9 @@ function nodeStatusLabel(status: NodeStatus): NodeStatusLabel {
       return NodeStatusLabel.rejected;
     case NodeStatus.Retrying:
       return NodeStatusLabel.retrying;
-    default:
-      return NodeStatusLabel.not_started;
   }
+  const exhaustive: never = status;
+  return exhaustive;
 }
 
 function updateRequiredNodeStatus(

@@ -42,6 +42,42 @@ func requireNoDeprecatedTagsKey(t *testing.T, data []byte) {
 	require.False(t, ok)
 }
 
+func TestDeriveManualDAGRunStatusRetryingIsRunning(t *testing.T) {
+	t.Parallel()
+
+	status := deriveManualDAGRunStatus([]*exec.Node{
+		{
+			Step:   core.Step{Name: "retrying"},
+			Status: core.NodeRetrying,
+		},
+	}, core.Failed)
+
+	assert.Equal(t, core.Running, status)
+}
+
+func TestDeriveManualDAGRunStatusContinueOnMarkSuccessIsContinuable(t *testing.T) {
+	t.Parallel()
+
+	status := deriveManualDAGRunStatus([]*exec.Node{
+		{
+			Step: core.Step{
+				Name: "failed-continuable",
+				ContinueOn: core.ContinueOn{
+					Failure:     true,
+					MarkSuccess: true,
+				},
+			},
+			Status: core.NodeFailed,
+		},
+		{
+			Step:   core.Step{Name: "succeeded"},
+			Status: core.NodeSucceeded,
+		},
+	}, core.Running)
+
+	assert.Equal(t, core.PartiallySucceeded, status)
+}
+
 func TestApplyInlineEnqueueLabels_ArrayLabels(t *testing.T) {
 	t.Parallel()
 

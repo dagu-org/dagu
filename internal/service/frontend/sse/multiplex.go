@@ -1206,7 +1206,7 @@ func (t *multiplexTopic) poll(forcePublish bool) {
 	}
 	t.clientsMu.RUnlock()
 
-	var totalFetchDuration time.Duration
+	var totalSuccessFetchDuration time.Duration
 	var successCount int
 	var firstErr error
 
@@ -1214,17 +1214,17 @@ func (t *multiplexTopic) poll(forcePublish bool) {
 		start := time.Now()
 		payload, err := t.fetchPayload(session.fetchCtx)
 		fetchDuration := time.Since(start)
-		totalFetchDuration += fetchDuration
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}
-			if t.mux.metrics != nil {
-				t.mux.metrics.FetchError(string(t.topicType))
-			}
 			continue
 		}
+		totalSuccessFetchDuration += fetchDuration
 		successCount++
+		if t.mux.metrics != nil {
+			t.mux.metrics.RecordFetchDuration(string(t.topicType), fetchDuration)
+		}
 
 		hash := computeHash(payload)
 		t.clientsMu.Lock()
@@ -1248,6 +1248,9 @@ func (t *multiplexTopic) poll(forcePublish bool) {
 		session.enqueueMessage(t.key, eventID, data)
 	}
 
+	if firstErr != nil && t.mux.metrics != nil {
+		t.mux.metrics.FetchError(string(t.topicType))
+	}
 	if successCount == 0 && firstErr != nil {
 		interval, _ := t.errorBackoff.Next(firstErr)
 		t.backoffUntil = time.Now().Add(interval)
@@ -1257,11 +1260,7 @@ func (t *multiplexTopic) poll(forcePublish bool) {
 		return
 	}
 
-	fetchDuration := totalFetchDuration / time.Duration(successCount)
-	if t.mux.metrics != nil {
-		t.mux.metrics.RecordFetchDuration(string(t.topicType), fetchDuration)
-	}
-
+	fetchDuration := totalSuccessFetchDuration / time.Duration(successCount)
 	t.backoffUntil = time.Time{}
 	t.errorBackoff.Reset()
 	t.currentInterval = time.Duration(

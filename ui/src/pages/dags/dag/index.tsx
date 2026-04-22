@@ -1,7 +1,14 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { components } from '../../../api/v1/schema';
 import { AppBarContext } from '../../../contexts/AppBarContext';
@@ -51,6 +58,7 @@ function DAGDetails() {
   const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
   const [trackedDagRunId, setTrackedDagRunId] = useState<string>();
+  const previousURLDagRunId = useRef<string | null>(dagRunId);
   const remoteNode =
     searchParams.get('remoteNode') ||
     appBarContext.selectedRemoteNode ||
@@ -172,7 +180,7 @@ function DAGDetails() {
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
-  const effectiveDAGRunId = dagRunId || trackedDagRunId;
+  const effectiveDAGRunId = trackedDagRunId || dagRunId;
   const dagRunQueryEnabled = Boolean(
     dagRunName && effectiveDAGRunId && !subDAGRunId && dagMatchesWorkspace
   );
@@ -270,11 +278,39 @@ function DAGDetails() {
   const handleRunStarted = useCallback(
     (nextDAGRunId: string) => {
       setTrackedDagRunId(nextDAGRunId);
-      navigateToStatusTab();
+      const nextSearchParams = new URLSearchParams();
+      nextSearchParams.set('dagRunId', nextDAGRunId);
+      nextSearchParams.set('dagRunName', dagData?.dag?.name || dagRunName);
+      if (remoteNode && remoteNode !== 'local') {
+        nextSearchParams.set('remoteNode', remoteNode);
+      }
+      if (queryWorkspace) {
+        nextSearchParams.set('workspace', queryWorkspace);
+      }
+      navigate(`/dags/${fileName}?${nextSearchParams.toString()}`);
       void mutateDag();
     },
-    [mutateDag, navigateToStatusTab]
+    [
+      dagData?.dag?.name,
+      dagRunName,
+      fileName,
+      mutateDag,
+      navigate,
+      queryWorkspace,
+      remoteNode,
+    ]
   );
+
+  useEffect(() => {
+    const previous = previousURLDagRunId.current;
+    previousURLDagRunId.current = dagRunId;
+    if (!dagRunId || dagRunId === trackedDagRunId) {
+      return;
+    }
+    if (previous !== dagRunId) {
+      setTrackedDagRunId(undefined);
+    }
+  }, [dagRunId, trackedDagRunId]);
 
   useEffect(() => {
     setTrackedDagRunId(undefined);

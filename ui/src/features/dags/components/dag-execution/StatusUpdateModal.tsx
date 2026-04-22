@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * StatusUpdateModal component provides a modal dialog for manually updating a step's status.
  *
@@ -44,9 +47,21 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
   // Create refs for the buttons
   const successButtonRef = React.useRef<HTMLButtonElement>(null);
   const failedButtonRef = React.useRef<HTMLButtonElement>(null);
-  
+
   // Track which button is selected (0 = success, 1 = failed)
   const [selectedButton, setSelectedButton] = React.useState(0);
+  const submitStatus = React.useCallback(
+    (status: NodeStatus) => {
+      void (async () => {
+        try {
+          await onSubmit(step, status);
+        } catch {
+          // Submit handlers are expected to surface their own user-facing errors.
+        }
+      })();
+    },
+    [onSubmit, step]
+  );
 
   // Handle keyboard events
   React.useEffect(() => {
@@ -60,16 +75,16 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           e.preventDefault();
           setSelectedButton(selectedButton === 0 ? 1 : 0);
           break;
-          
+
         case 'Enter':
           e.preventDefault();
           if (selectedButton === 0) {
-            void onSubmit(step, NodeStatus.Success);
+            submitStatus(NodeStatus.Success);
           } else {
-            void onSubmit(step, NodeStatus.Failed);
+            submitStatus(NodeStatus.Failed);
           }
           break;
-          
+
         case 'Escape':
           e.preventDefault();
           dismissModal();
@@ -81,7 +96,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, step, onSubmit, dismissModal, selectedButton]);
+  }, [visible, step, submitStatus, dismissModal, selectedButton]);
 
   // We're not using the position prop anymore as we want the modal to be centered
   // The Dialog component from shadcn/ui will center the modal by default
@@ -109,7 +124,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                   : 'border-border hover:border-success hover:bg-success-muted'
                 }
               `}
-              onClick={() => void onSubmit(step, NodeStatus.Success)}
+              onClick={() => submitStatus(NodeStatus.Success)}
               onMouseEnter={() => setSelectedButton(0)}
             >
               <div className="flex flex-col items-center gap-2">
@@ -117,7 +132,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                 <span className="font-mono text-sm">Success</span>
               </div>
             </button>
-            
+
             <button
               ref={failedButtonRef}
               className={`
@@ -127,7 +142,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                   : 'border-border hover:border-error hover:bg-error-muted'
                 }
               `}
-              onClick={() => void onSubmit(step, NodeStatus.Failed)}
+              onClick={() => submitStatus(NodeStatus.Failed)}
               onMouseEnter={() => setSelectedButton(1)}
             >
               <div className="flex flex-col items-center gap-2">

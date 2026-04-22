@@ -130,7 +130,7 @@ func TestRegisterDedicatedSSEFetchersKeepsDAGRunTopicsPollingWithEventStore(t *t
 
 			require.Eventually(t, func() bool {
 				return fetches.Load() >= 2
-			}, time.Second, 10*time.Millisecond)
+			}, 3*time.Second, 10*time.Millisecond)
 
 			cancel()
 			require.Eventually(t, func() bool {

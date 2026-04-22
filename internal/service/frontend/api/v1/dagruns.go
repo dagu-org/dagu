@@ -2342,7 +2342,7 @@ func deriveManualDAGRunStatus(nodes []*exec.Node, fallback core.Status) core.Sta
 			hasRejected = true
 		case core.NodeFailed:
 			hasFailed = true
-			if node.Step.ContinueOn.Failure && !node.Step.ContinueOn.MarkSuccess {
+			if node.Step.ContinueOn.Failure {
 				hasContinuableFailure = true
 			} else {
 				hasUncontinuableFailure = true
@@ -2363,7 +2363,7 @@ func deriveManualDAGRunStatus(nodes []*exec.Node, fallback core.Status) core.Sta
 	case hasRunning:
 		return core.Running
 	case hasRetrying:
-		return core.Queued
+		return core.Running
 	case hasWaiting:
 		return core.Waiting
 	case hasRejected:
@@ -3437,7 +3437,13 @@ func (a *API) GetDAGRunDetailsData(ctx context.Context, identifier string) (any,
 	if !ok {
 		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId')", identifier)
 	}
-	return a.getDAGRunDetailsData(ctx, dagName, dagRunId)
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs/{name}/{dagRunId}",
+		dagName:  dagName,
+		dagRunID: dagRunId,
+	}, func(readCtx context.Context) (api.GetDAGRunDetails200JSONResponse, error) {
+		return a.getDAGRunDetailsData(readCtx, dagName, dagRunId)
+	})
 }
 
 // GetSubDAGRunDetailsData returns sub DAG run details for SSE.
@@ -3483,6 +3489,14 @@ func (a *API) GetSubDAGRunDetailsData(ctx context.Context, identifier string) (a
 // GetDAGRunLogsData returns DAG run logs for SSE.
 // Identifier format: "dagName/dagRunId" or "dagName/dagRunId?tail=N"
 func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, error) {
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs/{name}/{dagRunId}/logs",
+	}, func(readCtx context.Context) (DAGRunLogsResponse, error) {
+		return a.getDAGRunLogsData(readCtx, identifier)
+	})
+}
+
+func (a *API) getDAGRunLogsData(ctx context.Context, identifier string) (DAGRunLogsResponse, error) {
 	// Parse query params if present
 	pathPart := identifier
 	var queryParams url.Values
@@ -3500,16 +3514,16 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 
 	dagName, dagRunId, ok := strings.Cut(pathPart, "/")
 	if !ok {
-		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId')", identifier)
+		return DAGRunLogsResponse{}, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId')", identifier)
 	}
 
 	ref := exec.NewDAGRunRef(dagName, dagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+		return DAGRunLogsResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
 	if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(dagStatus)); err != nil {
-		return nil, err
+		return DAGRunLogsResponse{}, err
 	}
 
 	// Parse tail parameter with bounds validation (100-10000, default 500)
@@ -3525,7 +3539,7 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 
 	content, lineCount, totalLines, hasMore, _, err := fileutil.ReadLogContent(dagStatus.Log, options)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("error reading scheduler log: %w", err)
+		return DAGRunLogsResponse{}, fmt.Errorf("error reading scheduler log: %w", err)
 	}
 
 	schedulerLog := SchedulerLogInfo{
@@ -3559,24 +3573,32 @@ func (a *API) GetDAGRunLogsData(ctx context.Context, identifier string) (any, er
 // GetStepLogData returns step log for SSE.
 // Identifier format: "dagName/dagRunId/stepName"
 func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error) {
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/dag-runs/{name}/{dagRunId}/logs/steps/{stepName}",
+	}, func(readCtx context.Context) (StepLogResponse, error) {
+		return a.getStepLogData(readCtx, identifier)
+	})
+}
+
+func (a *API) getStepLogData(ctx context.Context, identifier string) (StepLogResponse, error) {
 	parts := strings.SplitN(identifier, "/", 3)
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId/stepName')", identifier)
+		return StepLogResponse{}, fmt.Errorf("invalid identifier format: %s (expected 'dagName/dagRunId/stepName')", identifier)
 	}
 	dagName, dagRunId, stepName := parts[0], parts[1], parts[2]
 
 	ref := exec.NewDAGRunRef(dagName, dagRunId)
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
-		return nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+		return StepLogResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
 	if err := a.requireDAGRunStatusVisible(ctx, dagStatus); err != nil {
-		return nil, err
+		return StepLogResponse{}, err
 	}
 
 	node, err := dagStatus.NodeByName(stepName)
 	if err != nil {
-		return nil, fmt.Errorf("step %s not found in DAG %s", stepName, dagName)
+		return StepLogResponse{}, fmt.Errorf("step %s not found in DAG %s", stepName, dagName)
 	}
 
 	options := fileutil.LogReadOptions{
@@ -3591,7 +3613,7 @@ func (a *API) GetStepLogData(ctx context.Context, identifier string) (any, error
 	if node.Stdout != "" {
 		stdoutContent, lineCount, totalLines, hasMore, _, err = fileutil.ReadLogContent(node.Stdout, options)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("error reading stdout: %w", err)
+			return StepLogResponse{}, fmt.Errorf("error reading stdout: %w", err)
 		}
 	}
 

@@ -408,11 +408,15 @@ func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string) (in
 // GetQueuesListData returns queue list for SSE.
 // Identifier format: URL query string (ignored for now)
 func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
-	response, err := a.ListQueues(ctx, api.ListQueuesRequestObject{})
-	if err != nil {
-		return nil, fmt.Errorf("error listing queues: %w", err)
-	}
-	return response, nil
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/queues",
+	}, func(readCtx context.Context) (api.ListQueuesResponseObject, error) {
+		response, err := a.ListQueues(readCtx, api.ListQueuesRequestObject{})
+		if err != nil {
+			return nil, fmt.Errorf("error listing queues: %w", err)
+		}
+		return response, nil
+	})
 }
 
 func (a *API) effectiveLeaseStaleThreshold() time.Duration {

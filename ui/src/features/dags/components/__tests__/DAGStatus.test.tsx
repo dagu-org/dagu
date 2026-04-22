@@ -187,4 +187,54 @@ describe('DAGStatus', () => {
     ).toBeInTheDocument();
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
   });
+
+  it('does not optimistically update the graph when graph status updates fail', async () => {
+    const refresh = vi.fn();
+    vi.mocked(useClient).mockReturnValue({
+      PATCH: patchMock.mockResolvedValue({
+        error: { message: 'update failed' },
+      }),
+    } as unknown as ReturnType<typeof useClient>);
+
+    render(
+      <MemoryRouter>
+        <AppBarContext.Provider value={appBarValue}>
+          <DAGContext.Provider
+            value={{
+              refresh,
+              name: 'example',
+              fileName: 'example.yaml',
+            }}
+          >
+            <DAGStatus dagRun={dagRun} fileName="example.yaml" />
+          </DAGContext.Provider>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open status modal' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Mark failed' })
+    );
+
+    await waitFor(() => {
+      expect(patchMock).toHaveBeenCalledWith(
+        '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status',
+        expect.objectContaining({
+          body: {
+            status: NodeStatus.Failed,
+          },
+        })
+      );
+    });
+    expect(
+      screen.queryByText(`Graph status: ${NodeStatus.Failed}`)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(`Graph status: ${NodeStatus.Success}`)
+    ).toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

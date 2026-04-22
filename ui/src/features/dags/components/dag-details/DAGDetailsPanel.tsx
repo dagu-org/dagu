@@ -155,7 +155,18 @@ function DAGDetailsPanel({
 
   function handleFullscreenClick(e?: React.MouseEvent): void {
     const tabPath = activeTab === 'status' ? '' : `/${activeTab}`;
-    const url = `/dags/${fileName}${tabPath}`;
+    const searchParams = new URLSearchParams();
+    if (trackedDagRunId) {
+      searchParams.set('dagRunId', trackedDagRunId);
+      if (data?.dag?.name) {
+        searchParams.set('dagRunName', data.dag.name);
+      }
+    }
+    if (remoteNode && remoteNode !== 'local') {
+      searchParams.set('remoteNode', remoteNode);
+    }
+    const query = searchParams.toString();
+    const url = `/dags/${fileName}${tabPath}${query ? `?${query}` : ''}`;
 
     if (e?.metaKey || e?.ctrlKey) {
       window.open(url, '_blank');
@@ -202,7 +213,16 @@ function DAGDetailsPanel({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onNavigate, activeTab, fileName, navigate]);
+  }, [
+    onClose,
+    onNavigate,
+    activeTab,
+    fileName,
+    navigate,
+    trackedDagRunId,
+    data?.dag?.name,
+    remoteNode,
+  ]);
 
   // Show error state if DAG not found
   if (notFound) {
