@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	osexec "os/exec"
 	"strings"
@@ -221,9 +222,7 @@ func cloneWorkerSelector(selector map[string]string) map[string]string {
 		return nil
 	}
 	clone := make(map[string]string, len(selector))
-	for key, value := range selector {
-		clone[key] = value
-	}
+	maps.Copy(clone, selector)
 	return clone
 }
 
