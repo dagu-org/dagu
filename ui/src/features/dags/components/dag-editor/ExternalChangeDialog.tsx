@@ -5,7 +5,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 import React from 'react';
 
@@ -87,11 +87,7 @@ function ExternalChangeDialog({ visible, onDiscard, onIgnore }: Props) {
             <X className="h-4 w-4" />
             Ignore
           </Button>
-          <Button
-            ref={discardButtonRef}
-            className="btn-3d-primary"
-            onClick={onDiscard}
-          >
+          <Button ref={discardButtonRef} variant="primary" onClick={onDiscard}>
             <RefreshCw className="h-4 w-4" />
             Discard & Reload
           </Button>

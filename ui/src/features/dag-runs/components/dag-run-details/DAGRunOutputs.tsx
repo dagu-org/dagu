@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import StatusChip from '../../../../ui/StatusChip';
+import StatusChip from '@/components/ui/status-chip';
 import dayjs from '@/lib/dayjs';
 
 // Convert StatusLabel string to Status enum
@@ -230,9 +230,7 @@ function DAGRunOutputs({ dagName, dagRunId }: Props) {
             ) : (
               filteredOutputs.map(([key, value]) => (
                 <TableRow key={key} className="hover:bg-muted/50">
-                  <TableCell className="font-mono font-medium">
-                    {key}
-                  </TableCell>
+                  <TableCell className="font-mono font-medium">{key}</TableCell>
                   <TableCell className="font-mono text-muted-foreground whitespace-normal break-words">
                     {value}
                   </TableCell>

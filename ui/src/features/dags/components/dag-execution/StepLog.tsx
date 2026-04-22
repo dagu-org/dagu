@@ -6,10 +6,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import { components, NodeStatus, Stream } from '../../../../api/v1/schema';
-import { Button } from '../../../../components/ui/button';
-import { Input } from '../../../../components/ui/input';
-import { ReloadButton } from '../../../../components/ui/reload-button';
-import { Switch } from '../../../../components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ReloadButton } from '@/components/ui/reload-button';
+import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
@@ -18,7 +18,7 @@ import { useQuery } from '../../../../hooks/api';
 import { whenEnabled } from '../../../../hooks/queryUtils';
 import { useStepLogSSE } from '../../../../hooks/useStepLogSSE';
 import { isActiveNodeStatus } from '../../../../lib/status-utils';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 
 // Extended Log type with pagination fields
 interface LogWithPagination {
@@ -103,9 +103,11 @@ function StepLog({
     dagRun.rootDAGRunId !== dagRun.dagRunId;
 
   // SSE is used for real-time updates when viewing tail of an active step (not sub-DAG runs)
-  const shouldUseSSE = viewMode === 'tail' && isLiveMode && isActive && !isSubDAGRun;
+  const shouldUseSSE =
+    viewMode === 'tail' && isLiveMode && isActive && !isSubDAGRun;
   const sseResult = useStepLogSSE(dagName, dagRunId, stepName, shouldUseSSE);
-  const sseIsActive = shouldUseSSE && sseResult.isConnected && !sseResult.shouldUseFallback;
+  const sseIsActive =
+    shouldUseSSE && sseResult.isConnected && !sseResult.shouldUseFallback;
 
   // Fall back to REST polling when SSE is not available or not connected
   const usePolling = !sseIsActive;
@@ -113,7 +115,8 @@ function StepLog({
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const tail = viewMode === 'tail' ? pageSize : undefined;
   const head = viewMode === 'head' ? pageSize : undefined;
-  const offset = viewMode === 'page' ? (currentPage - 1) * pageSize + 1 : undefined;
+  const offset =
+    viewMode === 'page' ? (currentPage - 1) * pageSize + 1 : undefined;
   const limit = viewMode === 'page' ? pageSize : undefined;
 
   // SWR options - poll only when SSE is not available
@@ -172,19 +175,23 @@ function StepLog({
     swrOptions
   );
 
-  const { data, isLoading, error, mutate } = isSubDAGRun ? subDAGQuery : dagRunQuery;
+  const { data, isLoading, error, mutate } = isSubDAGRun
+    ? subDAGQuery
+    : dagRunQuery;
 
   // Transform SSE data to LogWithPagination format when available
-  const sseLogData: LogWithPagination | null = sseIsActive && sseResult.data
-    ? {
-        content: stream === Stream.stdout
-          ? sseResult.data.stdoutContent
-          : sseResult.data.stderrContent,
-        lineCount: sseResult.data.lineCount,
-        totalLines: sseResult.data.totalLines,
-        hasMore: sseResult.data.hasMore,
-      }
-    : null;
+  const sseLogData: LogWithPagination | null =
+    sseIsActive && sseResult.data
+      ? {
+          content:
+            stream === Stream.stdout
+              ? sseResult.data.stdoutContent
+              : sseResult.data.stderrContent,
+          lineCount: sseResult.data.lineCount,
+          totalLines: sseResult.data.totalLines,
+          hasMore: sseResult.data.hasMore,
+        }
+      : null;
 
   const scrollToBottom = useCallback(() => {
     if (logContainerRef.current) {
@@ -253,7 +260,11 @@ function StepLog({
   }
 
   function handleJumpToLine(): void {
-    if (jumpToLine === '' || jumpToLine < 1 || jumpToLine > (cachedData?.totalLines || 0)) {
+    if (
+      jumpToLine === '' ||
+      jumpToLine < 1 ||
+      jumpToLine > (cachedData?.totalLines || 0)
+    ) {
       return;
     }
 
@@ -268,7 +279,10 @@ function StepLog({
       const lineElements = document.querySelectorAll('[data-line-number]');
       for (const element of lineElements) {
         const htmlElement = element as HTMLElement;
-        const lineNumber = parseInt(htmlElement.getAttribute('data-line-number') || '0', 10);
+        const lineNumber = parseInt(
+          htmlElement.getAttribute('data-line-number') || '0',
+          10
+        );
         if (lineNumber === lineNum) {
           htmlElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           htmlElement.classList.add('bg-primary/20');
@@ -315,7 +329,16 @@ function StepLog({
     } catch (err) {
       console.error('Download failed:', err);
     }
-  }, [config.apiURL, dagName, dagRunId, stepName, stream, dagRun, isSubDAGRun, remoteNode]);
+  }, [
+    config.apiURL,
+    dagName,
+    dagRunId,
+    stepName,
+    stream,
+    dagRun,
+    isSubDAGRun,
+    remoteNode,
+  ]);
 
   if (isLoading && !cachedData && isInitialLoad.current) {
     return <LoadingIndicator />;
@@ -343,8 +366,10 @@ function StepLog({
   const isEstimate = logData?.isEstimate || false;
 
   const rawLines = content ? content.split('\n') : ['<No log output>'];
-  const lines = rawLines[rawLines.length - 1] === '' ? rawLines.slice(0, -1) : rawLines;
-  const effectiveTotalLines = (totalLines - lines.length <= 1) ? lines.length : totalLines;
+  const lines =
+    rawLines[rawLines.length - 1] === '' ? rawLines.slice(0, -1) : rawLines;
+  const effectiveTotalLines =
+    totalLines - lines.length <= 1 ? lines.length : totalLines;
 
   const totalPages = calculateTotalPages(effectiveTotalLines, pageSize);
 
@@ -412,7 +437,9 @@ function StepLog({
               <span className="text-xs text-muted-foreground">Wrap</span>
               <Switch
                 checked={preferences.logWrap}
-                onCheckedChange={(checked) => updatePreference('logWrap', checked)}
+                onCheckedChange={(checked) =>
+                  updatePreference('logWrap', checked)
+                }
               />
             </div>
 
@@ -538,7 +565,9 @@ function StepLog({
             </div>
           </div>
         )}
-        <pre className={`h-full font-mono text-sm text-foreground log-content ${preferences.logWrap ? '' : 'min-w-max'}`}>
+        <pre
+          className={`h-full font-mono text-sm text-foreground log-content ${preferences.logWrap ? '' : 'min-w-max'}`}
+        >
           {lines.map((line, index) => (
             <div key={index} className="flex pr-2 py-0.5">
               <span
@@ -547,7 +576,9 @@ function StepLog({
               >
                 {getLineNumber(index)}
               </span>
-              <span className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}>
+              <span
+                className={`flex-grow select-text cursor-text ${preferences.logWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}`}
+              >
                 {line || ' '}
               </span>
             </div>

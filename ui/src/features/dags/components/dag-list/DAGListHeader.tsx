@@ -9,8 +9,8 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { Wand2 } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { RefreshButton } from '../../../../components/ui/refresh-button';
-import Title from '../../../../ui/Title';
+import { RefreshButton } from '@/components/ui/refresh-button';
+import Title from '@/components/ui/title';
 import { CreateDAGButton } from '../common';
 
 interface DAGListHeaderProps {

@@ -129,7 +129,7 @@ function Content({ navbarColor, children }: LayoutProps) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar - Desktop - GCP Style */}
+      {/* Sidebar - Desktop - Developer-tool */}
       <aside
         className={cn(
           'hidden md:block h-full border-r border-border z-20',
@@ -153,7 +153,7 @@ function Content({ navbarColor, children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main Content Area - GCP Style */}
+      {/* Main Content Area - Developer-tool */}
       <div className="flex flex-col flex-1 h-full overflow-hidden relative bg-background">
         {/* Mobile Header Bar - Minimal Design */}
         <header
@@ -200,7 +200,7 @@ function Content({ navbarColor, children }: LayoutProps) {
         </main>
       </div>
 
-      {/* Mobile Sidebar - Overlay - GCP Style */}
+      {/* Mobile Sidebar - Overlay - Developer-tool */}
       {isMobileSidebarOpen && (
         <div
           className="fixed inset-0 bg-background/60 z-50 md:hidden flex backdrop-blur-sm"
@@ -219,7 +219,10 @@ function Content({ navbarColor, children }: LayoutProps) {
               <span
                 className={cn(
                   'font-semibold whitespace-normal leading-tight',
-                  getResponsiveTitleClass(config.title || 'Dagu', 'sidebar-mobile')
+                  getResponsiveTitleClass(
+                    config.title || 'Dagu',
+                    'sidebar-mobile'
+                  )
                 )}
               >
                 {config.title || 'Dagu'}

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v1/schema';
-import Mermaid from '../../../../ui/Mermaid';
+import Mermaid from '@/components/ui/mermaid';
 
 /**
  * Escapes special characters in labels for safe Mermaid syntax interpolation.
@@ -207,7 +207,8 @@ function Graph({
       const isSubDAGRun = !!step.call;
       const hasParallelExecutions = !!step.parallel;
       // Check if this is a router step
-      const isRouterStep = step.executorConfig?.type === 'router' || !!step.router;
+      const isRouterStep =
+        step.executorConfig?.type === 'router' || !!step.router;
 
       // Add indicator for sub dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
@@ -303,16 +304,16 @@ function Graph({
 
     // Unified status colors
     const statusColors = {
-      none: '#5f6368',      // neutral gray
-      running: '#81c784',   // light green (distinct from success)
-      retrying: '#e37400',  // warning amber for scheduled backoff
-      done: '#1e8e3e',      // success green
-      error: '#d93025',     // error red
-      cancel: '#d946ef',    // pink/magenta for aborted
-      skipped: '#5f6368',   // neutral gray
-      partial: '#e37400',   // warning amber
-      waiting: '#e37400',   // warning amber
-      rejected: '#d93025',  // error red
+      none: '#5f6368', // neutral gray
+      running: '#81c784', // light green (distinct from success)
+      retrying: '#e37400', // warning amber for scheduled backoff
+      done: '#1e8e3e', // success green
+      error: '#d93025', // error red
+      cancel: '#d946ef', // pink/magenta for aborted
+      skipped: '#5f6368', // neutral gray
+      partial: '#e37400', // warning amber
+      waiting: '#e37400', // warning amber
+      rejected: '#d93025', // error red
     };
 
     dat.push(

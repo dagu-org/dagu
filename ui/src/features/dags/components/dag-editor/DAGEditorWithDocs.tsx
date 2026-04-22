@@ -8,7 +8,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { JSONSchema } from '@/lib/schema-utils';
-import { Button } from '../../../../components/ui/button';
+import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useYamlCursorPath } from '../../../../hooks/useYamlCursorPath';
 import DAGEditor, { type CursorPosition } from './DAGEditor';

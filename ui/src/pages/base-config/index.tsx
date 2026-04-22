@@ -1,8 +1,8 @@
 import { RotateCcw, Save } from 'lucide-react';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Button } from '../../components/ui/button';
-import { useErrorModal } from '../../components/ui/error-modal';
-import { useSimpleToast } from '../../components/ui/simple-toast';
+import { Button } from '@/components/ui/button';
+import { useErrorModal } from '@/components/ui/error-modal';
+import { useSimpleToast } from '@/components/ui/simple-toast';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useConfig } from '../../contexts/ConfigContext';
 import DAGEditorWithDocs from '../../features/dags/components/dag-editor/DAGEditorWithDocs';

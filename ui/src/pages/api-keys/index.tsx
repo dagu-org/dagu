@@ -18,7 +18,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY, useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { KeyRound, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { APIKeyFormModal } from './APIKeyFormModal';

@@ -76,7 +76,7 @@ function getTitleInitial(title: string): string {
   return title.charAt(0).toUpperCase();
 }
 
-// GCP-Style Active States - Clean & Minimal
+// Developer-tool Active States - Clean & Minimal
 function getActiveIndicatorStyle(customColor: boolean): string {
   return customColor ? 'bg-white' : 'bg-sidebar-primary';
 }
@@ -86,7 +86,7 @@ function getActiveLinkStyle(customColor: boolean): string {
 }
 
 function getActiveIconStyle(customColor: boolean): string {
-  return customColor ? 'text-foreground' : 'text-sidebar-primary';
+  return customColor ? 'text-sidebar-foreground' : 'text-sidebar-primary';
 }
 
 function getIconWrapperStyle(customColor: boolean): string {
@@ -118,7 +118,7 @@ type SectionLabelProps = {
   customColor?: boolean;
 };
 
-// GCP-Style Section Labels - Subtle & Professional
+// Developer-tool Section Labels - Subtle & Professional
 function SectionLabel({
   label,
   isOpen,
@@ -150,7 +150,7 @@ type SidebarButtonProps = {
   customColor: boolean;
 };
 
-// GCP-Style Sidebar Button - Clean & Minimal
+// Developer-tool Sidebar Button - Clean & Minimal
 function SidebarButton({
   onClick,
   icon,
@@ -165,11 +165,11 @@ function SidebarButton({
       style={{ transition: 'background-color 150ms ease' }}
       title={isOpen ? '' : label}
     >
-      <div className="flex items-center justify-center flex-shrink-0 text-sidebar-foreground group-hover:text-foreground">
+      <div className="flex items-center justify-center flex-shrink-0 text-sidebar-foreground">
         {icon}
       </div>
       <span
-        className="text-sm font-medium text-sidebar-foreground group-hover:text-foreground whitespace-nowrap overflow-hidden"
+        className="text-sm font-medium text-sidebar-foreground whitespace-nowrap overflow-hidden"
         style={{
           transition:
             'opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1), max-width 280ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -184,7 +184,7 @@ function SidebarButton({
   );
 }
 
-// GCP-Style Navigation Item - Clean Active States with Left Border
+// Developer-tool Navigation Item - Clean Active States with Left Border
 function NavItem({
   to,
   icon,
@@ -203,14 +203,12 @@ function NavItem({
     'h-9 gap-3',
     isActive
       ? getActiveLinkStyle(customColor)
-      : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+      : 'text-sidebar-foreground hover:bg-sidebar-hover'
   );
 
   const iconClassName = cn(
     'flex items-center justify-center flex-shrink-0',
-    isActive
-      ? getActiveIconStyle(customColor)
-      : 'text-sidebar-foreground group-hover:text-foreground'
+    isActive ? getActiveIconStyle(customColor) : 'text-sidebar-foreground'
   );
 
   return (
@@ -236,9 +234,7 @@ function NavItem({
         <span
           className={cn(
             'text-sm font-medium whitespace-nowrap overflow-hidden',
-            isActive
-              ? 'text-foreground'
-              : 'text-sidebar-foreground group-hover:text-foreground'
+            isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground'
           )}
           style={{
             transition:
@@ -309,14 +305,12 @@ function NavGroup({
     'h-9 gap-3',
     isChildActive && !effectivelyExpanded
       ? getActiveLinkStyle(customColor)
-      : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+      : 'text-sidebar-foreground hover:bg-sidebar-hover'
   );
 
   const iconClassName = cn(
     'flex items-center justify-center flex-shrink-0',
-    isChildActive
-      ? getActiveIconStyle(customColor)
-      : 'text-sidebar-foreground group-hover:text-foreground'
+    isChildActive ? getActiveIconStyle(customColor) : 'text-sidebar-foreground'
   );
 
   return (
@@ -345,8 +339,8 @@ function NavGroup({
             className={cn(
               'text-sm font-medium whitespace-nowrap overflow-hidden',
               isChildActive
-                ? 'text-foreground'
-                : 'text-sidebar-foreground group-hover:text-foreground'
+                ? 'text-sidebar-foreground'
+                : 'text-sidebar-foreground'
             )}
             style={{
               transition:
@@ -421,7 +415,7 @@ export const mainListItems = React.forwardRef<
 
   return (
     <div ref={ref} className="flex flex-col h-full">
-      {/* GCP-Style Header - Clean & Minimal */}
+      {/* Developer-tool Header - Clean & Minimal */}
       <div className="h-14 relative mb-4 flex items-center border-b border-sidebar-border px-1">
         <button
           onClick={onToggle}
@@ -429,7 +423,7 @@ export const mainListItems = React.forwardRef<
             'h-9 px-2 rounded-md flex-shrink-0 flex items-center justify-center',
             customColor
               ? 'hover:opacity-70'
-              : 'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-hover'
+              : 'text-sidebar-foreground hover:bg-sidebar-hover'
           )}
           style={{ transition: 'background-color 150ms ease' }}
           aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
@@ -463,7 +457,7 @@ export const mainListItems = React.forwardRef<
         </button>
         <span
           className={cn(
-            'font-semibold tracking-tight text-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
+            'font-semibold tracking-tight text-sidebar-foreground select-none whitespace-nowrap leading-tight ml-1 overflow-hidden',
             getResponsiveTitleClass(title, 'sidebar-expanded')
           )}
           style={{
@@ -478,7 +472,7 @@ export const mainListItems = React.forwardRef<
         </span>
       </div>
 
-      {/* GCP-Style Navigation - Compact Spacing */}
+      {/* Developer-tool Navigation - Compact Spacing */}
       <nav className="flex-1 flex flex-col gap-4">
         <AppBarContext.Consumer>
           {(context) => {
@@ -807,7 +801,7 @@ export const mainListItems = React.forwardRef<
         </div>
       </nav>
 
-      {/* GCP-Style Footer - Clean Controls */}
+      {/* Developer-tool Footer - Clean Controls */}
       <div className="mt-auto pt-3 border-t border-sidebar-border flex flex-col gap-2">
         <div
           className={cn(

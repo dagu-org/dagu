@@ -1,4 +1,4 @@
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 
 interface ForgetDialogProps {
   open: boolean;
@@ -25,7 +25,9 @@ export function ForgetDialog({
     >
       <p className="text-sm text-muted-foreground">
         Remove{' '}
-        <span className="font-mono font-medium text-foreground break-all">{itemId}</span>{' '}
+        <span className="font-mono font-medium text-foreground break-all">
+          {itemId}
+        </span>{' '}
         from sync tracking? This does not delete the file from the remote
         repository.
       </p>

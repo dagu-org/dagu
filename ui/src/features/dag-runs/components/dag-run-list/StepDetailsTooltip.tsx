@@ -4,7 +4,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '../../../../components/ui/tooltip';
+} from '@/components/ui/tooltip';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { isAbortLikeError } from '../../../../lib/requestTimeout';
 import {
@@ -76,7 +76,9 @@ export function StepDetailsTooltip({
   const [details, setDetails] = React.useState<DAGRunDetails | null>(null);
   const [error, setError] = React.useState<Error | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
-  const fetchTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const controllerRef = React.useRef<AbortController | null>(null);
 
   const canRequestDetails = Boolean(dagRun.name && dagRun.dagRunId);
@@ -203,11 +205,7 @@ export function StepDetailsTooltip({
           <>
             {hasStepData ? (
               <>
-                {renderStepList(
-                  'Running steps',
-                  runningSteps,
-                  'text-success'
-                )}
+                {renderStepList('Running steps', runningSteps, 'text-success')}
                 {renderStepList(
                   'Retrying steps',
                   retryingSteps,

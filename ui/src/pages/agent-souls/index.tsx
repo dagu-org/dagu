@@ -24,7 +24,7 @@ import { useIsAdmin } from '@/contexts/AuthContext';
 import { useClient, useQuery } from '@/hooks/api';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { DAGPagination } from '@/features/dags/components/common';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 
 type SoulResponse = components['schemas']['SoulResponse'];
 
@@ -60,7 +60,9 @@ export default function AgentSoulsPage(): React.ReactNode {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await client.GET('/settings/agent', { params: { query: { remoteNode } } });
+        const { data } = await client.GET('/settings/agent', {
+          params: { query: { remoteNode } },
+        });
         if (data) setDefaultSoulId(data.selectedSoulId ?? undefined);
       } catch {
         // Best-effort fetch
@@ -92,21 +94,28 @@ export default function AgentSoulsPage(): React.ReactNode {
         params: { query: { remoteNode } },
         body: { selectedSoulId: soul.id },
       });
-      if (apiError) throw new Error(apiError.message || 'Failed to set default soul');
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to set default soul');
       setDefaultSoulId(data.selectedSoulId ?? undefined);
       setSuccess(`"${soul.name}" is now the default soul`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to set default soul');
+      setError(
+        err instanceof Error ? err.message : 'Failed to set default soul'
+      );
     }
   }
 
   async function handleDeleteSoul(): Promise<void> {
     if (!deletingSoul) return;
     try {
-      const { error: apiError } = await client.DELETE('/settings/agent/souls/{soulId}', {
-        params: { path: { soulId: deletingSoul.id }, query: { remoteNode } },
-      });
-      if (apiError) throw new Error(apiError.message || 'Failed to delete soul');
+      const { error: apiError } = await client.DELETE(
+        '/settings/agent/souls/{soulId}',
+        {
+          params: { path: { soulId: deletingSoul.id }, query: { remoteNode } },
+        }
+      );
+      if (apiError)
+        throw new Error(apiError.message || 'Failed to delete soul');
       setDeletingSoul(null);
       setSuccess(`Soul "${deletingSoul.name}" deleted`);
       await mutate();
@@ -134,7 +143,11 @@ export default function AgentSoulsPage(): React.ReactNode {
             Manage personality and identity definitions for the AI agent
           </p>
         </div>
-        <Button onClick={() => navigate('/agent-souls/new')} size="sm" className="h-8">
+        <Button
+          onClick={() => navigate('/agent-souls/new')}
+          size="sm"
+          className="h-8"
+        >
           <Plus className="h-4 w-4 mr-1.5" />
           Create Soul
         </Button>
@@ -182,15 +195,14 @@ export default function AgentSoulsPage(): React.ReactNode {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {souls.map((soul) => (
-            <div
-              key={soul.id}
-              className="card-obsidian p-4 space-y-3"
-            >
+            <div key={soul.id} className="card-obsidian p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-medium truncate">{soul.name}</h3>
                   <div className="flex items-center gap-1.5">
-                    <code className="text-xs text-muted-foreground">{soul.id}</code>
+                    <code className="text-xs text-muted-foreground">
+                      {soul.id}
+                    </code>
                     {soul.id === defaultSoulId && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
                         Default
@@ -213,7 +225,9 @@ export default function AgentSoulsPage(): React.ReactNode {
                         <Star className="h-4 w-4 mr-2" />
                         Set as Default
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate(`/agent-souls/${soul.id}`)}>
+                      <DropdownMenuItem
+                        onClick={() => navigate(`/agent-souls/${soul.id}`)}
+                      >
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
@@ -234,7 +248,6 @@ export default function AgentSoulsPage(): React.ReactNode {
                   {soul.description}
                 </p>
               )}
-
             </div>
           ))}
         </div>

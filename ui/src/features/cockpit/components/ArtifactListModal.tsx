@@ -14,7 +14,7 @@ import {
 } from '@/features/dag-runs/hooks/dagRunDetailsRequest';
 import ArtifactsTab from '@/features/dags/components/artifacts/ArtifactsTab';
 import { cn } from '@/lib/utils';
-import LoadingIndicator from '@/ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 const CLOSE_ANIMATION_MS = 200;

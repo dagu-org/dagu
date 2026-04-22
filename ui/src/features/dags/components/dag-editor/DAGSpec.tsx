@@ -10,16 +10,16 @@ import { useCanWriteForWorkspace } from '@/contexts/AuthContext';
 import { StepDetails } from '@/features/dags/components/step-details';
 import { cn, toMermaidNodeId } from '@/lib/utils';
 import { workspaceNameFromLabels } from '@/lib/workspace';
-import BorderedBox from '@/ui/BorderedBox';
+import BorderedBox from '@/components/ui/bordered-box';
 import { AlertTriangle, MousePointerClick, Save, Undo2, X } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useCookies } from 'react-cookie';
 import { createPortal } from 'react-dom';
 import { components } from '../../../../api/v1/schema';
-import { Button } from '../../../../components/ui/button';
-import { useErrorModal } from '../../../../components/ui/error-modal';
-import { useSimpleToast } from '../../../../components/ui/simple-toast';
-import { Tab, Tabs } from '../../../../components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { useErrorModal } from '@/components/ui/error-modal';
+import { useSimpleToast } from '@/components/ui/simple-toast';
+import { Tab, Tabs } from '@/components/ui/tabs';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useSchema } from '../../../../contexts/SchemaContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
@@ -30,7 +30,7 @@ import {
   sseFallbackOptions,
   useSSECacheSync,
 } from '../../../../hooks/useSSECacheSync';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStepTable } from '../dag-details';
 import { FlowchartType, Graph } from '../visualization';
@@ -144,7 +144,7 @@ function DAGSpec({ fileName, localDags, editorHints }: Props) {
           dag: next.dag,
           errors: next.errors ?? [],
           spec: next.spec,
-      }
+        }
   );
 
   const dagWorkspaceName = React.useMemo(
@@ -684,16 +684,17 @@ function SpecStepDetailsDrawer({
         return;
       }
 
-      const focusableElements = drawerRef.current?.querySelectorAll<HTMLElement>(
-        [
-          'a[href]',
-          'button:not([disabled])',
-          'textarea:not([disabled])',
-          'input:not([disabled])',
-          'select:not([disabled])',
-          '[tabindex]:not([tabindex="-1"])',
-        ].join(',')
-      );
+      const focusableElements =
+        drawerRef.current?.querySelectorAll<HTMLElement>(
+          [
+            'a[href]',
+            'button:not([disabled])',
+            'textarea:not([disabled])',
+            'input:not([disabled])',
+            'select:not([disabled])',
+            '[tabindex]:not([tabindex="-1"])',
+          ].join(',')
+        );
       if (!focusableElements || focusableElements.length === 0) {
         event.preventDefault();
         return;

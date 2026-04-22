@@ -1,4 +1,4 @@
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 
 interface CleanupDialogProps {
   open: boolean;

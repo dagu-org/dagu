@@ -27,7 +27,7 @@ import { AppBarContext } from '../../../contexts/AppBarContext';
 import { useConfig } from '../../../contexts/ConfigContext';
 import { useClient } from '../../../hooks/api';
 import { cn, toMermaidNodeId } from '../../../lib/utils';
-import BorderedBox from '../../../ui/BorderedBox';
+import BorderedBox from '@/components/ui/bordered-box';
 import { DAGRunOutputs } from '../../dag-runs/components/dag-run-details';
 import { DAGContext } from '../contexts/DAGContext';
 import { getEventHandlers } from '../lib/getEventHandlers';
@@ -279,7 +279,8 @@ function DAGStatus({
           searchParams.set('step', node.step.name);
 
           // Determine root DAG name
-          const rootDAGName = displayDAGRun.rootDAGRunName || displayDAGRun.name;
+          const rootDAGName =
+            displayDAGRun.rootDAGRunName || displayDAGRun.name;
           url = `/dag-runs/${rootDAGName}/${dagRunId}?${searchParams.toString()}`;
         } else {
           // For DAGs, use the existing approach with query parameters
@@ -356,8 +357,7 @@ function DAGStatus({
   // Check if there are any steps awaiting approval
   const waitingStepCount =
     displayDAGRun.nodes?.filter((node) => node.status === NodeStatus.Waiting)
-      .length ||
-    0;
+      .length || 0;
   const hasWaitingSteps = waitingStepCount > 0;
   const hasArtifacts = artifactEnabled || !!displayDAGRun.artifactsAvailable;
 

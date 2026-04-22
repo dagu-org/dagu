@@ -11,7 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import React from 'react';
 import { components, NodeStatus } from '../../../../api/v1/schema';
@@ -119,9 +119,10 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
               ref={successButtonRef}
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
-                ${selectedButton === 0 
-                  ? 'border-success bg-success-muted' 
-                  : 'border-border hover:border-success hover:bg-success-muted'
+                ${
+                  selectedButton === 0
+                    ? 'border-success bg-success-muted'
+                    : 'border-border hover:border-success hover:bg-success-muted'
                 }
               `}
               onClick={() => submitStatus(NodeStatus.Success)}
@@ -137,9 +138,10 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
               ref={failedButtonRef}
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
-                ${selectedButton === 1 
-                  ? 'border-error bg-error-muted' 
-                  : 'border-border hover:border-error hover:bg-error-muted'
+                ${
+                  selectedButton === 1
+                    ? 'border-error bg-error-muted'
+                    : 'border-border hover:border-error hover:bg-error-muted'
                 }
               `}
               onClick={() => submitStatus(NodeStatus.Failed)}

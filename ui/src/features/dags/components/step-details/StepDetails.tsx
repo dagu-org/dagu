@@ -3,7 +3,7 @@
 
 import { components } from '@/api/v1/schema';
 import { Badge } from '@/components/ui/badge';
-import BorderedBox from '@/ui/BorderedBox';
+import BorderedBox from '@/components/ui/bordered-box';
 import React from 'react';
 
 type Step = components['schemas']['Step'];
@@ -129,7 +129,10 @@ function renderStepFieldValue(name: string, value: unknown): React.ReactNode {
   if (typeof value === 'string') {
     if (name === 'script' || value.includes('\n') || value.length > 120) {
       return (
-        <CodeBlock value={value} language={name === 'script' ? 'shell' : 'text'} />
+        <CodeBlock
+          value={value}
+          language={name === 'script' ? 'shell' : 'text'}
+        />
       );
     }
     return <div className="break-words text-sm text-foreground">{value}</div>;
@@ -189,13 +192,16 @@ function ObjectFieldCard({ value }: { value: unknown }) {
   );
 }
 
-function renderNestedFieldValue(
-  name: string,
-  value: unknown
-): React.ReactNode {
-  if (typeof value === 'string' && (value.includes('\n') || value.length > 120)) {
+function renderNestedFieldValue(name: string, value: unknown): React.ReactNode {
+  if (
+    typeof value === 'string' &&
+    (value.includes('\n') || value.length > 120)
+  ) {
     return (
-      <CodeBlock value={value} language={name === 'script' ? 'shell' : 'text'} />
+      <CodeBlock
+        value={value}
+        language={name === 'script' ? 'shell' : 'text'}
+      />
     );
   }
   if (isPlainObject(value) || Array.isArray(value)) {
@@ -281,10 +287,7 @@ function highlightShellLine(line: string): React.ReactNode[] {
   return splitShellSegments(line).flatMap((segment, segmentIndex) => {
     if (segment.type === 'comment') {
       return (
-        <span
-          key={`${segmentIndex}-comment`}
-          className="text-slate-500"
-        >
+        <span key={`${segmentIndex}-comment`} className="text-slate-500">
           {segment.text}
         </span>
       );
@@ -396,7 +399,8 @@ function hasMeaningfulValue(value: unknown): boolean {
   if (value == null) return false;
   if (typeof value === 'string') return value.trim().length > 0;
   if (typeof value === 'boolean') return true;
-  if (Array.isArray(value)) return value.some((item) => hasMeaningfulValue(item));
+  if (Array.isArray(value))
+    return value.some((item) => hasMeaningfulValue(item));
   if (isPlainObject(value)) {
     return Object.values(value).some((item) => hasMeaningfulValue(item));
   }

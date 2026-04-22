@@ -9,12 +9,7 @@ import {
   YAxis,
 } from 'recharts';
 import { components } from '../../../api/v1/schema';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '../../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatBytes } from '../../../lib/formatBytes';
 
 type MetricPoint = components['schemas']['MetricPoint'];
@@ -129,7 +124,10 @@ function ResourceChart({
                 }}
                 itemStyle={{ color: 'var(--foreground)' }}
                 labelStyle={{ color: 'var(--muted-foreground)' }}
-                formatter={(value: number | string) => [`${Number(value).toFixed(1)}${unit}`, title]}
+                formatter={(value: number | string) => [
+                  `${Number(value).toFixed(1)}${unit}`,
+                  title,
+                ]}
               />
               <Area
                 type="monotone"

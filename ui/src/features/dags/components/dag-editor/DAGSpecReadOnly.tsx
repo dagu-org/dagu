@@ -31,7 +31,7 @@ import {
 } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useClient, useQuery } from '../../../../hooks/api';
-import ConfirmModal from '../../../../ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import Graph, { type FlowchartType } from '../visualization/Graph';
 import DAGEditorWithDocs from './DAGEditorWithDocs';
 

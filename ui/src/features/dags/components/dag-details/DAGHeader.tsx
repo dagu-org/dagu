@@ -1,19 +1,12 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import {
-  Calendar,
-  Check,
-  Copy,
-  RefreshCw,
-  Server,
-  Timer,
-} from 'lucide-react';
+import { Calendar, Check, Copy, RefreshCw, Server, Timer } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
-import StatusChip from '../../../../ui/StatusChip';
+import StatusChip from '@/components/ui/status-chip';
 import AutoRetryBadge from '../../../dag-runs/components/common/AutoRetryBadge';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import { DAGActions } from '../common';
@@ -175,18 +168,19 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
           {/* Breadcrumb navigation */}
           {dagRunToDisplay && (
             <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground mb-2">
-              {dagRunToDisplay.rootDAGRunId && dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
-                <>
-                  <a
-                    href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
-                    onClick={handleRootDAGRunClick}
-                    className="text-primary hover:text-primary hover:underline transition-colors font-medium"
-                  >
-                    {dagRunToDisplay.rootDAGRunName}
-                  </a>
-                  <span className="text-muted-foreground mx-1">/</span>
-                </>
-              )}
+              {dagRunToDisplay.rootDAGRunId &&
+                dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
+                  <>
+                    <a
+                      href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
+                      onClick={handleRootDAGRunClick}
+                      className="text-primary hover:text-primary hover:underline transition-colors font-medium"
+                    >
+                      {dagRunToDisplay.rootDAGRunName}
+                    </a>
+                    <span className="text-muted-foreground mx-1">/</span>
+                  </>
+                )}
 
               {dagRunToDisplay.parentDAGRunName &&
                 dagRunToDisplay.parentDAGRunId &&

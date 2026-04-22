@@ -12,10 +12,18 @@ import {
 } from '@/components/ui/tooltip';
 import { isHarnessStep } from '@/lib/harness-step';
 import { getExecutorCommand } from '@/lib/executor-utils';
-import { ArrowRight, Code, Folder, GitBranch, GitFork, Mail, RefreshCw } from 'lucide-react';
+import {
+  ArrowRight,
+  Code,
+  Folder,
+  GitBranch,
+  GitFork,
+  Mail,
+  RefreshCw,
+} from 'lucide-react';
 import { components } from '../../../../api/v1/schema';
-import { Badge } from '../../../../components/ui/badge';
-import { TableCell, TableRow } from '../../../../components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { TableCell, TableRow } from '@/components/ui/table';
 import HarnessStepSummary from './HarnessStepSummary';
 
 /**
@@ -39,9 +47,7 @@ function DAGStepTableRow({ step, index }: Props) {
       key={index}
       className="flex items-center gap-1.5 mb-1 text-xs bg-muted rounded-md p-1.5"
     >
-      <span className="font-medium text-foreground/90">
-        {c.condition}
-      </span>
+      <span className="font-medium text-foreground/90">{c.condition}</span>
       <span className="text-muted-foreground">=&gt;</span>
       <span className="text-foreground/90">{c.expected}</span>
     </div>
@@ -84,13 +90,20 @@ function DAGStepTableRow({ step, index }: Props) {
               <div className="flex items-center gap-1.5 text-xs">
                 <GitFork className="h-3.5 w-3.5 text-info" />
                 <span className="font-medium">Router:</span>
-                <code className="bg-muted px-1 rounded">{step.router.value}</code>
+                <code className="bg-muted px-1 rounded">
+                  {step.router.value}
+                </code>
               </div>
               {step.router.routes && (
                 <div className="text-xs bg-muted/50 rounded p-1.5 space-y-0.5">
                   {step.router.routes.map((route, idx) => (
-                    <div key={idx} className="flex items-center gap-1 font-mono">
-                      <span className="text-muted-foreground">{route.pattern}</span>
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1 font-mono"
+                    >
+                      <span className="text-muted-foreground">
+                        {route.pattern}
+                      </span>
                       <span className="text-muted-foreground">→</span>
                       <span>{route.targets?.join(', ')}</span>
                     </div>
@@ -177,7 +190,9 @@ function DAGStepTableRow({ step, index }: Props) {
             ))}
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground leading-tight">None</span>
+          <span className="text-xs text-muted-foreground leading-tight">
+            None
+          </span>
         )}
       </TableCell>
 
@@ -231,10 +246,7 @@ function DAGStepTableRow({ step, index }: Props) {
                   </span>
                   {step.repeatPolicy.condition.expected && (
                     <>
-                      <span className="text-muted-foreground">
-                        {' '}
-                        ={' '}
-                      </span>
+                      <span className="text-muted-foreground"> = </span>
                       <span className="text-success">
                         {step.repeatPolicy.condition.expected}
                       </span>
@@ -247,9 +259,7 @@ function DAGStepTableRow({ step, index }: Props) {
               {step.repeatPolicy.exitCode &&
                 step.repeatPolicy.exitCode.length > 0 && (
                   <div className="text-xs bg-muted rounded px-1.5 py-0.5">
-                    <span className="text-muted-foreground">
-                      exit codes:
-                    </span>{' '}
+                    <span className="text-muted-foreground">exit codes:</span>{' '}
                     <span className="font-mono text-warning">
                       [{step.repeatPolicy.exitCode.join(', ')}]
                     </span>
@@ -262,9 +272,7 @@ function DAGStepTableRow({ step, index }: Props) {
           {step.mailOnError && (
             <div className="flex items-center gap-1.5 text-xs bg-error-muted rounded-md px-1.5 py-0.5 w-fit">
               <Mail className="h-3.5 w-3.5 text-error" />
-              <span className="font-medium text-error">
-                Mail on Error
-              </span>
+              <span className="font-medium text-error">Mail on Error</span>
             </div>
           )}
 
@@ -308,7 +316,9 @@ function DAGStepTableRow({ step, index }: Props) {
         {preconditions && preconditions.length > 0 ? (
           <div className="space-y-1">{preconditions}</div>
         ) : (
-          <span className="text-xs text-muted-foreground leading-tight">None</span>
+          <span className="text-xs text-muted-foreground leading-tight">
+            None
+          </span>
         )}
       </TableCell>
     </TableRow>

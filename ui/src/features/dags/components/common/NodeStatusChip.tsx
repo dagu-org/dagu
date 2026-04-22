@@ -5,7 +5,7 @@
  */
 import { cn } from '@/lib/utils';
 import { getStatusClass, isActiveNodeStatus } from '@/lib/status-utils';
-import MatrixText from '@/ui/MatrixText';
+import MatrixText from '@/components/ui/matrix-text';
 import React, { useEffect, useState } from 'react';
 import { NodeStatus } from '../../../../api/v1/schema';
 

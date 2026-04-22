@@ -6,10 +6,15 @@ interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-// GCP-Style Tabs Container
 function Tabs({ className, children, ...props }: Omit<TabsProps, 'value'>) {
   return (
-    <div className={cn('inline-flex items-center border-b border-border', className)} {...props}>
+    <div
+      className={cn(
+        'inline-flex items-center border-b border-border',
+        className
+      )}
+      {...props}
+    >
       {children}
     </div>
   );
@@ -21,7 +26,6 @@ interface TabProps extends React.HTMLAttributes<HTMLElement> {
   asChild?: boolean;
 }
 
-// GCP-Style Tab - Clean with Bottom Border Indicator
 function Tab({
   className,
   isActive,

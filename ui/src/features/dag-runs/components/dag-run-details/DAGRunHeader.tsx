@@ -1,12 +1,19 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Calendar, FileText, RefreshCw, Server, Terminal, Timer } from 'lucide-react';
+import {
+  Calendar,
+  FileText,
+  RefreshCw,
+  Server,
+  Terminal,
+  Timer,
+} from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
-import StatusChip from '../../../../ui/StatusChip';
+import StatusChip from '@/components/ui/status-chip';
 import AutoRetryBadge from '../common/AutoRetryBadge';
 import { DAGRunActions } from '../common';
 
@@ -144,7 +151,9 @@ const DAGRunHeader: React.FC<DAGRunHeaderProps> = ({ dagRun, refreshFn }) => {
                 href={`/dags/${encodeURIComponent(dagRun.sourceFileName)}/`}
                 onClick={(e) => {
                   e.preventDefault();
-                  navigate(`/dags/${encodeURIComponent(dagRun.sourceFileName!)}/`);
+                  navigate(
+                    `/dags/${encodeURIComponent(dagRun.sourceFileName!)}/`
+                  );
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                 title="View DAG Definition"

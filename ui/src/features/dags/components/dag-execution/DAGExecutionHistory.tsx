@@ -23,7 +23,7 @@ import {
   useSSECacheSync,
 } from '../../../../hooks/useSSECacheSync';
 import { toMermaidNodeId } from '../../../../lib/utils';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
 import { updateDAGRunsNodeStatus } from '../../lib/nodeStatus';
@@ -474,9 +474,7 @@ function DAGHistoryTable({
                   setLogViewer((prev) => ({ ...prev, isOpen: false }))
                 }
                 logType={logViewer.logType}
-                dagName={
-                  selectedDAGRun.name
-                }
+                dagName={selectedDAGRun.name}
                 dagRunId={logViewer.dagRunId}
                 stepName={logViewer.stepName}
                 dagRun={selectedDAGRun}

@@ -29,7 +29,7 @@ import {
   workspaceSelectionKey,
   workspaceSelectionQuery,
 } from '../../lib/workspace';
-import LoadingIndicator from '../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 
 type DAGDefinitionsFilters = {
   searchText: string;
