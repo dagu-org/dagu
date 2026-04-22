@@ -1148,6 +1148,7 @@ func (a *API) UpdateDAGRunStepStatus(ctx context.Context, request api.UpdateDAGR
 	}
 
 	dagStatus.Nodes[stepIdx].Status = nodeStatusMapping[request.Body.Status]
+	dagStatus.Status = deriveManualDAGRunStatus(dagStatus.Nodes, dagStatus.Status)
 
 	if err := a.updateDAGRunStatus(ctx, ref, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
@@ -2277,6 +2278,7 @@ func (a *API) UpdateSubDAGRunStepStatus(ctx context.Context, request api.UpdateS
 	}
 
 	dagStatus.Nodes[stepIdx].Status = nodeStatusMapping[request.Body.Status]
+	dagStatus.Status = deriveManualDAGRunStatus(dagStatus.Nodes, dagStatus.Status)
 
 	if err := a.updateDAGRunStatus(ctx, root, *dagStatus); err != nil {
 		return nil, fmt.Errorf("error updating status: %w", err)
@@ -2304,6 +2306,85 @@ var nodeStatusMapping = map[api.NodeStatus]core.NodeStatus{
 	api.NodeStatusWaiting:        core.NodeWaiting,
 	api.NodeStatusRejected:       core.NodeRejected,
 	api.NodeStatusRetrying:       core.NodeRetrying,
+}
+
+func deriveManualDAGRunStatus(nodes []*exec.Node, fallback core.Status) core.Status {
+	if len(nodes) == 0 {
+		return fallback
+	}
+
+	var (
+		hasRunning              bool
+		hasRetrying             bool
+		hasWaiting              bool
+		hasRejected             bool
+		hasFailed               bool
+		hasUncontinuableFailure bool
+		hasContinuableFailure   bool
+		hasAborted              bool
+		hasPartial              bool
+		hasSuccess              bool
+		hasNotStarted           bool
+	)
+
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		switch node.Status {
+		case core.NodeRunning:
+			hasRunning = true
+		case core.NodeRetrying:
+			hasRetrying = true
+		case core.NodeWaiting:
+			hasWaiting = true
+		case core.NodeRejected:
+			hasRejected = true
+		case core.NodeFailed:
+			hasFailed = true
+			if node.Step.ContinueOn.Failure && !node.Step.ContinueOn.MarkSuccess {
+				hasContinuableFailure = true
+			} else {
+				hasUncontinuableFailure = true
+			}
+		case core.NodeAborted:
+			hasAborted = true
+		case core.NodePartiallySucceeded:
+			hasPartial = true
+			hasSuccess = true
+		case core.NodeSucceeded, core.NodeSkipped:
+			hasSuccess = true
+		case core.NodeNotStarted:
+			hasNotStarted = true
+		}
+	}
+
+	switch {
+	case hasRunning:
+		return core.Running
+	case hasRetrying:
+		return core.Queued
+	case hasWaiting:
+		return core.Waiting
+	case hasRejected:
+		return core.Rejected
+	case hasFailed && hasUncontinuableFailure:
+		return core.Failed
+	case hasFailed && hasContinuableFailure && hasSuccess:
+		return core.PartiallySucceeded
+	case hasFailed:
+		return core.Failed
+	case hasAborted:
+		return core.Aborted
+	case hasPartial:
+		return core.PartiallySucceeded
+	case hasNotStarted && !hasSuccess:
+		return core.NotStarted
+	case hasNotStarted:
+		return core.Running
+	default:
+		return core.Succeeded
+	}
 }
 
 func (a *API) RetryDAGRun(ctx context.Context, request api.RetryDAGRunRequestObject) (api.RetryDAGRunResponseObject, error) {

@@ -24,7 +24,10 @@ type Props = {
   /** Step to update status for */
   step?: components['schemas']['Step'];
   /** Function called when the user submits the status update */
-  onSubmit: (step: components['schemas']['Step'], status: NodeStatus) => void;
+  onSubmit: (
+    step: components['schemas']['Step'],
+    status: NodeStatus
+  ) => void | Promise<void>;
   /** Optional position for the modal (x, y coordinates) */
   position?: { x: number; y: number };
 };
@@ -61,9 +64,9 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
         case 'Enter':
           e.preventDefault();
           if (selectedButton === 0) {
-            onSubmit(step, NodeStatus.Success);
+            void onSubmit(step, NodeStatus.Success);
           } else {
-            onSubmit(step, NodeStatus.Failed);
+            void onSubmit(step, NodeStatus.Failed);
           }
           break;
           
@@ -106,7 +109,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                   : 'border-border hover:border-success hover:bg-success-muted'
                 }
               `}
-              onClick={() => onSubmit(step, NodeStatus.Success)}
+              onClick={() => void onSubmit(step, NodeStatus.Success)}
               onMouseEnter={() => setSelectedButton(0)}
             >
               <div className="flex flex-col items-center gap-2">
@@ -124,7 +127,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                   : 'border-border hover:border-error hover:bg-error-muted'
                 }
               `}
-              onClick={() => onSubmit(step, NodeStatus.Failed)}
+              onClick={() => void onSubmit(step, NodeStatus.Failed)}
               onMouseEnter={() => setSelectedButton(1)}
             >
               <div className="flex flex-col items-center gap-2">

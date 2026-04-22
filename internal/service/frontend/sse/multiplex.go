@@ -248,7 +248,7 @@ func (m *Multiplexer) Context() context.Context {
 
 // createSession creates a multiplexed SSE session and applies the initial topic set.
 func (m *Multiplexer) createSession(ctx context.Context, w http.ResponseWriter, requested []string, lastEventID uint64) (createSessionResult, error) {
-	session, err := newStreamSession(w, m)
+	session, err := newStreamSession(w, m, context.WithoutCancel(ctx))
 	if err != nil {
 		return createSessionResult{}, err
 	}
@@ -671,10 +671,13 @@ func parseTopicList(rawTopics []string) ([]ParsedTopic, error) {
 	return parsed, nil
 }
 
-func newStreamSession(w http.ResponseWriter, mux *Multiplexer) (*streamSession, error) {
+func newStreamSession(w http.ResponseWriter, mux *Multiplexer, fetchCtx context.Context) (*streamSession, error) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return nil, ErrStreamingNotSupported
+	}
+	if fetchCtx == nil {
+		fetchCtx = context.Background()
 	}
 
 	return &streamSession{
@@ -683,6 +686,7 @@ func newStreamSession(w http.ResponseWriter, mux *Multiplexer) (*streamSession, 
 		flusher:           flusher,
 		controller:        http.NewResponseController(w),
 		mux:               mux,
+		fetchCtx:          fetchCtx,
 		topics:            make(map[string]*multiplexTopic),
 		ready:             make(chan struct{}, 1),
 		heartbeatInterval: mux.heartbeatInterval,
@@ -697,6 +701,7 @@ type streamSession struct {
 	flusher           http.Flusher
 	controller        *http.ResponseController
 	mux               *Multiplexer
+	fetchCtx          context.Context
 	heartbeatInterval time.Duration
 	writeBufferSize   int
 	slowClientTimeout time.Duration
@@ -1015,7 +1020,7 @@ type multiplexTopic struct {
 	clientsMu         sync.RWMutex
 	sessions          map[*streamSession]struct{}
 	retiring          bool
-	lastHash          string
+	lastHashBySession map[*streamSession]string
 	lastChangeEventID uint64
 	stopCh            chan struct{}
 	notifyCh          chan struct{}
@@ -1036,18 +1041,19 @@ func newMultiplexTopic(
 	policy.MaxInterval = 30 * time.Second
 
 	return &multiplexTopic{
-		mux:             mux,
-		key:             parsed.Key,
-		topicType:       parsed.Type,
-		identifier:      parsed.Identifier,
-		fetcher:         fetcher,
-		refreshMode:     refreshMode,
-		publishOnWake:   publishOnWake,
-		sessions:        make(map[*streamSession]struct{}),
-		stopCh:          make(chan struct{}),
-		notifyCh:        make(chan struct{}, 1),
-		errorBackoff:    backoff.NewRetrier(policy),
-		currentInterval: mux.watcherBaseInterval,
+		mux:               mux,
+		key:               parsed.Key,
+		topicType:         parsed.Type,
+		identifier:        parsed.Identifier,
+		fetcher:           fetcher,
+		refreshMode:       refreshMode,
+		publishOnWake:     publishOnWake,
+		sessions:          make(map[*streamSession]struct{}),
+		lastHashBySession: make(map[*streamSession]string),
+		stopCh:            make(chan struct{}),
+		notifyCh:          make(chan struct{}, 1),
+		errorBackoff:      backoff.NewRetrier(policy),
+		currentInterval:   mux.watcherBaseInterval,
 	}
 }
 
@@ -1072,6 +1078,7 @@ func (t *multiplexTopic) removeSession(session *streamSession) {
 	t.clientsMu.Lock()
 	defer t.clientsMu.Unlock()
 	delete(t.sessions, session)
+	delete(t.lastHashBySession, session)
 }
 
 func (t *multiplexTopic) sessionCount() int {
@@ -1192,50 +1199,75 @@ func (t *multiplexTopic) poll(forcePublish bool) {
 		return
 	}
 
-	start := time.Now()
-	payload, err := t.fetchPayload(t.mux.ctx)
-	fetchDuration := time.Since(start)
-	if err != nil {
-		interval, _ := t.errorBackoff.Next(err)
-		t.backoffUntil = time.Now().Add(interval)
-		if t.mux.metrics != nil {
-			t.mux.metrics.FetchError(string(t.topicType))
+	t.clientsMu.RLock()
+	sessions := make([]*streamSession, 0, len(t.sessions))
+	for session := range t.sessions {
+		sessions = append(sessions, session)
+	}
+	t.clientsMu.RUnlock()
+
+	var totalFetchDuration time.Duration
+	var successCount int
+	var firstErr error
+
+	for _, session := range sessions {
+		start := time.Now()
+		payload, err := t.fetchPayload(session.fetchCtx)
+		fetchDuration := time.Since(start)
+		totalFetchDuration += fetchDuration
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			if t.mux.metrics != nil {
+				t.mux.metrics.FetchError(string(t.topicType))
+			}
+			continue
 		}
+		successCount++
+
+		hash := computeHash(payload)
+		t.clientsMu.Lock()
+		if _, ok := t.sessions[session]; !ok {
+			t.clientsMu.Unlock()
+			continue
+		}
+		if hash == t.lastHashBySession[session] && !forcePublish {
+			t.clientsMu.Unlock()
+			continue
+		}
+		t.lastHashBySession[session] = hash
+		eventID := t.mux.nextID()
+		t.lastChangeEventID = eventID
+		t.clientsMu.Unlock()
+
+		data, err := buildMessageData(t.key, payload)
+		if err != nil {
+			continue
+		}
+		session.enqueueMessage(t.key, eventID, data)
+	}
+
+	if successCount == 0 && firstErr != nil {
+		interval, _ := t.errorBackoff.Next(firstErr)
+		t.backoffUntil = time.Now().Add(interval)
+		return
+	}
+	if successCount == 0 {
 		return
 	}
 
+	fetchDuration := totalFetchDuration / time.Duration(successCount)
 	if t.mux.metrics != nil {
 		t.mux.metrics.RecordFetchDuration(string(t.topicType), fetchDuration)
 	}
+
 	t.backoffUntil = time.Time{}
 	t.errorBackoff.Reset()
 	t.currentInterval = time.Duration(
 		float64(max(t.mux.watcherBaseInterval, min(intervalMultiplier*fetchDuration, t.mux.watcherMaxInterval)))*smoothingFactor +
 			float64(t.currentInterval)*(1-smoothingFactor),
 	)
-
-	hash := computeHash(payload)
-	t.clientsMu.Lock()
-	if hash == t.lastHash && !forcePublish {
-		t.clientsMu.Unlock()
-		return
-	}
-	t.lastHash = hash
-	eventID := t.mux.nextID()
-	t.lastChangeEventID = eventID
-	sessions := make([]*streamSession, 0, len(t.sessions))
-	for session := range t.sessions {
-		sessions = append(sessions, session)
-	}
-	t.clientsMu.Unlock()
-
-	data, err := buildMessageData(t.key, payload)
-	if err != nil {
-		return
-	}
-	for _, session := range sessions {
-		session.enqueueMessage(t.key, eventID, data)
-	}
 }
 
 func (t *multiplexTopic) sendSnapshot(ctx context.Context, session *streamSession, eventID uint64) error {
@@ -1245,8 +1277,12 @@ func (t *multiplexTopic) sendSnapshot(ctx context.Context, session *streamSessio
 	}
 	hash := computeHash(payload)
 	t.clientsMu.Lock()
+	if _, ok := t.sessions[session]; !ok {
+		t.clientsMu.Unlock()
+		return nil
+	}
+	t.lastHashBySession[session] = hash
 	if t.lastChangeEventID == 0 {
-		t.lastHash = hash
 		t.lastChangeEventID = eventID
 	}
 	t.clientsMu.Unlock()

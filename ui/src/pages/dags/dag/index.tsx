@@ -50,6 +50,7 @@ function DAGDetails() {
   const stepName = searchParams.get('step');
   const subDAGRunId = searchParams.get('subDAGRunId');
   const queriedDAGRunName = searchParams.get('dagRunName');
+  const [trackedDagRunId, setTrackedDagRunId] = useState<string>();
   const remoteNode =
     searchParams.get('remoteNode') ||
     appBarContext.selectedRemoteNode ||
@@ -171,14 +172,15 @@ function DAGDetails() {
 
   // Use dagRunName from URL if available, otherwise use the name from dagData
   const dagRunName = queriedDAGRunName || dagData?.dag?.name || '';
+  const effectiveDAGRunId = dagRunId || trackedDagRunId;
   const dagRunQueryEnabled = Boolean(
-    dagRunName && dagRunId && !subDAGRunId && dagMatchesWorkspace
+    dagRunName && effectiveDAGRunId && !subDAGRunId && dagMatchesWorkspace
   );
 
   // Fetch specific DAG-run data if dagRunId is provided
   const dagRunSSE = useDAGRunSSE(
     dagRunName,
-    dagRunId || '',
+    effectiveDAGRunId || '',
     dagRunQueryEnabled,
     remoteNode
   );
@@ -188,7 +190,7 @@ function DAGDetails() {
       params: {
         path: {
           name: dagRunName,
-          dagRunId: dagRunId || '',
+          dagRunId: effectiveDAGRunId || '',
         },
         query: scopedQuery,
       },
@@ -229,7 +231,7 @@ function DAGDetails() {
     if (subDAGRunId) {
       return subDAGRunResponse?.dagRunDetails;
     }
-    if (dagRunId) {
+    if (effectiveDAGRunId) {
       return dagRunResponse?.dagRunDetails;
     }
     return dagData?.latestDAGRun;
@@ -254,10 +256,29 @@ function DAGDetails() {
     mutateDag();
     if (subDAGRunId) {
       mutateSubDagRun();
-    } else if (dagRunId) {
+    } else if (effectiveDAGRunId) {
       mutateDagRun();
     }
-  }, [mutateDag, mutateDagRun, mutateSubDagRun, dagRunId, subDAGRunId]);
+  }, [
+    mutateDag,
+    mutateDagRun,
+    mutateSubDagRun,
+    effectiveDAGRunId,
+    subDAGRunId,
+  ]);
+
+  const handleRunStarted = useCallback(
+    (nextDAGRunId: string) => {
+      setTrackedDagRunId(nextDAGRunId);
+      navigateToStatusTab();
+      void mutateDag();
+    },
+    [mutateDag, navigateToStatusTab]
+  );
+
+  useEffect(() => {
+    setTrackedDagRunId(undefined);
+  }, [fileName, remoteNode]);
 
   // Determine which DAG-run to display - fallback to latest when specific run is loading
   const displayDAGRun = currentDAGRun || dagData?.latestDAGRun;
@@ -306,6 +327,7 @@ function DAGDetails() {
                   skipHeader={true}
                   localDags={dagData?.localDags}
                   editorHints={dagData?.editorHints}
+                  onRunStarted={handleRunStarted}
                 />
               </>
             )}

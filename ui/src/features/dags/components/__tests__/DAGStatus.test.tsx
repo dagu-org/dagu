@@ -1,0 +1,190 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  components,
+  NodeStatus,
+  NodeStatusLabel,
+  Status,
+  StatusLabel,
+} from '@/api/v1/schema';
+import { AppBarContext } from '@/contexts/AppBarContext';
+import { useClient } from '@/hooks/api';
+import { DAGContext } from '../../contexts/DAGContext';
+import DAGStatus from '../DAGStatus';
+
+const patchMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/hooks/api', () => ({
+  useClient: vi.fn(),
+}));
+
+vi.mock('@/contexts/ConfigContext', () => ({
+  useConfig: () => ({
+    permissions: {
+      runDags: true,
+    },
+  }),
+}));
+
+vi.mock('@/components/ui/error-modal', () => ({
+  useErrorModal: () => ({
+    showError: vi.fn(),
+  }),
+}));
+
+vi.mock('react-cookie', () => ({
+  useCookies: () => [{}, vi.fn()],
+}));
+
+vi.mock('../visualization', () => ({
+  Graph: ({
+    onRightClickNode,
+    steps,
+  }: {
+    onRightClickNode?: (id: string) => void;
+    steps?: components['schemas']['Node'][];
+  }) => (
+    <div>
+      <div>Graph status: {steps?.[0]?.status}</div>
+      <button type="button" onClick={() => onRightClickNode?.('step')}>
+        Open status modal
+      </button>
+    </div>
+  ),
+  TimelineChart: () => <div>Timeline</div>,
+}));
+
+vi.mock('../dag-execution', () => ({
+  LogViewer: () => null,
+  ParallelExecutionModal: () => null,
+  StatusUpdateModal: ({
+    visible,
+    step,
+    onSubmit,
+  }: {
+    visible: boolean;
+    step?: components['schemas']['Step'];
+    onSubmit: (
+      step: components['schemas']['Step'],
+      status: NodeStatus
+    ) => void | Promise<void>;
+  }) =>
+    visible && step ? (
+      <button
+        type="button"
+        onClick={() => void onSubmit(step, NodeStatus.Failed)}
+      >
+        Mark failed
+      </button>
+    ) : null,
+}));
+
+vi.mock('../dag-details', () => ({
+  DAGStatusOverview: () => <div>Status overview</div>,
+  NodeStatusTable: () => <div>Node status table</div>,
+}));
+
+vi.mock('../approval', () => ({
+  ApprovalTab: () => null,
+}));
+
+vi.mock('../artifacts/ArtifactsTab', () => ({
+  default: () => null,
+}));
+
+vi.mock('../chat-history', () => ({
+  ChatHistoryTab: () => null,
+}));
+
+vi.mock('../dag-editor', () => ({
+  DAGSpecReadOnly: () => null,
+}));
+
+vi.mock('../../../dag-runs/components/dag-run-details', () => ({
+  DAGRunOutputs: () => null,
+}));
+
+const appBarValue = {
+  title: 'DAGs',
+  setTitle: vi.fn(),
+  remoteNodes: ['local'],
+  setRemoteNodes: vi.fn(),
+  selectedRemoteNode: 'local',
+  selectRemoteNode: vi.fn(),
+};
+
+const dagRun = {
+  name: 'example',
+  dagRunId: 'run-1',
+  status: Status.Failed,
+  statusLabel: StatusLabel.failed,
+  autoRetryCount: 0,
+  startedAt: '',
+  finishedAt: '',
+  artifactsAvailable: false,
+  nodes: [
+    {
+      step: {
+        name: 'step',
+      },
+      status: NodeStatus.Success,
+      statusLabel: NodeStatusLabel.succeeded,
+    },
+  ],
+} as components['schemas']['DAGRunDetails'];
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('DAGStatus', () => {
+  it('updates the rendered graph immediately after graph status updates succeed', async () => {
+    const refresh = vi.fn();
+    vi.mocked(useClient).mockReturnValue({
+      PATCH: patchMock.mockResolvedValue({ error: undefined }),
+    } as unknown as ReturnType<typeof useClient>);
+
+    render(
+      <MemoryRouter>
+        <AppBarContext.Provider value={appBarValue}>
+          <DAGContext.Provider
+            value={{
+              refresh,
+              name: 'example',
+              fileName: 'example.yaml',
+            }}
+          >
+            <DAGStatus dagRun={dagRun} fileName="example.yaml" />
+          </DAGContext.Provider>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open status modal' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Mark failed' })
+    );
+
+    await waitFor(() => {
+      expect(patchMock).toHaveBeenCalledWith(
+        '/dag-runs/{name}/{dagRunId}/steps/{stepName}/status',
+        expect.objectContaining({
+          body: {
+            status: NodeStatus.Failed,
+          },
+        })
+      );
+    });
+    expect(
+      screen.getByText(`Graph status: ${NodeStatus.Failed}`)
+    ).toBeInTheDocument();
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+  });
+});

@@ -11,6 +11,7 @@ export const DAGContext = React.createContext<{
     dagRunId?: string,
     immediate?: boolean
   ) => string | void | Promise<string | void>;
+  onRunStarted?: (dagRunId: string) => void | Promise<void>;
 }>({
   refresh: () => {
     return;

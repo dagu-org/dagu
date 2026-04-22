@@ -46,6 +46,7 @@ type DAGDetailsContentProps = {
     dagRunId?: string,
     immediate?: boolean
   ) => string | void | Promise<string | void>;
+  onRunStarted?: (dagRunId: string) => void | Promise<void>;
   /** When true, forces enqueue mode in DAGContext (used by cockpit) */
   forceEnqueue?: boolean;
   /** When true, automatically opens the start/enqueue modal on mount */
@@ -76,6 +77,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   localDags,
   editorHints,
   onEnqueue,
+  onRunStarted,
   forceEnqueue = false,
   autoOpenStartModal = false,
 }) => {
@@ -127,6 +129,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         forceEnqueue,
         autoOpenStartModal,
         onEnqueue,
+        onRunStarted,
       }}
     >
       <div className="w-full flex flex-col">

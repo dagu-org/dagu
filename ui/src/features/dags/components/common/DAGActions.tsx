@@ -818,7 +818,16 @@ function DAGActions({
           action={dagContext.forceEnqueue ? 'enqueue' : undefined}
           onSubmit={async (params, dagRunId, immediate) => {
             if (dagContext.onEnqueue) {
-              await dagContext.onEnqueue(params, dagRunId, immediate);
+              const result = await dagContext.onEnqueue(
+                params,
+                dagRunId,
+                immediate
+              );
+              const startedRunId =
+                typeof result === 'string' && result ? result : dagRunId;
+              if (startedRunId) {
+                await dagContext.onRunStarted?.(startedRunId);
+              }
               return;
             }
 
@@ -828,7 +837,7 @@ function DAGActions({
             }
 
             // Use /start endpoint if immediate is true, otherwise use /enqueue
-            const { error } = await (immediate
+            const { data, error } = await (immediate
               ? client.POST('/dags/{fileName}/start', {
                   params: {
                     path: {
@@ -857,6 +866,9 @@ function DAGActions({
               );
             }
 
+            if (data?.dagRunId) {
+              await dagContext.onRunStarted?.(data.dagRunId);
+            }
             // Just refresh the current page data
             reloadData();
             // Navigate to status tab after execution (if available)

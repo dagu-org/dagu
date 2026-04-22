@@ -1388,6 +1388,50 @@ func seedLatestDAGRunStatus(
 	return ref
 }
 
+func TestUpdateDAGRunStepStatusRecomputesAggregateStatus(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dag := &core.DAG{
+		Name: "manual_step_status_aggregate",
+		Steps: []core.Step{
+			{Name: "step1"},
+			{Name: "step2"},
+		},
+	}
+	const dagRunID = "manual-step-status-run"
+	seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		dagRunID,
+		core.Succeeded,
+		seedDAGRunStatusOptions{
+			nodeStatuses: map[string]core.NodeStatus{
+				"step1": core.NodeSucceeded,
+				"step2": core.NodeSucceeded,
+			},
+		},
+	)
+
+	server.Client().Patch(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/steps/%s/status", dag.Name, dagRunID, "step1"),
+		api.UpdateDAGRunStepStatusJSONRequestBody{Status: api.NodeStatusFailed},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	status := waitForStoredDAGRunStatus(
+		t,
+		server,
+		dag.Name,
+		dagRunID,
+		5*time.Second,
+		func(status *exec.DAGRunStatus) bool {
+			return status.Status == core.Failed &&
+				hasNodeWithStatus(status, "step1", core.NodeFailed)
+		},
+	)
+	require.Equal(t, core.Failed, status.Status)
+}
+
 func TestDeleteDAGRun(t *testing.T) {
 	server := test.SetupServer(t)
 	dag := &core.DAG{Name: "delete_run_dag"}

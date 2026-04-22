@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, X } from 'lucide-react';
 
@@ -11,7 +11,9 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGRunSSE } from '../../../../hooks/useDAGRunSSE';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import {
   sseFallbackOptions,
   useSSECacheSync,
@@ -62,6 +64,7 @@ function DAGDetailsPanel({
   const [currentDAGRun, setCurrentDAGRun] = useState<
     DAGRunDetails | undefined
   >();
+  const [trackedDagRunId, setTrackedDagRunId] = useState<string>();
   const [activeTab, setActiveTab] = useState('status');
   const [notFound, setNotFound] = useState(false);
 
@@ -94,6 +97,26 @@ function DAGDetailsPanel({
   );
   useSSECacheSync(dagSSE, mutate);
 
+  const dagName = data?.dag?.name || '';
+  const trackedRunEnabled = !!dagName && !!trackedDagRunId;
+  const trackedRunSSE = useDAGRunSSE(
+    dagName,
+    trackedDagRunId || '',
+    trackedRunEnabled,
+    remoteNode
+  );
+  const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
+    '/dag-runs/{name}/{dagRunId}',
+    whenEnabled(trackedRunEnabled, {
+      params: {
+        path: { name: dagName, dagRunId: trackedDagRunId || '' },
+        query: { remoteNode },
+      },
+    }),
+    sseFallbackOptions(trackedRunSSE)
+  );
+  useSSECacheSync(trackedRunSSE, mutateTrackedRun);
+
   // Track data loading state and handle 404 errors
   useEffect(() => {
     if (error) {
@@ -110,11 +133,25 @@ function DAGDetailsPanel({
   useEffect(() => {
     setNotFound(false);
     setActiveTab('status');
+    setTrackedDagRunId(undefined);
+    setCurrentDAGRun(undefined);
   }, [fileName, remoteNode]);
 
   function refreshFn(): void {
     setTimeout(() => mutate(), 500);
+    if (trackedDagRunId) {
+      setTimeout(() => mutateTrackedRun(), 500);
+    }
   }
+
+  const handleRunStarted = useCallback(
+    (dagRunId: string) => {
+      setTrackedDagRunId(dagRunId);
+      setActiveTab('status');
+      void mutate();
+    },
+    [mutate]
+  );
 
   function handleFullscreenClick(e?: React.MouseEvent): void {
     const tabPath = activeTab === 'status' ? '' : `/${activeTab}`;
@@ -128,10 +165,14 @@ function DAGDetailsPanel({
   }
 
   useEffect(() => {
-    if (data) {
+    if (trackedRunData?.dagRunDetails) {
+      setCurrentDAGRun(trackedRunData.dagRunDetails);
+    } else if (data) {
       setCurrentDAGRun(data.latestDAGRun);
     }
-  }, [data]);
+  }, [data, trackedRunData]);
+
+  const displayDAGRun = currentDAGRun || data?.latestDAGRun;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -196,7 +237,7 @@ function DAGDetailsPanel({
       >
         <RootDAGRunContext.Provider
           value={{
-            data: currentDAGRun,
+            data: displayDAGRun,
             setData: setCurrentDAGRun,
           }}
         >
@@ -231,18 +272,19 @@ function DAGDetailsPanel({
                 fileName={fileName}
                 filePath={data.filePath}
                 dag={data.dag}
-                currentDAGRun={data.latestDAGRun}
+                currentDAGRun={displayDAGRun}
                 latestDAGRun={data.latestDAGRun}
                 refreshFn={refreshFn}
                 formatDuration={formatDuration}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
-                dagRunId="latest"
+                dagRunId={trackedDagRunId ?? 'latest'}
                 stepName={null}
                 isModal={true}
                 navigateToStatusTab={() => setActiveTab('status')}
                 localDags={data.localDags}
                 editorHints={data.editorHints}
+                onRunStarted={handleRunStarted}
               />
             </div>
           </div>

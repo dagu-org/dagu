@@ -272,7 +272,7 @@ func TestMultiplexerRetiresUnusedTopicsBeforeReuse(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, created)
 
-	session, err := newStreamSession(httptest.NewRecorder(), mux)
+	session, err := newStreamSession(httptest.NewRecorder(), mux, context.Background())
 	require.NoError(t, err)
 	require.True(t, session.addTopic(topic))
 	require.True(t, topic.addSession(session))
@@ -295,7 +295,7 @@ func TestMultiplexTopicSendSnapshotDropsRemovedTopics(t *testing.T) {
 	topic := newMultiplexTopic(mux, parsed, func(_ context.Context, identifier string) (any, error) {
 		return map[string]string{"id": identifier}, nil
 	}, TopicRefreshModePolling, false)
-	session, err := newStreamSession(httptest.NewRecorder(), mux)
+	session, err := newStreamSession(httptest.NewRecorder(), mux, context.Background())
 	require.NoError(t, err)
 	require.True(t, session.addTopic(topic))
 
@@ -466,6 +466,67 @@ func TestMultiplexerOnDemandTopicOnlyRefetchesOnWake(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return fetches.Load() == 2
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestMultiplexerWakeTopicFetchesWithDetachedSessionContext(t *testing.T) {
+	type ctxKey string
+	const userKey ctxKey = "user"
+
+	mux := NewMultiplexer(StreamConfig{}, nil)
+	t.Cleanup(mux.Shutdown)
+
+	mux.RegisterFetcher(TopicTypeDAGRuns, func(ctx context.Context, identifier string) (any, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		user, _ := ctx.Value(userKey).(string)
+		if user == "" {
+			return nil, errors.New("missing user in fetch context")
+		}
+		return map[string]string{
+			"id":   identifier,
+			"user": user,
+		}, nil
+	})
+	mux.SetRefreshMode(TopicTypeDAGRuns, TopicRefreshModeOnDemand)
+
+	topicKey := "dagruns:workspace=all"
+	aliceCtx, cancelAlice := context.WithCancel(context.WithValue(context.Background(), userKey, "alice"))
+	aliceResult, err := mux.createSession(aliceCtx, httptest.NewRecorder(), []string{topicKey}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, aliceResult.session)
+	defer mux.removeSession(aliceResult.session)
+	cancelAlice()
+
+	bobCtx, cancelBob := context.WithCancel(context.WithValue(context.Background(), userKey, "bob"))
+	bobResult, err := mux.createSession(bobCtx, httptest.NewRecorder(), []string{topicKey}, 0)
+	require.NoError(t, err)
+	require.NotNil(t, bobResult.session)
+	defer mux.removeSession(bobResult.session)
+	cancelBob()
+
+	mux.WakeTopic(TopicTypeDAGRuns, "workspace=all")
+
+	assertSessionPayloadUser := func(session *streamSession, expected string) bool {
+		msg := session.popNext()
+		if msg == nil {
+			return false
+		}
+		var envelope struct {
+			Payload struct {
+				User string `json:"user"`
+			} `json:"payload"`
+		}
+		require.NoError(t, json.Unmarshal(msg.data, &envelope))
+		return envelope.Payload.User == expected
+	}
+
+	require.Eventually(t, func() bool {
+		return assertSessionPayloadUser(aliceResult.session, "alice")
+	}, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		return assertSessionPayloadUser(bobResult.session, "bob")
 	}, time.Second, 10*time.Millisecond)
 }
 
