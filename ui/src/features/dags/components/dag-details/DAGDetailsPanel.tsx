@@ -293,7 +293,6 @@ function DAGDetailsPanel({
                 filePath={data.filePath}
                 dag={data.dag}
                 currentDAGRun={displayDAGRun}
-                latestDAGRun={data.latestDAGRun}
                 refreshFn={refreshFn}
                 formatDuration={formatDuration}
                 activeTab={activeTab}

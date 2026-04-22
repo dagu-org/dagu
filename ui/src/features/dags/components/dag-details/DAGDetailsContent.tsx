@@ -28,7 +28,6 @@ type DAGDetailsContentProps = {
   filePath?: string;
   dag: components['schemas']['DAGDetails'];
   currentDAGRun?: components['schemas']['DAGRunDetails'];
-  latestDAGRun?: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
@@ -64,7 +63,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   filePath,
   dag,
   currentDAGRun,
-  latestDAGRun,
   refreshFn,
   formatDuration,
   activeTab,
@@ -140,7 +138,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
             currentDAGRun={currentDAGRun}
             fileName={fileName || ''}
             filePath={filePath}
-            workspace={dagWorkspaceName}
             refreshFn={refreshFn}
             formatDuration={formatDuration}
             navigateToStatusTab={navigateToStatusTab}
@@ -352,8 +349,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           <div className={activeTab === 'spec' ? 'visible' : 'hidden'}>
             <DAGEditButtons
               fileName={fileName || ''}
-              dagName={dag?.name || fileName || ''}
-              latestDAGRun={latestDAGRun}
               workspace={dagWorkspaceName}
             />
           </div>

@@ -45,7 +45,6 @@ import {
   Sun,
   Terminal,
   Users,
-  Wand2,
   Webhook,
 } from 'lucide-react';
 import * as React from 'react';
@@ -401,7 +400,6 @@ export const mainListItems = React.forwardRef<
   const { user } = useAuth();
   const hasRbac = useHasFeature('rbac');
   const hasAudit = useHasFeature('audit');
-  const appBarContext = React.useContext(AppBarContext);
   const canWrite =
     config.authMode !== 'builtin'
       ? config.permissions.writeDags
@@ -622,16 +620,6 @@ export const mainListItems = React.forwardRef<
               onClick={onNavItemClick}
               customColor={customColor}
             />
-            {canWrite && config.agentEnabled && (
-              <NavItem
-                to="/design"
-                text="Design"
-                icon={<Wand2 size={18} />}
-                isOpen={isOpen}
-                onClick={onNavItemClick}
-                customColor={customColor}
-              />
-            )}
             <NavItem
               to="/dag-runs"
               text="Runs"
