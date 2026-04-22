@@ -137,3 +137,27 @@ func TestProcHandle_StartPublishesInitializedFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, meta, entry.Meta)
 }
+
+func TestProcHandle_OpenInitializedProcFileRecreatesMissingParentDir(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	meta := testProcMetaFromRun(exec.NewDAGRunRef("test_proc", "run-1"))
+	fileName := procFilePath(tmpDir, exec.NewUTC(time.Now()), meta)
+	proc := NewProcHandler(fileName, meta, 0, 0)
+	dagDir := filepath.Dir(fileName)
+
+	require.NoError(t, os.MkdirAll(dagDir, 0750))
+	require.NoError(t, os.Remove(dagDir))
+
+	fd, err := proc.openInitializedProcFile(time.Now().Unix())
+	require.NoError(t, err)
+	require.NoError(t, fd.Close())
+	t.Cleanup(func() {
+		_ = os.Remove(fileName)
+	})
+
+	_, err = os.Stat(fileName)
+	require.NoError(t, err)
+}

@@ -5,7 +5,6 @@ package fileutil
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -51,24 +50,8 @@ func RenameWithRetry(oldPath, newPath string) error {
 // sharing violations that can happen while another process is still releasing
 // the target file handle.
 func ReplaceFileWithRetry(source, target string) error {
-	if runtime.GOOS != "windows" {
-		return os.Rename(source, target)
-	}
-
 	return retryWindowsFileOp(func() error {
-		info, err := os.Stat(target)
-		switch {
-		case err == nil:
-			if info.IsDir() {
-				return fmt.Errorf("target path is a directory: %s", target)
-			}
-			if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
-				return err
-			}
-		case !os.IsNotExist(err):
-			return err
-		}
-		return os.Rename(source, target)
+		return replaceFile(source, target)
 	})
 }
 
