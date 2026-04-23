@@ -210,7 +210,14 @@ func IsDAGRunEventType(kind EventKind, eventType EventType) bool {
 		return false
 	}
 	switch eventType {
-	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
+	case TypeDAGRunQueued,
+		TypeDAGRunRunning,
+		TypeDAGRunUpdated,
+		TypeDAGRunWaiting,
+		TypeDAGRunSucceeded,
+		TypeDAGRunFailed,
+		TypeDAGRunAborted,
+		TypeDAGRunRejected:
 		return true
 	case TypeLLMUsageRecorded:
 		return false
@@ -226,7 +233,7 @@ func IsNotificationEventType(kind EventKind, eventType EventType) bool {
 	switch eventType {
 	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 		return true
-	case TypeDAGRunQueued, TypeDAGRunRunning, TypeLLMUsageRecorded:
+	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunUpdated, TypeLLMUsageRecorded:
 		return false
 	default:
 		return false

@@ -33,6 +33,7 @@ type mockDAGRunStore struct {
 	subAttempts         map[string]*mockDAGRunAttempt // key: rootID:subID
 	createAttemptErr    error
 	createSubAttemptErr error
+	listStatusesCalls   int
 	mu                  sync.Mutex
 }
 
@@ -117,6 +118,7 @@ func (m *mockDAGRunStore) ListStatuses(_ context.Context, opts ...exec.ListDAGRu
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.listStatusesCalls++
 
 	var statuses []*exec.DAGRunStatus
 	appendStatus := func(status *exec.DAGRunStatus) {
@@ -150,6 +152,12 @@ func (m *mockDAGRunStore) ListStatuses(_ context.Context, opts ...exec.ListDAGRu
 	}
 
 	return statuses, nil
+}
+
+func (m *mockDAGRunStore) ListStatusesCallCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.listStatusesCalls
 }
 
 func (m *mockDAGRunStore) ListStatusesPage(ctx context.Context, opts ...exec.ListDAGRunStatusesOption) (exec.DAGRunStatusPage, error) {
@@ -1839,6 +1847,60 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		}
 	})
 
+	t.Run("DetectStaleLeasesFailsLeasedRunWithoutStatusScan", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			StaleLeaseThreshold:       time.Second,
+		})
+
+		ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-lease"}
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-lease",
+			AttemptID:  "attempt-1",
+			AttemptKey: "lease-key-1",
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+			Nodes: []*exec.Node{
+				{Status: core.NodeRunning},
+			},
+		})
+
+		staleAt := time.Now().Add(-10 * time.Second).UTC()
+		require.NoError(t, leaseStore.Upsert(ctx, exec.DAGRunLease{
+			AttemptKey:      "lease-key-1",
+			DAGRun:          ref,
+			Root:            ref,
+			AttemptID:       "attempt-1",
+			QueueName:       "lease-dag",
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: staleAt.UnixMilli(),
+			ClaimedAt:       staleAt.UnixMilli(),
+		}))
+
+		h.detectStaleLeases(ctx)
+
+		assert.Zero(t, store.ListStatusesCallCount())
+
+		status, err := attempt.ReadStatus(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, core.Failed, status.Status)
+		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
+		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+
+		_, err = leaseStore.Get(ctx, "lease-key-1")
+		assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+	})
+
 	t.Run("DetectStaleLeasesFailsOrphanedDistributedStatusWithoutLease", func(t *testing.T) {
 		t.Parallel()
 
@@ -1873,25 +1935,26 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
 	})
 
-	t.Run("BackfillActiveDistributedRunsRepairsHistoricalOrphanedRemoteStatus", func(t *testing.T) {
+	t.Run("DetectStaleLeasesRebuildsActiveIndexFromLeasesWithoutStatusScan", func(t *testing.T) {
 		t.Parallel()
 
 		ctx := context.Background()
-		baseDir := t.TempDir()
-		store := filedagrun.New(filepath.Join(baseDir, "dag-runs"))
-		leaseStore := filedistributed.NewDAGRunLeaseStore(filepath.Join(baseDir, "distributed"))
-		activeStore := filedistributed.NewActiveDistributedRunStore(filepath.Join(baseDir, "distributed"))
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
 		h := NewHandler(HandlerConfig{
 			DAGRunStore:               store,
 			DAGRunLeaseStore:          leaseStore,
 			ActiveDistributedRunStore: activeStore,
-			StaleLeaseThreshold:       time.Second,
+			StaleLeaseThreshold:       time.Minute,
 		})
 
-		attemptKey := exec.GenerateAttemptKey("lease-dag", "run-old", "lease-dag", "run-old", "attempt-1")
-		createStoredAttemptStatus(t, store, time.Now().UTC().Add(-48*time.Hour), "lease-dag", "run-old", exec.DAGRunStatus{
+		ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-lease"}
+		attemptKey := "lease-key-1"
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
 			Name:       "lease-dag",
-			DAGRunID:   "run-old",
+			DAGRunID:   "run-lease",
 			AttemptID:  "attempt-1",
 			AttemptKey: attemptKey,
 			Status:     core.Running,
@@ -1900,20 +1963,31 @@ func TestHandler_ZombieDetection(t *testing.T) {
 				{Status: core.NodeRunning},
 			},
 		})
+		freshAt := time.Now().UTC()
+		require.NoError(t, leaseStore.Upsert(ctx, exec.DAGRunLease{
+			AttemptKey:      attemptKey,
+			DAGRun:          ref,
+			Root:            ref,
+			AttemptID:       "attempt-1",
+			QueueName:       "lease-dag",
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: freshAt.UnixMilli(),
+			ClaimedAt:       freshAt.UnixMilli(),
+		}))
 
-		h.backfillActiveDistributedRuns(ctx)
+		h.detectStaleLeases(ctx)
 
-		attempt, err := store.FindAttempt(ctx, exec.DAGRunRef{Name: "lease-dag", ID: "run-old"})
-		require.NoError(t, err)
+		assert.Zero(t, store.ListStatusesCallCount())
+
 		status, err := attempt.ReadStatus(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, core.Failed, status.Status)
-		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
-		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+		assert.Equal(t, core.Running, status.Status)
 
-		records, err := activeStore.ListAll(ctx)
+		record, err := activeStore.Get(ctx, attemptKey)
 		require.NoError(t, err)
-		assert.Empty(t, records)
+		assert.Equal(t, ref, record.DAGRun)
+		assert.Equal(t, "attempt-1", record.AttemptID)
+		assert.Equal(t, "worker-1", record.WorkerID)
 	})
 
 	t.Run("DetectIndexedDistributedStatusesFailsActiveEntryWhenLeaseMissing", func(t *testing.T) {
@@ -1964,7 +2038,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		assert.Empty(t, records)
 	})
 
-	t.Run("DetectStaleLeasesFallsBackToStatusScanWhenActiveIndexMissesRun", func(t *testing.T) {
+	t.Run("DetectStaleLeasesDoesNotScanStatusesWhenActiveIndexMissesRun", func(t *testing.T) {
 		t.Parallel()
 
 		ctx := context.Background()
@@ -1996,9 +2070,8 @@ func TestHandler_ZombieDetection(t *testing.T) {
 
 		status, err := attempt.ReadStatus(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, core.Failed, status.Status)
-		assert.Equal(t, staleDistributedLeaseReason("worker-1"), status.Error)
-		assert.Equal(t, core.NodeFailed, status.Nodes[0].Status)
+		assert.Equal(t, core.Running, status.Status)
+		assert.Zero(t, store.ListStatusesCallCount())
 
 		records, err := activeStore.ListAll(ctx)
 		require.NoError(t, err)
