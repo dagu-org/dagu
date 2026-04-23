@@ -13,8 +13,10 @@ import (
 	"github.com/dagucloud/dagu/internal/agent"
 	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/automata"
+	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/service/audit"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -33,6 +35,9 @@ func (a *API) ListAutomata(ctx context.Context, _ api.ListAutomataRequestObject)
 	}
 	resp := make([]api.AutomataSummary, 0, len(items))
 	for _, item := range items {
+		if !a.canAccessWorkspace(ctx, automataWorkspaceNameFromTags(item.Tags)) {
+			continue
+		}
 		summary := toAPIAutomataSummary(item)
 		summary.AutomataController = &controllerStatus
 		resp = append(resp, summary)
@@ -49,6 +54,9 @@ func (a *API) GetAutomata(ctx context.Context, request api.GetAutomataRequestObj
 	if err != nil {
 		return nil, toAutomataAPIError(err)
 	}
+	if err := a.requireWorkspaceVisible(ctx, automataWorkspaceNameFromDetail(item)); err != nil {
+		return nil, err
+	}
 	resp := toAPIAutomataDetail(item)
 	resp.AutomataController = &controllerStatus
 	return api.GetAutomata200JSONResponse(resp), nil
@@ -56,6 +64,9 @@ func (a *API) GetAutomata(ctx context.Context, request api.GetAutomataRequestObj
 
 func (a *API) GetAutomataSpec(ctx context.Context, request api.GetAutomataSpecRequestObject) (api.GetAutomataSpecResponseObject, error) {
 	if err := a.requireAutomataService(); err != nil {
+		return nil, err
+	}
+	if err := a.requireAutomataVisible(ctx, string(request.Name)); err != nil {
 		return nil, err
 	}
 	spec, err := a.automataService.GetSpec(ctx, string(request.Name))
@@ -72,6 +83,9 @@ func (a *API) GetAutomataDocument(ctx context.Context, request api.GetAutomataDo
 	if err := a.requireAutomataDocumentStore(); err != nil {
 		return nil, err
 	}
+	if err := a.requireAutomataVisible(ctx, string(request.Name)); err != nil {
+		return nil, err
+	}
 	item, err := a.automataService.GetDocument(ctx, string(request.Name), string(request.Document))
 	if err != nil {
 		return nil, toAutomataAPIError(err)
@@ -86,13 +100,13 @@ func (a *API) UpdateAutomataDocument(ctx context.Context, request api.UpdateAuto
 	if err := a.requireAutomataDocumentStore(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
 	name := string(request.Name)
+	if err := a.requireAutomataDAGWrite(ctx, name); err != nil {
+		return nil, err
+	}
 	document := string(request.Document)
 	item, err := a.automataService.SaveDocument(ctx, name, document, request.Body.Content)
 	if err != nil {
@@ -112,10 +126,10 @@ func (a *API) DeleteAutomataDocument(ctx context.Context, request api.DeleteAuto
 	if err := a.requireAutomataDocumentStore(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataDAGWrite(ctx, name); err != nil {
 		return nil, err
 	}
-	name := string(request.Name)
 	document := string(request.Document)
 	if err := a.automataService.DeleteDocument(ctx, name, document); err != nil {
 		return nil, toAutomataAPIError(err)
@@ -131,13 +145,13 @@ func (a *API) PutAutomataSpec(ctx context.Context, request api.PutAutomataSpecRe
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
 	name := string(request.Name)
+	if err := a.requireAutomataSpecWrite(ctx, name, request.Body.Spec); err != nil {
+		return nil, err
+	}
 	if err := a.automataService.PutSpec(ctx, name, request.Body.Spec); err != nil {
 		return nil, toAutomataAPIError(err)
 	}
@@ -149,10 +163,10 @@ func (a *API) DeleteAutomata(ctx context.Context, request api.DeleteAutomataRequ
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataDAGWrite(ctx, name); err != nil {
 		return nil, err
 	}
-	name := string(request.Name)
 	if err := a.automataService.Delete(ctx, name); err != nil {
 		return nil, toAutomataAPIError(err)
 	}
@@ -164,13 +178,13 @@ func (a *API) RenameAutomata(ctx context.Context, request api.RenameAutomataRequ
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
 	name := string(request.Name)
+	if err := a.requireAutomataDAGWrite(ctx, name); err != nil {
+		return nil, err
+	}
 	body := automata.RenameRequest{
 		NewName:     request.Body.NewName,
 		RequestedBy: a.currentUsername(ctx),
@@ -189,13 +203,13 @@ func (a *API) DuplicateAutomata(ctx context.Context, request api.DuplicateAutoma
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
 	name := string(request.Name)
+	if err := a.requireAutomataDAGWrite(ctx, name); err != nil {
+		return nil, err
+	}
 	body := automata.DuplicateRequest{NewName: request.Body.NewName}
 	if err := a.automataService.Duplicate(ctx, name, body); err != nil {
 		return nil, toAutomataAPIError(err)
@@ -211,13 +225,13 @@ func (a *API) ResetAutomata(ctx context.Context, request api.ResetAutomataReques
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if err := a.requireReadyAutomataController(ctx); err != nil {
 		return nil, err
 	}
-	name := string(request.Name)
 	if err := a.automataService.ResetState(ctx, name); err != nil {
 		return nil, toAutomataAPIError(err)
 	}
@@ -229,13 +243,13 @@ func (a *API) StartAutomata(ctx context.Context, request api.StartAutomataReques
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if err := a.requireReadyAutomataController(ctx); err != nil {
 		return nil, err
 	}
-	name := string(request.Name)
 	body := automata.StartRequest{
 		RequestedBy: a.currentUsername(ctx),
 	}
@@ -256,13 +270,13 @@ func (a *API) PauseAutomata(ctx context.Context, request api.PauseAutomataReques
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if err := a.requireReadyAutomataController(ctx); err != nil {
 		return nil, err
 	}
-	name := string(request.Name)
 	if err := a.automataService.Pause(ctx, name, a.currentUsername(ctx)); err != nil {
 		return nil, toAutomataAPIError(err)
 	}
@@ -274,13 +288,13 @@ func (a *API) ResumeAutomata(ctx context.Context, request api.ResumeAutomataRequ
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if err := a.requireReadyAutomataController(ctx); err != nil {
 		return nil, err
 	}
-	name := string(request.Name)
 	if err := a.automataService.Resume(ctx, name, a.currentUsername(ctx)); err != nil {
 		return nil, toAutomataAPIError(err)
 	}
@@ -292,13 +306,13 @@ func (a *API) CreateAutomataTask(ctx context.Context, request api.CreateAutomata
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	name := string(request.Name)
 	task, err := a.automataService.CreateTask(ctx, name, automata.CreateTaskRequest{
 		Description: request.Body.Description,
 		RequestedBy: a.currentUsername(ctx),
@@ -317,13 +331,13 @@ func (a *API) UpdateAutomataTask(ctx context.Context, request api.UpdateAutomata
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	name := string(request.Name)
 	task, err := a.automataService.UpdateTask(ctx, name, request.TaskId, automata.UpdateTaskRequest{
 		Description: request.Body.Description,
 		Done:        request.Body.Done,
@@ -343,10 +357,10 @@ func (a *API) DeleteAutomataTask(ctx context.Context, request api.DeleteAutomata
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
-	name := string(request.Name)
 	if err := a.automataService.DeleteTask(ctx, name, request.TaskId, a.currentUsername(ctx)); err != nil {
 		return nil, toAutomataAPIError(err)
 	}
@@ -361,13 +375,13 @@ func (a *API) ReorderAutomataTasks(ctx context.Context, request api.ReorderAutom
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	name := string(request.Name)
 	if err := a.automataService.ReorderTasks(ctx, name, automata.ReorderTasksRequest{
 		TaskIDs:     append([]string(nil), request.Body.TaskIds...),
 		RequestedBy: a.currentUsername(ctx),
@@ -384,7 +398,8 @@ func (a *API) MessageAutomata(ctx context.Context, request api.MessageAutomataRe
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if err := a.requireReadyAutomataController(ctx); err != nil {
@@ -393,7 +408,6 @@ func (a *API) MessageAutomata(ctx context.Context, request api.MessageAutomataRe
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	name := string(request.Name)
 	body := automata.OperatorMessageRequest{
 		Message:     request.Body.Message,
 		RequestedBy: a.currentUsername(ctx),
@@ -409,7 +423,8 @@ func (a *API) RespondAutomata(ctx context.Context, request api.RespondAutomataRe
 	if err := a.requireAutomataService(); err != nil {
 		return nil, err
 	}
-	if err := a.requireExecute(ctx); err != nil {
+	name := string(request.Name)
+	if err := a.requireAutomataExecute(ctx, name); err != nil {
 		return nil, err
 	}
 	if err := a.requireReadyAutomataController(ctx); err != nil {
@@ -418,7 +433,6 @@ func (a *API) RespondAutomata(ctx context.Context, request api.RespondAutomataRe
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	name := string(request.Name)
 	body := automata.HumanResponseRequest{
 		PromptID:          request.Body.PromptId,
 		SelectedOptionIDs: append([]string(nil), valueOf(request.Body.SelectedOptionIds)...),
@@ -432,6 +446,95 @@ func (a *API) RespondAutomata(ctx context.Context, request api.RespondAutomataRe
 		"prompt_id": body.PromptID,
 	})
 	return api.RespondAutomata204Response{}, nil
+}
+
+func automataWorkspaceNameFromTags(tags []string) string {
+	workspaceName, state := exec.WorkspaceLabelFromLabels(core.NewLabels(tags))
+	switch state {
+	case exec.WorkspaceLabelValid:
+		return workspaceName
+	case exec.WorkspaceLabelInvalid:
+		return invalidWorkspaceLabelName
+	case exec.WorkspaceLabelMissing:
+		return ""
+	default:
+		return ""
+	}
+}
+
+func automataWorkspaceNameFromDefinition(def *automata.Definition) string {
+	if def == nil {
+		return ""
+	}
+	return automataWorkspaceNameFromTags(def.Tags)
+}
+
+func automataWorkspaceNameFromDetail(detail *automata.Detail) string {
+	if detail == nil {
+		return ""
+	}
+	return automataWorkspaceNameFromDefinition(detail.Definition)
+}
+
+func automataWorkspaceNameFromSpec(spec string) (string, error) {
+	var def automata.Definition
+	if err := yaml.Unmarshal([]byte(spec), &def); err != nil {
+		return "", err
+	}
+	return automataWorkspaceNameFromDefinition(&def), nil
+}
+
+func (a *API) automataWorkspaceName(ctx context.Context, name string) (string, error) {
+	spec, err := a.automataService.GetSpec(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	workspaceName, err := automataWorkspaceNameFromSpec(spec)
+	if err != nil {
+		return "", nil
+	}
+	return workspaceName, nil
+}
+
+func (a *API) requireAutomataVisible(ctx context.Context, name string) error {
+	workspaceName, err := a.automataWorkspaceName(ctx, name)
+	if err != nil {
+		return toAutomataAPIError(err)
+	}
+	return a.requireWorkspaceVisible(ctx, workspaceName)
+}
+
+func (a *API) requireAutomataDAGWrite(ctx context.Context, name string) error {
+	workspaceName, err := a.automataWorkspaceName(ctx, name)
+	if err != nil {
+		return toAutomataAPIError(err)
+	}
+	return a.requireDAGWriteForWorkspace(ctx, workspaceName)
+}
+
+func (a *API) requireAutomataExecute(ctx context.Context, name string) error {
+	workspaceName, err := a.automataWorkspaceName(ctx, name)
+	if err != nil {
+		return toAutomataAPIError(err)
+	}
+	return a.requireExecuteForWorkspace(ctx, workspaceName)
+}
+
+func (a *API) requireAutomataSpecWrite(ctx context.Context, name, spec string) error {
+	currentWorkspaceName, err := a.automataWorkspaceName(ctx, name)
+	if err == nil {
+		if err := a.requireDAGWriteForWorkspace(ctx, currentWorkspaceName); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, exec.ErrDAGNotFound) && !errors.Is(err, os.ErrNotExist) {
+		return toAutomataAPIError(err)
+	}
+
+	nextWorkspaceName, err := automataWorkspaceNameFromSpec(spec)
+	if err != nil {
+		return a.requireDAGWrite(ctx)
+	}
+	return a.requireDAGWriteForWorkspace(ctx, nextWorkspaceName)
 }
 
 func (a *API) requireAutomataService() error {

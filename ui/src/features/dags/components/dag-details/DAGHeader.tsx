@@ -1,23 +1,12 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Button } from '@/components/ui/button';
-import { useCanWrite } from '@/contexts/AuthContext';
-import { useConfig } from '@/contexts/ConfigContext';
-import {
-  Calendar,
-  Check,
-  Copy,
-  RefreshCw,
-  Server,
-  Timer,
-  Wand2,
-} from 'lucide-react';
+import { Calendar, Check, Copy, RefreshCw, Server, Timer } from 'lucide-react';
 import React, { useCallback, useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
-import StatusChip from '../../../../ui/StatusChip';
+import StatusChip from '@/components/ui/status-chip';
 import AutoRetryBadge from '../../../dag-runs/components/common/AutoRetryBadge';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import { DAGActions } from '../common';
@@ -43,8 +32,6 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const params = useParams<{ tab?: string }>();
-  const canWrite = useCanWrite();
-  const config = useConfig();
   const rootDAGRunContext = React.useContext(RootDAGRunContext);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [currentDuration, setCurrentDuration] = React.useState<string>('--');
@@ -172,7 +159,6 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
     !dagRunToDisplay ||
     !dagRunToDisplay.rootDAGRunId ||
     dagRunToDisplay.dagRunId === dagRunToDisplay.rootDAGRunId;
-  const canOpenDesign = canWrite && config.agentEnabled && !!fileName;
 
   return (
     <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
@@ -182,18 +168,19 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
           {/* Breadcrumb navigation */}
           {dagRunToDisplay && (
             <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground mb-2">
-              {dagRunToDisplay.rootDAGRunId && dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
-                <>
-                  <a
-                    href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
-                    onClick={handleRootDAGRunClick}
-                    className="text-primary hover:text-primary hover:underline transition-colors font-medium"
-                  >
-                    {dagRunToDisplay.rootDAGRunName}
-                  </a>
-                  <span className="text-muted-foreground mx-1">/</span>
-                </>
-              )}
+              {dagRunToDisplay.rootDAGRunId &&
+                dagRunToDisplay.rootDAGRunId !== dagRunToDisplay.dagRunId && (
+                  <>
+                    <a
+                      href={`/dags/${fileName}?dagRunId=${dagRunToDisplay.rootDAGRunId}&dagRunName=${encodeURIComponent(dagRunToDisplay.rootDAGRunName)}`}
+                      onClick={handleRootDAGRunClick}
+                      className="text-primary hover:text-primary hover:underline transition-colors font-medium"
+                    >
+                      {dagRunToDisplay.rootDAGRunName}
+                    </a>
+                    <span className="text-muted-foreground mx-1">/</span>
+                  </>
+                )}
 
               {dagRunToDisplay.parentDAGRunName &&
                 dagRunToDisplay.parentDAGRunId &&
@@ -234,31 +221,16 @@ const DAGHeader: React.FC<DAGHeaderProps> = ({
           </div>
         </div>
 
-        {(showActions || canOpenDesign) && (
+        {showActions && (
           <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
-            {canOpenDesign && (
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                title="Open this DAG in Design"
-              >
-                <Link to={`/design?dag=${encodeURIComponent(fileName)}`}>
-                  <Wand2 className="h-4 w-4" />
-                  Design
-                </Link>
-              </Button>
-            )}
-            {showActions && (
-              <DAGActions
-                status={dagRunToDisplay}
-                dag={dag}
-                fileName={fileName}
-                refresh={refreshFn}
-                displayMode="compact"
-                navigateToStatusTab={navigateToStatusTab}
-              />
-            )}
+            <DAGActions
+              status={dagRunToDisplay}
+              dag={dag}
+              fileName={fileName}
+              refresh={refreshFn}
+              displayMode="compact"
+              navigateToStatusTab={navigateToStatusTab}
+            />
           </div>
         )}
       </div>

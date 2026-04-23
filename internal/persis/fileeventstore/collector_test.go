@@ -70,6 +70,32 @@ func TestCollectorDrainOnceQuarantinesMalformedInbox(t *testing.T) {
 	require.Len(t, entries, 1)
 }
 
+func TestCollectorDrainOnceIgnoresAtomicWriteTempFiles(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	store, err := New(baseDir)
+	require.NoError(t, err)
+
+	event := testEvent("evt-final", time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC))
+	require.NoError(t, store.Emit(context.Background(), event))
+
+	tmpFile := filepath.Join(store.inboxDir, "pending.json.tmp.123")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("{partial"), filePermissions))
+
+	collector, err := NewCollector(baseDir, 10)
+	require.NoError(t, err)
+	require.NoError(t, collector.DrainOnce(context.Background()))
+
+	assertFileExists(t, tmpFile, true)
+	assertInboxCount(t, store.inboxDir, 1)
+	assertLogLineCount(t, filepath.Join(baseDir, "_2026032912.jsonl"), 1)
+
+	entries, err := os.ReadDir(store.quarantineDir)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
 func TestCollectorDrainOnceDropsDuplicateInboxEventsWithinSinglePass(t *testing.T) {
 	t.Parallel()
 

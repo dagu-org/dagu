@@ -17,7 +17,9 @@ describe('Automata workspace helpers', () => {
     expect(workspaceTagForAutomataSelection('team_alpha')).toBe(
       'workspace=team_alpha'
     );
-    expect(workspaceTagForAutomataSelection('team-alpha')).toBeUndefined();
+    expect(workspaceTagForAutomataSelection('team-alpha')).toBe(
+      'workspace=team-alpha'
+    );
   });
 
   it('replaces existing workspace tags when creating inside a workspace', () => {

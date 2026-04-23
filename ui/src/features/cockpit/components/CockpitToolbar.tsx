@@ -23,7 +23,6 @@ export function CockpitToolbar({
         <>
           <TemplateSelector
             selectedTemplate={selectedTemplate}
-            selectedWorkspace={selectedWorkspace}
             onSelect={onSelectTemplate}
             onOpenChange={onTemplateSelectorOpenChange}
           />

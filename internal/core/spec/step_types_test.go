@@ -43,7 +43,7 @@ step_types:
           - {$input: repeat}
 steps:
   - type: greet
-    config:
+    with:
       message: hello
 `))
 	require.NoError(t, err)
@@ -57,6 +57,195 @@ steps:
 	assert.Equal(t, []string{"hello", "3"}, step.Commands[0].Args)
 	assert.Equal(t, "greet", step.ExecutorConfig.Metadata["custom_type"])
 	assert.Equal(t, "Send a greeting", step.Description)
+}
+
+func TestCustomStepTypes_LegacyConfigAlias(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-legacy-config
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - {$input: message}
+steps:
+  - type: greet
+    config:
+      message: hello
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+	require.Len(t, dag.Steps[0].Commands, 1)
+	assert.Equal(t, []string{"hello"}, dag.Steps[0].Commands[0].Args)
+}
+
+func TestCustomStepTypes_RejectWithAndLegacyConfig(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-mixed-config
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ .input.message }}
+steps:
+  - type: greet
+    with:
+      message: hello
+    config:
+      message: goodbye
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `fields "with" and "config" cannot be used together`)
+}
+
+func TestCustomStepTypes_TemplateSupportsHermeticFunctions(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-template-functions
+step_types:
+  format_message:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+        fallback:
+          type: string
+          default: ""
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - '{{ .input.message | trim | upper | replace "HELLO" "HI" }}'
+          - '{{ list "b" "a" "b" | uniq | sortAlpha | join "," }}'
+          - '{{ .input.fallback | default "fallback" }}'
+steps:
+  - type: format_message
+    config:
+      message: " hello "
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{"HI", "a,b", "fallback"}, step.Commands[0].Args)
+	assert.Equal(t, "format_message", step.ExecutorConfig.Metadata["custom_type"])
+}
+
+func TestCustomStepTypes_TemplateKeepsJSONHelper(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-json-helper
+step_types:
+  emit:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - '{{ json .input.message }}'
+steps:
+  - type: emit
+    config:
+      message: 'hello "quoted" world'
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, []string{`"hello \"quoted\" world"`}, step.Commands[0].Args)
+}
+
+func TestCustomStepTypes_TemplateRejectsBlockedFunctions(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-template-blocked-functions
+step_types:
+  stamp:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties: {}
+    template:
+      exec:
+        command: /bin/echo
+        args:
+          - '{{ now }}'
+steps:
+  - type: stamp
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `function "now" not defined`)
+}
+
+func TestCustomStepTypes_HarnessCommandCanUseTypedInput(t *testing.T) {
+	t.Parallel()
+
+	dag, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-harness-typed-input
+step_types:
+  codex_task:
+    type: harness
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+    template:
+      command:
+        $input: prompt
+      config:
+        provider: codex
+steps:
+  - type: codex_task
+    config:
+      prompt: 'Review "quoted" text'
+`))
+	require.NoError(t, err)
+	require.Len(t, dag.Steps, 1)
+
+	step := dag.Steps[0]
+	assert.Equal(t, "harness", step.ExecutorConfig.Type)
+	require.Len(t, step.Commands, 1)
+	assert.Equal(t, `Review "quoted" text`, step.Commands[0].CmdWithArgs)
+	assert.Equal(t, "codex_task", step.ExecutorConfig.Metadata["custom_type"])
 }
 
 func TestCustomStepTypes_RuntimeVariableInputsDeferSchemaValidation(t *testing.T) {
@@ -91,7 +280,7 @@ step_types:
           - {$input: mode}
 steps:
   - type: run_with_inputs
-    config:
+    with:
       message: hello-${SUFFIX}
       count: ${COUNT}
       enabled: ${ENABLED}
@@ -127,7 +316,7 @@ step_types:
           - {$input: count}
 steps:
   - type: repeat
-    config:
+    with:
       count: count-${COUNT}
 `), WithoutEval())
 	require.Error(t, err)
@@ -155,7 +344,7 @@ step_types:
       command: echo {{ json .input.message }}
 steps:
   - type: greet
-    config:
+    with:
       message: hello-from-container
 `))
 	require.NoError(t, err)
@@ -187,7 +376,7 @@ step_types:
       command: echo {{ json .input.message }}
 steps:
   - type: greet
-    config:
+    with:
       message: hello-inline
 `))
 	require.NoError(t, err)
@@ -225,7 +414,7 @@ step_types:
 name: custom-step-base
 steps:
   - type: greet
-    config:
+    with:
       message: hello-from-base
 `), WithBaseConfigContent(baseYAML))
 	require.NoError(t, err)
@@ -263,7 +452,7 @@ step_types:
 name: custom-step-base-normalized
 steps:
   - type: greet
-    config:
+    with:
       message: hello-from-normalized-base
 `), WithBaseConfigContent(baseYAML))
 	require.NoError(t, err)
@@ -404,7 +593,7 @@ step_types:
 steps:
   - type: greet
     command: echo should-fail
-    config:
+    with:
       message: hello
 `))
 	require.Error(t, err)
@@ -434,7 +623,7 @@ step_types:
 handler_on:
   success:
     type: greet
-    config:
+    with:
       message: handler-ok
 steps:
   - command: echo run
@@ -446,6 +635,36 @@ steps:
 	assert.Equal(t, "greet", dag.HandlerOn.Success.ExecutorConfig.Metadata["custom_type"])
 	require.Len(t, dag.HandlerOn.Success.Commands, 1)
 	assert.Equal(t, []string{"handler-ok"}, dag.HandlerOn.Success.Commands[0].Args)
+}
+
+func TestCustomStepTypes_HandlerRejectsWithAndLegacyConfig(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadYAML(context.Background(), []byte(`
+name: custom-step-handler-mixed-config
+step_types:
+  greet:
+    type: command
+    input_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+    template:
+      command: echo {{ .input.message }}
+handler_on:
+  success:
+    type: greet
+    with:
+      message: hello
+    config:
+      message: goodbye
+steps:
+  - command: echo run
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `fields "with" and "config" cannot be used together`)
 }
 
 func TestCustomStepTypes_HandlerAllowsExplicitZeroValueOverrides(t *testing.T) {
@@ -473,7 +692,7 @@ step_types:
 handler_on:
   success:
     type: greet
-    config:
+    with:
       message: handler-ok
     timeout_sec: 0
     mail_on_error: false
@@ -693,7 +912,7 @@ step_types:
 handler_on:
   success:
     type: greet
-    config:
+    with:
       message: handler-ok
 steps:
   - command: echo run
@@ -882,7 +1101,7 @@ func TestValidateCustomStepInput_DefersRuntimeExpressionLeaves(t *testing.T) {
 			t.Parallel()
 
 			schema := mustResolveCustomStepInputSchema(t, tt.schema)
-			_, err := validateCustomStepInput("test", schema, tt.input)
+			_, err := validateCustomStepInput("test", schema, "with", tt.input)
 			tt.assertErr(t, err)
 		})
 	}

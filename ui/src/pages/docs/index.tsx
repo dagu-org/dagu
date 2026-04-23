@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { ChevronLeft } from 'lucide-react';
 import React, {
   useCallback,
@@ -14,6 +17,7 @@ import {
 import SplitLayout from '@/components/SplitLayout';
 import { useSimpleToast } from '@/components/ui/simple-toast';
 import { AppBarContext } from '@/contexts/AppBarContext';
+import { useCanWrite } from '@/contexts/AuthContext';
 import { DocTabProvider, useDocTabContext } from '@/contexts/DocTabContext';
 import { usePageContext } from '@/contexts/PageContext';
 import { UnsavedChangesProvider } from '@/contexts/UnsavedChangesContext';
@@ -24,7 +28,19 @@ import { useClient, useQuery } from '@/hooks/api';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDocTreeSSE } from '@/hooks/useDocTreeSSE';
 import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
-import ConfirmModal from '@/ui/ConfirmModal';
+import {
+  DEFAULT_WORKSPACE_DISPLAY_NAME,
+  isMutableWorkspaceSelection,
+  sanitizeWorkspaceName,
+  workspaceTargetSelectionQuery,
+  workspaceTargetQueryForWorkspace,
+  WorkspaceTargetQuery,
+  workspaceNameForSelection,
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
+  visibleDocumentPathForWorkspace,
+} from '@/lib/workspace';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { CreateDocModal } from './components/CreateDocModal';
 import DocTabEditorPanel from './components/DocTabEditorPanel';
 import DocTreeSidebar from './components/DocTreeSidebar';
@@ -36,15 +52,37 @@ function titleFromPath(docPath: string): string {
   return segments[segments.length - 1] || docPath;
 }
 
-function normalizeDocPathForWorkspace(
-  docPath: string,
-  workspaceName: string
-): string {
-  if (!workspaceName) {
-    return docPath;
+function encodeDocPathForURL(docPath: string): string {
+  return docPath.split('/').map(encodeURIComponent).join('/');
+}
+
+function workspaceSearchForDocTab(workspace?: string | null): string {
+  const sanitized = sanitizeWorkspaceName(workspace ?? '');
+  if (sanitized) {
+    return `?workspace=${encodeURIComponent(sanitized)}`;
   }
-  const prefix = `${workspaceName}/`;
-  return docPath.startsWith(prefix) ? docPath.slice(prefix.length) : docPath;
+  return '';
+}
+
+function normalizedDocWorkspace(workspace?: string | null): string | null {
+  return sanitizeWorkspaceName(workspace ?? '') || null;
+}
+
+function docWorkspaceMatches(
+  left?: string | null,
+  right?: string | null
+): boolean {
+  return normalizedDocWorkspace(left) === normalizedDocWorkspace(right);
+}
+
+function docPathMatches(docPath: string, targetPath: string): boolean {
+  return docPath === targetPath || docPath.startsWith(targetPath + '/');
+}
+
+function mutationWorkspaceFromQuery(
+  query: WorkspaceTargetQuery | null
+): string | null {
+  return normalizedDocWorkspace(query?.workspace);
 }
 
 function DocsContent() {
@@ -57,8 +95,19 @@ function DocsContent() {
   const isMobile = useIsMobile();
 
   const { selectedTemplate, selectTemplate } = useCockpitState();
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
-  const workspaceQuery = selectedWorkspace || undefined;
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const selectedWorkspace = workspaceNameForSelection(workspaceSelection);
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceTargetQuery = React.useMemo(
+    () => workspaceTargetSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const canWrite = useCanWrite();
+  const canMutateDocs =
+    canWrite && isMutableWorkspaceSelection(workspaceSelection);
 
   const { setContext } = usePageContext();
   const {
@@ -90,15 +139,20 @@ function DocsContent() {
 
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameDocPath, setRenameDocPath] = useState('');
+  const [renameWorkspace, setRenameWorkspace] = useState<string | null>(null);
   const [renameLoading, setRenameLoading] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteDocPath, setDeleteDocPath] = useState('');
   const [deleteDocTitle, setDeleteDocTitle] = useState('');
+  const [deleteWorkspace, setDeleteWorkspace] = useState<string | null>(null);
 
   // Batch delete state
   const [batchDeletePaths, setBatchDeletePaths] = useState<string[]>([]);
+  const [batchDeleteWorkspace, setBatchDeleteWorkspace] = useState<
+    string | null
+  >(null);
   const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
 
   // Sort preferences
@@ -111,7 +165,7 @@ function DocsContent() {
     sort,
     order,
     remoteNode,
-    workspace: workspaceQuery,
+    ...workspaceQuery,
   });
 
   const {
@@ -125,10 +179,10 @@ function DocsContent() {
       params: {
         query: {
           remoteNode,
-          workspace: workspaceQuery,
           perPage: 200,
           sort,
           order,
+          ...workspaceQuery,
         },
       },
     },
@@ -173,13 +227,15 @@ function DocsContent() {
     if (isNavigatingRef.current) return;
     const docPath = location.pathname.replace(/^\/docs\/?/, '');
     if (docPath) {
-      const decodedPath = normalizeDocPathForWorkspace(
-        decodeURIComponent(docPath),
-        selectedWorkspace
+      const searchParams = new URLSearchParams(location.search);
+      const queryWorkspace = sanitizeWorkspaceName(
+        searchParams.get('workspace') ?? ''
       );
-      openDoc(decodedPath, titleFromPath(decodedPath));
+      const docWorkspace = queryWorkspace || null;
+      const decodedPath = decodeURIComponent(docPath);
+      openDoc(decodedPath, titleFromPath(decodedPath), docWorkspace);
     }
-  }, [location.pathname, openDoc, selectedWorkspace]);
+  }, [location.pathname, location.search, openDoc, selectedWorkspace]);
 
   // Tab → URL (skip on initial mount — URL takes precedence)
   useEffect(() => {
@@ -193,9 +249,19 @@ function DocsContent() {
       : null;
     const docPath = activeTab?.docPath;
     const currentPath = location.pathname.replace(/^\/docs\/?/, '');
-    if (docPath && docPath !== decodeURIComponent(currentPath)) {
+    const targetSearch = activeTab
+      ? workspaceSearchForDocTab(activeTab.workspace)
+      : '';
+    const encodedDocPath = docPath ? encodeDocPathForURL(docPath) : '';
+    if (docPath && encodedDocPath !== currentPath) {
       isNavigatingRef.current = true;
-      navigate('/docs/' + docPath, { replace: true });
+      navigate(`/docs/${encodedDocPath}${targetSearch}`, { replace: true });
+      requestAnimationFrame(() => {
+        isNavigatingRef.current = false;
+      });
+    } else if (docPath && location.search !== targetSearch) {
+      isNavigatingRef.current = true;
+      navigate(`/docs/${encodedDocPath}${targetSearch}`, { replace: true });
       requestAnimationFrame(() => {
         isNavigatingRef.current = false;
       });
@@ -206,22 +272,17 @@ function DocsContent() {
         isNavigatingRef.current = false;
       });
     }
-  }, [activeTabId, tabs, navigate, location.pathname]);
+  }, [activeTabId, tabs, navigate, location.pathname, location.search]);
 
   // File selection handler
   const handleSelectFile = useCallback(
-    (docPath: string, title: string) => {
-      openDoc(docPath, title);
+    (docPath: string, title: string, workspace?: string | null) => {
+      const visiblePath = visibleDocumentPathForWorkspace(docPath, workspace);
+      openDoc(visiblePath, title, workspace ?? null);
       if (isMobile) setMobileView('editor');
     },
     [openDoc, isMobile]
   );
-
-  // Track selected IDs from sidebar for batch operations
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const handleSelectionChange = useCallback((ids: string[]) => {
-    setSelectedIds(ids);
-  }, []);
 
   // Context menu actions
   const handleContextAction = useCallback(
@@ -234,31 +295,42 @@ function DocsContent() {
           break;
         case 'rename':
           setRenameDocPath(action.docPath);
+          setRenameWorkspace(mutationWorkspaceFromQuery(workspaceTargetQuery));
           setRenameError(null);
           setRenameModalOpen(true);
           break;
         case 'delete':
           setDeleteDocPath(action.docPath);
           setDeleteDocTitle(action.title);
+          setDeleteWorkspace(mutationWorkspaceFromQuery(workspaceTargetQuery));
           setDeleteConfirmOpen(true);
           break;
         case 'deleteBatch':
-          setBatchDeletePaths([...selectedIds]);
+          setBatchDeletePaths([...action.paths]);
+          setBatchDeleteWorkspace(
+            mutationWorkspaceFromQuery(workspaceTargetQuery)
+          );
           setBatchDeleteConfirmOpen(true);
           break;
       }
     },
-    [selectedIds]
+    [workspaceTargetQuery]
   );
 
   // Create handler
   const handleCreate = useCallback(
     async (path: string) => {
+      if (!canMutateDocs || !workspaceTargetQuery) {
+        setCreateError(
+          `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before creating.`
+        );
+        return;
+      }
       setCreateLoading(true);
       setCreateError(null);
       try {
         const { error } = await client.POST('/docs', {
-          params: { query: { remoteNode, workspace: workspaceQuery } },
+          params: { query: { remoteNode, ...workspaceTargetQuery } },
           body: { id: path, content: '' },
         });
         if (error) {
@@ -266,7 +338,10 @@ function DocsContent() {
           return;
         }
         mutate();
-        openDoc(path, titleFromPath(path));
+        const createdWorkspace = normalizedDocWorkspace(
+          workspaceTargetQuery.workspace
+        );
+        openDoc(path, titleFromPath(path), createdWorkspace);
         showToast('Document created');
         setCreateModalOpen(false);
       } catch {
@@ -275,21 +350,36 @@ function DocsContent() {
         setCreateLoading(false);
       }
     },
-    [client, remoteNode, workspaceQuery, mutate, openDoc, showToast]
+    [
+      canMutateDocs,
+      client,
+      remoteNode,
+      workspaceTargetQuery,
+      mutate,
+      openDoc,
+      showToast,
+    ]
   );
 
   // Rename handler (from modal)
   const handleRenameModal = useCallback(
     async (newPath: string) => {
+      if (!canMutateDocs || !workspaceTargetQuery) {
+        setRenameError(
+          `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before renaming.`
+        );
+        return;
+      }
       setRenameLoading(true);
       setRenameError(null);
       try {
+        const mutationQuery = workspaceTargetQueryForWorkspace(renameWorkspace);
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
             query: {
               remoteNode,
-              workspace: workspaceQuery,
               path: renameDocPath,
+              ...mutationQuery,
             },
           },
           body: { newPath },
@@ -299,11 +389,11 @@ function DocsContent() {
           return;
         }
         mutate();
-        // Update all tabs under the renamed path (handles both file and directory renames).
+        // Update tabs under the renamed path in the mutated workspace only.
         for (const tab of tabs) {
           if (
-            tab.docPath === renameDocPath ||
-            tab.docPath.startsWith(renameDocPath + '/')
+            docWorkspaceMatches(tab.workspace, renameWorkspace) &&
+            docPathMatches(tab.docPath, renameDocPath)
           ) {
             const updatedPath =
               newPath + tab.docPath.slice(renameDocPath.length);
@@ -323,9 +413,11 @@ function DocsContent() {
     },
     [
       client,
+      canMutateDocs,
       remoteNode,
-      workspaceQuery,
+      workspaceTargetQuery,
       renameDocPath,
+      renameWorkspace,
       mutate,
       tabs,
       updateTab,
@@ -336,10 +428,18 @@ function DocsContent() {
   // Shared path-change handler for rename and move
   const handlePathChange = useCallback(
     async (oldPath: string, newPath: string, action: 'renamed' | 'moved') => {
+      if (!canMutateDocs || !workspaceTargetQuery) {
+        showToast(
+          `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before editing documents`
+        );
+        return;
+      }
+      const mutationWorkspace =
+        mutationWorkspaceFromQuery(workspaceTargetQuery);
       try {
         const { error } = await client.POST('/docs/doc/rename', {
           params: {
-            query: { remoteNode, workspace: workspaceQuery, path: oldPath },
+            query: { remoteNode, path: oldPath, ...workspaceTargetQuery },
           },
           body: { newPath },
         });
@@ -352,11 +452,11 @@ function DocsContent() {
           return;
         }
         mutate();
-        // Update ALL tabs under the moved path (handles both file and directory moves).
+        // Update tabs under the moved path in the mutated workspace only.
         for (const tab of tabs) {
           if (
-            tab.docPath === oldPath ||
-            tab.docPath.startsWith(oldPath + '/')
+            docWorkspaceMatches(tab.workspace, mutationWorkspace) &&
+            docPathMatches(tab.docPath, oldPath)
           ) {
             const updatedPath = newPath + tab.docPath.slice(oldPath.length);
             updateTab(tab.id, {
@@ -373,7 +473,16 @@ function DocsContent() {
         mutate();
       }
     },
-    [client, remoteNode, workspaceQuery, mutate, tabs, updateTab, showToast]
+    [
+      canMutateDocs,
+      client,
+      remoteNode,
+      workspaceTargetQuery,
+      mutate,
+      tabs,
+      updateTab,
+      showToast,
+    ]
   );
 
   const handleInlineRename = useCallback(
@@ -399,10 +508,18 @@ function DocsContent() {
 
   // Delete handler (supports both files and directories)
   const handleDelete = useCallback(async () => {
+    if (!canMutateDocs || !workspaceTargetQuery) {
+      showToast(
+        `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before deleting documents`
+      );
+      setDeleteConfirmOpen(false);
+      return;
+    }
     try {
+      const mutationQuery = workspaceTargetQueryForWorkspace(deleteWorkspace);
       const { error } = await client.DELETE('/docs/doc', {
         params: {
-          query: { remoteNode, workspace: workspaceQuery, path: deleteDocPath },
+          query: { remoteNode, path: deleteDocPath, ...mutationQuery },
         },
       });
       if (error) {
@@ -413,8 +530,8 @@ function DocsContent() {
       // Close tabs for deleted path (exact match + prefix for directories)
       for (const tab of tabs) {
         if (
-          tab.docPath === deleteDocPath ||
-          tab.docPath.startsWith(deleteDocPath + '/')
+          docWorkspaceMatches(tab.workspace, deleteWorkspace) &&
+          docPathMatches(tab.docPath, deleteDocPath)
         ) {
           clearDraft(tab.id);
           markTabSaved(tab.id);
@@ -429,9 +546,11 @@ function DocsContent() {
     }
   }, [
     client,
+    canMutateDocs,
     remoteNode,
-    workspaceQuery,
+    workspaceTargetQuery,
     deleteDocPath,
+    deleteWorkspace,
     mutate,
     tabs,
     closeTab,
@@ -442,9 +561,19 @@ function DocsContent() {
 
   // Batch delete handler
   const handleBatchDelete = useCallback(async () => {
+    if (!canMutateDocs || !workspaceTargetQuery) {
+      showToast(
+        `Select a workspace or ${DEFAULT_WORKSPACE_DISPLAY_NAME} before deleting documents`
+      );
+      setBatchDeleteConfirmOpen(false);
+      setBatchDeletePaths([]);
+      return;
+    }
     try {
+      const mutationQuery =
+        workspaceTargetQueryForWorkspace(batchDeleteWorkspace);
       const { data, error } = await client.POST('/docs/delete-batch', {
-        params: { query: { remoteNode, workspace: workspaceQuery } },
+        params: { query: { remoteNode, ...mutationQuery } },
         body: { paths: batchDeletePaths },
       });
       if (error) {
@@ -456,8 +585,9 @@ function DocsContent() {
       const deletedSet = new Set(data.deleted);
       for (const tab of tabs) {
         const shouldClose =
-          deletedSet.has(tab.docPath) ||
-          [...deletedSet].some((dp) => tab.docPath.startsWith(dp + '/'));
+          docWorkspaceMatches(tab.workspace, batchDeleteWorkspace) &&
+          (deletedSet.has(tab.docPath) ||
+            [...deletedSet].some((dp) => tab.docPath.startsWith(dp + '/')));
         if (shouldClose) {
           clearDraft(tab.id);
           markTabSaved(tab.id);
@@ -478,9 +608,11 @@ function DocsContent() {
     }
   }, [
     batchDeletePaths,
+    batchDeleteWorkspace,
+    canMutateDocs,
     client,
     remoteNode,
-    workspaceQuery,
+    workspaceTargetQuery,
     mutate,
     tabs,
     closeTab,
@@ -490,17 +622,25 @@ function DocsContent() {
   ]);
 
   // Batch delete from selection bar
-  const handleBatchDeleteFromBar = useCallback((paths: string[]) => {
-    setBatchDeletePaths(paths);
-    setBatchDeleteConfirmOpen(true);
-  }, []);
+  const handleBatchDeleteFromBar = useCallback(
+    (paths: string[]) => {
+      setBatchDeletePaths(paths);
+      setBatchDeleteWorkspace(mutationWorkspaceFromQuery(workspaceTargetQuery));
+      setBatchDeleteConfirmOpen(true);
+    },
+    [workspaceTargetQuery]
+  );
 
   // Delete triggered from tab menu or editor header
-  const handleDeleteFromTab = useCallback((docPath: string, title: string) => {
-    setDeleteDocPath(docPath);
-    setDeleteDocTitle(title);
-    setDeleteConfirmOpen(true);
-  }, []);
+  const handleDeleteFromTab = useCallback(
+    (docPath: string, title: string, workspace?: string | null) => {
+      setDeleteDocPath(docPath);
+      setDeleteDocTitle(title);
+      setDeleteWorkspace(normalizedDocWorkspace(workspace));
+      setDeleteConfirmOpen(true);
+    },
+    []
+  );
 
   const leftPanel = (
     <DocTreeSidebar
@@ -518,7 +658,7 @@ function DocsContent() {
       onRename={handleInlineRename}
       onMove={handleMove}
       onBatchDelete={handleBatchDeleteFromBar}
-      onSelectionChange={handleSelectionChange}
+      canMutate={canMutateDocs}
       activeDocContent={activeDocContent}
       onHeadingClick={handleHeadingClick}
       sortField={docSortField}
@@ -685,7 +825,7 @@ function DocsPage() {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const docTabStorageKey = `dagu_doc_tabs:${JSON.stringify({
     remoteNode,
-    workspace: appBarContext.selectedWorkspace || null,
+    workspace: workspaceSelectionKey(appBarContext.workspaceSelection),
   })}`;
 
   return (

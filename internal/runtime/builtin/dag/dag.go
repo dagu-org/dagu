@@ -55,6 +55,7 @@ func newDAGExecutor(ctx context.Context, step core.Step) (executor.Executor, err
 	if len(step.WorkerSelector) > 0 && child.DAG.HasApprovalSteps() {
 		return nil, fmt.Errorf("%w: %s", ErrApprovalStepsWithWorker, step.SubDAG.Name)
 	}
+	child.SetWorkerSelector(step.WorkerSelector)
 
 	dir := runtime.GetEnv(ctx).WorkingDir
 	if dir != "" && !fileutil.FileExists(dir) {

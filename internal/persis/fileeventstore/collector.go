@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -140,6 +141,9 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 		if entry.IsDir() {
 			continue
 		}
+		if !strings.HasSuffix(entry.Name(), inboxSuffix) {
+			continue
+		}
 		processed++
 		path := filepath.Join(c.store.inboxDir, entry.Name())
 		pending, err := c.readPendingEvent(path)
@@ -148,7 +152,7 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 			continue
 		}
 		if _, ok := c.seenIDs[pending.event.ID]; ok {
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			if err := fileutil.RemoveWithRetry(path); err != nil && !os.IsNotExist(err) {
 				slog.Warn("fileeventstore: failed to delete duplicate inbox file",
 					slog.String("file", path),
 					slog.String("error", err.Error()))
@@ -156,7 +160,7 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 			continue
 		}
 		if _, ok := queuedIDs[pending.event.ID]; ok {
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			if err := fileutil.RemoveWithRetry(path); err != nil && !os.IsNotExist(err) {
 				slog.Warn("fileeventstore: failed to delete duplicate inbox file",
 					slog.String("file", path),
 					slog.String("error", err.Error()))
@@ -200,7 +204,7 @@ func (c *Collector) appendGroup(hour string, group []pendingInboxEvent) error {
 			if _, ok := c.seenIDs[item.event.ID]; !ok {
 				continue
 			}
-			if err := os.Remove(item.path); err != nil && !os.IsNotExist(err) {
+			if err := fileutil.RemoveWithRetry(item.path); err != nil && !os.IsNotExist(err) {
 				slog.Warn("fileeventstore: failed to delete processed inbox file",
 					slog.String("file", item.path),
 					slog.String("error", err.Error()))
@@ -245,7 +249,7 @@ func (c *Collector) appendGroup(hour string, group []pendingInboxEvent) error {
 }
 
 func (c *Collector) readPendingEvent(path string) (pendingInboxEvent, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // controlled path
+	data, err := fileutil.ReadFileWithRetry(path)
 	if err != nil {
 		return pendingInboxEvent{}, err
 	}
@@ -269,7 +273,7 @@ func (c *Collector) quarantine(path, name string, parseErr error) {
 	if _, err := os.Stat(dest); err == nil {
 		dest = filepath.Join(c.store.quarantineDir, fmt.Sprintf("%d-%s", c.now().UTC().UnixNano(), name))
 	}
-	if err := os.Rename(path, dest); err != nil {
+	if err := fileutil.RenameWithRetry(path, dest); err != nil {
 		slog.Warn("fileeventstore: failed to quarantine inbox file",
 			slog.String("file", path),
 			slog.String("error", err.Error()))

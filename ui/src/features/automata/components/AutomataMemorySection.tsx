@@ -10,10 +10,10 @@ import {
 
 import { AutomataDocument, type components } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useCanWrite } from '@/contexts/AuthContext';
 import { useClient } from '@/hooks/api';
-import ConfirmModal from '@/ui/ConfirmModal';
 
 type AutomataDocumentResponse =
   components['schemas']['AutomataDocumentResponse'];

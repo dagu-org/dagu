@@ -23,12 +23,27 @@ function initializeMermaid(): void {
     theme: dark ? 'dark' : 'default',
     themeVariables: {
       background: 'transparent',
-      primaryColor: getCSSVariable('--card', dark ? '#292a2d' : '#faf8f5'),
-      primaryTextColor: getCSSVariable('--foreground', dark ? '#e8eaed' : '#3d3833'),
-      primaryBorderColor: getCSSVariable('--border', dark ? '#5f6368' : '#d4cdc0'),
-      lineColor: getCSSVariable('--muted-foreground', dark ? '#9aa0a6' : '#7a7268'),
-      secondaryColor: getCSSVariable('--secondary', dark ? '#35363a' : '#f5f0e8'),
-      tertiaryColor: getCSSVariable('--background', dark ? '#202124' : '#f5f0e8'),
+      primaryColor: getCSSVariable('--card', dark ? '#181b22' : '#ffffff'),
+      primaryTextColor: getCSSVariable(
+        '--foreground',
+        dark ? '#e5e7eb' : '#111827'
+      ),
+      primaryBorderColor: getCSSVariable(
+        '--border',
+        dark ? '#303746' : '#d7dde6'
+      ),
+      lineColor: getCSSVariable(
+        '--muted-foreground',
+        dark ? '#9ca3af' : '#64748b'
+      ),
+      secondaryColor: getCSSVariable(
+        '--secondary',
+        dark ? '#242936' : '#eef2f7'
+      ),
+      tertiaryColor: getCSSVariable(
+        '--background',
+        dark ? '#111318' : '#f5f7fb'
+      ),
     },
     fontFamily: 'Arial',
     logLevel: 4,
@@ -75,7 +90,9 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     }
 
     render();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [code, idPrefix]);
 
   if (error) {

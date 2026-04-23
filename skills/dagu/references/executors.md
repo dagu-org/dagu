@@ -40,7 +40,7 @@ Run commands in Docker containers.
 steps:
   - name: build
     type: docker
-    config:
+    with:
       image: golang:1.23
       pull: always
       auto_remove: true
@@ -52,7 +52,7 @@ steps:
 
 Aliases: `docker`, `container`
 
-Config fields:
+`with` fields:
 - `image` — Docker image (required unless `container_name` is set)
 - `container_name` — Name/ID of existing container for exec mode
 - `pull` — Image pull policy: `always`, `never`, `missing` (default)
@@ -120,7 +120,7 @@ steps:
     parallel: ${ITEMS}
 ```
 
-Config fields:
+`parallel` fields:
 - `items` — Array of items to process (strings or key-value param maps)
 - `max_concurrent` — Max parallel executions (default 10)
 
@@ -138,7 +138,7 @@ Remote command execution and file transfer over SSH.
 steps:
   - name: remote
     type: ssh
-    config:
+    with:
       user: deploy
       host: server.example.com
       key: ~/.ssh/id_rsa
@@ -147,7 +147,7 @@ steps:
 
   - name: upload
     type: sftp
-    config:
+    with:
       user: deploy
       host: server.example.com
       key: ~/.ssh/id_rsa
@@ -156,7 +156,7 @@ steps:
       destination: /remote/file.tar.gz
 ```
 
-Shared SSH config fields: `user`, `host`, `port` (default 22), `key`, `password`, `timeout` (default 30s), `strict_host_key` (default true), `known_host_file`, `shell`, `shell_args`, `bastion` (jump host with `host`, `port`, `user`, `key`, `password`).
+Shared SSH `with` fields: `user`, `host`, `port` (default 22), `key`, `password`, `timeout` (default 30s), `strict_host_key` (default true), `known_host_file`, `shell`, `shell_args`, `bastion` (jump host with `host`, `port`, `user`, `key`, `password`).
 
 SFTP additional fields: `direction` (`upload` or `download`), `source`, `destination`.
 
@@ -169,7 +169,7 @@ steps:
   - name: api-call
     type: http
     command: "POST https://api.example.com/data"
-    config:
+    with:
       headers:
         Authorization: "Bearer ${TOKEN}"
         Content-Type: application/json
@@ -178,7 +178,7 @@ steps:
       timeout: 30
 ```
 
-Command format: `"METHOD URL"`. Config fields: `timeout` (seconds), `headers` (map), `query` (map), `body` (string), `silent`, `debug`, `json`, `skip_tls_verify`.
+Command format: `"METHOD URL"`. `with` fields: `timeout` (seconds), `headers` (map), `query` (map), `body` (string), `silent`, `debug`, `json`, `skip_tls_verify`.
 
 ## jq
 
@@ -192,7 +192,7 @@ steps:
     script: '{"items": [{"name": "a", "quantity": 1}]}'
 ```
 
-Query from `command:`, input JSON from `script:`. Config fields:
+Query from `command:`, input JSON from `script:`. `with` fields:
 - `raw` — Output raw strings without JSON encoding (like `jq -r`)
 
 Notes:
@@ -207,7 +207,7 @@ Render text using Go `text/template`.
 steps:
   - id: render
     type: template
-    config:
+    with:
       data:
         name: Alice
     script: |
@@ -217,17 +217,17 @@ steps:
 
 Behavior:
 - `script` is required and is rendered as a template, not executed as a shell script
-- Template data comes from `config.data` and is accessed as `{{ .key }}`
+- Template data comes from `with.data` and is accessed as `{{ .key }}`
 - Supports normal Go template control flow plus a safe subset of slim-sprig functions
 - Missing keys fail the step
-- If `config.output` is set, the rendered result is written to that file instead of stdout
-- Relative `config.output` paths are resolved from the step working directory
+- If `with.output` is set, the rendered result is written to that file instead of stdout
+- Relative `with.output` paths are resolved from the step working directory
 
-Config fields:
+`with` fields:
 - `data` — Object exposed to the template as `.`
 - `output` — File path for rendered output; if omitted, rendered text is written to stdout
 
-Important: step `output:` and `config.output` are different. Step `output:` captures stdout into a Dagu variable. `config.output` writes the rendered result directly to a file.
+Important: step `output:` and `with.output` are different. Step `output:` captures stdout into a Dagu variable. `with.output` writes the rendered result directly to a file.
 
 Use `template` when you need to generate text files such as Markdown, config files, SQL, JSON, or prompts. It is usually safer and simpler than building files with `echo`, heredocs, or shell string interpolation.
 
@@ -239,7 +239,7 @@ SQL database queries. Use `type: postgres` or `type: sqlite`.
 steps:
   - name: query
     type: postgres
-    config:
+    with:
       dsn: "postgres://user:pass@localhost:5432/db"
       output_format: json
       timeout: 120
@@ -249,7 +249,7 @@ steps:
 
 SQL from `command:` (single statement) or `script:` (multiple statements, also supports `file:///path/to/file.sql`).
 
-Config fields: `dsn` (required), `params` (map or array), `timeout` (seconds), `transaction`, `isolation_level` (`default`, `read_committed`, `repeatable_read`, `serializable`), `output_format` (`jsonl`, `json`, `csv`), `headers`, `null_string`, `max_rows`, `streaming`, `output_file`, `import` (bulk import config with `input_file`, `table`, `format`, `batch_size`, etc.).
+`with` fields: `dsn` (required), `params` (map or array), `timeout` (seconds), `transaction`, `isolation_level` (`default`, `read_committed`, `repeatable_read`, `serializable`), `output_format` (`jsonl`, `json`, `csv`), `headers`, `null_string`, `max_rows`, `streaming`, `output_file`, `import` (bulk import config with `input_file`, `table`, `format`, `batch_size`, etc.).
 
 SQLite-specific: `shared_memory` (shared cache for `:memory:` DBs across steps), `file_lock`. PostgreSQL-specific: `advisory_lock`.
 
@@ -261,7 +261,7 @@ Redis operations.
 steps:
   - name: cache-set
     type: redis
-    config:
+    with:
       url: "redis://localhost:6379"
       command: SET
       key: mykey
@@ -282,7 +282,7 @@ steps:
   - name: upload
     type: s3
     command: upload
-    config:
+    with:
       region: us-east-1
       bucket: my-bucket
       key: data/output.csv
@@ -301,14 +301,14 @@ Send email.
 steps:
   - name: notify
     type: mail
-    config:
+    with:
       from: noreply@example.com
       to: team@example.com
       subject: "Build Complete"
       message: "The build finished successfully."
 ```
 
-Config fields:
+`with` fields:
 - `from` — Sender email address
 - `to` — Recipient(s) (string or array of strings)
 - `subject` — Email subject line
@@ -325,7 +325,7 @@ steps:
   - name: compress
     type: archive
     command: create
-    config:
+    with:
       source: /data/output
       destination: /data/output.tar.gz
       format: tar.gz
@@ -333,7 +333,7 @@ steps:
         - "*.tmp"
 ```
 
-Config fields: `source` (required), `destination` (required for create), `format` (`zip`, `tar`, `tar.gz`, etc.; inferred from filename if omitted), `compression_level`, `password` (extract/list only), `overwrite`, `strip_components`, `include`/`exclude` (glob patterns).
+`with` fields: `source` (required), `destination` (required for create), `format` (`zip`, `tar`, `tar.gz`, etc.; inferred from filename if omitted), `compression_level`, `password` (extract/list only), `overwrite`, `strip_components`, `include`/`exclude` (glob patterns).
 
 ## chat
 
@@ -407,16 +407,16 @@ harness:
 steps:
   - name: generate-tests
     command: "Write unit tests for the auth module"
-    config:
+    with:
       yolo: true
     output: RESULT
 ```
 
-The `command` field is the prompt. `config.provider` can reference either a built-in provider or a named custom entry under top-level `harnesses:`. All non-reserved keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Built-in providers also normalize `snake_case` keys to kebab-case flag names. Reserved keys are `provider` and `fallback`.
+The `command` field is the prompt. `with.provider` can reference either a built-in provider or a named custom entry under top-level `harnesses:`. All non-reserved `with` keys are passed directly as CLI flags (`--key value` for strings/numbers, `--key` for booleans). Built-in providers also normalize `snake_case` keys to kebab-case flag names. Reserved keys are `provider` and `fallback`.
 
 Supported providers: `claude`, `codex`, `copilot`, `opencode`, `pi`.
 
-Top-level `harness:` acts as a DAG-wide default. Step-level config overlays the DAG-level primary config, and step-level `fallback` replaces the DAG-level `fallback`. If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`.
+Top-level `harness:` acts as a DAG-wide default. Step-level `with` overlays the DAG-level primary harness config, and step-level `with.fallback` replaces the DAG-level `fallback`. If a step omits `type:` and the DAG defines `harness:`, the step is inferred as `type: harness`.
 
 `provider` may be parameterized with `${...}` and is resolved at runtime after interpolation.
 

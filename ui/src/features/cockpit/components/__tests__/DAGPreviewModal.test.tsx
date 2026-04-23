@@ -8,7 +8,10 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { useClient } from '@/hooks/api';
 import { DAGPreviewModal } from '../DAGPreviewModal';
 
-const mockSidePanel = vi.fn((_props: unknown) => <div>dag details panel</div>);
+const mockSidePanel = vi.fn((props: unknown) => {
+  void props;
+  return <div>dag details panel</div>;
+});
 
 vi.mock('@/hooks/api', () => ({
   useClient: vi.fn(),

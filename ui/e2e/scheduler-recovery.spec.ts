@@ -28,7 +28,7 @@ test('runs an overdue scheduled DAG after the scheduler is restarted', async ({ 
     const dagName = uniqueName('e2e-schedule-recovery');
     const scheduledDate = nextMinuteBoundary(30_000);
     const scheduledAt = formatOneOffScheduleAt(scheduledDate);
-    const fileName = await writeLocalDAG(
+    await writeLocalDAG(
       dagName,
       `
 name: ${dagName}

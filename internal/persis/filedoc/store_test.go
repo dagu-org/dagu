@@ -254,6 +254,23 @@ func TestListFlatWithPathPrefix(t *testing.T) {
 	assert.Equal(t, "runbook", result.Items[0].ID)
 }
 
+func TestListFlatExcludePathRootsBeforePagination(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "aaa/hidden", "hidden"))
+	require.NoError(t, store.Create(ctx, "bbb", "visible"))
+
+	opts := defaultFlatOpts(1, 1)
+	opts.ExcludePathRoots = []string{"aaa"}
+	result, err := store.ListFlat(ctx, opts)
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "bbb", result.Items[0].ID)
+	assert.Equal(t, 1, result.TotalCount)
+	assert.Equal(t, 1, result.TotalPages)
+}
+
 func TestListTree(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -272,6 +289,23 @@ func TestListTree(t *testing.T) {
 	assert.Equal(t, 2, len(result.Items[0].Children))
 	assert.Equal(t, "file", result.Items[1].Type)
 	assert.Equal(t, "readme.md", result.Items[1].Name)
+}
+
+func TestListTreeExcludePathRootsBeforePagination(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Create(ctx, "aaa", "hidden"))
+	require.NoError(t, store.Create(ctx, "bbb", "visible"))
+
+	opts := defaultListOpts(1, 1)
+	opts.ExcludePathRoots = []string{"aaa"}
+	result, err := store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "bbb", result.Items[0].ID)
+	assert.Equal(t, 1, result.TotalCount)
+	assert.Equal(t, 1, result.TotalPages)
 }
 
 func TestSearch(t *testing.T) {

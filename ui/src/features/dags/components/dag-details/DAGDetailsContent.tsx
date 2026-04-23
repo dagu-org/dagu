@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components } from '../../../../api/v1/schema';
+import { workspaceNameFromLabels } from '../../../../lib/workspace';
 import { DAGStatus } from '../../components';
 import { DAGContext } from '../../contexts/DAGContext';
 import { LinkTab } from '../common';
@@ -27,7 +28,6 @@ type DAGDetailsContentProps = {
   filePath?: string;
   dag: components['schemas']['DAGDetails'];
   currentDAGRun?: components['schemas']['DAGRunDetails'];
-  latestDAGRun?: components['schemas']['DAGRunDetails'];
   refreshFn: () => void;
   formatDuration: (startDate: string, endDate: string) => string;
   activeTab: string;
@@ -45,6 +45,7 @@ type DAGDetailsContentProps = {
     dagRunId?: string,
     immediate?: boolean
   ) => string | void | Promise<string | void>;
+  onRunStarted?: (dagRunId: string) => void | Promise<void>;
   /** When true, forces enqueue mode in DAGContext (used by cockpit) */
   forceEnqueue?: boolean;
   /** When true, automatically opens the start/enqueue modal on mount */
@@ -62,7 +63,6 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   filePath,
   dag,
   currentDAGRun,
-  latestDAGRun,
   refreshFn,
   formatDuration,
   activeTab,
@@ -75,6 +75,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
   localDags,
   editorHints,
   onEnqueue,
+  onRunStarted,
   forceEnqueue = false,
   autoOpenStartModal = false,
 }) => {
@@ -84,6 +85,14 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
     logType: 'execution',
     stepName: undefined,
   });
+  const dagWorkspaceName = React.useMemo(
+    () =>
+      workspaceNameFromLabels([
+        ...(dag.labels ?? []),
+        ...(dag.tags ?? []),
+      ]),
+    [dag.labels, dag.tags]
+  );
 
   const handleTabClick = (tab: string) => {
     if (onTabChange) {
@@ -118,6 +127,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
         forceEnqueue,
         autoOpenStartModal,
         onEnqueue,
+        onRunStarted,
       }}
     >
       <div className="w-full flex flex-col">
@@ -339,8 +349,7 @@ const DAGDetailsContent: React.FC<DAGDetailsContentProps> = ({
           <div className={activeTab === 'spec' ? 'visible' : 'hidden'}>
             <DAGEditButtons
               fileName={fileName || ''}
-              dagName={dag?.name || fileName || ''}
-              latestDAGRun={latestDAGRun}
+              workspace={dagWorkspaceName}
             />
           </div>
         </div>

@@ -24,7 +24,7 @@ import (
 steps:
   - name: run-in-k8s
     type: k8s
-    config:
+    with:
       image: python:3.11
       namespace: default
       resources:

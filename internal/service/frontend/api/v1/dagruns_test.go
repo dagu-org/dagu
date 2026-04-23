@@ -631,40 +631,41 @@ steps:
 func TestApproveDAGRunStepMissingRequired(t *testing.T) {
 	server := test.SetupServer(t)
 
-	dagSpec := fmt.Sprintf(`type: graph
-steps:
-  - name: wait-step
-    command: %q
-    approval:
-      prompt: "Please provide reason"
-      input:
-        - reason
-      required:
-        - reason
-  - name: after-wait
-    depends: [wait-step]
-    command: "echo done"`, "exit 0")
-
-	_ = server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+	dag := &core.DAG{
 		Name: "approval_required_dag",
-		Spec: &dagSpec,
-	}).ExpectStatus(http.StatusCreated).Send(t)
-
-	// Start the DAG
-	startResp := server.Client().Post("/api/v1/dags/approval_required_dag/start", api.ExecuteDAGJSONRequestBody{}).
-		ExpectStatus(http.StatusOK).Send(t)
-
-	var startBody api.ExecuteDAG200JSONResponse
-	startResp.Unmarshal(t, &startBody)
-
-	// Wait for DAG to enter Wait status
-	waitForStoredDAGRunStatus(t, server, "approval_required_dag", startBody.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
-		return status.Status == core.Waiting && hasNodeWithStatus(status, "wait-step", core.NodeWaiting)
-	})
+		Type: core.TypeGraph,
+		Steps: []core.Step{
+			{
+				Name: "wait-step",
+				Approval: &core.ApprovalConfig{
+					Prompt:   "Please provide reason",
+					Input:    []string{"reason"},
+					Required: []string{"reason"},
+				},
+			},
+			{
+				Name:    "after-wait",
+				Depends: []string{"wait-step"},
+			},
+		},
+	}
+	dagRunID := "approval-required-run"
+	seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		dagRunID,
+		core.Waiting,
+		seedDAGRunStatusOptions{
+			nodeStatuses: map[string]core.NodeStatus{
+				"wait-step": core.NodeWaiting,
+			},
+		},
+	)
 
 	// Try to approve without required input - should fail
 	_ = server.Client().Post(
-		fmt.Sprintf("/api/v1/dag-runs/approval_required_dag/%s/steps/wait-step/approve", startBody.DagRunId),
+		fmt.Sprintf("/api/v1/dag-runs/approval_required_dag/%s/steps/wait-step/approve", dagRunID),
 		api.ApproveStepRequest{},
 	).ExpectStatus(http.StatusBadRequest).Send(t)
 }
@@ -1386,6 +1387,50 @@ func seedLatestDAGRunStatus(
 	require.NoError(t, attempt.Close(server.Context))
 
 	return ref
+}
+
+func TestUpdateDAGRunStepStatusRecomputesAggregateStatus(t *testing.T) {
+	server := test.SetupServer(t)
+
+	dag := &core.DAG{
+		Name: "manual_step_status_aggregate",
+		Steps: []core.Step{
+			{Name: "step1"},
+			{Name: "step2"},
+		},
+	}
+	const dagRunID = "manual-step-status-run"
+	seedLatestDAGRunStatus(
+		t,
+		server,
+		dag,
+		dagRunID,
+		core.Succeeded,
+		seedDAGRunStatusOptions{
+			nodeStatuses: map[string]core.NodeStatus{
+				"step1": core.NodeSucceeded,
+				"step2": core.NodeSucceeded,
+			},
+		},
+	)
+
+	server.Client().Patch(
+		fmt.Sprintf("/api/v1/dag-runs/%s/%s/steps/%s/status", dag.Name, dagRunID, "step1"),
+		api.UpdateDAGRunStepStatusJSONRequestBody{Status: api.NodeStatusFailed},
+	).ExpectStatus(http.StatusOK).Send(t)
+
+	status := waitForStoredDAGRunStatus(
+		t,
+		server,
+		dag.Name,
+		dagRunID,
+		5*time.Second,
+		func(status *exec.DAGRunStatus) bool {
+			return status.Status == core.Failed &&
+				hasNodeWithStatus(status, "step1", core.NodeFailed)
+		},
+	)
+	require.Equal(t, core.Failed, status.Status)
 }
 
 func TestDeleteDAGRun(t *testing.T) {

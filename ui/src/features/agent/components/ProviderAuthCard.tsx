@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  CheckCircle2,
   Copy,
   ExternalLink,
   Loader2,

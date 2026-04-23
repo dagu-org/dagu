@@ -3,7 +3,10 @@
 
 package workspace
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestValidateName(t *testing.T) {
 	t.Parallel()
@@ -15,9 +18,11 @@ func TestValidateName(t *testing.T) {
 	}{
 		{testName: "alphanumeric", name: "engineering1", valid: true},
 		{testName: "underscore", name: "team_ai", valid: true},
+		{testName: "hyphen", name: "team-ai", valid: true},
 		{testName: "empty", name: "", valid: false},
-		{testName: "hyphen", name: "team-ai", valid: false},
 		{testName: "space", name: "team ai", valid: false},
+		{testName: "reserved all", name: "all", valid: false},
+		{testName: "reserved default", name: "default", valid: false},
 	}
 
 	for _, tt := range tests {
@@ -26,7 +31,7 @@ func TestValidateName(t *testing.T) {
 			if tt.valid && err != nil {
 				t.Fatalf("ValidateName(%q) returned error: %v", tt.name, err)
 			}
-			if !tt.valid && err != ErrInvalidWorkspaceName {
+			if !tt.valid && !errors.Is(err, ErrInvalidWorkspaceName) {
 				t.Fatalf("ValidateName(%q) = %v, want %v", tt.name, err, ErrInvalidWorkspaceName)
 			}
 		})

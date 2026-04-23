@@ -34,7 +34,7 @@ kubernetes:
 steps:
   - name: step1
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       resources:
         requests:
@@ -47,7 +47,7 @@ steps:
 
   - name: step2
     type: kubernetes
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `
@@ -111,7 +111,7 @@ kubernetes:
 steps:
   - name: step1
     type: k8s
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `
@@ -128,7 +128,7 @@ func TestKubernetesStepRequiresEffectiveImage(t *testing.T) {
 steps:
   - name: step1
     type: k8s
-    config:
+    with:
       namespace: jobs
     command: echo hello
 `
@@ -168,7 +168,7 @@ kubernetes:
 steps:
   - name: step1
     type: k8s
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `)
@@ -223,7 +223,7 @@ kubernetes:
 steps:
   - name: step1
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       security_context:
         capabilities:
@@ -271,7 +271,7 @@ kubernetes: {}
 steps:
   - name: step1
     type: k8s
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `)

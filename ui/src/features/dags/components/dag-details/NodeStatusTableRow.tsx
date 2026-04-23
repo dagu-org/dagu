@@ -26,7 +26,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import {
   AlertCircle,
   ChevronDown,
@@ -45,7 +45,8 @@ import {
   Status,
   Stream,
 } from '../../../../api/v1/schema';
-import StyledTableRow from '../../../../ui/StyledTableRow';
+import StyledTableRow from '@/components/ui/styled-table-row';
+import { DAGContext } from '../../contexts/DAGContext';
 import { NodeStatusChip } from '../common';
 import { InlineLogViewer } from '../common/InlineLogViewer';
 import StatusUpdateModal from '../dag-execution/StatusUpdateModal';
@@ -68,6 +69,8 @@ type Props = {
     dagRunId: string,
     node?: components['schemas']['Node']
   ) => void;
+  /** Function called after this row's status update succeeds */
+  onNodeStatusUpdated?: (stepName: string, status: NodeStatus) => void;
   /** Full dagRun details (optional) - used to determine if this is a sub dagRun */
   dagRun: components['schemas']['DAGRunDetails'];
   /** View mode: desktop or mobile */
@@ -131,6 +134,7 @@ function NodeStatusTableRow({
   rownum,
   node,
   onViewLog,
+  onNodeStatusUpdated,
   dagRun,
   view = 'desktop',
 }: Props) {
@@ -138,6 +142,7 @@ function NodeStatusTableRow({
   const navigate = useNavigate();
   const client = useClient();
   const appBarContext = useContext(AppBarContext);
+  const dagContext = useContext(DAGContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
   const { showError } = useErrorModal();
   // State to store the current duration for running tasks
@@ -367,6 +372,8 @@ function NodeStatusTableRow({
       return;
     }
 
+    onNodeStatusUpdated?.(step.name, status);
+    dagContext.refresh();
     setShowStatusModal(false);
   };
 
@@ -718,7 +725,7 @@ function NodeStatusTableRow({
                   node.status !== NodeStatus.Rejected && (
                     <Button
                       size="icon-sm"
-                      className="btn-3d-secondary"
+                      variant="secondary"
                       title="Retry from this step"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -850,7 +857,6 @@ function NodeStatusTableRow({
           step={node.step}
           onSubmit={handleStatusUpdate}
         />
-
       </>
     );
   }
@@ -1172,7 +1178,6 @@ function NodeStatusTableRow({
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
         </div>
       )}
     </div>

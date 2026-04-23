@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, MessageSquare, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useAgentChatContext } from '@/features/agent/context/AgentChatContext';
 import { useAgentChat } from '@/features/agent/hooks/useAgentChat';
 import { ChatMessages } from '@/features/agent/components/ChatMessages';

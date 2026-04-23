@@ -15,7 +15,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { components, Status, TriggerType } from '../../../../api/v1/schema';
+import { components, Status } from '../../../../api/v1/schema';
 import { triggerTypeLabels } from '../common/TriggerTypeIndicator';
 
 type Props = {

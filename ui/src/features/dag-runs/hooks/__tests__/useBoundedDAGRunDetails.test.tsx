@@ -5,7 +5,10 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDAGRunSSE } from '@/hooks/useDAGRunSSE';
 import { useSubDAGRunSSE } from '@/hooks/useSubDAGRunSSE';
+import type { SSEState } from '@/hooks/useSSE';
 import { useBoundedDAGRunDetails } from '../useBoundedDAGRunDetails';
+
+type DAGRunSSEState = SSEState<unknown>;
 
 const { fetchDAGRunDetailsMock, dagRunSSEState, subDAGRunSSEState } =
   vi.hoisted(() => ({
@@ -17,7 +20,7 @@ const { fetchDAGRunDetailsMock, dagRunSSEState, subDAGRunSSEState } =
         isConnected: true,
         isConnecting: false,
         shouldUseFallback: false,
-      } as any,
+      } as DAGRunSSEState,
     },
     subDAGRunSSEState: {
       current: {
@@ -26,7 +29,7 @@ const { fetchDAGRunDetailsMock, dagRunSSEState, subDAGRunSSEState } =
         isConnected: false,
         isConnecting: false,
         shouldUseFallback: true,
-      } as any,
+      } as DAGRunSSEState,
     },
   }));
 

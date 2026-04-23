@@ -19,7 +19,7 @@ import { TOKEN_KEY, useAuth, useIsAdmin } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useHasFeature } from '@/hooks/useLicense';
 import dayjs from '@/lib/dayjs';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import {
   Ban,
   Info,
@@ -190,7 +190,10 @@ export default function UsersPage() {
           <Info className="h-4 w-4 shrink-0" />
           <span>
             User management features (create, edit, delete) require a{' '}
-            <Link to="/license" className="text-primary underline underline-offset-2">
+            <Link
+              to="/license"
+              className="text-primary underline underline-offset-2"
+            >
               license or trial
             </Link>
             . Password reset is available for all admins.
@@ -278,7 +281,9 @@ export default function UsersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {hasRbac && (
-                          <DropdownMenuItem onClick={() => setEditingUser(user)}>
+                          <DropdownMenuItem
+                            onClick={() => setEditingUser(user)}
+                          >
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>

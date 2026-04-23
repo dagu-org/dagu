@@ -195,7 +195,23 @@ export function buildAutomataThread(
     return a.sortIndex - b.sortIndex;
   });
 
-  return merged.map(({ sortTime: _sortTime, sortSequence: _sortSequence, sortIndex: _sortIndex, ...item }) => item);
+  return merged.map((item): AutomataThreadItem => {
+    if (item.kind === 'queued') {
+      return {
+        id: item.id,
+        kind: item.kind,
+        createdAt: item.createdAt,
+        queuedKind: item.queuedKind,
+        message: item.message,
+      };
+    }
+    return {
+      id: item.id,
+      kind: item.kind,
+      createdAt: item.createdAt,
+      message: item.message,
+    };
+  });
 }
 
 export function agentMessageLabel(type?: string): string {

@@ -8,7 +8,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,7 +22,10 @@ import (
 	authmodel "github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/persis/fileuser"
+	"github.com/dagucloud/dagu/internal/service/eventstore"
+	apiv1 "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
 	frontendauth "github.com/dagucloud/dagu/internal/service/frontend/auth"
+	"github.com/dagucloud/dagu/internal/service/frontend/sse"
 )
 
 // testContext returns a context that is cancelled when the test ends,
@@ -54,6 +59,114 @@ func testConfig(tmpDir string, ia config.InitialAdmin) *config.Config {
 				},
 			},
 		},
+	}
+}
+
+func TestRegisterDedicatedSSEFetchersUsesEventStoreInvalidationForRunTopics(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		topicType  sse.TopicType
+		topic      string
+		identifier string
+	}{
+		{
+			name:       "dag run details",
+			topicType:  sse.TopicTypeDAGRun,
+			topic:      "dagrun:test/run-1",
+			identifier: "test/run-1",
+		},
+		{
+			name:       "sub dag run details",
+			topicType:  sse.TopicTypeSubDAGRun,
+			topic:      "subdagrun:test/run-1/sub-1",
+			identifier: "test/run-1/sub-1",
+		},
+		{
+			name:       "dag history",
+			topicType:  sse.TopicTypeDAGHistory,
+			topic:      "daghistory:test.yaml",
+			identifier: "test.yaml",
+		},
+		{
+			name:       "dag runs list",
+			topicType:  sse.TopicTypeDAGRuns,
+			topic:      "dagruns:limit=10&status=4",
+			identifier: "limit=10&status=4",
+		},
+		{
+			name:       "queues list",
+			topicType:  sse.TopicTypeQueues,
+			topic:      "queues:",
+			identifier: "",
+		},
+		{
+			name:       "dags list",
+			topicType:  sse.TopicTypeDAGsList,
+			topic:      "dagslist:page=1&perPage=100",
+			identifier: "page=1&perPage=100",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mux := sse.NewMultiplexer(sse.StreamConfig{HeartbeatInterval: time.Hour}, nil)
+			t.Cleanup(mux.Shutdown)
+
+			srv := &Server{
+				apiV1:        &apiv1.API{},
+				eventService: eventstore.New(nil),
+			}
+			srv.registerDedicatedSSEFetchers(mux)
+
+			var fetches atomic.Int64
+			mux.RegisterFetcher(tt.topicType, func(_ context.Context, identifier string) (any, error) {
+				return map[string]any{
+					"id":      identifier,
+					"fetches": fetches.Add(1),
+				}, nil
+			})
+
+			handler := sse.NewMultiplexHandler(mux, nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				req := httptest.NewRequest(
+					http.MethodGet,
+					"/api/v1/events/stream?topic="+url.QueryEscape(tt.topic),
+					nil,
+				).WithContext(ctx)
+				handler.HandleStream(httptest.NewRecorder(), req)
+			}()
+
+			require.Eventually(t, func() bool {
+				return fetches.Load() == 1
+			}, time.Second, 10*time.Millisecond)
+			require.Never(t, func() bool {
+				return fetches.Load() > 1
+			}, 1200*time.Millisecond, 20*time.Millisecond)
+
+			mux.WakeTopic(tt.topicType, tt.identifier)
+			require.Eventually(t, func() bool {
+				return fetches.Load() == 2
+			}, time.Second, 10*time.Millisecond)
+
+			cancel()
+			require.Eventually(t, func() bool {
+				select {
+				case <-done:
+					return true
+				default:
+					return false
+				}
+			}, time.Second, 10*time.Millisecond)
+		})
 	}
 }
 

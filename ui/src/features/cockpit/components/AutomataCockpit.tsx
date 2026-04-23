@@ -3,11 +3,11 @@ import { Bot, PauseCircle, PlayCircle, Plus, Waypoints } from 'lucide-react';
 import { AutomataDisplayStatus, components, Status } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { Button } from '@/components/ui/button';
+import StatusChip from '@/components/ui/status-chip';
+import Title from '@/components/ui/title';
 import { useQuery } from '@/hooks/api';
 import { cn } from '@/lib/utils';
 import dayjs from '@/lib/dayjs';
-import StatusChip from '@/ui/StatusChip';
-import Title from '@/ui/Title';
 import { AutomataAvatar } from '@/features/automata/components/AutomataAvatar';
 import { AutomataCreateModal } from '@/features/automata/components/AutomataCreateModal';
 import {

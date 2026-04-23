@@ -32,33 +32,19 @@ func instanceFilePath(baseDir, serviceName, instanceID string) string {
 
 // writeInstanceFile writes instance information to a file atomically
 func writeInstanceFile(filename string, info *instanceInfo) error {
-	// Ensure the directory exists
 	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
-	data, err := json.MarshalIndent(info, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal instance info: %w", err)
+	if err := fileutil.WriteJSONAtomic(filename, info, 0600); err != nil {
+		return fmt.Errorf("failed to write instance file: %w", err)
 	}
-
-	// Write atomically by writing to temp file first then renaming
-	tmpFile := filename + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	if err := os.Rename(tmpFile, filename); err != nil {
-		_ = os.Remove(tmpFile) // Clean up temp file on error
-		return fmt.Errorf("failed to rename temp file: %w", err)
-	}
-
 	return nil
 }
 
 // readInstanceFile reads instance information from a file
 func readInstanceFile(path string) (*instanceInfo, error) {
-	data, err := os.ReadFile(path) // #nosec G304
+	data, err := fileutil.ReadFileWithRetry(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read instance file: %w", err)
 	}
@@ -73,7 +59,7 @@ func readInstanceFile(path string) (*instanceInfo, error) {
 
 // removeInstanceFile removes an instance file
 func removeInstanceFile(filename string) error {
-	if err := os.Remove(filename); err != nil && !os.IsNotExist(err) {
+	if err := fileutil.RemoveWithRetry(filename); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove instance file: %w", err)
 	}
 	return nil

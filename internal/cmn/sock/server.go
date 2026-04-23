@@ -153,14 +153,17 @@ func newHTTPResponseWriter(conn *net.Conn) http.ResponseWriter {
 
 func (w *httpResponseWriter) Write(data []byte) (int, error) {
 	response := http.Response{
-		StatusCode: w.statusCode,
-		ProtoMajor: 1,
-		ProtoMinor: 0,
-		Body:       io.NopCloser(strings.NewReader(string(data))),
-		Header:     w.header,
+		StatusCode:    w.statusCode,
+		ProtoMajor:    1,
+		ProtoMinor:    0,
+		Body:          io.NopCloser(strings.NewReader(string(data))),
+		Header:        w.header,
+		ContentLength: int64(len(data)),
 	}
-	_ = response.Write(*w.conn)
-	return 0, nil
+	if err := response.Write(*w.conn); err != nil {
+		return 0, err
+	}
+	return len(data), nil
 }
 
 func (w *httpResponseWriter) Header() http.Header {

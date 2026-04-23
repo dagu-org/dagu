@@ -44,7 +44,7 @@ step_types:
 steps:
   - name: greet-user
     type: greet
-    config:
+    with:
       message: "*.go"
     output: OUT
 `)
@@ -90,7 +90,7 @@ steps:
   - id: consume
     depends: [produce]
     type: repeat
-    config:
+    with:
       count: ${COUNT}
     output: OUT
 `)
@@ -178,7 +178,7 @@ step_types:
 steps:
   - name: run-bash-template
     type: bash_snippet
-    config:
+    with:
       message: xxx
     output: OUT
 `)
@@ -219,7 +219,7 @@ name: custom-step-base
 steps:
   - name: greet-user
     type: greet
-    config:
+    with:
       message: "hello from base"
     output: OUT
 `)

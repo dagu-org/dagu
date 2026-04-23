@@ -15,12 +15,13 @@ export interface DocTab {
   id: string;
   docPath: string;
   title: string;
+  workspace?: string | null;
 }
 
 interface DocTabContextType {
   tabs: DocTab[];
   activeTabId: string | null;
-  openDoc: (docPath: string, title: string) => void;
+  openDoc: (docPath: string, title: string, workspace?: string | null) => void;
   closeTab: (tabId: string) => void;
   closeAllTabs: () => void;
   closeOtherTabs: (keepTabId: string) => void;
@@ -28,7 +29,7 @@ interface DocTabContextType {
   getActiveDocPath: () => string | null;
   updateTab: (
     tabId: string,
-    updates: Partial<Pick<DocTab, 'docPath' | 'title'>>
+    updates: Partial<Pick<DocTab, 'docPath' | 'title' | 'workspace'>>
   ) => void;
 
   // Draft content persistence
@@ -130,9 +131,13 @@ export function DocTabProvider({
     };
   }, [unsavedTabIds, setHasUnsavedChanges]);
 
-  const openDoc = useCallback((docPath: string, title: string) => {
+  const openDoc = useCallback((docPath: string, title: string, workspace?: string | null) => {
     // Check if already open
-    const existingTab = tabsRef.current.find((t) => t.docPath === docPath);
+    const normalizedWorkspace = workspace ?? null;
+    const existingTab = tabsRef.current.find(
+      (t) =>
+        t.docPath === docPath && (t.workspace ?? null) === normalizedWorkspace
+    );
     if (existingTab) {
       setActiveTabId(existingTab.id);
       return;
@@ -143,6 +148,7 @@ export function DocTabProvider({
       id: generateTabId(),
       docPath,
       title,
+      workspace: normalizedWorkspace,
     };
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTab.id);
@@ -212,7 +218,10 @@ export function DocTabProvider({
   }, []);
 
   const updateTab = useCallback(
-    (tabId: string, updates: Partial<Pick<DocTab, 'docPath' | 'title'>>) => {
+    (
+      tabId: string,
+      updates: Partial<Pick<DocTab, 'docPath' | 'title' | 'workspace'>>
+    ) => {
       setTabs((prev) =>
         prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
       );

@@ -96,17 +96,18 @@ type DAGRunStore interface {
 
 // ListDAGRunStatusesOptions contains options for listing runs
 type ListDAGRunStatusesOptions struct {
-	DAGRunID   string
-	Name       string
-	ExactName  string
-	From       TimeInUTC
-	To         TimeInUTC
-	Statuses   []core.Status
-	Limit      int
-	Cursor     string
-	Labels     []string // Filter by DAG labels (AND logic - all labels must match)
-	Unlimited  bool
-	AllHistory bool
+	DAGRunID        string
+	Name            string
+	ExactName       string
+	From            TimeInUTC
+	To              TimeInUTC
+	Statuses        []core.Status
+	Limit           int
+	Cursor          string
+	Labels          []string // Filter by DAG labels (AND logic - all labels must match)
+	WorkspaceFilter *WorkspaceFilter
+	Unlimited       bool
+	AllHistory      bool
 }
 
 // ListRunsOption is a functional option for configuring ListRunsOptions
@@ -158,6 +159,13 @@ func WithDAGRunID(dagRunID string) ListDAGRunStatusesOption {
 func WithLabels(labels []string) ListDAGRunStatusesOption {
 	return func(o *ListDAGRunStatusesOptions) {
 		o.Labels = labels
+	}
+}
+
+// WithWorkspaceFilter sets the workspace visibility filter for listing dag-runs.
+func WithWorkspaceFilter(filter *WorkspaceFilter) ListDAGRunStatusesOption {
+	return func(o *ListDAGRunStatusesOptions) {
+		o.WorkspaceFilter = filter
 	}
 }
 

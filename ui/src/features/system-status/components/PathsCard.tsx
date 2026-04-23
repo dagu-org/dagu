@@ -9,13 +9,13 @@ import {
   Settings,
 } from 'lucide-react';
 import React from 'react';
-import { Button } from '../../../components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../../../components/ui/dialog';
+} from '@/components/ui/dialog';
 import { useConfig, type PathsConfig } from '../../../contexts/ConfigContext';
 import { cn } from '../../../lib/utils';
 

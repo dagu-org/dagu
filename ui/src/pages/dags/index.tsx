@@ -26,9 +26,10 @@ import {
 } from '../../hooks/useSSECacheSync';
 import {
   withoutWorkspaceLabels,
-  withWorkspaceLabel,
+  workspaceSelectionKey,
+  workspaceSelectionQuery,
 } from '../../lib/workspace';
-import LoadingIndicator from '../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 
 type DAGDefinitionsFilters = {
   searchText: string;
@@ -65,14 +66,20 @@ function DAGsContent() {
   const appBarContext = React.useContext(AppBarContext);
   const searchState = useSearchState();
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
-  const selectedWorkspace = appBarContext.selectedWorkspace || '';
+  const workspaceSelection = appBarContext.workspaceSelection;
+  const workspaceQuery = React.useMemo(
+    () => workspaceSelectionQuery(workspaceSelection),
+    [workspaceSelection]
+  );
+  const workspaceKey = workspaceSelectionKey(workspaceSelection);
   const searchStateScope = JSON.stringify({
     remoteNode,
-    workspace: selectedWorkspace || null,
+    workspace: workspaceKey,
   });
   const { preferences, updatePreference } = useUserPreferences();
   const { tabs, activeTabId, selectDAG, addTab, closeTab, getActiveFileName } =
     useTabContext();
+  const previousWorkspaceKeyRef = React.useRef(workspaceKey);
 
   const defaultFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -101,6 +108,16 @@ function DAGsContent() {
 
   // Get selected DAG from tab context
   const selectedDAG = getActiveFileName();
+
+  React.useEffect(() => {
+    if (previousWorkspaceKeyRef.current === workspaceKey) {
+      return;
+    }
+    previousWorkspaceKeyRef.current = workspaceKey;
+    for (const tab of tabs) {
+      closeTab(tab.id);
+    }
+  }, [closeTab, tabs, workspaceKey]);
 
   const currentFilters = React.useMemo<DAGDefinitionsFilters>(
     () => ({
@@ -208,11 +225,6 @@ function DAGsContent() {
     updatePreference('pageLimit', newLimit);
   };
 
-  const effectiveAPISearchLabels = React.useMemo(
-    () => withWorkspaceLabel(apiSearchLabels, selectedWorkspace),
-    [apiSearchLabels, selectedWorkspace]
-  );
-
   const queryParams = React.useMemo(
     () => ({
       remoteNode,
@@ -220,20 +232,20 @@ function DAGsContent() {
       perPage: preferences.pageLimit || 200,
       name: apiSearchText || undefined,
       labels:
-        effectiveAPISearchLabels.length > 0
-          ? effectiveAPISearchLabels.join(',')
-          : undefined,
+        apiSearchLabels.length > 0 ? apiSearchLabels.join(',') : undefined,
       sort: sortField,
       order: sortOrder,
+      ...workspaceQuery,
     }),
     [
       remoteNode,
       page,
       preferences.pageLimit,
       apiSearchText,
-      effectiveAPISearchLabels,
+      apiSearchLabels,
       sortField,
       sortOrder,
+      workspaceQuery,
     ]
   );
 
@@ -429,9 +441,10 @@ function DAGsContent() {
 function DAGs() {
   const appBarContext = React.useContext(AppBarContext);
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
+  const workspaceKey = workspaceSelectionKey(appBarContext.workspaceSelection);
   const dagTabStorageKey = `dagu_dag_tabs:${JSON.stringify({
     remoteNode,
-    workspace: appBarContext.selectedWorkspace || null,
+    workspace: workspaceKey,
   })}`;
 
   return (

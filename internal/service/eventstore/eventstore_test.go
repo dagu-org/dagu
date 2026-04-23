@@ -181,6 +181,48 @@ func TestDAGRunSnapshotFromEventBackfillsLegacyDAGFile(t *testing.T) {
 	assert.Equal(t, "run-1", status.DAGRunID)
 }
 
+func TestEmitPersistedStatusTransitionFromContextEmitsUpdateForRepeatedStatus(t *testing.T) {
+	t.Parallel()
+
+	store := &captureStore{}
+	service := New(store)
+	ctx := WithContext(context.Background(), service, Source{Service: SourceServiceServer})
+	status := &exec.DAGRunStatus{
+		Name:      "briefing",
+		DAGRunID:  "run-1",
+		AttemptID: "attempt-1",
+		Status:    core.Running,
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	previous, emitted, err := EmitPersistedStatusTransitionFromContext(ctx, "", status, nil)
+	require.NoError(t, err)
+	require.True(t, emitted)
+	require.NotNil(t, store.event)
+	assert.Equal(t, TypeDAGRunRunning, store.event.Type)
+	assert.Equal(t, TypeDAGRunRunning, previous)
+
+	store.event = nil
+	next, emitted, err := EmitPersistedStatusTransitionFromContext(ctx, previous, status, nil)
+	require.NoError(t, err)
+	require.True(t, emitted)
+	require.NotNil(t, store.event)
+	assert.Equal(t, TypeDAGRunUpdated, store.event.Type)
+	assert.Equal(t, TypeDAGRunRunning, next)
+	assert.True(t, IsDAGRunEventType(store.event.Kind, store.event.Type))
+	assert.False(t, IsNotificationEventType(store.event.Kind, store.event.Type))
+}
+
+func TestDAGRunUpdateEventIDIncludesRecordedAt(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2026, 4, 23, 1, 2, 3, 0, time.UTC)
+	first := DAGRunUpdateEventID("briefing", "run-1", "attempt-1", base)
+	second := DAGRunUpdateEventID("briefing", "run-1", "attempt-1", base.Add(time.Nanosecond))
+
+	assert.NotEqual(t, first, second)
+}
+
 func TestNewDAGRunEventDeepClonesData(t *testing.T) {
 	t.Parallel()
 

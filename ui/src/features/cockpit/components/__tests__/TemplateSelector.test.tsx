@@ -6,6 +6,7 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { useQuery } from '@/hooks/api';
+import { WorkspaceKind } from '@/lib/workspace';
 import { TemplateSelector } from '../TemplateSelector';
 
 vi.mock('@/hooks/api', () => ({
@@ -19,6 +20,7 @@ const appBarValue = {
   setRemoteNodes: vi.fn(),
   selectedRemoteNode: 'local',
   selectRemoteNode: vi.fn(),
+  workspaceSelection: { kind: WorkspaceKind.all },
 };
 
 const mockDags = [
@@ -41,12 +43,7 @@ const queryCalls: Array<{
 }> = [];
 
 const useQueryMock = useQuery as unknown as {
-  mockImplementation: (
-    fn: (
-      path: string,
-      params?: unknown,
-    ) => unknown
-  ) => void;
+  mockImplementation: (fn: (path: string, params?: unknown) => unknown) => void;
 };
 
 function latestQueryCall(path: string) {
@@ -61,7 +58,6 @@ function renderSelector(
     <AppBarContext.Provider value={appBarValue}>
       <TemplateSelector
         selectedTemplate=""
-        selectedWorkspace=""
         onSelect={vi.fn()}
         {...props}
       />
@@ -109,7 +105,10 @@ describe('TemplateSelector', () => {
     expect(latestQueryCall('/dags/labels')?.init).toEqual(
       expect.objectContaining({
         params: expect.objectContaining({
-          query: { remoteNode: 'local' },
+          query: {
+            remoteNode: 'local',
+            workspace: WorkspaceKind.all,
+          },
         }),
       })
     );
@@ -133,7 +132,6 @@ describe('TemplateSelector', () => {
         <AppBarContext.Provider value={appBarValue}>
           <TemplateSelector
             selectedTemplate={selectedTemplate}
-            selectedWorkspace=""
             onSelect={setSelectedTemplate}
           />
         </AppBarContext.Provider>
@@ -145,7 +143,9 @@ describe('TemplateSelector', () => {
     fireEvent.click(screen.getByRole('button', { name: /select template/i }));
     fireEvent.click(screen.getByText('Example DAG'));
 
-    expect(screen.queryByPlaceholderText('Search DAGs...')).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText('Search DAGs...')
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Example DAG')).toBeInTheDocument();
     expect(latestQueryCall('/dags')?.init).toBeNull();
   });

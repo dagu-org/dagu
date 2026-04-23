@@ -265,7 +265,7 @@ func (it *dagRunStatusIterator) loadDay(ctx context.Context, dayPath string) ([]
 			continue
 		}
 
-		status := it.store.resolveStatus(ctx, run, it.labelFilters, it.statusesFilter, it.hasStatusFilter)
+		status := it.store.resolveStatus(ctx, run, it.labelFilters, it.opts.WorkspaceFilter, it.statusesFilter, it.hasStatusFilter)
 		if status == nil {
 			continue
 		}

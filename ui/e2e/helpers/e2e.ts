@@ -31,6 +31,13 @@ export type StackConfig = {
 };
 
 export type UserRole = 'admin' | 'manager' | 'developer' | 'operator' | 'viewer';
+type WorkspaceAccessPayload = {
+  all: boolean;
+  grants: Array<{
+    workspace: string;
+    role: UserRole;
+  }>;
+};
 export type RunStatusLabel =
   | 'not_started'
   | 'running'
@@ -107,6 +114,9 @@ type ExecFileSyncError = Error & {
 };
 
 const TOKEN_KEY = 'dagu_auth_token';
+const WORKSPACE_SCOPE_STORAGE_KEY = 'dagu-selected-workspace-scope';
+const LEGACY_WORKSPACE_STORAGE_KEY = 'dagu-selected-workspace';
+const LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY = 'dagu_cockpit_workspace';
 const repoRoot = path.resolve(__dirname, '../../..');
 const stackScriptPath = path.resolve(repoRoot, 'scripts/e2e/start-stack.sh');
 const stackFilePath =
@@ -168,6 +178,21 @@ export async function clearSession(page: Page): Promise<void> {
   await page.reload();
 }
 
+export async function useDefaultWorkspaceScope(page: Page): Promise<void> {
+  await page.evaluate(
+    ([scopeKey, legacyKey, cockpitLegacyKey]) => {
+      localStorage.setItem(scopeKey, JSON.stringify({ scope: 'default' }));
+      localStorage.removeItem(legacyKey);
+      localStorage.removeItem(cockpitLegacyKey);
+    },
+    [
+      WORKSPACE_SCOPE_STORAGE_KEY,
+      LEGACY_WORKSPACE_STORAGE_KEY,
+      LEGACY_COCKPIT_WORKSPACE_STORAGE_KEY,
+    ]
+  );
+}
+
 export async function loginViaAPI(
   request: APIRequestContext,
   username: string,
@@ -193,14 +218,22 @@ export async function createUser(
     username: string;
     password: string;
     role: UserRole;
+    workspaceAccess?: WorkspaceAccessPayload;
   }
 ): Promise<void> {
   const response = await request.post('/api/v1/users?remoteNode=local', {
     headers: authHeaders(token),
-    data: user,
+    data: {
+      ...user,
+      workspaceAccess: user.workspaceAccess ?? { all: true, grants: [] },
+    },
   });
 
-  expect(response.ok()).toBeTruthy();
+  const failureBody = response.ok() ? '' : await response.text();
+  expect(
+    response.ok(),
+    `createUser failed with ${response.status()}: ${failureBody}`
+  ).toBeTruthy();
 }
 
 export async function waitForDAGAvailable(

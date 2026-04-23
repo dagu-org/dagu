@@ -9,8 +9,8 @@ import {
 } from '@/components/ui/tooltip';
 import AutoRetryBadge from '@/features/dag-runs/components/common/AutoRetryBadge';
 import dayjs from '@/lib/dayjs';
-import StatusChip from '@/ui/StatusChip';
-import Ticker from '@/ui/Ticker';
+import StatusChip from '@/components/ui/status-chip';
+import Ticker from '@/components/ui/ticker';
 
 type DAGRunSummary = components['schemas']['DAGRunSummary'];
 

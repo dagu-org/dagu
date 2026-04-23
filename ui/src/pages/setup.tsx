@@ -157,7 +157,11 @@ export default function SetupPage() {
       completeSetup(result);
       setCurrentStep(2);
     } catch (err) {
-      if ((err as any)?.status === 403) {
+      const status =
+        err instanceof Error && 'status' in err
+          ? (err as Error & { status?: unknown }).status
+          : undefined;
+      if (status === 403) {
         navigate('/login', { replace: true });
         return;
       }

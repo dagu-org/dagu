@@ -9,6 +9,7 @@ import { Status } from '@/api/v1/schema';
 import { AppBarContext } from '@/contexts/AppBarContext';
 import { ConfigContext, type Config } from '@/contexts/ConfigContext';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
+import { WorkspaceKind } from '@/lib/workspace';
 import { usePaginatedDAGRuns } from '../../features/dag-runs/hooks/dagRunPagination';
 import { useClient } from '../../hooks/api';
 import DashboardPage from '../index';
@@ -104,7 +105,12 @@ function renderPage({
               workspaces: selectedWorkspace
                 ? [{ id: 'workspace-1', name: selectedWorkspace }]
                 : [],
-              selectedWorkspace,
+              workspaceSelection: selectedWorkspace
+                ? {
+                    kind: WorkspaceKind.workspace,
+                    workspace: selectedWorkspace,
+                  }
+                : { kind: WorkspaceKind.all },
               selectWorkspace: () => undefined,
             }}
           >
@@ -205,7 +211,7 @@ describe('DashboardPage', () => {
     expect(latestCall?.query).toEqual(
       expect.objectContaining({
         remoteNode: 'remote-a',
-        labels: 'workspace=ops',
+        workspace: 'ops',
       })
     );
 
@@ -215,7 +221,7 @@ describe('DashboardPage', () => {
         params: {
           query: expect.objectContaining({
             remoteNode: 'remote-a',
-            labels: 'workspace=ops',
+            workspace: 'ops',
           }),
         },
       })

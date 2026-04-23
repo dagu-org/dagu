@@ -28,7 +28,7 @@ export default function CockpitPage(): React.ReactElement {
     const stored = localStorage.getItem(COCKPIT_MODE_STORAGE_KEY);
     return stored === 'automata' ? 'automata' : 'runs';
   });
-  const { selectedWorkspace, selectedTemplate, selectTemplate } =
+  const { selectedWorkspace, workspaceKey, selectedTemplate, selectTemplate } =
     useCockpitState();
 
   useEffect(() => {
@@ -138,6 +138,7 @@ export default function CockpitPage(): React.ReactElement {
       {effectiveMode === 'runs' ? (
         <DateKanbanList
           selectedWorkspace={selectedWorkspace}
+          workspaceKey={workspaceKey}
           suspendLoadMore={suspendBackgroundLoading}
         />
       ) : (

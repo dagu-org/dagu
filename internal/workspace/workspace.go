@@ -4,13 +4,15 @@
 package workspace
 
 import (
+	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-var workspaceNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+var workspaceNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // Workspace is the domain model for a cockpit workspace.
 type Workspace struct {
@@ -33,11 +35,18 @@ func NewWorkspace(name, description string) *Workspace {
 	}
 }
 
-// ValidateName returns ErrInvalidWorkspaceName when the name is empty or
-// contains characters other than letters, numbers, and underscores.
+// ValidateName checks whether a workspace name can be safely reused as a label
+// value and filesystem path segment.
 func ValidateName(name string) error {
-	if !workspaceNamePattern.MatchString(name) {
+	if name == "" {
 		return ErrInvalidWorkspaceName
+	}
+	switch strings.ToLower(name) {
+	case "all", "default":
+		return fmt.Errorf("%w: all and default are reserved names", ErrInvalidWorkspaceName)
+	}
+	if !workspaceNamePattern.MatchString(name) {
+		return fmt.Errorf("%w: must contain only letters, numbers, underscores, and hyphens", ErrInvalidWorkspaceName)
 	}
 	return nil
 }

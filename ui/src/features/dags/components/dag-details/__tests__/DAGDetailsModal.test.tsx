@@ -6,7 +6,10 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import DAGDetailsModal from '../DAGDetailsModal';
 
-const mockSidePanel = vi.fn((_props?: unknown) => <div>shared dag modal</div>);
+const mockSidePanel = vi.fn((props?: unknown) => {
+  void props;
+  return <div>shared dag modal</div>;
+});
 
 vi.mock('../DAGDetailsSidePanel', () => ({
   default: (props: unknown) => mockSidePanel(props),

@@ -379,6 +379,7 @@ func TestRetry_Distributed(t *testing.T) {
 		externalStepRetry: true,
 		distributedRuns:   make(map[string]bool),
 		cmds:              make(map[string]*exec.Cmd),
+		dagCtx:            dagCtx,
 		killed:            make(chan struct{}),
 	}
 
@@ -393,6 +394,10 @@ func TestRetry_Distributed(t *testing.T) {
 	assert.Equal(t, "flaky", task.Step)
 	assert.True(t, task.ExternalStepRetry)
 	require.NotNil(t, task.PreviousStatus)
+	assert.True(t, executor.distributedRuns["child-789"])
+
+	require.NoError(t, executor.Kill(os.Interrupt))
+	assert.Equal(t, 1, dispatcher.requestCancelCalled)
 }
 
 func TestBuildRetryCommand_NoRootDAGRun(t *testing.T) {

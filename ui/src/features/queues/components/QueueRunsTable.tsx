@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
 import { cn } from '@/lib/utils';
-import StatusChip from '@/ui/StatusChip';
+import StatusChip from '@/components/ui/status-chip';
 
 type QueueDAGRun = components['schemas']['DAGRunSummary'];
 

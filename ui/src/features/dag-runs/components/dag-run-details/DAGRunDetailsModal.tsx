@@ -15,7 +15,7 @@ import { components } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { DAGRunContext } from '../../contexts/DAGRunContext';
 import { useBoundedDAGRunDetails } from '../../hooks/useBoundedDAGRunDetails';
 import { matchesRequestedDAGRunDetails } from '../../hooks/dagRunDetailsRequest';

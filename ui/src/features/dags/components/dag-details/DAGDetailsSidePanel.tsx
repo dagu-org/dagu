@@ -16,7 +16,7 @@ import { sseFallbackOptions, useSSECacheSync } from '@/hooks/useSSECacheSync';
 import dayjs from '@/lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
-import LoadingIndicator from '@/ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import type { components } from '@/api/v1/schema';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
@@ -136,14 +136,24 @@ function DAGDetailsSidePanel({
     isOpen || shouldRender ? stableFileNameRef.current : '';
 
   React.useEffect(() => {
+    let openFrame: number | undefined;
+    let visibleFrame: number | undefined;
+
     if (isOpen) {
       setShouldRender(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
+      openFrame = window.requestAnimationFrame(() => {
+        visibleFrame = window.requestAnimationFrame(() => {
           setIsVisible(true);
         });
       });
-      return;
+      return () => {
+        if (openFrame !== undefined) {
+          window.cancelAnimationFrame(openFrame);
+        }
+        if (visibleFrame !== undefined) {
+          window.cancelAnimationFrame(visibleFrame);
+        }
+      };
     }
 
     setIsVisible(false);
@@ -407,10 +417,7 @@ function DAGDetailsSidePanel({
     return panel;
   }
 
-  return createPortal(
-    panel,
-    document.querySelector('.radix-themes') || document.body
-  );
+  return createPortal(panel, document.body);
 }
 
 export default DAGDetailsSidePanel;

@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
 import { components, Status } from '../../../../api/v1/schema';
 import dayjs from '../../../../lib/dayjs';
 import { getDAGRunScheduleSortValue } from '../../../../lib/dagRunTiming';
-import StatusChip from '../../../../ui/StatusChip';
+import StatusChip from '@/components/ui/status-chip';
 import AutoRetryBadge from '../common/AutoRetryBadge';
 import {
   DAGRunSelectionItem,

@@ -51,6 +51,16 @@ func TestRetryScannerEvaluateRetryDecision(t *testing.T) {
 			reason:   "retry_exhausted",
 		},
 		{
+			name:   "RetryLimitZeroSkips",
+			status: cloneRetryStatus(baseStatus),
+			metadata: dagRetryMetadata{
+				limit:       0,
+				interval:    time.Minute,
+				maxInterval: 10 * time.Minute,
+			},
+			reason: "retry_policy_missing",
+		},
+		{
 			name:      "MissingFinishedAtFallsBackToCreatedAt",
 			status:    withCreatedAt(withFinishedAt(baseStatus, ""), now.Add(-2*time.Minute).UnixMilli()),
 			metadata:  mustRetryMetadataFromDAG(t, baseDAG),
@@ -226,6 +236,54 @@ func TestRetryScannerScanEnqueuesRetry(t *testing.T) {
 	assert.Equal(t, 0, store.findAttemptCalls)
 
 	queueStore.AssertExpectations(t)
+}
+
+func TestRetryScannerScanSkipsDisabledRetryPolicy(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 3, 14, 14, 0, 0, 0, time.UTC)
+	dag := &core.DAG{
+		Name:     "retry-disabled-dag",
+		Location: "/tmp/retry-disabled-dag.yaml",
+		RetryPolicy: &core.DAGRetryPolicy{
+			Limit:       0,
+			Interval:    time.Minute,
+			Backoff:     0,
+			MaxInterval: 10 * time.Minute,
+		},
+	}
+	status := &exec.DAGRunStatus{
+		Name:           dag.Name,
+		DAGRunID:       "run-1",
+		AttemptID:      "att-1",
+		Status:         core.Failed,
+		AutoRetryCount: 0,
+		FinishedAt:     now.Add(-3 * time.Minute).Format(time.RFC3339),
+		ScheduleTime:   now.Add(-10 * time.Minute).Format(time.RFC3339),
+	}
+	store := newRetryScannerStore(dag, status)
+	queueStore := &exec.MockQueueStore{}
+
+	scanner, err := NewRetryScanner(
+		store,
+		queueStore,
+		nil,
+		24*time.Hour,
+		func() time.Time { return now },
+	)
+	require.NoError(t, err)
+
+	err = scanner.scan(context.Background())
+	require.NoError(t, err)
+
+	latest := store.mustStatus(status.DAGRun())
+	assert.Equal(t, core.Failed, latest.Status)
+	assert.Equal(t, 0, latest.AutoRetryCount)
+	assert.Equal(t, 0, latest.AutoRetryLimit)
+	assert.Equal(t, 0, store.latestAttemptCalls)
+	assert.Len(t, store.listCalls, 1)
+	assert.Equal(t, 0, store.findAttemptCalls)
+	queueStore.AssertNotCalled(t, "Enqueue", mock.Anything, dag.ProcGroup(), exec.QueuePriorityLow, status.DAGRun())
 }
 
 func TestRetryScannerScanEnqueuesRetryWithoutLiveTargets(t *testing.T) {

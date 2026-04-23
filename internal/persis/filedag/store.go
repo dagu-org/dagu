@@ -433,6 +433,9 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			if len(opts.Labels) > 0 && !containsAllLabels(dag.Labels, opts.Labels) {
 				continue
 			}
+			if !opts.WorkspaceFilter.MatchesLabels(dag.Labels) {
+				continue
+			}
 
 			allDags = append(allDags, dag)
 		}
@@ -476,6 +479,9 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			}
 
 			if len(opts.Labels) > 0 && !containsAllLabels(dag.Labels, opts.Labels) {
+				continue
+			}
+			if !opts.WorkspaceFilter.MatchesLabels(dag.Labels) {
 				continue
 			}
 
@@ -598,6 +604,19 @@ func normalizedDAGSearchLabels(labels []string) string {
 	return strings.Join(normalized, ",")
 }
 
+func dagSearchScopeKey(labels []string, filter *exec.WorkspaceFilter) string {
+	parts := []string{normalizedDAGSearchLabels(labels)}
+	if filter != nil && filter.Enabled {
+		workspaces := append([]string(nil), filter.Workspaces...)
+		sort.Strings(workspaces)
+		parts = append(parts, strings.Join(workspaces, ","))
+		if filter.IncludeUnlabelled {
+			parts = append(parts, "unlabelled")
+		}
+	}
+	return strings.Join(parts, "|")
+}
+
 func decodeDAGSearchCursor(raw, query, labels string) (dagSearchCursor, error) {
 	if raw == "" {
 		return dagSearchCursor{}, nil
@@ -696,7 +715,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		return nil, nil, fmt.Errorf("failed to create DAGs directory %s: %w", store.baseDir, err)
 	}
 
-	labelsKey := normalizedDAGSearchLabels(opts.Labels)
+	labelsKey := dagSearchScopeKey(opts.Labels, opts.WorkspaceFilter)
 	cursor, err := decodeDAGSearchCursor(opts.Cursor, opts.Query, labelsKey)
 	if err != nil {
 		return nil, nil, err
@@ -730,8 +749,9 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		}
 
 		filePath := filepath.Join(store.baseDir, entry.Name())
-		if len(opts.Labels) > 0 {
-			dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
+		var dag *core.DAG
+		if len(opts.Labels) > 0 || opts.WorkspaceFilter != nil {
+			dag, err = spec.Load(ctx, filePath, store.defaultLoadOptions(
 				spec.OnlyMetadata(),
 				spec.WithoutEval(),
 				spec.SkipSchemaValidation(),
@@ -742,6 +762,9 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 				continue
 			}
 			if !containsAllLabels(dag.Labels, opts.Labels) {
+				continue
+			}
+			if !opts.WorkspaceFilter.MatchesLabels(dag.Labels) {
 				continue
 			}
 		}
@@ -766,6 +789,24 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 			continue
 		}
 
+		workspaceName := ""
+		if dag == nil {
+			dag, err = spec.Load(ctx, filePath, store.defaultLoadOptions(
+				spec.OnlyMetadata(),
+				spec.WithoutEval(),
+				spec.SkipSchemaValidation(),
+				spec.WithAllowBuildErrors(),
+			)...)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("reading %s metadata failed: %s", fileName, err))
+			}
+		}
+		if dag != nil {
+			if name, ok := exec.WorkspaceNameFromLabels(dag.Labels); ok {
+				workspaceName = name
+			}
+		}
+
 		if len(results) == limit {
 			hasMore = true
 			nextCursor = exec.EncodeSearchCursor(dagSearchCursor{
@@ -780,6 +821,7 @@ func (store *Storage) SearchCursor(ctx context.Context, opts exec.SearchDAGsOpti
 		item := exec.SearchDAGResult{
 			Name:           fileName,
 			FileName:       fileName,
+			Workspace:      workspaceName,
 			Matches:        window.Matches,
 			HasMoreMatches: window.HasMore,
 		}
@@ -810,7 +852,7 @@ func (store *Storage) SearchMatches(ctx context.Context, fileName string, opts e
 		return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
 	}
 
-	labelsKey := normalizedDAGSearchLabels(opts.Labels)
+	labelsKey := dagSearchScopeKey(opts.Labels, opts.WorkspaceFilter)
 	cursor, err := decodeDAGMatchCursor(opts.Cursor, opts.Query, labelsKey, fileName)
 	if err != nil {
 		return nil, err
@@ -828,7 +870,7 @@ func (store *Storage) SearchMatches(ctx context.Context, fileName string, opts e
 		}
 		return nil, err
 	}
-	if len(opts.Labels) > 0 {
+	if len(opts.Labels) > 0 || opts.WorkspaceFilter != nil {
 		dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
 			spec.OnlyMetadata(),
 			spec.WithoutEval(),
@@ -839,6 +881,9 @@ func (store *Storage) SearchMatches(ctx context.Context, fileName string, opts e
 			return nil, err
 		}
 		if !containsAllLabels(dag.Labels, opts.Labels) {
+			return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
+		}
+		if !opts.WorkspaceFilter.MatchesLabels(dag.Labels) {
 			return &exec.CursorResult[*exec.Match]{Items: []*exec.Match{}}, nil
 		}
 	}

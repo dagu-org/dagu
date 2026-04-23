@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { components } from '@/api/v1/schema';
 import { getEventHandlers } from '../getEventHandlers';
+
+type DAGRunDetails = components['schemas']['DAGRunDetails'];
 
 describe('getEventHandlers', () => {
   it('includes the onAbort lifecycle hook as-is', () => {
@@ -7,7 +10,7 @@ describe('getEventHandlers', () => {
       onAbort: {
         step: { name: 'onAbort' },
       },
-    } as any;
+    } as DAGRunDetails;
 
     const handlers = getEventHandlers(dagRun);
     const handler = handlers[0]!;
@@ -28,11 +31,11 @@ describe('getEventHandlers', () => {
       onExit: {
         step: { name: 'onExit' },
       },
-    } as any;
+    } as DAGRunDetails;
 
     const handlers = getEventHandlers(dagRun);
 
-    expect(handlers.map((h: any) => h.step.name)).toEqual([
+    expect(handlers.map((h) => h.step.name)).toEqual([
       'onSuccess',
       'onFailure',
       'onExit',

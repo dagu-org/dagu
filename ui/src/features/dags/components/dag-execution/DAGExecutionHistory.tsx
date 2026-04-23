@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * DAGExecutionHistory component displays the execution history of a DAG.
  *
@@ -20,10 +23,12 @@ import {
   useSSECacheSync,
 } from '../../../../hooks/useSSECacheSync';
 import { toMermaidNodeId } from '../../../../lib/utils';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { getEventHandlers } from '../../lib/getEventHandlers';
+import { updateDAGRunsNodeStatus } from '../../lib/nodeStatus';
 import { DAGStatusOverview, NodeStatusTable } from '../dag-details';
+import { StepDetailsDrawer } from '../step-details';
 import { DAGGraph } from '../visualization';
 import { HistoryTable, LogViewer, StatusUpdateModal } from './';
 
@@ -81,6 +86,7 @@ function DAGExecutionHistory({
       fileName={fileName}
       dagRuns={data.dagRuns}
       gridData={data.gridData}
+      refreshHistory={() => void mutate()}
     />
   );
 }
@@ -95,17 +101,30 @@ type HistoryTableProps = {
   gridData: components['schemas']['DAGGridItem'][] | null;
   /** List of DAG dagRuns */
   dagRuns: components['schemas']['DAGRunDetails'][] | null;
+  /** Refresh execution history list */
+  refreshHistory: () => void;
 };
 
 /**
  * DAGHistoryTable displays detailed execution history with interactive elements
  */
-function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
+function DAGHistoryTable({
+  fileName,
+  gridData,
+  dagRuns,
+  refreshHistory,
+}: HistoryTableProps) {
   const appBarContext = React.useContext(AppBarContext);
+  const dagContext = React.useContext(DAGContext);
   const client = useClient();
   const navigate = useNavigate();
   const { showError } = useErrorModal();
   const [modal, setModal] = React.useState(false);
+  const [displayDAGRuns, setDisplayDAGRuns] = React.useState(dagRuns);
+
+  React.useEffect(() => {
+    setDisplayDAGRuns(dagRuns);
+  }, [dagRuns]);
 
   // State for log viewer
   const [logViewer, setLogViewer] = useState<{
@@ -137,10 +156,10 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
   // Ensure index is valid when dagRuns change (e.g., when switching DAGs)
   React.useEffect(() => {
-    if (!dagRuns || dagRuns.length === 0) return;
+    if (!displayDAGRuns || displayDAGRuns.length === 0) return;
 
     // Clamp the index to be within valid range
-    const maxIdx = dagRuns.length - 1;
+    const maxIdx = displayDAGRuns.length - 1;
     const validIdx = Math.max(0, Math.min(idx, maxIdx));
 
     // Only update if the index needs adjustment
@@ -150,19 +169,19 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
       setSearchParams(newParams);
       setIdx(validIdx);
     }
-  }, [dagRuns, idx]);
+  }, [displayDAGRuns, idx]);
 
   /**
    * Update the selected dagRun index and update URL parameters
    */
   const updateIdx = (newIdx: number) => {
     // Ensure newIdx is within valid range
-    if (newIdx < 0 || !dagRuns || newIdx >= dagRuns.length) {
+    if (newIdx < 0 || !displayDAGRuns || newIdx >= displayDAGRuns.length) {
       return;
     }
 
     setIdx(newIdx);
-    const reversedDAGRuns = [...(dagRuns || [])].reverse();
+    const reversedDAGRuns = [...(displayDAGRuns || [])].reverse();
 
     if (reversedDAGRuns && reversedDAGRuns[newIdx]) {
       // Instead of directly updating the context, update the URL with the dagRun ID
@@ -206,7 +225,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
         updateIdx(idx + 1);
       }
     },
-    [idx, dagRuns, updateIdx]
+    [idx, displayDAGRuns, updateIdx]
   );
 
   // Add and remove keyboard event listener
@@ -217,19 +236,27 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
     };
   }, [handleKeyDown]);
 
-  // Get event handlers for the selected dagRun
-  let handlers: components['schemas']['Node'][] | null = null;
-  if (dagRuns && idx < dagRuns.length && dagRuns[idx]) {
-    handlers = getEventHandlers(dagRuns[idx]);
-  }
-
   // Reverse the dagRuns array for display (newest first)
-  const reversedDAGRuns = [...(dagRuns || [])].reverse();
+  const reversedDAGRuns = [...(displayDAGRuns || [])].reverse();
+  const selectedDAGRun = reversedDAGRuns[idx];
+  const handlers = selectedDAGRun ? getEventHandlers(selectedDAGRun) : null;
 
   // State for the selected step in the status update modal
   const [selectedStep, setSelectedStep] = React.useState<
     components['schemas']['Step'] | undefined
   >(undefined);
+  const [selectedDetailStep, setSelectedDetailStep] = React.useState<
+    components['schemas']['Step'] | undefined
+  >(undefined);
+  const [isStepDetailsOpen, setIsStepDetailsOpen] = React.useState(false);
+
+  const closeStepDetails = React.useCallback(() => {
+    setIsStepDetailsOpen(false);
+  }, []);
+
+  React.useEffect(() => {
+    closeStepDetails();
+  }, [idx, closeStepDetails]);
 
   /**
    * Close the status update modal
@@ -243,12 +270,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
     _step: components['schemas']['Step'],
     status: NodeStatus
   ) => {
-    if (
-      !selectedStep ||
-      !reversedDAGRuns ||
-      idx >= reversedDAGRuns.length ||
-      !reversedDAGRuns[idx]
-    ) {
+    if (!selectedStep || !selectedDAGRun) {
       return;
     }
 
@@ -258,8 +280,8 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
       {
         params: {
           path: {
-            name: reversedDAGRuns[idx].name,
-            dagRunId: reversedDAGRuns[idx].dagRunId,
+            name: selectedDAGRun.name,
+            dagRunId: selectedDAGRun.dagRunId,
             stepName: selectedStep.name,
           },
           query: {
@@ -280,8 +302,27 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
       return;
     }
 
+    setDisplayDAGRuns((current) =>
+      updateDAGRunsNodeStatus(
+        current,
+        selectedDAGRun.dagRunId,
+        selectedStep.name,
+        status
+      )
+    );
+    refreshHistory();
+    dagContext.refresh();
     dismissModal();
   };
+
+  const applyDisplayedNodeStatus = React.useCallback(
+    (dagRunId: string, stepName: string, status: NodeStatus) => {
+      setDisplayDAGRuns((current) =>
+        updateDAGRunsNodeStatus(current, dagRunId, stepName, status)
+      );
+    },
+    []
+  );
 
   // Removed the effect that updates the DAG status context
   // The status details page will handle this based on URL parameters
@@ -318,6 +359,26 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
       }
     },
     [reversedDAGRuns, idx, navigate]
+  );
+
+  const onInspectStepOnGraph = React.useCallback(
+    (id: string) => {
+      const dagRun = reversedDAGRuns[idx];
+      if (!dagRun) {
+        return;
+      }
+
+      const n = dagRun.nodes?.find(
+        (node) => toMermaidNodeId(node.step.name) == id
+      );
+      if (!n) {
+        return;
+      }
+
+      setSelectedDetailStep(n.step);
+      setIsStepDetailsOpen(true);
+    },
+    [reversedDAGRuns, idx]
   );
 
   /**
@@ -360,17 +421,18 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
             idx={idx}
           />
 
-          {reversedDAGRuns && reversedDAGRuns[idx] ? (
+          {selectedDAGRun ? (
             <React.Fragment>
               <DAGGraph
-                dagRun={reversedDAGRuns[idx]}
+                dagRun={selectedDAGRun}
+                onClickStep={onInspectStepOnGraph}
                 onSelectStep={onSelectStepOnGraph}
                 onRightClickStep={onRightClickStepOnGraph}
               />
 
               <div className="bg-surface border border-border rounded-lg p-4">
                 <DAGStatusOverview
-                  status={reversedDAGRuns[idx]}
+                  status={selectedDAGRun}
                   onViewLog={(dagRunId) => {
                     setLogViewer({
                       isOpen: true,
@@ -384,9 +446,16 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
               </div>
 
               <NodeStatusTable
-                nodes={reversedDAGRuns[idx].nodes}
-                status={reversedDAGRuns[idx]}
+                nodes={selectedDAGRun.nodes}
+                status={selectedDAGRun}
                 {...props}
+                onNodeStatusUpdated={(stepName, status) =>
+                  applyDisplayedNodeStatus(
+                    selectedDAGRun.dagRunId,
+                    stepName,
+                    status
+                  )
+                }
                 onViewLog={(stepName, dagRunId) => {
                   const isStderr = stepName.endsWith('_stderr');
                   const actualStepName = isStderr
@@ -397,7 +466,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                     isOpen: true,
                     logType: 'step',
                     stepName: actualStepName,
-                    dagRunId: dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                    dagRunId: dagRunId || selectedDAGRun.dagRunId,
                     stream: isStderr ? Stream.stderr : Stream.stdout,
                   });
                 }}
@@ -405,9 +474,16 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
 
               {handlers && handlers.length ? (
                 <NodeStatusTable
-                  nodes={getEventHandlers(reversedDAGRuns[idx])}
-                  status={reversedDAGRuns[idx]}
+                  nodes={handlers}
+                  status={selectedDAGRun}
                   {...props}
+                  onNodeStatusUpdated={(stepName, status) =>
+                    applyDisplayedNodeStatus(
+                      selectedDAGRun.dagRunId,
+                      stepName,
+                      status
+                    )
+                  }
                   onViewLog={(stepName, dagRunId) => {
                     const isStderr = stepName.endsWith('_stderr');
                     const actualStepName = isStderr
@@ -418,8 +494,7 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                       isOpen: true,
                       logType: 'step',
                       stepName: actualStepName,
-                      dagRunId:
-                        dagRunId || reversedDAGRuns[idx]?.dagRunId || '',
+                      dagRunId: dagRunId || selectedDAGRun.dagRunId,
                       stream: isStderr ? Stream.stderr : Stream.stdout,
                     });
                   }}
@@ -433,14 +508,10 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
                   setLogViewer((prev) => ({ ...prev, isOpen: false }))
                 }
                 logType={logViewer.logType}
-                dagName={
-                  reversedDAGRuns && reversedDAGRuns[idx]
-                    ? reversedDAGRuns[idx].name
-                    : ''
-                }
+                dagName={selectedDAGRun.name}
                 dagRunId={logViewer.dagRunId}
                 stepName={logViewer.stepName}
-                dagRun={reversedDAGRuns[idx]}
+                dagRun={selectedDAGRun}
                 stream={logViewer.stream}
               />
             </React.Fragment>
@@ -451,6 +522,13 @@ function DAGHistoryTable({ fileName, gridData, dagRuns }: HistoryTableProps) {
             step={selectedStep}
             dismissModal={dismissModal}
             onSubmit={onUpdateStatus}
+          />
+
+          <StepDetailsDrawer
+            dagName={selectedDAGRun?.name}
+            isOpen={isStepDetailsOpen}
+            step={selectedDetailStep}
+            onClose={closeStepDetails}
           />
         </div>
       )}

@@ -566,6 +566,7 @@ func (e *parallelExecutor) newChildExecutor(
 		return nil, fmt.Errorf("%w: %s", ErrApprovalStepsWithWorker, target)
 	}
 
+	child.SetWorkerSelector(e.step.WorkerSelector)
 	child.SetExternalStepRetry(true)
 	return child, nil
 }

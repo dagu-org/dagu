@@ -144,7 +144,7 @@ func (s *NotificationAutomataSnapshot) Validate() error {
 	}
 	switch s.EventType {
 	case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished:
-	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
+	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunUpdated, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
 		return errors.New("eventstore: invalid automata notification snapshot: unsupported event type")
 	default:
 		return errors.New("eventstore: invalid automata notification snapshot: unsupported event type")
@@ -270,7 +270,14 @@ func IsDAGRunEventType(kind EventKind, eventType EventType) bool {
 		return false
 	}
 	switch eventType {
-	case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
+	case TypeDAGRunQueued,
+		TypeDAGRunRunning,
+		TypeDAGRunUpdated,
+		TypeDAGRunWaiting,
+		TypeDAGRunSucceeded,
+		TypeDAGRunFailed,
+		TypeDAGRunAborted,
+		TypeDAGRunRejected:
 		return true
 	case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished, TypeLLMUsageRecorded:
 		return false
@@ -288,7 +295,7 @@ func IsNotificationEventType(kind EventKind, eventType EventType) bool {
 		switch eventType {
 		case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 			return true
-		case TypeDAGRunQueued, TypeDAGRunRunning, TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished, TypeLLMUsageRecorded:
+		case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunUpdated, TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished, TypeLLMUsageRecorded:
 			return false
 		default:
 			return false
@@ -297,7 +304,7 @@ func IsNotificationEventType(kind EventKind, eventType EventType) bool {
 		switch eventType {
 		case TypeAutomataNeedsInput, TypeAutomataError, TypeAutomataFinished:
 			return true
-		case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
+		case TypeDAGRunQueued, TypeDAGRunRunning, TypeDAGRunUpdated, TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected, TypeLLMUsageRecorded:
 			return false
 		default:
 			return false

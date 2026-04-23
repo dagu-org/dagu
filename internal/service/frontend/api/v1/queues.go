@@ -108,6 +108,9 @@ func (a *API) fetchDAGRunSummary(ctx context.Context, dagRun exec.DAGRunRef) (ap
 	if err != nil {
 		return api.DAGRunSummary{}, err
 	}
+	if !a.canAccessWorkspace(ctx, statusWorkspaceName(runStatus)) {
+		return api.DAGRunSummary{}, workspaceResourceNotFound()
+	}
 	return toDAGRunSummary(*runStatus), nil
 }
 
@@ -235,12 +238,15 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 			if err != nil {
 				continue
 			}
-			if queue == nil {
-				queue = getOrCreateQueue(queueMap, groupName, a.config)
-			}
 			runStatus, err := attempt.ReadStatus(ctx)
 			if err != nil {
 				continue
+			}
+			if !a.canAccessWorkspace(ctx, statusWorkspaceName(runStatus)) {
+				continue
+			}
+			if queue == nil {
+				queue = getOrCreateQueue(queueMap, groupName, a.config)
 			}
 			queue.running = append(queue.running, toDAGRunSummary(*runStatus))
 			localRunningIDs[dagRun.ID] = struct{}{}
@@ -257,7 +263,7 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 	}
 
 	if onlyQueue != "" {
-		count, err := a.queueStore.Len(ctx, onlyQueue)
+		count, err := a.countVisibleQueuedItems(ctx, onlyQueue)
 		if err != nil {
 			return nil, &Error{
 				Code:       api.ErrorCodeInternalError,
@@ -279,7 +285,7 @@ func (a *API) collectQueues(ctx context.Context, onlyQueue string) (map[string]*
 			}
 		}
 		for _, queueName := range queueNames {
-			count, err := a.queueStore.Len(ctx, queueName)
+			count, err := a.countVisibleQueuedItems(ctx, queueName)
 			if err != nil {
 				logger.Warn(ctx, "Failed to get queue length",
 					tag.Queue(queueName),
@@ -342,6 +348,10 @@ func (a *API) listVisibleQueuedItems(ctx context.Context, queueName string, limi
 
 			summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
 			if err != nil {
+				var apiErr *Error
+				if errors.As(err, &apiErr) && apiErr.HTTPStatus == 404 {
+					continue
+				}
 				logger.Warn(ctx, "Failed to fetch queued DAG run summary",
 					tag.Queue(queueName),
 					tag.Error(err),
@@ -367,14 +377,46 @@ func (a *API) listVisibleQueuedItems(ctx context.Context, queueName string, limi
 	return items, currentCursor, nil
 }
 
+func (a *API) countVisibleQueuedItems(ctx context.Context, queueName string) (int, error) {
+	if a.queueStore == nil {
+		return 0, nil
+	}
+	count := 0
+	cursor := ""
+	for {
+		page, err := a.queueStore.ListCursor(ctx, queueName, cursor, queueCursorScanBatch)
+		if err != nil {
+			return 0, err
+		}
+		for _, queuedItem := range page.Items {
+			dagRunRef, err := queuedItem.Data()
+			if err != nil {
+				continue
+			}
+			summary, err := a.fetchDAGRunSummary(ctx, *dagRunRef)
+			if err == nil && summary.Status != api.StatusRunning {
+				count++
+			}
+		}
+		if !page.HasMore {
+			return count, nil
+		}
+		cursor = page.NextCursor
+	}
+}
+
 // GetQueuesListData returns queue list for SSE.
 // Identifier format: URL query string (ignored for now)
 func (a *API) GetQueuesListData(ctx context.Context, _ string) (any, error) {
-	response, err := a.ListQueues(ctx, api.ListQueuesRequestObject{})
-	if err != nil {
-		return nil, fmt.Errorf("error listing queues: %w", err)
-	}
-	return response, nil
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/queues",
+	}, func(readCtx context.Context) (api.ListQueuesResponseObject, error) {
+		response, err := a.ListQueues(readCtx, api.ListQueuesRequestObject{})
+		if err != nil {
+			return nil, fmt.Errorf("error listing queues: %w", err)
+		}
+		return response, nil
+	})
 }
 
 func (a *API) effectiveLeaseStaleThreshold() time.Duration {
@@ -433,10 +475,19 @@ func (a *API) runningSummaryFromLease(ctx context.Context, lease exec.DAGRunLeas
 	if status.AttemptID != lease.AttemptID {
 		return api.DAGRunSummary{}, false
 	}
+	if !a.canAccessWorkspace(ctx, statusWorkspaceName(status)) {
+		return api.DAGRunSummary{}, false
+	}
 	switch status.Status {
-	case core.Running, core.NotStarted:
+	case core.Running:
 		return toDAGRunSummary(*status), true
-	case core.Failed, core.Aborted, core.Succeeded, core.Queued,
+	case core.NotStarted, core.Queued:
+		// A fresh lease means the worker owns the queue slot, even if the
+		// persisted status has not caught up to running yet.
+		summary := toDAGRunSummary(*status)
+		summary.Status = api.StatusRunning
+		return summary, true
+	case core.Failed, core.Aborted, core.Succeeded,
 		core.PartiallySucceeded, core.Waiting, core.Rejected:
 		return api.DAGRunSummary{}, false
 	}

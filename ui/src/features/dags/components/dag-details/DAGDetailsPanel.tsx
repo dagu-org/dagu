@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, X } from 'lucide-react';
 
@@ -11,14 +11,16 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { usePageContext } from '../../../../contexts/PageContext';
 import { UnsavedChangesProvider } from '../../../../contexts/UnsavedChangesContext';
 import { useQuery } from '../../../../hooks/api';
+import { useDAGRunSSE } from '../../../../hooks/useDAGRunSSE';
 import { useDAGSSE } from '../../../../hooks/useDAGSSE';
+import { whenEnabled } from '../../../../hooks/queryUtils';
 import {
   sseFallbackOptions,
   useSSECacheSync,
 } from '../../../../hooks/useSSECacheSync';
 import dayjs from '../../../../lib/dayjs';
 import { shouldIgnoreKeyboardShortcuts } from '../../../../lib/keyboard-shortcuts';
-import LoadingIndicator from '../../../../ui/LoadingIndicator';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { DAGContext } from '../../contexts/DAGContext';
 import { RootDAGRunContext } from '../../contexts/RootDAGRunContext';
 import DAGDetailsContent from './DAGDetailsContent';
@@ -62,6 +64,7 @@ function DAGDetailsPanel({
   const [currentDAGRun, setCurrentDAGRun] = useState<
     DAGRunDetails | undefined
   >();
+  const [trackedDagRunId, setTrackedDagRunId] = useState<string>();
   const [activeTab, setActiveTab] = useState('status');
   const [notFound, setNotFound] = useState(false);
 
@@ -94,6 +97,26 @@ function DAGDetailsPanel({
   );
   useSSECacheSync(dagSSE, mutate);
 
+  const dagName = data?.dag?.name || '';
+  const trackedRunEnabled = !!dagName && !!trackedDagRunId;
+  const trackedRunSSE = useDAGRunSSE(
+    dagName,
+    trackedDagRunId || '',
+    trackedRunEnabled,
+    remoteNode
+  );
+  const { data: trackedRunData, mutate: mutateTrackedRun } = useQuery(
+    '/dag-runs/{name}/{dagRunId}',
+    whenEnabled(trackedRunEnabled, {
+      params: {
+        path: { name: dagName, dagRunId: trackedDagRunId || '' },
+        query: { remoteNode },
+      },
+    }),
+    sseFallbackOptions(trackedRunSSE)
+  );
+  useSSECacheSync(trackedRunSSE, mutateTrackedRun);
+
   // Track data loading state and handle 404 errors
   useEffect(() => {
     if (error) {
@@ -110,15 +133,40 @@ function DAGDetailsPanel({
   useEffect(() => {
     setNotFound(false);
     setActiveTab('status');
+    setTrackedDagRunId(undefined);
+    setCurrentDAGRun(undefined);
   }, [fileName, remoteNode]);
 
   function refreshFn(): void {
     setTimeout(() => mutate(), 500);
+    if (trackedDagRunId) {
+      setTimeout(() => mutateTrackedRun(), 500);
+    }
   }
+
+  const handleRunStarted = useCallback(
+    (dagRunId: string) => {
+      setTrackedDagRunId(dagRunId);
+      setActiveTab('status');
+      void mutate();
+    },
+    [mutate]
+  );
 
   function handleFullscreenClick(e?: React.MouseEvent): void {
     const tabPath = activeTab === 'status' ? '' : `/${activeTab}`;
-    const url = `/dags/${fileName}${tabPath}`;
+    const searchParams = new URLSearchParams();
+    if (trackedDagRunId) {
+      searchParams.set('dagRunId', trackedDagRunId);
+      if (data?.dag?.name) {
+        searchParams.set('dagRunName', data.dag.name);
+      }
+    }
+    if (remoteNode && remoteNode !== 'local') {
+      searchParams.set('remoteNode', remoteNode);
+    }
+    const query = searchParams.toString();
+    const url = `/dags/${fileName}${tabPath}${query ? `?${query}` : ''}`;
 
     if (e?.metaKey || e?.ctrlKey) {
       window.open(url, '_blank');
@@ -128,10 +176,14 @@ function DAGDetailsPanel({
   }
 
   useEffect(() => {
-    if (data) {
+    if (trackedRunData?.dagRunDetails) {
+      setCurrentDAGRun(trackedRunData.dagRunDetails);
+    } else if (data) {
       setCurrentDAGRun(data.latestDAGRun);
     }
-  }, [data]);
+  }, [data, trackedRunData]);
+
+  const displayDAGRun = currentDAGRun || data?.latestDAGRun;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -161,7 +213,16 @@ function DAGDetailsPanel({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onNavigate, activeTab, fileName, navigate]);
+  }, [
+    onClose,
+    onNavigate,
+    activeTab,
+    fileName,
+    navigate,
+    trackedDagRunId,
+    data?.dag?.name,
+    remoteNode,
+  ]);
 
   // Show error state if DAG not found
   if (notFound) {
@@ -196,7 +257,7 @@ function DAGDetailsPanel({
       >
         <RootDAGRunContext.Provider
           value={{
-            data: currentDAGRun,
+            data: displayDAGRun,
             setData: setCurrentDAGRun,
           }}
         >
@@ -231,18 +292,18 @@ function DAGDetailsPanel({
                 fileName={fileName}
                 filePath={data.filePath}
                 dag={data.dag}
-                currentDAGRun={data.latestDAGRun}
-                latestDAGRun={data.latestDAGRun}
+                currentDAGRun={displayDAGRun}
                 refreshFn={refreshFn}
                 formatDuration={formatDuration}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
-                dagRunId="latest"
+                dagRunId={trackedDagRunId ?? 'latest'}
                 stepName={null}
                 isModal={true}
                 navigateToStatusTab={() => setActiveTab('status')}
                 localDags={data.localDags}
                 editorHints={data.editorHints}
+                onRunStarted={handleRunStarted}
               />
             </div>
           </div>

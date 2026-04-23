@@ -42,6 +42,59 @@ func requireNoDeprecatedTagsKey(t *testing.T, data []byte) {
 	require.False(t, ok)
 }
 
+func TestDeriveManualDAGRunStatusRetryingIsRunning(t *testing.T) {
+	t.Parallel()
+
+	status := deriveManualDAGRunStatus([]*exec.Node{
+		{
+			Step:   core.Step{Name: "retrying"},
+			Status: core.NodeRetrying,
+		},
+	}, core.Failed)
+
+	assert.Equal(t, core.Running, status)
+}
+
+func TestDeriveManualDAGRunStatusContinueOnMarkSuccessIsContinuable(t *testing.T) {
+	t.Parallel()
+
+	status := deriveManualDAGRunStatus([]*exec.Node{
+		{
+			Step: core.Step{
+				Name: "failed-continuable",
+				ContinueOn: core.ContinueOn{
+					Failure:     true,
+					MarkSuccess: true,
+				},
+			},
+			Status: core.NodeFailed,
+		},
+		{
+			Step:   core.Step{Name: "succeeded"},
+			Status: core.NodeSucceeded,
+		},
+	}, core.Running)
+
+	assert.Equal(t, core.PartiallySucceeded, status)
+}
+
+func TestDeriveManualDAGRunStatusMixedNotStartedAndSucceededIsNonRunning(t *testing.T) {
+	t.Parallel()
+
+	status := deriveManualDAGRunStatus([]*exec.Node{
+		{
+			Step:   core.Step{Name: "succeeded"},
+			Status: core.NodeSucceeded,
+		},
+		{
+			Step:   core.Step{Name: "reset"},
+			Status: core.NodeNotStarted,
+		},
+	}, core.Succeeded)
+
+	assert.Equal(t, core.PartiallySucceeded, status)
+}
+
 func TestApplyInlineEnqueueLabels_ArrayLabels(t *testing.T) {
 	t.Parallel()
 
@@ -180,7 +233,8 @@ func TestApplyInlineEnqueueLabels_InvalidYAML(t *testing.T) {
 func TestDAGRunListOptionsFromQueryStringParsesMultipleStatuses(t *testing.T) {
 	t.Parallel()
 
-	opts, err := dagRunListOptionsFromQueryString(
+	api := &API{}
+	opts, err := api.dagRunListOptionsFromQueryString(
 		context.Background(),
 		"status=5&status=1,6&limit=20",
 	)
@@ -202,7 +256,8 @@ func TestDAGRunListOptionsFromQueryStringParsesMultipleStatuses(t *testing.T) {
 func TestDAGRunListOptionsFromQueryStringRejectsInvalidStatuses(t *testing.T) {
 	t.Parallel()
 
-	_, err := dagRunListOptionsFromQueryString(
+	api := &API{}
+	_, err := api.dagRunListOptionsFromQueryString(
 		context.Background(),
 		"status=1&status=running",
 	)
@@ -287,6 +342,69 @@ func TestAPIListDAGRunsReturnsGatewayTimeoutWhenReadDeadlineExpires(t *testing.T
 	require.Equal(t, http.StatusGatewayTimeout, timeoutResp.StatusCode)
 	require.Equal(t, openapiv1.ErrorCodeTimeout, timeoutResp.Body.Code)
 	require.Equal(t, "dag-run list request timed out", timeoutResp.Body.Message)
+}
+
+func TestDAGRunListOptionsFromQueryStringIncludesWorkspaceFilter(t *testing.T) {
+	t.Parallel()
+
+	api := &API{}
+
+	t.Run("workspace scope", func(t *testing.T) {
+		t.Parallel()
+
+		opts, err := api.dagRunListOptionsFromQueryString(
+			context.Background(),
+			"workspace=ops",
+		)
+		require.NoError(t, err)
+
+		var listOpts exec.ListDAGRunStatusesOptions
+		for _, opt := range opts.query {
+			opt(&listOpts)
+		}
+
+		require.NotNil(t, listOpts.WorkspaceFilter)
+		assert.True(t, listOpts.WorkspaceFilter.Enabled)
+		assert.Equal(t, []string{"ops"}, listOpts.WorkspaceFilter.Workspaces)
+		assert.False(t, listOpts.WorkspaceFilter.IncludeUnlabelled)
+	})
+
+	t.Run("default scope", func(t *testing.T) {
+		t.Parallel()
+
+		opts, err := api.dagRunListOptionsFromQueryString(
+			context.Background(),
+			"workspace=default",
+		)
+		require.NoError(t, err)
+
+		var listOpts exec.ListDAGRunStatusesOptions
+		for _, opt := range opts.query {
+			opt(&listOpts)
+		}
+
+		require.NotNil(t, listOpts.WorkspaceFilter)
+		assert.True(t, listOpts.WorkspaceFilter.Enabled)
+		assert.Empty(t, listOpts.WorkspaceFilter.Workspaces)
+		assert.True(t, listOpts.WorkspaceFilter.IncludeUnlabelled)
+	})
+
+	t.Run("all scope without auth keeps aggregate unfiltered", func(t *testing.T) {
+		t.Parallel()
+
+		opts, err := api.dagRunListOptionsFromQueryString(
+			context.Background(),
+			"workspace=all",
+		)
+		require.NoError(t, err)
+
+		var listOpts exec.ListDAGRunStatusesOptions
+		for _, opt := range opts.query {
+			opt(&listOpts)
+		}
+
+		assert.Nil(t, listOpts.WorkspaceFilter)
+	})
 }
 
 type blockingLatestAttemptStore struct {

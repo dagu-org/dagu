@@ -28,7 +28,7 @@ describe('SearchResult', () => {
     });
   });
 
-  it('loads more DAG matches without sending a client-side limit override', async () => {
+  it('loads more DAG matches without workspace query params when omitted', async () => {
     render(
       <MemoryRouter>
         <SearchResult
@@ -71,5 +71,84 @@ describe('SearchResult', () => {
         },
       },
     });
+  });
+
+  it('loads more DAG matches with the feed workspace query', async () => {
+    render(
+      <MemoryRouter>
+        <SearchResult
+          type="dag"
+          query="needle"
+          workspaceQuery={{
+            workspace: 'team-a',
+          }}
+          results={[
+            {
+              fileName: 'build',
+              name: 'build',
+              workspace: 'team-a',
+              matches: [
+                {
+                  line: 'needle',
+                  lineNumber: 3,
+                  startLine: 3,
+                },
+              ],
+              hasMoreMatches: true,
+              nextMatchesCursor: 'cursor-1',
+            },
+          ]}
+        />
+      </MemoryRouter>
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show more matches' })
+    );
+
+    await waitFor(() => {
+      expect(getMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(getMock).toHaveBeenCalledWith('/search/dags/{fileName}/matches', {
+      params: {
+        path: { fileName: 'build' },
+        query: {
+          remoteNode: 'local',
+          q: 'needle',
+          cursor: 'cursor-1',
+          workspace: 'team-a',
+        },
+      },
+    });
+  });
+
+  it('links DAG results to the result workspace', () => {
+    render(
+      <MemoryRouter>
+        <SearchResult
+          type="dag"
+          query="needle"
+          results={[
+            {
+              fileName: 'build',
+              name: 'build',
+              workspace: 'team-a',
+              matches: [
+                {
+                  line: 'needle',
+                  lineNumber: 3,
+                  startLine: 3,
+                },
+              ],
+              hasMoreMatches: false,
+            },
+          ]}
+        />
+      </MemoryRouter>
+    );
+
+    const link = screen.getByRole('link', { name: /build/i });
+    expect(link.getAttribute('href')).toBe('/dags/build/spec?workspace=team-a');
   });
 });

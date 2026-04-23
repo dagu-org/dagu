@@ -774,6 +774,7 @@ paths:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PerPage"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "name"
           in: "query"
           required: false
@@ -1656,7 +1657,6 @@ paths:
       parameters:
         - $ref: "#/components/parameters/DAGFileName"
         - $ref: "#/components/parameters/RemoteNode"
-        - $ref: "#/components/parameters/Workspace"
         - name: "q"
           in: "query"
           required: true
@@ -1669,6 +1669,7 @@ paths:
           schema:
             type: "string"
           description: "Filter DAG matches by labels (comma-separated). Returns matches only when the DAG has ALL specified labels."
+        - $ref: "#/components/parameters/Workspace"
         - $ref: "#/components/parameters/SearchCursor"
         - $ref: "#/components/parameters/SearchMatchLimit"
       responses:
@@ -1756,6 +1757,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
           description: "A successful response"
@@ -1780,6 +1782,7 @@ paths:
         - "dags"
       parameters:
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
           description: "A successful response"
@@ -1809,6 +1812,7 @@ paths:
         - $ref: "#/components/parameters/DAGRunListLimit"
         - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
         - name: "name"
           in: "query"
           required: false
@@ -2018,6 +2022,7 @@ paths:
         - $ref: "#/components/parameters/DAGRunListLimit"
         - $ref: "#/components/parameters/DAGRunListCursor"
         - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/Workspace"
       responses:
         "200":
           description: "A successful response"
@@ -7891,11 +7896,13 @@ components:
     Workspace:
       name: workspace
       in: query
-      description: selected workspace scope
+      description: "Workspace selector. For list and search APIs, use all, default, or a workspace name. Omitted means all. For document target APIs, use default or a workspace name; omitted means default."
       required: false
       schema:
         type: string
-        pattern: "^[A-Za-z0-9_]+$"
+        minLength: 1
+        maxLength: 64
+        pattern: "^[A-Za-z0-9_-]+$"
 
     SearchCursor:
       name: cursor
@@ -8914,6 +8921,9 @@ components:
         name:
           type: string
           description: "Logical name of the DAG"
+        workspace:
+          type: string
+          description: "Workspace label value for the DAG. Omitted for default DAGs and invalid workspace labels."
         schedule:
           type: array
           description: "List of scheduling expressions defining when DAG-runs should be created from this DAG"
@@ -9448,6 +9458,9 @@ components:
           $ref: "#/components/schemas/DAGRunId"
         name:
           $ref: "#/components/schemas/DAGName"
+        workspace:
+          type: string
+          description: "Workspace label value for the DAG-run. Omitted for default DAG-runs and invalid workspace labels."
         status:
           $ref: "#/components/schemas/Status"
         statusLabel:
@@ -9966,6 +9979,9 @@ components:
         name:
           type: string
           description: "Display label for the DAG result; file-backed search currently mirrors fileName"
+        workspace:
+          type: string
+          description: "Workspace label value for the matching DAG. Omitted for default DAGs and invalid workspace labels."
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
@@ -10007,6 +10023,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for default documents."
         hasMoreMatches:
           type: boolean
           description: "Whether additional snippets are available beyond the preview"
@@ -10463,6 +10482,41 @@ components:
         - operator
         - viewer
 
+    WorkspaceName:
+      type: string
+      description: "Workspace name. The reserved names all and default are not allowed."
+      minLength: 1
+      maxLength: 64
+      pattern: "^[A-Za-z0-9_-]+$"
+
+    WorkspaceGrant:
+      type: object
+      description: "Role granted for a specific workspace"
+      properties:
+        workspace:
+          $ref: "#/components/schemas/WorkspaceName"
+        role:
+          $ref: "#/components/schemas/UserRole"
+      required:
+        - workspace
+        - role
+
+    WorkspaceAccess:
+      type: object
+      description: "Workspace access policy. all=true grants the top-level role in every workspace. all=false requires explicit workspace grants and a top-level viewer role."
+      properties:
+        all:
+          type: boolean
+          description: "Whether this identity can access all workspaces"
+        grants:
+          type: array
+          description: "Workspace-specific grants used when all=false"
+          items:
+            $ref: "#/components/schemas/WorkspaceGrant"
+      required:
+        - all
+        - grants
+
     SetupRequest:
       type: object
       description: "Request body for initial admin account setup"
@@ -10555,6 +10609,8 @@ components:
           minLength: 8
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
       required:
         - username
         - password
@@ -10571,6 +10627,8 @@ components:
           maxLength: 64
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
         isDisabled:
           type: boolean
           description: "Whether to disable the user account"
@@ -10587,6 +10645,8 @@ components:
           description: "User's username"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
         authProvider:
           type: string
           enum: [builtin, oidc]
@@ -10606,6 +10666,7 @@ components:
         - id
         - username
         - role
+        - workspaceAccess
         - createdAt
         - updatedAt
 
@@ -10644,6 +10705,8 @@ components:
           description: "Purpose description"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
         keyPrefix:
           type: string
           description: "First 8 characters for identification"
@@ -10667,6 +10730,7 @@ components:
         - id
         - name
         - role
+        - workspaceAccess
         - keyPrefix
         - createdAt
         - updatedAt
@@ -10707,6 +10771,8 @@ components:
           description: "Purpose description"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
       required:
         - name
         - role
@@ -10739,6 +10805,8 @@ components:
           description: "New description"
         role:
           $ref: "#/components/schemas/UserRole"
+        workspaceAccess:
+          $ref: "#/components/schemas/WorkspaceAccess"
 
     SuccessResponse:
       type: object
@@ -11550,6 +11618,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for default documents."
         content:
           type: string
           description: "Full file content including YAML frontmatter"
@@ -11576,6 +11647,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for default documents."
         modifiedAt:
           type: string
           format: date-time
@@ -11595,6 +11669,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this node. Omitted for default nodes."
         type:
           type: string
           enum:
@@ -11637,6 +11714,9 @@ components:
           type: string
         title:
           type: string
+        workspace:
+          type: string
+          description: "Workspace that owns this document. Omitted for default documents."
         matches:
           type: array
           items:
@@ -12900,7 +12980,7 @@ components:
         - name
       properties:
         name:
-          type: string
+          $ref: "#/components/schemas/WorkspaceName"
         description:
           type: string
 
@@ -12908,7 +12988,7 @@ components:
       type: object
       properties:
         name:
-          type: string
+          $ref: "#/components/schemas/WorkspaceName"
         description:
           type: string
 
@@ -12921,7 +13001,7 @@ components:
         id:
           type: string
         name:
-          type: string
+          $ref: "#/components/schemas/WorkspaceName"
         description:
           type: string
         createdAt:

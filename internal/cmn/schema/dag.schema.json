@@ -787,11 +787,11 @@
     },
     "harness": {
       "$ref": "#/definitions/harnessDefaultsConfig",
-      "description": "Default harness configuration for coding-agent steps in the DAG. Steps with type: harness inherit these defaults, and steps without an explicit type are treated as harness steps when this block is present. Step-level config overrides primary keys and replaces DAG-level fallback when fallback is set."
+      "description": "Default harness configuration for coding-agent steps in the DAG. Steps with type: harness inherit these defaults, and steps without an explicit type are treated as harness steps when this block is present. Step-level with overrides primary keys and replaces DAG-level fallback when fallback is set."
     },
     "harnesses": {
       "$ref": "#/definitions/harnessDefinitions",
-      "description": "Reusable custom harness definitions available to harness steps. Each definition describes how to invoke a named harness CLI; steps reference definitions via config.provider."
+      "description": "Reusable custom harness definitions available to harness steps. Each definition describes how to invoke a named harness CLI; steps reference definitions via with.provider."
     },
     "steps": {
       "oneOf": [
@@ -892,7 +892,7 @@
             { "type": "integer" },
             { "type": "string" }
           ],
-          "description": "Maximum number of retry attempts"
+          "description": "Maximum number of retry attempts for a failed step. Use 0 to disable automatic retries for that step."
         },
         "interval_sec": {
           "oneOf": [
@@ -937,10 +937,10 @@
       "properties": {
         "limit": {
           "oneOf": [
-            { "type": "integer", "minimum": 1 },
-            { "type": "string", "pattern": "^0*[1-9][0-9]*$" }
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]+$" }
           ],
-          "description": "Maximum number of retry attempts"
+          "description": "Maximum number of scheduler-issued DAG retry attempts. Use 0 to disable DAG-level automatic retries."
         },
         "interval_sec": {
           "oneOf": [
@@ -1629,9 +1629,15 @@
           "$ref": "#/definitions/executorType",
           "description": "Builtin executor type or a custom step type name declared in step_types or base config. If omitted, Dagu infers the builtin type from other step fields. Cannot be used together with 'executor' field."
         },
+        "with": {
+          "$ref": "#/definitions/executorConfig",
+          "description": "Executor-specific configuration. For builtin types, this is the executor config object. For custom step types, this is the validated input object defined by step_types.<name>.input_schema."
+        },
         "config": {
           "$ref": "#/definitions/executorConfig",
-          "description": "Executor-specific configuration. For builtin types, this is the executor config object. For custom step types, this is the validated input object defined by step_types.<name>.input_schema. Cannot be used together with 'executor' field."
+          "deprecated": true,
+          "doNotSuggest": true,
+          "description": "Legacy alias for 'with'. Use 'with' for new DAGs."
         },
         "llm": {
           "$ref": "#/definitions/llmConfig",
@@ -1710,10 +1716,20 @@
           }
         },
         {
+          "not": {
+            "required": ["with", "config"]
+          }
+        },
+        {
           "if": { "properties": { "type": { "const": "http" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/httpExecutorConfig" }
+              "with": { "$ref": "#/definitions/httpExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/httpExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1721,7 +1737,25 @@
           "if": { "properties": { "type": { "const": "ssh" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/sshExecutorConfig" }
+              "with": { "$ref": "#/definitions/sshExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/sshExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sftp" } } },
+          "then": {
+            "properties": {
+              "with": { "$ref": "#/definitions/sftpExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/sftpExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1731,7 +1765,12 @@
           },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/dockerExecutorConfig" }
+              "with": { "$ref": "#/definitions/dockerExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/dockerExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1739,7 +1778,12 @@
           "if": { "properties": { "type": { "const": "mail" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/mailExecutorConfig" }
+              "with": { "$ref": "#/definitions/mailExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/mailExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1747,7 +1791,12 @@
           "if": { "properties": { "type": { "const": "jq" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/jqExecutorConfig" }
+              "with": { "$ref": "#/definitions/jqExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/jqExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1755,7 +1804,12 @@
           "if": { "properties": { "type": { "const": "archive" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/archiveExecutorConfig" }
+              "with": { "$ref": "#/definitions/archiveExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/archiveExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1763,7 +1817,12 @@
           "if": { "properties": { "type": { "const": "postgres" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/postgresExecutorConfig" }
+              "with": { "$ref": "#/definitions/postgresExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/postgresExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1771,7 +1830,12 @@
           "if": { "properties": { "type": { "const": "sqlite" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/sqliteExecutorConfig" }
+              "with": { "$ref": "#/definitions/sqliteExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/sqliteExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1779,7 +1843,12 @@
           "if": { "properties": { "type": { "const": "redis" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/redisExecutorConfig" }
+              "with": { "$ref": "#/definitions/redisExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/redisExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1789,7 +1858,12 @@
           },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/kubernetesExecutorConfig" }
+              "with": { "$ref": "#/definitions/kubernetesExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/kubernetesExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1797,7 +1871,12 @@
           "if": { "properties": { "type": { "const": "s3" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/s3ExecutorConfig" }
+              "with": { "$ref": "#/definitions/s3ExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/s3ExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -1805,7 +1884,12 @@
           "if": { "properties": { "type": { "const": "harness" } } },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/harnessExecutorConfig" }
+              "with": { "$ref": "#/definitions/harnessExecutorConfig" },
+              "config": {
+                "$ref": "#/definitions/harnessExecutorConfig",
+                "deprecated": true,
+                "doNotSuggest": true
+              }
             }
           }
         },
@@ -2446,6 +2530,96 @@
         }
       },
       "description": "SSH executor configuration for remote command execution."
+    },
+    "sftpExecutorConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "destination"],
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "SSH username for authentication. Required."
+        },
+        "host": {
+          "type": "string",
+          "description": "Hostname or IP address of the SSH server. Required."
+        },
+        "ip": {
+          "type": "string",
+          "description": "Alias for 'host'. IP address of the SSH server."
+        },
+        "port": {
+          "oneOf": [{ "type": "string" }, { "type": "integer" }],
+          "default": "22",
+          "description": "SSH port number. Defaults to 22."
+        },
+        "key": {
+          "type": "string",
+          "description": "Path to SSH private key file. If not specified, defaults are tried: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, ~/.ssh/id_dsa."
+        },
+        "password": {
+          "type": "string",
+          "description": "SSH password for authentication. Not recommended; prefer key-based authentication."
+        },
+        "strict_host_key": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable strict host key checking. When true (default), verifies server's host key against known_hosts."
+        },
+        "known_host_file": {
+          "type": "string",
+          "default": "~/.ssh/known_hosts",
+          "description": "Path to known_hosts file for host key verification."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Connection timeout such as '30s' or '1m'."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["upload", "download"],
+          "default": "upload",
+          "description": "Transfer direction. Defaults to upload."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source path. For upload, this is a local path; for download, this is a remote path."
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Destination path. For upload, this is a remote path; for download, this is a local path."
+        },
+        "bastion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "host": {
+              "type": "string",
+              "description": "Bastion host address."
+            },
+            "port": {
+              "oneOf": [{ "type": "string" }, { "type": "integer" }],
+              "description": "Bastion SSH port."
+            },
+            "user": {
+              "type": "string",
+              "description": "Bastion SSH username."
+            },
+            "key": {
+              "type": "string",
+              "description": "Path to bastion private key file."
+            },
+            "password": {
+              "type": "string",
+              "description": "Bastion SSH password."
+            }
+          },
+          "description": "Bastion/jump host configuration."
+        }
+      },
+      "description": "SFTP executor configuration for file transfers over SSH."
     },
     "dockerExecutorConfig": {
       "type": "object",
@@ -4533,7 +4707,7 @@
           "$ref": "#/definitions/kubernetesCommonConfig"
         }
       ],
-      "description": "Default Kubernetes configuration for explicit Kubernetes steps. Same fields as step-level config, but image is optional."
+      "description": "Default Kubernetes configuration for explicit Kubernetes steps. Same fields as step-level with, but image is optional."
     },
     "kubernetesExecutorConfig": {
       "allOf": [
@@ -4901,7 +5075,7 @@
         "input_schema": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Inline JSON Schema object used to validate and default the custom step's config input."
+          "description": "Inline JSON Schema object used to validate and default the custom step's with input."
         },
         "template": {
           "type": "object",
@@ -4960,6 +5134,14 @@
           "then": {
             "properties": {
               "config": { "$ref": "#/definitions/sshExecutorConfig" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sftp" } } },
+          "then": {
+            "properties": {
+              "config": { "$ref": "#/definitions/sftpExecutorConfig" }
             }
           }
         },

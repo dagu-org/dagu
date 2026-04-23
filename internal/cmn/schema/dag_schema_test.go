@@ -392,6 +392,26 @@ steps:
 `,
 		},
 		{
+			name: "LimitZero",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 0
+steps:
+  - command: echo hi
+`,
+		},
+		{
+			name: "StringLimitZero",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: "0"
+steps:
+  - command: echo hi
+`,
+		},
+		{
 			name: "RejectsMissingLimit",
 			spec: `
 name: retryable-dag
@@ -415,12 +435,58 @@ steps:
 			wantErr: "retry_policy",
 		},
 		{
+			name: "RejectsNegativeLimit",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: -1
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsNegativeStringLimit",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: "-1"
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
 			name: "RejectsNonNumericStringInterval",
 			spec: `
 name: retryable-dag
 retry_policy:
   limit: 3
   interval_sec: later
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsZeroInterval",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 1
+  interval_sec: 0
+steps:
+  - command: echo hi
+`,
+			wantErr: "retry_policy",
+		},
+		{
+			name: "RejectsZeroMaxInterval",
+			spec: `
+name: retryable-dag
+retry_policy:
+  limit: 1
+  max_interval_sec: 0
 steps:
   - command: echo hi
 `,
@@ -506,6 +572,206 @@ steps:
 	require.Contains(t, err.Error(), "steps")
 }
 
+func TestDAGSchemaStepWithFieldAndConfigAlias(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "CanonicalWith",
+			spec: `
+steps:
+  - type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+`,
+		},
+		{
+			name: "LegacyConfigAlias",
+			spec: `
+steps:
+  - type: http
+    command: GET https://example.com
+    config:
+      timeout: 30
+`,
+		},
+		{
+			name: "RejectBothWithAndConfig",
+			spec: `
+steps:
+  - type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+    config:
+      timeout: 60
+`,
+			wantErr: "steps",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestDAGSchemaSSHExecutorPort(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+	doc := mustParseYAMLDocument(t, `
+steps:
+  - type: ssh
+    command: hostname
+    with:
+      host: example.com
+      user: deploy
+      port: 22
+`)
+
+	require.NoError(t, resolved.Validate(doc))
+}
+
+func TestDAGSchemaSFTPExecutor(t *testing.T) {
+	t.Parallel()
+
+	resolved := mustResolveDAGSchema(t)
+	sftpConfigSchema := mustResolveDAGSchemaDefinition(t, "sftpExecutorConfig")
+
+	tests := []struct {
+		name    string
+		spec    string
+		wantErr string
+	}{
+		{
+			name: "WithConfig",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: "22"
+      direction: upload
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+`,
+		},
+		{
+			name: "NumericPorts",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: 22
+      direction: upload
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+      bastion:
+        host: bastion.example.com
+        user: deploy
+        port: 2222
+`,
+		},
+		{
+			name: "LegacyConfigAlias",
+			spec: `
+steps:
+  - type: sftp
+    config:
+      host: example.com
+      source: /srv/backups/backup.tar.gz
+      destination: ./backup.tar.gz
+      direction: download
+`,
+		},
+		{
+			name: "RejectInvalidDirection",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: "22"
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+      direction: sync
+`,
+			wantErr: "direction",
+		},
+		{
+			name: "RejectEmptySource",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: "22"
+      direction: upload
+      source: ""
+      destination: /srv/backups/backup.tar.gz
+`,
+			wantErr: "source",
+		},
+		{
+			name: "RejectUnknownConfigField",
+			spec: `
+steps:
+  - type: sftp
+    with:
+      host: example.com
+      user: deploy
+      port: "22"
+      direction: upload
+      source: ./backup.tar.gz
+      destination: /srv/backups/backup.tar.gz
+      unknown_field: true
+`,
+			wantErr: "unknown_field",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := mustParseYAMLDocument(t, tt.spec)
+			err := resolved.Validate(doc)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+
+			configErr := sftpConfigSchema.Validate(firstStepConfig(t, doc))
+			require.Error(t, configErr)
+			require.Contains(t, configErr.Error(), tt.wantErr)
+		})
+	}
+}
+
 func TestDAGSchemaKubernetes(t *testing.T) {
 	t.Parallel()
 
@@ -526,7 +792,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `,
@@ -541,7 +807,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       cleanup_policy: keep
     command: echo hello
 `,
@@ -552,7 +818,7 @@ steps:
 steps:
   - id: report
     type: kubernetes
-    config:
+    with:
       image: alpine:3.20
       namespace: batch
       cleanup_policy: keep
@@ -580,7 +846,7 @@ kubernetes:
 steps:
   - id: report
     type: kubernetes
-    config:
+    with:
       image: alpine:3.20
       security_context:
         run_as_non_root: true
@@ -644,7 +910,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       affinity: {}
       pod_failure_policy: {}
@@ -660,7 +926,7 @@ kubernetes:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
     command: echo hello
 `,
@@ -672,7 +938,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       env:
         - value: missing-name
@@ -686,7 +952,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       env_from:
         - prefix: APP_
@@ -700,7 +966,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       security_context:
         seccomp_profile:
@@ -715,7 +981,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       pod_failure_policy:
         rules:
@@ -733,7 +999,7 @@ steps:
 steps:
   - id: report
     type: kubernetes
-    config:
+    with:
       image: alpine:3.20
       unknown_field: true
     command: echo hello
@@ -746,7 +1012,7 @@ steps:
 steps:
   - id: report
     type: k8s
-    config:
+    with:
       image: alpine:3.20
       volumes:
         - name: data
@@ -801,7 +1067,7 @@ steps:
 
   - type: harness
     command: Fix bugs
-    config:
+    with:
       model: opus
       effort: high
 `,
@@ -819,7 +1085,7 @@ harnesses:
 steps:
   - type: harness
     command: Summarize the repository state
-    config:
+    with:
       provider: gemini
       model: gemini-2.5-pro
       yolo: true
@@ -836,7 +1102,7 @@ harnesses:
 steps:
   - type: harness
     command: Summarize the repository state
-    config:
+    with:
       provider: gemini
 `,
 			wantErr: "harnesses",
@@ -853,7 +1119,7 @@ harnesses:
 steps:
   - type: harness
     command: Summarize the repository state
-    config:
+    with:
       provider: gemini
 `,
 			wantErr: "harnesses",
@@ -877,7 +1143,7 @@ steps:
 steps:
   - type: harness
     command: Write tests
-    config:
+    with:
       provider: claude
       fallback:
         - provider: codex
@@ -927,10 +1193,47 @@ func mustResolveDAGSchema(t *testing.T) *jsonschema.Resolved {
 	return resolved
 }
 
+func mustResolveDAGSchemaDefinition(t *testing.T, name string) *jsonschema.Resolved {
+	t.Helper()
+
+	var root struct {
+		Definitions map[string]json.RawMessage `json:"definitions"`
+	}
+	require.NoError(t, json.Unmarshal(DAGSchemaJSON, &root))
+
+	definition, ok := root.Definitions[name]
+	require.True(t, ok, "schema definition %q should exist", name)
+
+	var schema jsonschema.Schema
+	require.NoError(t, json.Unmarshal(definition, &schema))
+
+	resolved, err := schema.Resolve(&jsonschema.ResolveOptions{})
+	require.NoError(t, err)
+	return resolved
+}
+
 func mustParseYAMLDocument(t *testing.T, spec string) map[string]any {
 	t.Helper()
 
 	var doc map[string]any
 	require.NoError(t, yaml.Unmarshal([]byte(spec), &doc))
 	return doc
+}
+
+func firstStepConfig(t *testing.T, doc map[string]any) map[string]any {
+	t.Helper()
+
+	steps, ok := doc["steps"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, steps)
+
+	step, ok := steps[0].(map[string]any)
+	require.True(t, ok)
+
+	if config, ok := step["with"].(map[string]any); ok {
+		return config
+	}
+	config, ok := step["config"].(map[string]any)
+	require.True(t, ok)
+	return config
 }

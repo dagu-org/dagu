@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { components } from '../../../../api/v1/schema';
+import { components, NodeStatus } from '../../../../api/v1/schema';
 import NodeStatusTableRow from './NodeStatusTableRow';
 
 /**
@@ -29,12 +29,20 @@ type Props = {
     dagRunId: string,
     node?: components['schemas']['Node']
   ) => void;
+  /** Function called after a row status update succeeds */
+  onNodeStatusUpdated?: (stepName: string, status: NodeStatus) => void;
 };
 
 /**
  * NodeStatusTable displays execution status information for all nodes in a DAG run
  */
-function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
+function NodeStatusTable({
+  nodes,
+  status,
+  fileName,
+  onViewLog,
+  onNodeStatusUpdated,
+}: Props) {
   // Don't render if there are no nodes
   if (!nodes || !nodes.length) {
     return null;
@@ -81,6 +89,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
                   node={n}
                   name={fileName}
                   onViewLog={onViewLog}
+                  onNodeStatusUpdated={onNodeStatusUpdated}
                   dagRun={status}
                   view="desktop"
                 />
@@ -99,6 +108,7 @@ function NodeStatusTable({ nodes, status, fileName, onViewLog }: Props) {
             node={n}
             name={fileName}
             onViewLog={onViewLog}
+            onNodeStatusUpdated={onNodeStatusUpdated}
             dagRun={status}
             view="mobile"
           />

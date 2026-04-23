@@ -290,6 +290,10 @@ func normalizeStepData(ctx BuildContext, data []any) []any {
 }
 
 func decodeStep(raw map[string]any) (*step, error) {
+	if err := validateStepConfigAliasRaw(raw); err != nil {
+		return nil, err
+	}
+
 	var st step
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,

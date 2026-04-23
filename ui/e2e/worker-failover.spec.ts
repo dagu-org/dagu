@@ -13,7 +13,6 @@ import {
   stopService,
   uniqueName,
   waitForDAGAvailable,
-  waitForRunStatus,
   waitForWorkerSet,
   writeLocalDAG,
 } from './helpers/e2e';

@@ -18,7 +18,7 @@ import { AppBarContext } from '@/contexts/AppBarContext';
 import { TOKEN_KEY } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import dayjs from '@/lib/dayjs';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import {
   CheckCircle2,
   Globe,
@@ -327,7 +327,11 @@ export default function RemoteNodesPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Actions">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Actions"
+                          >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>

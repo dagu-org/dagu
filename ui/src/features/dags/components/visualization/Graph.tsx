@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { components, NodeStatus } from '../../../../api/v1/schema';
-import Mermaid from '../../../../ui/Mermaid';
+import Mermaid from '@/components/ui/mermaid';
 
 /**
  * Escapes special characters in labels for safe Mermaid syntax interpolation.
@@ -55,10 +55,12 @@ type Props = {
   onChangeFlowchart?: (value: FlowchartType) => void;
   /** Steps or nodes to visualize */
   steps?: Steps;
-  /** Callback for node click events (double-click) */
+  /** Callback for node click events */
   onClickNode?: onClickNode;
   /** Whether a single click should invoke onClickNode */
   selectOnClick?: boolean;
+  /** Callback for node double-click events */
+  onDoubleClickNode?: onClickNode;
   /** Callback for node right-click events */
   onRightClickNode?: onRightClickNode;
   /** Whether to show status icons */
@@ -89,6 +91,7 @@ function Graph({
   type = 'status',
   onClickNode,
   selectOnClick = false,
+  onDoubleClickNode,
   onRightClickNode,
   showIcons = true,
   isExpandedView = false,
@@ -207,7 +210,8 @@ function Graph({
       const isSubDAGRun = !!step.call;
       const hasParallelExecutions = !!step.parallel;
       // Check if this is a router step
-      const isRouterStep = step.executorConfig?.type === 'router' || !!step.router;
+      const isRouterStep =
+        step.executorConfig?.type === 'router' || !!step.router;
 
       // Add indicator for sub dagRun nodes in the label only
       // Escape any special characters in the label to prevent Mermaid parsing errors
@@ -299,20 +303,19 @@ function Graph({
     // Use theme-appropriate colors for light/dark modes
     const nodeFill = isDarkMode ? '#161a3d' : '#ffffff'; // --card for dark, white for light
     const nodeColor = isDarkMode ? '#f1f5f9' : '#0f1129'; // --foreground for dark, --background for light
-    const strokeDefault = isDarkMode ? '#2d336d' : '#94a3b8';
 
     // Unified status colors
     const statusColors = {
-      none: '#5f6368',      // neutral gray
-      running: '#81c784',   // light green (distinct from success)
-      retrying: '#e37400',  // warning amber for scheduled backoff
-      done: '#1e8e3e',      // success green
-      error: '#d93025',     // error red
-      cancel: '#d946ef',    // pink/magenta for aborted
-      skipped: '#5f6368',   // neutral gray
-      partial: '#e37400',   // warning amber
-      waiting: '#e37400',   // warning amber
-      rejected: '#d93025',  // error red
+      none: '#5f6368', // neutral gray
+      running: '#81c784', // light green (distinct from success)
+      retrying: '#e37400', // warning amber for scheduled backoff
+      done: '#1e8e3e', // success green
+      error: '#d93025', // error red
+      cancel: '#d946ef', // pink/magenta for aborted
+      skipped: '#5f6368', // neutral gray
+      partial: '#e37400', // warning amber
+      waiting: '#e37400', // warning amber
+      rejected: '#d93025', // error red
     };
 
     dat.push(
@@ -453,7 +456,7 @@ function Graph({
           def={graph}
           scale={scale}
           onClick={selectOnClick ? onClickNode : undefined}
-          onDoubleClick={onClickNode}
+          onDoubleClick={onDoubleClickNode ?? onClickNode}
           onRightClick={onRightClickNode}
         />
       </div>
@@ -475,6 +478,7 @@ function Graph({
                 type={type}
                 onClickNode={onClickNode}
                 selectOnClick={selectOnClick}
+                onDoubleClickNode={onDoubleClickNode}
                 onRightClickNode={onRightClickNode}
                 showIcons={showIcons}
                 isExpandedView={true}

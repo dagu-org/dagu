@@ -157,18 +157,21 @@ steps:
 	initialLease := waitForLease(t, f, status.AttemptKey, 5*time.Second).LastHeartbeatAt
 	runningSince := time.Now()
 
+	var lease exec.DAGRunLease
 	require.Eventually(t, func() bool {
-		lease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
-		if err != nil || lease == nil {
+		currentStatus, err := f.latestStatus()
+		if err != nil || currentStatus.Status != core.Running || currentStatus.AttemptKey != status.AttemptKey {
 			return false
 		}
-		return lease.LastHeartbeatAt > initialLease
-	}, 10*time.Second, 100*time.Millisecond, "heartbeat should refresh beyond initial value")
+		currentLease, err := f.coord.DAGRunLeaseStore.Get(f.coord.Context, status.AttemptKey)
+		if err != nil || currentLease == nil || currentLease.LastHeartbeatAt <= initialLease {
+			return false
+		}
+		status = currentStatus
+		lease = *currentLease
+		return true
+	}, 10*time.Second, 100*time.Millisecond, "heartbeat should refresh while run remains active")
 
-	status, err := f.latestStatus()
-	require.NoError(t, err)
-	require.Equal(t, core.Running, status.Status)
-	lease := waitForLease(t, f, status.AttemptKey, 5*time.Second)
 	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
 	assert.WithinDuration(t, time.Now(), time.UnixMilli(lease.LastHeartbeatAt), freshWindow)
 	if runtime.GOOS == "windows" {
@@ -181,11 +184,10 @@ steps:
 	require.Eventually(t, func() bool {
 		return time.Since(runningSince) >= leaseObservationWindow
 	}, leaseObservationWindow+time.Second, 200*time.Millisecond)
-	status, err = f.latestStatus()
+	status, err := f.latestStatus()
 	require.NoError(t, err)
 	require.Equal(t, core.Running, status.Status, "run should remain active beyond the stale threshold")
 	lease = waitForLease(t, f, status.AttemptKey, 5*time.Second)
-	assert.Greater(t, lease.LastHeartbeatAt, initialLease)
 
 	require.NoError(t, os.WriteFile(releaseFile, []byte("ok"), 0600))
 	finalStatus := f.waitForStatus(core.Succeeded, finalStatusTimeout)

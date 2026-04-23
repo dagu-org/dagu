@@ -9,8 +9,7 @@
   align-items: center;
   border-radius: 9999px;
   transition: background-color 0.2s ease;
-  /* Light mode unchecked - warm gray */
-  background-color: #d4cdc0;
+  background-color: var(--input);
 }
 
 .switch-root:focus-visible {
@@ -22,29 +21,25 @@
   opacity: 0.5;
 }
 
-/* Light mode checked */
 .switch-root[data-state='checked'] {
   background-color: var(--primary);
 }
 
-/* Dark mode unchecked - visible slate gray */
 .dark .switch-root {
-  background-color: #334155;
+  background-color: var(--input);
 }
 
-/* Dark mode checked - filled with primary color */
 .dark .switch-root[data-state='checked'] {
   background-color: var(--primary);
 }
 
-/* Thumb styles - white in both modes for contrast */
 .switch-thumb {
   pointer-events: none;
   display: block;
   height: 1rem;
   width: 1rem;
   border-radius: 9999px;
-  background-color: #ffffff;
+  background-color: var(--card);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: transform 0.2s ease;
 }

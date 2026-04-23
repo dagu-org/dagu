@@ -1,5 +1,5 @@
 import React from 'react';
-import Title from '../../../ui/Title';
+import Title from '@/components/ui/title';
 
 type Props = {
   title: string;

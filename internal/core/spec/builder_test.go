@@ -49,6 +49,67 @@ func (th *DAG) AssertParam(t *testing.T, params ...string) {
 	}
 }
 
+func TestStepWithFieldAndConfigAlias(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		yaml string
+	}{
+		{
+			name: "CanonicalWith",
+			yaml: `
+steps:
+  - name: request
+    type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+`,
+		},
+		{
+			name: "LegacyConfig",
+			yaml: `
+steps:
+  - name: request
+    type: http
+    command: GET https://example.com
+    config:
+      timeout: 30
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dag, err := spec.LoadYAML(context.Background(), []byte(tt.yaml))
+			require.NoError(t, err)
+			require.Len(t, dag.Steps, 1)
+			assert.Equal(t, "http", dag.Steps[0].ExecutorConfig.Type)
+			assert.EqualValues(t, 30, dag.Steps[0].ExecutorConfig.Config["timeout"])
+		})
+	}
+}
+
+func TestStepWithFieldRejectsLegacyConfigTogether(t *testing.T) {
+	t.Parallel()
+
+	_, err := spec.LoadYAML(context.Background(), []byte(`
+steps:
+  - name: request
+    type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+    config:
+      timeout: 60
+`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `fields "with" and "config" cannot be used together`)
+}
+
 func TestEnvParams(t *testing.T) {
 	t.Parallel()
 
@@ -571,7 +632,7 @@ steps:
   - command: http://example.com
     name: step1
     type: http
-    config:
+    with:
       key: value
       map:
         foo: bar
@@ -1664,14 +1725,14 @@ steps:
   - script: |
       echo "script content"
   - type: http
-    config:
+    with:
       url: https://example.com
   - call: sub-dag
   - type: docker
-    config:
+    with:
       image: alpine
   - type: ssh
-    config:
+    with:
       host: example.com
 `)
 		dag, err := spec.LoadYAML(context.Background(), data)
@@ -2733,7 +2794,7 @@ steps:
   - name: step1
     command: node app.js
     type: docker
-    config:
+    with:
       image: python:3.11
 `
 		ctx := context.Background()
@@ -2805,7 +2866,7 @@ steps:
   - name: step1
     command: echo hello
     type: ssh
-    config:
+    with:
       user: overrideuser
       ip: override.com
   - name: step2
@@ -2836,11 +2897,11 @@ redis:
 steps:
   - name: step1
     type: redis
-    config:
+    with:
       command: PING
   - name: step2
     type: redis
-    config:
+    with:
       command: GET
       key: mykey
 `
@@ -2872,12 +2933,12 @@ redis:
 steps:
   - name: step1
     type: redis
-    config:
+    with:
       db: 1
       command: PING
   - name: step2
     type: redis
-    config:
+    with:
       command: GET
       key: mykey
 `
@@ -2907,7 +2968,7 @@ redis:
   port: 6379
 steps:
   - name: step1
-    config:
+    with:
       command: PING
 `
 		ctx := context.Background()
@@ -2985,7 +3046,7 @@ steps:
   - name: step1
     type: harness
     command: "Fix bugs"
-    config:
+    with:
       model: opus
       effort: high
 `
@@ -3015,7 +3076,7 @@ steps:
   - name: step1
     type: harness
     command: "Generate docs"
-    config:
+    with:
       provider: copilot
       fallback:
         - provider: claude
@@ -3043,7 +3104,7 @@ steps:
   - name: step1
     type: harness
     command: "No retries"
-    config:
+    with:
       fallback: []
 `
 		dag, err := spec.LoadYAML(context.Background(), []byte(yaml))
@@ -3147,7 +3208,7 @@ steps:
   - name: step1
     type: harness
     command: "Review this repository"
-    config:
+    with:
       provider: gemini
 `
 		_, err := spec.LoadYAML(context.Background(), []byte(yaml))
@@ -3177,7 +3238,7 @@ harnesses:
     prompt_flag: --prompt
 steps:
   - command: "Review this repository"
-    config:
+    with:
       provider: gemini
 `
 		_, err := spec.LoadYAML(context.Background(), []byte(yaml))

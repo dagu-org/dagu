@@ -34,9 +34,6 @@ func (a *API) ReflectAutomataMemory(ctx context.Context, request api.ReflectAuto
 	if err := a.requireAutomataDocumentStore(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if err := a.requireAgent(ctx); err != nil {
 		return nil, err
 	}
@@ -45,6 +42,9 @@ func (a *API) ReflectAutomataMemory(ctx context.Context, request api.ReflectAuto
 	detail, err := a.automataService.Detail(ctx, name)
 	if err != nil {
 		return nil, toAutomataAPIError(err)
+	}
+	if err := a.requireDAGWriteForWorkspace(ctx, automataWorkspaceNameFromDetail(detail)); err != nil {
+		return nil, err
 	}
 	if detail.State == nil || strings.TrimSpace(detail.State.SessionID) == "" || len(detail.Messages) == 0 {
 		return nil, automataMemoryReflectionBadRequest("Automata has no session transcript to reflect on")

@@ -1183,15 +1183,23 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 	registrar.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
 	registrar.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
 
-	// DAG-run and queue live views have an explicit eventstore-backed invalidation
-	// path, so they should not keep background polling once the SSE topic is live.
+	// Run-driven topics have an event-store invalidation path. Keeping them on
+	// demand avoids repeated full-list and history reads while browsers are
+	// connected; DAG-run event collection wakes the exact and aggregate topics.
 	if srv.eventService != nil {
-		registrar.SetRefreshMode(sse.TopicTypeDAGRun, sse.TopicRefreshModeOnDemand)
-		registrar.SetRefreshMode(sse.TopicTypeSubDAGRun, sse.TopicRefreshModeOnDemand)
-		registrar.SetRefreshMode(sse.TopicTypeDAGHistory, sse.TopicRefreshModeOnDemand)
-		registrar.SetRefreshMode(sse.TopicTypeDAGRuns, sse.TopicRefreshModeOnDemand)
-		registrar.SetRefreshMode(sse.TopicTypeQueues, sse.TopicRefreshModeOnDemand)
+		for _, topicType := range []sse.TopicType{
+			sse.TopicTypeDAGRun,
+			sse.TopicTypeSubDAGRun,
+			sse.TopicTypeDAGHistory,
+			sse.TopicTypeDAGRuns,
+			sse.TopicTypeQueues,
+			sse.TopicTypeDAGsList,
+		} {
+			registrar.SetRefreshMode(topicType, sse.TopicRefreshModeOnDemand)
+		}
+		registrar.SetPublishOnWake(sse.TopicTypeDAGsList, true)
 		registrar.SetPublishOnWake(sse.TopicTypeDAGRuns, true)
+		registrar.SetPublishOnWake(sse.TopicTypeQueues, true)
 	}
 }
 

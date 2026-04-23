@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	osexec "os/exec"
 	"strings"
@@ -47,6 +48,9 @@ type SubDAGExecutor struct {
 
 	// coordinatorCli is used for distributed execution
 	coordinatorCli exec.Dispatcher
+
+	// workerSelector overrides the child DAG's selector for this invocation.
+	workerSelector map[string]string
 
 	// Process tracking for ALL executions
 	mu              sync.Mutex
@@ -188,6 +192,40 @@ func (e *SubDAGExecutor) SetExternalStepRetry(enabled bool) {
 	e.externalStepRetry = enabled
 }
 
+// SetWorkerSelector sets a per-invocation worker selector for the sub DAG.
+func (e *SubDAGExecutor) SetWorkerSelector(selector map[string]string) {
+	e.workerSelector = cloneWorkerSelector(selector)
+}
+
+func (e *SubDAGExecutor) effectiveWorkerSelector() map[string]string {
+	if len(e.workerSelector) > 0 {
+		return e.workerSelector
+	}
+	return e.DAG.WorkerSelector
+}
+
+func (e *SubDAGExecutor) shouldDispatchToCoordinator(defaultMode config.ExecutionMode) bool {
+	if e.DAG.ForceLocal {
+		return false
+	}
+	if e.coordinatorCli == nil {
+		return false
+	}
+	if len(e.effectiveWorkerSelector()) > 0 {
+		return true
+	}
+	return defaultMode == config.ExecutionModeDistributed
+}
+
+func cloneWorkerSelector(selector map[string]string) map[string]string {
+	if len(selector) == 0 {
+		return nil
+	}
+	clone := make(map[string]string, len(selector))
+	maps.Copy(clone, selector)
+	return clone
+}
+
 func (e *SubDAGExecutor) newLocalCLICommand(
 	ctx context.Context,
 	workDir string,
@@ -276,7 +314,7 @@ func (e *SubDAGExecutor) BuildCoordinatorTask(ctx context.Context, runParams Run
 		tag.Target(e.DAG.Name),
 	)
 	logger.Info(taskCtx, "Built coordinator task for sub DAG",
-		slog.Any("worker-selector", e.DAG.WorkerSelector),
+		slog.Any("worker-selector", e.effectiveWorkerSelector()),
 	)
 
 	return task, nil
@@ -330,7 +368,7 @@ func (e *SubDAGExecutor) coordinatorTaskOptions(ctx context.Context, extra ...Ta
 			Name: rCtx.DAG.Name,
 			ID:   rCtx.DAGRunID,
 		}),
-		WithWorkerSelector(e.DAG.WorkerSelector),
+		WithWorkerSelector(e.effectiveWorkerSelector()),
 		WithBaseConfig(baseConfig),
 	}
 	if e.DAG.SourceFile != "" {
@@ -374,7 +412,7 @@ func (e *SubDAGExecutor) Execute(ctx context.Context, runParams RunParams, workD
 	ctx = logger.WithValues(ctx, tag.SubDAG(e.DAG.Name), tag.SubRunID(runParams.RunID))
 
 	rCtx := exec.GetContext(ctx)
-	if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecMode) {
+	if e.shouldDispatchToCoordinator(rCtx.DefaultExecMode) {
 		// Handle distributed execution
 		logger.Info(ctx, "Executing sub DAG via distributed execution")
 
@@ -397,8 +435,13 @@ func (e *SubDAGExecutor) Retry(ctx context.Context, runParams RunParams, stepNam
 	ctx = logger.WithValues(ctx, tag.SubDAG(e.DAG.Name), tag.SubRunID(runParams.RunID))
 
 	rCtx := exec.GetContext(ctx)
-	if core.ShouldDispatchToCoordinator(e.DAG, e.coordinatorCli != nil, rCtx.DefaultExecMode) {
+	if e.shouldDispatchToCoordinator(rCtx.DefaultExecMode) {
 		logger.Info(ctx, "Retrying sub DAG via distributed execution", tag.Step(stepName))
+
+		e.mu.Lock()
+		e.distributedRuns[runParams.RunID] = true
+		e.mu.Unlock()
+
 		if err := e.dispatchRetryToCoordinator(ctx, runParams, stepName); err != nil {
 			return nil, fmt.Errorf("distributed step retry failed: %w", err)
 		}

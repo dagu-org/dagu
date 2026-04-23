@@ -1336,7 +1336,39 @@ func TestBuildStepExecutor(t *testing.T) {
 			expected: core.ExecutorConfig{Type: "http", Config: make(map[string]any)},
 		},
 		{
-			name: "TypeAndConfig",
+			name: "SFTPTypeAndWith",
+			step: &step{
+				Type: "sftp",
+				With: map[string]any{
+					"source":      "./backup.tar.gz",
+					"destination": "/srv/backups/backup.tar.gz",
+				},
+			},
+			ctx: testStepBuildContext(),
+			expected: core.ExecutorConfig{
+				Type: "sftp",
+				Config: map[string]any{
+					"source":      "./backup.tar.gz",
+					"destination": "/srv/backups/backup.tar.gz",
+				},
+			},
+		},
+		{
+			name: "TypeAndWith",
+			step: &step{
+				Type: "docker",
+				With: map[string]any{
+					"image": "alpine:latest",
+				},
+			},
+			ctx: testStepBuildContext(),
+			expected: core.ExecutorConfig{
+				Type:   "docker",
+				Config: map[string]any{"image": "alpine:latest"},
+			},
+		},
+		{
+			name: "TypeAndLegacyConfig",
 			step: &step{
 				Type: "docker",
 				Config: map[string]any{
@@ -1348,6 +1380,16 @@ func TestBuildStepExecutor(t *testing.T) {
 				Type:   "docker",
 				Config: map[string]any{"image": "alpine:latest"},
 			},
+		},
+		{
+			name: "RejectWithAndLegacyConfig",
+			step: &step{
+				Type:   "docker",
+				With:   map[string]any{"image": "alpine:latest"},
+				Config: map[string]any{"image": "busybox:latest"},
+			},
+			ctx:     testStepBuildContext(),
+			wantErr: true,
 		},
 		{
 			name: "InheritsContainerExecutor",
@@ -3146,7 +3188,7 @@ func TestStepExecutorNewFormat_Integration(t *testing.T) {
 			yaml: `steps:
   - name: deploy
     type: ssh
-    config:
+    with:
       host: prod.example.com
       user: deploy
       port: 22
@@ -3164,7 +3206,7 @@ func TestStepExecutorNewFormat_Integration(t *testing.T) {
 			yaml: `steps:
   - name: webhook
     type: http
-    config:
+    with:
       timeout: 30
       headers:
         Authorization: Bearer token123
@@ -3183,7 +3225,7 @@ func TestStepExecutorNewFormat_Integration(t *testing.T) {
 			yaml: `steps:
   - name: parse
     type: jq
-    config:
+    with:
       raw: true
     command: .name
 `,
@@ -3197,7 +3239,7 @@ func TestStepExecutorNewFormat_Integration(t *testing.T) {
 			yaml: `steps:
   - name: ssh-step
     type: ssh
-    config:
+    with:
       host: example.com
     command: uptime
 `,

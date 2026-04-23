@@ -19,15 +19,15 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'; // Import Shadcn Tooltip
 import dayjs from '@/lib/dayjs';
-import ActionButton from '@/ui/ActionButton';
-import StatusChip from '@/ui/StatusChip';
+import ActionButton from '@/components/ui/action-button';
+import StatusChip from '@/components/ui/status-chip';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import { AlertTriangle, Ban, Play, RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -36,8 +36,8 @@ import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useUnsavedChanges } from '../../../../contexts/UnsavedChangesContext';
 import { useClient } from '../../../../hooks/api';
-import ConfirmModal from '../../../../ui/ConfirmModal';
-import LabeledItem from '../../../../ui/LabeledItem';
+import ConfirmModal from '@/components/ui/confirm-dialog';
+import LabeledItem from '@/components/ui/labeled-item';
 import { getDAGRunTerminateActionDetails } from '../../../dag-runs/components/common/terminateAction';
 import { DAGContext } from '../../contexts/DAGContext';
 import { StartDAGModal } from '../dag-execution';
@@ -818,7 +818,16 @@ function DAGActions({
           action={dagContext.forceEnqueue ? 'enqueue' : undefined}
           onSubmit={async (params, dagRunId, immediate) => {
             if (dagContext.onEnqueue) {
-              await dagContext.onEnqueue(params, dagRunId, immediate);
+              const result = await dagContext.onEnqueue(
+                params,
+                dagRunId,
+                immediate
+              );
+              const startedRunId =
+                typeof result === 'string' && result ? result : dagRunId;
+              if (startedRunId) {
+                await dagContext.onRunStarted?.(startedRunId);
+              }
               return;
             }
 
@@ -828,7 +837,7 @@ function DAGActions({
             }
 
             // Use /start endpoint if immediate is true, otherwise use /enqueue
-            const { error } = await (immediate
+            const { data, error } = await (immediate
               ? client.POST('/dags/{fileName}/start', {
                   params: {
                     path: {
@@ -857,6 +866,9 @@ function DAGActions({
               );
             }
 
+            if (data?.dagRunId) {
+              await dagContext.onRunStarted?.(data.dagRunId);
+            }
             // Just refresh the current page data
             reloadData();
             // Navigate to status tab after execution (if available)

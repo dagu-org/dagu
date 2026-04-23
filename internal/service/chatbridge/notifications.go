@@ -111,7 +111,7 @@ func NotificationClassForEvent(event NotificationEvent) (NotificationClass, bool
 			return NotificationClassUrgent, true
 		case eventstore.TypeDAGRunSucceeded:
 			return NotificationClassSuccessDigest, true
-		case eventstore.TypeAutomataNeedsInput, eventstore.TypeAutomataError, eventstore.TypeAutomataFinished, eventstore.TypeLLMUsageRecorded:
+		case eventstore.TypeDAGRunUpdated, eventstore.TypeAutomataNeedsInput, eventstore.TypeAutomataError, eventstore.TypeAutomataFinished, eventstore.TypeLLMUsageRecorded:
 			return NotificationClassUnknown, false
 		default:
 			return NotificationClassForStatus(dagRun.Status)
@@ -120,7 +120,7 @@ func NotificationClassForEvent(event NotificationEvent) (NotificationClass, bool
 		switch event.Type {
 		case eventstore.TypeAutomataNeedsInput, eventstore.TypeAutomataError, eventstore.TypeAutomataFinished:
 			return NotificationClassUrgent, true
-		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
+		case eventstore.TypeDAGRunQueued, eventstore.TypeDAGRunRunning, eventstore.TypeDAGRunUpdated, eventstore.TypeDAGRunWaiting, eventstore.TypeDAGRunSucceeded, eventstore.TypeDAGRunFailed, eventstore.TypeDAGRunAborted, eventstore.TypeDAGRunRejected, eventstore.TypeLLMUsageRecorded:
 			return NotificationClassUnknown, false
 		default:
 			return NotificationClassUnknown, false

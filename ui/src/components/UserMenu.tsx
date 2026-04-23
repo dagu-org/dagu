@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
-import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,

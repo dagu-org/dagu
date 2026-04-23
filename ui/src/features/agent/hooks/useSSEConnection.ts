@@ -29,5 +29,9 @@ export function useSSEConnection(
   _remoteNode: string,
   _callbacks: SSECallbacks
 ): AgentSSEStatus {
+  void _sessionId;
+  void _apiURL;
+  void _remoteNode;
+  void _callbacks;
   return { isSessionLive: false };
 }

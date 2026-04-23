@@ -11,21 +11,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateWorkspaceRejectsHyphenatedName(t *testing.T) {
+func TestCreateWorkspaceAcceptsHyphenatedName(t *testing.T) {
 	server := setupBuiltinAuthServer(t)
 	token := getAdminToken(t, server)
 
 	resp := server.Client().Post("/api/v1/workspaces", api.CreateWorkspaceRequest{
 		Name: "ops-team",
-	}).WithBearerToken(token).ExpectStatus(http.StatusBadRequest).Send(t)
+	}).WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
 
-	var errResp api.Error
-	resp.Unmarshal(t, &errResp)
-	require.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
-	require.Contains(t, errResp.Message, "letters, numbers, and underscores")
+	var workspace api.WorkspaceResponse
+	resp.Unmarshal(t, &workspace)
+	require.Equal(t, "ops-team", workspace.Name)
 }
 
-func TestUpdateWorkspaceRejectsHyphenatedName(t *testing.T) {
+func TestUpdateWorkspaceAcceptsHyphenatedName(t *testing.T) {
 	server := setupBuiltinAuthServer(t)
 	token := getAdminToken(t, server)
 
@@ -36,13 +35,12 @@ func TestUpdateWorkspaceRejectsHyphenatedName(t *testing.T) {
 	var created api.WorkspaceResponse
 	createResp.Unmarshal(t, &created)
 
-	invalidName := "ops-team"
+	nextName := "ops-team"
 	resp := server.Client().Patch("/api/v1/workspaces/"+created.Id, api.UpdateWorkspaceRequest{
-		Name: &invalidName,
-	}).WithBearerToken(token).ExpectStatus(http.StatusBadRequest).Send(t)
+		Name: &nextName,
+	}).WithBearerToken(token).ExpectStatus(http.StatusOK).Send(t)
 
-	var errResp api.Error
-	resp.Unmarshal(t, &errResp)
-	require.Equal(t, api.ErrorCodeBadRequest, errResp.Code)
-	require.Contains(t, errResp.Message, "letters, numbers, and underscores")
+	var workspace api.WorkspaceResponse
+	resp.Unmarshal(t, &workspace)
+	require.Equal(t, "ops-team", workspace.Name)
 }

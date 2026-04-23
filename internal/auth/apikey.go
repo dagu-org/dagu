@@ -21,6 +21,9 @@ type APIKey struct {
 	Description string `json:"description,omitempty"`
 	// Role determines the API key's permissions.
 	Role Role `json:"role"`
+	// WorkspaceAccess restricts access to selected workspaces.
+	// Nil is treated as all-workspaces for backward compatibility.
+	WorkspaceAccess *WorkspaceAccess `json:"workspace_access,omitempty"`
 	// KeyHash is the bcrypt hash of the API key secret.
 	// Excluded from JSON serialization for security.
 	KeyHash string `json:"-"`
@@ -51,31 +54,33 @@ func NewAPIKey(name, description string, role Role, keyHash, keyPrefix, createdB
 	}
 	now := time.Now().UTC()
 	return &APIKey{
-		ID:          uuid.New().String(),
-		Name:        name,
-		Description: description,
-		Role:        role,
-		KeyHash:     keyHash,
-		KeyPrefix:   keyPrefix,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		CreatedBy:   createdBy,
+		ID:              uuid.New().String(),
+		Name:            name,
+		Description:     description,
+		Role:            role,
+		WorkspaceAccess: AllWorkspaceAccess(),
+		KeyHash:         keyHash,
+		KeyPrefix:       keyPrefix,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		CreatedBy:       createdBy,
 	}, nil
 }
 
 // APIKeyForStorage is used for JSON serialization to persistent storage.
 // It includes the key hash which is excluded from the regular APIKey JSON.
 type APIKeyForStorage struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
-	Role        Role       `json:"role"`
-	KeyHash     string     `json:"key_hash"`
-	KeyPrefix   string     `json:"key_prefix"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	CreatedBy   string     `json:"created_by"`
-	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	Description     string           `json:"description,omitempty"`
+	Role            Role             `json:"role"`
+	WorkspaceAccess *WorkspaceAccess `json:"workspace_access,omitempty"`
+	KeyHash         string           `json:"key_hash"`
+	KeyPrefix       string           `json:"key_prefix"`
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
+	CreatedBy       string           `json:"created_by"`
+	LastUsedAt      *time.Time       `json:"last_used_at,omitempty"`
 }
 
 // ToStorage converts an APIKey to APIKeyForStorage for persistence.
@@ -83,16 +88,17 @@ type APIKeyForStorage struct {
 // ToStorage and ToAPIKey are updated to maintain field synchronization.
 func (k *APIKey) ToStorage() *APIKeyForStorage {
 	return &APIKeyForStorage{
-		ID:          k.ID,
-		Name:        k.Name,
-		Description: k.Description,
-		Role:        k.Role,
-		KeyHash:     k.KeyHash,
-		KeyPrefix:   k.KeyPrefix,
-		CreatedAt:   k.CreatedAt,
-		UpdatedAt:   k.UpdatedAt,
-		CreatedBy:   k.CreatedBy,
-		LastUsedAt:  k.LastUsedAt,
+		ID:              k.ID,
+		Name:            k.Name,
+		Description:     k.Description,
+		Role:            k.Role,
+		WorkspaceAccess: CloneWorkspaceAccess(k.WorkspaceAccess),
+		KeyHash:         k.KeyHash,
+		KeyPrefix:       k.KeyPrefix,
+		CreatedAt:       k.CreatedAt,
+		UpdatedAt:       k.UpdatedAt,
+		CreatedBy:       k.CreatedBy,
+		LastUsedAt:      k.LastUsedAt,
 	}
 }
 
@@ -101,15 +107,16 @@ func (k *APIKey) ToStorage() *APIKeyForStorage {
 // ToStorage and ToAPIKey are updated to maintain field synchronization.
 func (s *APIKeyForStorage) ToAPIKey() *APIKey {
 	return &APIKey{
-		ID:          s.ID,
-		Name:        s.Name,
-		Description: s.Description,
-		Role:        s.Role,
-		KeyHash:     s.KeyHash,
-		KeyPrefix:   s.KeyPrefix,
-		CreatedAt:   s.CreatedAt,
-		UpdatedAt:   s.UpdatedAt,
-		CreatedBy:   s.CreatedBy,
-		LastUsedAt:  s.LastUsedAt,
+		ID:              s.ID,
+		Name:            s.Name,
+		Description:     s.Description,
+		Role:            s.Role,
+		WorkspaceAccess: CloneWorkspaceAccess(s.WorkspaceAccess),
+		KeyHash:         s.KeyHash,
+		KeyPrefix:       s.KeyPrefix,
+		CreatedAt:       s.CreatedAt,
+		UpdatedAt:       s.UpdatedAt,
+		CreatedBy:       s.CreatedBy,
+		LastUsedAt:      s.LastUsedAt,
 	}
 }

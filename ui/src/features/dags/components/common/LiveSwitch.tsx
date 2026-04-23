@@ -6,7 +6,7 @@
 import { useErrorModal } from '@/components/ui/error-modal';
 import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '@/contexts/AppBarContext';
-import ConfirmModal from '@/ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { useCallback, useContext, useState } from 'react';
 import { components } from '../../../../api/v1/schema';
 import { useConfig } from '../../../../contexts/ConfigContext';

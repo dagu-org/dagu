@@ -15,14 +15,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import dayjs from '@/lib/dayjs';
-import ActionButton from '@/ui/ActionButton';
+import ActionButton from '@/components/ui/action-button';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import { Ban, RefreshCw, Square, X } from 'lucide-react';
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -30,9 +30,9 @@ import { components, NodeStatus, Status } from '../../../../api/v1/schema';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
 import { useClient } from '../../../../hooks/api';
-import ConfirmModal from '../../../../ui/ConfirmModal';
-import LabeledItem from '../../../../ui/LabeledItem';
-import StatusChip from '../../../../ui/StatusChip';
+import ConfirmModal from '@/components/ui/confirm-dialog';
+import LabeledItem from '@/components/ui/labeled-item';
+import StatusChip from '@/components/ui/status-chip';
 import { getDAGRunTerminateActionDetails } from './terminateAction';
 
 /**
@@ -513,7 +513,6 @@ function DAGRunActions({
                 </div>
               </div>
             )}
-
           </div>
         </ConfirmModal>
 

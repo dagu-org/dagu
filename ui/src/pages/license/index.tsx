@@ -5,8 +5,14 @@ import { useConfig, useUpdateConfig } from '@/contexts/ConfigContext';
 import { useClient } from '@/hooks/api';
 import { LICENSE_CONSOLE_URL } from '@/lib/constants';
 import dayjs from '@/lib/dayjs';
-import ConfirmModal from '@/ui/ConfirmModal';
-import { AlertTriangle, CheckCircle2, Info, Shield, XCircle } from 'lucide-react';
+import ConfirmModal from '@/components/ui/confirm-dialog';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  Shield,
+  XCircle,
+} from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 
 export default function LicensePage() {
@@ -143,9 +149,7 @@ export default function LicensePage() {
 
           <span className="text-muted-foreground">Features</span>
           <span>
-            {license.features.length > 0
-              ? license.features.join(', ')
-              : 'None'}
+            {license.features.length > 0 ? license.features.join(', ') : 'None'}
           </span>
 
           {license.expiry && (
@@ -165,8 +169,8 @@ export default function LicensePage() {
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <span>
-                This license is configured via an environment variable
-                (<code className="text-xs">DAGU_LICENSE</code> or{' '}
+                This license is configured via an environment variable (
+                <code className="text-xs">DAGU_LICENSE</code> or{' '}
                 <code className="text-xs">DAGU_LICENSE_KEY</code>). To
                 deactivate, remove the environment variable and restart Dagu.
               </span>
@@ -213,16 +217,21 @@ export default function LicensePage() {
           </Button>
         </form>
         {error && (
-          <div role="alert" className="text-sm text-destructive">{error}</div>
+          <div role="alert" className="text-sm text-destructive">
+            {error}
+          </div>
         )}
         {successMessage && (
-          <div role="status" className="text-sm text-green-600 dark:text-green-400">
+          <div
+            role="status"
+            className="text-sm text-green-600 dark:text-green-400"
+          >
             {successMessage}
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          Enter your license or trial key to activate Dagu features. You can obtain a
-          key from{' '}
+          Enter your license or trial key to activate Dagu features. You can
+          obtain a key from{' '}
           <a
             href={LICENSE_CONSOLE_URL}
             target="_blank"

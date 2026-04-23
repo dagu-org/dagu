@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * StatusUpdateModal component provides a modal dialog for manually updating a step's status.
  *
@@ -8,7 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import React from 'react';
 import { components, NodeStatus } from '../../../../api/v1/schema';
@@ -24,7 +27,10 @@ type Props = {
   /** Step to update status for */
   step?: components['schemas']['Step'];
   /** Function called when the user submits the status update */
-  onSubmit: (step: components['schemas']['Step'], status: NodeStatus) => void;
+  onSubmit: (
+    step: components['schemas']['Step'],
+    status: NodeStatus
+  ) => void | Promise<void>;
   /** Optional position for the modal (x, y coordinates) */
   position?: { x: number; y: number };
 };
@@ -41,9 +47,21 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
   // Create refs for the buttons
   const successButtonRef = React.useRef<HTMLButtonElement>(null);
   const failedButtonRef = React.useRef<HTMLButtonElement>(null);
-  
+
   // Track which button is selected (0 = success, 1 = failed)
   const [selectedButton, setSelectedButton] = React.useState(0);
+  const submitStatus = React.useCallback(
+    (status: NodeStatus) => {
+      void (async () => {
+        try {
+          await onSubmit(step, status);
+        } catch {
+          // Submit handlers are expected to surface their own user-facing errors.
+        }
+      })();
+    },
+    [onSubmit, step]
+  );
 
   // Handle keyboard events
   React.useEffect(() => {
@@ -57,16 +75,16 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           e.preventDefault();
           setSelectedButton(selectedButton === 0 ? 1 : 0);
           break;
-          
+
         case 'Enter':
           e.preventDefault();
           if (selectedButton === 0) {
-            onSubmit(step, NodeStatus.Success);
+            submitStatus(NodeStatus.Success);
           } else {
-            onSubmit(step, NodeStatus.Failed);
+            submitStatus(NodeStatus.Failed);
           }
           break;
-          
+
         case 'Escape':
           e.preventDefault();
           dismissModal();
@@ -78,7 +96,7 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [visible, step, onSubmit, dismissModal, selectedButton]);
+  }, [visible, step, submitStatus, dismissModal, selectedButton]);
 
   // We're not using the position prop anymore as we want the modal to be centered
   // The Dialog component from shadcn/ui will center the modal by default
@@ -101,12 +119,13 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
               ref={successButtonRef}
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
-                ${selectedButton === 0 
-                  ? 'border-success bg-success-muted' 
-                  : 'border-border hover:border-success hover:bg-success-muted'
+                ${
+                  selectedButton === 0
+                    ? 'border-success bg-success-muted'
+                    : 'border-border hover:border-success hover:bg-success-muted'
                 }
               `}
-              onClick={() => onSubmit(step, NodeStatus.Success)}
+              onClick={() => submitStatus(NodeStatus.Success)}
               onMouseEnter={() => setSelectedButton(0)}
             >
               <div className="flex flex-col items-center gap-2">
@@ -114,17 +133,18 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
                 <span className="font-mono text-sm">Success</span>
               </div>
             </button>
-            
+
             <button
               ref={failedButtonRef}
               className={`
                 group relative overflow-hidden rounded-lg border p-4 transition-all duration-200 focus:outline-none
-                ${selectedButton === 1 
-                  ? 'border-error bg-error-muted' 
-                  : 'border-border hover:border-error hover:bg-error-muted'
+                ${
+                  selectedButton === 1
+                    ? 'border-error bg-error-muted'
+                    : 'border-border hover:border-error hover:bg-error-muted'
                 }
               `}
-              onClick={() => onSubmit(step, NodeStatus.Failed)}
+              onClick={() => submitStatus(NodeStatus.Failed)}
               onMouseEnter={() => setSelectedButton(1)}
             >
               <div className="flex flex-col items-center gap-2">

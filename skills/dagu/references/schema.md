@@ -33,6 +33,7 @@
 | `hist_retention_days` | int | 30 | History retention |
 | `queue` | string | — | Queue name for concurrency control. Define queues in global config with `max_concurrency`. |
 | `preconditions` | array | — | DAG-level preconditions (`condition`, `expected`, `negate`) |
+| `retry_policy` | object | — | DAG-level automatic retry policy: `{limit, interval_sec, backoff, max_interval_sec}`. `limit: 0` disables automatic DAG retries. |
 | `handler_on` | object | — | Event handlers: `init`, `success`, `failure`, `abort`, `exit`, `wait` (each is a step definition) |
 | `smtp` | object | — | SMTP config: `host`, `port`, `username`, `password` |
 | `error_mail` | object | — | Error mail: `from`, `to`, `prefix`, `attach_logs` |
@@ -58,6 +59,7 @@
 - `params:` values are resolved as strings.
 - `handler_on` keys are exactly `init`, `success`, `failure`, `abort`, `exit`, and `wait`.
 - `container:` is polymorphic: a string targets an existing container, while an object creates a new one.
+- Top-level `retry_policy.limit: 0` disables DAG-level automatic retries.
 
 ## Step-Level Fields
 
@@ -83,7 +85,7 @@
 | `mail_on_error` | bool | — | Send mail on step error |
 | `container` | string or object | — | Step-level container config |
 | `type` | string | — | Executor type override |
-| `config` | map | — | Executor-specific config |
+| `with` | map | — | Executor-specific config. Legacy alias: `config`; do not specify both fields |
 | `call` | string | — | Sub-DAG name (for `dag` executor) |
 | `params` | string or map | — | Sub-DAG parameters |
 | `parallel` | object or array | — | Parallel execution: `{items, max_concurrent}` (default max_concurrent: 10) |

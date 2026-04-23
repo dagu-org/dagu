@@ -4,8 +4,8 @@
 import { Layers, Search } from 'lucide-react';
 import React from 'react';
 import { components } from '../../api/v1/schema';
-import { Input } from '../../components/ui/input';
-import { RefreshButton } from '../../components/ui/refresh-button';
+import { Input } from '@/components/ui/input';
+import { RefreshButton } from '@/components/ui/refresh-button';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import { useSearchState } from '../../contexts/SearchStateContext';
 import QueueList from '../../features/queues/components/QueueList';
@@ -15,7 +15,7 @@ import {
   sseFallbackOptions,
   useSSECacheSync,
 } from '../../hooks/useSSECacheSync';
-import Title from '../../ui/Title';
+import Title from '@/components/ui/title';
 
 function Queues() {
   const appBarContext = React.useContext(AppBarContext);

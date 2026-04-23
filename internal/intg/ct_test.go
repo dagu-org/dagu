@@ -66,7 +66,7 @@ env:
   - ABC=XYZ
 steps:
   - type: docker
-    config:
+    with:
       image: alpine:3
       auto_remove: true
     command: echo 123 abc $FOO $ABC
@@ -81,7 +81,7 @@ steps:
 			dagConfig: `
 steps:
   - type: docker
-    config:
+    with:
       image: alpine:3
       auto_remove: true
       container_name: dagu-autostart
@@ -517,7 +517,7 @@ func TestDockerExecutor_ExecInExistingContainer(t *testing.T) {
 	dagConfig := fmt.Sprintf(`
 steps:
   - type: docker
-    config:
+    with:
       container_name: %s
       exec:
         working_dir: /
@@ -542,7 +542,7 @@ func TestDockerExecutor_ErrorIncludesRecentStderr(t *testing.T) {
 	dagConfig := fmt.Sprintf(`
 steps:
   - type: docker
-    config:
+    with:
       image: %s
       auto_remove: true
     command: sh -c 'echo first 1>&2; echo second 1>&2; exit 7'

@@ -38,6 +38,7 @@ type EventType string
 const (
 	TypeDAGRunQueued    EventType = "dag.run.queued"
 	TypeDAGRunRunning   EventType = "dag.run.running"
+	TypeDAGRunUpdated   EventType = "dag.run.updated"
 	TypeDAGRunWaiting   EventType = "dag.run.waiting"
 	TypeDAGRunSucceeded EventType = "dag.run.succeeded"
 	TypeDAGRunFailed    EventType = "dag.run.failed"
@@ -229,6 +230,18 @@ func AutomataEventID(eventType EventType, automataName string, identityParts ...
 	return "automata_" + stableID(parts...)
 }
 
+func DAGRunUpdateEventID(dagName, dagRunID, attemptID string, recordedAt time.Time) string {
+	// Same-status updates are invalidation edges. The file collector deduplicates
+	// by event ID globally, so update IDs must remain unique across writes.
+	return "dag_update_" + stableID(
+		string(TypeDAGRunUpdated),
+		dagName,
+		dagRunID,
+		attemptID,
+		recordedAt.UTC().Format(time.RFC3339Nano),
+	)
+}
+
 func LLMUsageEventID(sessionID, messageID string) string {
 	return "llm_" + stableID(string(TypeLLMUsageRecorded), sessionID, messageID)
 }
@@ -238,6 +251,15 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 		return nil
 	}
 	source = normalizeSource(source)
+	recordedAt := time.Now().UTC()
+	eventID := DAGRunEventID(eventType, status.Name, status.DAGRunID, status.AttemptID)
+	if eventType == TypeDAGRunUpdated {
+		eventID = DAGRunUpdateEventID(status.Name, status.DAGRunID, status.AttemptID, recordedAt)
+	}
+	occurredAt := dagRunOccurredAt(status, eventType)
+	if eventType == TypeDAGRunUpdated {
+		occurredAt = recordedAt
+	}
 	data = cloneData(data)
 	if snapshot := newDAGRunStatusSnapshot(status, dagRunFileNameFromData(data)); snapshot != nil {
 		if data == nil {
@@ -246,10 +268,10 @@ func NewDAGRunEvent(source Source, eventType EventType, status *exec.DAGRunStatu
 		data[dagRunStatusSnapshotDataKey] = snapshot
 	}
 	event := &Event{
-		ID:             DAGRunEventID(eventType, status.Name, status.DAGRunID, status.AttemptID),
+		ID:             eventID,
 		SchemaVersion:  SchemaVersion,
-		OccurredAt:     dagRunOccurredAt(status, eventType),
-		RecordedAt:     time.Now().UTC(),
+		OccurredAt:     occurredAt,
+		RecordedAt:     recordedAt,
 		Kind:           KindDAGRun,
 		Type:           eventType,
 		SourceService:  source.Service,
@@ -414,6 +436,8 @@ func dagRunOccurredAt(status *exec.DAGRunStatus, eventType EventType) time.Time 
 		if t, err := stringutil.ParseTime(status.QueuedAt); err == nil && !t.IsZero() {
 			return t.UTC()
 		}
+	case TypeDAGRunUpdated:
+		return time.Now().UTC()
 	case TypeDAGRunWaiting, TypeDAGRunSucceeded, TypeDAGRunFailed, TypeDAGRunAborted, TypeDAGRunRejected:
 		if t, err := stringutil.ParseTime(status.FinishedAt); err == nil && !t.IsZero() {
 			return t.UTC()

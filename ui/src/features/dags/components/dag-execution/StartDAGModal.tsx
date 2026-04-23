@@ -18,7 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/CustomDialog';
+} from '@/components/ui/dialog';
 import { AlertTriangle, ListPlus, Play, X } from 'lucide-react';
 import React from 'react';
 

@@ -9,15 +9,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/agent"
+	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
 	"github.com/dagucloud/dagu/internal/service/audit"
-	"github.com/dagucloud/dagu/internal/workspace"
 )
 
 const (
@@ -65,20 +66,6 @@ func validateDocPath(path string) error {
 	return nil
 }
 
-func validateDocWorkspace(name *string) (string, error) {
-	if name == nil || *name == "" {
-		return "", nil
-	}
-	if err := workspace.ValidateName(*name); err != nil {
-		return "", &Error{
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "invalid workspace: must contain only letters, numbers, and underscores",
-			HTTPStatus: http.StatusBadRequest,
-		}
-	}
-	return *name, nil
-}
-
 func scopedDocPath(workspaceName, path string) (string, error) {
 	if err := validateDocPath(path); err != nil {
 		return "", err
@@ -100,12 +87,239 @@ func visibleDocPath(workspaceName, path string) string {
 	return strings.TrimPrefix(path, workspaceName+"/")
 }
 
+type docWorkspaceVisibility struct {
+	all     bool
+	allowed map[string]struct{}
+	known   map[string]struct{}
+}
+
+func (a *API) knownDocWorkspaceNames(ctx context.Context, required bool) (map[string]struct{}, error) {
+	if a.workspaceStore == nil {
+		if required {
+			return nil, workspaceStoreUnavailable()
+		}
+		return nil, nil
+	}
+	workspaces, err := a.workspaceStore.List(ctx)
+	if err != nil {
+		if required {
+			return nil, fmt.Errorf("failed to list workspaces: %w", err)
+		}
+		return nil, nil
+	}
+	known := make(map[string]struct{}, len(workspaces))
+	for _, ws := range workspaces {
+		known[ws.Name] = struct{}{}
+	}
+	return known, nil
+}
+
+func (a *API) docWorkspaceVisibility(ctx context.Context) (docWorkspaceVisibility, error) {
+	visibility := docWorkspaceVisibility{all: true}
+	known, err := a.knownDocWorkspaceNames(ctx, a.workspaceStore != nil)
+	if err != nil {
+		return visibility, err
+	}
+	visibility.known = known
+	if a.authService == nil {
+		return visibility, nil
+	}
+	user, ok := auth.UserFromContext(ctx)
+	if !ok {
+		return visibility, errAuthRequired
+	}
+	access := auth.NormalizeWorkspaceAccess(user.WorkspaceAccess)
+	if access.All {
+		return visibility, nil
+	}
+	known, err = a.knownDocWorkspaceNames(ctx, true)
+	if err != nil {
+		return visibility, err
+	}
+	visibility.all = false
+	visibility.allowed = make(map[string]struct{}, len(access.Grants))
+	visibility.known = known
+	for _, grant := range access.Grants {
+		visibility.allowed[grant.Workspace] = struct{}{}
+	}
+	return visibility, nil
+}
+
+func (a *API) noWorkspaceDocVisibility(ctx context.Context) (docWorkspaceVisibility, error) {
+	known, err := a.knownDocWorkspaceNames(ctx, a.workspaceStore != nil)
+	if err != nil {
+		return docWorkspaceVisibility{}, err
+	}
+	return docWorkspaceVisibility{
+		allowed: make(map[string]struct{}),
+		known:   known,
+	}, nil
+}
+
+func (a *API) docWorkspaceVisibilityForSelection(ctx context.Context, selection workspaceSelection) (docWorkspaceVisibility, error) {
+	switch selection.mode {
+	case workspaceSelectionAll:
+		return a.docWorkspaceVisibility(ctx)
+	case workspaceSelectionDefault:
+		return a.noWorkspaceDocVisibility(ctx)
+	case workspaceSelectionNamed:
+		if err := a.requireWorkspaceVisible(ctx, selection.workspace); err != nil {
+			return docWorkspaceVisibility{}, err
+		}
+		return docWorkspaceVisibility{all: true}, nil
+	default:
+		return docWorkspaceVisibility{}, badWorkspaceError("invalid workspace")
+	}
+}
+
+func (a *API) docReadScopeForParams(
+	ctx context.Context,
+	workspaceParam *api.Workspace,
+) (string, docWorkspaceVisibility, error) {
+	selection, err := parseWorkspaceSelection(workspaceParam)
+	if err != nil {
+		return "", docWorkspaceVisibility{}, err
+	}
+	visibility, err := a.docWorkspaceVisibilityForSelection(ctx, selection)
+	if err != nil {
+		return "", docWorkspaceVisibility{}, err
+	}
+	if selection.mode == workspaceSelectionNamed {
+		return selection.workspace, visibility, nil
+	}
+	return "", visibility, nil
+}
+
+func docTargetWorkspaceForParam(workspaceParam *api.Workspace) (string, error) {
+	if workspaceParam == nil {
+		return "", nil
+	}
+	raw := string(*workspaceParam)
+	if raw == "" {
+		return "", badWorkspaceError("workspace must not be empty")
+	}
+	switch raw {
+	case "all":
+		return "", badWorkspaceError("workspace=all cannot target a single document")
+	case "default":
+		return "", nil
+	default:
+		return validateWorkspaceParam(raw)
+	}
+}
+
+func (a *API) docPointReadScopeForParams(
+	ctx context.Context,
+	workspaceParam *api.Workspace,
+) (string, docWorkspaceVisibility, error) {
+	workspaceName, err := docTargetWorkspaceForParam(workspaceParam)
+	if err != nil {
+		return "", docWorkspaceVisibility{}, err
+	}
+	if workspaceName == "" {
+		visibility, err := a.noWorkspaceDocVisibility(ctx)
+		if err != nil {
+			return "", docWorkspaceVisibility{}, err
+		}
+		return "", visibility, nil
+	}
+	if err := a.requireWorkspaceVisible(ctx, workspaceName); err != nil {
+		return "", docWorkspaceVisibility{}, err
+	}
+	return workspaceName, docWorkspaceVisibility{all: true}, nil
+}
+
+func docMutationScopeForParams(workspaceParam *api.Workspace) (string, error) {
+	return docTargetWorkspaceForParam(workspaceParam)
+}
+
+func (a *API) scopedDocMutationPath(ctx context.Context, workspaceName, path string) (string, error) {
+	if workspaceName == "" {
+		known, err := a.knownDocWorkspaceNames(ctx, a.workspaceStore != nil)
+		if err != nil {
+			return "", err
+		}
+		if docWorkspaceNameForPath(path, docWorkspaceVisibility{known: known}, true) != "" {
+			return "", badWorkspaceError("path targets a workspace; set workspace")
+		}
+	}
+	return scopedDocPath(workspaceName, path)
+}
+
+func (v docWorkspaceVisibility) knownWorkspace(name string) bool {
+	if name == "" {
+		return false
+	}
+	if v.known != nil {
+		_, ok := v.known[name]
+		return ok
+	}
+	if v.allowed != nil {
+		_, ok := v.allowed[name]
+		return ok
+	}
+	return false
+}
+
+func docWorkspaceNameForPath(path string, visibility docWorkspaceVisibility, includeWorkspaceRoot bool) string {
+	workspaceName, rest, hasSlash := strings.Cut(path, "/")
+	if workspaceName == "" {
+		return ""
+	}
+	if !hasSlash && !includeWorkspaceRoot {
+		return ""
+	}
+	if hasSlash && rest == "" {
+		return ""
+	}
+	if visibility.knownWorkspace(workspaceName) {
+		return workspaceName
+	}
+	return ""
+}
+
+func docWorkspaceValue(workspaceName, path string, visibility docWorkspaceVisibility, includeWorkspaceRoot bool) *string {
+	if workspaceName != "" {
+		return ptrOf(workspaceName)
+	}
+	return optionalString(docWorkspaceNameForPath(path, visibility, includeWorkspaceRoot))
+}
+
+func (v docWorkspaceVisibility) visible(path string) bool {
+	if v.all {
+		return true
+	}
+	workspaceName, _, _ := strings.Cut(path, "/")
+	if workspaceName == "" {
+		return true
+	}
+	if _, ok := v.known[workspaceName]; !ok {
+		return true
+	}
+	_, ok := v.allowed[workspaceName]
+	return ok
+}
+
+func (v docWorkspaceVisibility) excludedPathRoots() []string {
+	if v.all || len(v.known) == 0 {
+		return nil
+	}
+	roots := make([]string, 0, len(v.known))
+	for name := range v.known {
+		if _, ok := v.allowed[name]; !ok {
+			roots = append(roots, name)
+		}
+	}
+	sort.Strings(roots)
+	return roots
+}
+
 // ListDocs returns documents as tree or flat list.
 func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (api.ListDocsResponseObject, error) {
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -113,11 +327,12 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 	sortField, sortOrder := docSortParams(request.Params.Sort, request.Params.Order)
 
 	opts := agent.ListDocsOptions{
-		Page:       valueOf(request.Params.Page),
-		PerPage:    valueOf(request.Params.PerPage),
-		Sort:       sortField,
-		Order:      sortOrder,
-		PathPrefix: workspaceName,
+		Page:             valueOf(request.Params.Page),
+		PerPage:          valueOf(request.Params.PerPage),
+		Sort:             sortField,
+		Order:            sortOrder,
+		PathPrefix:       workspaceName,
+		ExcludePathRoots: visibility.excludedPathRoots(),
 	}
 
 	flat := valueOf(request.Params.Flat)
@@ -131,7 +346,9 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 
 		items := make([]api.DocMetadataResponse, 0, len(result.Items))
 		for _, m := range result.Items {
-			items = append(items, toDocMetadataResponse(m))
+			item := toDocMetadataResponse(m)
+			item.Workspace = docWorkspaceValue(workspaceName, m.ID, visibility, false)
+			items = append(items, item)
 		}
 
 		return api.ListDocs200JSONResponse{
@@ -148,7 +365,7 @@ func (a *API) ListDocs(ctx context.Context, request api.ListDocsRequestObject) (
 
 	tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
 	for _, node := range result.Items {
-		tree = append(tree, toDocTreeResponse(node))
+		tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
 	}
 
 	return api.ListDocs200JSONResponse{
@@ -162,19 +379,19 @@ func (a *API) CreateDoc(ctx context.Context, request api.CreateDocRequestObject)
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, err := docMutationScopeForParams(request.Params.Workspace)
 	if err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
 		return nil, err
 	}
 
 	id := request.Body.Id
-	scopedID, err := scopedDocPath(workspaceName, id)
+	scopedID, err := a.scopedDocMutationPath(ctx, workspaceName, id)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +418,7 @@ func (a *API) GetDoc(ctx context.Context, request api.GetDocRequestObject) (api.
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, visibility, err := a.docPointReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -216,9 +433,17 @@ func (a *API) GetDoc(ctx context.Context, request api.GetDocRequestObject) (api.
 		}
 		return nil, internalError(err)
 	}
+	if workspaceName == "" && !visibility.all {
+		if !visibility.visible(doc.ID) {
+			return nil, errDocNotFound
+		}
+	}
+	rawID := doc.ID
 	doc.ID = visibleDocPath(workspaceName, doc.ID)
+	resp := toDocResponse(doc)
+	resp.Workspace = docWorkspaceValue(workspaceName, rawID, visibility, false)
 
-	return api.GetDoc200JSONResponse(toDocResponse(doc)), nil
+	return api.GetDoc200JSONResponse(resp), nil
 }
 
 // SearchDocs searches document content.
@@ -234,7 +459,7 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, visibility, err := a.docReadScopeForParams(ctx, request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -247,16 +472,20 @@ func (a *API) SearchDocs(ctx context.Context, request api.SearchDocsRequestObjec
 
 	items := make([]api.DocSearchResultItem, 0, len(results))
 	for _, r := range results {
+		rawID := r.ID
 		if workspaceName != "" {
 			prefix := workspaceName + "/"
 			if !strings.HasPrefix(r.ID, prefix) {
 				continue
 			}
 			r.ID = strings.TrimPrefix(r.ID, prefix)
+		} else if !visibility.visible(r.ID) {
+			continue
 		}
 		item := api.DocSearchResultItem{
-			Id:    r.ID,
-			Title: r.Title,
+			Id:        r.ID,
+			Title:     r.Title,
+			Workspace: docWorkspaceValue(workspaceName, rawID, visibility, false),
 		}
 		if len(r.Matches) > 0 {
 			matches := make([]api.SearchMatchItem, 0, len(r.Matches))
@@ -282,17 +511,17 @@ func (a *API) UpdateDoc(ctx context.Context, request api.UpdateDocRequestObject)
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, err := docMutationScopeForParams(request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
-	docID, err := scopedDocPath(workspaceName, request.Params.Path)
+	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
+		return nil, err
+	}
+	docID, err := a.scopedDocMutationPath(ctx, workspaceName, request.Params.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -318,14 +547,14 @@ func (a *API) DeleteDoc(ctx context.Context, request api.DeleteDocRequestObject)
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, err := docMutationScopeForParams(request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
-	docID, err := scopedDocPath(workspaceName, request.Params.Path)
+	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
+		return nil, err
+	}
+	docID, err := a.scopedDocMutationPath(ctx, workspaceName, request.Params.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -351,21 +580,21 @@ func (a *API) RenameDoc(ctx context.Context, request api.RenameDocRequestObject)
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil {
 		return nil, ErrInvalidRequestBody
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, err := docMutationScopeForParams(request.Params.Workspace)
 	if err != nil {
 		return nil, err
 	}
-	oldPath, err := scopedDocPath(workspaceName, request.Params.Path)
+	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
+		return nil, err
+	}
+	oldPath, err := a.scopedDocMutationPath(ctx, workspaceName, request.Params.Path)
 	if err != nil {
 		return nil, err
 	}
-	newPath, err := scopedDocPath(workspaceName, request.Body.NewPath)
+	newPath, err := a.scopedDocMutationPath(ctx, workspaceName, request.Body.NewPath)
 	if err != nil {
 		return nil, err
 	}
@@ -396,9 +625,6 @@ func (a *API) DeleteDocBatch(ctx context.Context, request api.DeleteDocBatchRequ
 	if err := a.requireDocManagement(); err != nil {
 		return nil, err
 	}
-	if err := a.requireDAGWrite(ctx); err != nil {
-		return nil, err
-	}
 	if request.Body == nil || len(request.Body.Paths) == 0 {
 		return nil, &Error{
 			Code:       api.ErrorCodeBadRequest,
@@ -413,13 +639,16 @@ func (a *API) DeleteDocBatch(ctx context.Context, request api.DeleteDocBatchRequ
 			HTTPStatus: http.StatusBadRequest,
 		}
 	}
-	workspaceName, err := validateDocWorkspace(request.Params.Workspace)
+	workspaceName, err := docMutationScopeForParams(request.Params.Workspace)
 	if err != nil {
+		return nil, err
+	}
+	if err := a.requireDAGWriteForWorkspace(ctx, workspaceName); err != nil {
 		return nil, err
 	}
 	scopedPaths := make([]string, 0, len(request.Body.Paths))
 	for _, p := range request.Body.Paths {
-		scoped, err := scopedDocPath(workspaceName, p)
+		scoped, err := a.scopedDocMutationPath(ctx, workspaceName, p)
 		if err != nil {
 			return nil, err
 		}
@@ -461,77 +690,102 @@ func (a *API) DeleteDocBatch(ctx context.Context, request api.DeleteDocBatchRequ
 // GetDocTreeData is the SSE data method for the doc tree.
 // Identifier format: URL query string (e.g., "page=1&perPage=200")
 func (a *API) GetDocTreeData(ctx context.Context, queryString string) (any, error) {
-	if a.docStore == nil {
-		return nil, errDocStoreNotAvailable
-	}
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/docs/tree",
+	}, func(readCtx context.Context) (any, error) {
+		if a.docStore == nil {
+			return nil, errDocStoreNotAvailable
+		}
 
-	params, err := url.ParseQuery(queryString)
-	if err != nil {
-		params = url.Values{}
-	}
+		params, err := url.ParseQuery(queryString)
+		if err != nil {
+			params = url.Values{}
+		}
 
-	page := parseIntParam(params.Get("page"), 1)
-	perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
-	workspaceName := params.Get("workspace")
-	if workspaceName != "" {
-		if _, err := validateDocWorkspace(&workspaceName); err != nil {
+		page := parseIntParam(params.Get("page"), 1)
+		perPage := min(parseIntParam(params.Get("perPage"), 200), 200)
+		workspaceParam := workspaceParamFromValues(params)
+		workspaceName, visibility, err := a.docReadScopeForParams(readCtx, workspaceParam)
+		if err != nil {
 			return nil, err
 		}
-	}
 
-	sortField, sortOrder := docSortParamsFromQuery(params)
+		sortField, sortOrder := docSortParamsFromQuery(params)
 
-	result, err := a.docStore.List(ctx, agent.ListDocsOptions{
-		Page:       page,
-		PerPage:    perPage,
-		Sort:       sortField,
-		Order:      sortOrder,
-		PathPrefix: workspaceName,
+		result, err := a.docStore.List(readCtx, agent.ListDocsOptions{
+			Page:             page,
+			PerPage:          perPage,
+			Sort:             sortField,
+			Order:            sortOrder,
+			PathPrefix:       workspaceName,
+			ExcludePathRoots: visibility.excludedPathRoots(),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
+		for _, node := range result.Items {
+			tree = append(tree, toDocTreeResponseWithWorkspace(node, workspaceName, visibility))
+		}
+
+		return api.ListDocs200JSONResponse{
+			Tree:       &tree,
+			Pagination: toPagination(*result),
+		}, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	tree := make([]api.DocTreeNodeResponse, 0, len(result.Items))
-	for _, node := range result.Items {
-		tree = append(tree, toDocTreeResponse(node))
-	}
-
-	return api.ListDocs200JSONResponse{
-		Tree:       &tree,
-		Pagination: toPagination(*result),
-	}, nil
 }
 
 // GetDocContentData is the SSE data method for doc content.
 func (a *API) GetDocContentData(ctx context.Context, docID string) (any, error) {
-	if a.docStore == nil {
-		return nil, errDocStoreNotAvailable
-	}
-	path, queryString, hasQuery := strings.Cut(docID, "?")
-	workspaceName := ""
-	if hasQuery {
-		params, err := url.ParseQuery(queryString)
-		if err != nil {
-			return nil, err
+	return withDAGRunReadTimeout(ctx, dagRunReadRequestInfo{
+		endpoint: "/docs/{docID}",
+	}, func(readCtx context.Context) (any, error) {
+		if a.docStore == nil {
+			return nil, errDocStoreNotAvailable
 		}
-		workspaceName = params.Get("workspace")
-		if workspaceName != "" {
-			if _, err := validateDocWorkspace(&workspaceName); err != nil {
+		path, queryString, hasQuery := strings.Cut(docID, "?")
+		var (
+			workspaceName string
+			visibility    docWorkspaceVisibility
+			err           error
+			params        url.Values
+		)
+		if hasQuery {
+			params, err = url.ParseQuery(queryString)
+			if err != nil {
+				return nil, err
+			}
+			workspaceParam := workspaceParamFromValues(params)
+			workspaceName, visibility, err = a.docPointReadScopeForParams(readCtx, workspaceParam)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			workspaceName, visibility, err = a.docPointReadScopeForParams(readCtx, nil)
+			if err != nil {
 				return nil, err
 			}
 		}
-	}
-	scopedID, err := scopedDocPath(workspaceName, path)
-	if err != nil {
-		return nil, err
-	}
-	doc, err := a.docStore.Get(ctx, scopedID)
-	if err != nil {
-		return nil, err
-	}
-	doc.ID = visibleDocPath(workspaceName, doc.ID)
-	return toDocResponse(doc), nil
+		scopedID, err := scopedDocPath(workspaceName, path)
+		if err != nil {
+			return nil, err
+		}
+		doc, err := a.docStore.Get(readCtx, scopedID)
+		if err != nil {
+			return nil, err
+		}
+		if workspaceName == "" && !visibility.all {
+			if !visibility.visible(doc.ID) {
+				return nil, errDocNotFound
+			}
+		}
+		rawID := doc.ID
+		doc.ID = visibleDocPath(workspaceName, doc.ID)
+		resp := toDocResponse(doc)
+		resp.Workspace = docWorkspaceValue(workspaceName, rawID, visibility, false)
+		return resp, nil
+	})
 }
 
 func toDocResponse(doc *agent.Doc) api.DocResponse {
@@ -565,11 +819,20 @@ func toDocMetadataResponse(m agent.DocMetadata) api.DocMetadataResponse {
 }
 
 func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
+	return toDocTreeResponseWithWorkspace(node, "", docWorkspaceVisibility{})
+}
+
+func toDocTreeResponseWithWorkspace(
+	node *agent.DocTreeNode,
+	workspaceName string,
+	visibility docWorkspaceVisibility,
+) api.DocTreeNodeResponse {
 	resp := api.DocTreeNodeResponse{
-		Id:    node.ID,
-		Name:  node.Name,
-		Title: ptrOf(node.Title),
-		Type:  api.DocTreeNodeResponseType(node.Type),
+		Id:        node.ID,
+		Name:      node.Name,
+		Title:     ptrOf(node.Title),
+		Type:      api.DocTreeNodeResponseType(node.Type),
+		Workspace: docWorkspaceValue(workspaceName, node.ID, visibility, node.Type == "directory"),
 	}
 	if !node.ModTime.IsZero() {
 		t := node.ModTime
@@ -578,7 +841,7 @@ func toDocTreeResponse(node *agent.DocTreeNode) api.DocTreeNodeResponse {
 	if len(node.Children) > 0 {
 		children := make([]api.DocTreeNodeResponse, 0, len(node.Children))
 		for _, child := range node.Children {
-			children = append(children, toDocTreeResponse(child))
+			children = append(children, toDocTreeResponseWithWorkspace(child, workspaceName, visibility))
 		}
 		resp.Children = &children
 	}

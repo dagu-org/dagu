@@ -9,8 +9,10 @@ import {
   type components,
 } from '@/api/v1/schema';
 import { Button } from '@/components/ui/button';
+import ConfirmModal from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { Tab, Tabs } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -36,9 +38,7 @@ import {
   type AutomataTaskTemplate,
 } from '@/features/automata/detail-utils';
 import { cn } from '@/lib/utils';
-import ConfirmModal from '@/ui/ConfirmModal';
-import LoadingIndicator from '@/ui/LoadingIndicator';
-import StatusChip from '@/ui/StatusChip';
+import StatusChip from '@/components/ui/status-chip';
 import DAGDetailsModal from '@/features/dags/components/dag-details/DAGDetailsModal';
 import DAGRunDetailsModal from '@/features/dag-runs/components/dag-run-details/DAGRunDetailsModal';
 

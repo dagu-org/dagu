@@ -24,7 +24,7 @@ func TestTemplateExecutor(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         greeting: hello
     script: |
@@ -51,7 +51,7 @@ func TestTemplateExecutor(t *testing.T) {
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       output: "`+outFileForYAML+`"
       data:
         title: Test Report
@@ -80,7 +80,7 @@ func TestTemplateExecutor(t *testing.T) {
   - name: render
     type: template
     working_dir: "`+tmpDirForYAML+`"
-    config:
+    with:
       output: "subdir/output.txt"
       data:
         msg: relative
@@ -111,7 +111,7 @@ steps:
     depends:
       - producer
     type: template
-    config:
+    with:
       data:
         name: ${NAME}
     script: "Hello, {{ .name }}!"
@@ -133,7 +133,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         name: test
     script: |
@@ -161,7 +161,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         name: test
     script: "{{ .undefined_key }}"
@@ -180,7 +180,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         title: Domain Report
         domains: "example.com,test.org,demo.net"
@@ -215,7 +215,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         items: ""
     script: |
@@ -238,7 +238,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         name: ""
         title: Admin
@@ -261,7 +261,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         name: "  My Service  "
     script: '{{ .name | trim | lower | replace " " "-" }}'
@@ -283,7 +283,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         app:
           name: MyApp
@@ -311,7 +311,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         domains:
           - api.example.com
@@ -340,7 +340,7 @@ steps:
       app={{ .app.name | lower | replace " " "-" }}
       owner={{ get .app "owner" | default "unknown" }}
       domains={{ get .app "domains" | default (list "localhost") | uniq | sortAlpha | join "," }}
-    config:
+    with:
       data:
         app:
           name: My Service
@@ -370,7 +370,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data: {}
     script: '{{ env "HOME" }}'
 `)
@@ -387,7 +387,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         app:
           name: test
@@ -406,7 +406,7 @@ steps:
 		dag := th.DAG(t, `steps:
   - name: render
     type: template
-    config:
+    with:
       data:
         csv: "a,b,c"
     script: |

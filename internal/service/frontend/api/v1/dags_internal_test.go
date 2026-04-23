@@ -5,6 +5,7 @@ package api_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,9 @@ import (
 	"time"
 
 	openapi "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/spec"
 	localapi "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/dagucloud/dagu/internal/test"
@@ -27,6 +31,26 @@ func (s stubSchedulerStateStore) Load(context.Context) (*scheduler.SchedulerStat
 }
 
 func (stubSchedulerStateStore) Save(context.Context, *scheduler.SchedulerState) error {
+	return nil
+}
+
+var errLoadSpecFatal = errors.New("load spec fatal")
+
+type loadSpecErrorDAGStore struct {
+	exec.DAGStore
+	updateCalled bool
+}
+
+func (s *loadSpecErrorDAGStore) GetDetails(context.Context, string, ...spec.LoadOption) (*core.DAG, error) {
+	return &core.DAG{Name: "load-spec-error"}, nil
+}
+
+func (s *loadSpecErrorDAGStore) LoadSpec(context.Context, []byte, ...spec.LoadOption) (*core.DAG, error) {
+	return nil, errLoadSpecFatal
+}
+
+func (s *loadSpecErrorDAGStore) UpdateSpec(context.Context, string, []byte) error {
+	s.updateCalled = true
 	return nil
 }
 
@@ -91,6 +115,56 @@ steps:
 	require.Len(t, sseResp.Dags, 1)
 	require.NotNil(t, sseResp.Dags[0].NextRun)
 	require.True(t, listResp.Dags[0].NextRun.Equal(*sseResp.Dags[0].NextRun))
+}
+
+func TestGetDAGsListDataUsesConfiguredListDefaults(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.Config.UI.DAGs.SortField = "name"
+	helper.Config.UI.DAGs.SortOrder = "desc"
+	helper.DAG(t, `
+name: sse-sort-alpha
+steps:
+  - command: echo alpha
+`)
+	helper.DAG(t, `
+name: sse-sort-zulu
+steps:
+  - command: echo zulu
+`)
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	listRespObj, err := api.ListDAGs(context.Background(), openapi.ListDAGsRequestObject{
+		Params: openapi.ListDAGsParams{},
+	})
+	require.NoError(t, err)
+
+	listResp, ok := listRespObj.(*openapi.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, listResp.Dags, 2)
+	require.Equal(t, "sse-sort-zulu", listResp.Dags[0].Dag.Name)
+
+	sseRespAny, err := api.GetDAGsListData(context.Background(), "")
+	require.NoError(t, err)
+
+	sseResp, ok := sseRespAny.(openapi.ListDAGs200JSONResponse)
+	require.True(t, ok)
+	require.Len(t, sseResp.Dags, 2)
+	require.Equal(t, listResp.Dags[0].Dag.Name, sseResp.Dags[0].Dag.Name)
+	require.Equal(t, listResp.Dags[1].Dag.Name, sseResp.Dags[1].Dag.Name)
 }
 
 func TestGetDAGDetails_InvalidYAML_Returns200WithErrors(t *testing.T) {
@@ -186,7 +260,7 @@ steps:
   - id: consume
     depends: [produce]
     type: repeat
-    config:
+    with:
       message: runtime value
       count: ${COUNT}
 `
@@ -202,6 +276,127 @@ steps:
 	resp, ok := respObj.(openapi.UpdateDAGSpec200JSONResponse)
 	require.True(t, ok, "expected 200 response, got %T", respObj)
 	require.Empty(t, resp.Errors)
+}
+
+func TestUpdateDAGSpec_StepConfigAliasCompatibility(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "step-config-alias-api", []byte(`
+name: step-config-alias-api
+steps:
+  - command: echo original
+`))
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "step-config-alias-api",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: `
+name: step-config-alias-api
+steps:
+  - name: request
+    type: http
+    command: GET https://example.com
+    config:
+      timeout: 30
+`,
+		},
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.UpdateDAGSpec200JSONResponse)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+	require.Empty(t, resp.Errors)
+}
+
+func TestUpdateDAGSpec_RejectsStepWithAndLegacyConfigTogether(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	helper.CreateDAGFile(t, helper.Config.Paths.DAGsDir, "step-mixed-config-api", []byte(`
+name: step-mixed-config-api
+steps:
+  - command: echo original
+`))
+
+	api := localapi.New(
+		helper.DAGStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "step-mixed-config-api",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: `
+name: step-mixed-config-api
+steps:
+  - name: request
+    type: http
+    command: GET https://example.com
+    with:
+      timeout: 30
+    config:
+      timeout: 60
+`,
+		},
+	})
+	require.NoError(t, err)
+
+	resp, ok := respObj.(openapi.UpdateDAGSpec200JSONResponse)
+	require.True(t, ok, "expected 200 response, got %T", respObj)
+	require.NotEmpty(t, resp.Errors)
+	require.Contains(t, resp.Errors[0], `fields "with" and "config" cannot be used together`)
+}
+
+func TestUpdateDAGSpec_ReturnsFatalLoadSpecError(t *testing.T) {
+	t.Parallel()
+
+	helper := test.Setup(t, test.WithStatusPersistence())
+	dagStore := &loadSpecErrorDAGStore{}
+	api := localapi.New(
+		dagStore,
+		helper.DAGRunStore,
+		helper.QueueStore,
+		helper.ProcStore,
+		helper.DAGRunMgr,
+		helper.Config,
+		nil,
+		helper.ServiceRegistry,
+		nil,
+		nil,
+	)
+
+	respObj, err := api.UpdateDAGSpec(context.Background(), openapi.UpdateDAGSpecRequestObject{
+		FileName: "load-spec-error",
+		Body: &openapi.UpdateDAGSpecJSONRequestBody{
+			Spec: "steps:\n  - command: echo updated\n",
+		},
+	})
+
+	require.ErrorIs(t, err, errLoadSpecFatal)
+	require.Nil(t, respObj)
+	require.False(t, dagStore.updateCalled)
 }
 
 func TestGetDAGDetails_EditorHintsIncludeInheritedCustomStepTypes(t *testing.T) {

@@ -146,7 +146,7 @@ function isStepLikeSchema(schema: JSONSchema): boolean {
     schema.type === 'object' &&
     !!properties &&
     isRecord(properties.type) &&
-    isRecord(properties.config)
+    (isRecord(properties.with) || isRecord(properties.config))
   );
 }
 
@@ -465,8 +465,13 @@ export function buildAugmentedDAGSchema(
       },
       then: {
         properties: {
+          with: {
+            $ref: `#${definitionPointer}`,
+          },
           config: {
             $ref: `#${definitionPointer}`,
+            deprecated: true,
+            doNotSuggest: true,
           },
         },
       },

@@ -79,6 +79,7 @@ export function DelegatePanel({
 
   return (
     <div
+      data-delegate-id={delegateId}
       className={cn(
         'fixed',
         'flex flex-col',

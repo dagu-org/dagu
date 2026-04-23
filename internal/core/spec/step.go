@@ -98,7 +98,11 @@ type step struct {
 	// Type specifies the executor type (ssh, http, jq, mail, docker, archive).
 	Type string `yaml:"type,omitempty"`
 
+	// With contains executor-specific configuration.
+	With map[string]any `yaml:"with,omitempty"`
+
 	// Config contains executor-specific configuration.
+	// Deprecated: use With.
 	Config map[string]any `yaml:"config,omitempty"`
 
 	// LLM contains the configuration for LLM-based executors (chat, agent, etc.).
@@ -126,6 +130,56 @@ type step struct {
 type execSpec struct {
 	Command string `yaml:"command,omitempty"`
 	Args    []any  `yaml:"args,omitempty"`
+}
+
+func (s *step) executorConfig() map[string]any {
+	if s != nil && s.With != nil {
+		return s.With
+	}
+	if s != nil {
+		return s.Config
+	}
+	return nil
+}
+
+func (s *step) executorConfigFieldName() string {
+	if s != nil && s.With != nil {
+		return "with"
+	}
+	if s != nil && s.Config != nil {
+		return "config"
+	}
+	return "with"
+}
+
+func validateStepConfigAliasStruct(s *step) error {
+	if s == nil || s.With == nil || s.Config == nil {
+		return nil
+	}
+	return newStepConfigAliasError(map[string]any{
+		"with":   s.With,
+		"config": s.Config,
+	})
+}
+
+func validateStepConfigAliasRaw(raw map[string]any) error {
+	if raw == nil {
+		return nil
+	}
+	_, hasWith := raw["with"]
+	_, hasConfig := raw["config"]
+	if !hasWith || !hasConfig {
+		return nil
+	}
+	return newStepConfigAliasError(raw)
+}
+
+func newStepConfigAliasError(value any) error {
+	return core.NewValidationError(
+		"with",
+		value,
+		fmt.Errorf("fields %q and %q cannot be used together; use %q", "with", "config", "with"),
+	)
 }
 
 // approvalConfig defines the approval configuration for a step.
@@ -372,6 +426,10 @@ func runStepTransformers(ctx StepBuildContext, spec *step, result *core.Step) co
 
 // build transforms the step specification into a core.Step.
 func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
+	if err := validateStepConfigAliasStruct(s); err != nil {
+		return nil, err
+	}
+
 	result := &core.Step{
 		ExecutorConfig: core.ExecutorConfig{Config: make(map[string]any)},
 	}
@@ -452,7 +510,7 @@ func (s *step) build(ctx StepBuildContext) (*core.Step, error) {
 	// Only validate when config has actual values (not just initialized as empty map)
 	if len(result.ExecutorConfig.Config) > 0 {
 		if err := core.ValidateExecutorConfig(result.ExecutorConfig.Type, result.ExecutorConfig.Config); err != nil {
-			errs = append(errs, wrapTransformError("config", err))
+			errs = append(errs, wrapTransformError(s.executorConfigFieldName(), err))
 		}
 	}
 
@@ -1242,7 +1300,7 @@ func validateLLM(result *core.Step) error {
 		return core.NewValidationError(
 			"llm",
 			result.LLM,
-			fmt.Errorf("executor type %q does not support llm field; use type: chat with llm: config", result.ExecutorConfig.Type),
+			fmt.Errorf("executor type %q does not support llm field; use type: chat with llm configuration", result.ExecutorConfig.Type),
 		)
 	}
 
@@ -1316,11 +1374,16 @@ func buildStepParamsField(ctx StepBuildContext, s *step, result *core.Step) erro
 
 // buildStepExecutor parses the executor configuration from step fields.
 func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
-	// Step-level type and config fields
+	if err := validateStepConfigAliasStruct(s); err != nil {
+		return err
+	}
+
+	// Step-level type and with/config fields
 	if s.Type != "" {
 		result.ExecutorConfig.Type = strings.TrimSpace(s.Type)
 	}
-	maps.Copy(result.ExecutorConfig.Config, s.Config)
+	stepConfig := s.executorConfig()
+	maps.Copy(result.ExecutorConfig.Config, stepConfig)
 
 	// Infer type from container field
 	if result.ExecutorConfig.Type == "" && result.Container != nil {
@@ -1346,7 +1409,7 @@ func buildStepExecutor(ctx StepBuildContext, s *step, result *core.Step) error {
 		mergeRedisConfig(ctx.dag.Redis, result.ExecutorConfig.Config)
 	}
 	if result.ExecutorConfig.Type == "harness" && ctx.dag != nil && ctx.dag.Harness != nil {
-		result.ExecutorConfig.Config = mergeHarnessConfig(ctx.dag.Harness, s.Config)
+		result.ExecutorConfig.Config = mergeHarnessConfig(ctx.dag.Harness, stepConfig)
 	}
 	if isKubernetesExecutorType(result.ExecutorConfig.Type) && ctx.dag != nil && ctx.dag.Kubernetes != nil {
 		result.ExecutorConfig.Config = mergeKubernetesExecutorConfig(ctx.dag.Kubernetes, result.ExecutorConfig.Config)

@@ -124,7 +124,8 @@ export function dereferenceSchema(schema: JSONSchema): JSONSchema {
           cache.set(ref, resolved);
         }
       }
-      const { $ref: _ref, ...rest } = obj;
+      const rest = { ...obj };
+      delete rest.$ref;
       if (Object.keys(rest).length === 0) {
         return resolved;
       }

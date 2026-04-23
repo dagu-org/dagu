@@ -6,8 +6,10 @@ package queue_test
 import (
 	"fmt"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
+	"github.com/dagucloud/dagu/internal/core/spec"
 	"github.com/dagucloud/dagu/internal/service/coordinator"
 	"github.com/dagucloud/dagu/internal/service/scheduler"
 	"github.com/dagucloud/dagu/internal/test"
@@ -76,14 +79,42 @@ name: sleep-dag
 queue: global-queue
 steps:
   - name: sleep
-    command: %s
-`, test.ShellQuote(test.Sleep(sleepDuration))), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
+    %s
+`, directSleepStepYAML(t, sleepDuration)), WithQueue("global-queue"), WithGlobalQueue("global-queue", 3)).
 		Enqueue(3).StartScheduler(30 * time.Second)
 
 	f.WaitDrain(35 * time.Second)
 	f.WaitForAllStatuses(core.Succeeded, 20*time.Second)
 	f.Stop()
 	f.AssertConcurrent(maxDiff)
+}
+
+func directSleepStepYAML(t *testing.T, d time.Duration) string {
+	t.Helper()
+
+	if runtime.GOOS == "windows" {
+		commandPath, err := osexec.LookPath("ping")
+		require.NoError(t, err)
+
+		seconds := max(int((d+time.Second-1)/time.Second), 1)
+
+		return fmt.Sprintf(
+			"exec:\n      command: %s\n      args: [%s, %s, %s]",
+			strconv.Quote(commandPath),
+			strconv.Quote("-n"),
+			strconv.Quote(strconv.Itoa(seconds+1)),
+			strconv.Quote("127.0.0.1"),
+		)
+	}
+
+	commandPath, err := osexec.LookPath("sleep")
+	require.NoError(t, err)
+
+	return fmt.Sprintf(
+		"exec:\n      command: %s\n      args: [%s]",
+		strconv.Quote(commandPath),
+		strconv.Quote(strconv.FormatFloat(d.Seconds(), 'f', -1, 64)),
+	)
 }
 
 func TestLocalQueueFIFOProcessing(t *testing.T) {
@@ -94,10 +125,9 @@ steps:
   - name: sleep
     command: %s
 `, test.ShellQuote(test.Sleep(time.Second)))).Enqueue(3).StartScheduler(30 * time.Second)
+	defer f.Stop()
 
 	f.WaitDrain(20 * time.Second)
-	f.Stop()
-
 	times := f.collectStartTimes()
 	require.Len(t, times, 3)
 	for i := 1; i < len(times); i++ {
@@ -340,6 +370,67 @@ steps:
 		assert.Equal(t, core.Succeeded, latest.Status)
 		assert.NotEqual(t, originalAttemptID, latest.AttemptID)
 		assert.Equal(t, 1, latest.AutoRetryCount)
+	})
+
+	t.Run("DisabledByChildSkipsInheritedBaseRetryPolicy", func(t *testing.T) {
+		f := newFixture(t, `
+type: graph
+name: retry-disabled-dag
+queue: retry-disabled-queue
+retry_policy:
+  limit: 0
+steps:
+  - id: retry_step
+    command: echo retried
+`, WithQueue("retry-disabled-queue"), WithGlobalQueue("retry-disabled-queue", 1))
+
+		require.NoError(t, os.WriteFile(f.th.Config.Paths.BaseConfig, []byte(`
+retry_policy:
+  limit: 1
+  interval_sec: 1
+  backoff: false
+  max_interval_sec: 1
+`), 0600))
+
+		dag, err := spec.Load(f.th.Context, f.dag.Location, spec.WithBaseConfig(f.th.Config.Paths.BaseConfig))
+		require.NoError(t, err)
+		f.dag = dag
+		require.NotNil(t, f.dag.RetryPolicy)
+		require.Equal(t, 0, f.dag.RetryPolicy.Limit)
+
+		failedAt := time.Now().UTC().Add(-30 * time.Second)
+		runID := f.FailedRunWithMetadata(runStatusOptions{
+			StartedAt:    failedAt.Add(-5 * time.Second),
+			FinishedAt:   failedAt,
+			ScheduleTime: failedAt.Add(-time.Minute),
+			TriggerType:  core.TriggerTypeScheduler,
+		})
+		originalStatus := f.MustStatus(runID)
+		originalAttemptID := originalStatus.AttemptID
+		require.Equal(t, 0, originalStatus.AutoRetryLimit)
+
+		f.StartScheduler(10 * time.Second)
+		defer f.Stop()
+
+		require.Never(t, func() bool {
+			status, err := f.Status(runID)
+			if err != nil {
+				return false
+			}
+			return status.AttemptID != originalAttemptID ||
+				status.Status != core.Failed ||
+				status.AutoRetryCount != 0
+		}, 3*time.Second, 100*time.Millisecond)
+
+		latest := f.MustStatus(runID)
+		assert.Equal(t, core.Failed, latest.Status)
+		assert.Equal(t, originalAttemptID, latest.AttemptID)
+		assert.Equal(t, 0, latest.AutoRetryCount)
+		assert.Equal(t, 0, latest.AutoRetryLimit)
+
+		items, err := f.th.QueueStore.List(f.th.Context, "retry-disabled-queue")
+		require.NoError(t, err)
+		assert.Empty(t, items)
 	})
 
 	t.Run("NewerScheduledRunDoesNotSuppressRetry", func(t *testing.T) {

@@ -29,7 +29,7 @@ env:
 steps:
   - name: jq-price
     type: jq
-    config:
+    with:
       raw: true
     script: |
       {"price":"${PRICE}"}
@@ -53,7 +53,7 @@ steps:
 steps:
   - name: jq-literal
     type: jq
-    config:
+    with:
       raw: true
     script: |
       {"literal":"'${HOME}'"}
@@ -98,7 +98,7 @@ env:
 steps:
   - name: http-price
     type: http
-    config:
+    with:
       headers:
         Authorization: "Bearer \\$TOKEN"
         Content-Type: application/json
