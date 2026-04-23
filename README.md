@@ -30,7 +30,7 @@ For a quick look at how workflows are defined, see the [examples](https://docs.d
 |---|---|
 | ![Cockpit](./assets/images/ui-cockpit.png) | ![DAG Run Details](./assets/images/ui-dag-run-details.png) |
 
-**Try it live:** [Live Demo](https://demo-instance.dagu.sh/) (credentials: `demouser` / `demouser`)
+**Try it live:** [Live Demo](https://dagu-demo-f5e33d0e.dagu.sh) (credentials: `demouser` / `demouser`)
 
 ## Production Operation Notes
 
