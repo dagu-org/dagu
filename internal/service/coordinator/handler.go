@@ -917,6 +917,7 @@ func (h *Handler) AckTaskClaim(ctx context.Context, req *coordinatorv1.AckTaskCl
 	if err := h.dagRunLeaseStore.Upsert(ctx, buildLeaseFromTask(claimed.Task, req.WorkerId, h.owner, now)); err != nil {
 		return nil, status.Error(codes.Internal, "failed to create run lease: "+err.Error())
 	}
+	h.upsertActiveDistributedRunFromTask(ctx, claimed.Task, req.WorkerId, now)
 	if err := h.dispatchTaskStore.DeleteClaim(ctx, req.ClaimToken); err != nil {
 		return nil, status.Error(codes.Internal, "failed to finalize task claim: "+err.Error())
 	}
@@ -2182,8 +2183,8 @@ func (h *Handler) reconcileDistributedLease(ctx context.Context, lease exec.DAGR
 		return
 	}
 
-	if !exec.IsRemoteWorkerID(runStatus.WorkerID) ||
-		!exec.LeaseIdentityMatchesStatus(&lease, runStatus, attemptID) {
+	workerID, ok := distributedWorkerIDForStatus(runStatus, lease.WorkerID)
+	if !ok || !exec.LeaseIdentityMatchesStatus(&lease, runStatus, attemptID) {
 		h.deleteDistributedTracking(ctx, context.WithoutCancel(ctx), lease.DAGRun, lease.AttemptKey,
 			"Failed to delete superseded distributed lease",
 			"Failed to delete superseded active distributed run",
@@ -2194,22 +2195,29 @@ func (h *Handler) reconcileDistributedLease(ctx context.Context, lease exec.DAGR
 	switch runStatus.Status {
 	case core.Running, core.NotStarted:
 		if lease.IsFresh(now, h.staleLeaseThreshold) {
-			h.upsertActiveDistributedRun(ctx, runStatus, lease.WorkerID, attemptID)
+			h.upsertActiveDistributedRun(ctx, runStatus, workerID, attemptID)
 			return
 		}
 	case core.Queued:
 		if lease.IsFresh(now, h.staleLeaseThreshold) {
+			h.upsertActiveDistributedRun(ctx, runStatus, workerID, attemptID)
 			return
 		}
-	default:
+	case core.Failed, core.Aborted, core.Succeeded, core.PartiallySucceeded, core.Waiting, core.Rejected:
 		h.deleteDistributedTracking(ctx, context.WithoutCancel(ctx), lease.DAGRun, lease.AttemptKey,
 			"Failed to delete inactive distributed lease",
 			"Failed to delete inactive active distributed run",
 		)
 		return
+	default:
+		h.deleteDistributedTracking(ctx, context.WithoutCancel(ctx), lease.DAGRun, lease.AttemptKey,
+			"Failed to delete unknown-state distributed lease",
+			"Failed to delete unknown-state active distributed run",
+		)
+		return
 	}
 
-	h.markStatusLeaseRunFailed(ctx, runStatus, attemptID, lease.AttemptKey, staleDistributedLeaseReason(lease.WorkerID))
+	h.markStatusLeaseRunFailed(ctx, runStatus, attemptID, lease.AttemptKey, staleDistributedLeaseReason(workerID))
 }
 
 func staleDistributedLeaseReason(workerID string) string {
@@ -2275,7 +2283,8 @@ func (h *Handler) detectIndexedDistributedStatuses(ctx context.Context, now time
 			continue
 		}
 
-		if !h.indexedDistributedRunMatchesStatus(record, runStatus) {
+		workerID, ok := distributedWorkerIDForStatus(runStatus, record.WorkerID)
+		if !ok || !h.indexedDistributedRunMatchesStatus(record, runStatus) {
 			h.deleteDistributedTracking(ctx, context.WithoutCancel(ctx), record.DAGRun, record.AttemptKey,
 				"Failed to delete superseded distributed lease from active index",
 				"Failed to delete superseded active distributed run",
@@ -2297,11 +2306,11 @@ func (h *Handler) detectIndexedDistributedStatuses(ctx context.Context, now time
 		}
 
 		if exec.LeaseMatchesStatus(lease, runStatus, record.AttemptID, now, h.staleLeaseThreshold) {
-			h.upsertActiveDistributedRun(ctx, runStatus, runStatus.WorkerID, record.AttemptID)
+			h.upsertActiveDistributedRun(ctx, runStatus, workerID, record.AttemptID)
 			continue
 		}
 
-		h.markStatusLeaseRunFailed(ctx, runStatus, record.AttemptID, record.AttemptKey, staleDistributedLeaseReason(runStatus.WorkerID))
+		h.markStatusLeaseRunFailed(ctx, runStatus, record.AttemptID, record.AttemptKey, staleDistributedLeaseReason(workerID))
 	}
 }
 
@@ -2393,14 +2402,55 @@ func (h *Handler) upsertActiveDistributedRun(
 	}
 }
 
+func (h *Handler) upsertActiveDistributedRunFromTask(
+	ctx context.Context,
+	task *coordinatorv1.Task,
+	workerID string,
+	now time.Time,
+) {
+	if h.activeDistributedRunStore == nil || task == nil || task.AttemptKey == "" {
+		return
+	}
+	if !exec.IsRemoteWorkerID(workerID) {
+		return
+	}
+
+	root := exec.DAGRunRef{Name: task.RootDagRunName, ID: task.RootDagRunId}
+	if root.Zero() {
+		root = exec.DAGRunRef{Name: task.Target, ID: task.DagRunId}
+	}
+
+	record := exec.ActiveDistributedRun{
+		AttemptKey: task.AttemptKey,
+		DAGRun: exec.DAGRunRef{
+			Name: task.Target,
+			ID:   task.DagRunId,
+		},
+		Root:      root,
+		AttemptID: task.AttemptId,
+		WorkerID:  workerID,
+		Status:    core.Queued,
+		UpdatedAt: now.UnixMilli(),
+	}
+	if err := h.activeDistributedRunStore.Upsert(ctx, record); err != nil {
+		logger.Warn(ctx, "Failed to upsert active distributed run from task claim",
+			tag.RunID(task.DagRunId),
+			tag.AttemptKey(task.AttemptKey),
+			tag.Error(err),
+		)
+	}
+}
+
 func (h *Handler) indexedDistributedRunMatchesStatus(
 	record exec.ActiveDistributedRun,
 	runStatus *exec.DAGRunStatus,
 ) bool {
-	if runStatus == nil || !exec.IsRemoteWorkerID(runStatus.WorkerID) {
+	if _, ok := distributedWorkerIDForStatus(runStatus, record.WorkerID); !ok {
 		return false
 	}
-	if runStatus.Status != core.Running && runStatus.Status != core.NotStarted {
+	if runStatus.Status != core.Running &&
+		runStatus.Status != core.NotStarted &&
+		runStatus.Status != core.Queued {
 		return false
 	}
 
@@ -2418,6 +2468,25 @@ func (h *Handler) indexedDistributedRunMatchesStatus(
 		}
 	}
 	return true
+}
+
+func distributedWorkerIDForStatus(status *exec.DAGRunStatus, fallbackWorkerID string) (string, bool) {
+	if status == nil {
+		return "", false
+	}
+	if exec.IsRemoteWorkerID(status.WorkerID) {
+		return status.WorkerID, true
+	}
+	if status.WorkerID != "" {
+		return "", false
+	}
+	if status.Status != core.Queued && status.Status != core.NotStarted {
+		return "", false
+	}
+	if !exec.IsRemoteWorkerID(fallbackWorkerID) {
+		return "", false
+	}
+	return fallbackWorkerID, true
 }
 
 func (h *Handler) markStatusLeaseRunFailed(

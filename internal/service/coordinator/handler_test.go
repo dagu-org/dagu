@@ -477,23 +477,6 @@ func (m *mockDAGRunAttempt) WasClosed() bool {
 	return m.closed
 }
 
-func createStoredAttemptStatus(
-	t *testing.T,
-	store exec.DAGRunStore,
-	ts time.Time,
-	dagName string,
-	dagRunID string,
-	runStatus exec.DAGRunStatus,
-) {
-	t.Helper()
-
-	attempt, err := store.CreateAttempt(context.Background(), &core.DAG{Name: dagName}, ts, dagRunID, exec.NewDAGRunAttemptOptions{})
-	require.NoError(t, err)
-	require.NoError(t, attempt.Open(context.Background()))
-	require.NoError(t, attempt.Write(context.Background(), runStatus))
-	require.NoError(t, attempt.Close(context.Background()))
-}
-
 func TestHandler_Poll(t *testing.T) {
 	t.Parallel()
 
@@ -1788,10 +1771,13 @@ func TestHandler_ZombieDetection(t *testing.T) {
 			name       string
 			status     core.Status
 			nodeStatus core.NodeStatus
+			workerID   string
 		}{
-			{name: "Running", status: core.Running, nodeStatus: core.NodeRunning},
-			{name: "NotStarted", status: core.NotStarted, nodeStatus: core.NodeNotStarted},
-			{name: "Queued", status: core.Queued, nodeStatus: core.NodeNotStarted},
+			{name: "Running", status: core.Running, nodeStatus: core.NodeRunning, workerID: "worker-1"},
+			{name: "NotStarted", status: core.NotStarted, nodeStatus: core.NodeNotStarted, workerID: "worker-1"},
+			{name: "NotStartedWithoutPersistedWorkerID", status: core.NotStarted, nodeStatus: core.NodeNotStarted},
+			{name: "Queued", status: core.Queued, nodeStatus: core.NodeNotStarted, workerID: "worker-1"},
+			{name: "QueuedWithoutPersistedWorkerID", status: core.Queued, nodeStatus: core.NodeNotStarted},
 		}
 
 		for _, tc := range testCases {
@@ -1814,7 +1800,7 @@ func TestHandler_ZombieDetection(t *testing.T) {
 					AttemptID:  "attempt-1",
 					AttemptKey: "lease-key-1",
 					Status:     tc.status,
-					WorkerID:   "worker-1",
+					WorkerID:   tc.workerID,
 					Nodes: []*exec.Node{
 						{Status: tc.nodeStatus},
 					},
@@ -2725,10 +2711,12 @@ func TestHandler_ReportStatus(t *testing.T) {
 		baseDir := filepath.Join(t.TempDir(), "distributed")
 		dispatchStore := filedistributed.NewDispatchTaskStore(baseDir)
 		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
 		h := NewHandler(HandlerConfig{
-			DispatchTaskStore: dispatchStore,
-			DAGRunLeaseStore:  leaseStore,
-			Owner:             exec.CoordinatorEndpoint{ID: "coord-a", Host: "127.0.0.1", Port: 1234},
+			DispatchTaskStore:         dispatchStore,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			Owner:                     exec.CoordinatorEndpoint{ID: "coord-a", Host: "127.0.0.1", Port: 1234},
 		})
 		ctx := context.Background()
 
@@ -2763,6 +2751,14 @@ func TestHandler_ReportStatus(t *testing.T) {
 		assert.Equal(t, "queue-a", lease.QueueName)
 		assert.Equal(t, "worker-1", lease.WorkerID)
 		assert.Equal(t, "coord-a", lease.Owner.ID)
+
+		record, err := activeStore.Get(ctx, "attempt-key-1")
+		require.NoError(t, err)
+		assert.Equal(t, "test-dag", record.DAGRun.Name)
+		assert.Equal(t, "run-123", record.DAGRun.ID)
+		assert.Equal(t, "attempt-1", record.AttemptID)
+		assert.Equal(t, "worker-1", record.WorkerID)
+		assert.Equal(t, core.Queued, record.Status)
 
 		_, err = dispatchStore.GetClaim(ctx, claimed.ClaimToken)
 		assert.ErrorIs(t, err, exec.ErrDispatchTaskNotFound)
