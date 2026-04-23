@@ -2195,12 +2195,7 @@ func (h *Handler) reconcileDistributedLease(ctx context.Context, lease exec.DAGR
 	}
 
 	switch runStatus.Status {
-	case core.Running, core.NotStarted:
-		if lease.IsFresh(now, h.staleLeaseThreshold) {
-			h.upsertActiveDistributedRun(ctx, runStatus, workerID, attemptID)
-			return
-		}
-	case core.Queued:
+	case core.Running, core.NotStarted, core.Queued:
 		if lease.IsFresh(now, h.staleLeaseThreshold) {
 			h.upsertActiveDistributedRun(ctx, runStatus, workerID, attemptID)
 			return
