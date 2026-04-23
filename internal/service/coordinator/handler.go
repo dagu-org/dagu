@@ -2151,7 +2151,9 @@ func (h *Handler) reconcileDistributedLease(ctx context.Context, lease exec.DAGR
 	attempt, runStatus, err := h.resolveLatestAttempt(ctx, lease.DAGRun.Name, lease.DAGRun.ID, lease.Root)
 	switch {
 	case err == nil:
-	case errors.Is(err, exec.ErrDAGRunIDNotFound), errors.Is(err, exec.ErrNoStatusData):
+	case errors.Is(err, exec.ErrDAGRunIDNotFound),
+		errors.Is(err, exec.ErrNoStatusData),
+		errors.Is(err, exec.ErrCorruptedStatusFile):
 		h.deleteDistributedTracking(ctx, context.WithoutCancel(ctx), lease.DAGRun, lease.AttemptKey,
 			"Failed to delete distributed lease for missing leased run",
 			"Failed to delete active distributed run for missing leased run",
@@ -2267,7 +2269,9 @@ func (h *Handler) detectIndexedDistributedStatuses(ctx context.Context, now time
 		_, runStatus, err := h.resolveLatestAttempt(ctx, record.DAGRun.Name, record.DAGRun.ID, record.Root)
 		switch {
 		case err == nil:
-		case errors.Is(err, exec.ErrDAGRunIDNotFound), errors.Is(err, exec.ErrNoStatusData):
+		case errors.Is(err, exec.ErrDAGRunIDNotFound),
+			errors.Is(err, exec.ErrNoStatusData),
+			errors.Is(err, exec.ErrCorruptedStatusFile):
 			h.deleteDistributedTracking(ctx, context.WithoutCancel(ctx), record.DAGRun, record.AttemptKey,
 				"Failed to delete distributed lease for missing indexed run",
 				"Failed to delete active distributed run for missing indexed run",

@@ -212,6 +212,8 @@ func DAGRunEventID(eventType EventType, dagName, dagRunID, attemptID string) str
 }
 
 func DAGRunUpdateEventID(dagName, dagRunID, attemptID string, recordedAt time.Time) string {
+	// Same-status updates are invalidation edges. The file collector deduplicates
+	// by event ID globally, so update IDs must remain unique across writes.
 	return "dag_update_" + stableID(
 		string(TypeDAGRunUpdated),
 		dagName,

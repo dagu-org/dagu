@@ -213,6 +213,16 @@ func TestEmitPersistedStatusTransitionFromContextEmitsUpdateForRepeatedStatus(t 
 	assert.False(t, IsNotificationEventType(store.event.Kind, store.event.Type))
 }
 
+func TestDAGRunUpdateEventIDIncludesRecordedAt(t *testing.T) {
+	t.Parallel()
+
+	base := time.Date(2026, 4, 23, 1, 2, 3, 0, time.UTC)
+	first := DAGRunUpdateEventID("briefing", "run-1", "attempt-1", base)
+	second := DAGRunUpdateEventID("briefing", "run-1", "attempt-1", base.Add(time.Nanosecond))
+
+	assert.NotEqual(t, first, second)
+}
+
 func TestNewDAGRunEventDeepClonesData(t *testing.T) {
 	t.Parallel()
 

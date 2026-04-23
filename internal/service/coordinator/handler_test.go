@@ -2063,6 +2063,62 @@ func TestHandler_ZombieDetection(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, records)
 	})
+
+	t.Run("DetectStaleLeasesDeletesTrackingForCorruptedStatus", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		store := newMockDAGRunStore()
+		baseDir := filepath.Join(t.TempDir(), "distributed")
+		leaseStore := filedistributed.NewDAGRunLeaseStore(baseDir)
+		activeStore := filedistributed.NewActiveDistributedRunStore(baseDir)
+		h := NewHandler(HandlerConfig{
+			DAGRunStore:               store,
+			DAGRunLeaseStore:          leaseStore,
+			ActiveDistributedRunStore: activeStore,
+			StaleLeaseThreshold:       time.Second,
+		})
+
+		ref := exec.DAGRunRef{Name: "lease-dag", ID: "run-corrupted"}
+		attemptKey := "lease-key-corrupted"
+		attempt := store.addAttempt(ref, &exec.DAGRunStatus{
+			Name:       "lease-dag",
+			DAGRunID:   "run-corrupted",
+			AttemptID:  "attempt-1",
+			AttemptKey: attemptKey,
+			Status:     core.Running,
+			WorkerID:   "worker-1",
+		})
+		attempt.readStatusError = exec.ErrCorruptedStatusFile
+
+		staleAt := time.Now().Add(-10 * time.Second).UTC()
+		require.NoError(t, leaseStore.Upsert(ctx, exec.DAGRunLease{
+			AttemptKey:      attemptKey,
+			DAGRun:          ref,
+			Root:            ref,
+			AttemptID:       "attempt-1",
+			QueueName:       "lease-dag",
+			WorkerID:        "worker-1",
+			LastHeartbeatAt: staleAt.UnixMilli(),
+			ClaimedAt:       staleAt.UnixMilli(),
+		}))
+		require.NoError(t, activeStore.Upsert(ctx, exec.ActiveDistributedRun{
+			AttemptKey: attemptKey,
+			DAGRun:     ref,
+			Root:       ref,
+			AttemptID:  "attempt-1",
+			WorkerID:   "worker-1",
+			Status:     core.Running,
+		}))
+
+		h.detectStaleLeases(ctx)
+
+		assert.Zero(t, store.ListStatusesCallCount())
+		_, err := leaseStore.Get(ctx, attemptKey)
+		assert.ErrorIs(t, err, exec.ErrDAGRunLeaseNotFound)
+		_, err = activeStore.Get(ctx, attemptKey)
+		assert.ErrorIs(t, err, exec.ErrActiveRunNotFound)
+	})
 }
 
 func TestHandler_ReportStatus(t *testing.T) {
