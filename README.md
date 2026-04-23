@@ -14,11 +14,11 @@
   </p>
 </div>
 
-## Command-Native Workflow Engine
+## Lightweight, Local-First, Declarative Workflow Engine
 
-Dagu is the command-native workflow engine AI agents need. It turns scripts, containers, server tasks, and agent CLIs into scheduled, observable, retryable production workflows.
+Dagu is a self-contained workflow engine. Workflows are defined in YAML and can run shell commands, scripts, containers, HTTP requests, SQL queries, SSH commands, sub-workflows, and AI agent steps.
 
-It runs as a single self-hosted binary with no required database, message broker, or language-specific runtime. Workflows are defined as DAGs (Directed Acyclic Graphs) in YAML, and all state is stored in local files by default.
+Dagu runs as a single binary and stores state in local files by default. It does not require a database, message broker, or language-specific SDK. It includes scheduling, dependencies, retries, queues, logs, a Web UI, and optional distributed workers.
 
 For a quick look at how workflows are defined, see the [examples](https://docs.dagu.sh/writing-workflows/examples).
 
@@ -76,6 +76,24 @@ Dagu is useful when scripts, containers, server jobs, data tasks, or agent-drive
     6+ services to manage
 ```
 
+## Deployment Models
+
+Dagu can run on one machine, as a self-hosted production service, as a full managed Dagu Cloud server, or as a hybrid deployment with private workers inside your infrastructure.
+
+| Model | Server | Execution | Best for |
+|------|--------|-----------|----------|
+| **Local single-server** | `dagu start-all` on one machine. | Same machine. | Development, small scheduled workloads, edge jobs, and simple internal automation. |
+| **Self-hosted** | Dagu server on your infrastructure. | Local execution or distributed workers on your infrastructure. | Teams that need ownership of networking, secrets, storage, runtime, and upgrade timing. |
+| **Dagu Cloud** | Full managed Dagu server in a dedicated, isolated gVisor instance on GKE. | Managed instance. | Teams that want Dagu operated for them without running the server themselves. |
+| **Hybrid** | Full managed Dagu Cloud server. | Private workers in your infrastructure over mTLS. | Docker steps, private networks, custom runtimes, secrets-heavy jobs, and data-local work. |
+
+### Licensing and Cloud
+
+- **Community self-host:** GPLv3. No license key required. You operate the server, storage, upgrades, networking, and workers. Start with the [installation guide](https://docs.dagu.sh/getting-started/installation/).
+- **Self-host license:** Adds SSO, RBAC, and audit logging to self-hosted Dagu. Licenses apply to Dagu servers, not workers, so execution can scale across your own infrastructure. See [self-host licensing](https://dagu.sh/pricing#self-host).
+- **Dagu Cloud managed instance:** Includes its own managed license. It can run workflows directly as a full Dagu server, and private workers can also run on your infrastructure using a worker mTLS bundle. See [Dagu Cloud](https://dagu.sh/cloud).
+
+Managed Dagu Cloud instances do not expose a Docker daemon or Docker socket. Workflows that need Docker step execution should use self-hosted Dagu or a private worker with Docker access.
 
 ## Architecture
 
