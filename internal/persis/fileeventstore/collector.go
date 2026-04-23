@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -138,6 +139,9 @@ func (c *Collector) DrainOnce(_ context.Context) error {
 			break
 		}
 		if entry.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), inboxSuffix) {
 			continue
 		}
 		processed++
