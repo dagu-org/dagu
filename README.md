@@ -14,21 +14,25 @@
   </p>
 </div>
 
-## Lightweight, Local-First, Declarative Workflow Engine
+## Self-Hosted Control Plane for Existing Ops Automation
 
-Dagu is a self-contained workflow engine. Workflows are defined in YAML and can run shell commands, scripts, containers, HTTP requests, SQL queries, SSH commands, sub-workflows, and AI agent steps.
+Dagu gives teams one place to run, schedule, review, and debug existing ops automation without standing up a database, message broker, or language-specific SDK stack.
 
-Dagu runs as a single binary and stores state in local files by default. It does not require a database, message broker, or language-specific SDK. It includes scheduling, dependencies, retries, queues, logs, a Web UI, and optional distributed workers.
+Dagu workflows are defined in YAML and can run shell commands, scripts, containers, HTTP requests, SQL queries, SSH commands, sub-workflows, and AI agent steps. It runs as a single binary, stores state in local files by default, and adds scheduling, dependencies, retries, queues, logs, documents, a Web UI, and optional distributed workers around existing ops automation.
 
 For a quick look at how workflows are defined, see the [examples](https://docs.dagu.sh/writing-workflows/examples).
+
+<div align="center">
+  <img src="./assets/images/readme-cockpit-dark.png" width="1200" alt="Dagu cockpit in dark mode with running, waiting, succeeded, and failed workflows">
+</div>
 
 <div align="center">
   <video src="./assets/images/dagu-demo.mp4" width="720" controls preload="metadata"></video>
 </div>
 
-| Cockpit (Kanban) | DAG Run Details |
-|---|---|
-| ![Cockpit](./assets/images/ui-cockpit.png) | ![DAG Run Details](./assets/images/ui-dag-run-details.png) |
+| Run Details | Step Logs | Documents |
+|---|---|---|
+| ![Run details in dark mode](./assets/images/readme-run-details-dark.png) | ![Workflow logs in dark mode](./assets/images/readme-logs-dark.png) | ![Workflow documents in dark mode](./assets/images/readme-documents-dark.png) |
 
 **Try it live:** [Live Demo](https://dagu-demo-f5e33d0e.dagu.sh) (credentials: `demouser` / `demouser`)
 
@@ -43,15 +47,15 @@ Dagu stores state in local files by default. How much it can run depends on the 
 
 ## Real-World Use Cases
 
-Dagu is useful when scripts, containers, server jobs, data tasks, or agent-driven work need visible dependencies, schedules, logs, retries, and a simple way to operate them.
+Dagu is useful when teams need to consolidate scripts, cron jobs, server tasks, containers, data jobs, and approval-gated operational work into one visible, governed workflow system without rewriting the underlying automation.
 
-**Cron and legacy script management.** Run existing shell scripts, Python scripts, HTTP calls, and scheduled jobs without rewriting them. Dependencies, run status, logs, retries, and history become visible in the Web UI instead of being hidden across crontabs and server log files.
+**Cron and legacy script management.** Run existing shell scripts, Python scripts, HTTP calls, and scheduled jobs without rewriting them. Dagu turns hidden cron jobs into visible workflows with dependencies, run status, logs, retries, approvals, and history in one place.
 
 **ETL and data operations.** Run PostgreSQL or SQLite queries, S3 transfers, `jq` transforms, validation steps, and reusable sub-workflows. Daily data workflows stay declarative, observable, and easy to retry when one step fails.
 
 **Media conversion.** Run `ffmpeg`, thumbnail extraction, audio normalization, image processing, and other compute-heavy jobs. Conversion work can run across distributed workers while status, history, logs, and artifacts stay in one persistence layer for monitoring, debugging, and retries.
 
-**Infrastructure and server automation.** Coordinate SSH backups, cleanup jobs, deploy scripts, patch windows, precondition checks, and lifecycle hooks. Remote operations get schedules, retries, notifications, and per-step logs without requiring operators to SSH into servers for every recovery.
+**Infrastructure and server automation.** Coordinate SSH backups, cleanup jobs, deploy scripts, patch windows, precondition checks, lifecycle hooks, and manual approvals. Remote operations get schedules, retries, notifications, and per-step logs without requiring operators to SSH into servers for every recovery.
 
 **Container and Kubernetes workflows.** Compose workflows where each step can run a Docker image, Kubernetes Job, shell command, or validation step. Image-based tasks can be routed to the right workers without building a custom control plane around containers.
 
@@ -71,8 +75,8 @@ Dagu is useful when scripts, containers, server jobs, data tasks, or agent-drive
   │  Worker(s)             │        │                  │
   │  PostgreSQL            │        └──────────────────┘
   │  Redis / RabbitMQ      │         Single binary.
-  │  Python runtime        │         Zero dependencies.
-  └────────────────────────┘         Just run it.
+  │  Python runtime        │         Self-hosted by default.
+  └────────────────────────┘         Adds scheduling, retries, and approvals around existing automation.
     6+ services to manage
 ```
 
