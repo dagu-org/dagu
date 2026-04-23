@@ -78,23 +78,26 @@ func TestRetry(t *testing.T) {
 
 		op := func(_ context.Context) error {
 			attempts++
-			if attempts == 1 {
-				// Cancel after first attempt
-				go func() {
-					time.Sleep(20 * time.Millisecond)
-					cancel()
-				}()
-			}
 			return errors.New("error")
 		}
 
-		policy := NewConstantBackoffPolicy(100 * time.Millisecond)
+		enteredBackoff := make(chan struct{}, 1)
+		go func() {
+			<-enteredBackoff
+			cancel()
+		}()
+
+		policy := &signalingRetryPolicy{
+			interval:       time.Second,
+			enteredBackoff: enteredBackoff,
+		}
 		start := time.Now()
 		err := Retry(ctx, op, policy, nil)
 		elapsed := time.Since(start)
 
 		assert.Equal(t, context.Canceled, err)
-		assert.Less(t, elapsed, 50*time.Millisecond) // Should exit quickly
+		assert.Equal(t, 1, attempts)
+		assert.Less(t, elapsed, 200*time.Millisecond)
 	})
 
 	t.Run("RetriesExhausted", func(t *testing.T) {
@@ -156,6 +159,19 @@ func TestRetry(t *testing.T) {
 		// With jitter, timing is unpredictable but should be relatively quick
 		assert.Less(t, elapsed, 200*time.Millisecond)
 	})
+}
+
+type signalingRetryPolicy struct {
+	interval       time.Duration
+	enteredBackoff chan<- struct{}
+}
+
+func (p *signalingRetryPolicy) ComputeNextInterval(_ int, _ time.Duration, _ error) (time.Duration, error) {
+	select {
+	case p.enteredBackoff <- struct{}{}:
+	default:
+	}
+	return p.interval, nil
 }
 
 func TestRetryFailureLogLevelOverride(t *testing.T) {
