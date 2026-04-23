@@ -62,33 +62,50 @@ func testConfig(tmpDir string, ia config.InitialAdmin) *config.Config {
 	}
 }
 
-func TestRegisterDedicatedSSEFetchersKeepsDAGRunTopicsPollingWithEventStore(t *testing.T) {
+func TestRegisterDedicatedSSEFetchersUsesEventStoreInvalidationForRunTopics(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		topicType sse.TopicType
-		topic     string
+		name       string
+		topicType  sse.TopicType
+		topic      string
+		identifier string
 	}{
 		{
-			name:      "dag run details",
-			topicType: sse.TopicTypeDAGRun,
-			topic:     "dagrun:test/run-1",
+			name:       "dag run details",
+			topicType:  sse.TopicTypeDAGRun,
+			topic:      "dagrun:test/run-1",
+			identifier: "test/run-1",
 		},
 		{
-			name:      "sub dag run details",
-			topicType: sse.TopicTypeSubDAGRun,
-			topic:     "subdagrun:test/run-1/sub-1",
+			name:       "sub dag run details",
+			topicType:  sse.TopicTypeSubDAGRun,
+			topic:      "subdagrun:test/run-1/sub-1",
+			identifier: "test/run-1/sub-1",
 		},
 		{
-			name:      "dag history",
-			topicType: sse.TopicTypeDAGHistory,
-			topic:     "daghistory:test.yaml",
+			name:       "dag history",
+			topicType:  sse.TopicTypeDAGHistory,
+			topic:      "daghistory:test.yaml",
+			identifier: "test.yaml",
 		},
 		{
-			name:      "dag runs list",
-			topicType: sse.TopicTypeDAGRuns,
-			topic:     "dagruns:limit=10&status=4",
+			name:       "dag runs list",
+			topicType:  sse.TopicTypeDAGRuns,
+			topic:      "dagruns:limit=10&status=4",
+			identifier: "limit=10&status=4",
+		},
+		{
+			name:       "queues list",
+			topicType:  sse.TopicTypeQueues,
+			topic:      "queues:",
+			identifier: "",
+		},
+		{
+			name:       "dags list",
+			topicType:  sse.TopicTypeDAGsList,
+			topic:      "dagslist:page=1&perPage=100",
+			identifier: "page=1&perPage=100",
 		},
 	}
 
@@ -129,8 +146,16 @@ func TestRegisterDedicatedSSEFetchersKeepsDAGRunTopicsPollingWithEventStore(t *t
 			}()
 
 			require.Eventually(t, func() bool {
-				return fetches.Load() >= 2
-			}, 3*time.Second, 10*time.Millisecond)
+				return fetches.Load() == 1
+			}, time.Second, 10*time.Millisecond)
+			require.Never(t, func() bool {
+				return fetches.Load() > 1
+			}, 1200*time.Millisecond, 20*time.Millisecond)
+
+			mux.WakeTopic(tt.topicType, tt.identifier)
+			require.Eventually(t, func() bool {
+				return fetches.Load() == 2
+			}, time.Second, 10*time.Millisecond)
 
 			cancel()
 			require.Eventually(t, func() bool {

@@ -1161,14 +1161,23 @@ func (srv *Server) registerDedicatedSSEFetchers(registrar *sse.Multiplexer) {
 	registrar.RegisterFetcher(sse.TopicTypeDoc, srv.apiV1.GetDocContentData)
 	registrar.RegisterFetcher(sse.TopicTypeDocTree, srv.apiV1.GetDocTreeData)
 
-	// Queue views have an eventstore-backed invalidation path. DAG-run list
-	// topics intentionally stay on the default polling mode: cockpit/dashboard
-	// views depend on summaries that can change without a reliable lifecycle
-	// event for every visible field, and manual step mutations can leave the
-	// aggregate DAG-run lifecycle unchanged.
+	// Run-driven topics have an event-store invalidation path. Keeping them on
+	// demand avoids repeated full-list and history reads while browsers are
+	// connected; DAG-run event collection wakes the exact and aggregate topics.
 	if srv.eventService != nil {
-		registrar.SetRefreshMode(sse.TopicTypeQueues, sse.TopicRefreshModeOnDemand)
+		for _, topicType := range []sse.TopicType{
+			sse.TopicTypeDAGRun,
+			sse.TopicTypeSubDAGRun,
+			sse.TopicTypeDAGHistory,
+			sse.TopicTypeDAGRuns,
+			sse.TopicTypeQueues,
+			sse.TopicTypeDAGsList,
+		} {
+			registrar.SetRefreshMode(topicType, sse.TopicRefreshModeOnDemand)
+		}
+		registrar.SetPublishOnWake(sse.TopicTypeDAGsList, true)
 		registrar.SetPublishOnWake(sse.TopicTypeDAGRuns, true)
+		registrar.SetPublishOnWake(sse.TopicTypeQueues, true)
 	}
 }
 

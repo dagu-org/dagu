@@ -897,7 +897,7 @@ func TestAttempt_WorkDir(t *testing.T) {
 	assert.Equal(t, filepath.Join(dagRunDir, "work"), att.WorkDir())
 }
 
-func TestAttempt_WriteEmitsLifecycleTransitionsOnce(t *testing.T) {
+func TestAttempt_WriteEmitsLifecycleTransitionsAndStatusUpdates(t *testing.T) {
 	t.Parallel()
 
 	dir := createTempDir(t)
@@ -929,11 +929,14 @@ func TestAttempt_WriteEmitsLifecycleTransitionsOnce(t *testing.T) {
 	require.NoError(t, att.Write(ctx, succeeded))
 	require.NoError(t, att.Write(ctx, succeeded))
 
-	require.Len(t, store.events, 3)
+	require.Len(t, store.events, 6)
 	assert.Equal(t, []eventstore.EventType{
 		eventstore.TypeDAGRunQueued,
+		eventstore.TypeDAGRunUpdated,
 		eventstore.TypeDAGRunRunning,
+		eventstore.TypeDAGRunUpdated,
 		eventstore.TypeDAGRunSucceeded,
+		eventstore.TypeDAGRunUpdated,
 	}, captureEventTypes(store.events))
 
 	snapshot, err := eventstore.DAGRunSnapshotFromEvent(store.events[0])
@@ -973,9 +976,10 @@ func TestAttempt_OpenRestoresLastEmittedLifecycleState(t *testing.T) {
 	running.StartedAt = time.Now().UTC().Format(time.RFC3339)
 	require.NoError(t, reopened.Write(ctx, running))
 
-	require.Len(t, store.events, 2)
+	require.Len(t, store.events, 3)
 	assert.Equal(t, []eventstore.EventType{
 		eventstore.TypeDAGRunQueued,
+		eventstore.TypeDAGRunUpdated,
 		eventstore.TypeDAGRunRunning,
 	}, captureEventTypes(store.events))
 }

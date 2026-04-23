@@ -221,7 +221,19 @@ func LeaseMatchesStatus(
 	if !lease.IsFresh(now, staleThreshold) {
 		return false
 	}
+	return LeaseIdentityMatchesStatus(lease, status, fallbackAttemptID)
+}
 
+// LeaseIdentityMatchesStatus reports whether the lease belongs to the same
+// persisted distributed attempt as status, independent of freshness.
+func LeaseIdentityMatchesStatus(
+	lease *DAGRunLease,
+	status *DAGRunStatus,
+	fallbackAttemptID string,
+) bool {
+	if lease == nil || status == nil {
+		return false
+	}
 	attemptKey := AttemptKeyForStatus(status, fallbackAttemptID)
 	if attemptKey != "" && lease.AttemptKey != attemptKey {
 		return false

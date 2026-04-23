@@ -60,15 +60,16 @@ func EmitPersistedStatusTransitionFromContext(
 	if !ok || service == nil || status == nil {
 		return previous, false, nil
 	}
-	eventType, ok := PersistedDAGRunEventTypeForStatus(status.Status)
+	lifecycleEventType, ok := PersistedDAGRunEventTypeForStatus(status.Status)
 	if !ok {
 		return previous, false, nil
 	}
-	if eventType == previous {
-		return previous, false, nil
+	eventType := lifecycleEventType
+	if lifecycleEventType == previous {
+		eventType = TypeDAGRunUpdated
 	}
 	if err := service.Emit(context.WithoutCancel(ctx), NewDAGRunEvent(source, eventType, status, data)); err != nil {
 		return previous, false, err
 	}
-	return eventType, true, nil
+	return lifecycleEventType, true, nil
 }

@@ -176,6 +176,30 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Pre-pull integration test images
+        if: ${{ matrix.suite == 'intg' }}
+        shell: bash
+        run: |
+          images=(
+            "alpine:3"
+            "busybox:latest"
+            "redis:7-alpine"
+            "minio/minio:RELEASE.2024-10-02T17-50-41Z"
+          )
+
+          for image in "${images[@]}"; do
+            for attempt in 1 2 3 4; do
+              if docker pull "${image}"; then
+                break
+              fi
+              if [[ "${attempt}" -eq 4 ]]; then
+                echo "failed to pull ${image}" >&2
+                exit 1
+              fi
+              sleep "$((attempt * 5))"
+            done
+          done
+
       - name: Resolve test packages
         id: test-packages
         shell: bash

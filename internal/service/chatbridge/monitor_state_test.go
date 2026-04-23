@@ -170,7 +170,7 @@ func TestNotificationMonitor_RestartRequeuesPersistedPending(t *testing.T) {
 		called := calls
 		mu.Unlock()
 		return called >= 1 && secondMonitor.IsDelivered("dest-1", status)
-	}, time.Second, 10*time.Millisecond)
+	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -259,7 +259,7 @@ func TestNotificationMonitor_StateLockAllowsSingleWriterAndTakeover(t *testing.T
 		default:
 			return false
 		}
-	}, time.Second, 10*time.Millisecond)
+	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 
 	firstStatus := &exec.DAGRunStatus{
 		Name:       "briefing",
