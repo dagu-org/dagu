@@ -64,25 +64,28 @@ func newReporter(f SenderFn, cfg reporterConfig) *reporter {
 func (r *reporter) reportStep(
 	ctx context.Context, dag *core.DAG, dagStatus exec.DAGRunStatus, node *runtime.Node,
 ) error {
-	nodeStatus := node.State().Status
-	if nodeStatus == core.NodeFailed && node.NodeData().Step.MailOnError && r.errorMail != nil {
-		fromAddress := r.errorMail.From
-		toAddresses := r.errorMail.To
-		subject := fmt.Sprintf("%s %s (%s)", r.errorMail.Prefix, dag.Name, dagStatus.Status)
-		html := renderHTMLWithDAGInfo(dagStatus)
-		attachments := addAttachments(r.errorMail.AttachLogs, dagStatus.Nodes)
-		return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
+	if r == nil {
+		return nil
+	}
+	if r.errorMail == nil {
+		return nil
+	}
+	if node.State().Status == core.NodeFailed && node.NodeData().Step.MailOnError {
+		return r.sendConfiguredMail(ctx, r.errorMail, dag.Name, dagStatus)
 	}
 	return nil
 }
 
 // send is a function that sends a report mail.
 func (r *reporter) send(ctx context.Context, dag *core.DAG, dagStatus exec.DAGRunStatus, err error) error {
+	if r == nil {
+		return nil
+	}
 	mailConfig := r.selectMailConfig(dag, dagStatus, err)
 	if mailConfig == nil {
 		return nil
 	}
-	return r.sendMail(ctx, mailConfig, dag.Name, dagStatus)
+	return r.sendConfiguredMail(ctx, mailConfig, dag.Name, dagStatus)
 }
 
 // selectMailConfig returns the appropriate mail config based on status, or nil if no mail should be sent.
@@ -103,27 +106,59 @@ func (r *reporter) selectMailConfig(dag *core.DAG, dagStatus exec.DAGRunStatus, 
 	}
 }
 
-// sendMail sends an email using the provided mail configuration.
-func (r *reporter) sendMail(ctx context.Context, mailConfig *core.MailConfig, dagName string, dagStatus exec.DAGRunStatus) error {
-	subject := fmt.Sprintf("%s %s (%s)", mailConfig.Prefix, dagName, dagStatus.Status)
-	html := renderHTMLWithDAGInfo(dagStatus)
-	attachments := addAttachments(mailConfig.AttachLogs, dagStatus.Nodes)
-	return r.senderFn(ctx, mailConfig.From, mailConfig.To, subject, html, attachments)
+func (r *reporter) sendConfiguredMail(ctx context.Context, mailConfig *core.MailConfig, dagName string, dagStatus exec.DAGRunStatus) error {
+	return r.senderFn(
+		ctx,
+		mailConfig.From,
+		mailConfig.To,
+		buildMailSubject(mailConfig.Prefix, dagName, dagStatus.Status),
+		renderHTMLWithDAGInfo(dagStatus),
+		addAttachments(mailConfig.AttachLogs, dagStatus.Nodes),
+	)
 }
 
-// statusToClass maps a status string to its CSS class.
+func buildMailSubject(prefix, dagName string, status core.Status) string {
+	return fmt.Sprintf("%s %s (%s)", prefix, dagName, status)
+}
+
 func statusToClass(status string) string {
-	statusClasses := map[string]string{
-		"finished":            "status-finished",
-		"succeeded":           "status-finished",
-		"failed":              "status-failed",
-		"running":             "status-running",
-		"skipped":             "status-skipped",
-		"partially_succeeded": "status-partial-success",
-		"aborted":             "status-aborted",
-		"waiting":             "status-waiting",
+	switch status {
+	case "finished", "succeeded":
+		return "status-finished"
+	case "failed":
+		return "status-failed"
+	case "running":
+		return "status-running"
+	case "skipped":
+		return "status-skipped"
+	case "partially_succeeded":
+		return "status-partial-success"
+	case "aborted":
+		return "status-aborted"
+	case "waiting":
+		return "status-waiting"
+	default:
+		return ""
 	}
-	return statusClasses[status]
+}
+
+func statusBadgeClass(status string) string {
+	switch status {
+	case "finished", "succeeded":
+		return "success"
+	case "failed":
+		return "failed"
+	case "running":
+		return "running"
+	case "skipped":
+		return "skipped"
+	case "aborted":
+		return "aborted"
+	case "waiting":
+		return "wait"
+	default:
+		return ""
+	}
 }
 
 var dagHeader = table.Row{
@@ -137,6 +172,11 @@ var dagHeader = table.Row{
 }
 
 func renderDAGSummary(dagStatus exec.DAGRunStatus, err error) string {
+	errText := ""
+	if err != nil {
+		errText = err.Error()
+	}
+
 	dataRow := table.Row{
 		dagStatus.DAGRunID,
 		dagStatus.Name,
@@ -144,11 +184,7 @@ func renderDAGSummary(dagStatus exec.DAGRunStatus, err error) string {
 		dagStatus.FinishedAt,
 		dagStatus.Status,
 		dagStatus.Params,
-	}
-	if err != nil {
-		dataRow = append(dataRow, err.Error())
-	} else {
-		dataRow = append(dataRow, "")
+		errText,
 	}
 
 	reportTable := table.NewWriter()
@@ -172,17 +208,15 @@ func renderStepSummary(nodes []*exec.Node) string {
 	stepTable.AppendHeader(stepHeader)
 
 	for i, n := range nodes {
-		number := fmt.Sprintf("%d", i+1)
-		dataRow := table.Row{
-			number,
+		stepTable.AppendRow(table.Row{
+			fmt.Sprintf("%d", i+1),
 			n.Step.Name,
 			n.StartedAt,
 			n.FinishedAt,
 			n.Status.String(),
-		}
-		dataRow = append(dataRow, formatCommands(n.Step.Commands))
-		dataRow = append(dataRow, n.Error)
-		stepTable.AppendRow(dataRow)
+			formatCommands(n.Step.Commands),
+			n.Error,
+		})
 	}
 
 	return stepTable.Render()
@@ -249,25 +283,31 @@ func renderHTML(nodes []*exec.Node) string {
     </style>
 </head>
 <body>
-<table>
-<thead>
-<tr>`)
-
-	// Add table headers
-	headers := []string{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"}
-	for _, header := range headers {
-		_, _ = buffer.WriteString(fmt.Sprintf("<th>%s</th>", header))
-	}
-	_, _ = buffer.WriteString("</tr></thead><tbody>")
-
-	// Add table rows
-	for i, n := range nodes {
-		writeNodeRow(&buffer, i, n)
-	}
-
-	_, _ = buffer.WriteString("</tbody></table></body></html>")
+`)
+	writeHTMLTable(&buffer, nodes)
+	_, _ = buffer.WriteString("</body></html>")
 
 	return buffer.String()
+}
+
+var htmlTableHeaders = []string{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"}
+
+func writeHTMLTable(buffer *bytes.Buffer, nodes []*exec.Node) {
+	_, _ = buffer.WriteString("<table><thead><tr>")
+	writeHTMLHeaderCells(buffer, htmlTableHeaders)
+	_, _ = buffer.WriteString("</tr></thead><tbody>")
+	for i, n := range nodes {
+		writeNodeRow(buffer, i, n)
+	}
+	_, _ = buffer.WriteString("</tbody></table>")
+}
+
+func writeHTMLHeaderCells(buffer *bytes.Buffer, headers []string) {
+	for _, header := range headers {
+		_, _ = buffer.WriteString("<th>")
+		_, _ = buffer.WriteString(header)
+		_, _ = buffer.WriteString("</th>")
+	}
 }
 
 // writeNodeRow writes a single node row to the HTML buffer.
@@ -476,18 +516,8 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
     <div class="dag-info">
         <div class="status-badge `)
 
-	// Add status class
 	statusStr := dagStatus.Status.String()
-	badgeClasses := map[string]string{
-		"finished":  "success",
-		"succeeded": "success",
-		"failed":    "failed",
-		"running":   "running",
-		"skipped":   "skipped",
-		"aborted":   "aborted",
-		"waiting":   "wait",
-	}
-	_, _ = buffer.WriteString(badgeClasses[statusStr])
+	_, _ = buffer.WriteString(statusBadgeClass(statusStr))
 	_, _ = buffer.WriteString(`">`)
 	_, _ = buffer.WriteString(strings.ToUpper(statusStr))
 	_, _ = buffer.WriteString(`</div>
@@ -539,24 +569,9 @@ func renderHTMLWithDAGInfo(dagStatus exec.DAGRunStatus) string {
             </div>
         </div>
     </div>
-    
-    <table>
-    <thead>
-    <tr>`)
-
-	// Add table headers
-	headers := []string{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"}
-	for _, header := range headers {
-		_, _ = buffer.WriteString(fmt.Sprintf("<th>%s</th>", header))
-	}
-	_, _ = buffer.WriteString("</tr></thead><tbody>")
-
-	// Add table rows
-	for i, n := range dagStatus.Nodes {
-		writeNodeRow(&buffer, i, n)
-	}
-
-	_, _ = buffer.WriteString("</tbody></table></div></body></html>")
+`)
+	writeHTMLTable(&buffer, dagStatus.Nodes)
+	_, _ = buffer.WriteString("</div></body></html>")
 
 	return buffer.String()
 }

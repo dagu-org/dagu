@@ -64,11 +64,17 @@ func (m *Client) Send(
 	subject, body string,
 	attachments []string,
 ) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, mailTimeout)
+	defer cancel()
+
 	logger.Info(ctx, "Sending email", slog.Any("to", to), tag.Subject(subject))
 	if m.username == "" && m.password == "" {
-		return m.sendWithNoAuth(from, to, subject, body, attachments)
+		return m.send(ctx, from, to, subject, body, attachments, false)
 	}
-	return m.sendWithAuth(from, to, subject, body, attachments)
+	return m.send(ctx, from, to, subject, body, attachments, true)
 }
 
 func (m *Client) sendWithNoAuth(
@@ -77,57 +83,9 @@ func (m *Client) sendWithNoAuth(
 	subject, body string,
 	attachments []string,
 ) error {
-	// Create a dialer with timeout
-	dialer := &net.Dialer{
-		Timeout: mailTimeout,
-	}
-
-	// Dial with timeout
-	conn, err := dialer.Dial("tcp", m.host+":"+m.port)
-	if err != nil {
-		return err
-	}
-
-	// Set deadline for all operations
-	deadline := time.Now().Add(mailTimeout)
-	if err := conn.SetDeadline(deadline); err != nil {
-		_ = conn.Close()
-		return err
-	}
-
-	c, err := smtp.NewClient(conn, m.host)
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() {
-		_ = c.Close()
-	}()
-
-	if err = c.Mail(replacer.Replace(from)); err != nil {
-		return err
-	}
-	for i := range to {
-		to[i] = replacer.Replace(to[i])
-		if err = c.Rcpt(to[i]); err != nil {
-			return err
-		}
-	}
-	wc, err := c.Data()
-	if err != nil {
-		return err
-	}
-	body = processEmailBody(body)
-	_, err = wc.Write(
-		m.composeMail(to, from, subject, body, attachments),
-	)
-	if err != nil {
-		return err
-	}
-	if err := wc.Close(); err != nil {
-		return err
-	}
-	return c.Quit()
+	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
+	defer cancel()
+	return m.send(ctx, from, to, subject, body, attachments, false)
 }
 
 func (m *Client) sendWithAuth(
@@ -136,120 +94,126 @@ func (m *Client) sendWithAuth(
 	subject, body string,
 	attachments []string,
 ) error {
-	// Create a context with timeout for cancellation support
 	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
 	defer cancel()
-
-	// Create a channel to receive the result
-	type result struct {
-		err error
-	}
-	resultChan := make(chan result, 1)
-
-	// Run the mail sending in a goroutine with proper STARTTLS and auth support
-	go func() {
-		err := m.sendWithSTARTTLS(ctx, from, to, subject, body, attachments)
-		resultChan <- result{err: err}
-	}()
-
-	// Wait for either completion or context cancellation
-	select {
-	case res := <-resultChan:
-		return res.err
-	case <-ctx.Done():
-		return fmt.Errorf("mail sending timeout after %v", mailTimeout)
-	}
+	return m.send(ctx, from, to, subject, body, attachments, true)
 }
 
-// sendWithSTARTTLS connects to the SMTP server, negotiates STARTTLS if available,
-// and authenticates using LOGIN auth (falling back to PLAIN if LOGIN is unavailable).
-func (m *Client) sendWithSTARTTLS(
+func (m *Client) send(
 	ctx context.Context,
 	from string,
 	to []string,
 	subject, body string,
 	attachments []string,
+	useAuth bool,
 ) error {
-	addr := m.host + ":" + m.port
-
-	// Use a dialer with context for cancellation support
 	dialer := &net.Dialer{
 		Timeout: mailTimeout,
 	}
-	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(m.host, m.port))
 	if err != nil {
-		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		return err
 	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
-	// Set deadline based on context deadline for cleaner shutdown
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := conn.SetDeadline(deadline); err != nil {
-			_ = conn.Close()
 			return err
 		}
 	}
 
-	// Create SMTP client
 	c, err := smtp.NewClient(conn, m.host)
 	if err != nil {
-		_ = conn.Close()
-		return fmt.Errorf("failed to create SMTP client: %w", err)
+		return err
 	}
 	defer func() {
 		_ = c.Close()
 	}()
 
-	// Send EHLO/HELO
-	if err = c.Hello("localhost"); err != nil {
+	if useAuth {
+		if err := m.enableAuth(ctx, c); err != nil {
+			return err
+		}
+	}
+
+	recipients := sanitizeAddresses(to)
+	if err := c.Mail(replacer.Replace(from)); err != nil {
+		if useAuth {
+			return fmt.Errorf("MAIL FROM failed: %w", err)
+		}
+		return err
+	}
+	for _, recipient := range recipients {
+		if err := c.Rcpt(recipient); err != nil {
+			if useAuth {
+				return fmt.Errorf("RCPT TO failed: %w", err)
+			}
+			return err
+		}
+	}
+
+	wc, err := c.Data()
+	if err != nil {
+		if useAuth {
+			return fmt.Errorf("DATA command failed: %w", err)
+		}
+		return err
+	}
+	defer func() {
+		_ = wc.Close()
+	}()
+
+	payload := m.composeMail(recipients, from, subject, processEmailBody(body), attachments)
+	_, err = wc.Write(payload)
+	if err != nil {
+		if useAuth {
+			return fmt.Errorf("failed to write email body: %w", err)
+		}
+		return err
+	}
+	if err := wc.Close(); err != nil {
+		if useAuth {
+			return fmt.Errorf("failed to close data writer: %w", err)
+		}
+		return err
+	}
+
+	return c.Quit()
+}
+
+func sanitizeAddresses(addresses []string) []string {
+	if len(addresses) == 0 {
+		return nil
+	}
+	cleaned := make([]string, len(addresses))
+	for i, address := range addresses {
+		cleaned[i] = replacer.Replace(address)
+	}
+	return cleaned
+}
+
+// enableAuth negotiates STARTTLS if available and then authenticates.
+func (m *Client) enableAuth(ctx context.Context, c *smtp.Client) error {
+	if err := c.Hello("localhost"); err != nil {
 		return fmt.Errorf("HELO failed: %w", err)
 	}
 
-	// Check if STARTTLS is supported and upgrade connection
 	if ok, _ := c.Extension("STARTTLS"); ok {
 		tlsConfig := &tls.Config{
 			ServerName: m.host,
 			MinVersion: tls.VersionTLS12,
 		}
-		if err = c.StartTLS(tlsConfig); err != nil {
+		if err := c.StartTLS(tlsConfig); err != nil {
 			return fmt.Errorf("STARTTLS failed: %w", err)
 		}
 	}
 
-	// Authenticate using LOGIN auth (more widely supported than PLAIN for "basic auth")
-	if err = m.authenticate(ctx, c); err != nil {
+	if err := m.authenticate(ctx, c); err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
-
-	// Set sender
-	if err = c.Mail(replacer.Replace(from)); err != nil {
-		return fmt.Errorf("MAIL FROM failed: %w", err)
-	}
-
-	// Set recipients
-	for i := range to {
-		to[i] = replacer.Replace(to[i])
-		if err = c.Rcpt(to[i]); err != nil {
-			return fmt.Errorf("RCPT TO failed: %w", err)
-		}
-	}
-
-	// Send the email body
-	wc, err := c.Data()
-	if err != nil {
-		return fmt.Errorf("DATA command failed: %w", err)
-	}
-
-	body = processEmailBody(body)
-	_, err = wc.Write(m.composeMail(to, from, subject, body, attachments))
-	if err != nil {
-		return fmt.Errorf("failed to write email body: %w", err)
-	}
-
-	if err = wc.Close(); err != nil {
-		return fmt.Errorf("failed to close data writer: %w", err)
-	}
-
-	return c.Quit()
+	return nil
 }
 
 // authenticate tries LOGIN auth first, then falls back to PLAIN auth.
@@ -338,26 +302,17 @@ func (m *Client) composeMail(
 	to []string,
 	from, subject, body string,
 	attachments []string,
-) (b []byte) {
-	msg := m.composeHeader(to, from, subject) +
-		"\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
-	b = joinBytes([]byte(msg), addAttachments(attachments))
-	b = joinBytes(b, []byte("\r\n\r\n--"+boundary+"--\r\n\r\n"))
-	b = joinBytes(b, []byte("\r\n\r\n"))
-	return b
-}
-
-func joinBytes(s ...[]byte) []byte {
-	n := 0
-	for _, v := range s {
-		n += len(v)
-	}
-
-	b, i := make([]byte, n), 0
-	for _, v := range s {
-		i += copy(b[i:], v)
-	}
-	return b
+) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(m.composeHeader(to, from, subject))
+	buf.WriteString("\r\n")
+	buf.WriteString(base64.StdEncoding.EncodeToString([]byte(body)))
+	buf.Write(addAttachments(attachments))
+	buf.WriteString("\r\n\r\n--")
+	buf.WriteString(boundary)
+	buf.WriteString("--\r\n\r\n")
+	buf.WriteString("\r\n\r\n")
+	return buf.Bytes()
 }
 
 func newlineToBrTag(body string) string {
@@ -394,9 +349,7 @@ func addAttachments(attachments []string) []byte {
 					filepath.Base(fileName) + "\r\n",
 			)
 			_, _ = buf.WriteString("Content-Transfer-Encoding: base64\r\n\n")
-			b := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
-			base64.StdEncoding.Encode(b, data)
-			_, _ = buf.Write(b)
+			_, _ = buf.WriteString(base64.StdEncoding.EncodeToString(data))
 		}
 	}
 	return buf.Bytes()

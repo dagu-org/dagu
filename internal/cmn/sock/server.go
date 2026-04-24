@@ -5,13 +5,13 @@ package sock
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -83,16 +83,28 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 			}
 			return err
 		}
-		go func() {
-			request, err := http.ReadRequest(bufio.NewReader(conn))
-			if err != nil {
-				logger.Error(ctx, "Failed to read request",
-					tag.Error(err))
-			} else {
-				srv.handlerFunc(newHTTPResponseWriter(&conn), request)
-			}
-			_ = conn.Close()
-		}()
+		go srv.serveConn(ctx, conn)
+	}
+}
+
+func (srv *Server) serveConn(ctx context.Context, conn net.Conn) {
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	request, err := http.ReadRequest(bufio.NewReader(conn))
+	if err != nil {
+		logger.Error(ctx, "Failed to read request", tag.Error(err))
+		return
+	}
+	defer func() {
+		_ = request.Body.Close()
+	}()
+
+	writer := newHTTPResponseWriter(conn)
+	srv.handlerFunc(writer, request)
+	if err := writer.flush(); err != nil {
+		logger.Error(ctx, "Failed to write response", tag.Error(err))
 	}
 }
 
@@ -138,12 +150,14 @@ func (srv *Server) clearListener(listener net.Listener) {
 var _ http.ResponseWriter = (*httpResponseWriter)(nil)
 
 type httpResponseWriter struct {
-	conn       *net.Conn
+	conn       net.Conn
 	header     http.Header
 	statusCode int
+	body       bytes.Buffer
+	wroteBody  bool
 }
 
-func newHTTPResponseWriter(conn *net.Conn) http.ResponseWriter {
+func newHTTPResponseWriter(conn net.Conn) *httpResponseWriter {
 	return &httpResponseWriter{
 		conn:       conn,
 		header:     make(http.Header),
@@ -152,18 +166,24 @@ func newHTTPResponseWriter(conn *net.Conn) http.ResponseWriter {
 }
 
 func (w *httpResponseWriter) Write(data []byte) (int, error) {
+	w.wroteBody = true
+	return w.body.Write(data)
+}
+
+func (w *httpResponseWriter) flush() error {
+	if !w.wroteBody {
+		return nil
+	}
+
 	response := http.Response{
 		StatusCode:    w.statusCode,
 		ProtoMajor:    1,
 		ProtoMinor:    0,
-		Body:          io.NopCloser(strings.NewReader(string(data))),
-		Header:        w.header,
-		ContentLength: int64(len(data)),
+		Body:          io.NopCloser(bytes.NewReader(w.body.Bytes())),
+		Header:        w.header.Clone(),
+		ContentLength: int64(w.body.Len()),
 	}
-	if err := response.Write(*w.conn); err != nil {
-		return 0, err
-	}
-	return len(data), nil
+	return response.Write(w.conn)
 }
 
 func (w *httpResponseWriter) Header() http.Header {

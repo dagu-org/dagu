@@ -121,23 +121,13 @@ type Step struct {
 
 // String returns a formatted string representation of the step
 func (s *Step) String() string {
-	fields := []struct {
-		name  string
-		value string
-	}{
-		{"Name", s.Name},
-		{"Dir", s.Dir},
-		{"Command", s.Command},
-		{"Args", fmt.Sprintf("%v", s.Args)},
-		{"Depends", fmt.Sprintf("[%s]", strings.Join(s.Depends, ", "))},
-	}
-
-	var parts []string
-	for _, field := range fields {
-		parts = append(parts, fmt.Sprintf("%s: %s", field.name, field.value))
-	}
-
-	return strings.Join(parts, "\t")
+	return strings.Join([]string{
+		fmt.Sprintf("Name: %s", s.Name),
+		fmt.Sprintf("Dir: %s", s.Dir),
+		fmt.Sprintf("Command: %s", s.Command),
+		fmt.Sprintf("Args: %v", s.Args),
+		fmt.Sprintf("Depends: [%s]", strings.Join(s.Depends, ", ")),
+	}, "\t")
 }
 
 // SubDAG contains information about a sub DAG to be executed.
@@ -179,33 +169,31 @@ func (s *Step) HasMultipleCommands() bool {
 // UnmarshalJSON implements json.Unmarshaler for backward compatibility.
 // It handles old JSON format where command/args fields were used instead of commands.
 func (s *Step) UnmarshalJSON(data []byte) error {
-	// Use type alias to avoid infinite recursion
-	type Alias Step
+	type alias Step
 	aux := &struct {
-		*Alias
+		*alias
 	}{
-		Alias: (*Alias)(s),
+		alias: (*alias)(s),
 	}
 
 	if err := json.Unmarshal(data, aux); err != nil {
 		return err
 	}
 
-	// If Commands is already populated, we're done (new format)
-	if len(s.Commands) > 0 {
+	if len(s.Commands) > 0 || (s.Command == "" && len(s.Args) == 0 && s.CmdWithArgs == "") {
 		return nil
 	}
 
-	// Migrate legacy fields to Commands only when legacy command data exists.
-	if s.Command != "" || len(s.Args) > 0 || s.CmdWithArgs != "" {
-		s.Commands = []CommandEntry{{
-			Command:     s.Command,
-			Args:        s.Args,
-			CmdWithArgs: s.CmdWithArgs,
-		}}
-	}
-
+	s.Commands = []CommandEntry{s.legacyCommandEntry()}
 	return nil
+}
+
+func (s *Step) legacyCommandEntry() CommandEntry {
+	return CommandEntry{
+		Command:     s.Command,
+		Args:        s.Args,
+		CmdWithArgs: s.CmdWithArgs,
+	}
 }
 
 // ExecutorConfig contains the configuration for the executor.

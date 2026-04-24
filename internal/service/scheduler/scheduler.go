@@ -666,39 +666,43 @@ func (s *Scheduler) startRetryScanner(ctx context.Context) {
 // cronLoop runs the main scheduler loop to invoke jobs at scheduled times.
 func (s *Scheduler) cronLoop(ctx context.Context, sig chan os.Signal) {
 	tickTime := s.clock().Truncate(time.Minute)
-
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
 	s.running.Store(true)
 	defer s.running.Store(false)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-sig:
-			return
-		case <-s.quit:
-			return
-		case <-timer.C:
-			_ = timer.Stop()
-
-			// Plan and dispatch all schedules (start, stop, restart)
-			for _, run := range s.planner.Plan(ctx, tickTime) {
-				s.dispatchRun(ctx, run)
-			}
-			s.planner.Advance(tickTime)
-
-			tickTime = s.NextTick(tickTime)
-			timer.Reset(tickTime.Sub(s.clock()))
-		}
+	for s.waitForTick(ctx, sig, timer) {
+		s.runTick(ctx, tickTime)
+		tickTime = s.NextTick(tickTime)
+		timer.Reset(tickTime.Sub(s.clock()))
 	}
+}
+
+func (s *Scheduler) waitForTick(ctx context.Context, sig chan os.Signal, timer *time.Timer) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-sig:
+		return false
+	case <-s.quit:
+		return false
+	case <-timer.C:
+		_ = timer.Stop()
+		return true
+	}
+}
+
+func (s *Scheduler) runTick(ctx context.Context, tickTime time.Time) {
+	for _, run := range s.planner.Plan(ctx, tickTime) {
+		s.dispatchRun(ctx, run)
+	}
+	s.planner.Advance(tickTime)
 }
 
 // NextTick returns the next tick time for the scheduler.
 func (*Scheduler) NextTick(now time.Time) time.Time {
-	return now.Add(time.Minute).Truncate(time.Second * 60)
+	return now.Truncate(time.Minute).Add(time.Minute)
 }
 
 // IsRunning returns whether the scheduler is currently running.
@@ -772,20 +776,21 @@ func (s *Scheduler) stopCron(ctx context.Context) {
 // we need the result to decide whether to advance the watermark).
 // Non-catchup runs are dispatched in a goroutine (process spawn can be slow).
 func (s *Scheduler) dispatchRun(ctx context.Context, run PlannedRun) {
-	dispatch := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.Error(ctx, "Run dispatch panicked",
-					tag.DAG(run.DAG.Name),
-					tag.Error(panicToError(r)),
-				)
-			}
-		}()
-		s.planner.DispatchRun(ctx, run)
-	}
 	if run.TriggerType == core.TriggerTypeCatchUp {
-		dispatch()
+		s.dispatchPlannedRun(ctx, run)
 		return
 	}
-	go dispatch()
+	go s.dispatchPlannedRun(ctx, run)
+}
+
+func (s *Scheduler) dispatchPlannedRun(ctx context.Context, run PlannedRun) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error(ctx, "Run dispatch panicked",
+				tag.DAG(run.DAG.Name),
+				tag.Error(panicToError(r)),
+			)
+		}
+	}()
+	s.planner.DispatchRun(ctx, run)
 }

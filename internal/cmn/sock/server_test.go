@@ -163,3 +163,39 @@ func TestShutdownWhileServerStarts(t *testing.T) {
 		t.Fatal("timed out waiting for socket server to stop")
 	}
 }
+
+func TestMultipleWritesProduceSingleResponseBody(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test_server_multiple_writes")
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("O"))
+			_, _ = w.Write([]byte("K"))
+		},
+	)
+	require.NoError(t, err)
+
+	client := sock.NewClient(tmpFile.Name())
+	listen := make(chan error, 1)
+	done := make(chan error, 1)
+
+	go func() {
+		done <- unixServer.Serve(context.Background(), listen)
+	}()
+
+	require.NoError(t, <-listen)
+
+	body, err := client.Request(http.MethodGet, "/")
+	require.NoError(t, err)
+	require.Equal(t, "OK", body)
+
+	require.NoError(t, unixServer.Shutdown(context.Background()))
+	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
+}
