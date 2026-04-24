@@ -23,11 +23,7 @@ Dagu workflows are defined in YAML and can run shell commands, scripts, containe
 For a quick look at how workflows are defined, see the [examples](https://docs.dagu.sh/writing-workflows/examples).
 
 <div align="center">
-  <img src="./assets/images/readme-cockpit-dark.png" width="1200" alt="Dagu cockpit in dark mode with running, waiting, succeeded, and failed workflows">
-</div>
-
-<div align="center">
-  <video src="./assets/images/dagu-demo.mp4" width="720" controls preload="metadata"></video>
+  <img src="./assets/images/dagu-demo.gif" width="720" alt="Dagu demo showing the cockpit kanban view and YAML workflow editing">
 </div>
 
 | Run Details | Step Logs | Documents |
@@ -83,6 +79,31 @@ Dagu is useful when teams need to consolidate scripts, cron jobs, server tasks, 
 ## Deployment Models
 
 Dagu can run on one machine, as a self-hosted production service, as a full managed Dagu Cloud server, or as a hybrid deployment with private workers inside your infrastructure.
+
+Need the full breakdown, tradeoffs, and architecture notes? See the [Deployment Models guide](https://docs.dagu.sh/overview/deployment-models).
+
+<table>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <strong>Local Single-Server</strong><br>
+      <img src="./assets/images/deployment-model-local.gif" width="100%" alt="Local single-server deployment model with one Dagu server handling scheduling and execution.">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <strong>Self-Hosted</strong><br>
+      <img src="./assets/images/deployment-model-self-hosted.gif" width="100%" alt="Self-hosted deployment model with the Dagu server and workers running on your infrastructure.">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <strong>Dagu Cloud</strong><br>
+      <img src="./assets/images/deployment-model-cloud.gif" width="100%" alt="Dagu Cloud deployment model with a managed Dagu server running in the cloud.">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <strong>Hybrid</strong><br>
+      <img src="./assets/images/deployment-model-hybrid.gif" width="100%" alt="Hybrid deployment model with a managed Dagu Cloud server and private workers in your infrastructure.">
+    </td>
+  </tr>
+</table>
 
 | Model | Server | Execution | Best for |
 |------|--------|-----------|----------|
