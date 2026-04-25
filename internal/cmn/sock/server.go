@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -106,7 +107,12 @@ func (srv *Server) httpHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				logger.Error(ctx, "Socket handler panicked", slog.Any("panic", recovered))
+				logger.Error(
+					ctx,
+					"Socket handler panicked",
+					slog.Any("panic", recovered),
+					slog.String("stack", string(debug.Stack())),
+				)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()

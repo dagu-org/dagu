@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestMain installs an isolated HOME directory for socket integration tests.
 func TestMain(m *testing.M) {
 	testHomeDir, err := os.MkdirTemp("", "controller_test")
 	if err != nil {
@@ -30,6 +31,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// TestStartAndShutdownServer verifies the server accepts requests and shuts down cleanly.
 func TestStartAndShutdownServer(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_start_shutdown")
 	require.NoError(t, err)
@@ -72,6 +74,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestHeaderOnlyResponse verifies responses without a body are preserved over the unix socket transport.
 func TestHeaderOnlyResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
@@ -123,6 +126,7 @@ func TestHeaderOnlyResponse(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestEmptyResponse verifies empty HTTP responses round-trip without synthetic data.
 func TestEmptyResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
@@ -155,6 +159,7 @@ func TestEmptyResponse(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestShutdownWhileServerStarts verifies shutdown wins even if serving has only just started.
 func TestShutdownWhileServerStarts(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_shutdown_while_server_starts")
 	require.NoError(t, err)
@@ -191,6 +196,7 @@ func TestShutdownWhileServerStarts(t *testing.T) {
 	}
 }
 
+// TestMultipleWritesProduceSingleResponseBody verifies multiple handler writes are concatenated once.
 func TestMultipleWritesProduceSingleResponseBody(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_multiple_writes")
 	require.NoError(t, err)
@@ -227,6 +233,7 @@ func TestMultipleWritesProduceSingleResponseBody(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestResponseHeadersAreReturnedToClient verifies response headers survive the unix socket transport.
 func TestResponseHeadersAreReturnedToClient(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_response_headers")
 	require.NoError(t, err)
@@ -281,6 +288,7 @@ func TestResponseHeadersAreReturnedToClient(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestShutdownWaitsForActiveHandlers verifies graceful shutdown waits for in-flight handlers to finish.
 func TestShutdownWaitsForActiveHandlers(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_shutdown_waits_for_handlers")
 	require.NoError(t, err)

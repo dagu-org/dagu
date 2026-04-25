@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestExpandHomeDir verifies the loader expands only the current user's home shorthand.
 func TestExpandHomeDir(t *testing.T) {
 	t.Parallel()
 
@@ -28,6 +29,7 @@ func TestExpandHomeDir(t *testing.T) {
 	assert.Equal(t, "~alice/dags/test.yaml", expandHomeDir("~alice/dags/test.yaml"))
 }
 
+// TestUnmarshalData verifies manifest decoding handles empty and malformed YAML inputs.
 func TestUnmarshalData(t *testing.T) {
 	t.Parallel()
 
@@ -47,6 +49,7 @@ func TestUnmarshalData(t *testing.T) {
 	})
 }
 
+// TestDecode verifies manifest decoding preserves raw fields and surfaces validation errors.
 func TestDecode(t *testing.T) {
 	t.Parallel()
 
@@ -105,6 +108,7 @@ func TestDecode(t *testing.T) {
 	})
 }
 
+// TestNewManifestDecoderSharesInstance verifies callers reuse the shared decoder instance.
 func TestNewManifestDecoderSharesInstance(t *testing.T) {
 	t.Parallel()
 

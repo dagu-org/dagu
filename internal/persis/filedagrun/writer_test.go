@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestWriter verifies writer persistence to new and existing status files.
 func TestWriter(t *testing.T) {
 	th := setupTestStore(t)
 
@@ -71,6 +72,7 @@ func TestWriter(t *testing.T) {
 	})
 }
 
+// TestWriterErrorHandling verifies writer lifecycle and error paths.
 func TestWriterErrorHandling(t *testing.T) {
 	th := setupTestStore(t)
 
@@ -133,6 +135,7 @@ func TestWriterErrorHandling(t *testing.T) {
 	})
 }
 
+// TestWriterRename verifies status files follow DAG rename operations.
 func TestWriterRename(t *testing.T) {
 	th := setupTestStore(t)
 

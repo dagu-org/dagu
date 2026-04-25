@@ -87,6 +87,7 @@ func (w *Writer) Write(ctx context.Context, st exec.DAGRunStatus) error {
 	return nil
 }
 
+// write encodes a single status entry and persists it to disk.
 func (w *Writer) write(st exec.DAGRunStatus) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

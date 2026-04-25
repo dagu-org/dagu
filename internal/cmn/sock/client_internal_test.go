@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestNewClientInitializesReusableHTTPClient verifies the cached HTTP client setup.
 func TestNewClientInitializesReusableHTTPClient(t *testing.T) {
 	t.Parallel()
 
