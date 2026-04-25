@@ -1106,6 +1106,39 @@ steps:
 	assert.NotContains(t, string(childDAG.YamlData), "call: child-task")
 }
 
+func TestLoad_MultiDocumentFileWithLeadingSeparatorPreservesMainDocumentProvenance(t *testing.T) {
+	t.Parallel()
+
+	dagFile := createTempYAMLFile(t, `---
+steps:
+  - name: call-child
+    call: child-task
+
+---
+name: child-task
+steps:
+  - name: work
+    command: echo "child"
+`)
+
+	dag, err := spec.Load(context.Background(), dagFile)
+	require.NoError(t, err)
+	require.NotNil(t, dag.LocalDAGs)
+
+	childDAG, ok := dag.LocalDAGs["child-task"]
+	require.True(t, ok)
+
+	assert.Equal(t, dagFile, dag.Location)
+	assert.Equal(t, dagFile, dag.SourceFile)
+	assert.Contains(t, string(dag.YamlData), "call: child-task")
+	assert.Contains(t, string(dag.YamlData), "name: child-task")
+
+	assert.Equal(t, dagFile, childDAG.Location)
+	assert.Equal(t, dagFile, childDAG.SourceFile)
+	assert.Contains(t, string(childDAG.YamlData), "name: child-task")
+	assert.NotContains(t, string(childDAG.YamlData), "call: child-task")
+}
+
 func TestLoadYAMLWithOpts_TypeInheritanceInMultiDocumentYAML(t *testing.T) {
 	t.Parallel()
 

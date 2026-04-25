@@ -436,7 +436,7 @@ func decodeDocuments(data []byte) ([]dagDocument, error) {
 		if len(doc) == 0 {
 			continue
 		}
-		docs = append(docs, dagDocument{index: index, data: doc})
+		docs = append(docs, dagDocument{index: len(docs), data: doc})
 	}
 }
 
@@ -684,7 +684,7 @@ func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 }
 
 func expandHomeDir(file string) string {
-	if !strings.HasPrefix(file, "~") {
+	if file != "~" && !strings.HasPrefix(file, "~/") && !strings.HasPrefix(file, `~\`) {
 		return file
 	}
 
