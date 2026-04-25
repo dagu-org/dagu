@@ -70,7 +70,7 @@ export default function ImproveDAGDefinitionModal({
   const handleSubmit = useCallback(async () => {
     const trimmed = prompt.trim();
     if (!trimmed) {
-      setError('Describe what should be improved before starting the agent.');
+      setError('Describe what should be improved before asking Steward.');
       return;
     }
     setError(null);
@@ -93,10 +93,10 @@ export default function ImproveDAGDefinitionModal({
         <DialogHeader className="space-y-1">
           <DialogTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4 text-primary" />
-            Improve DAG Definition
+            Ask Steward to Improve DAG
           </DialogTitle>
           <DialogDescription className="text-xs leading-5">
-            Start a fresh agent session with this DAG reference, the latest run
+            Start a fresh steward session with this DAG reference, the latest run
             details, and your request.
           </DialogDescription>
         </DialogHeader>
@@ -123,7 +123,7 @@ export default function ImproveDAGDefinitionModal({
             </div>
 
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Focus the agent on reliability, readability, timeouts, retries,
+              Focus the steward on reliability, readability, timeouts, retries,
               dependency structure, step naming, or any other improvement you
               want applied to this DAG definition.
             </p>
@@ -147,7 +147,7 @@ export default function ImproveDAGDefinitionModal({
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              Press Cmd/Ctrl+Enter to launch the agent.
+              Press Cmd/Ctrl+Enter to ask Steward.
             </p>
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
@@ -170,7 +170,7 @@ export default function ImproveDAGDefinitionModal({
             disabled={isLoading}
           >
             <Wand2 className="h-4 w-4" />
-            {isLoading ? 'Starting...' : 'Start Improvement'}
+            {isLoading ? 'Starting...' : 'Ask Steward'}
           </Button>
         </DialogFooter>
       </DialogContent>
