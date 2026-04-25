@@ -3327,7 +3327,7 @@ func validatePushBackInputs(step core.Step, body *api.PushBackStepRequest) error
 	return checkMissingInputs(step.Approval.Required, provided)
 }
 
-func applyPushBack(_ context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) error {
+func applyPushBack(ctx context.Context, node *exec.Node, status *exec.DAGRunStatus, body *api.PushBackStepRequest) error {
 	targetName := node.Step.Name
 	if node.Step.Approval != nil && strings.TrimSpace(node.Step.Approval.RewindTo) != "" {
 		targetName = strings.TrimSpace(node.Step.Approval.RewindTo)
@@ -3344,7 +3344,7 @@ func applyPushBack(_ context.Context, node *exec.Node, status *exec.DAGRunStatus
 	}
 	allowedInputs := pushBackAllowedInputs(node.Step)
 	filteredInputs := exec.FilterPushBackInputs(allowedInputs, inputs)
-	history := buildPushBackHistory(node, allowedInputs, nextIteration, filteredInputs)
+	history := buildPushBackHistory(ctx, node, allowedInputs, nextIteration, filteredInputs)
 
 	// Reset the configured rewind target and everything that depends on it.
 	rewoundNodes := append([]*exec.Node{status.Nodes[targetIdx]}, findDependentNodes(status.Nodes, targetName)...)
@@ -3355,10 +3355,15 @@ func applyPushBack(_ context.Context, node *exec.Node, status *exec.DAGRunStatus
 	return nil
 }
 
-func buildPushBackHistory(node *exec.Node, allowedInputs []string, nextIteration int, inputs map[string]string) []exec.PushBackEntry {
+func buildPushBackHistory(ctx context.Context, node *exec.Node, allowedInputs []string, nextIteration int, inputs map[string]string) []exec.PushBackEntry {
 	history := exec.NormalizePushBackHistory(allowedInputs, node.ApprovalIteration, node.PushBackInputs, node.PushBackHistory)
+	var actor string
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		actor = user.Username
+	}
 	history = append(history, exec.PushBackEntry{
 		Iteration: nextIteration,
+		By:        actor,
 		Inputs:    cloneStringMap(inputs),
 	})
 	return history

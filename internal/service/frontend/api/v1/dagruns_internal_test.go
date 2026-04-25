@@ -12,6 +12,7 @@ import (
 	"time"
 
 	openapiv1 "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/auth"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/goccy/go-yaml"
@@ -264,6 +265,48 @@ func TestApplyPushBackAppendsLegacyPushBackInputsToHistory(t *testing.T) {
 	secondHistoryInputs, ok := second["inputs"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "second pass", secondHistoryInputs["FEEDBACK"])
+}
+
+func TestApplyPushBackRecordsAuthenticatedUserInHistory(t *testing.T) {
+	t.Parallel()
+
+	inputs := map[string]string{"FEEDBACK": "needs revision"}
+	status := &exec.DAGRunStatus{
+		Nodes: []*exec.Node{
+			{
+				Step: core.Step{
+					Name: "review",
+					Approval: &core.ApprovalConfig{
+						Input: []string{"FEEDBACK"},
+					},
+				},
+				Status: core.NodeWaiting,
+			},
+		},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.User{Username: "reviewer1"})
+	err := applyPushBack(ctx, status.Nodes[0], status, &openapiv1.PushBackStepRequest{
+		Inputs: &inputs,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, status.Nodes[0].PushBackHistory, 1)
+	assert.Equal(t, "reviewer1", status.Nodes[0].PushBackHistory[0].By)
+
+	rawNode, err := json.Marshal(status.Nodes[0])
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(rawNode, &payload))
+
+	history, ok := payload["pushBackHistory"].([]any)
+	require.True(t, ok)
+	require.Len(t, history, 1)
+
+	first, ok := history[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "reviewer1", first["by"])
 }
 
 func TestApplyInlineEnqueueLabels_ArrayLabels(t *testing.T) {

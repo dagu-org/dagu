@@ -902,6 +902,7 @@ func clonePushBackHistory(src []exec.PushBackEntry) []exec.PushBackEntry {
 	for i, entry := range src {
 		dst[i] = exec.PushBackEntry{
 			Iteration: entry.Iteration,
+			By:        entry.By,
 			Inputs:    cloneStringMap(entry.Inputs),
 		}
 	}

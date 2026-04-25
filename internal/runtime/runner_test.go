@@ -3724,6 +3724,18 @@ func TestPushBackInputsExposeJSONHistoryEnvForRewoundStep(t *testing.T) {
 
 	node.SetApprovalIteration(2)
 	node.SetPushBackInputs(map[string]string{"FEEDBACK": "rerun from review"})
+	node.SetPushBackHistory([]exec.PushBackEntry{
+		{
+			Iteration: 1,
+			By:        "reviewer-a",
+			Inputs:    map[string]string{"FEEDBACK": "first pass"},
+		},
+		{
+			Iteration: 2,
+			By:        "reviewer-b",
+			Inputs:    map[string]string{"FEEDBACK": "rerun from review"},
+		},
+	})
 
 	result := plan.assertRun(t, core.Succeeded)
 	result.assertNodeStatus(t, "prepare", core.NodeSucceeded)
@@ -3739,10 +3751,18 @@ func TestPushBackInputsExposeJSONHistoryEnvForRewoundStep(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(lines[1]), &payload))
 
 	assert.Equal(t, float64(2), payload["iteration"])
+	assert.Equal(t, "reviewer-b", payload["by"])
 
 	inputs, ok := payload["inputs"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "rerun from review", inputs["FEEDBACK"])
+
+	history, ok := payload["history"].([]any)
+	require.True(t, ok)
+	require.Len(t, history, 2)
+	second, ok := history[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "reviewer-b", second["by"])
 }
 
 func TestWaitStep(t *testing.T) {

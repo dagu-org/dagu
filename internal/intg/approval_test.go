@@ -13,6 +13,7 @@ import (
 	"time"
 
 	api "github.com/dagucloud/dagu/api/v1"
+	"github.com/dagucloud/dagu/internal/cmn/config"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/test"
@@ -334,7 +335,14 @@ steps:
 }
 
 func TestApprovalPushBackExposesHistoricalFeedbackEnvAcrossRewoundScope(t *testing.T) {
-	server := test.SetupServer(t)
+	const username = "reviewer"
+	const password = "secretpass123"
+
+	server := test.SetupServer(t, test.WithConfigMutator(func(cfg *config.Config) {
+		cfg.Server.Auth.Mode = config.AuthModeBasic
+		cfg.Server.Auth.Basic.Username = username
+		cfg.Server.Auth.Basic.Password = password
+	}))
 
 	dagName := "intg_pushback_scope_env"
 	spec := fmt.Sprintf(`name: %s
@@ -368,13 +376,13 @@ steps:
 	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,
 		Spec: &spec,
-	}).ExpectStatus(http.StatusCreated).Send(t)
+	}).WithBasicAuth(username, password).ExpectStatus(http.StatusCreated).Send(t)
 
 	runID := "pushback-history-env"
 	startResp := server.Client().Post(
 		fmt.Sprintf("/api/v1/dags/%s/start", dagName),
 		api.ExecuteDAGJSONRequestBody{DagRunId: &runID},
-	).ExpectStatus(http.StatusOK).Send(t)
+	).WithBasicAuth(username, password).ExpectStatus(http.StatusOK).Send(t)
 
 	var startBody api.ExecuteDAG200JSONResponse
 	startResp.Unmarshal(t, &startBody)
@@ -386,7 +394,7 @@ steps:
 	server.Client().Post(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/steps/review/push-back", dagName, runID),
 		api.PushBackStepRequest{Inputs: &firstInputs},
-	).ExpectStatus(http.StatusOK).Send(t)
+	).WithBasicAuth(username, password).ExpectStatus(http.StatusOK).Send(t)
 
 	waitForApprovalStepWaitingStatus(t, server, dagName, runID, "review", 1)
 
@@ -394,7 +402,7 @@ steps:
 	server.Client().Post(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/steps/review/push-back", dagName, runID),
 		api.PushBackStepRequest{Inputs: &secondInputs},
-	).ExpectStatus(http.StatusOK).Send(t)
+	).WithBasicAuth(username, password).ExpectStatus(http.StatusOK).Send(t)
 
 	status := waitForApprovalStepWaitingStatus(t, server, dagName, runID, "review", 2)
 	reviewNode := nodeByName(t, status, "review")
@@ -405,7 +413,7 @@ steps:
 	server.Client().Post(
 		fmt.Sprintf("/api/v1/dag-runs/%s/%s/steps/review/approve", dagName, runID),
 		api.ApproveStepRequest{},
-	).ExpectStatus(http.StatusOK).Send(t)
+	).WithBasicAuth(username, password).ExpectStatus(http.StatusOK).Send(t)
 
 	status = waitForDAGRunStatus(t, server, dagName, runID, core.Succeeded)
 
@@ -414,7 +422,7 @@ steps:
 		stdoutContent, err := os.ReadFile(node.Stdout)
 		require.NoError(t, err)
 		require.Equal(t, "second pass", lastLabeledOutputValue(string(stdoutContent), "FEEDBACK="), "%s did not receive latest feedback", stepName)
-		requirePushBackPayload(t, stepName, lastLabeledOutputValue(string(stdoutContent), "DAG_PUSHBACK="))
+		requirePushBackPayload(t, stepName, lastLabeledOutputValue(string(stdoutContent), "DAG_PUSHBACK="), username)
 	}
 }
 
@@ -497,26 +505,31 @@ func nodeByName(t *testing.T, status *exec.DAGRunStatus, stepName string) *exec.
 	return nil
 }
 
-func requirePushBackPayload(t *testing.T, stepName, raw string) {
+func requirePushBackPayload(t *testing.T, stepName, raw, expectedUser string) {
 	t.Helper()
 
 	require.NotEmptyf(t, raw, "%s stdout did not contain DAG_PUSHBACK output", stepName)
 
 	var payload struct {
 		Iteration int               `json:"iteration"`
+		By        string            `json:"by"`
 		Inputs    map[string]string `json:"inputs"`
 		History   []struct {
 			Iteration int               `json:"iteration"`
+			By        string            `json:"by"`
 			Inputs    map[string]string `json:"inputs"`
 		} `json:"history"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(raw), &payload))
 	require.Equalf(t, 2, payload.Iteration, "%s saw unexpected push-back iteration", stepName)
+	require.Equalf(t, expectedUser, payload.By, "%s saw unexpected latest push-back actor", stepName)
 	require.Equalf(t, "second pass", payload.Inputs["FEEDBACK"], "%s saw unexpected latest feedback", stepName)
 	require.Lenf(t, payload.History, 2, "%s saw unexpected push-back history length", stepName)
 	require.Equalf(t, 1, payload.History[0].Iteration, "%s saw unexpected first push-back iteration", stepName)
+	require.Equalf(t, expectedUser, payload.History[0].By, "%s saw unexpected first push-back actor", stepName)
 	require.Equalf(t, "first pass", payload.History[0].Inputs["FEEDBACK"], "%s saw unexpected first push-back feedback", stepName)
 	require.Equalf(t, 2, payload.History[1].Iteration, "%s saw unexpected second push-back iteration", stepName)
+	require.Equalf(t, expectedUser, payload.History[1].By, "%s saw unexpected second push-back actor", stepName)
 	require.Equalf(t, "second pass", payload.History[1].Inputs["FEEDBACK"], "%s saw unexpected second push-back feedback", stepName)
 }
 

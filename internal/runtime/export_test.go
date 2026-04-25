@@ -6,6 +6,8 @@ package runtime
 import (
 	"context"
 	"maps"
+
+	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
 // SetupChatMessages exports setupChatMessages for testing.
@@ -30,4 +32,11 @@ func (n *Node) SetPushBackInputs(inputs map[string]string) {
 	n.Data.mu.Lock()
 	defer n.Data.mu.Unlock()
 	n.inner.State.PushBackInputs = maps.Clone(inputs)
+}
+
+// SetPushBackHistory sets push-back history for testing.
+func (n *Node) SetPushBackHistory(history []exec.PushBackEntry) {
+	n.Data.mu.Lock()
+	defer n.Data.mu.Unlock()
+	n.inner.State.PushBackHistory = exec.ClonePushBackHistory(history)
 }

@@ -10,6 +10,7 @@ import (
 
 type pushBackPayload struct {
 	Iteration int                  `json:"iteration"`
+	By        string               `json:"by,omitempty"`
 	Inputs    map[string]string    `json:"inputs,omitempty"`
 	History   []exec.PushBackEntry `json:"history,omitempty"`
 }
@@ -19,10 +20,14 @@ func marshalPushBackPayload(allowedInputs []string, state NodeState) (string, er
 		return "", nil
 	}
 
+	history := exec.NormalizePushBackHistory(allowedInputs, state.ApprovalIteration, state.PushBackInputs, state.PushBackHistory)
 	payload := pushBackPayload{
 		Iteration: state.ApprovalIteration,
 		Inputs:    exec.FilterPushBackInputs(allowedInputs, state.PushBackInputs),
-		History:   exec.NormalizePushBackHistory(allowedInputs, state.ApprovalIteration, state.PushBackInputs, state.PushBackHistory),
+		History:   history,
+	}
+	if len(history) > 0 {
+		payload.By = history[len(history)-1].By
 	}
 
 	data, err := json.Marshal(payload)

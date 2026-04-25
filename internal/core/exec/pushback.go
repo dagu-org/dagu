@@ -63,6 +63,7 @@ func ClonePushBackHistory(src []PushBackEntry) []PushBackEntry {
 	for i, entry := range src {
 		dst[i] = PushBackEntry{
 			Iteration: entry.Iteration,
+			By:        entry.By,
 			Inputs:    maps.Clone(entry.Inputs),
 		}
 	}

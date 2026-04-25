@@ -11,6 +11,7 @@ import (
 // PushBackEntry records one push-back event for a step approval cycle.
 type PushBackEntry struct {
 	Iteration int               `json:"iteration"`
+	By        string            `json:"by,omitempty"`
 	Inputs    map[string]string `json:"inputs,omitempty"`
 }
 
