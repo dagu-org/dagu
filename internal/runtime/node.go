@@ -656,8 +656,8 @@ func (n *Node) signalToSend(sig os.Signal, allowOverride bool) os.Signal {
 func (n *Node) Cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	switch n.Status() {
-	case core.NodeRunning, core.NodeWaiting:
+	status := n.Status()
+	if status == core.NodeRunning || status == core.NodeWaiting {
 		n.SetStatus(core.NodeAborted)
 	}
 }
