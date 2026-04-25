@@ -5,20 +5,15 @@ package sock
 
 import (
 	"context"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestServeConnRecoversFromHandlerPanic(t *testing.T) {
+func TestHTTPHandlerRecoversFromHandlerPanic(t *testing.T) {
 	t.Parallel()
-
-	serverConn, clientConn := net.Pipe()
-	defer func() {
-		_ = clientConn.Close()
-	}()
 
 	srv, err := NewServer(
 		"ignored",
@@ -28,16 +23,11 @@ func TestServeConnRecoversFromHandlerPanic(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	request, err := http.NewRequest(http.MethodGet, "/", nil)
-	require.NoError(t, err)
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	recorder := httptest.NewRecorder()
 
-	go func() {
-		_ = request.Write(clientConn)
-		_ = clientConn.Close()
-	}()
-
-	srv.connWG.Add(1)
 	require.NotPanics(t, func() {
-		srv.serveConn(context.Background(), serverConn)
+		srv.httpHandler(context.Background()).ServeHTTP(recorder, request)
 	})
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
 }

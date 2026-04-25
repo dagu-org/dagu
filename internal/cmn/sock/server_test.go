@@ -227,6 +227,60 @@ func TestMultipleWritesProduceSingleResponseBody(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+func TestResponseHeadersAreReturnedToClient(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test_server_response_headers")
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-Dagu-Test", "present")
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte("accepted"))
+		},
+	)
+	require.NoError(t, err)
+
+	listen := make(chan error, 1)
+	done := make(chan error, 1)
+
+	go func() {
+		done <- unixServer.Serve(context.Background(), listen)
+	}()
+
+	require.NoError(t, <-listen)
+
+	conn, err := net.DialTimeout("unix", tmpFile.Name(), 3*time.Second)
+	require.NoError(t, err)
+	defer func() {
+		_ = conn.Close()
+	}()
+	require.NoError(t, conn.SetDeadline(time.Now().Add(3*time.Second)))
+
+	request, err := http.NewRequest(http.MethodGet, "/headers", nil)
+	require.NoError(t, err)
+	require.NoError(t, request.Write(conn))
+
+	response, err := http.ReadResponse(bufio.NewReader(conn), request)
+	require.NoError(t, err)
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, response.StatusCode)
+	require.Equal(t, "present", response.Header.Get("X-Dagu-Test"))
+	require.Equal(t, "accepted", string(body))
+
+	require.NoError(t, unixServer.Shutdown(context.Background()))
+	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
+}
+
 func TestShutdownWaitsForActiveHandlers(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_shutdown_waits_for_handlers")
 	require.NoError(t, err)

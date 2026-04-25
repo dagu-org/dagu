@@ -5,6 +5,7 @@ package filedagrun
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -105,6 +106,24 @@ func TestWriterErrorHandling(t *testing.T) {
 		assert.True(t, writer.IsOpen())
 		require.NoError(t, writer.close())
 		assert.False(t, writer.IsOpen())
+	})
+
+	t.Run("WritesNewlineDelimitedJSON", func(t *testing.T) {
+		writerPath := filepath.Join(th.TmpDir, "ndjson.dat")
+		writer := NewWriter(writerPath)
+		require.NoError(t, writer.Open())
+
+		dag := th.DAG("test_newline_delimited_json")
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, core.Running, 1, time.Now())
+
+		require.NoError(t, writer.write(dagRunStatus))
+		require.NoError(t, writer.close())
+
+		data, err := os.ReadFile(writerPath)
+		require.NoError(t, err)
+		require.NotEmpty(t, data)
+		assert.Equal(t, byte('\n'), data[len(data)-1])
 	})
 }
 

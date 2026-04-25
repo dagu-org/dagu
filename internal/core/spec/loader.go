@@ -842,38 +842,12 @@ func readYAMLFile(file string) (cfg map[string]any, err error) {
 
 // unmarshalData unmarshals the data into a map.
 func unmarshalData(data []byte) (map[string]any, error) {
-	var cm map[string]any
-	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
-	if errors.Is(err, io.EOF) {
-		err = nil
-	}
-
-	return cm, err
+	return newManifestDecoder().Unmarshal(data)
 }
 
 // decode decodes the configuration map into a manifest.
 func decode(cm map[string]any) (*dag, error) {
-	if _, hasLabels := cm["labels"]; hasLabels {
-		if _, hasTags := cm["tags"]; hasTags {
-			return nil, fmt.Errorf("labels and deprecated tags cannot both be set")
-		}
-	}
-
-	c := new(dag)
-	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: true,
-		Result:      c,
-		TagName:     "yaml",
-		DecodeHook:  TypedUnionDecodeHook(),
-	})
-	err := md.Decode(cm)
-	err = withSnakeCaseKeyHint(err)
-	if err == nil {
-		c.handlerOnRaw = extractRawHandlerOn(cm)
-		c.defaultsRaw = extractRawDefaults(cm)
-	}
-
-	return c, err
+	return newManifestDecoder().Decode(cm)
 }
 
 func extractRawHandlerOn(cm map[string]any) map[string]map[string]any {

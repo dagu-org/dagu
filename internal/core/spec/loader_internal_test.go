@@ -4,6 +4,7 @@
 package spec
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,4 +26,81 @@ func TestExpandHomeDir(t *testing.T) {
 		filepath.Clean(expandHomeDir("~/dags/test.yaml")),
 	)
 	assert.Equal(t, "~alice/dags/test.yaml", expandHomeDir("~alice/dags/test.yaml"))
+}
+
+func TestUnmarshalData(t *testing.T) {
+	t.Parallel()
+
+	t.Run("EmptyDocument", func(t *testing.T) {
+		t.Parallel()
+
+		data, err := unmarshalData(nil)
+		require.NoError(t, err)
+		assert.Nil(t, data)
+	})
+
+	t.Run("RejectsMalformedYAML", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := unmarshalData([]byte("steps: ["))
+		require.Error(t, err)
+	})
+}
+
+func TestDecode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RejectsLabelsAndTagsTogether", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := decode(map[string]any{
+			"labels": map[string]any{"team": "core"},
+			"tags":   []any{"legacy"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "labels and deprecated tags cannot both be set")
+	})
+
+	t.Run("CapturesRawHandlerOnAndDefaults", func(t *testing.T) {
+		t.Parallel()
+
+		manifest, err := decode(map[string]any{
+			"steps": []any{
+				map[string]any{
+					"name":    "step-1",
+					"command": "echo hello",
+				},
+			},
+			"handler_on": map[string]any{
+				"failure": map[string]any{
+					"command": "echo fail",
+				},
+			},
+			"defaults": map[string]any{
+				"shell": "bash",
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, manifest)
+		require.Contains(t, manifest.handlerOnRaw, "failure")
+		require.Equal(t, "echo fail", manifest.handlerOnRaw["failure"]["command"])
+		require.Equal(t, "bash", manifest.defaultsRaw["shell"])
+	})
+
+	t.Run("ReportsUnknownKeys", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := decode(map[string]any{
+			"steps": []any{
+				map[string]any{
+					"name":    "step-1",
+					"command": "echo hello",
+				},
+			},
+			"unknown_key": true,
+		})
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, ErrNameOrPathRequired))
+		assert.Contains(t, err.Error(), "unknown_key")
+	})
 }

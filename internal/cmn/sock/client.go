@@ -4,12 +4,14 @@
 package sock
 
 import (
-	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -27,44 +29,71 @@ func NewClient(addr string) *Client {
 	return &Client{addr: addr}
 }
 
-const (
-	defaultTimeout = time.Millisecond * 3000
-)
+const defaultTimeout = 3 * time.Second
 
 func wrapTimeout(op string, err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, context.DeadlineExceeded):
+		return fmt.Errorf("%s: %w", op, ErrTimeout)
+	}
+
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return fmt.Errorf("%s: %w", op, ErrTimeout)
 	}
+
 	return fmt.Errorf("%s: %w", op, err)
 }
 
+func normalizePath(path string) string {
+	if path == "" {
+		return "/"
+	}
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+	return "/" + path
+}
+
+func (cl *Client) httpClient() *http.Client {
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			dialer := &net.Dialer{Timeout: defaultTimeout}
+			conn, err := dialer.DialContext(ctx, "unix", cl.addr)
+			if err != nil {
+				return nil, wrapTimeout("dial unix socket", err)
+			}
+			return conn, nil
+		},
+		DisableCompression: true,
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   defaultTimeout,
+	}
+}
+
 // Request sends a request to the frontend and returns the response.
-func (cl *Client) Request(method, url string) (string, error) {
-	conn, err := net.DialTimeout("unix", cl.addr, defaultTimeout)
-	if err != nil {
-		return "", fmt.Errorf("dial unix socket: %w", err)
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
+func (cl *Client) Request(method, path string) (string, error) {
+	client := cl.httpClient()
+	defer client.CloseIdleConnections()
 
-	if err := conn.SetDeadline(time.Now().Add(defaultTimeout)); err != nil {
-		return "", fmt.Errorf("set connection deadline: %w", err)
+	requestURL := &url.URL{
+		Scheme: "http",
+		Host:   "unix",
+		Path:   normalizePath(path),
 	}
-
-	request, err := http.NewRequest(method, url, nil)
+	request, err := http.NewRequest(method, requestURL.String(), nil)
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
 	}
 
-	if err := request.Write(conn); err != nil {
-		return "", wrapTimeout("write request", err)
-	}
-
-	response, err := http.ReadResponse(bufio.NewReader(conn), request)
+	response, err := client.Do(request)
 	if err != nil {
-		return "", wrapTimeout("read response", err)
+		return "", wrapTimeout("send request", err)
 	}
 	defer func() {
 		_ = response.Body.Close()
