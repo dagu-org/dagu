@@ -513,23 +513,35 @@ func requirePushBackPayload(t *testing.T, stepName, raw, expectedUser string) {
 	var payload struct {
 		Iteration int               `json:"iteration"`
 		By        string            `json:"by"`
+		At        string            `json:"at"`
 		Inputs    map[string]string `json:"inputs"`
 		History   []struct {
 			Iteration int               `json:"iteration"`
 			By        string            `json:"by"`
+			At        string            `json:"at"`
 			Inputs    map[string]string `json:"inputs"`
 		} `json:"history"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(raw), &payload))
 	require.Equalf(t, 2, payload.Iteration, "%s saw unexpected push-back iteration", stepName)
 	require.Equalf(t, expectedUser, payload.By, "%s saw unexpected latest push-back actor", stepName)
+	require.NotEmptyf(t, payload.At, "%s saw empty latest push-back timestamp", stepName)
+	_, err := time.Parse(time.RFC3339, payload.At)
+	require.NoErrorf(t, err, "%s saw invalid latest push-back timestamp", stepName)
 	require.Equalf(t, "second pass", payload.Inputs["FEEDBACK"], "%s saw unexpected latest feedback", stepName)
 	require.Lenf(t, payload.History, 2, "%s saw unexpected push-back history length", stepName)
 	require.Equalf(t, 1, payload.History[0].Iteration, "%s saw unexpected first push-back iteration", stepName)
 	require.Equalf(t, expectedUser, payload.History[0].By, "%s saw unexpected first push-back actor", stepName)
+	require.NotEmptyf(t, payload.History[0].At, "%s saw empty first push-back timestamp", stepName)
+	_, err = time.Parse(time.RFC3339, payload.History[0].At)
+	require.NoErrorf(t, err, "%s saw invalid first push-back timestamp", stepName)
 	require.Equalf(t, "first pass", payload.History[0].Inputs["FEEDBACK"], "%s saw unexpected first push-back feedback", stepName)
 	require.Equalf(t, 2, payload.History[1].Iteration, "%s saw unexpected second push-back iteration", stepName)
 	require.Equalf(t, expectedUser, payload.History[1].By, "%s saw unexpected second push-back actor", stepName)
+	require.NotEmptyf(t, payload.History[1].At, "%s saw empty second push-back timestamp", stepName)
+	_, err = time.Parse(time.RFC3339, payload.History[1].At)
+	require.NoErrorf(t, err, "%s saw invalid second push-back timestamp", stepName)
+	require.Equalf(t, payload.At, payload.History[1].At, "%s saw mismatched latest push-back timestamp", stepName)
 	require.Equalf(t, "second pass", payload.History[1].Inputs["FEEDBACK"], "%s saw unexpected second push-back feedback", stepName)
 }
 

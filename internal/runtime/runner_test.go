@@ -3728,11 +3728,13 @@ func TestPushBackInputsExposeJSONHistoryEnvForRewoundStep(t *testing.T) {
 		{
 			Iteration: 1,
 			By:        "reviewer-a",
+			At:        "2026-04-26T06:10:00Z",
 			Inputs:    map[string]string{"FEEDBACK": "first pass"},
 		},
 		{
 			Iteration: 2,
 			By:        "reviewer-b",
+			At:        "2026-04-26T06:20:00Z",
 			Inputs:    map[string]string{"FEEDBACK": "rerun from review"},
 		},
 	})
@@ -3752,6 +3754,7 @@ func TestPushBackInputsExposeJSONHistoryEnvForRewoundStep(t *testing.T) {
 
 	assert.Equal(t, float64(2), payload["iteration"])
 	assert.Equal(t, "reviewer-b", payload["by"])
+	assert.Equal(t, "2026-04-26T06:20:00Z", payload["at"])
 
 	inputs, ok := payload["inputs"].(map[string]any)
 	require.True(t, ok)
@@ -3763,6 +3766,7 @@ func TestPushBackInputsExposeJSONHistoryEnvForRewoundStep(t *testing.T) {
 	second, ok := history[1].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "reviewer-b", second["by"])
+	assert.Equal(t, "2026-04-26T06:20:00Z", second["at"])
 }
 
 func TestWaitStep(t *testing.T) {

@@ -307,6 +307,10 @@ func TestApplyPushBackRecordsAuthenticatedUserInHistory(t *testing.T) {
 	first, ok := history[0].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "reviewer1", first["by"])
+	at, ok := first["at"].(string)
+	require.True(t, ok)
+	_, err = time.Parse(time.RFC3339, at)
+	require.NoError(t, err)
 }
 
 func TestApplyInlineEnqueueLabels_ArrayLabels(t *testing.T) {

@@ -3364,6 +3364,7 @@ func buildPushBackHistory(ctx context.Context, node *exec.Node, allowedInputs []
 	history = append(history, exec.PushBackEntry{
 		Iteration: nextIteration,
 		By:        actor,
+		At:        time.Now().UTC().Format(time.RFC3339),
 		Inputs:    cloneStringMap(inputs),
 	})
 	return history

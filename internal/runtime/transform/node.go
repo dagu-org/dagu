@@ -111,6 +111,7 @@ func clonePushBackHistory(src []exec.PushBackEntry) []exec.PushBackEntry {
 		dst[i] = exec.PushBackEntry{
 			Iteration: entry.Iteration,
 			By:        entry.By,
+			At:        entry.At,
 		}
 		if len(entry.Inputs) > 0 {
 			inputs := make(map[string]string, len(entry.Inputs))
