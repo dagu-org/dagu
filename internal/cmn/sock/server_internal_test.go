@@ -31,3 +31,17 @@ func TestHTTPHandlerRecoversFromHandlerPanic(t *testing.T) {
 	})
 	require.Equal(t, http.StatusInternalServerError, recorder.Code)
 }
+
+func TestNewHTTPServerConfiguresTimeouts(t *testing.T) {
+	t.Parallel()
+
+	srv, err := NewServer(
+		"ignored",
+		func(http.ResponseWriter, *http.Request) {},
+	)
+	require.NoError(t, err)
+
+	httpServer := srv.newHTTPServer(context.Background())
+	require.Equal(t, defaultTimeout, httpServer.ReadHeaderTimeout)
+	require.Equal(t, idleTimeout, httpServer.IdleTimeout)
+}

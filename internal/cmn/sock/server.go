@@ -12,6 +12,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -20,6 +21,8 @@ import (
 var ErrServerRequestedShutdown = errors.New(
 	"socket frontend is requested to shutdown",
 )
+
+const idleTimeout = 30 * time.Second
 
 // Server is a unix socket frontend that passes http requests to HandlerFunc.
 type Server struct {
@@ -58,12 +61,7 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 		return err
 	}
 
-	httpServer := &http.Server{
-		Handler: srv.httpHandler(ctx),
-		BaseContext: func(net.Listener) context.Context {
-			return ctx
-		},
-	}
+	httpServer := srv.newHTTPServer(ctx)
 
 	if !srv.install(listener, httpServer) {
 		if listen != nil {
@@ -85,18 +83,25 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 	}()
 
 	err = httpServer.Serve(listener)
-	switch {
-	case err == nil && srv.quit.Load():
+	if isClosedServerError(err) && srv.quit.Load() {
 		return ErrServerRequestedShutdown
-	case isClosedServerError(err) && srv.quit.Load():
-		return ErrServerRequestedShutdown
-	case err == nil:
-		return nil
-	default:
-		return err
+	}
+	return err
+}
+
+// newHTTPServer builds the HTTP server used for unix socket requests.
+func (srv *Server) newHTTPServer(ctx context.Context) *http.Server {
+	return &http.Server{
+		Handler:           srv.httpHandler(ctx),
+		ReadHeaderTimeout: defaultTimeout,
+		IdleTimeout:       idleTimeout,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
 	}
 }
 
+// httpHandler adapts the raw handler and recovers panics into HTTP 500 responses.
 func (srv *Server) httpHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -114,7 +119,6 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 	srv.mu.Lock()
 	srv.quit.Store(true)
 	httpServer := srv.httpServer
-	listener := srv.listener
 	srv.httpServer = nil
 	srv.listener = nil
 	srv.mu.Unlock()
@@ -127,16 +131,10 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 		return nil
 	}
 
-	if listener != nil {
-		if err := listener.Close(); err != nil && !isClosedServerError(err) {
-			logger.Error(ctx, "Failed to close listener", tag.Error(err))
-			return err
-		}
-	}
-
 	return nil
 }
 
+// install records the live listener/server pair if shutdown has not started.
 func (srv *Server) install(listener net.Listener, httpServer *http.Server) bool {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -148,6 +146,7 @@ func (srv *Server) install(listener net.Listener, httpServer *http.Server) bool 
 	return true
 }
 
+// clear drops the listener/server pair that finished serving.
 func (srv *Server) clear(listener net.Listener, httpServer *http.Server) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
@@ -159,6 +158,7 @@ func (srv *Server) clear(listener net.Listener, httpServer *http.Server) {
 	}
 }
 
+// isClosedServerError reports whether an error is expected during graceful shutdown.
 func isClosedServerError(err error) bool {
 	return errors.Is(err, http.ErrServerClosed) ||
 		errors.Is(err, net.ErrClosed) ||

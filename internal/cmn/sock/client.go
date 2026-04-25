@@ -22,15 +22,32 @@ var (
 // Client is a unix socket client that can send requests
 // to the frontend over HTTP.
 type Client struct {
-	addr string
+	addr   string
+	client *http.Client
 }
 
+// NewClient creates a unix socket HTTP client with a reusable transport.
 func NewClient(addr string) *Client {
-	return &Client{addr: addr}
+	cl := &Client{addr: addr}
+	cl.client = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				conn, err := (&net.Dialer{}).DialContext(ctx, "unix", cl.addr)
+				if err != nil {
+					return nil, wrapTimeout("dial unix socket", err)
+				}
+				return conn, nil
+			},
+			DisableCompression: true,
+		},
+		Timeout: defaultTimeout,
+	}
+	return cl
 }
 
 const defaultTimeout = 3 * time.Second
 
+// wrapTimeout normalizes timeout errors to the exported socket timeout sentinel.
 func wrapTimeout(op string, err error) error {
 	switch {
 	case err == nil:
@@ -47,6 +64,7 @@ func wrapTimeout(op string, err error) error {
 	return fmt.Errorf("%s: %w", op, err)
 }
 
+// normalizePath ensures requests always use an absolute HTTP path.
 func normalizePath(path string) string {
 	if path == "" {
 		return "/"
@@ -57,30 +75,8 @@ func normalizePath(path string) string {
 	return "/" + path
 }
 
-func (cl *Client) httpClient() *http.Client {
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			dialer := &net.Dialer{Timeout: defaultTimeout}
-			conn, err := dialer.DialContext(ctx, "unix", cl.addr)
-			if err != nil {
-				return nil, wrapTimeout("dial unix socket", err)
-			}
-			return conn, nil
-		},
-		DisableCompression: true,
-	}
-
-	return &http.Client{
-		Transport: transport,
-		Timeout:   defaultTimeout,
-	}
-}
-
 // Request sends a request to the frontend and returns the response.
 func (cl *Client) Request(method, path string) (string, error) {
-	client := cl.httpClient()
-	defer client.CloseIdleConnections()
-
 	requestURL := &url.URL{
 		Scheme: "http",
 		Host:   "unix",
@@ -91,7 +87,7 @@ func (cl *Client) Request(method, path string) (string, error) {
 		return "", fmt.Errorf("build request: %w", err)
 	}
 
-	response, err := client.Do(request)
+	response, err := cl.client.Do(request)
 	if err != nil {
 		return "", wrapTimeout("send request", err)
 	}

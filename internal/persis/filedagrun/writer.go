@@ -143,6 +143,7 @@ func (w *Writer) close() error {
 	return nil
 }
 
+// flushAndSyncLocked flushes the buffered encoder output and syncs the file.
 func (w *Writer) flushAndSyncLocked() error {
 	var errs []error
 
@@ -168,6 +169,7 @@ func (w *Writer) IsOpen() bool {
 	return w.isOpenLocked()
 }
 
+// isOpenLocked reports whether the writer has an active file and encoder.
 func (w *Writer) isOpenLocked() bool {
 	return w.file != nil && w.buffer != nil && w.encoder != nil
 }

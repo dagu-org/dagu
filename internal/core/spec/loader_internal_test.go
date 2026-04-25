@@ -104,3 +104,12 @@ func TestDecode(t *testing.T) {
 		assert.Contains(t, err.Error(), "unknown_key")
 	})
 }
+
+func TestNewManifestDecoderSharesInstance(t *testing.T) {
+	t.Parallel()
+
+	first := newManifestDecoder()
+	second := newManifestDecoder()
+
+	require.Same(t, first, second)
+}

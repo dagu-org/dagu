@@ -6,23 +6,27 @@ package spec
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/goccy/go-yaml"
 )
 
+// manifestDecoder converts raw YAML maps into internal manifest structures.
 type manifestDecoder struct {
 	decodeHook mapstructure.DecodeHookFunc
 }
 
-func newManifestDecoder() *manifestDecoder {
-	return &manifestDecoder{
-		decodeHook: TypedUnionDecodeHook(),
-	}
+var defaultManifestDecoder = &manifestDecoder{
+	decodeHook: TypedUnionDecodeHook(),
 }
 
+// newManifestDecoder returns the shared manifest decoder instance.
+func newManifestDecoder() *manifestDecoder {
+	return defaultManifestDecoder
+}
+
+// Unmarshal decodes raw YAML bytes into a generic manifest map.
 func (d *manifestDecoder) Unmarshal(data []byte) (map[string]any, error) {
 	if len(data) == 0 {
 		return nil, nil
@@ -43,6 +47,7 @@ func (d *manifestDecoder) Unmarshal(data []byte) (map[string]any, error) {
 	return parsed, nil
 }
 
+// Decode converts a manifest map into the internal DAG representation.
 func (d *manifestDecoder) Decode(input map[string]any) (*dag, error) {
 	if err := validateManifestAliases(input); err != nil {
 		return nil, err
@@ -63,6 +68,7 @@ func (d *manifestDecoder) Decode(input map[string]any) (*dag, error) {
 	return decoded, nil
 }
 
+// newMapDecoder creates a mapstructure decoder for the target manifest.
 func (d *manifestDecoder) newMapDecoder(target *dag) (*mapstructure.Decoder, error) {
 	return mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
@@ -72,10 +78,11 @@ func (d *manifestDecoder) newMapDecoder(target *dag) (*mapstructure.Decoder, err
 	})
 }
 
+// validateManifestAliases checks for incompatible legacy and current alias usage.
 func validateManifestAliases(input map[string]any) error {
 	if _, hasLabels := input["labels"]; hasLabels {
 		if _, hasTags := input["tags"]; hasTags {
-			return fmt.Errorf("labels and deprecated tags cannot both be set")
+			return errors.New("labels and deprecated tags cannot both be set")
 		}
 	}
 	return nil

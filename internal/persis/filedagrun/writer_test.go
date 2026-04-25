@@ -4,7 +4,9 @@
 package filedagrun
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -123,6 +125,10 @@ func TestWriterErrorHandling(t *testing.T) {
 		data, err := os.ReadFile(writerPath)
 		require.NoError(t, err)
 		require.NotEmpty(t, data)
+
+		var decoded map[string]any
+		require.NoError(t, json.Unmarshal(bytes.TrimRight(data, "\n"), &decoded))
+
 		assert.Equal(t, byte('\n'), data[len(data)-1])
 	})
 }
