@@ -199,7 +199,7 @@ function Content({ navbarColor, children }: LayoutProps) {
             <button
               onClick={toggleChat}
               className="p-2 rounded-md hover:bg-muted transition-colors"
-              aria-label="Agent Console"
+              aria-label="Steward Console"
             >
               <Terminal className="h-5 w-5" />
             </button>

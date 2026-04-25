@@ -67,7 +67,7 @@ export function ChatMessages({
         <div className="text-center">
           <Terminal className="h-8 w-8 mx-auto mb-2 opacity-30" />
           <p className="text-xs text-muted-foreground">
-            Ask the agent to create DAGs, run commands, or help with workflows
+            Ask Steward to improve, repair, or explain workflows
           </p>
         </div>
       </div>

@@ -57,7 +57,7 @@ export function AgentChatModalHeader({
           <PanelLeft className="h-4 w-4" />
         </button>
         <Terminal className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <span className="text-xs font-medium text-foreground truncate">Agent</span>
+        <span className="text-xs font-medium text-foreground truncate">Steward</span>
       </div>
       {totalCost != null && totalCost > 0 && (
         <span className="text-[10px] text-muted-foreground/60 flex-shrink-0 tabular-nums">

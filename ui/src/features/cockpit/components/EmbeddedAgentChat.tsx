@@ -119,7 +119,7 @@ export function EmbeddedAgentChat(): React.ReactElement {
           {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
         </button>
         <MessageSquare size={14} className="text-muted-foreground" />
-        <span className="text-xs font-medium">Agent</span>
+        <span className="text-xs font-medium">Steward</span>
         {sessionId && (
           <button
             onClick={clearSession}
@@ -168,7 +168,7 @@ export function EmbeddedAgentChat(): React.ReactElement {
             onSend={handleSend}
             onCancel={handleCancel}
             isWorking={isWorking}
-            placeholder="Ask the agent..."
+            placeholder="Ask Steward..."
             initialValue={initialInputValue}
             hasActiveSession={!!sessionId}
           />
