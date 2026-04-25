@@ -168,12 +168,27 @@ func TestNode(t *testing.T) {
 		require.Contains(t, err.Error(), "signal: interrupt")
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
 	})
-	t.Run("CancelWaiting", func(t *testing.T) {
+	t.Run("CancelUpdatesOnlyRunningOrWaiting", func(t *testing.T) {
 		t.Parallel()
 
-		node := runtime.NewNode(core.Step{Name: core.NodeWaiting.String()}, runtime.NodeState{Status: core.NodeWaiting})
-		node.Cancel()
-		require.Equal(t, core.NodeAborted, node.State().Status)
+		tests := []struct {
+			name   string
+			status core.NodeStatus
+			want   core.NodeStatus
+		}{
+			{name: "Running", status: core.NodeRunning, want: core.NodeAborted},
+			{name: "Waiting", status: core.NodeWaiting, want: core.NodeAborted},
+			{name: "Succeeded", status: core.NodeSucceeded, want: core.NodeSucceeded},
+			{name: "NotStarted", status: core.NodeNotStarted, want: core.NodeNotStarted},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				node := runtime.NewNode(core.Step{Name: tt.name}, runtime.NodeState{Status: tt.status})
+				node.Cancel()
+				require.Equal(t, tt.want, node.State().Status)
+			})
+		}
 	})
 	t.Run("LogOutput", func(t *testing.T) {
 		t.Parallel()

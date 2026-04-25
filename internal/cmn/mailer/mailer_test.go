@@ -5,9 +5,13 @@ package mailer
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -218,6 +222,311 @@ func TestComposeMailSanitizesHeaders(t *testing.T) {
 	assert.Contains(t, payload, "To: to@example.comX-Dagu-To: injected")
 	assert.Contains(t, payload, "From: from@example.comX-Dagu-From: injected")
 	assert.Contains(t, payload, "Subject: subjectX-Dagu-Subject: injected")
+}
+
+func TestSanitizeHeaderFieldRemovesControlCharactersAndTruncates(t *testing.T) {
+	t.Parallel()
+
+	value := strings.Repeat("a", 300) + "\r\n" + "b" + string([]byte{0x00, 0x1f, 0x7f}) + "\t"
+	sanitized := sanitizeHeaderField(value)
+
+	require.Len(t, sanitized, 256)
+	require.NotContains(t, sanitized, "\r")
+	require.NotContains(t, sanitized, "\n")
+	for _, r := range sanitized {
+		require.False(t, r < 0x20 && r != '\t')
+		require.NotEqual(t, rune(0x7f), r)
+	}
+}
+
+func TestComposeMailAttachmentTransferEncodingHeaderAppearsOncePerPart(t *testing.T) {
+	t.Parallel()
+
+	attachment := filepath.Join(t.TempDir(), "attachment.txt")
+	require.NoError(t, os.WriteFile(attachment, []byte("hello"), 0600))
+
+	client := New(Config{})
+	payload := string(client.composeMail(
+		[]string{"to@example.com"},
+		"from@example.com",
+		"subject",
+		"body",
+		[]string{attachment},
+	))
+
+	require.Equal(t, 2, strings.Count(payload, "Content-Transfer-Encoding: base64"))
+}
+
+func TestComposeMailEndsWithClosingBoundary(t *testing.T) {
+	t.Parallel()
+
+	client := New(Config{})
+	payload := string(client.composeMail(
+		[]string{"to@example.com"},
+		"from@example.com",
+		"subject",
+		"body",
+		nil,
+	))
+
+	require.True(t, strings.HasSuffix(payload, "--"+boundary+"--\r\n"))
+	require.NotContains(t, payload, "--"+boundary+"--\r\n\r\n")
+}
+
+func TestSendWithoutAuthSkipsStartTLS(t *testing.T) {
+	t.Parallel()
+
+	server, err := newSMTPRecordingServer()
+	require.NoError(t, err)
+	server.advertiseSTARTTLS = true
+	defer func() {
+		_ = server.Close()
+	}()
+
+	go server.Serve()
+
+	host, port, err := net.SplitHostPort(server.Address())
+	require.NoError(t, err)
+
+	mailer := New(Config{Host: host, Port: port})
+	err = mailer.Send(
+		context.Background(),
+		"from@example.com",
+		[]string{"to@example.com"},
+		"Subject",
+		"Body",
+		nil,
+	)
+	require.NoError(t, err)
+	require.Zero(t, server.StartTLSCount())
+}
+
+func TestSendWrapsSMTPCommandErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		configure      func(*smtpRecordingServer)
+		expectedSubstr string
+	}{
+		{
+			name: "MailFrom",
+			configure: func(server *smtpRecordingServer) {
+				server.mailFromResponse = "550 sender rejected\r\n"
+			},
+			expectedSubstr: "MAIL FROM failed",
+		},
+		{
+			name: "RcptTo",
+			configure: func(server *smtpRecordingServer) {
+				server.rcptToResponse = "550 recipient rejected\r\n"
+			},
+			expectedSubstr: "RCPT TO failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, err := newSMTPRecordingServer()
+			require.NoError(t, err)
+			tt.configure(server)
+			defer func() {
+				_ = server.Close()
+			}()
+
+			go server.Serve()
+
+			host, port, err := net.SplitHostPort(server.Address())
+			require.NoError(t, err)
+
+			mailer := New(Config{Host: host, Port: port})
+			err = mailer.Send(
+				context.Background(),
+				"from@example.com",
+				[]string{"to@example.com"},
+				"Subject",
+				"Body",
+				nil,
+			)
+			require.Error(t, err)
+			require.ErrorContains(t, err, tt.expectedSubstr)
+		})
+	}
+}
+
+func TestSendSanitizesHeaders(t *testing.T) {
+	t.Parallel()
+
+	server, err := newSMTPRecordingServer()
+	require.NoError(t, err)
+	defer func() {
+		_ = server.Close()
+	}()
+
+	go server.Serve()
+
+	host, port, err := net.SplitHostPort(server.Address())
+	require.NoError(t, err)
+
+	mailer := New(Config{Host: host, Port: port})
+	err = mailer.Send(
+		context.Background(),
+		"from@example.com\r\nX-Dagu-From: injected",
+		[]string{"to@example.com\r\nX-Dagu-To: injected"},
+		"Subject\r\nX-Dagu-Subject: injected",
+		"Body",
+		nil,
+	)
+	require.NoError(t, err)
+
+	payloads := server.RecordedDataBodies()
+	require.Len(t, payloads, 1)
+	payload := payloads[0]
+	require.NotContains(t, payload, "\r\nX-Dagu-From:")
+	require.NotContains(t, payload, "\r\nX-Dagu-To:")
+	require.NotContains(t, payload, "\r\nX-Dagu-Subject:")
+	require.Contains(t, payload, "From: from@example.comX-Dagu-From: injected")
+	require.Contains(t, payload, "To: to@example.comX-Dagu-To: injected")
+	require.Contains(t, payload, "Subject: SubjectX-Dagu-Subject: injected")
+}
+
+type smtpRecordingServer struct {
+	listener           net.Listener
+	advertiseSTARTTLS  bool
+	mailFromResponse   string
+	rcptToResponse     string
+	startTLSResponse   string
+	mu                 sync.Mutex
+	startTLSCount      int
+	recordedDataBodies []string
+}
+
+func newSMTPRecordingServer() (*smtpRecordingServer, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, err
+	}
+	return &smtpRecordingServer{
+		listener:         listener,
+		mailFromResponse: "250 OK\r\n",
+		rcptToResponse:   "250 OK\r\n",
+		startTLSResponse: "454 TLS not available\r\n",
+	}, nil
+}
+
+func (s *smtpRecordingServer) Address() string {
+	return s.listener.Addr().String()
+}
+
+func (s *smtpRecordingServer) Close() error {
+	return s.listener.Close()
+}
+
+func (s *smtpRecordingServer) StartTLSCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.startTLSCount
+}
+
+func (s *smtpRecordingServer) RecordedDataBodies() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.recordedDataBodies...)
+}
+
+func (s *smtpRecordingServer) Serve() {
+	for {
+		conn, err := s.listener.Accept()
+		if err != nil {
+			return
+		}
+		go s.handleConnection(conn)
+	}
+}
+
+func (s *smtpRecordingServer) handleConnection(conn net.Conn) {
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	writer := bufio.NewWriter(conn)
+	reader := bufio.NewReader(conn)
+
+	_, _ = writer.WriteString("220 mock.server ESMTP\r\n")
+	_ = writer.Flush()
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+
+		switch {
+		case strings.HasPrefix(line, "HELO") || strings.HasPrefix(line, "EHLO"):
+			_, _ = writer.WriteString("250-mock.server\r\n")
+			if s.advertiseSTARTTLS {
+				_, _ = writer.WriteString("250-STARTTLS\r\n")
+			}
+			_, _ = writer.WriteString("250 OK\r\n")
+		case strings.HasPrefix(line, "STARTTLS"):
+			s.mu.Lock()
+			s.startTLSCount++
+			s.mu.Unlock()
+			_, _ = writer.WriteString(s.startTLSResponse)
+		case strings.HasPrefix(line, "MAIL FROM:"):
+			_, _ = writer.WriteString(s.mailFromResponse)
+		case strings.HasPrefix(line, "RCPT TO:"):
+			_, _ = writer.WriteString(s.rcptToResponse)
+		case strings.HasPrefix(line, "DATA"):
+			_, _ = writer.WriteString("354 Start mail input\r\n")
+			_ = writer.Flush()
+
+			var payload bytes.Buffer
+			for {
+				dataLine, err := reader.ReadString('\n')
+				if err != nil {
+					return
+				}
+				if strings.TrimSpace(dataLine) == "." {
+					s.mu.Lock()
+					s.recordedDataBodies = append(s.recordedDataBodies, payload.String())
+					s.mu.Unlock()
+					_, _ = writer.WriteString("250 OK\r\n")
+					break
+				}
+				payload.WriteString(dataLine)
+			}
+		case strings.HasPrefix(line, "QUIT"):
+			_, _ = writer.WriteString("221 Bye\r\n")
+			_ = writer.Flush()
+			return
+		default:
+			_, _ = writer.WriteString("500 Unknown command\r\n")
+		}
+		_ = writer.Flush()
+	}
+}
+
+func (m *Client) sendWithNoAuth(
+	from string,
+	to []string,
+	subject, body string,
+	attachments []string,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
+	defer cancel()
+	return m.send(ctx, from, to, subject, body, attachments, false)
+}
+
+func (m *Client) sendWithAuth(
+	from string,
+	to []string,
+	subject, body string,
+	attachments []string,
+) error {
+	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
+	defer cancel()
+	return m.send(ctx, from, to, subject, body, attachments, true)
 }
 
 // mockSMTPServer creates a mock SMTP server for testing

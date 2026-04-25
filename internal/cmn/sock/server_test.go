@@ -49,10 +49,10 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	client := sock.NewClient(tmpFile.Name())
 	listen := make(chan error, 1)
+	done := make(chan error, 1)
 
 	go func() {
-		err := unixServer.Serve(context.Background(), listen)
-		require.True(t, errors.Is(err, sock.ErrServerRequestedShutdown))
+		done <- unixServer.Serve(context.Background(), listen)
 	}()
 
 	// Wait for the server to signal it is ready.
@@ -69,6 +69,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 		_, err := client.Request(http.MethodPost, "/")
 		return err != nil
 	}, 5*time.Second, 10*time.Millisecond)
+	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
 func TestHeaderOnlyResponse(t *testing.T) {
@@ -88,10 +89,10 @@ func TestHeaderOnlyResponse(t *testing.T) {
 	require.NoError(t, err)
 
 	listen := make(chan error, 1)
+	done := make(chan error, 1)
 
 	go func() {
-		err = unixServer.Serve(context.Background(), listen)
-		_ = unixServer.Shutdown(context.Background())
+		done <- unixServer.Serve(context.Background(), listen)
 	}()
 
 	// Wait for the server to signal it is ready.
@@ -118,6 +119,8 @@ func TestHeaderOnlyResponse(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusForbidden, response.StatusCode)
 	require.Empty(t, body)
+	require.NoError(t, unixServer.Shutdown(context.Background()))
+	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
 func TestEmptyResponse(t *testing.T) {
@@ -136,10 +139,10 @@ func TestEmptyResponse(t *testing.T) {
 
 	client := sock.NewClient(tmpFile.Name())
 	listen := make(chan error, 1)
+	done := make(chan error, 1)
 
 	go func() {
-		err = unixServer.Serve(context.Background(), listen)
-		_ = unixServer.Shutdown(context.Background())
+		done <- unixServer.Serve(context.Background(), listen)
 	}()
 
 	// Wait for the server to signal it is ready.
@@ -148,6 +151,8 @@ func TestEmptyResponse(t *testing.T) {
 	body, err := client.Request(http.MethodGet, "/")
 	require.NoError(t, err)
 	require.Empty(t, body)
+	require.NoError(t, unixServer.Shutdown(context.Background()))
+	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
 func TestShutdownWhileServerStarts(t *testing.T) {
@@ -219,5 +224,62 @@ func TestMultipleWritesProduceSingleResponseBody(t *testing.T) {
 	require.Equal(t, "OK", body)
 
 	require.NoError(t, unixServer.Shutdown(context.Background()))
+	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
+}
+
+func TestShutdownWaitsForActiveHandlers(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test_server_shutdown_waits_for_handlers")
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	handlerStarted := make(chan struct{})
+	releaseHandler := make(chan struct{})
+
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, _ *http.Request) {
+			close(handlerStarted)
+			<-releaseHandler
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("OK"))
+		},
+	)
+	require.NoError(t, err)
+
+	client := sock.NewClient(tmpFile.Name())
+	listen := make(chan error, 1)
+	done := make(chan error, 1)
+	requestDone := make(chan error, 1)
+	shutdownDone := make(chan error, 1)
+
+	go func() {
+		done <- unixServer.Serve(context.Background(), listen)
+	}()
+
+	require.NoError(t, <-listen)
+
+	go func() {
+		_, err := client.Request(http.MethodGet, "/")
+		requestDone <- err
+	}()
+
+	<-handlerStarted
+
+	go func() {
+		shutdownDone <- unixServer.Shutdown(context.Background())
+	}()
+
+	select {
+	case err := <-shutdownDone:
+		t.Fatalf("shutdown returned before the active handler finished: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(releaseHandler)
+	require.NoError(t, <-requestDone)
+	require.NoError(t, <-shutdownDone)
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }

@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -54,6 +55,7 @@ var (
 	boundary     = "==simple-boundary-dagu-mailer"
 	errFileEmpty = errors.New("file is empty")
 	mailTimeout  = 30 * time.Second
+	maxHeaderLen = 256
 )
 
 // SendMail sends an email.
@@ -74,28 +76,6 @@ func (m *Client) Send(
 	if m.username == "" && m.password == "" {
 		return m.send(ctx, from, to, subject, body, attachments, false)
 	}
-	return m.send(ctx, from, to, subject, body, attachments, true)
-}
-
-func (m *Client) sendWithNoAuth(
-	from string,
-	to []string,
-	subject, body string,
-	attachments []string,
-) error {
-	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
-	defer cancel()
-	return m.send(ctx, from, to, subject, body, attachments, false)
-}
-
-func (m *Client) sendWithAuth(
-	from string,
-	to []string,
-	subject, body string,
-	attachments []string,
-) error {
-	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
-	defer cancel()
 	return m.send(ctx, from, to, subject, body, attachments, true)
 }
 
@@ -132,52 +112,42 @@ func (m *Client) send(
 		_ = c.Close()
 	}()
 
-	if err := m.prepareSession(ctx, c, useAuth); err != nil {
-		return err
+	if useAuth {
+		if err := m.prepareSession(ctx, c); err != nil {
+			return err
+		}
 	}
 
 	recipients := sanitizeAddresses(to)
 	safeFrom := sanitizeHeaderField(from)
 	safeSubject := sanitizeHeaderField(subject)
 	if err := c.Mail(safeFrom); err != nil {
-		if useAuth {
-			return fmt.Errorf("MAIL FROM failed: %w", err)
-		}
-		return err
+		return fmt.Errorf("MAIL FROM failed: %w", err)
 	}
 	for _, recipient := range recipients {
 		if err := c.Rcpt(recipient); err != nil {
-			if useAuth {
-				return fmt.Errorf("RCPT TO failed: %w", err)
-			}
-			return err
+			return fmt.Errorf("RCPT TO failed: %w", err)
 		}
 	}
 
 	wc, err := c.Data()
 	if err != nil {
-		if useAuth {
-			return fmt.Errorf("DATA command failed: %w", err)
-		}
-		return err
+		return fmt.Errorf("DATA command failed: %w", err)
 	}
 
 	payload := m.composeMail(recipients, safeFrom, safeSubject, processEmailBody(body), attachments)
 	_, err = wc.Write(payload)
 	if err != nil {
-		if useAuth {
-			return fmt.Errorf("failed to write email body: %w", err)
-		}
-		return err
+		return fmt.Errorf("failed to write email body: %w", err)
 	}
 	if err := wc.Close(); err != nil {
-		if useAuth {
-			return fmt.Errorf("failed to close data writer: %w", err)
-		}
-		return err
+		return fmt.Errorf("failed to close data writer: %w", err)
 	}
 
-	return c.Quit()
+	if err := c.Quit(); err != nil {
+		return fmt.Errorf("QUIT failed: %w", err)
+	}
+	return nil
 }
 
 func sanitizeAddresses(addresses []string) []string {
@@ -192,11 +162,24 @@ func sanitizeAddresses(addresses []string) []string {
 }
 
 func sanitizeHeaderField(value string) string {
-	return replacer.Replace(value)
+	value = replacer.Replace(value)
+	var b strings.Builder
+	b.Grow(min(len(value), maxHeaderLen))
+	for _, r := range value {
+		if r != '\t' && (r < 0x20 || r == 0x7f) {
+			continue
+		}
+		size := utf8.RuneLen(r)
+		if size < 0 || b.Len()+size > maxHeaderLen {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
-// prepareSession negotiates STARTTLS if available and authenticates when enabled.
-func (m *Client) prepareSession(ctx context.Context, c *smtp.Client, useAuth bool) error {
+// prepareSession negotiates STARTTLS and authenticates authenticated sessions.
+func (m *Client) prepareSession(ctx context.Context, c *smtp.Client) error {
 	if err := c.Hello("localhost"); err != nil {
 		return fmt.Errorf("HELO failed: %w", err)
 	}
@@ -209,10 +192,6 @@ func (m *Client) prepareSession(ctx context.Context, c *smtp.Client, useAuth boo
 		if err := c.StartTLS(tlsConfig); err != nil {
 			return fmt.Errorf("STARTTLS failed: %w", err)
 		}
-	}
-
-	if !useAuth {
-		return nil
 	}
 
 	if err := m.authenticate(ctx, c); err != nil {
@@ -316,10 +295,9 @@ func (m *Client) composeMail(
 	buf.WriteString("\r\n")
 	buf.WriteString(base64.StdEncoding.EncodeToString([]byte(body)))
 	buf.Write(addAttachments(attachments))
-	buf.WriteString("\r\n\r\n--")
+	buf.WriteString("\r\n--")
 	buf.WriteString(boundary)
-	buf.WriteString("--\r\n\r\n")
-	buf.WriteString("\r\n\r\n")
+	buf.WriteString("--\r\n")
 	return buf.Bytes()
 }
 
@@ -349,14 +327,14 @@ func addAttachments(attachments []string) []byte {
 	for _, fileName := range attachments {
 		data, err := readFile(fileName)
 		if err == nil {
-			_, _ = fmt.Fprintf(&buf, "\r\n\n--%s\r\n", boundary)
-			_, _ = buf.WriteString("Content-Type: text/plain;" + "\r\n")
-			_, _ = buf.WriteString("Content-Transfer-Encoding: base64" + "\r\n")
+			_, _ = fmt.Fprintf(&buf, "\r\n--%s\r\n", boundary)
+			_, _ = buf.WriteString("Content-Type: text/plain\r\n")
+			_, _ = buf.WriteString("Content-Transfer-Encoding: base64\r\n")
 			_, _ = buf.WriteString(
 				"Content-Disposition: attachment; filename=" +
 					filepath.Base(fileName) + "\r\n",
 			)
-			_, _ = buf.WriteString("Content-Transfer-Encoding: base64\r\n\n")
+			_, _ = buf.WriteString("\r\n")
 			_, _ = buf.WriteString(base64.StdEncoding.EncodeToString(data))
 		}
 	}

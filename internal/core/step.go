@@ -6,6 +6,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -191,7 +192,7 @@ func (s *Step) UnmarshalJSON(data []byte) error {
 func (s *Step) legacyCommandEntry() CommandEntry {
 	return CommandEntry{
 		Command:     s.Command,
-		Args:        append([]string(nil), s.Args...),
+		Args:        slices.Clone(s.Args),
 		CmdWithArgs: s.CmdWithArgs,
 	}
 }

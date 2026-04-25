@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -29,6 +30,7 @@ type Server struct {
 	handlerFunc HTTPHandlerFunc
 	listener    net.Listener
 	quit        atomic.Bool
+	connWG      sync.WaitGroup
 	mu          sync.Mutex
 }
 
@@ -83,13 +85,20 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 			}
 			return err
 		}
+		srv.connWG.Add(1)
 		go srv.serveConn(ctx, conn)
 	}
 }
 
 func (srv *Server) serveConn(ctx context.Context, conn net.Conn) {
 	defer func() {
+		srv.connWG.Done()
 		_ = conn.Close()
+	}()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			logger.Error(ctx, "Socket handler panicked", slog.Any("panic", recovered))
+		}
 	}()
 
 	request, err := http.ReadRequest(bufio.NewReader(conn))
@@ -124,8 +133,11 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 			logger.Error(ctx, "Failed to close listener",
 				tag.Error(err))
 		}
-		return err
+		if err != nil {
+			return err
+		}
 	}
+	srv.connWG.Wait()
 	return nil
 }
 
