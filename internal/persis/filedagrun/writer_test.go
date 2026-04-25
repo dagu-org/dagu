@@ -4,7 +4,10 @@
 package filedagrun
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestWriter verifies writer persistence to new and existing status files.
 func TestWriter(t *testing.T) {
 	th := setupTestStore(t)
 
@@ -68,6 +72,7 @@ func TestWriter(t *testing.T) {
 	})
 }
 
+// TestWriterErrorHandling verifies writer lifecycle and error paths.
 func TestWriterErrorHandling(t *testing.T) {
 	th := setupTestStore(t)
 
@@ -106,8 +111,31 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 		assert.False(t, writer.IsOpen())
 	})
+
+	t.Run("WritesNewlineDelimitedJSON", func(t *testing.T) {
+		writerPath := filepath.Join(th.TmpDir, "ndjson.dat")
+		writer := NewWriter(writerPath)
+		require.NoError(t, writer.Open())
+
+		dag := th.DAG("test_newline_delimited_json")
+		dagRunID := uuid.Must(uuid.NewV7()).String()
+		dagRunStatus := transform.NewStatusBuilder(dag.DAG).Create(dagRunID, core.Running, 1, time.Now())
+
+		require.NoError(t, writer.write(dagRunStatus))
+		require.NoError(t, writer.close())
+
+		data, err := os.ReadFile(writerPath)
+		require.NoError(t, err)
+		require.NotEmpty(t, data)
+
+		var decoded map[string]any
+		require.NoError(t, json.Unmarshal(bytes.TrimRight(data, "\n"), &decoded))
+
+		assert.Equal(t, byte('\n'), data[len(data)-1])
+	})
 }
 
+// TestWriterRename verifies status files follow DAG rename operations.
 func TestWriterRename(t *testing.T) {
 	th := setupTestStore(t)
 

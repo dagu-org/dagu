@@ -25,7 +25,8 @@ var (
 
 type Writer struct {
 	target     string
-	writer     *bufio.Writer
+	buffer     *bufio.Writer
+	encoder    *json.Encoder
 	file       *os.File
 	mu         sync.Mutex
 	bufferSize int
@@ -69,7 +70,9 @@ func (w *Writer) Open() error {
 	}
 
 	w.file = file
-	w.writer = bufio.NewWriterSize(file, w.bufferSize)
+	w.buffer = bufio.NewWriterSize(file, w.bufferSize)
+	w.encoder = json.NewEncoder(w.buffer)
+	w.encoder.SetEscapeHTML(false)
 	return nil
 }
 
@@ -84,6 +87,7 @@ func (w *Writer) Write(ctx context.Context, st exec.DAGRunStatus) error {
 	return nil
 }
 
+// write encodes a single status entry and persists it to disk.
 func (w *Writer) write(st exec.DAGRunStatus) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -92,28 +96,11 @@ func (w *Writer) write(st exec.DAGRunStatus) error {
 		return ErrWriterNotOpen
 	}
 
-	jsonBytes, err := json.Marshal(st)
-	if err != nil {
-		return fmt.Errorf("failed to marshal status: %w", err)
+	if err := w.encoder.Encode(st); err != nil {
+		return fmt.Errorf("failed to encode status: %w", err)
 	}
 
-	if _, err := w.writer.Write(jsonBytes); err != nil {
-		return fmt.Errorf("failed to write JSON: %w", err)
-	}
-
-	if err := w.writer.WriteByte('\n'); err != nil {
-		return fmt.Errorf("failed to write newline: %w", err)
-	}
-
-	if err := w.writer.Flush(); err != nil {
-		return fmt.Errorf("failed to flush data: %w", err)
-	}
-
-	if err := w.file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync data: %w", err)
-	}
-
-	return nil
+	return w.flushAndSyncLocked()
 }
 
 // Close flushes any buffered data and closes the underlying file.
@@ -138,12 +125,8 @@ func (w *Writer) close() error {
 
 	var errs []error
 
-	if err := w.writer.Flush(); err != nil {
-		errs = append(errs, fmt.Errorf("flush error: %w", err))
-	}
-
-	if err := w.file.Sync(); err != nil {
-		errs = append(errs, fmt.Errorf("sync error: %w", err))
+	if err := w.flushAndSyncLocked(); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := w.file.Close(); err != nil {
@@ -151,7 +134,27 @@ func (w *Writer) close() error {
 	}
 
 	w.file = nil
-	w.writer = nil
+	w.buffer = nil
+	w.encoder = nil
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
+}
+
+// flushAndSyncLocked flushes the buffered encoder output and syncs the file.
+func (w *Writer) flushAndSyncLocked() error {
+	var errs []error
+
+	if err := w.buffer.Flush(); err != nil {
+		errs = append(errs, fmt.Errorf("flush error: %w", err))
+	}
+
+	if err := w.file.Sync(); err != nil {
+		errs = append(errs, fmt.Errorf("sync error: %w", err))
+	}
 
 	if len(errs) > 0 {
 		return errors.Join(errs...)
@@ -167,6 +170,7 @@ func (w *Writer) IsOpen() bool {
 	return w.isOpenLocked()
 }
 
+// isOpenLocked reports whether the writer has an active file and encoder.
 func (w *Writer) isOpenLocked() bool {
-	return w.file != nil && w.writer != nil
+	return w.file != nil && w.buffer != nil && w.encoder != nil
 }

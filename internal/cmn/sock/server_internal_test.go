@@ -4,21 +4,19 @@
 package sock
 
 import (
+	"bytes"
 	"context"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/stretchr/testify/require"
 )
 
-func TestServeConnRecoversFromHandlerPanic(t *testing.T) {
+// TestHTTPHandlerRecoversFromHandlerPanic verifies panic recovery logs context and returns HTTP 500.
+func TestHTTPHandlerRecoversFromHandlerPanic(t *testing.T) {
 	t.Parallel()
-
-	serverConn, clientConn := net.Pipe()
-	defer func() {
-		_ = clientConn.Close()
-	}()
 
 	srv, err := NewServer(
 		"ignored",
@@ -28,16 +26,38 @@ func TestServeConnRecoversFromHandlerPanic(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	var logs bytes.Buffer
+	ctx := logger.WithLogger(
+		context.Background(),
+		logger.NewLogger(
+			logger.WithQuiet(),
+			logger.WithFormat("text"),
+			logger.WithWriter(&logs),
+		),
+	)
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	recorder := httptest.NewRecorder()
+
+	require.NotPanics(t, func() {
+		srv.httpHandler(ctx).ServeHTTP(recorder, request)
+	})
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	require.Contains(t, logs.String(), "panic=boom")
+	require.Contains(t, logs.String(), "stack=")
+}
+
+// TestNewHTTPServerConfiguresTimeouts verifies the unix socket server installs defensive timeouts.
+func TestNewHTTPServerConfiguresTimeouts(t *testing.T) {
+	t.Parallel()
+
+	srv, err := NewServer(
+		"ignored",
+		func(http.ResponseWriter, *http.Request) {},
+	)
 	require.NoError(t, err)
 
-	go func() {
-		_ = request.Write(clientConn)
-		_ = clientConn.Close()
-	}()
-
-	srv.connWG.Add(1)
-	require.NotPanics(t, func() {
-		srv.serveConn(context.Background(), serverConn)
-	})
+	httpServer := srv.newHTTPServer(context.Background())
+	require.Equal(t, defaultTimeout, httpServer.ReadHeaderTimeout)
+	require.Equal(t, idleTimeout, httpServer.IdleTimeout)
 }

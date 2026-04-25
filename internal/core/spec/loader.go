@@ -242,6 +242,7 @@ func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*core.D
 	return mainDAG, nil
 }
 
+// loadYAMLFailure returns a placeholder DAG when YAML loading is allowed to fail.
 func loadYAMLFailure(opts BuildOpts, err error) (*core.DAG, error) {
 	if dag := buildLoadErrorDAG(opts, "", err); dag != nil {
 		return dag, nil
@@ -249,6 +250,7 @@ func loadYAMLFailure(opts BuildOpts, err error) (*core.DAG, error) {
 	return nil, core.ErrorList{err}
 }
 
+// buildLoadErrorDAG creates a placeholder DAG when build errors are allowed.
 func buildLoadErrorDAG(opts BuildOpts, filePath string, err error) *core.DAG {
 	if !opts.Has(BuildFlagAllowBuildErrors) {
 		return nil
@@ -330,6 +332,7 @@ func loadDAG(ctx BuildContext, nameOrPath string) (*core.DAG, error) {
 	return mainDAG, nil
 }
 
+// loadDAGFailure returns a placeholder DAG when file loading is allowed to fail.
 func loadDAGFailure(ctx BuildContext, filePath string, err error) (*core.DAG, error) {
 	if dag := buildLoadErrorDAG(ctx.opts, filePath, err); dag != nil {
 		return dag, nil
@@ -337,6 +340,7 @@ func loadDAGFailure(ctx BuildContext, filePath string, err error) (*core.DAG, er
 	return nil, err
 }
 
+// assembleLoadedDAGs returns the first DAG and attaches later documents as locals.
 func assembleLoadedDAGs(dags []*core.DAG, emptyErr error) (*core.DAG, error) {
 	if len(dags) == 0 {
 		return nil, emptyErr
@@ -350,6 +354,7 @@ func assembleLoadedDAGs(dags []*core.DAG, emptyErr error) (*core.DAG, error) {
 	return mainDAG, nil
 }
 
+// attachLocalDAGs registers secondary documents as named local DAGs.
 func attachLocalDAGs(mainDAG *core.DAG, localDAGs []*core.DAG) error {
 	if len(localDAGs) == 0 {
 		return nil
@@ -366,6 +371,7 @@ func attachLocalDAGs(mainDAG *core.DAG, localDAGs []*core.DAG) error {
 	return nil
 }
 
+// applyWorkingDirFallback sets a working directory when the manifest omits one.
 func applyWorkingDirFallback(dag *core.DAG, filePath string) error {
 	if dag.WorkingDir != "" {
 		dag.WorkingDirExplicit = true
@@ -399,6 +405,7 @@ type dagDocument struct {
 	data  map[string]any
 }
 
+// loadDAGsFromData builds DAGs from every non-empty YAML document in the input.
 func loadDAGsFromData(ctx BuildContext, data []byte, filePath string, baseDef *dag) ([]*core.DAG, error) {
 	docs, err := decodeDocuments(data)
 	if err != nil {
@@ -420,6 +427,7 @@ func loadDAGsFromData(ctx BuildContext, data []byte, filePath string, baseDef *d
 	return dags, nil
 }
 
+// decodeDocuments splits a YAML stream into non-empty manifest documents.
 func decodeDocuments(data []byte) ([]dagDocument, error) {
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	docs := make([]dagDocument, 0, 1)
@@ -440,6 +448,7 @@ func decodeDocuments(data []byte) ([]dagDocument, error) {
 	}
 }
 
+// loadBaseDefinition loads and decodes the optional base manifest.
 func loadBaseDefinition(opts BuildOpts) (*dag, []byte, error) {
 	if opts.Has(BuildFlagOnlyMetadata) {
 		return nil, nil, nil
@@ -457,6 +466,7 @@ func loadBaseDefinition(opts BuildOpts) (*dag, []byte, error) {
 	return baseDef, baseRaw, nil
 }
 
+// readBaseDefinitionData returns the raw bytes and label for the base manifest.
 func readBaseDefinitionData(opts BuildOpts) ([]byte, string, error) {
 	if len(opts.BaseConfigContent) > 0 {
 		return opts.BaseConfigContent, "embedded base config", nil
@@ -475,6 +485,7 @@ func readBaseDefinitionData(opts BuildOpts) ([]byte, string, error) {
 	return baseRaw, "base config", nil
 }
 
+// decodeDefinitionData parses manifest data into the internal dag definition.
 func decodeDefinitionData(data []byte, description string) (*dag, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
@@ -526,6 +537,7 @@ func processDAGDocument(
 	return dest, nil
 }
 
+// buildDocumentContext applies per-document overrides for multi-DAG files.
 func buildDocumentContext(ctx BuildContext, index int) BuildContext {
 	ctx.index = index
 	if index == 0 {
@@ -539,6 +551,7 @@ func buildDocumentContext(ctx BuildContext, index int) BuildContext {
 	return ctx.WithOpts(opts)
 }
 
+// prepareDocumentContext builds the inherited context and destination DAG.
 func prepareDocumentContext(ctx BuildContext, baseDef, spec *dag) (BuildContext, *core.DAG, error) {
 	customStepTypes, err := buildCustomStepTypeRegistry(stepTypesOf(baseDef), stepTypesOf(spec))
 	if err != nil {
@@ -559,6 +572,7 @@ func prepareDocumentContext(ctx BuildContext, baseDef, spec *dag) (BuildContext,
 	return ctx, baseDAG, nil
 }
 
+// buildDocumentBase builds the reusable base DAG and decoded defaults.
 func buildDocumentBase(ctx BuildContext, baseDef *dag) (*core.DAG, *defaults, error) {
 	baseDAG, err := buildBaseDAG(ctx, baseDef)
 	if err != nil {
@@ -573,6 +587,7 @@ func buildDocumentBase(ctx BuildContext, baseDef *dag) (*core.DAG, *defaults, er
 	return baseDAG, baseDefaults, nil
 }
 
+// documentYAML returns the YAML payload stored for a specific document.
 func documentYAML(index int, doc map[string]any, fullData []byte) ([]byte, error) {
 	if index == 0 {
 		return fullData, nil
@@ -605,6 +620,7 @@ func buildBaseDAG(ctx BuildContext, baseDef *dag) (*core.DAG, error) {
 	return baseDAG, nil
 }
 
+// stepTypesOf returns the custom step type declarations for a manifest.
 func stepTypesOf(d *dag) map[string]customStepTypeSpec {
 	if d == nil {
 		return nil
@@ -612,6 +628,7 @@ func stepTypesOf(d *dag) map[string]customStepTypeSpec {
 	return d.StepTypes
 }
 
+// shouldInheritType reports whether a document should reuse the base DAG type.
 func shouldInheritType(doc map[string]any, baseDef, spec *dag) bool {
 	if baseDef == nil || spec == nil {
 		return false
@@ -683,6 +700,7 @@ func resolveYamlFilePath(ctx BuildContext, file string) (string, error) {
 	return filepath.Abs(file)
 }
 
+// expandHomeDir expands a leading tilde when the caller used a home-relative path.
 func expandHomeDir(file string) string {
 	if file != "~" && !strings.HasPrefix(file, "~/") && !strings.HasPrefix(file, `~\`) {
 		return file
@@ -699,6 +717,7 @@ type mergeTransformer struct{}
 
 var _ mergo.Transformers = (*mergeTransformer)(nil)
 
+// Transformer customizes merge behavior for fields that need non-default semantics.
 func (*mergeTransformer) Transformer(
 	typ reflect.Type,
 ) func(dst, src reflect.Value) error {
@@ -842,40 +861,15 @@ func readYAMLFile(file string) (cfg map[string]any, err error) {
 
 // unmarshalData unmarshals the data into a map.
 func unmarshalData(data []byte) (map[string]any, error) {
-	var cm map[string]any
-	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
-	if errors.Is(err, io.EOF) {
-		err = nil
-	}
-
-	return cm, err
+	return newManifestDecoder().Unmarshal(data)
 }
 
 // decode decodes the configuration map into a manifest.
 func decode(cm map[string]any) (*dag, error) {
-	if _, hasLabels := cm["labels"]; hasLabels {
-		if _, hasTags := cm["tags"]; hasTags {
-			return nil, fmt.Errorf("labels and deprecated tags cannot both be set")
-		}
-	}
-
-	c := new(dag)
-	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: true,
-		Result:      c,
-		TagName:     "yaml",
-		DecodeHook:  TypedUnionDecodeHook(),
-	})
-	err := md.Decode(cm)
-	err = withSnakeCaseKeyHint(err)
-	if err == nil {
-		c.handlerOnRaw = extractRawHandlerOn(cm)
-		c.defaultsRaw = extractRawDefaults(cm)
-	}
-
-	return c, err
+	return newManifestDecoder().Decode(cm)
 }
 
+// extractRawHandlerOn copies raw handler definitions for later processing.
 func extractRawHandlerOn(cm map[string]any) map[string]map[string]any {
 	rawHandlers, ok := cm["handler_on"].(map[string]any)
 	if !ok || len(rawHandlers) == 0 {
@@ -896,6 +890,7 @@ func extractRawHandlerOn(cm map[string]any) map[string]map[string]any {
 	return cloned
 }
 
+// extractRawDefaults copies raw defaults from the decoded manifest map.
 func extractRawDefaults(cm map[string]any) map[string]any {
 	rawDefaults, ok := cm["defaults"].(map[string]any)
 	if !ok || len(rawDefaults) == 0 {

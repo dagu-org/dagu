@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestMain installs an isolated HOME directory for socket integration tests.
 func TestMain(m *testing.M) {
 	testHomeDir, err := os.MkdirTemp("", "controller_test")
 	if err != nil {
@@ -30,6 +31,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// TestStartAndShutdownServer verifies the server accepts requests and shuts down cleanly.
 func TestStartAndShutdownServer(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_start_shutdown")
 	require.NoError(t, err)
@@ -72,6 +74,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestHeaderOnlyResponse verifies responses without a body are preserved over the unix socket transport.
 func TestHeaderOnlyResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
@@ -123,6 +126,7 @@ func TestHeaderOnlyResponse(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestEmptyResponse verifies empty HTTP responses round-trip without synthetic data.
 func TestEmptyResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
@@ -155,6 +159,7 @@ func TestEmptyResponse(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestShutdownWhileServerStarts verifies shutdown wins even if serving has only just started.
 func TestShutdownWhileServerStarts(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_shutdown_while_server_starts")
 	require.NoError(t, err)
@@ -191,6 +196,7 @@ func TestShutdownWhileServerStarts(t *testing.T) {
 	}
 }
 
+// TestMultipleWritesProduceSingleResponseBody verifies multiple handler writes are concatenated once.
 func TestMultipleWritesProduceSingleResponseBody(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_multiple_writes")
 	require.NoError(t, err)
@@ -227,6 +233,62 @@ func TestMultipleWritesProduceSingleResponseBody(t *testing.T) {
 	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
 }
 
+// TestResponseHeadersAreReturnedToClient verifies response headers survive the unix socket transport.
+func TestResponseHeadersAreReturnedToClient(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test_server_response_headers")
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-Dagu-Test", "present")
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte("accepted"))
+		},
+	)
+	require.NoError(t, err)
+
+	listen := make(chan error, 1)
+	done := make(chan error, 1)
+
+	go func() {
+		done <- unixServer.Serve(context.Background(), listen)
+	}()
+
+	require.NoError(t, <-listen)
+
+	conn, err := net.DialTimeout("unix", tmpFile.Name(), 3*time.Second)
+	require.NoError(t, err)
+	defer func() {
+		_ = conn.Close()
+	}()
+	require.NoError(t, conn.SetDeadline(time.Now().Add(3*time.Second)))
+
+	request, err := http.NewRequest(http.MethodGet, "/headers", nil)
+	require.NoError(t, err)
+	require.NoError(t, request.Write(conn))
+
+	response, err := http.ReadResponse(bufio.NewReader(conn), request)
+	require.NoError(t, err)
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, response.StatusCode)
+	require.Equal(t, "present", response.Header.Get("X-Dagu-Test"))
+	require.Equal(t, "accepted", string(body))
+
+	require.NoError(t, unixServer.Shutdown(context.Background()))
+	require.True(t, errors.Is(<-done, sock.ErrServerRequestedShutdown))
+}
+
+// TestShutdownWaitsForActiveHandlers verifies graceful shutdown waits for in-flight handlers to finish.
 func TestShutdownWaitsForActiveHandlers(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_server_shutdown_waits_for_handlers")
 	require.NoError(t, err)
