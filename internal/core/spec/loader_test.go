@@ -1391,6 +1391,21 @@ steps:
 			errContains: "duplicate DAG name",
 		},
 		{
+			name: "DuplicateMainAndSubDAGNames",
+			content: `name: duplicate-name
+steps:
+  - name: step1
+    command: echo "main"
+
+---
+name: duplicate-name
+steps:
+  - name: step1
+    command: echo "child"
+`,
+			errContains: "duplicate DAG name",
+		},
+		{
 			name: "SubDAGWithoutName",
 			content: `steps:
   - name: step1

@@ -452,3 +452,9 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.NotContains(t, html, "style=")
 	})
 }
+
+func TestStatusBadgeClassPartiallySucceeded(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, "success", statusBadgeClass("partially_succeeded"))
+}

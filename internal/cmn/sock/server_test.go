@@ -4,8 +4,11 @@
 package sock_test
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"io"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -68,7 +71,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
-func TestNoResponse(t *testing.T) {
+func TestHeaderOnlyResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
 	require.NoError(t, tmpFile.Close())
@@ -84,7 +87,6 @@ func TestNoResponse(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	client := sock.NewClient(tmpFile.Name())
 	listen := make(chan error, 1)
 
 	go func() {
@@ -95,11 +97,30 @@ func TestNoResponse(t *testing.T) {
 	// Wait for the server to signal it is ready.
 	require.NoError(t, <-listen)
 
-	_, err = client.Request(http.MethodGet, "/")
-	require.Error(t, err)
+	conn, err := net.DialTimeout("unix", tmpFile.Name(), 3*time.Second)
+	require.NoError(t, err)
+	defer func() {
+		_ = conn.Close()
+	}()
+	require.NoError(t, conn.SetDeadline(time.Now().Add(3*time.Second)))
+
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	require.NoError(t, err)
+	require.NoError(t, request.Write(conn))
+
+	response, err := http.ReadResponse(bufio.NewReader(conn), request)
+	require.NoError(t, err)
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusForbidden, response.StatusCode)
+	require.Empty(t, body)
 }
 
-func TestErrorResponse(t *testing.T) {
+func TestEmptyResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
 	require.NoError(t, tmpFile.Close())
@@ -124,8 +145,9 @@ func TestErrorResponse(t *testing.T) {
 	// Wait for the server to signal it is ready.
 	require.NoError(t, <-listen)
 
-	_, err = client.Request(http.MethodGet, "/")
-	require.Error(t, err)
+	body, err := client.Request(http.MethodGet, "/")
+	require.NoError(t, err)
+	require.Empty(t, body)
 }
 
 func TestShutdownWhileServerStarts(t *testing.T) {

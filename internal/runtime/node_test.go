@@ -157,7 +157,7 @@ func TestNode(t *testing.T) {
 		go func() {
 			exec := <-execCh
 			<-exec.ready
-			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
+			node.Signal(node.Context, syscall.Signal(0), true) // allow override signal
 		}()
 
 		node.SetStatus(core.NodeRunning)
@@ -167,6 +167,13 @@ func TestNode(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "signal: interrupt")
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
+	})
+	t.Run("CancelWaiting", func(t *testing.T) {
+		t.Parallel()
+
+		node := runtime.NewNode(core.Step{Name: core.NodeWaiting.String()}, runtime.NodeState{Status: core.NodeWaiting})
+		node.Cancel()
+		require.Equal(t, core.NodeAborted, node.State().Status)
 	})
 	t.Run("LogOutput", func(t *testing.T) {
 		t.Parallel()

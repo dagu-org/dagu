@@ -628,7 +628,10 @@ func validateUniqueNames(dags []*core.DAG) error {
 		return nil
 	}
 
-	names := make(map[string]struct{}, len(dags)-1)
+	names := make(map[string]struct{}, len(dags))
+	if dags[0].Name != "" {
+		names[dags[0].Name] = struct{}{}
+	}
 	for i, dag := range dags[1:] {
 		index := i + 1
 		if dag.Name == "" {

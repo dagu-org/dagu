@@ -640,10 +640,9 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 				tag.Step(n.Name()),
 			)
 		}
-	}
-
-	if status == core.NodeRunning && signal.IsTerminationSignalOS(sig) {
-		n.SetStatus(core.NodeAborted)
+		if signal.IsTerminationSignalOS(killSignal) {
+			n.SetStatus(core.NodeAborted)
+		}
 	}
 }
 
@@ -657,7 +656,8 @@ func (n *Node) signalToSend(sig os.Signal, allowOverride bool) os.Signal {
 func (n *Node) Cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.Status() == core.NodeRunning {
+	switch n.Status() {
+	case core.NodeRunning, core.NodeWaiting:
 		n.SetStatus(core.NodeAborted)
 	}
 }

@@ -8,7 +8,8 @@
     <link rel="icon" href="{{ basePath }}/assets/favicon.ico" />
     <title>{{ navbarTitle }}</title>
     <script>
-      const getConfig = () => ({
+      function getConfig() {
+        return {
           apiURL: "{{ apiURL }}",
           basePath: "{{ basePath }}",
           title: "{{ navbarTitle }}",
@@ -58,7 +59,8 @@
             gitSyncDir: "{{ js pathGitSyncDir }}",
             auditLogsDir: "{{ js pathAuditLogsDir }}",
           },
-        });
+        };
+      }
     </script>
     <script
       defer="defer"

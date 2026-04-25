@@ -154,7 +154,6 @@ type httpResponseWriter struct {
 	header     http.Header
 	statusCode int
 	body       bytes.Buffer
-	wroteBody  bool
 }
 
 func newHTTPResponseWriter(conn net.Conn) *httpResponseWriter {
@@ -166,15 +165,10 @@ func newHTTPResponseWriter(conn net.Conn) *httpResponseWriter {
 }
 
 func (w *httpResponseWriter) Write(data []byte) (int, error) {
-	w.wroteBody = true
 	return w.body.Write(data)
 }
 
 func (w *httpResponseWriter) flush() error {
-	if !w.wroteBody {
-		return nil
-	}
-
 	response := http.Response{
 		StatusCode:    w.statusCode,
 		ProtoMajor:    1,

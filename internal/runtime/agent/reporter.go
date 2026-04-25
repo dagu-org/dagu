@@ -146,6 +146,8 @@ func statusBadgeClass(status string) string {
 	switch status {
 	case "finished", "succeeded":
 		return "success"
+	case "partially_succeeded":
+		return "success"
 	case "failed":
 		return "failed"
 	case "running":

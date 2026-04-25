@@ -684,6 +684,7 @@ func (s *Scheduler) waitForTick(ctx context.Context, sig chan os.Signal, timer *
 	case <-ctx.Done():
 		return false
 	case <-sig:
+		s.Stop(ctx)
 		return false
 	case <-s.quit:
 		return false

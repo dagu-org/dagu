@@ -132,14 +132,14 @@ func (m *Client) send(
 		_ = c.Close()
 	}()
 
-	if useAuth {
-		if err := m.enableAuth(ctx, c); err != nil {
-			return err
-		}
+	if err := m.prepareSession(ctx, c, useAuth); err != nil {
+		return err
 	}
 
 	recipients := sanitizeAddresses(to)
-	if err := c.Mail(replacer.Replace(from)); err != nil {
+	safeFrom := sanitizeHeaderField(from)
+	safeSubject := sanitizeHeaderField(subject)
+	if err := c.Mail(safeFrom); err != nil {
 		if useAuth {
 			return fmt.Errorf("MAIL FROM failed: %w", err)
 		}
@@ -161,11 +161,8 @@ func (m *Client) send(
 		}
 		return err
 	}
-	defer func() {
-		_ = wc.Close()
-	}()
 
-	payload := m.composeMail(recipients, from, subject, processEmailBody(body), attachments)
+	payload := m.composeMail(recipients, safeFrom, safeSubject, processEmailBody(body), attachments)
 	_, err = wc.Write(payload)
 	if err != nil {
 		if useAuth {
@@ -194,8 +191,12 @@ func sanitizeAddresses(addresses []string) []string {
 	return cleaned
 }
 
-// enableAuth negotiates STARTTLS if available and then authenticates.
-func (m *Client) enableAuth(ctx context.Context, c *smtp.Client) error {
+func sanitizeHeaderField(value string) string {
+	return replacer.Replace(value)
+}
+
+// prepareSession negotiates STARTTLS if available and authenticates when enabled.
+func (m *Client) prepareSession(ctx context.Context, c *smtp.Client, useAuth bool) error {
 	if err := c.Hello("localhost"); err != nil {
 		return fmt.Errorf("HELO failed: %w", err)
 	}
@@ -208,6 +209,10 @@ func (m *Client) enableAuth(ctx context.Context, c *smtp.Client) error {
 		if err := c.StartTLS(tlsConfig); err != nil {
 			return fmt.Errorf("STARTTLS failed: %w", err)
 		}
+	}
+
+	if !useAuth {
+		return nil
 	}
 
 	if err := m.authenticate(ctx, c); err != nil {
@@ -287,6 +292,9 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 func (*Client) composeHeader(
 	to []string, from string, subject string,
 ) string {
+	to = sanitizeAddresses(to)
+	from = sanitizeHeaderField(from)
+	subject = sanitizeHeaderField(subject)
 	return "To: " + strings.Join(to, ",") + "\r\n" +
 		"From: " + from + "\r\n" +
 		"Subject: " + subject + "\r\n" +

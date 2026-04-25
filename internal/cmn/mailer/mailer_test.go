@@ -200,6 +200,26 @@ Please check the configuration.`,
 	}
 }
 
+func TestComposeMailSanitizesHeaders(t *testing.T) {
+	t.Parallel()
+
+	client := New(Config{})
+	payload := string(client.composeMail(
+		[]string{"to@example.com\r\nX-Dagu-To: injected"},
+		"from@example.com\r\nX-Dagu-From: injected",
+		"subject\r\nX-Dagu-Subject: injected",
+		"body",
+		nil,
+	))
+
+	assert.NotContains(t, payload, "\r\nX-Dagu-To:")
+	assert.NotContains(t, payload, "\r\nX-Dagu-From:")
+	assert.NotContains(t, payload, "\r\nX-Dagu-Subject:")
+	assert.Contains(t, payload, "To: to@example.comX-Dagu-To: injected")
+	assert.Contains(t, payload, "From: from@example.comX-Dagu-From: injected")
+	assert.Contains(t, payload, "Subject: subjectX-Dagu-Subject: injected")
+}
+
 // mockSMTPServer creates a mock SMTP server for testing
 type mockSMTPServer struct {
 	listener      net.Listener

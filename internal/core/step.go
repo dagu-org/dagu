@@ -191,7 +191,7 @@ func (s *Step) UnmarshalJSON(data []byte) error {
 func (s *Step) legacyCommandEntry() CommandEntry {
 	return CommandEntry{
 		Command:     s.Command,
-		Args:        s.Args,
+		Args:        append([]string(nil), s.Args...),
 		CmdWithArgs: s.CmdWithArgs,
 	}
 }
