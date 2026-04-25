@@ -19,6 +19,10 @@ func TestExpandHomeDir(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, homeDir, expandHomeDir("~"))
-	assert.Equal(t, filepath.Join(homeDir, "dags", "test.yaml"), expandHomeDir("~/dags/test.yaml"))
+	assert.Equal(
+		t,
+		filepath.Clean(filepath.Join(homeDir, "dags", "test.yaml")),
+		filepath.Clean(expandHomeDir("~/dags/test.yaml")),
+	)
 	assert.Equal(t, "~alice/dags/test.yaml", expandHomeDir("~alice/dags/test.yaml"))
 }
