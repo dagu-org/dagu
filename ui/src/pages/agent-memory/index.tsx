@@ -32,7 +32,7 @@ export default function AgentMemoryPage(): React.ReactNode {
   const remoteNode = appBarContext.selectedRemoteNode || 'local';
 
   useEffect(() => {
-    setTitle('Agent Memory');
+    setTitle('Steward Memory');
   }, [setTitle]);
 
   const fetchMemory = useCallback(async () => {
@@ -44,7 +44,7 @@ export default function AgentMemoryPage(): React.ReactNode {
           params: { query: { remoteNode } },
         }
       );
-      if (apiError) throw new Error('Failed to fetch agent memory');
+      if (apiError) throw new Error('Failed to fetch steward memory');
       setGlobalMemory(data.globalMemory ?? '');
       setDagNames(data.dagMemories ?? []);
       setMemoryDir(data.memoryDir ?? '');
@@ -184,9 +184,9 @@ export default function AgentMemoryPage(): React.ReactNode {
   return (
     <div className="space-y-4 max-w-7xl">
       <div>
-        <h1 className="text-lg font-semibold">Agent Memory</h1>
+        <h1 className="text-lg font-semibold">Steward Memory</h1>
         <p className="text-sm text-muted-foreground">
-          View and manage the AI agent's persistent memory
+          View and manage the steward&apos;s persistent memory
         </p>
         {isLoading && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
@@ -230,7 +230,7 @@ export default function AgentMemoryPage(): React.ReactNode {
           onChange={(e) => setGlobalMemory(e.target.value)}
           disabled={isLoading}
           className="w-full h-64 p-3 text-sm font-mono bg-muted/50 border rounded-md resize-y focus:outline-none focus:ring-1 focus:ring-ring"
-          placeholder="No global memory yet. The agent will write here when it learns something."
+          placeholder="No global memory yet. The steward will write here when it learns something."
         />
 
         <div className="flex gap-2">
@@ -278,7 +278,7 @@ export default function AgentMemoryPage(): React.ReactNode {
           </div>
         ) : dagNames.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            No DAG-specific memories yet. The agent will create these when
+            No DAG-specific memories yet. The steward will create these when
             working with specific DAGs.
           </p>
         ) : (
@@ -377,7 +377,7 @@ export default function AgentMemoryPage(): React.ReactNode {
         onSubmit={handleDeleteGlobal}
       >
         <p>
-          Are you sure you want to clear the global agent memory? This action
+          Are you sure you want to clear the global steward memory? This action
           cannot be undone.
         </p>
       </ConfirmModal>

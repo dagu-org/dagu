@@ -42,7 +42,7 @@ export default function SoulEditorPage() {
   const saveHandlerRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   useEffect(() => {
-    appBarContext.setTitle(isCreating ? 'Create Soul' : 'Edit Soul');
+    appBarContext.setTitle(isCreating ? 'Create Profile' : 'Edit Profile');
   }, [appBarContext, isCreating]);
 
   // Fetch soul data in edit mode
@@ -58,7 +58,7 @@ export default function SoulEditorPage() {
       });
       if (controller.signal.aborted) return;
       if (error) {
-        showError(error.message || 'Failed to load soul');
+        showError(error.message || 'Failed to load profile');
         navigate('/agent-souls');
         return;
       }
@@ -89,8 +89,8 @@ export default function SoulEditorPage() {
             description: description || undefined,
           },
         });
-        if (error) throw new Error(error.message || 'Failed to create soul');
-        showToast('Soul created');
+        if (error) throw new Error(error.message || 'Failed to create profile');
+        showToast('Profile created');
       } else {
         const { error } = await client.PATCH('/settings/agent/souls/{soulId}', {
           params: { path: { soulId: soulId! }, query: { remoteNode } },
@@ -100,8 +100,8 @@ export default function SoulEditorPage() {
             description: description || undefined,
           },
         });
-        if (error) throw new Error(error.message || 'Failed to update soul');
-        showToast('Soul saved');
+        if (error) throw new Error(error.message || 'Failed to update profile');
+        showToast('Profile saved');
       }
       navigate('/agent-souls');
     } catch (err) {
@@ -151,7 +151,7 @@ export default function SoulEditorPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-sm font-semibold">
-            {isCreating ? 'Create Soul' : `Edit: ${name}`}
+            {isCreating ? 'Create Profile' : `Edit Profile: ${name}`}
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -183,7 +183,7 @@ export default function SoulEditorPage() {
                 }
               }}
               onBlur={() => setNameTouched(true)}
-              placeholder="My Soul"
+              placeholder="My Profile"
               className="h-7 text-sm"
               required
             />
@@ -197,7 +197,7 @@ export default function SoulEditorPage() {
               id="soul-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this soul defines"
+              placeholder="What this profile defines"
               className="h-7 text-sm"
             />
           </div>

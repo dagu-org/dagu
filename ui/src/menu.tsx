@@ -721,7 +721,7 @@ export const mainListItems = React.forwardRef<
                 <NavGroup
                   groupKey="agent"
                   icon={<Bot size={18} />}
-                  label="Agent"
+                  label="Steward"
                   isOpen={isOpen}
                   basePath="/agent-"
                   customColor={customColor}
@@ -744,7 +744,7 @@ export const mainListItems = React.forwardRef<
                   />
                   <NavItem
                     to="/agent-souls"
-                    text="Souls"
+                    text="Profiles"
                     icon={<Ghost size={18} />}
                     isOpen={isOpen}
                     onClick={onNavItemClick}
@@ -817,7 +817,7 @@ export const mainListItems = React.forwardRef<
             <SidebarButton
               onClick={toggleChat}
               icon={<Terminal size={18} />}
-              label="Agent"
+              label="Steward"
               isOpen={isOpen}
             />
           )}

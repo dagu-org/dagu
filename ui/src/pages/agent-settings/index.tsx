@@ -205,7 +205,7 @@ export default function AgentSettingsPage(): ReactNode {
   );
 
   useEffect(() => {
-    appBarContext.setTitle('Agent Settings');
+    appBarContext.setTitle('Steward Settings');
   }, [appBarContext]);
 
   const fetchTools = useCallback(async (): Promise<ToolMeta[]> => {
@@ -228,7 +228,7 @@ export default function AgentSettingsPage(): ReactNode {
         const { data, error: apiError } = await client.GET('/settings/agent', {
           params: { query: { remoteNode } },
         });
-        if (apiError) throw new Error('Failed to fetch agent configuration');
+        if (apiError) throw new Error('Failed to fetch steward configuration');
         const normalizedPolicy = normalizeToolPolicy(data.toolPolicy, tools);
         setEnabled(data.enabled ?? false);
         setDefaultModelId(data.defaultModelId);
@@ -591,9 +591,9 @@ export default function AgentSettingsPage(): ReactNode {
     <div className="space-y-4 max-w-7xl pb-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Agent Settings</h1>
+          <h1 className="text-lg font-semibold">Steward Settings</h1>
           <p className="text-sm text-muted-foreground">
-            Configure the AI assistant for workflow generation
+            Configure Steward for workflow generation and improvement
           </p>
         </div>
         <Button
@@ -633,10 +633,10 @@ export default function AgentSettingsPage(): ReactNode {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="enabled" className="text-sm font-medium">
-              Enable Agent
+              Enable Steward
             </Label>
             <p className="text-xs text-muted-foreground">
-              Turn on the AI assistant feature
+              Turn on the steward feature
             </p>
           </div>
           <Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
@@ -644,9 +644,9 @@ export default function AgentSettingsPage(): ReactNode {
 
         {souls.length > 0 && (
           <div className="space-y-1">
-            <Label className="text-sm font-medium">Agent Personality</Label>
+            <Label className="text-sm font-medium">Default Profile</Label>
             <p className="text-xs text-muted-foreground">
-              Select the soul that defines the agent&apos;s identity and
+              Select the profile that defines the steward&apos;s identity and
               communication style
             </p>
             <Select
@@ -656,11 +656,11 @@ export default function AgentSettingsPage(): ReactNode {
               }
             >
               <SelectTrigger className="h-8 text-xs max-w-[300px]">
-                <SelectValue placeholder="Select soul" />
+                <SelectValue placeholder="Select profile" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__" className="text-xs">
-                  Default (no soul)
+                  Default (no profile)
                 </SelectItem>
                 {souls.map((s) => (
                   <SelectItem key={s.id} value={s.id} className="text-xs">
@@ -681,7 +681,7 @@ export default function AgentSettingsPage(): ReactNode {
               Web Search
             </Label>
             <p className="text-xs text-muted-foreground">
-              Enable provider-native web search for agent sessions
+              Enable provider-native web search for steward sessions
             </p>
           </div>
           <Switch

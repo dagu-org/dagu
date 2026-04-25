@@ -50,7 +50,7 @@ export default function AgentSoulsPage(): React.ReactNode {
   const debouncedQuery = useDebouncedValue(searchQuery, 300);
 
   useEffect(() => {
-    appBarContext.setTitle('Agent Souls');
+    appBarContext.setTitle('Profiles');
   }, [appBarContext]);
 
   useEffect(() => {
@@ -95,12 +95,12 @@ export default function AgentSoulsPage(): React.ReactNode {
         body: { selectedSoulId: soul.id },
       });
       if (apiError)
-        throw new Error(apiError.message || 'Failed to set default soul');
+        throw new Error(apiError.message || 'Failed to set default profile');
       setDefaultSoulId(data.selectedSoulId ?? undefined);
-      setSuccess(`"${soul.name}" is now the default soul`);
+      setSuccess(`"${soul.name}" is now the default profile`);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to set default soul'
+        err instanceof Error ? err.message : 'Failed to set default profile'
       );
     }
   }
@@ -115,12 +115,12 @@ export default function AgentSoulsPage(): React.ReactNode {
         }
       );
       if (apiError)
-        throw new Error(apiError.message || 'Failed to delete soul');
+        throw new Error(apiError.message || 'Failed to delete profile');
       setDeletingSoul(null);
-      setSuccess(`Soul "${deletingSoul.name}" deleted`);
+      setSuccess(`Profile "${deletingSoul.name}" deleted`);
       await mutate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete soul');
+      setError(err instanceof Error ? err.message : 'Failed to delete profile');
     }
   }
 
@@ -138,9 +138,9 @@ export default function AgentSoulsPage(): React.ReactNode {
     <div className="space-y-4 max-w-7xl pb-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Agent Souls</h1>
+          <h1 className="text-lg font-semibold">Profiles</h1>
           <p className="text-sm text-muted-foreground">
-            Manage personality and identity definitions for the AI agent
+            Manage named profiles for the steward
           </p>
         </div>
         <Button
@@ -149,7 +149,7 @@ export default function AgentSoulsPage(): React.ReactNode {
           className="h-8"
         >
           <Plus className="h-4 w-4 mr-1.5" />
-          Create Soul
+          Create Profile
         </Button>
       </div>
 
@@ -170,7 +170,7 @@ export default function AgentSoulsPage(): React.ReactNode {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search souls..."
+            placeholder="Search profiles..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-8 pl-8 text-sm"
@@ -178,7 +178,7 @@ export default function AgentSoulsPage(): React.ReactNode {
         </div>
       </div>
 
-      {/* Souls Grid */}
+      {/* Profiles Grid */}
       {isLoading && !data ? (
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -188,8 +188,8 @@ export default function AgentSoulsPage(): React.ReactNode {
           <Ghost className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-sm text-muted-foreground">
             {!debouncedQuery
-              ? 'No souls configured. Create a soul to get started.'
-              : 'No souls match your search criteria.'}
+              ? 'No profiles configured. Create a profile to get started.'
+              : 'No profiles match your search criteria.'}
           </p>
         </div>
       ) : (
@@ -271,14 +271,14 @@ export default function AgentSoulsPage(): React.ReactNode {
 
       {/* Delete Confirmation */}
       <ConfirmModal
-        title="Delete Soul"
+        title="Delete Profile"
         buttonText="Delete"
         visible={!!deletingSoul}
         dismissModal={() => setDeletingSoul(null)}
         onSubmit={handleDeleteSoul}
       >
         <p>
-          Are you sure you want to delete the soul &quot;{deletingSoul?.name}
+          Are you sure you want to delete the profile &quot;{deletingSoul?.name}
           &quot;? This action cannot be undone.
         </p>
       </ConfirmModal>
