@@ -401,30 +401,62 @@ handlerOn:
 
 For more examples, see the [Examples documentation](https://docs.dagu.sh/writing-workflows/examples).
 
-## Built-in Executors
+## Built-in and Custom Step Types
 
-Dagu includes built-in step executors. Each runs within the Dagu process (or worker) — no plugins or external runtimes required.
+Dagu includes built-in step types that run within the Dagu process (or worker).
 
-| Executor | Purpose |
+| Step type | Purpose |
 |----------|---------|
-| `command` | Shell commands and scripts (bash, sh, PowerShell, custom shells) |
-| `docker` | Run containers with registry auth, volume mounts, resource limits |
-| `kubernetes` | Execute Kubernetes Pods with resource requests, service accounts, namespaces |
-| `ssh` | Remote command execution with key-based auth and SFTP file transfer |
-| `harness` | Run coding agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi) as workflow steps |
-| `agent` | Multi-step LLM agent execution with tool calling |
-| `mail` | Send email via SMTP |
-| `template` | Text generation with template rendering |
-| `http` | HTTP requests (GET, POST, PUT, DELETE) with headers and authentication |
-| `sql` | Query PostgreSQL and SQLite with parameterized queries and result capture |
-| `redis` | Redis commands, pipelines, and Lua scripts |
-| `s3` | Upload, download, list, and delete S3 objects |
-| `jq` | JSON transformation using jq expressions |
-| `archive` | Create zip/tar archives with glob patterns |
-| `dag` | Invoke another DAG as a sub-workflow with parameter passing |
-| `router` | Conditional step routing based on expressions |
+| [`shell` / `command`](https://docs.dagu.sh/step-types/shell) | Shell commands and scripts (bash, sh, PowerShell, custom shells) |
+| [`docker`](https://docs.dagu.sh/step-types/docker) | Run containers with registry auth, volume mounts, and resource limits |
+| [`kubernetes` / `k8s`](https://docs.dagu.sh/step-types/kubernetes) | Execute Kubernetes Jobs with namespace, image, and resource settings |
+| [`ssh`](https://docs.dagu.sh/step-types/ssh) | Remote command execution over SSH |
+| [`sftp`](https://docs.dagu.sh/step-types/sftp) | File transfer over SFTP |
+| [`http`](https://docs.dagu.sh/step-types/http) | HTTP requests with headers, auth, and request bodies |
+| [`postgres`](https://docs.dagu.sh/step-types/sql/postgresql) / [`sqlite`](https://docs.dagu.sh/step-types/sql/sqlite) | SQL queries, imports, and exports for PostgreSQL and SQLite |
+| [`redis`](https://docs.dagu.sh/step-types/redis) | Redis commands, pipelines, and Lua scripts |
+| [`s3`](https://docs.dagu.sh/step-types/s3) | Upload, download, list, and delete S3 objects |
+| [`jq`](https://docs.dagu.sh/step-types/jq) | JSON transformation using jq expressions |
+| [`archive`](https://docs.dagu.sh/step-types/archive) | Create and extract zip/tar archives |
+| [`mail`](https://docs.dagu.sh/step-types/mail) | Send email via SMTP |
+| [`template`](https://docs.dagu.sh/step-types/template) | Text generation with template rendering |
+| [`router`](https://docs.dagu.sh/step-types/router) | Conditional step routing based on values and patterns |
+| [`dag` / `subworkflow` / `call:`](https://docs.dagu.sh/writing-workflows/control-flow) | Invoke another DAG as a sub-workflow with params and dependencies |
+| [`harness`](https://docs.dagu.sh/step-types/harness) | Run coding agent CLIs such as Claude Code, Codex, Copilot, OpenCode, and Pi |
+| [`chat`](https://docs.dagu.sh/features/chat/basics) | Single-shot LLM calls inside workflows |
+| [`agent`](https://docs.dagu.sh/features/agent/step) | Multi-step LLM agent execution with tool calling |
 
-See [step type documentation](https://docs.dagu.sh/step-types/shell) for configuration details of each executor.
+You can also define your own reusable step types with the top-level `step_types` field. Custom step types expand to built-in step types during DAG load, so you can wrap a common shell, HTTP, SQL, or other step pattern behind a typed interface with validated input.
+
+```yaml
+step_types:
+  webhook:
+    type: http
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [url, text]
+      properties:
+        url:
+          type: string
+        text:
+          type: string
+    template:
+      command: POST {{ .input.url }}
+      with:
+        headers:
+          Content-Type: application/json
+        body: |
+          {"text": {{ json .input.text }}}
+
+steps:
+  - type: webhook
+    with:
+      url: https://hooks.example.com/ops
+      text: deploy complete
+```
+
+See [Custom Step Types](https://docs.dagu.sh/writing-workflows/custom-step-types) for the feature guide and [YAML Specification](https://docs.dagu.sh/writing-workflows/yaml-specification) for the exact `step_types` and `type` field behavior.
 
 ## Security and Access Control
 
@@ -620,7 +652,7 @@ Full configuration reference: [docs.dagu.sh/server-admin/reference](https://docs
 
 - [Getting Started](https://docs.dagu.sh/getting-started/installation) — Installation and first workflow
 - [Writing Workflows](https://docs.dagu.sh/writing-workflows/examples) — YAML syntax, scheduling, execution control
-- [Step Types](https://docs.dagu.sh/step-types/shell) — All 17 executor types
+- [Step Types](https://docs.dagu.sh/step-types/shell) — [Shell](https://docs.dagu.sh/step-types/shell), [Docker](https://docs.dagu.sh/step-types/docker), [Kubernetes](https://docs.dagu.sh/step-types/kubernetes), [HTTP](https://docs.dagu.sh/step-types/http), [SQL](https://docs.dagu.sh/step-types/sql/), [Harness](https://docs.dagu.sh/step-types/harness), [Agent Step](https://docs.dagu.sh/features/agent/step), and [Custom Step Types](https://docs.dagu.sh/writing-workflows/custom-step-types)
 - [Distributed Execution](https://docs.dagu.sh/server-admin/distributed/) — Coordinator/worker setup
 - [Authentication](https://docs.dagu.sh/server-admin/authentication/) — RBAC, OIDC, API keys
 - [Git Sync](https://docs.dagu.sh/server-admin/git-sync) — Version-controlled DAG definitions
