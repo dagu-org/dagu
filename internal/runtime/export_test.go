@@ -3,7 +3,10 @@
 
 package runtime
 
-import "context"
+import (
+	"context"
+	"maps"
+)
 
 // SetupChatMessages exports setupChatMessages for testing.
 func (r *Runner) SetupChatMessages(ctx context.Context, node *Node) {
@@ -20,4 +23,11 @@ func (n *Node) SetApprovalIteration(iteration int) {
 	n.Data.mu.Lock()
 	defer n.Data.mu.Unlock()
 	n.inner.State.ApprovalIteration = iteration
+}
+
+// SetPushBackInputs sets the latest push-back inputs for testing.
+func (n *Node) SetPushBackInputs(inputs map[string]string) {
+	n.Data.mu.Lock()
+	defer n.Data.mu.Unlock()
+	n.inner.State.PushBackInputs = maps.Clone(inputs)
 }

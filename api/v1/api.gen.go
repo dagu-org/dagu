@@ -784,6 +784,9 @@ type ApprovalConfig struct {
 	// Prompt Message displayed to the approver
 	Prompt *string `json:"prompt,omitempty"`
 
+	// RewindTo Optional step name to restart from when the approver pushes the step back. Must reference the step itself or an upstream dependency.
+	RewindTo *string `json:"rewindTo,omitempty"`
+
 	// Required Subset of input fields that must be provided
 	Required *[]string `json:"required,omitempty"`
 }

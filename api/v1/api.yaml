@@ -7696,6 +7696,9 @@ components:
           items:
             type: string
           description: "Subset of input fields that must be provided"
+        rewindTo:
+          type: string
+          description: "Optional step name to restart from when the approver pushes the step back. Must reference the step itself or an upstream dependency."
 
     Error:
       type: object

@@ -153,6 +153,7 @@ func toStep(obj core.Step) api.Step {
 			Prompt:   ptrOf(obj.Approval.Prompt),
 			Input:    ptrOf(obj.Approval.Input),
 			Required: ptrOf(obj.Approval.Required),
+			RewindTo: ptrOf(obj.Approval.RewindTo),
 		}
 	}
 

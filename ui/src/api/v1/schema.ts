@@ -2976,6 +2976,8 @@ export interface components {
             input?: string[];
             /** @description Subset of input fields that must be provided */
             required?: string[];
+            /** @description Optional step name to restart from when the approver pushes the step back. Must reference the step itself or an upstream dependency. */
+            rewindTo?: string;
         };
         /** @description Generic error response object */
         Error: {
