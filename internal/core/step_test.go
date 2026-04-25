@@ -343,3 +343,16 @@ func TestCommandEntry_String(t *testing.T) {
 		})
 	}
 }
+
+func TestStepUnmarshalJSONCopiesLegacyArgs(t *testing.T) {
+	t.Parallel()
+
+	var step Step
+	err := json.Unmarshal([]byte(`{"command":"echo","args":["hello"],"cmdWithArgs":"echo hello"}`), &step)
+	require.NoError(t, err)
+	require.Len(t, step.Commands, 1)
+	require.Equal(t, []string{"hello"}, step.Commands[0].Args)
+
+	step.Args[0] = "changed"
+	assert.Equal(t, []string{"hello"}, step.Commands[0].Args)
+}

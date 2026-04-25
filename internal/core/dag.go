@@ -24,13 +24,13 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// Execution type constants
+// Supported DAG execution types.
 const (
-	// TypeGraph is the execution type using dependency-based parallel execution
+	// TypeGraph runs dependency-aware steps in parallel where possible.
 	TypeGraph = "graph"
-	// TypeChain executes steps sequentially in the order they are defined
+	// TypeChain runs steps strictly in declaration order.
 	TypeChain = "chain"
-	// TypeAgent is reserved for future agent-based execution
+	// TypeAgent is reserved for agent-oriented execution flows.
 	TypeAgent = "agent"
 )
 
@@ -51,14 +51,13 @@ const (
 // EffectiveLogOutput returns the effective log output mode for a step.
 // Priority: step-level > DAG-level > default (LogOutputSeparate).
 func EffectiveLogOutput(dag *DAG, step *Step) LogOutputMode {
-	switch {
-	case step != nil && step.LogOutput != "":
+	if step != nil && step.LogOutput != "" {
 		return step.LogOutput
-	case dag != nil && dag.LogOutput != "":
-		return dag.LogOutput
-	default:
-		return LogOutputSeparate
 	}
+	if dag != nil && dag.LogOutput != "" {
+		return dag.LogOutput
+	}
+	return LogOutputSeparate
 }
 
 // DAG contains all information about a DAG.

@@ -97,6 +97,15 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 		assert.NoError(t, writer.close()) // Second close should not return an error
 	})
+
+	t.Run("IsOpenTracksLifecycle", func(t *testing.T) {
+		writer := NewWriter(filepath.Join(th.TmpDir, "lifecycle.dat"))
+		assert.False(t, writer.IsOpen())
+		require.NoError(t, writer.Open())
+		assert.True(t, writer.IsOpen())
+		require.NoError(t, writer.close())
+		assert.False(t, writer.IsOpen())
+	})
 }
 
 func TestWriterRename(t *testing.T) {

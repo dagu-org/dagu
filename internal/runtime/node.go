@@ -48,16 +48,10 @@ type Node struct {
 }
 
 func NewNode(step core.Step, state NodeState) *Node {
-	return &Node{
-		Data: newSafeData(NodeData{Step: step, State: state}),
-	}
+	return &Node{Data: newSafeData(NodeData{Step: step, State: state})}
 }
 
-func NodeWithData(data NodeData) *Node {
-	return &Node{
-		Data: newSafeData(data),
-	}
-}
+func NodeWithData(data NodeData) *Node { return &Node{Data: newSafeData(data)} }
 
 func (n *Node) NodeData() NodeData {
 	return n.Data.Data()
@@ -536,38 +530,46 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		}
 		n.SetSubRuns(subRuns)
 
-		// Setup the executor with sub DAG run information
-		if n.Step().Parallel == nil {
-			// Single sub DAG execution
-			exec, ok := cmd.(executor.DAGExecutor)
-			if !ok {
-				return nil, fmt.Errorf("executor %T does not support sub DAG execution", cmd)
-			}
-			exec.SetParams(executor.RunParams{
-				RunID:   subRuns[0].DAGRunID,
-				Params:  subRuns[0].Params,
-				DAGName: subRuns[0].DAGName,
-			})
-		} else {
-			// Parallel sub DAG execution
-			exec, ok := cmd.(executor.ParallelExecutor)
-			if !ok {
-				return nil, fmt.Errorf("executor %T does not support parallel execution", cmd)
-			}
-			// Convert SubDAGRun to executor.RunParams
-			var runParamsList []executor.RunParams
-			for _, subRun := range subRuns {
-				runParamsList = append(runParamsList, executor.RunParams{
-					RunID:   subRun.DAGRunID,
-					Params:  subRun.Params,
-					DAGName: subRun.DAGName,
-				})
-			}
-			exec.SetParamsList(runParamsList)
+		if err := n.configureSubDAGExecutor(cmd, subRuns); err != nil {
+			return nil, err
 		}
 	}
 
 	return cmd, nil
+}
+
+func (n *Node) configureSubDAGExecutor(cmd executor.Executor, subRuns []SubDAGRun) error {
+	if n.Step().Parallel == nil {
+		dagExecutor, ok := cmd.(executor.DAGExecutor)
+		if !ok {
+			return fmt.Errorf("executor %T does not support sub DAG execution", cmd)
+		}
+		dagExecutor.SetParams(runParams(subRuns[0]))
+		return nil
+	}
+
+	parallelExecutor, ok := cmd.(executor.ParallelExecutor)
+	if !ok {
+		return fmt.Errorf("executor %T does not support parallel execution", cmd)
+	}
+	parallelExecutor.SetParamsList(runParamsList(subRuns))
+	return nil
+}
+
+func runParams(subRun SubDAGRun) executor.RunParams {
+	return executor.RunParams{
+		RunID:   subRun.DAGRunID,
+		Params:  subRun.Params,
+		DAGName: subRun.DAGName,
+	}
+}
+
+func runParamsList(subRuns []SubDAGRun) []executor.RunParams {
+	params := make([]executor.RunParams, 0, len(subRuns))
+	for _, subRun := range subRuns {
+		params = append(params, runParams(subRun))
+	}
+	return params
 }
 
 // evaluateCommandArgs evaluates the command and arguments of the node.
@@ -625,36 +627,37 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	s := n.Status()
-	if s == core.NodeRunning && n.cmd != nil {
-		sigsig := sig
-		if allowOverride && n.SignalOnStop() != "" {
-			sigsig = syscall.Signal(signal.GetSignalNum(n.SignalOnStop()))
-		}
+	status := n.Status()
+	if status == core.NodeRunning && n.cmd != nil {
+		killSignal := n.signalToSend(sig, allowOverride)
 		logger.Info(ctx, "Sending signal",
-			tag.Signal(sigsig.String()),
+			tag.Signal(killSignal.String()),
 			tag.Step(n.Name()),
 		)
-		if err := n.cmd.Kill(sigsig); err != nil {
+		if err := n.cmd.Kill(killSignal); err != nil {
 			logger.Error(ctx, "Failed to send signal",
 				tag.Error(err),
 				tag.Step(n.Name()),
 			)
 		}
-	}
-
-	if signal.IsTerminationSignalOS(sig) {
-		if s == core.NodeRunning {
+		if signal.IsTerminationSignalOS(killSignal) {
 			n.SetStatus(core.NodeAborted)
 		}
 	}
 }
 
+func (n *Node) signalToSend(sig os.Signal, allowOverride bool) os.Signal {
+	if allowOverride && n.SignalOnStop() != "" {
+		return syscall.Signal(signal.GetSignalNum(n.SignalOnStop()))
+	}
+	return sig
+}
+
 func (n *Node) Cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	s := n.Status()
-	if s == core.NodeRunning {
+	status := n.Status()
+	if status == core.NodeRunning || status == core.NodeWaiting {
 		n.SetStatus(core.NodeAborted)
 	}
 }
@@ -792,10 +795,9 @@ func getNextNodeID() int {
 func (n *Node) Init() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.id != 0 {
-		return
+	if n.id == 0 {
+		n.id = getNextNodeID()
 	}
-	n.id = getNextNodeID()
 }
 
 // BuildSubDAGRuns constructs the sub DAG runs based on parallel configuration

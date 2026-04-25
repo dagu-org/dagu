@@ -122,14 +122,33 @@ func TestScheduler(t *testing.T) {
 		}, 5*time.Second, 10*time.Millisecond, "dispatch should have been called for start schedule")
 	})
 	t.Run("NextTick", func(t *testing.T) {
-		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-
 		th := test.SetupScheduler(t)
 		schedulerInstance, err := scheduler.New(th.Config, newMockJobManager(), th.DAGRunMgr, th.DAGRunStore, th.QueueStore, th.ProcStore, th.ServiceRegistry, th.CoordinatorCli, nil)
 		require.NoError(t, err)
 
-		next := schedulerInstance.NextTick(now)
-		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
+		tests := []struct {
+			name     string
+			now      time.Time
+			expected time.Time
+		}{
+			{
+				name:     "MidMinute",
+				now:      time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC),
+				expected: time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC),
+			},
+			{
+				name:     "OnMinuteBoundary",
+				now:      time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+				expected: time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC),
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				next := schedulerInstance.NextTick(tt.now)
+				require.Equal(t, tt.expected, next)
+			})
+		}
 	})
 }
 

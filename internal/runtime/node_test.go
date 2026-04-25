@@ -157,7 +157,7 @@ func TestNode(t *testing.T) {
 		go func() {
 			exec := <-execCh
 			<-exec.ready
-			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
+			node.Signal(node.Context, syscall.Signal(0), true) // allow override signal
 		}()
 
 		node.SetStatus(core.NodeRunning)
@@ -167,6 +167,28 @@ func TestNode(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "signal: interrupt")
 		require.Equal(t, core.NodeAborted.String(), node.State().Status.String())
+	})
+	t.Run("CancelUpdatesOnlyRunningOrWaiting", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name   string
+			status core.NodeStatus
+			want   core.NodeStatus
+		}{
+			{name: "Running", status: core.NodeRunning, want: core.NodeAborted},
+			{name: "Waiting", status: core.NodeWaiting, want: core.NodeAborted},
+			{name: "Succeeded", status: core.NodeSucceeded, want: core.NodeSucceeded},
+			{name: "NotStarted", status: core.NodeNotStarted, want: core.NodeNotStarted},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				node := runtime.NewNode(core.Step{Name: tt.name}, runtime.NodeState{Status: tt.status})
+				node.Cancel()
+				require.Equal(t, tt.want, node.State().Status)
+			})
+		}
 	})
 	t.Run("LogOutput", func(t *testing.T) {
 		t.Parallel()

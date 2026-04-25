@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -54,6 +55,7 @@ var (
 	boundary     = "==simple-boundary-dagu-mailer"
 	errFileEmpty = errors.New("file is empty")
 	mailTimeout  = 30 * time.Second
+	maxHeaderLen = 256
 )
 
 // SendMail sends an email.
@@ -64,192 +66,138 @@ func (m *Client) Send(
 	subject, body string,
 	attachments []string,
 ) error {
-	logger.Info(ctx, "Sending email", slog.Any("to", to), tag.Subject(subject))
-	if m.username == "" && m.password == "" {
-		return m.sendWithNoAuth(from, to, subject, body, attachments)
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return m.sendWithAuth(from, to, subject, body, attachments)
-}
-
-func (m *Client) sendWithNoAuth(
-	from string,
-	to []string,
-	subject, body string,
-	attachments []string,
-) error {
-	// Create a dialer with timeout
-	dialer := &net.Dialer{
-		Timeout: mailTimeout,
-	}
-
-	// Dial with timeout
-	conn, err := dialer.Dial("tcp", m.host+":"+m.port)
-	if err != nil {
-		return err
-	}
-
-	// Set deadline for all operations
-	deadline := time.Now().Add(mailTimeout)
-	if err := conn.SetDeadline(deadline); err != nil {
-		_ = conn.Close()
-		return err
-	}
-
-	c, err := smtp.NewClient(conn, m.host)
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() {
-		_ = c.Close()
-	}()
-
-	if err = c.Mail(replacer.Replace(from)); err != nil {
-		return err
-	}
-	for i := range to {
-		to[i] = replacer.Replace(to[i])
-		if err = c.Rcpt(to[i]); err != nil {
-			return err
-		}
-	}
-	wc, err := c.Data()
-	if err != nil {
-		return err
-	}
-	body = processEmailBody(body)
-	_, err = wc.Write(
-		m.composeMail(to, from, subject, body, attachments),
-	)
-	if err != nil {
-		return err
-	}
-	if err := wc.Close(); err != nil {
-		return err
-	}
-	return c.Quit()
-}
-
-func (m *Client) sendWithAuth(
-	from string,
-	to []string,
-	subject, body string,
-	attachments []string,
-) error {
-	// Create a context with timeout for cancellation support
-	ctx, cancel := context.WithTimeout(context.Background(), mailTimeout)
+	ctx, cancel := context.WithTimeout(ctx, mailTimeout)
 	defer cancel()
 
-	// Create a channel to receive the result
-	type result struct {
-		err error
+	logger.Info(ctx, "Sending email", slog.Any("to", to), tag.Subject(subject))
+	if m.username == "" && m.password == "" {
+		return m.send(ctx, from, to, subject, body, attachments, false)
 	}
-	resultChan := make(chan result, 1)
-
-	// Run the mail sending in a goroutine with proper STARTTLS and auth support
-	go func() {
-		err := m.sendWithSTARTTLS(ctx, from, to, subject, body, attachments)
-		resultChan <- result{err: err}
-	}()
-
-	// Wait for either completion or context cancellation
-	select {
-	case res := <-resultChan:
-		return res.err
-	case <-ctx.Done():
-		return fmt.Errorf("mail sending timeout after %v", mailTimeout)
-	}
+	return m.send(ctx, from, to, subject, body, attachments, true)
 }
 
-// sendWithSTARTTLS connects to the SMTP server, negotiates STARTTLS if available,
-// and authenticates using LOGIN auth (falling back to PLAIN if LOGIN is unavailable).
-func (m *Client) sendWithSTARTTLS(
+func (m *Client) send(
 	ctx context.Context,
 	from string,
 	to []string,
 	subject, body string,
 	attachments []string,
+	useAuth bool,
 ) error {
-	addr := m.host + ":" + m.port
-
-	// Use a dialer with context for cancellation support
 	dialer := &net.Dialer{
 		Timeout: mailTimeout,
 	}
-	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(m.host, m.port))
 	if err != nil {
-		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		return err
 	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
-	// Set deadline based on context deadline for cleaner shutdown
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := conn.SetDeadline(deadline); err != nil {
-			_ = conn.Close()
 			return err
 		}
 	}
 
-	// Create SMTP client
 	c, err := smtp.NewClient(conn, m.host)
 	if err != nil {
-		_ = conn.Close()
-		return fmt.Errorf("failed to create SMTP client: %w", err)
+		return err
 	}
 	defer func() {
 		_ = c.Close()
 	}()
 
-	// Send EHLO/HELO
-	if err = c.Hello("localhost"); err != nil {
-		return fmt.Errorf("HELO failed: %w", err)
-	}
-
-	// Check if STARTTLS is supported and upgrade connection
-	if ok, _ := c.Extension("STARTTLS"); ok {
-		tlsConfig := &tls.Config{
-			ServerName: m.host,
-			MinVersion: tls.VersionTLS12,
-		}
-		if err = c.StartTLS(tlsConfig); err != nil {
-			return fmt.Errorf("STARTTLS failed: %w", err)
+	if useAuth {
+		if err := m.prepareSession(ctx, c); err != nil {
+			return err
 		}
 	}
 
-	// Authenticate using LOGIN auth (more widely supported than PLAIN for "basic auth")
-	if err = m.authenticate(ctx, c); err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
-	}
-
-	// Set sender
-	if err = c.Mail(replacer.Replace(from)); err != nil {
+	recipients := sanitizeAddresses(to)
+	safeFrom := sanitizeHeaderField(from)
+	safeSubject := sanitizeHeaderField(subject)
+	if err := c.Mail(safeFrom); err != nil {
 		return fmt.Errorf("MAIL FROM failed: %w", err)
 	}
-
-	// Set recipients
-	for i := range to {
-		to[i] = replacer.Replace(to[i])
-		if err = c.Rcpt(to[i]); err != nil {
+	for _, recipient := range recipients {
+		if err := c.Rcpt(recipient); err != nil {
 			return fmt.Errorf("RCPT TO failed: %w", err)
 		}
 	}
 
-	// Send the email body
 	wc, err := c.Data()
 	if err != nil {
 		return fmt.Errorf("DATA command failed: %w", err)
 	}
 
-	body = processEmailBody(body)
-	_, err = wc.Write(m.composeMail(to, from, subject, body, attachments))
+	payload := m.composeMail(recipients, safeFrom, safeSubject, processEmailBody(body), attachments)
+	_, err = wc.Write(payload)
 	if err != nil {
 		return fmt.Errorf("failed to write email body: %w", err)
 	}
-
-	if err = wc.Close(); err != nil {
+	if err := wc.Close(); err != nil {
 		return fmt.Errorf("failed to close data writer: %w", err)
 	}
 
-	return c.Quit()
+	if err := c.Quit(); err != nil {
+		return fmt.Errorf("QUIT failed: %w", err)
+	}
+	return nil
+}
+
+func sanitizeAddresses(addresses []string) []string {
+	if len(addresses) == 0 {
+		return nil
+	}
+	cleaned := make([]string, len(addresses))
+	for i, address := range addresses {
+		cleaned[i] = replacer.Replace(address)
+	}
+	return cleaned
+}
+
+func sanitizeHeaderField(value string) string {
+	value = replacer.Replace(value)
+	var b strings.Builder
+	b.Grow(min(len(value), maxHeaderLen))
+	for _, r := range value {
+		if r != '\t' && (r < 0x20 || r == 0x7f) {
+			continue
+		}
+		size := utf8.RuneLen(r)
+		if size < 0 || b.Len()+size > maxHeaderLen {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// prepareSession negotiates STARTTLS and authenticates authenticated sessions.
+func (m *Client) prepareSession(ctx context.Context, c *smtp.Client) error {
+	if err := c.Hello("localhost"); err != nil {
+		return fmt.Errorf("HELO failed: %w", err)
+	}
+
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		tlsConfig := &tls.Config{
+			ServerName: m.host,
+			MinVersion: tls.VersionTLS12,
+		}
+		if err := c.StartTLS(tlsConfig); err != nil {
+			return fmt.Errorf("STARTTLS failed: %w", err)
+		}
+	}
+
+	if err := m.authenticate(ctx, c); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+	return nil
 }
 
 // authenticate tries LOGIN auth first, then falls back to PLAIN auth.
@@ -323,6 +271,9 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 func (*Client) composeHeader(
 	to []string, from string, subject string,
 ) string {
+	to = sanitizeAddresses(to)
+	from = sanitizeHeaderField(from)
+	subject = sanitizeHeaderField(subject)
 	return "To: " + strings.Join(to, ",") + "\r\n" +
 		"From: " + from + "\r\n" +
 		"Subject: " + subject + "\r\n" +
@@ -338,26 +289,16 @@ func (m *Client) composeMail(
 	to []string,
 	from, subject, body string,
 	attachments []string,
-) (b []byte) {
-	msg := m.composeHeader(to, from, subject) +
-		"\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
-	b = joinBytes([]byte(msg), addAttachments(attachments))
-	b = joinBytes(b, []byte("\r\n\r\n--"+boundary+"--\r\n\r\n"))
-	b = joinBytes(b, []byte("\r\n\r\n"))
-	return b
-}
-
-func joinBytes(s ...[]byte) []byte {
-	n := 0
-	for _, v := range s {
-		n += len(v)
-	}
-
-	b, i := make([]byte, n), 0
-	for _, v := range s {
-		i += copy(b[i:], v)
-	}
-	return b
+) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(m.composeHeader(to, from, subject))
+	buf.WriteString("\r\n")
+	buf.WriteString(base64.StdEncoding.EncodeToString([]byte(body)))
+	buf.Write(addAttachments(attachments))
+	buf.WriteString("\r\n--")
+	buf.WriteString(boundary)
+	buf.WriteString("--\r\n")
+	return buf.Bytes()
 }
 
 func newlineToBrTag(body string) string {
@@ -386,17 +327,15 @@ func addAttachments(attachments []string) []byte {
 	for _, fileName := range attachments {
 		data, err := readFile(fileName)
 		if err == nil {
-			_, _ = fmt.Fprintf(&buf, "\r\n\n--%s\r\n", boundary)
-			_, _ = buf.WriteString("Content-Type: text/plain;" + "\r\n")
-			_, _ = buf.WriteString("Content-Transfer-Encoding: base64" + "\r\n")
+			_, _ = fmt.Fprintf(&buf, "\r\n--%s\r\n", boundary)
+			_, _ = buf.WriteString("Content-Type: text/plain\r\n")
+			_, _ = buf.WriteString("Content-Transfer-Encoding: base64\r\n")
 			_, _ = buf.WriteString(
 				"Content-Disposition: attachment; filename=" +
 					filepath.Base(fileName) + "\r\n",
 			)
-			_, _ = buf.WriteString("Content-Transfer-Encoding: base64\r\n\n")
-			b := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
-			base64.StdEncoding.Encode(b, data)
-			_, _ = buf.Write(b)
+			_, _ = buf.WriteString("\r\n")
+			_, _ = buf.WriteString(base64.StdEncoding.EncodeToString(data))
 		}
 	}
 	return buf.Bytes()

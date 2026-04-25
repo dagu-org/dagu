@@ -452,3 +452,29 @@ func TestRenderHTMLComprehensive(t *testing.T) {
 		require.NotContains(t, html, "style=")
 	})
 }
+
+func TestStatusBadgeClass(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		status string
+		want   string
+	}{
+		{name: "Finished", status: "finished", want: "success"},
+		{name: "Succeeded", status: "succeeded", want: "success"},
+		{name: "PartiallySucceeded", status: "partially_succeeded", want: "success"},
+		{name: "Failed", status: "failed", want: "failed"},
+		{name: "Running", status: "running", want: "running"},
+		{name: "Skipped", status: "skipped", want: "skipped"},
+		{name: "Aborted", status: "aborted", want: "aborted"},
+		{name: "Waiting", status: "waiting", want: "wait"},
+		{name: "Unknown", status: "unknown", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, statusBadgeClass(tt.status))
+		})
+	}
+}
