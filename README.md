@@ -515,6 +515,8 @@ JSON or text format logging (`DAGU_LOG_FORMAT`). Logs are stored per-run with se
 
 ## Artifacts
 
+![Artifact browser in dark mode](./assets/images/readme-artifacts-dark.png)
+
 Dagu runs can write arbitrary files into `DAG_RUN_ARTIFACTS_DIR`, and Dagu stores them per run as [Artifacts](https://docs.dagu.sh/writing-workflows/artifacts). In the [Web UI](https://docs.dagu.sh/overview/web-ui), operators can browse the file tree, preview Markdown, text, and image files inline, and download any artifact when they need the raw file.
 
 This is useful for generated reports, screenshots, charts, exported JSON or CSV files, and other outputs that do not fit simple key/value [outputs](https://docs.dagu.sh/writing-workflows/outputs).
