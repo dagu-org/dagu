@@ -537,28 +537,28 @@ function WorkflowDesignPage() {
     if (!canWriteInSelectedScope) {
       showError(
         'Workspace is read-only',
-        'Select default or a writable workspace before asking the agent to change a DAG.'
+        'Select default or a writable workspace before asking Steward to change a DAG.'
       );
       return;
     }
     if (!config.agentEnabled) {
       showError(
-        'Agent is disabled',
-        'Enable the agent before starting an agentic workflow design session.'
+        'Steward is disabled',
+        'Enable Steward before starting a steward-guided workflow design session.'
       );
       return;
     }
     if (selectedDagFile && hasExistingUnsavedChanges) {
       showError(
         'Save or discard local edits first',
-        'The agent edits the saved DAG file on disk, so local YAML edits must be resolved before asking it to update the DAG.'
+        'Steward edits the saved DAG file on disk, so local YAML edits must be resolved before asking it to update the DAG.'
       );
       return;
     }
     if (!selectedDagFile && !newDagName) {
       showError(
         'DAG name required',
-        'Enter a target DAG name before asking the agent to create a workflow.'
+        'Enter a target DAG name before asking Steward to create a workflow.'
       );
       return;
     }
@@ -1096,7 +1096,7 @@ function DesignLeftPanel({
             onClick={() => onTabChange('agent')}
           >
             <MessageSquare className="h-4 w-4" />
-            Agent
+            Steward
           </Tab>
         </Tabs>
       </div>
@@ -1205,9 +1205,9 @@ function DesignLeftPanel({
         <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
           <Sparkles className="h-8 w-8 text-muted-foreground" />
           <div>
-            <h2 className="text-base font-semibold">Agent is disabled</h2>
+            <h2 className="text-base font-semibold">Steward is disabled</h2>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Enable the agent to use chat-driven workflow authoring.
+              Enable Steward to use chat-driven workflow authoring.
             </p>
           </div>
         </div>
@@ -1269,7 +1269,7 @@ function DesignToolbar({
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold">Design</h1>
             <p className="truncate text-xs text-muted-foreground">
-              Agentic workflow authoring and DAG preview
+              Steward-guided workflow authoring and DAG preview
             </p>
           </div>
         </div>
@@ -1535,11 +1535,11 @@ function StepChangePanel({
           className="mt-3 w-full"
         >
           <Send className="h-4 w-4" />
-          {isSending ? 'Sending...' : 'Send to Agent'}
+          {isSending ? 'Sending...' : 'Ask Steward'}
         </Button>
         {!agentEnabled && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Enable the agent to send workflow change requests.
+            Enable Steward to send workflow change requests.
           </p>
         )}
       </div>
