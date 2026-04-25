@@ -4,16 +4,16 @@
 package sock
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
-	"strings"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dagucloud/dagu/internal/cmn/logger"
 	"github.com/dagucloud/dagu/internal/cmn/logger/tag"
@@ -23,13 +23,18 @@ var ErrServerRequestedShutdown = errors.New(
 	"socket frontend is requested to shutdown",
 )
 
+const idleTimeout = 30 * time.Second
+
 // Server is a unix socket frontend that passes http requests to HandlerFunc.
 type Server struct {
 	addr        string
 	handlerFunc HTTPHandlerFunc
-	listener    net.Listener
-	quit        atomic.Bool
-	mu          sync.Mutex
+
+	listener   net.Listener
+	httpServer *http.Server
+
+	quit atomic.Bool
+	mu   sync.Mutex
 }
 
 // HTTPHandlerFunc is a function that handles HTTP requests.
@@ -56,7 +61,10 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 		}
 		return err
 	}
-	if !srv.setListener(listener) {
+
+	httpServer := srv.newHTTPServer(ctx)
+
+	if !srv.install(listener, httpServer) {
 		if listen != nil {
 			listen <- nil
 		}
@@ -64,112 +72,101 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 		_ = os.Remove(srv.addr)
 		return ErrServerRequestedShutdown
 	}
+
 	if listen != nil {
 		listen <- nil
 	}
-	logger.Debug(ctx, "Unix socket is listening",
-		tag.Addr(srv.addr))
+	logger.Debug(ctx, "Unix socket is listening", tag.Addr(srv.addr))
 
 	defer func() {
-		srv.clearListener(listener)
-		_ = srv.Shutdown(ctx)
+		srv.clear(listener, httpServer)
 		_ = os.Remove(srv.addr)
 	}()
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			if srv.quit.Load() {
-				return ErrServerRequestedShutdown
-			}
-			return err
-		}
-		go func() {
-			request, err := http.ReadRequest(bufio.NewReader(conn))
-			if err != nil {
-				logger.Error(ctx, "Failed to read request",
-					tag.Error(err))
-			} else {
-				srv.handlerFunc(newHTTPResponseWriter(&conn), request)
-			}
-			_ = conn.Close()
-		}()
+
+	err = httpServer.Serve(listener)
+	if isClosedServerError(err) && srv.quit.Load() {
+		return ErrServerRequestedShutdown
 	}
+	return err
+}
+
+// newHTTPServer builds the HTTP server used for unix socket requests.
+func (srv *Server) newHTTPServer(ctx context.Context) *http.Server {
+	return &http.Server{
+		Handler:           srv.httpHandler(ctx),
+		ReadHeaderTimeout: defaultTimeout,
+		IdleTimeout:       idleTimeout,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
+	}
+}
+
+// httpHandler adapts the raw handler and recovers panics into HTTP 500 responses.
+func (srv *Server) httpHandler(ctx context.Context) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				logger.Error(
+					ctx,
+					"Socket handler panicked",
+					slog.Any("panic", recovered),
+					slog.String("stack", string(debug.Stack())),
+				)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+		}()
+		srv.handlerFunc(w, r)
+	})
 }
 
 // Shutdown stops the frontend.
 func (srv *Server) Shutdown(ctx context.Context) error {
 	srv.mu.Lock()
-	if !srv.quit.Load() {
-		srv.quit.Store(true)
-	}
-	listener := srv.listener
+	srv.quit.Store(true)
+	httpServer := srv.httpServer
+	srv.httpServer = nil
 	srv.listener = nil
 	srv.mu.Unlock()
 
-	if listener != nil {
-		err := listener.Close()
-		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, os.ErrClosed) {
-			logger.Error(ctx, "Failed to close listener",
-				tag.Error(err))
+	if httpServer != nil {
+		if err := httpServer.Shutdown(ctx); err != nil && !isClosedServerError(err) {
+			logger.Error(ctx, "Failed to shutdown HTTP server", tag.Error(err))
+			return err
 		}
-		return err
+		return nil
 	}
+
 	return nil
 }
 
-func (srv *Server) setListener(listener net.Listener) bool {
+// install records the live listener/server pair if shutdown has not started.
+func (srv *Server) install(listener net.Listener, httpServer *http.Server) bool {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	if srv.quit.Load() {
 		return false
 	}
 	srv.listener = listener
+	srv.httpServer = httpServer
 	return true
 }
 
-func (srv *Server) clearListener(listener net.Listener) {
+// clear drops the listener/server pair that finished serving.
+func (srv *Server) clear(listener net.Listener, httpServer *http.Server) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	if srv.listener == listener {
 		srv.listener = nil
 	}
-}
-
-var _ http.ResponseWriter = (*httpResponseWriter)(nil)
-
-type httpResponseWriter struct {
-	conn       *net.Conn
-	header     http.Header
-	statusCode int
-}
-
-func newHTTPResponseWriter(conn *net.Conn) http.ResponseWriter {
-	return &httpResponseWriter{
-		conn:       conn,
-		header:     make(http.Header),
-		statusCode: http.StatusOK,
+	if srv.httpServer == httpServer {
+		srv.httpServer = nil
 	}
 }
 
-func (w *httpResponseWriter) Write(data []byte) (int, error) {
-	response := http.Response{
-		StatusCode:    w.statusCode,
-		ProtoMajor:    1,
-		ProtoMinor:    0,
-		Body:          io.NopCloser(strings.NewReader(string(data))),
-		Header:        w.header,
-		ContentLength: int64(len(data)),
-	}
-	if err := response.Write(*w.conn); err != nil {
-		return 0, err
-	}
-	return len(data), nil
-}
-
-func (w *httpResponseWriter) Header() http.Header {
-	return w.header
-}
-
-func (w *httpResponseWriter) WriteHeader(statusCode int) {
-	w.statusCode = statusCode
+// isClosedServerError reports whether an error is expected during graceful shutdown.
+func isClosedServerError(err error) bool {
+	return errors.Is(err, http.ErrServerClosed) ||
+		errors.Is(err, net.ErrClosed) ||
+		errors.Is(err, os.ErrClosed)
 }

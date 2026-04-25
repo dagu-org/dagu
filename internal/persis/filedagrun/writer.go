@@ -19,29 +19,17 @@ import (
 	"github.com/dagucloud/dagu/internal/core/exec"
 )
 
-// WriterState represents the current state of a writer
-type WriterState int
-
-// WriterState constants
-const (
-	WriterStateClosed WriterState = iota
-	WriterStateOpen
-)
-
-// Error definitions
 var (
 	ErrWriterNotOpen = errors.New("writer is not open")
 )
 
-// Writer manages writing status to a local file.
-// It provides thread-safe operations and ensures data durability.
 type Writer struct {
-	target     string        // Path to the target file
-	state      WriterState   // Current state of the writer
-	writer     *bufio.Writer // Buffered writer for performance
-	file       *os.File      // Underlying file handle
-	mu         sync.Mutex    // Mutex for thread safety
-	bufferSize int           // Size of the write buffer
+	target     string
+	buffer     *bufio.Writer
+	encoder    *json.Encoder
+	file       *os.File
+	mu         sync.Mutex
+	bufferSize int
 }
 
 // WriterOption defines functional options for configuring a Writer.
@@ -51,8 +39,7 @@ type WriterOption func(*Writer)
 func NewWriter(target string, opts ...WriterOption) *Writer {
 	w := &Writer{
 		target:     target,
-		state:      WriterStateClosed,
-		bufferSize: 4096, // Default buffer size
+		bufferSize: 4096,
 	}
 
 	for _, opt := range opts {
@@ -68,32 +55,30 @@ func (w *Writer) Open() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.state == WriterStateOpen {
-		return nil // Already open, no need to reopen
+	if w.isOpenLocked() {
+		return nil
 	}
 
-	// Create directories if needed
 	dir := filepath.Dir(w.target)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	// Open or create file
 	file, err := fileutil.OpenOrCreateFile(w.target)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", w.target, err)
 	}
 
 	w.file = file
-	w.writer = bufio.NewWriterSize(file, w.bufferSize)
-	w.state = WriterStateOpen
+	w.buffer = bufio.NewWriterSize(file, w.bufferSize)
+	w.encoder = json.NewEncoder(w.buffer)
+	w.encoder.SetEscapeHTML(false)
 	return nil
 }
 
 // Write serializes the status to JSON and appends it to the file.
 // It automatically flushes data to ensure durability.
 func (w *Writer) Write(ctx context.Context, st exec.DAGRunStatus) error {
-	// Add context info to logs if write fails
 	if err := w.write(st); err != nil {
 		logger.Error(ctx, "Failed to write status", tag.Error(err))
 		return err
@@ -102,47 +87,25 @@ func (w *Writer) Write(ctx context.Context, st exec.DAGRunStatus) error {
 	return nil
 }
 
+// write encodes a single status entry and persists it to disk.
 func (w *Writer) write(st exec.DAGRunStatus) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.state != WriterStateOpen {
+	if !w.isOpenLocked() {
 		return ErrWriterNotOpen
 	}
 
-	// Marshal status to JSON
-	jsonBytes, err := json.Marshal(st)
-	if err != nil {
-		return fmt.Errorf("failed to marshal status: %w", err)
+	if err := w.encoder.Encode(st); err != nil {
+		return fmt.Errorf("failed to encode status: %w", err)
 	}
 
-	// Write JSON line
-	if _, err := w.writer.Write(jsonBytes); err != nil {
-		return fmt.Errorf("failed to write JSON: %w", err)
-	}
-
-	// Add newline
-	if err := w.writer.WriteByte('\n'); err != nil {
-		return fmt.Errorf("failed to write newline: %w", err)
-	}
-
-	// Flush to ensure data is written to the underlying file
-	if err := w.writer.Flush(); err != nil {
-		return fmt.Errorf("failed to flush data: %w", err)
-	}
-
-	// Sync to ensure data is persisted to disk (important for multi-coordinator visibility)
-	if err := w.file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync data: %w", err)
-	}
-
-	return nil
+	return w.flushAndSyncLocked()
 }
 
 // Close flushes any buffered data and closes the underlying file.
 // It's safe to call close multiple times.
 func (w *Writer) Close(ctx context.Context) error {
-	// Add context info to logs if close fails
 	if err := w.close(); err != nil {
 		logger.Error(ctx, "Failed to close writer", tag.Error(err))
 		return err
@@ -156,36 +119,43 @@ func (w *Writer) close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.state == WriterStateClosed {
-		return nil // Already closed
+	if !w.isOpenLocked() {
+		return nil
 	}
 
 	var errs []error
 
-	// Flush any buffered data
-	if w.writer != nil {
-		if err := w.writer.Flush(); err != nil {
-			errs = append(errs, fmt.Errorf("flush error: %w", err))
-		}
+	if err := w.flushAndSyncLocked(); err != nil {
+		errs = append(errs, err)
 	}
 
-	// Ensure data is synced to disk
-	if w.file != nil {
-		if err := w.file.Sync(); err != nil {
-			errs = append(errs, fmt.Errorf("sync error: %w", err))
-		}
-
-		if err := w.file.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("close error: %w", err))
-		}
+	if err := w.file.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("close error: %w", err))
 	}
 
-	// Reset writer state
-	w.writer = nil
 	w.file = nil
-	w.state = WriterStateClosed
+	w.buffer = nil
+	w.encoder = nil
 
-	// Return combined errors if any
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
+}
+
+// flushAndSyncLocked flushes the buffered encoder output and syncs the file.
+func (w *Writer) flushAndSyncLocked() error {
+	var errs []error
+
+	if err := w.buffer.Flush(); err != nil {
+		errs = append(errs, fmt.Errorf("flush error: %w", err))
+	}
+
+	if err := w.file.Sync(); err != nil {
+		errs = append(errs, fmt.Errorf("sync error: %w", err))
+	}
+
 	if len(errs) > 0 {
 		return errors.Join(errs...)
 	}
@@ -197,5 +167,10 @@ func (w *Writer) close() error {
 func (w *Writer) IsOpen() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.state == WriterStateOpen
+	return w.isOpenLocked()
+}
+
+// isOpenLocked reports whether the writer has an active file and encoder.
+func (w *Writer) isOpenLocked() bool {
+	return w.file != nil && w.buffer != nil && w.encoder != nil
 }

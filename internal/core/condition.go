@@ -14,7 +14,7 @@ import (
 // The condition can be a command substitution or an environment variable.
 // The expected value must be a string without any substitutions.
 type Condition struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	Condition    string // Condition to evaluate
 	Expected     string // Expected value
@@ -22,38 +22,27 @@ type Condition struct {
 	errorMessage string // Error message if the condition is not met
 }
 
-func (c *Condition) MarshalJSON() ([]byte, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return json.Marshal(struct {
-		Condition    string `json:"condition,omitempty"`
-		Expected     string `json:"expected,omitempty"`
-		Negate       bool   `json:"negate,omitempty"`
-		ErrorMessage string `json:"error,omitempty"`
-	}{
-		Condition:    c.Condition,
-		Expected:     c.Expected,
-		Negate:       c.Negate,
-		ErrorMessage: c.errorMessage,
-	})
+type conditionJSON struct {
+	Condition    string `json:"condition,omitempty"`
+	Expected     string `json:"expected,omitempty"`
+	Negate       bool   `json:"negate,omitempty"`
+	ErrorMessage string `json:"error,omitempty"`
 }
 
+func (c *Condition) MarshalJSON() ([]byte, error) { return json.Marshal(c.snapshot()) }
+
 func (c *Condition) UnmarshalJSON(data []byte) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	var tmp struct {
-		Condition    string `json:"condition,omitempty"`
-		Expected     string `json:"expected,omitempty"`
-		Negate       bool   `json:"negate,omitempty"`
-		ErrorMessage string `json:"error,omitempty"`
-	}
-	if err := json.Unmarshal(data, &tmp); err != nil {
+	var decoded conditionJSON
+	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	c.Condition = tmp.Condition
-	c.Expected = tmp.Expected
-	c.Negate = tmp.Negate
-	c.errorMessage = tmp.ErrorMessage
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Condition = decoded.Condition
+	c.Expected = decoded.Expected
+	c.Negate = decoded.Negate
+	c.errorMessage = decoded.ErrorMessage
 	return nil
 }
 
@@ -71,7 +60,18 @@ func (c *Condition) SetErrorMessage(msg string) {
 }
 
 func (c *Condition) GetErrorMessage() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.errorMessage
+}
+
+func (c *Condition) snapshot() conditionJSON {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return conditionJSON{
+		Condition:    c.Condition,
+		Expected:     c.Expected,
+		Negate:       c.Negate,
+		ErrorMessage: c.errorMessage,
+	}
 }

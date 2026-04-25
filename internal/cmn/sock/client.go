@@ -4,63 +4,92 @@
 package sock
 
 import (
-	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
 var (
-	ErrTimeout           = fmt.Errorf("unix socket timeout")
-	ErrConnectionRefused = fmt.Errorf("unix socket connection failed")
+	ErrTimeout = errors.New("unix socket timeout")
 )
 
 // Client is a unix socket client that can send requests
 // to the frontend over HTTP.
 type Client struct {
-	addr string
+	addr   string
+	client *http.Client
 }
 
+// NewClient creates a unix socket HTTP client with a reusable transport.
 func NewClient(addr string) *Client {
-	return &Client{addr: addr}
+	cl := &Client{addr: addr}
+	cl.client = &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				conn, err := (&net.Dialer{}).DialContext(ctx, "unix", cl.addr)
+				if err != nil {
+					return nil, wrapTimeout("dial unix socket", err)
+				}
+				return conn, nil
+			},
+			DisableCompression: true,
+		},
+		Timeout: defaultTimeout,
+	}
+	return cl
 }
 
-const (
-	defaultTimeout = time.Millisecond * 3000
-)
+const defaultTimeout = 3 * time.Second
+
+// wrapTimeout normalizes timeout errors to the exported socket timeout sentinel.
+func wrapTimeout(op string, err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, context.DeadlineExceeded):
+		return fmt.Errorf("%s: %w", op, ErrTimeout)
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return fmt.Errorf("%s: %w", op, ErrTimeout)
+	}
+
+	return fmt.Errorf("%s: %w", op, err)
+}
+
+// normalizePath ensures requests always use an absolute HTTP path.
+func normalizePath(path string) string {
+	if path == "" {
+		return "/"
+	}
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+	return "/" + path
+}
 
 // Request sends a request to the frontend and returns the response.
-func (cl *Client) Request(method, url string) (string, error) {
-	conn, err := net.DialTimeout("unix", cl.addr, defaultTimeout)
+func (cl *Client) Request(method, path string) (string, error) {
+	requestURL := &url.URL{
+		Scheme: "http",
+		Host:   "unix",
+		Path:   normalizePath(path),
+	}
+	request, err := http.NewRequest(method, requestURL.String(), nil)
 	if err != nil {
-		return "", fmt.Errorf("dial failed: %w", err)
+		return "", fmt.Errorf("build request: %w", err)
 	}
 
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	if err := conn.SetDeadline((time.Now().Add(defaultTimeout))); err != nil {
-		return "", fmt.Errorf("set deadline failed: %w", err)
-	}
-
-	request, err := http.NewRequest(method, url, nil)
+	response, err := cl.client.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("create request failed: %w", err)
-	}
-
-	if err := request.Write(conn); err != nil {
-		return "", fmt.Errorf("write request failed: %w", err)
-	}
-
-	response, err := http.ReadResponse(bufio.NewReader(conn), request)
-	if err != nil {
-		if err, ok := err.(net.Error); ok && err.Timeout() {
-			return "", fmt.Errorf("request timeout: %w", ErrTimeout)
-		}
-		return "", fmt.Errorf("read response failed: %w", err)
+		return "", wrapTimeout("send request", err)
 	}
 	defer func() {
 		_ = response.Body.Close()
@@ -68,7 +97,7 @@ func (cl *Client) Request(method, url string) (string, error) {
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("read body failed: %w", err)
+		return "", wrapTimeout("read response body", err)
 	}
 
 	return string(body), nil

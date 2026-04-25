@@ -87,15 +87,23 @@ func (srv *Server) useTemplate(ctx context.Context, layout, name string) func(ht
 	}
 
 	return func(w http.ResponseWriter, data any) {
-		var buf bytes.Buffer
-		if err := tmpl.ExecuteTemplate(&buf, baseTemplateName, data); err != nil {
+		rendered, err := executeTemplate(tmpl, baseTemplateName, data)
+		if err != nil {
 			logger.Error(ctx, "Template execution failed", tag.Error(err))
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = io.Copy(w, &buf)
+		_, _ = io.Copy(w, rendered)
 	}
+}
+
+func executeTemplate(tmpl *template.Template, name string, data any) (*bytes.Buffer, error) {
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+		return nil, err
+	}
+	return &buf, nil
 }
 
 // SetupRequiredChecker determines whether initial admin setup is still needed.

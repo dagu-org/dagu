@@ -462,24 +462,12 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Resolve per-run work directory
-	if attempt != nil {
-		a.workDir = attempt.WorkDir()
-		if a.workDir == "" {
-			// Shared-nothing mode: create a temp directory as fallback
-			a.workDir = filepath.Join(os.TempDir(), fmt.Sprintf("dagu_%s_%s", fileutil.SafeName(a.dag.Name), a.dagRunID))
-			if err := os.MkdirAll(a.workDir, 0o750); err != nil {
-				return fmt.Errorf("failed to create work directory: %w", err)
-			}
-			// Register cleanup immediately so the temp dir is removed even if
-			// later initialization (attempt.Open, config evaluation, etc.) fails.
-			defer func() {
-				if a.dagRunStore == nil && a.workDir != "" {
-					if err := os.RemoveAll(a.workDir); err != nil {
-						logger.Warn(ctx, "Failed to remove temp work dir", tag.Error(err))
-					}
-				}
-			}()
-		}
+	cleanupWorkDir, err := a.prepareWorkDir(ctx, attempt)
+	if err != nil {
+		return err
+	}
+	if cleanupWorkDir != nil {
+		defer cleanupWorkDir()
 	}
 	if a.artifactDir != "" {
 		if err := os.MkdirAll(a.artifactDir, 0o750); err != nil {
@@ -1243,34 +1231,69 @@ func (a *Agent) statusSourceTarget() *exec.DAGRunStatus {
 	return a.retryTarget
 }
 
+func (a *Agent) prepareWorkDir(ctx context.Context, attempt exec.DAGRunAttempt) (func(), error) {
+	if attempt == nil {
+		return nil, nil
+	}
+
+	a.workDir = attempt.WorkDir()
+	if a.workDir != "" {
+		return nil, nil
+	}
+
+	a.workDir = filepath.Join(
+		os.TempDir(),
+		fmt.Sprintf("dagu_%s_%s", fileutil.SafeName(a.dag.Name), a.dagRunID),
+	)
+	if err := os.MkdirAll(a.workDir, 0o750); err != nil {
+		return nil, fmt.Errorf("failed to create work directory: %w", err)
+	}
+	if a.dagRunStore != nil {
+		return nil, nil
+	}
+
+	return func() {
+		if a.workDir == "" {
+			return
+		}
+		if err := os.RemoveAll(a.workDir); err != nil {
+			logger.Warn(ctx, "Failed to remove temp work dir", tag.Error(err))
+		}
+	}, nil
+}
+
 // writeStatus writes the current status to storage.
 // In shared-nothing mode (statusPusher is set), it only pushes to the coordinator.
 // In local mode, it writes to local storage via attempt.Write.
 func (a *Agent) writeStatus(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) {
-	// In shared-nothing mode, only push to coordinator (coordinator writes to its storage)
 	if a.statusPusher != nil {
-		// Use a context that won't be cancelled, so final status is always pushed
-		// even when the execution was cancelled (e.g., via heartbeat directive).
-		pushCtx := context.WithoutCancel(ctx)
-		if err := a.statusPusher.Push(pushCtx, status); err != nil {
-			logger.Error(ctx, "Failed to push status to coordinator", tag.Error(err))
-			var rejectedErr *remote.AttemptRejectedError
-			if errors.As(err, &rejectedErr) && !a.finished.Load() {
-				logger.Warn(ctx, "Coordinator rejected the worker attempt; stopping execution",
-					tag.AttemptID(a.dagRunAttemptID),
-					slog.String("reason", rejectedErr.Reason),
-				)
-				a.signal(context.Background(), syscall.SIGTERM, true)
-			}
-		}
+		a.pushStatus(ctx, status)
 		return
 	}
+	a.writeStatusLocally(ctx, attempt, status)
+}
 
-	// In local mode, write to local storage
-	if attempt != nil {
-		if err := attempt.Write(ctx, status); err != nil {
-			logger.Error(ctx, "Failed to write status to local storage", tag.Error(err))
+func (a *Agent) pushStatus(ctx context.Context, status exec.DAGRunStatus) {
+	pushCtx := context.WithoutCancel(ctx)
+	if err := a.statusPusher.Push(pushCtx, status); err != nil {
+		logger.Error(ctx, "Failed to push status to coordinator", tag.Error(err))
+		var rejectedErr *remote.AttemptRejectedError
+		if errors.As(err, &rejectedErr) && !a.finished.Load() {
+			logger.Warn(ctx, "Coordinator rejected the worker attempt; stopping execution",
+				tag.AttemptID(a.dagRunAttemptID),
+				slog.String("reason", rejectedErr.Reason),
+			)
+			a.signal(context.Background(), syscall.SIGTERM, true)
 		}
+	}
+}
+
+func (a *Agent) writeStatusLocally(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) {
+	if attempt == nil {
+		return
+	}
+	if err := attempt.Write(ctx, status); err != nil {
+		logger.Error(ctx, "Failed to write status to local storage", tag.Error(err))
 	}
 }
 
@@ -1652,8 +1675,10 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		a.runner.Signal(ctx, a.plan, sig, done, allowOverride)
 	}()
 
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	resendTicker := time.NewTicker(5 * time.Second)
+	defer resendTicker.Stop()
+	probeTicker := time.NewTicker(500 * time.Millisecond)
+	defer probeTicker.Stop()
 
 	for {
 		select {
@@ -1663,18 +1688,16 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 
 		case <-signalCtx.Done():
 			logger.Info(ctx, "Max cleanup time reached, sending SIGKILL to force termination")
-			// Force kill with SIGKILL and don't wait for completion
 			a.runner.Signal(ctx, a.plan, syscall.SIGKILL, nil, false)
 			return
 
-		case <-ticker.C:
+		case <-resendTicker.C:
 			logger.Info(ctx, "Resending signal to processes that haven't terminated",
 				tag.Signal(sig.String()),
 			)
 			a.runner.Signal(ctx, a.plan, sig, nil, false)
 
-		case <-time.After(500 * time.Millisecond):
-			// Quick check to avoid busy waiting, but still responsive
+		case <-probeTicker.C:
 			if a.plan != nil && !a.plan.HasActiveNodes() {
 				logger.Info(ctx, "No running processes detected, termination complete")
 				return
@@ -1689,12 +1712,7 @@ func (a *Agent) setupPlan(ctx context.Context) error {
 	if a.retryTarget != nil {
 		return a.setupRetryPlan(ctx)
 	}
-	plan, err := runtime.NewPlan(a.dag.Steps...)
-	if err != nil {
-		return err
-	}
-	a.plan = plan
-	return nil
+	return a.setupFreshPlan()
 }
 
 // setupRetryPlan sets up the plan for retry.
@@ -1703,18 +1721,9 @@ func (a *Agent) setupRetryPlan(ctx context.Context) error {
 		if a.stepRetry != "" {
 			return fmt.Errorf("cannot retry step %q: queued runs have no completed node state", a.stepRetry)
 		}
-		plan, err := runtime.NewPlan(a.dag.Steps...)
-		if err != nil {
-			return err
-		}
-		a.plan = plan
-		return nil
+		return a.setupFreshPlan()
 	}
-
-	nodes := make([]*runtime.Node, 0, len(a.retryTarget.Nodes))
-	for _, n := range a.retryTarget.Nodes {
-		nodes = append(nodes, transform.ToNode(n))
-	}
+	nodes := a.retryNodes()
 	// If the previous run was killed before writing node data to the status
 	// (e.g., SIGKILL before the initial 100ms status write), retryTarget.Nodes
 	// will be empty. Fall back to a fresh plan from the DAG definition so that
@@ -1724,17 +1733,29 @@ func (a *Agent) setupRetryPlan(ctx context.Context) error {
 		if a.stepRetry != "" {
 			return fmt.Errorf("cannot retry step %q: previous attempt has no node state", a.stepRetry)
 		}
-		plan, err := runtime.NewPlan(a.dag.Steps...)
-		if err != nil {
-			return err
-		}
-		a.plan = plan
-		return nil
+		return a.setupFreshPlan()
 	}
 	if a.stepRetry != "" {
 		return a.setupStepRetryPlan(nodes)
 	}
 	return a.setupDefaultRetryPlan(ctx, nodes)
+}
+
+func (a *Agent) setupFreshPlan() error {
+	plan, err := runtime.NewPlan(a.dag.Steps...)
+	if err != nil {
+		return err
+	}
+	a.plan = plan
+	return nil
+}
+
+func (a *Agent) retryNodes() []*runtime.Node {
+	nodes := make([]*runtime.Node, 0, len(a.retryTarget.Nodes))
+	for _, node := range a.retryTarget.Nodes {
+		nodes = append(nodes, transform.ToNode(node))
+	}
+	return nodes
 }
 
 // setupStepRetryPlan sets up the plan for retrying a specific step.
@@ -1758,15 +1779,9 @@ func (a *Agent) setupDefaultRetryPlan(ctx context.Context, nodes []*runtime.Node
 }
 
 func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, error) {
-	// In shared-nothing mode, dagRunStore is nil - return no-op attempt.
-	// Status updates are handled by statusPusher instead.
 	if a.dagRunStore == nil {
 		logger.Debug(ctx, "Using no-op DAGRunAttempt in shared-nothing mode")
-		attemptID := a.attemptID
-		if attemptID == "" {
-			attemptID = a.dagRunID
-		}
-		return exec.NewNoopDAGRunAttempt(attemptID, a.dag), nil
+		return exec.NewNoopDAGRunAttempt(a.noopAttemptID(), a.dag), nil
 	}
 
 	retentionDays := a.dag.HistRetentionDays
@@ -1786,9 +1801,17 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 		return a.preparedAttempt, nil
 	}
 
-	// Retry is true when:
-	// 1. Retrying a failed execution (retryTarget != nil)
-	// 2. Running from queue (queuedRun = true) - the dag-run was already created by enqueue
+	return a.dagRunStore.CreateAttempt(ctx, a.dag, time.Now(), a.dagRunID, a.attemptOptions())
+}
+
+func (a *Agent) noopAttemptID() string {
+	if a.attemptID != "" {
+		return a.attemptID
+	}
+	return a.dagRunID
+}
+
+func (a *Agent) attemptOptions() exec.NewDAGRunAttemptOptions {
 	opts := exec.NewDAGRunAttemptOptions{
 		Retry:     a.retryTarget != nil || a.queuedRun,
 		AttemptID: a.attemptID,
@@ -1796,18 +1819,12 @@ func (a *Agent) setupDAGRunAttempt(ctx context.Context) (exec.DAGRunAttempt, err
 	if a.isSubDAGRun.Load() {
 		opts.RootDAGRun = &a.rootDAGRun
 	}
-
-	return a.dagRunStore.CreateAttempt(ctx, a.dag, time.Now(), a.dagRunID, opts)
+	return opts
 }
 
 // setupSocketServer creates a socket server instance.
 func (a *Agent) setupSocketServer(ctx context.Context) error {
-	socketAddr := a.dag.SockAddr(a.dagRunID)
-	if a.isSubDAGRun.Load() {
-		socketAddr = a.dag.SockAddrForSubDAGRun(a.dagRunID)
-	}
-
-	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
+	socketServer, err := sock.NewServer(a.socketAddr(), a.HandleHTTP(ctx))
 	if err != nil {
 		return err
 	}
@@ -1815,29 +1832,40 @@ func (a *Agent) setupSocketServer(ctx context.Context) error {
 	return nil
 }
 
+func (a *Agent) socketAddr() string {
+	if a.isSubDAGRun.Load() {
+		return a.dag.SockAddrForSubDAGRun(a.dagRunID)
+	}
+	return a.dag.SockAddr(a.dagRunID)
+}
+
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	if a.isSubDAGRun.Load() {
-		return nil // Skip the check for sub dag-runs
+		return nil
 	}
-	if a.dagRunMgr.IsRunning(ctx, a.dag, a.dagRunID) {
-		return fmt.Errorf("already running. dag-run ID=%s, socket=%s", a.dagRunID, a.dag.SockAddr(a.dagRunID))
+	if !a.dagRunMgr.IsRunning(ctx, a.dag, a.dagRunID) {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("already running. dag-run ID=%s, socket=%s", a.dagRunID, a.dag.SockAddr(a.dagRunID))
 }
 
 // execWithRecovery executes a function with panic recovery and logs any panics.
 func execWithRecovery(ctx context.Context, fn func()) {
 	defer func() {
 		if panicObj := recover(); panicObj != nil {
-			logger.Error(ctx, "Recovered from panic",
-				slog.String("err", panicToError(panicObj).Error()),
-				slog.String("errType", fmt.Sprintf("%T", panicObj)),
-				slog.String("stackTrace", string(debug.Stack())),
-			)
+			logRecoveredPanic(ctx, panicObj)
 		}
 	}()
 	fn()
+}
+
+func logRecoveredPanic(ctx context.Context, panicObj any) {
+	logger.Error(ctx, "Recovered from panic",
+		slog.String("err", panicToError(panicObj).Error()),
+		slog.String("errType", fmt.Sprintf("%T", panicObj)),
+		slog.String("stackTrace", string(debug.Stack())),
+	)
 }
 
 // panicToError converts a panic value to an error.
@@ -1859,9 +1887,9 @@ func (e *httpError) Error() string { return e.Message }
 // encodeError returns error to the HTTP client.
 func encodeError(w http.ResponseWriter, err error) {
 	var httpErr *httpError
-	if errors.As(err, &httpErr) {
-		http.Error(w, httpErr.Error(), httpErr.Code)
+	if !errors.As(err, &httpErr) {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Error(w, err.Error(), http.StatusInternalServerError)
+	http.Error(w, httpErr.Error(), httpErr.Code)
 }
