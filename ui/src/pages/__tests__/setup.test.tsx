@@ -153,7 +153,7 @@ async function moveToAgentStep() {
 
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-  await screen.findByText('Enable AI Agent');
+  await screen.findByText('Enable Steward');
   await waitFor(() => {
     expect(getMock).toHaveBeenCalledWith('/settings/agent/model-presets', {
       params: { query: { remoteNode: 'local' } },
@@ -232,6 +232,10 @@ describe('SetupPage', () => {
   it('allows local onboarding without an API key and omits blank credentials', async () => {
     renderPage();
     await moveToAgentStep();
+
+    expect(
+      screen.getByText('Configure the steward (optional)')
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Local' }));
 

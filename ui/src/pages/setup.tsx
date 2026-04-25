@@ -325,7 +325,7 @@ export default function SetupPage() {
           <p className="text-sm text-muted-foreground">
             {currentStep === 1
               ? 'Create your admin account to get started'
-              : 'Configure the AI agent (optional)'}
+              : 'Configure the steward (optional)'}
           </p>
         </div>
 
@@ -432,7 +432,7 @@ export default function SetupPage() {
           </div>
         )}
 
-        {/* Step 2: Configure AI Agent */}
+        {/* Step 2: Configure Steward */}
         {currentStep === 2 && (
           <div className="space-y-4">
             {step2Error && (
@@ -449,10 +449,10 @@ export default function SetupPage() {
                   <Bot className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <Label htmlFor="agent-toggle" className="text-sm font-medium">
-                      Enable AI Agent
+                      Enable Steward
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      AI-powered workflow generation
+                      Workflow generation and improvement with AI
                     </p>
                   </div>
                 </div>
