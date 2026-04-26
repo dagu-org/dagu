@@ -549,8 +549,8 @@ func lastLabeledOutputValue(output, prefix string) string {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
-		if strings.HasPrefix(line, prefix) {
-			return strings.TrimPrefix(line, prefix)
+		if after, ok := strings.CutPrefix(line, prefix); ok {
+			return after
 		}
 	}
 	return ""

@@ -5,6 +5,7 @@ package transform
 
 import (
 	"errors"
+	"maps"
 
 	"github.com/dagucloud/dagu/internal/cmn/stringutil"
 	"github.com/dagucloud/dagu/internal/core/exec"
@@ -115,9 +116,7 @@ func clonePushBackHistory(src []exec.PushBackEntry) []exec.PushBackEntry {
 		}
 		if len(entry.Inputs) > 0 {
 			inputs := make(map[string]string, len(entry.Inputs))
-			for key, value := range entry.Inputs {
-				inputs[key] = value
-			}
+			maps.Copy(inputs, entry.Inputs)
 			dst[i].Inputs = inputs
 		}
 	}
