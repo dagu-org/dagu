@@ -3610,6 +3610,21 @@ export interface components {
             pushBackInputs?: {
                 [key: string]: string;
             };
+            /** @description Chronological push-back history for this step */
+            pushBackHistory?: components["schemas"]["PushBackHistoryEntry"][];
+        };
+        /** @description One push-back event recorded for an approval step */
+        PushBackHistoryEntry: {
+            /** @description Push-back iteration number */
+            iteration: number;
+            /** @description Authenticated user who pushed the step back */
+            by?: string;
+            /** @description RFC3339 timestamp when the push-back was recorded */
+            at?: string;
+            /** @description Inputs provided for this push-back event */
+            inputs?: {
+                [key: string]: string;
+            };
         };
         /** @description Metadata for a sub DAG-run */
         SubDAGRun: {
