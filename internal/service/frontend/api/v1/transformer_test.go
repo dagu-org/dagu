@@ -4,6 +4,7 @@
 package api
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -113,6 +114,42 @@ func TestToDAGDetailsIncludesParamDefDescriptions(t *testing.T) {
 	require.Len(t, *details.ParamDefs, 1)
 	require.NotNil(t, (*details.ParamDefs)[0].Description)
 	assert.Equal(t, "Free-form operator notes", *(*details.ParamDefs)[0].Description)
+}
+
+func TestToDAGDetailsIncludesParamSchema(t *testing.T) {
+	details := toDAGDetails(&core.DAG{
+		Name:        "schema-params",
+		ParamSchema: json.RawMessage(`{"type":"object","properties":{"region":{"type":"string"}}}`),
+	})
+
+	require.NotNil(t, details)
+	require.NotNil(t, details.ParamSchema)
+
+	properties, ok := (*details.ParamSchema)["properties"].(map[string]any)
+	require.True(t, ok)
+
+	region, ok := properties["region"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "string", region["type"])
+}
+
+func TestToDAGDetailsOmitsInvalidParamSchema(t *testing.T) {
+	t.Run("missing schema", func(t *testing.T) {
+		details := toDAGDetails(&core.DAG{Name: "no-schema"})
+
+		require.NotNil(t, details)
+		assert.Nil(t, details.ParamSchema)
+	})
+
+	t.Run("malformed schema", func(t *testing.T) {
+		details := toDAGDetails(&core.DAG{
+			Name:        "bad-schema",
+			ParamSchema: json.RawMessage(`{"type":"object"`),
+		})
+
+		require.NotNil(t, details)
+		assert.Nil(t, details.ParamSchema)
+	})
 }
 
 func TestToDAGDetailsIncludesArtifactsDir(t *testing.T) {

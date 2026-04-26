@@ -463,6 +463,7 @@ var metadataTransformers = []transform{
 	{"params", newTransformer("Params", buildParams)},
 	{"default_params", newTransformer("DefaultParams", buildDefaultParams)},
 	{"param_defs", newTransformer("ParamDefs", buildParamDefs)},
+	{"param_schema", newTransformer("ParamSchema", buildParamSchema)},
 	{"params_json", newTransformer("ParamsJSON", buildParamsJSON)},
 	{"env", newTransformer("Env", buildEnvs)},
 	{"schedule", newTransformer("Schedule", buildSchedule)},
@@ -928,6 +929,7 @@ type paramsResult struct {
 	Params        []string
 	DefaultParams string
 	ParamDefs     []core.ParamDef
+	ParamSchema   json.RawMessage
 	ParamsJSON    string // JSON representation of resolved params (original payload when provided as JSON)
 }
 
@@ -971,6 +973,14 @@ func buildParamsJSON(ctx BuildContext, d *dag) (string, error) {
 		return "", err
 	}
 	return result.ParamsJSON, nil
+}
+
+func buildParamSchema(ctx BuildContext, d *dag) (json.RawMessage, error) {
+	result, err := parseParamsInternal(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return cloneParamSchema(result.ParamSchema), nil
 }
 
 // detectJSONParams checks if the input string is valid JSON and returns it if so.

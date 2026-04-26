@@ -357,6 +357,14 @@ func TestParseStringParamsWithJSON(t *testing.T) {
 			},
 		},
 		{
+			name:  "JSONArrayOfNamedObjects",
+			input: `[{"region":"us-west-2"},{"count":"5"}]`,
+			expected: []paramPair{
+				{Name: "region", Value: "us-west-2"},
+				{Name: "count", Value: "5"},
+			},
+		},
+		{
 			name:  "JSONWithNonStringValues",
 			input: `{"count": 42, "enabled": true}`,
 			expected: []paramPair{

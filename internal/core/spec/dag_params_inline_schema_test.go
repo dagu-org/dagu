@@ -230,6 +230,75 @@ params:
 	assert.Contains(t, err.Error(), "batch_size")
 }
 
+func TestBuildInlineSchemaParamPlan_ExposesRenderableParamSchema(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: inline-schema-ui
+params:
+  type: object
+  properties:
+    region:
+      title: Which compute location?
+      description: Pick the AWS region to run in.
+      oneOf:
+        - const: us-east-1
+          title: US East 1
+        - const: us-west-2
+          title: US West 2
+    count:
+      type: integer
+      default: 3
+      minimum: 1
+  required:
+    - region
+`)
+
+	dag, err := LoadYAML(context.Background(), yamlData, WithoutEval())
+	require.NoError(t, err)
+	require.NotEmpty(t, dag.ParamSchema)
+	assert.JSONEq(t, `{
+	  "type": "object",
+	  "properties": {
+	    "region": {
+	      "type": "string",
+	      "title": "Which compute location?",
+	      "description": "Pick the AWS region to run in.",
+	      "oneOf": [
+	        {"const": "us-east-1", "title": "US East 1", "type": "string"},
+	        {"const": "us-west-2", "title": "US West 2", "type": "string"}
+	      ]
+	    },
+	    "count": {
+	      "type": "integer",
+	      "default": 3,
+	      "minimum": 1
+	    }
+	  },
+	  "required": ["region"]
+	}`, string(dag.ParamSchema))
+}
+
+func TestBuildInlineSchemaParamPlan_OmitsUnsupportedNestedParamSchema(t *testing.T) {
+	t.Parallel()
+
+	yamlData := []byte(`
+name: inline-schema-nested-ui
+params:
+  type: object
+  properties:
+    settings:
+      type: object
+      properties:
+        retries:
+          type: integer
+`)
+
+	dag, err := LoadYAML(context.Background(), yamlData, WithoutEval())
+	require.NoError(t, err)
+	assert.Empty(t, dag.ParamSchema)
+}
+
 // U15: positional parameters are rejected for inline schema
 func TestBuildInlineSchemaParamPlan_PositionalParamRejected(t *testing.T) {
 	t.Parallel()
