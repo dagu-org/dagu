@@ -425,9 +425,7 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			}
 
 			dag := dagindex.DAGFromEntry(entry, store.baseDir)
-			dagName := dag.Name
-
-			if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
+			if opts.Name != "" && !matchesDAGListSearch(dag.Name, dag.FileName(), opts.Name) {
 				continue
 			}
 			if len(opts.Labels) > 0 && !containsAllLabels(dag.Labels, opts.Labels) {
@@ -457,10 +455,7 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 			}
 
 			baseName := path.Base(entry.Name())
-			dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
-			if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
-				continue
-			}
+			fileName := strings.TrimSuffix(baseName, path.Ext(baseName))
 
 			filePath := filepath.Join(store.baseDir, entry.Name())
 			dag, err := spec.Load(ctx, filePath, store.defaultLoadOptions(
@@ -470,11 +465,11 @@ func (store *Storage) List(ctx context.Context, opts exec.ListDAGsOptions) (exec
 				spec.WithAllowBuildErrors(),
 			)...)
 			if err != nil {
-				errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
+				errList = append(errList, fmt.Sprintf("reading %s failed: %s", fileName, err))
 				continue
 			}
 
-			if opts.Name != "" && !containsSearchText(dagName, opts.Name) {
+			if opts.Name != "" && !matchesDAGListSearch(dag.Name, fileName, opts.Name) {
 				continue
 			}
 
@@ -1083,6 +1078,10 @@ var flagPermission os.FileMode = 0750
 // containsSearchText checks if the text contains the search string (case-insensitive).
 func containsSearchText(text string, search string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(search))
+}
+
+func matchesDAGListSearch(dagName, fileName, search string) bool {
+	return containsSearchText(dagName, search) || containsSearchText(fileName, search)
 }
 
 // containsAllLabels checks if the DAG labels match all filter labels (AND logic).

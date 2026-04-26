@@ -605,7 +605,7 @@ function DAGStatus({
       {/* Approval Tab Content */}
       {activeTab === 'approval' && hasWaitingSteps && (
         <div className={scrollPaneClassName}>
-          <ApprovalTab dagRun={displayDAGRun} dagName={fileName} />
+          <ApprovalTab dagRun={displayDAGRun} dagName={displayDAGRun.name} />
         </div>
       )}
 
