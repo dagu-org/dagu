@@ -36,7 +36,7 @@ func sanitizeRenderableParamSchema(root *jsonschema.Schema) (*jsonschema.Schema,
 	if root.Type != "" && root.Type != "object" {
 		return nil, false
 	}
-	if len(root.Types) > 0 && !(len(root.Types) == 1 && root.Types[0] == "object") {
+	if len(root.Types) > 0 && (len(root.Types) != 1 || root.Types[0] != "object") {
 		return nil, false
 	}
 	if len(root.Properties) == 0 {
