@@ -133,6 +133,25 @@ func TestToDAGDetailsIncludesParamSchema(t *testing.T) {
 	assert.Equal(t, "string", region["type"])
 }
 
+func TestToDAGDetailsOmitsInvalidParamSchema(t *testing.T) {
+	t.Run("missing schema", func(t *testing.T) {
+		details := toDAGDetails(&core.DAG{Name: "no-schema"})
+
+		require.NotNil(t, details)
+		assert.Nil(t, details.ParamSchema)
+	})
+
+	t.Run("malformed schema", func(t *testing.T) {
+		details := toDAGDetails(&core.DAG{
+			Name:        "bad-schema",
+			ParamSchema: json.RawMessage(`{"type":"object"`),
+		})
+
+		require.NotNil(t, details)
+		assert.Nil(t, details.ParamSchema)
+	})
+}
+
 func TestToDAGDetailsIncludesArtifactsDir(t *testing.T) {
 	details := toDAGDetails(&core.DAG{
 		Name: "artifacts-dir",

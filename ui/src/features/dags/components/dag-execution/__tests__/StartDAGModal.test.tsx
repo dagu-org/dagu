@@ -3,7 +3,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import StartDAGModal from '../StartDAGModal';
 
 const renderedFormProps = vi.fn();
@@ -47,8 +47,8 @@ vi.mock('@rjsf/validator-ajv8', () => ({
   default: {},
 }));
 
-afterEach(() => {
-  renderedFormProps.mockClear();
+beforeEach(() => {
+  vi.clearAllMocks();
 });
 
 describe('StartDAGModal', () => {
@@ -135,5 +135,50 @@ describe('StartDAGModal', () => {
 
     expect(screen.queryByTestId('schema-form')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/region/i)).toBeInTheDocument();
+  });
+
+  it('submits typed param fields as a JSON array payload', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <StartDAGModal
+        visible={true}
+        dismissModal={vi.fn()}
+        onSubmit={onSubmit}
+        dag={
+          {
+            name: 'typed-dag',
+            paramDefs: [
+              {
+                name: 'region',
+                type: 'string',
+                required: true,
+              },
+              {
+                name: 'count',
+                type: 'integer',
+                required: true,
+              },
+            ],
+          } as never
+        }
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/region/i), {
+      target: { value: 'us-west-2' },
+    });
+    fireEvent.change(screen.getByLabelText(/count/i), {
+      target: { value: '5' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        '[{"region":"us-west-2"},{"count":"5"}]',
+        undefined,
+        true
+      )
+    );
   });
 });

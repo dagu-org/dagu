@@ -41,7 +41,9 @@ export function buildParamSchemaUiSchema(
 ): ParamSchemaUiSchema {
   const uiSchema: ParamSchemaUiSchema = {};
 
-  for (const [name, propertySchema] of Object.entries(schema.properties ?? {})) {
+  for (const [name, propertySchema] of Object.entries(
+    schema.properties ?? {}
+  )) {
     const choiceCount = getChoiceCount(propertySchema);
     if (choiceCount > 0 && choiceCount <= radioChoiceLimit) {
       uiSchema[name] = { 'ui:widget': 'radio' };
@@ -58,6 +60,10 @@ export function stringifyParamSchemaFormData(
 }
 
 function coerceParamSchemaValue(value: string, schema: JSONSchema): unknown {
+  if (value.trim() === '') {
+    return value;
+  }
+
   switch (inferScalarType(schema)) {
     case 'integer': {
       const number = Number(value);

@@ -5,6 +5,7 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 
 	"github.com/dagucloud/dagu/api/v1"
@@ -447,6 +448,13 @@ func toJSONObject(raw json.RawMessage) *map[string]any {
 
 	var value map[string]any
 	if err := json.Unmarshal(raw, &value); err != nil {
+		slog.Warn(
+			"Failed to unmarshal DAG param schema produced by buildRenderableParamSchema",
+			"error",
+			err,
+			"length",
+			len(raw),
+		)
 		return nil
 	}
 	return &value

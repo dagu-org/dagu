@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { IChangeEvent } from '@rjsf/core';
+import type RJSFForm from '@rjsf/core';
 import Form from '@rjsf/shadcn';
 import type { RJSFSchema, UiSchema } from '@rjsf/utils';
 import validator from '@rjsf/validator-ajv8';
@@ -254,11 +255,19 @@ function StartDAGModal({
 }: Props) {
   const dagDetails = dag as components['schemas']['DAGDetails'] | undefined;
   const paramSchema = React.useMemo(() => {
-    const schema = dagDetails?.paramSchema;
+    const schema = dagDetails?.paramSchema as JSONSchema | undefined;
     if (!schema || Array.isArray(schema) || typeof schema !== 'object') {
       return undefined;
     }
-    return schema as JSONSchema;
+    if (
+      !schema.properties ||
+      Array.isArray(schema.properties) ||
+      typeof schema.properties !== 'object' ||
+      Object.keys(schema.properties).length === 0
+    ) {
+      return undefined;
+    }
+    return schema;
   }, [dagDetails]);
   const paramDefs = React.useMemo(
     () => dagDetails?.paramDefs ?? [],
@@ -316,7 +325,11 @@ function StartDAGModal({
         : undefined,
     [paramSchema]
   );
-  const schemaFormRef = React.useRef<any>(null);
+  const schemaFormRef = React.useRef<RJSFForm<
+    SchemaFormData,
+    RJSFSchema,
+    any
+  > | null>(null);
 
   React.useEffect(() => {
     if (!visible) {

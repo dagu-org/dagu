@@ -32,6 +32,19 @@ describe('paramSchemaForm helpers', () => {
     });
   });
 
+  it('preserves blank string defaults for numeric schema fields', () => {
+    const schema: JSONSchema = {
+      type: 'object',
+      properties: {
+        count: { type: 'integer' },
+      },
+    };
+
+    expect(buildParamSchemaFormData(schema, 'count=""')).toEqual({
+      count: '',
+    });
+  });
+
   it('uses radio widgets only for short fixed choice lists', () => {
     const schema: JSONSchema = {
       type: 'object',

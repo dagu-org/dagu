@@ -148,6 +148,8 @@ function SchemaRadioWidget<
       return undefined;
     }
     const selectedIndex = enumOptionsIndexForValue(value, enumOptions);
+    // Keep stale or out-of-range values visually unselected instead of
+    // coercing them back into an enum option.
     if (typeof selectedIndex !== 'string') {
       return undefined;
     }

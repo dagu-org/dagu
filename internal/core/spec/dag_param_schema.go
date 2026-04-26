@@ -42,7 +42,7 @@ func sanitizeRenderableParamSchema(root *jsonschema.Schema) (*jsonschema.Schema,
 	if len(root.Properties) == 0 {
 		return nil, false
 	}
-	if len(root.PatternProperties) > 0 || len(root.AllOf) > 0 || len(root.AnyOf) > 0 || len(root.OneOf) > 0 || root.Not != nil || root.If != nil || root.Then != nil || root.Else != nil || root.Items != nil || len(root.PrefixItems) > 0 || root.Contains != nil {
+	if hasUnsupportedRootConstruct(root) {
 		return nil, false
 	}
 
@@ -72,7 +72,7 @@ func sanitizeRenderableParamProperty(schema *jsonschema.Schema) (*jsonschema.Sch
 	if schema == nil {
 		return nil, false
 	}
-	if len(schema.AllOf) > 0 || len(schema.AnyOf) > 0 || schema.Not != nil || schema.If != nil || schema.Then != nil || schema.Else != nil || schema.Items != nil || len(schema.PrefixItems) > 0 || len(schema.Properties) > 0 || len(schema.PatternProperties) > 0 || schema.Contains != nil {
+	if hasUnsupportedPropertyConstruct(schema) {
 		return nil, false
 	}
 
@@ -96,7 +96,7 @@ func sanitizeRenderableParamProperty(schema *jsonschema.Schema) (*jsonschema.Sch
 		result.Default = append(json.RawMessage(nil), schema.Default...)
 	}
 	if len(schema.Enum) > 0 {
-		result.Enum = cloneAny(schema.Enum).([]any)
+		result.Enum = cloneSchemaEnumValues(schema.Enum)
 	}
 	if schema.Minimum != nil {
 		minimum := *schema.Minimum
@@ -178,4 +178,40 @@ func cloneParamSchema(raw json.RawMessage) json.RawMessage {
 		return nil
 	}
 	return append(json.RawMessage(nil), raw...)
+}
+
+func hasUnsupportedRootConstruct(schema *jsonschema.Schema) bool {
+	return len(schema.PatternProperties) > 0 ||
+		len(schema.AllOf) > 0 ||
+		len(schema.AnyOf) > 0 ||
+		len(schema.OneOf) > 0 ||
+		schema.Not != nil ||
+		schema.If != nil ||
+		schema.Then != nil ||
+		schema.Else != nil ||
+		schema.Items != nil ||
+		len(schema.PrefixItems) > 0 ||
+		schema.Contains != nil
+}
+
+func hasUnsupportedPropertyConstruct(schema *jsonschema.Schema) bool {
+	return len(schema.AllOf) > 0 ||
+		len(schema.AnyOf) > 0 ||
+		schema.Not != nil ||
+		schema.If != nil ||
+		schema.Then != nil ||
+		schema.Else != nil ||
+		schema.Items != nil ||
+		len(schema.PrefixItems) > 0 ||
+		len(schema.Properties) > 0 ||
+		len(schema.PatternProperties) > 0 ||
+		schema.Contains != nil
+}
+
+func cloneSchemaEnumValues(values []any) []any {
+	cloned := make([]any, 0, len(values))
+	for _, value := range values {
+		cloned = append(cloned, cloneAny(value))
+	}
+	return cloned
 }
