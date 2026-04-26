@@ -272,11 +272,13 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, entry exec.Pro
 }
 
 func (z *ZombieDetector) cleanupOrphanedStaleEntry(ctx context.Context, entry exec.ProcEntry, attemptKey string, findErr error) error {
-	if !errors.Is(findErr, exec.ErrDAGRunIDNotFound) {
+	if !errors.Is(findErr, exec.ErrDAGRunIDNotFound) &&
+		!errors.Is(findErr, exec.ErrNoStatusData) &&
+		!errors.Is(findErr, exec.ErrCorruptedStatusFile) {
 		return fmt.Errorf("find attempt: %w", findErr)
 	}
 
-	logger.Info(ctx, "Removing orphaned stale proc entry with no persisted DAG run", tag.Error(findErr))
+	logger.Info(ctx, "Removing orphaned stale proc entry with missing persisted DAG run state", tag.Error(findErr))
 	z.clearAttemptState(attemptKey)
 	if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
 		return fmt.Errorf("remove orphaned stale proc: %w", err)
