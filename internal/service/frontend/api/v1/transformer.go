@@ -4,6 +4,7 @@
 package api
 
 import (
+	"encoding/json"
 	"os"
 
 	"github.com/dagucloud/dagu/api/v1"
@@ -404,6 +405,8 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		paramDefs = ptrOf(defs)
 	}
 
+	paramSchema := toJSONObject(dag.ParamSchema)
+
 	var artifacts *api.DAGArtifactsConfig
 	if dag.Artifacts != nil {
 		artifacts = &api.DAGArtifactsConfig{
@@ -427,6 +430,7 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		MaxActiveSteps:    ptrOf(dag.MaxActiveSteps),
 		Params:            ptrOf(dag.Params),
 		ParamDefs:         paramDefs,
+		ParamSchema:       paramSchema,
 		Preconditions:     ptrOf(preconditions),
 		Schedule:          ptrOf(schedules),
 		Steps:             ptrOf(steps),
@@ -434,6 +438,18 @@ func toDAGDetails(dag *core.DAG) *api.DAGDetails {
 		Tags:              ptrOf(dag.Labels.Strings()),
 		RunConfig:         runConfig,
 	}
+}
+
+func toJSONObject(raw json.RawMessage) *map[string]any {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var value map[string]any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil
+	}
+	return &value
 }
 
 func toParamDefs(defs []core.ParamDef) []api.ParamDef {

@@ -8329,6 +8329,10 @@ components:
           description: "Ordered parameter definitions derived from DAG params for typed UI rendering and validation"
           items:
             $ref: "#/components/schemas/ParamDef"
+        paramSchema:
+          type: object
+          description: "Resolved JSON Schema for schema-backed DAG params when safe for direct UI form rendering"
+          additionalProperties: true
         defaultParams:
           type: string
           description: "Default parameter values in JSON format if not specified at DAG-run creation"

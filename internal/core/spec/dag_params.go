@@ -125,10 +125,16 @@ func buildDAGParamsResult(ctx BuildContext, d *dag) (*paramsResult, error) {
 		return nil, err
 	}
 
+	paramSchema, err := buildRenderableParamSchema(plan.schema)
+	if err != nil {
+		return nil, err
+	}
+
 	return &paramsResult{
 		Params:        params,
 		DefaultParams: defaultParams,
 		ParamDefs:     cloneParamDefs(plan.paramDefs),
+		ParamSchema:   paramSchema,
 		ParamsJSON:    paramsJSON,
 	}, nil
 }

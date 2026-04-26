@@ -138,6 +138,9 @@ type DAG struct {
 	// ParamDefs contains ordered parameter metadata derived from DAG params.
 	// It is exposed to the API for typed UI rendering and validation hints.
 	ParamDefs []ParamDef `json:"paramDefs,omitempty"`
+	// ParamSchema contains the resolved JSON Schema for schema-backed DAG params
+	// when that schema is safe for direct UI form rendering.
+	ParamSchema json.RawMessage `json:"paramSchema,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
 	// Note: This field is evaluated at build time and may contain secrets.
 	// It is excluded from JSON serialization to prevent secret leakage.

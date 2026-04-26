@@ -3340,6 +3340,10 @@ export interface components {
             params?: string[];
             /** @description Ordered parameter definitions derived from DAG params for typed UI rendering and validation */
             paramDefs?: components["schemas"]["ParamDef"][];
+            /** @description Resolved JSON Schema for schema-backed DAG params when safe for direct UI form rendering */
+            paramSchema?: {
+                [key: string]: unknown;
+            };
             /** @description Default parameter values in JSON format if not specified at DAG-run creation */
             defaultParams?: string;
             /** @description List of labels for categorizing and filtering DAGs */
