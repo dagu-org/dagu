@@ -73,7 +73,6 @@ func ConfirmAndRepairStaleDistributedRun(
 			return status, false, nil
 		}
 	case errors.Is(err, exec.ErrDAGRunLeaseNotFound):
-		lease = nil
 	default:
 		return status, false, err
 	}
