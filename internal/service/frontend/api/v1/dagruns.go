@@ -1849,10 +1849,10 @@ func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string
 		if status == nil {
 			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
 		}
-		status = a.repairConfirmedStaleDistributedRunOnRead(ctx, status)
 		if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(status)); err != nil {
 			return api.GetDAGRunDetails200JSONResponse{}, err
 		}
+		status = a.repairConfirmedStaleDistributedRunOnRead(ctx, status, attempt.ID())
 		return api.GetDAGRunDetails200JSONResponse{
 			DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *status),
 		}, nil
@@ -1867,18 +1867,31 @@ func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string
 	if err != nil {
 		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
-	dagStatus = a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus)
 	if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(dagStatus)); err != nil {
 		return api.GetDAGRunDetails200JSONResponse{}, err
 	}
+	dagStatus = a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID())
 	return api.GetDAGRunDetails200JSONResponse{
 		DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
 	}, nil
 }
 
-func (a *API) repairConfirmedStaleDistributedRunOnRead(ctx context.Context, status *exec.DAGRunStatus) *exec.DAGRunStatus {
+func (a *API) repairConfirmedStaleDistributedRunOnRead(
+	ctx context.Context,
+	status *exec.DAGRunStatus,
+	fallbackAttemptID string,
+) *exec.DAGRunStatus {
 	if status == nil || a.dagRunLeaseStore == nil || a.workerHeartbeatStore == nil {
 		return status
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" {
+		attemptID = fallbackAttemptID
+	}
+	fallbackWorkerID := status.WorkerID
+	if fallbackWorkerID == "" {
+		fallbackWorkerID = a.distributedFallbackWorkerIDFromLease(ctx, status, attemptID)
 	}
 
 	reconciled, _, err := runtime.ConfirmAndRepairStaleDistributedRun(ctx, runtime.DistributedRunRepairConfig{
@@ -1886,7 +1899,7 @@ func (a *API) repairConfirmedStaleDistributedRunOnRead(ctx context.Context, stat
 		DAGRunLeaseStore:     a.dagRunLeaseStore,
 		WorkerHeartbeatStore: a.workerHeartbeatStore,
 		StaleLeaseThreshold:  a.leaseStaleThreshold,
-	}, status, status.AttemptID, status.WorkerID)
+	}, status, attemptID, fallbackWorkerID)
 	if err != nil {
 		logger.Warn(ctx, "Failed to auto-repair stale distributed run on read",
 			tag.DAG(status.Name),
@@ -1900,6 +1913,28 @@ func (a *API) repairConfirmedStaleDistributedRunOnRead(ctx context.Context, stat
 		return reconciled
 	}
 	return status
+}
+
+func (a *API) distributedFallbackWorkerIDFromLease(
+	ctx context.Context,
+	status *exec.DAGRunStatus,
+	fallbackAttemptID string,
+) string {
+	if status == nil || status.WorkerID != "" || a.dagRunLeaseStore == nil {
+		return ""
+	}
+
+	attemptKey := exec.AttemptKeyForStatus(status, fallbackAttemptID)
+	if attemptKey == "" {
+		return ""
+	}
+
+	lease, err := a.dagRunLeaseStore.Get(ctx, attemptKey)
+	if err != nil || lease == nil || !exec.IsRemoteWorkerID(lease.WorkerID) {
+		return ""
+	}
+
+	return lease.WorkerID
 }
 
 func (a *API) toDAGRunDetailsWithSpecSource(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) api.DAGRunDetails {
