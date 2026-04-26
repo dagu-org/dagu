@@ -237,7 +237,8 @@ func TestFormatPushBackFeedback_NilApproval(t *testing.T) {
 	result := formatPushBackFeedback(inputs, nil)
 
 	assert.Contains(t, result, "requested changes")
-	assert.NotContains(t, result, "KEY")
+	assert.Contains(t, result, "Reviewer feedback:")
+	assert.Contains(t, result, "- KEY: value")
 }
 
 func TestFormatPushBackFeedback_DeterministicOrder(t *testing.T) {

@@ -18,6 +18,7 @@ import { DAGContext } from '../../contexts/DAGContext';
 import DAGStatus from '../DAGStatus';
 
 const patchMock = vi.hoisted(() => vi.fn());
+const approvalTabMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/hooks/api', () => ({
   useClient: vi.fn(),
@@ -95,7 +96,10 @@ vi.mock('../dag-details', () => ({
 }));
 
 vi.mock('../approval', () => ({
-  ApprovalTab: () => null,
+  ApprovalTab: (props: unknown) => {
+    approvalTabMock(props);
+    return null;
+  },
 }));
 
 vi.mock('../artifacts/ArtifactsTab', () => ({
@@ -262,5 +266,54 @@ describe('DAGStatus', () => {
       screen.getByText(`Graph status: ${NodeStatus.Success}`)
     ).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('passes the DAG run name to the approval tab when fileName differs', () => {
+    vi.mocked(useClient).mockReturnValue({
+      PATCH: patchMock,
+    } as unknown as ReturnType<typeof useClient>);
+
+    const waitingDagRun = {
+      ...dagRun,
+      name: 'test_name',
+      nodes: [
+        {
+          step: {
+            name: 'wait-step',
+            approval: {
+              prompt: 'Approve this step',
+            },
+          },
+          status: NodeStatus.Waiting,
+          statusLabel: NodeStatusLabel.waiting,
+        },
+      ],
+    } as components['schemas']['DAGRunDetails'];
+
+    render(
+      <MemoryRouter>
+        <AppBarContext.Provider value={appBarValue}>
+          <DAGContext.Provider
+            value={{
+              refresh: vi.fn(),
+              name: 'test_name',
+              fileName: 'approvaltest',
+            }}
+          >
+            <DAGStatus
+              dagRun={waitingDagRun}
+              fileName="approvaltest"
+              initialTab="approval"
+            />
+          </DAGContext.Provider>
+        </AppBarContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(approvalTabMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dagName: 'test_name',
+      })
+    );
   });
 });

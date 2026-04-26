@@ -56,7 +56,7 @@ type DAGStore interface {
 // ListDAGsOptions contains parameters for paginated DAG listing
 type ListDAGsOptions struct {
 	Paginator         *Paginator
-	Name              string                               // Optional name filter
+	Name              string                               // Optional search filter for DAG name or file name
 	Labels            []string                             // Optional labels filter (AND logic - all labels must match)
 	Sort              string                               // Optional sort field (name, updated_at, created_at, nextRun)
 	Order             string                               // Optional sort order (asc, desc)

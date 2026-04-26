@@ -1018,6 +1018,22 @@ steps:
 	require.Len(t, result.Items, 1)
 	assert.Equal(t, "filter-web-dag", result.Items[0].Name)
 
+	// File name filtering should work even when the DAG-level name differs.
+	fileNameOnlyContent := `name: display-name-only
+steps:
+  - name: step1
+    command: echo "file-name-filter"`
+	err = store.Create(ctx, "file-name-only-match", []byte(fileNameOnlyContent))
+	require.NoError(t, err)
+
+	opts = exec.ListDAGsOptions{Name: "file-name-only-match"}
+	result, errList, err = store.List(ctx, opts)
+	require.NoError(t, err)
+	require.Empty(t, errList)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "display-name-only", result.Items[0].Name)
+	assert.Equal(t, "file-name-only-match", result.Items[0].FileName())
+
 	// Test label filtering
 	opts = exec.ListDAGsOptions{Labels: []string{"frontend"}}
 	result, errList, err = store.List(ctx, opts)
