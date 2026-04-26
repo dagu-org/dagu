@@ -345,6 +345,7 @@ func TestApprovalPushBackExposesHistoricalFeedbackEnvAcrossRewoundScope(t *testi
 	}))
 
 	dagName := "intg_pushback_scope_env"
+	snippet := indentTestScript(pushBackSnapshotScript(), 6)
 	spec := fmt.Sprintf(`name: %s
 type: graph
 steps:
@@ -368,10 +369,10 @@ steps:
     script: |
 %s
 `, dagName,
-		indentTestScript(pushBackSnapshotScript(), 6),
-		indentTestScript(pushBackSnapshotScript(), 6),
-		indentTestScript(pushBackSnapshotScript(), 6),
-		indentTestScript(pushBackSnapshotScript(), 6))
+		snippet,
+		snippet,
+		snippet,
+		snippet)
 
 	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
 		Name: dagName,

@@ -5,6 +5,7 @@ package api
 
 import (
 	"os"
+	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
@@ -374,8 +375,12 @@ func toPushBackHistory(node *exec.Node) []api.PushBackHistoryEntry {
 		items[i] = api.PushBackHistoryEntry{
 			Iteration: entry.Iteration,
 			By:        ptrOf(entry.By),
-			At:        ptrOf(entry.At),
 			Inputs:    ptrOf(entry.Inputs),
+		}
+		if entry.At != "" {
+			if at, err := time.Parse(time.RFC3339, entry.At); err == nil {
+				items[i].At = &at
+			}
 		}
 	}
 	return items

@@ -448,21 +448,18 @@ func (r *Runner) runNodeExecution(ctx context.Context, plan *Plan, node *Node, p
 	if node.State().ApprovalIteration > 0 {
 		state := node.State()
 		env := GetEnv(ctx)
+		approval := node.Step().Approval
 		var allowedInputs []string
-		if approval := node.Step().Approval; approval != nil {
+		if approval != nil {
 			allowedInputs = approval.Input
 		}
 		filteredInputs := exec.FilterPushBackInputs(allowedInputs, state.PushBackInputs)
 		for k, v := range filteredInputs {
 			env = env.WithEnvVars(k, v)
 		}
-		if approval := node.Step().Approval; approval != nil && len(filteredInputs) != len(state.PushBackInputs) {
-			allowed := make(map[string]struct{}, len(approval.Input))
-			for _, key := range approval.Input {
-				allowed[key] = struct{}{}
-			}
+		if approval != nil && len(filteredInputs) != len(state.PushBackInputs) {
 			for k := range state.PushBackInputs {
-				if _, ok := allowed[k]; ok {
+				if _, ok := filteredInputs[k]; ok {
 					continue
 				}
 				logger.Warn(ctx, "Ignoring unexpected push-back input", slog.String("input", k))

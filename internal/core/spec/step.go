@@ -1974,7 +1974,7 @@ func buildStepApproval(_ StepBuildContext, s *step, result *core.Step) error {
 		Prompt:   s.Approval.Prompt,
 		Input:    s.Approval.Input,
 		Required: s.Approval.Required,
-		RewindTo: s.Approval.RewindTo,
+		RewindTo: strings.TrimSpace(s.Approval.RewindTo),
 	}
 	// Validate required fields are subset of input
 	for _, req := range result.Approval.Required {

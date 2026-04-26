@@ -146,6 +146,12 @@ func TestToNodeIncludesNormalizedPushBackHistory(t *testing.T) {
 		Stderr:            "stderr.log",
 		ApprovalIteration: 1,
 		PushBackInputs:    map[string]string{"FEEDBACK": "revise the summary", "IGNORED": "x"},
+		PushBackHistory: []exec.PushBackEntry{{
+			Iteration: 1,
+			By:        "reviewer",
+			At:        "2026-04-26T06:02:00Z",
+			Inputs:    map[string]string{"FEEDBACK": "revise the summary", "IGNORED": "x"},
+		}},
 	}
 
 	result := toNode(node)
@@ -154,6 +160,10 @@ func TestToNodeIncludesNormalizedPushBackHistory(t *testing.T) {
 	require.Len(t, *result.PushBackHistory, 1)
 	entry := (*result.PushBackHistory)[0]
 	assert.Equal(t, 1, entry.Iteration)
+	require.NotNil(t, entry.By)
+	assert.Equal(t, "reviewer", *entry.By)
+	require.NotNil(t, entry.At)
+	assert.Equal(t, "2026-04-26T06:02:00Z", entry.At.UTC().Format(time.RFC3339))
 	require.NotNil(t, entry.Inputs)
 	assert.Equal(t, "revise the summary", (*entry.Inputs)["FEEDBACK"])
 	_, ok := (*entry.Inputs)["IGNORED"]

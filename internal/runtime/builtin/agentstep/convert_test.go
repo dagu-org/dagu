@@ -237,6 +237,7 @@ func TestFormatPushBackFeedback_NilApproval(t *testing.T) {
 	result := formatPushBackFeedback(inputs, nil)
 
 	assert.Contains(t, result, "requested changes")
+	assert.Contains(t, result, "Reviewer feedback:")
 	assert.Contains(t, result, "- KEY: value")
 }
 

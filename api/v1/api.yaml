@@ -8842,12 +8842,14 @@ components:
       properties:
         iteration:
           type: integer
+          minimum: 1
           description: "Push-back iteration number"
         by:
           type: string
           description: "Authenticated user who pushed the step back"
         at:
           type: string
+          format: date-time
           description: "RFC3339 timestamp when the push-back was recorded"
         inputs:
           type: object
