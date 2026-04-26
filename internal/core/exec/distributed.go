@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	ErrDispatchTaskNotFound = errors.New("dispatch task claim not found")
-	ErrDAGRunLeaseNotFound  = errors.New("dag-run lease not found")
-	ErrActiveRunNotFound    = errors.New("active distributed run not found")
+	ErrDispatchTaskNotFound    = errors.New("dispatch task claim not found")
+	ErrDAGRunLeaseNotFound     = errors.New("dag-run lease not found")
+	ErrActiveRunNotFound       = errors.New("active distributed run not found")
+	ErrWorkerHeartbeatNotFound = errors.New("worker heartbeat not found")
 )
 
 // CoordinatorEndpoint identifies a coordinator instance that owns a
@@ -95,6 +96,7 @@ func (r WorkerHeartbeatRecord) LastHeartbeatTime() time.Time {
 // WorkerHeartbeatStore persists shared worker presence across coordinators.
 type WorkerHeartbeatStore interface {
 	Upsert(ctx context.Context, record WorkerHeartbeatRecord) error
+	Get(ctx context.Context, workerID string) (*WorkerHeartbeatRecord, error)
 	List(ctx context.Context) ([]WorkerHeartbeatRecord, error)
 	DeleteStale(ctx context.Context, before time.Time) (int, error)
 }
