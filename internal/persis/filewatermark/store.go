@@ -55,7 +55,7 @@ func (s *Store) Load(ctx context.Context) (*scheduler.SchedulerState, error) {
 	const expectedVersion = scheduler.SchedulerStateVersion
 	switch state.Version {
 	case expectedVersion:
-	case 0, 1:
+	case 0, 1, 2:
 		migrated, migrateErr := migrateWatermarkState(state.Version, &state)
 		if migrateErr != nil {
 			logger.Warn(ctx, "Failed to migrate watermark state, starting fresh",
@@ -154,6 +154,9 @@ func migrateWatermarkState(version int, state *scheduler.SchedulerState) (*sched
 		migrated.Version = 1
 		return migrateWatermarkState(1, &migrated)
 	case 1:
+		migrated.Version = 2
+		return migrateWatermarkState(2, &migrated)
+	case 2:
 		migrated.Version = scheduler.SchedulerStateVersion
 		if migrated.DAGs == nil {
 			migrated.DAGs = make(map[string]scheduler.DAGWatermark)

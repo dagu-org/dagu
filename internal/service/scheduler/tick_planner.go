@@ -250,11 +250,13 @@ func (tp *TickPlanner) Init(ctx context.Context, dags []*core.DAG) error {
 	for _, dag := range dags {
 		current := state.DAGs[dag.Name]
 		next, changed := reconcileOneOffState(current, dag, observedAt)
+		next, startChanged := reconcileStartScheduleState(next, dag, observedAt)
+		changed = changed || startChanged
 		if !changed {
 			continue
 		}
 		stateChanged = true
-		if next.LastScheduledTime.IsZero() && len(next.OneOffs) == 0 {
+		if isZeroDAGWatermark(next) {
 			delete(state.DAGs, dag.Name)
 			continue
 		}
@@ -629,6 +631,9 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 
 		// Guard 3: skipIfSuccessful — only the current schedule's own slots may suppress.
 		if dag.SkipIfSuccessful && latestStatus.Status == core.Succeeded && schedule.Parsed != nil {
+			if tp.isPreEditSuccess(dag.Name, latestStatus) {
+				return true
+			}
 			prevExecTime := computePrevExecTime(scheduledTime, schedule)
 			if !latestScheduleTime.Before(prevExecTime) && latestScheduleTime.Before(scheduledTime) {
 				logger.Info(ctx, "Skipping job due to successful prior run",
@@ -655,6 +660,9 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 
 		// Guard 3 fallback: preserve manual-run semantics when no slot identity exists.
 		if dag.SkipIfSuccessful && latestStatus.Status == core.Succeeded && schedule.Parsed != nil {
+			if tp.isPreEditSuccess(dag.Name, latestStatus) {
+				return true
+			}
 			prevExecTime := computePrevExecTime(scheduledTime, schedule)
 			if !latestStartedAt.Before(prevExecTime) && latestStartedAt.Before(scheduledTime) {
 				logger.Info(ctx, "Skipping job due to successful prior run",
@@ -683,6 +691,16 @@ func latestRunReferenceTime(status exec.DAGRunStatus) (time.Time, bool) {
 	return latestStartedAt.Truncate(time.Minute), true
 }
 
+func latestSuccessReferenceTime(status exec.DAGRunStatus) (time.Time, bool) {
+	if finishedAt, err := stringutil.ParseTime(status.FinishedAt); err == nil && !finishedAt.IsZero() {
+		return finishedAt, true
+	}
+	if startedAt, err := stringutil.ParseTime(status.StartedAt); err == nil && !startedAt.IsZero() {
+		return startedAt, true
+	}
+	return time.Time{}, false
+}
+
 func latestScheduledSlot(status exec.DAGRunStatus, schedule core.Schedule) (time.Time, latestScheduledSlotState) {
 	if status.ScheduleTime == "" {
 		return time.Time{}, latestScheduledSlotUnknown
@@ -704,6 +722,26 @@ func latestScheduledSlot(status exec.DAGRunStatus, schedule core.Schedule) (time
 func scheduleMatchesFireTime(schedule core.Schedule, scheduledTime time.Time) bool {
 	next, due := scheduleDueAt(schedule, scheduledTime)
 	return due && next.Equal(scheduledTime)
+}
+
+func (tp *TickPlanner) isPreEditSuccess(dagName string, status exec.DAGRunStatus) bool {
+	resetAt := tp.skipSuccessResetAt(dagName)
+	if resetAt.IsZero() {
+		return false
+	}
+
+	successAt, ok := latestSuccessReferenceTime(status)
+	return ok && successAt.Before(resetAt)
+}
+
+func (tp *TickPlanner) skipSuccessResetAt(dagName string) time.Time {
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+
+	if tp.watermarkState == nil {
+		return time.Time{}
+	}
+	return tp.watermarkState.DAGs[dagName].SkipSuccessResetAt
 }
 
 func (tp *TickPlanner) shouldRunOneOff(ctx context.Context, dag *core.DAG) bool {
@@ -1012,6 +1050,7 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		tp.entries[event.DAGName] = &plannerEntry{dag: event.DAG}
 		// Set watermark to now (new DAGs have no catchup)
 		flushNow = tp.advanceDAGWatermark(event.DAGName, tp.cfg.Clock())
+		flushNow = tp.reconcileStartScheduleState(event.DAG) || flushNow
 		flushNow = tp.reconcileOneOffSchedules(event.DAG) || flushNow
 		logger.Info(ctx, "Planner: DAG added", tag.DAG(event.DAGName))
 
@@ -1025,17 +1064,16 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		if event.DAG.CatchupWindow > 0 {
 			flushNow = tp.recomputeBuffer(ctx, event.DAG)
 		}
+		flushNow = tp.reconcileStartScheduleState(event.DAG) || flushNow
 		flushNow = tp.reconcileOneOffSchedules(event.DAG) || flushNow
 		logger.Info(ctx, "Planner: DAG updated", tag.DAG(event.DAGName))
 
 	case DAGChangeDeleted:
 		delete(tp.entries, event.DAGName)
 		delete(tp.buffers, event.DAGName)
-		tp.mu.Lock()
-		delete(tp.watermarkState.DAGs, event.DAGName)
-		tp.watermarkDirty.Store(true)
-		tp.mu.Unlock()
-		flushNow = true
+		// Preserve persisted watermark state across delete+add rewrite cycles so
+		// the re-added DAG can detect schedule edits before its next slot. Truly
+		// deleted DAG watermarks are pruned on the next Init.
 		logger.Info(ctx, "Planner: DAG deleted", tag.DAG(event.DAGName))
 	}
 
@@ -1058,7 +1096,30 @@ func (tp *TickPlanner) reconcileOneOffSchedules(dag *core.DAG) bool {
 		return false
 	}
 
-	if next.LastScheduledTime.IsZero() && len(next.OneOffs) == 0 {
+	if isZeroDAGWatermark(next) {
+		delete(tp.watermarkState.DAGs, dag.Name)
+	} else {
+		tp.watermarkState.DAGs[dag.Name] = next
+	}
+	tp.watermarkDirty.Store(true)
+	return true
+}
+
+func (tp *TickPlanner) reconcileStartScheduleState(dag *core.DAG) bool {
+	if dag == nil {
+		return false
+	}
+
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	current := tp.watermarkState.DAGs[dag.Name]
+	next, changed := reconcileStartScheduleState(current, dag, tp.cfg.Clock())
+	if !changed {
+		return false
+	}
+
+	if isZeroDAGWatermark(next) {
 		delete(tp.watermarkState.DAGs, dag.Name)
 	} else {
 		tp.watermarkState.DAGs[dag.Name] = next
