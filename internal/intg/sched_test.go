@@ -189,7 +189,7 @@ func TestScheduleEditWhileSuspendedDoesNotSuppressNewSlot(t *testing.T) {
 		return nil
 	})
 
-	clockBase := time.Date(2026, 4, 27, 10, 4, 59, 0, time.UTC)
+	clockBase := time.Date(2026, 4, 27, 10, 4, 30, 0, time.UTC)
 	clockStart := time.Now()
 	sc.SetClock(func() time.Time {
 		return clockBase.Add(time.Since(clockStart))
@@ -219,9 +219,23 @@ func TestScheduleEditWhileSuspendedDoesNotSuppressNewSlot(t *testing.T) {
 		return schedulerErr
 	}
 
+	schedulerHasSchedule := func(expression string) bool {
+		for _, loaded := range th.EntryReader.DAGs() {
+			if loaded.Name != dagName || len(loaded.Schedule) != 1 {
+				continue
+			}
+			return loaded.Schedule[0].Expression == expression
+		}
+		return false
+	}
+
 	require.Eventually(t, func() bool {
-		return sc.IsRunning()
+		if err := pollSchedulerErr(); err != nil {
+			return true
+		}
+		return sc.IsRunning() && schedulerHasSchedule("0 10 * * *")
 	}, intgTestTimeout(2*time.Second), 50*time.Millisecond)
+	require.NoError(t, schedulerErr)
 
 	writeSpec("5 10 * * *")
 
@@ -229,13 +243,7 @@ func TestScheduleEditWhileSuspendedDoesNotSuppressNewSlot(t *testing.T) {
 		if err := pollSchedulerErr(); err != nil {
 			return true
 		}
-		for _, loaded := range th.EntryReader.DAGs() {
-			if loaded.Name != dagName || len(loaded.Schedule) != 1 {
-				continue
-			}
-			return loaded.Schedule[0].Expression == "5 10 * * *"
-		}
-		return false
+		return schedulerHasSchedule("5 10 * * *")
 	}, intgTestTimeout(5*time.Second), 50*time.Millisecond)
 	require.NoError(t, schedulerErr)
 
@@ -246,7 +254,7 @@ func TestScheduleEditWhileSuspendedDoesNotSuppressNewSlot(t *testing.T) {
 			return true
 		}
 		return dispatchCount.Load() > 0
-	}, intgTestTimeout(5*time.Second), 50*time.Millisecond)
+	}, intgTestTimeout(35*time.Second), 50*time.Millisecond)
 	require.NoError(t, schedulerErr)
 	require.Equal(t, int32(1), dispatchCount.Load(), "edited schedules should dispatch exactly once")
 	lastDispatchMu.Lock()
