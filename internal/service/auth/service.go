@@ -1076,6 +1076,8 @@ func validateWebhookHMACMode(
 	enforcementMode auth.WebhookHMACEnforcementMode,
 ) (auth.WebhookHMACEnforcementMode, error) {
 	switch authMode {
+	case auth.WebhookAuthModeTokenOnly:
+		return "", ErrInvalidWebhookAuthMode
 	case auth.WebhookAuthModeTokenAndHMAC:
 		if enforcementMode == "" {
 			return auth.WebhookHMACEnforcementModeStrict, nil
