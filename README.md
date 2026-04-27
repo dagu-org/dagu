@@ -720,7 +720,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development workflow and code stand
 
   <br/><br/>
 
-  <a href="https://github.com/sponsors/dagu-org">
+  <a href="https://github.com/sponsors/dagucloud">
     <img src="https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86" width="150" alt="Sponsor">
   </a>
 </div>
