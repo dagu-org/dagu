@@ -317,6 +317,7 @@ func (a *API) UpdateDAGSpec(ctx context.Context, request api.UpdateDAGSpecReques
 	}
 
 	a.logAudit(ctx, audit.CategoryDAG, "dag_update", map[string]any{"dag_name": request.FileName})
+	a.notifyDAGMutation(request.FileName)
 
 	return api.UpdateDAGSpec200JSONResponse{
 		Errors: errs,
@@ -1615,6 +1616,7 @@ func (a *API) UpdateDAGSuspensionState(ctx context.Context, request api.UpdateDA
 		"dag_name":  request.FileName,
 		"suspended": request.Body.Suspend,
 	})
+	a.notifyDAGMutation(request.FileName)
 
 	return api.UpdateDAGSuspensionState200Response{}, nil
 }

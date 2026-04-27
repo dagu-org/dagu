@@ -459,6 +459,80 @@ func TestTickPlanner_HandleEvent_Deleted(t *testing.T) {
 	// Verify entry was removed
 	_, ok = tp.entries["del-dag"]
 	assert.False(t, ok, "del-dag should be removed from entries")
+
+	tp.mu.RLock()
+	_, hasWM := tp.watermarkState.DAGs["del-dag"]
+	tp.mu.RUnlock()
+	assert.True(t, hasWM, "del-dag watermark should be retained during the rewrite grace window")
+}
+
+func TestTickPlanner_DeletedWatermarkExpiresAfterGraceWindow(t *testing.T) {
+	t.Parallel()
+
+	const graceWindow = 2 * time.Minute
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	clock := now
+	eventCh := make(chan DAGChangeEvent, 256)
+	store := &mockWatermarkStore{}
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		QueuesEnabled:  true,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "test-run-id", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		RunExists: func(_ context.Context, _ *core.DAG, _ string) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return clock
+		},
+		Events: eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:     "deleted-after-grace",
+		Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
+		Type:    DAGChangeDeleted,
+		DAGName: dag.Name,
+	})
+	tp.entryMu.Unlock()
+
+	tp.mu.RLock()
+	_, hasWM := tp.watermarkState.DAGs[dag.Name]
+	tp.mu.RUnlock()
+	require.True(t, hasWM, "watermark should remain available during the rewrite grace window")
+
+	clock = now.Add(graceWindow + time.Second)
+	tp.Plan(context.Background(), clock)
+	tp.Flush(context.Background())
+
+	tp.mu.RLock()
+	_, hasWM = tp.watermarkState.DAGs[dag.Name]
+	tp.mu.RUnlock()
+	assert.False(t, hasWM, "watermark should be pruned after the grace window expires")
+
+	saved := store.lastSaved()
+	require.NotNil(t, saved)
+	_, hasPersisted := saved.DAGs[dag.Name]
+	assert.False(t, hasPersisted, "expired deleted watermark should not be persisted")
 }
 
 func TestTickPlanner_HandleEvent_Updated(t *testing.T) {
@@ -1348,6 +1422,80 @@ func TestTickPlanner_ShouldRunSkipIfSuccessful(t *testing.T) {
 	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
 	runs := tp.Plan(context.Background(), now)
 	assert.Len(t, runs, 0, "should skip when SkipIfSuccessful and last run succeeded in interval")
+}
+
+func TestTickPlanner_ShouldRunSkipIfSuccessfulIgnoresStaleEditedScheduleSlot(t *testing.T) {
+	t.Parallel()
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool { return false },
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{
+				Status:       core.Succeeded,
+				StartedAt:    "2026-02-07T12:34:00Z",
+				ScheduleTime: "2026-02-07T12:34:00Z",
+				TriggerType:  core.TriggerTypeScheduler,
+			}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
+		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 43, 0, 0, time.UTC) },
+		Events:    eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:             "skip-success-edited-schedule-dag",
+		SkipIfSuccessful: true,
+		Schedule:         []core.Schedule{mustParseSchedule(t, "43 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 43, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+	assert.Len(t, runs, 1, "should not skip when the last success belongs to a removed schedule slot")
+}
+
+func TestTickPlanner_ShouldRunSkipIfSuccessfulFallsBackToManualRunStartTime(t *testing.T) {
+	t.Parallel()
+
+	eventCh := make(chan DAGChangeEvent, 256)
+	tp := NewTickPlanner(TickPlannerConfig{
+		IsSuspended: func(_ context.Context, _ string) bool { return false },
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{
+				Status:      core.Succeeded,
+				StartedAt:   "2026-02-07T12:34:00Z",
+				TriggerType: core.TriggerTypeManual,
+			}, nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) { return false, nil },
+		GenRunID:  func(_ context.Context) (string, error) { return "run-1", nil },
+		Clock:     func() time.Time { return time.Date(2026, 2, 7, 12, 43, 0, 0, time.UTC) },
+		Events:    eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:             "skip-success-manual-fallback-dag",
+		SkipIfSuccessful: true,
+		Schedule:         []core.Schedule{mustParseSchedule(t, "43 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	now := time.Date(2026, 2, 7, 12, 43, 0, 0, time.UTC)
+	runs := tp.Plan(context.Background(), now)
+	assert.Len(t, runs, 0, "should still skip when a manual run already succeeded in the current interval")
+}
+
+func TestLatestScheduledSlotMarksRemovedScheduleSlotStale(t *testing.T) {
+	t.Parallel()
+
+	scheduledAt, state := latestScheduledSlot(exec.DAGRunStatus{
+		ScheduleTime: "2026-02-07T12:34:00Z",
+	}, mustParseSchedule(t, "43 * * * *"))
+
+	assert.Equal(t, latestScheduledSlotStale, state)
+	assert.Equal(t, time.Date(2026, 2, 7, 12, 34, 0, 0, time.UTC), scheduledAt)
 }
 
 func TestTickPlanner_ShouldRunAlreadyFinished(t *testing.T) {

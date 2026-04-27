@@ -4,23 +4,35 @@
 package scheduler
 
 import (
+	"fmt"
 	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/dagucloud/dagu/internal/core"
 )
 
-const SchedulerStateVersion = 2
+const SchedulerStateVersion = 3
 
 func cloneDAGWatermark(w DAGWatermark) DAGWatermark {
 	cloned := DAGWatermark{
-		LastScheduledTime: w.LastScheduledTime,
+		LastScheduledTime:        w.LastScheduledTime,
+		StartScheduleFingerprint: w.StartScheduleFingerprint,
+		SkipSuccessResetAt:       w.SkipSuccessResetAt,
 	}
 	if len(w.OneOffs) > 0 {
 		cloned.OneOffs = make(map[string]OneOffScheduleState, len(w.OneOffs))
 		maps.Copy(cloned.OneOffs, w.OneOffs)
 	}
 	return cloned
+}
+
+func isZeroDAGWatermark(w DAGWatermark) bool {
+	return w.LastScheduledTime.IsZero() &&
+		w.StartScheduleFingerprint == "" &&
+		w.SkipSuccessResetAt.IsZero() &&
+		len(w.OneOffs) == 0
 }
 
 func oneOffSchedules(dag *core.DAG) []core.Schedule {
@@ -90,6 +102,58 @@ func reconcileOneOffState(current DAGWatermark, dag *core.DAG, now time.Time) (D
 	}
 
 	return next, changed
+}
+
+func startScheduleFingerprint(dag *core.DAG) string {
+	if dag == nil {
+		return ""
+	}
+
+	fingerprints := make([]string, 0, len(dag.Schedule))
+	for _, schedule := range dag.Schedule {
+		if !schedule.IsCron() {
+			continue
+		}
+		fingerprint := schedule.Fingerprint()
+		if fingerprint == "" {
+			continue
+		}
+		fingerprints = append(fingerprints, fingerprint)
+	}
+	if len(fingerprints) == 0 {
+		return ""
+	}
+
+	slices.Sort(fingerprints)
+	return fmt.Sprintf("skip:%t|%s", dag.SkipIfSuccessful, strings.Join(fingerprints, ","))
+}
+
+func reconcileStartScheduleState(current DAGWatermark, dag *core.DAG, observedAt time.Time) (DAGWatermark, bool) {
+	next := cloneDAGWatermark(current)
+	fingerprint := startScheduleFingerprint(dag)
+
+	if next.StartScheduleFingerprint == fingerprint {
+		return next, false
+	}
+	if fingerprint == "" {
+		if next.StartScheduleFingerprint == "" && next.SkipSuccessResetAt.IsZero() {
+			return next, false
+		}
+		next.StartScheduleFingerprint = ""
+		next.SkipSuccessResetAt = time.Time{}
+		return next, true
+	}
+
+	// Empty fingerprints come from pre-v3 watermark state where schedule identity
+	// was not persisted, so seed the current fingerprint without forcing a reset.
+	if next.StartScheduleFingerprint == "" {
+		next.StartScheduleFingerprint = fingerprint
+		return next, true
+	}
+
+	next.StartScheduleFingerprint = fingerprint
+	next.SkipSuccessResetAt = observedAt
+	return next, true
 }
 
 // NextPlannedRun projects the next scheduler-aware run time for DAG listing/sorting.
