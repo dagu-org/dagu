@@ -227,6 +227,46 @@ func TestZombieDetectorDetectAndCleanZombies_OrphanedStaleEntryIsRemoved(t *test
 	dagRunStore.AssertExpectations(t)
 }
 
+func TestZombieDetectorDetectAndCleanZombies_StaleEntryWithMissingStatusIsRemoved(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dagRunStore := &mockDAGRunStore{}
+	procStore := &mockProcStore{}
+	detector := NewZombieDetector(dagRunStore, procStore, time.Second, 1)
+
+	entry := testRootProcEntry("queue", "test-dag", "run-1", "attempt-1", false)
+
+	procStore.On("ListAllEntries", ctx).Return([]exec.ProcEntry{entry}, nil).Once()
+	dagRunStore.On("FindAttempt", mock.Anything, exec.NewDAGRunRef("test-dag", "run-1")).Return(nil, exec.ErrNoStatusData).Once()
+	procStore.On("RemoveIfStale", mock.Anything, entry).Return(nil).Once()
+
+	detector.detectAndCleanZombies(ctx)
+
+	procStore.AssertExpectations(t)
+	dagRunStore.AssertExpectations(t)
+}
+
+func TestZombieDetectorDetectAndCleanZombies_StaleEntryWithCorruptedStatusIsRemoved(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dagRunStore := &mockDAGRunStore{}
+	procStore := &mockProcStore{}
+	detector := NewZombieDetector(dagRunStore, procStore, time.Second, 1)
+
+	entry := testRootProcEntry("queue", "test-dag", "run-1", "attempt-1", false)
+
+	procStore.On("ListAllEntries", ctx).Return([]exec.ProcEntry{entry}, nil).Once()
+	dagRunStore.On("FindAttempt", mock.Anything, exec.NewDAGRunRef("test-dag", "run-1")).Return(nil, exec.ErrCorruptedStatusFile).Once()
+	procStore.On("RemoveIfStale", mock.Anything, entry).Return(nil).Once()
+
+	detector.detectAndCleanZombies(ctx)
+
+	procStore.AssertExpectations(t)
+	dagRunStore.AssertExpectations(t)
+}
+
 func testRootProcEntry(groupName, dagName, dagRunID, attemptID string, fresh bool) exec.ProcEntry {
 	return exec.ProcEntry{
 		GroupName: groupName,

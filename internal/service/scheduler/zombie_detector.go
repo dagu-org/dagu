@@ -272,11 +272,19 @@ func (z *ZombieDetector) checkAndCleanZombie(ctx context.Context, entry exec.Pro
 }
 
 func (z *ZombieDetector) cleanupOrphanedStaleEntry(ctx context.Context, entry exec.ProcEntry, attemptKey string, findErr error) error {
-	if !errors.Is(findErr, exec.ErrDAGRunIDNotFound) {
+	if !errors.Is(findErr, exec.ErrDAGRunIDNotFound) &&
+		!errors.Is(findErr, exec.ErrNoStatusData) &&
+		!errors.Is(findErr, exec.ErrCorruptedStatusFile) {
 		return fmt.Errorf("find attempt: %w", findErr)
 	}
 
-	logger.Info(ctx, "Removing orphaned stale proc entry with no persisted DAG run", tag.Error(findErr))
+	if errors.Is(findErr, exec.ErrCorruptedStatusFile) {
+		logger.Warn(ctx, "Removing orphaned stale proc entry with corrupted persisted DAG run state", tag.Error(findErr))
+	} else {
+		logger.Info(ctx, "Removing orphaned stale proc entry with missing persisted DAG run state", tag.Error(findErr))
+	}
+	// A corrupted or missing status snapshot cannot be used for recovery, so the
+	// stale proc entry must be dropped to stop reporting the run as active.
 	z.clearAttemptState(attemptKey)
 	if err := z.procStore.RemoveIfStale(ctx, entry); err != nil {
 		return fmt.Errorf("remove orphaned stale proc: %w", err)

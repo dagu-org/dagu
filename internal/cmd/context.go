@@ -599,6 +599,9 @@ func (c *Context) NewServer(rs *resource.Service, opts ...frontend.ServerOption)
 	if c.DAGRunLeaseStore != nil {
 		opts = append(opts, frontend.WithAPIOption(apiv1.WithDAGRunLeaseStore(c.DAGRunLeaseStore)))
 	}
+	if c.WorkerHeartbeatStore != nil {
+		opts = append(opts, frontend.WithAPIOption(apiv1.WithWorkerHeartbeatStore(c.WorkerHeartbeatStore)))
+	}
 	opts = append(opts, frontend.WithAPIOption(apiv1.WithSchedulerStateStore(
 		filewatermark.New(filepath.Join(c.Config.Paths.DataDir, "scheduler")),
 	)))

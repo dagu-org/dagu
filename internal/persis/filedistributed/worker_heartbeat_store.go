@@ -35,6 +35,24 @@ func (s *WorkerHeartbeatStore) Upsert(_ context.Context, record exec.WorkerHeart
 	return writeJSONAtomic(s.recordPath(record.WorkerID), record)
 }
 
+func (s *WorkerHeartbeatStore) Get(_ context.Context, workerID string) (*exec.WorkerHeartbeatRecord, error) {
+	if workerID == "" {
+		return nil, exec.ErrWorkerHeartbeatNotFound
+	}
+
+	var record exec.WorkerHeartbeatRecord
+	if err := readJSONFile(s.recordPath(workerID), &record); err != nil {
+		if os.IsNotExist(err) {
+			return nil, exec.ErrWorkerHeartbeatNotFound
+		}
+		return nil, err
+	}
+	if record.WorkerID == "" {
+		return nil, exec.ErrWorkerHeartbeatNotFound
+	}
+	return &record, nil
+}
+
 func (s *WorkerHeartbeatStore) List(_ context.Context) ([]exec.WorkerHeartbeatRecord, error) {
 	files, err := sortedFiles(filepath.Join(s.baseDir, "workers"))
 	if err != nil {
