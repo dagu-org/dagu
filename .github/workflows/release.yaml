@@ -6,6 +6,11 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+-*"
 
+# contents: write is required for GoReleaser to create the GitHub release and
+# upload assets. Restrict everything else to the minimum.
+permissions:
+  contents: write
+
 jobs:
   # Build release binaries
   goreleaser:

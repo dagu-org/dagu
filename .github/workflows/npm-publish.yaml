@@ -17,8 +17,27 @@ permissions:
   id-token: write
 
 jobs:
+  # Validate user-supplied inputs before any job that uses secrets or publish steps.
+  # This prevents shell injection: a crafted version string could otherwise execute
+  # arbitrary code when interpolated into shell via ${{ inputs.version }}.
+  validate-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        env:
+          # Pass through env so the shell sees a plain string, not an interpolated expression.
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          # Allow bare semver (1.2.3) or with pre-release/build suffix (1.2.3-rc.1).
+          # Reject anything else — especially characters that are shell metacharacters.
+          if [ -n "$INPUT_VERSION" ] && ! echo "$INPUT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([.\-][a-zA-Z0-9._-]+)?$'; then
+            echo "::error::inputs.version must be semver (e.g. 1.16.4), got: ${INPUT_VERSION}"
+            exit 1
+          fi
+
   # First, publish all platform-specific packages
   publish-platform-packages:
+    needs: validate-inputs
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -95,31 +114,42 @@ jobs:
       - name: Download release asset
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Context values are passed via env so they're treated as data, not code.
+          # Writing ${{ expr }} directly inside `run:` would let a crafted value
+          # execute arbitrary shell commands before the runner sees the script.
+          RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          ASSET_NAME: ${{ matrix.asset }}
         run: |
-          # For workflow_dispatch, we need to find the release
-          if [ -z "${{ github.event.release.tag_name }}" ]; then
-            echo "Finding release for version v${{ inputs.version }}"
-            RELEASE_TAG="v${{ inputs.version }}"
+          # For workflow_dispatch, we need to find the release.
+          if [ -z "$RELEASE_TAG_NAME" ]; then
+            echo "Finding release for version v${INPUT_VERSION}"
+            RELEASE_TAG="v${INPUT_VERSION}"
           else
-            RELEASE_TAG="${{ github.event.release.tag_name }}"
+            RELEASE_TAG="$RELEASE_TAG_NAME"
           fi
 
-          echo "Downloading asset: ${{ matrix.asset }}"
+          echo "Downloading asset: ${ASSET_NAME}"
           gh release download "${RELEASE_TAG}" \
-            --repo ${{ github.repository }} \
-            --pattern "${{ matrix.asset }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "${ASSET_NAME}" \
             --dir /tmp
 
       - name: Extract binary
+        env:
+          # Matrix values passed via env for the same injection-prevention reason.
+          PACKAGE_NAME: ${{ matrix.package }}
+          ASSET_NAME: ${{ matrix.asset }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          mkdir -p npm/${{ matrix.package }}/bin
-          cd npm/${{ matrix.package }}/bin
+          mkdir -p "npm/${PACKAGE_NAME}/bin"
+          cd "npm/${PACKAGE_NAME}/bin"
 
           # All assets are now .tar.gz
-          tar -xzf /tmp/${{ matrix.asset }} dagu || tar -xzf /tmp/${{ matrix.asset }} dagu.exe
+          tar -xzf "/tmp/${ASSET_NAME}" dagu || tar -xzf "/tmp/${ASSET_NAME}" dagu.exe
 
           # Verify binary exists
-          if [[ "${{ matrix.platform }}" == "win32" ]]; then
+          if [[ "$PLATFORM" == "win32" ]]; then
             test -f dagu.exe
           else
             test -f dagu
@@ -127,12 +157,15 @@ jobs:
           fi
 
       - name: Update package version
+        env:
+          PACKAGE_NAME: ${{ matrix.package }}
         run: |
-          cd npm/${{ matrix.package }}
-          # Strip 'v' prefix if present
-          VERSION="${{ env.VERSION }}"
-          VERSION="${VERSION#v}"
-          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+          cd "npm/${PACKAGE_NAME}"
+          # Strip 'v' prefix if present. $VERSION comes from the top-level env block —
+          # reference the shell variable directly instead of re-interpolating ${{ env.VERSION }},
+          # which would re-open the injection window.
+          PKG_VERSION="${VERSION#v}"
+          npm version "${PKG_VERSION}" --no-git-tag-version --allow-same-version
 
       - name: Publish to NPM
         run: |
@@ -169,12 +202,13 @@ jobs:
         run: |
           cd npm/dagu
 
-          # Strip 'v' prefix if present
-          VERSION="${{ env.VERSION }}"
-          VERSION="${VERSION#v}"
+          # Strip 'v' prefix if present. Reference $VERSION (top-level env) directly
+          # in shell rather than via ${{ env.VERSION }} to avoid re-opening the
+          # template injection path.
+          PKG_VERSION="${VERSION#v}"
 
           # Update package version
-          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          npm version "$PKG_VERSION" --no-git-tag-version --allow-same-version
 
           # Update all optionalDependencies to match the version
           cat > update-deps.js << 'EOF'
@@ -193,7 +227,7 @@ jobs:
           console.log(JSON.stringify(pkg, null, 2));
           EOF
 
-          node update-deps.js "${VERSION}"
+          node update-deps.js "${PKG_VERSION}"
 
       - name: Wait for npm registry propagation
         run: |

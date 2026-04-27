@@ -18,6 +18,12 @@ on:
       - "ui/**"
       - ".github/workflows/frontend-ci.yaml"
 
+# Restrict to read-only: this workflow only runs tests and builds the frontend,
+# it never pushes or deploys anything. An explicit block prevents the default
+# broad token permissions from being available if the workflow is ever compromised.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build
