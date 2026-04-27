@@ -852,6 +852,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 			}
 			return nil, fmt.Errorf("error getting latest attempt: %w", err)
 		}
+
 		latestStatus, err := a.dagRunMgr.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest status: %w", err)
@@ -888,6 +889,7 @@ func (a *API) GetDAGDAGRunDetails(ctx context.Context, request api.GetDAGDAGRunD
 		}
 		return nil, fmt.Errorf("error getting status by dag-run ID: %w", err)
 	}
+
 	dagStatus = a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID())
 
 	return &api.GetDAGDAGRunDetails200JSONResponse{

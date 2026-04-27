@@ -1837,52 +1837,63 @@ func isDAGRunLookupNotFound(err error) bool {
 
 // getDAGRunDetailsData returns DAG run details data. Used by both HTTP handler and SSE fetcher.
 func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string) (api.GetDAGRunDetails200JSONResponse, error) {
+	attempt, dagStatus, err := a.loadRootDAGRunDetailsAttemptAndStatus(ctx, dagName, dagRunId)
+	if err != nil {
+		return api.GetDAGRunDetails200JSONResponse{}, err
+	}
+	return api.GetDAGRunDetails200JSONResponse{
+		DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
+	}, nil
+}
+
+func (a *API) loadRootDAGRunDetailsAttemptAndStatus(
+	ctx context.Context,
+	dagName, dagRunId string,
+) (exec.DAGRunAttempt, *exec.DAGRunStatus, error) {
 	if dagRunId == "latest" {
 		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
 		if err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("no dag-runs found for DAG %s", dagName)
+			return nil, nil, fmt.Errorf("no dag-runs found for DAG %s", dagName)
 		}
+
 		status, err := attempt.ReadStatus(ctx)
 		if err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
+			return nil, nil, fmt.Errorf("error getting latest status: %w", err)
 		}
 		if status == nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+			return nil, nil, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
 		}
 		if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(status)); err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, err
+			return nil, nil, err
 		}
 
 		ref := exec.NewDAGRunRef(dagName, status.DAGRunID)
-		status, err = a.dagRunMgr.GetSavedStatus(ctx, ref)
+		dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 		if err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
+			return nil, nil, fmt.Errorf("error getting latest status: %w", err)
 		}
-		if status == nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		if dagStatus == nil {
+			return nil, nil, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
 		}
-		status = a.repairConfirmedStaleDistributedRunOnRead(ctx, status, attempt.ID())
-		return api.GetDAGRunDetails200JSONResponse{
-			DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *status),
-		}, nil
+
+		return attempt, a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID()), nil
 	}
 
 	ref := exec.NewDAGRunRef(dagName, dagRunId)
 	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
 	if err != nil {
-		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+		return nil, nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
+
 	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
 	if err != nil {
-		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+		return nil, nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
 	}
 	if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(dagStatus)); err != nil {
-		return api.GetDAGRunDetails200JSONResponse{}, err
+		return nil, nil, err
 	}
-	dagStatus = a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID())
-	return api.GetDAGRunDetails200JSONResponse{
-		DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
-	}, nil
+
+	return attempt, a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID()), nil
 }
 
 func (a *API) repairConfirmedStaleDistributedRunOnRead(
