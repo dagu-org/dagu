@@ -20,6 +20,7 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import {
   components,
   WebhookAuthMode as WebhookAuthModeValue,
+  WebhookHMACConfigureRequestAuthMode as WebhookHMACAuthModeValue,
   WebhookHMACEnforcementMode as WebhookHMACEnforcementModeValue,
 } from '../../../../api/v1/schema';
 import { Button } from '@/components/ui/button';
@@ -41,11 +42,14 @@ import { Switch } from '@/components/ui/switch';
 import { AppBarContext } from '../../../../contexts/AppBarContext';
 import { TOKEN_KEY } from '../../../../contexts/AuthContext';
 import { useConfig } from '../../../../contexts/ConfigContext';
+import { useClient } from '../../../../hooks/api';
 import dayjs from '../../../../lib/dayjs';
 import ConfirmModal from '@/components/ui/confirm-dialog';
 
 type WebhookDetails = components['schemas']['WebhookDetails'];
 type WebhookAuthMode = components['schemas']['WebhookAuthMode'];
+type WebhookHMACAuthMode =
+  components['schemas']['WebhookHMACConfigureRequest']['authMode'];
 type WebhookHMACEnforcementMode =
   components['schemas']['WebhookHMACEnforcementMode'];
 
@@ -85,9 +89,22 @@ function formatWebhookAuthMode(mode: WebhookAuthMode): string {
   }
 }
 
+function toHMACAuthMode(mode: WebhookAuthMode): WebhookHMACAuthMode {
+  switch (mode) {
+    case WebhookAuthModeValue.token_and_hmac:
+      return WebhookHMACAuthModeValue.token_and_hmac;
+    case WebhookAuthModeValue.hmac_only:
+      return WebhookHMACAuthModeValue.hmac_only;
+    case WebhookAuthModeValue.token_only:
+    default:
+      throw new Error('HMAC auth mode cannot be token only');
+  }
+}
+
 function WebhookTab({ fileName }: WebhookTabProps) {
   const config = useConfig();
   const appBarContext = useContext(AppBarContext);
+  const client = useClient();
 
   // State
   const [webhook, setWebhook] = useState<WebhookDetails | null>(null);
@@ -326,33 +343,33 @@ function WebhookTab({ fileName }: WebhookTabProps) {
     }
   };
 
-  const handleEnableHMAC = async (authMode: WebhookAuthMode) => {
+  const handleEnableHMAC = async (authMode: WebhookHMACAuthMode) => {
     try {
       setIsActioning(true);
       setError(null);
       const remoteNode = getRemoteNodeParam();
       const enforcementMode =
-        authMode === WebhookAuthModeValue.hmac_only
+        authMode === WebhookHMACAuthModeValue.hmac_only
           ? WebhookHMACEnforcementModeValue.strict
           : draftEnforcementMode;
-      const response = await fetch(
-        `${config.apiURL}/dags/${encodeURIComponent(fileName)}/webhook/hmac/enable?remoteNode=${remoteNode}`,
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/enable',
         {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
+          body: {
             authMode,
             enforcementMode,
-          }),
+          },
         }
       );
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to enable HMAC');
+      if (apiError || !data) {
+        throw new Error(apiError?.message || 'Failed to enable HMAC');
       }
 
-      const data = await response.json();
       setWebhook(data.webhook);
       setDraftAuthMode(data.webhook.authMode);
       setDraftEnforcementMode(
@@ -372,27 +389,27 @@ function WebhookTab({ fileName }: WebhookTabProps) {
       setIsActioning(true);
       setError(null);
       const remoteNode = getRemoteNodeParam();
-      const response = await fetch(
-        `${config.apiURL}/dags/${encodeURIComponent(fileName)}/webhook/hmac/configure?remoteNode=${remoteNode}`,
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/configure',
         {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            authMode: draftAuthMode,
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
+          body: {
+            authMode: toHMACAuthMode(draftAuthMode),
             enforcementMode:
               draftAuthMode === WebhookAuthModeValue.hmac_only
                 ? WebhookHMACEnforcementModeValue.strict
                 : draftEnforcementMode,
-          }),
+          },
         }
       );
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to update HMAC settings');
+      if (apiError || !data) {
+        throw new Error(apiError?.message || 'Failed to update HMAC settings');
       }
 
-      const data = await response.json();
       setWebhook(data);
     } catch (err) {
       setError(
@@ -408,20 +425,20 @@ function WebhookTab({ fileName }: WebhookTabProps) {
       setIsActioning(true);
       setError(null);
       const remoteNode = getRemoteNodeParam();
-      const response = await fetch(
-        `${config.apiURL}/dags/${encodeURIComponent(fileName)}/webhook/hmac/disable?remoteNode=${remoteNode}`,
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/disable',
         {
-          method: 'POST',
-          headers: getAuthHeaders(),
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
         }
       );
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to disable HMAC');
+      if (apiError || !data) {
+        throw new Error(apiError?.message || 'Failed to disable HMAC');
       }
 
-      const data = await response.json();
       setWebhook(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to disable HMAC');
@@ -435,20 +452,20 @@ function WebhookTab({ fileName }: WebhookTabProps) {
       setIsActioning(true);
       setError(null);
       const remoteNode = getRemoteNodeParam();
-      const response = await fetch(
-        `${config.apiURL}/dags/${encodeURIComponent(fileName)}/webhook/hmac/regenerate?remoteNode=${remoteNode}`,
+      const { data, error: apiError } = await client.POST(
+        '/dags/{fileName}/webhook/hmac/regenerate',
         {
-          method: 'POST',
-          headers: getAuthHeaders(),
+          params: {
+            path: { fileName },
+            query: { remoteNode },
+          },
         }
       );
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to regenerate HMAC secret');
+      if (apiError || !data) {
+        throw new Error(apiError?.message || 'Failed to regenerate HMAC secret');
       }
 
-      const data = await response.json();
       setWebhook(data.webhook);
       setSecretReveal({ kind: 'hmac', value: data.hmacSecret });
     } catch (err) {
@@ -826,7 +843,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    handleEnableHMAC(WebhookAuthModeValue.token_and_hmac)
+                    handleEnableHMAC(WebhookHMACAuthModeValue.token_and_hmac)
                   }
                   disabled={isActioning}
                 >
@@ -836,7 +853,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    handleEnableHMAC(WebhookAuthModeValue.hmac_only)
+                    handleEnableHMAC(WebhookHMACAuthModeValue.hmac_only)
                   }
                   disabled={isActioning}
                 >

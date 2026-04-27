@@ -10,6 +10,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -639,6 +641,35 @@ func TestWebhooks_EnableHMAC_StrictRequiresSignature(t *testing.T) {
 		WithBearerToken(createResult.Token).
 		WithHeader("X-Dagu-Signature", signature).
 		ExpectStatus(http.StatusOK).Send(t)
+}
+
+func TestWebhooks_EnableHMAC_NotSupportedReturnsNotImplemented(t *testing.T) {
+	webhookParallel(t)
+
+	tmpDir := t.TempDir()
+	brokenDataDir := filepath.Join(tmpDir, "broken-data-dir")
+	require.NoError(t, os.WriteFile(brokenDataDir, []byte("not-a-directory"), 0600))
+
+	server := setupWebhookTestServer(t, func(cfg *config.Config) {
+		cfg.Paths.DataDir = brokenDataDir
+		cfg.Paths.WebhooksDir = filepath.Join(tmpDir, "webhooks")
+	})
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_hmac_not_supported_test"
+	createTestDAG(t, server, token, dagName)
+
+	server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	resp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook/hmac/enable", map[string]any{
+		"authMode":        "token_and_hmac",
+		"enforcementMode": "strict",
+	}).WithBearerToken(token).ExpectStatus(http.StatusNotImplemented).Send(t)
+
+	var apiErr api.Error
+	resp.Unmarshal(t, &apiErr)
+	assert.Equal(t, "webhook HMAC is not supported by this store", apiErr.Message)
 }
 
 func TestWebhooks_EnableHMAC_ObserveAllowsTokenOnly(t *testing.T) {

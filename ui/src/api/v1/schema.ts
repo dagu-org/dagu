@@ -3174,7 +3174,8 @@ export interface components {
         };
         /** @description Request to configure webhook HMAC auth mode and enforcement */
         WebhookHMACConfigureRequest: {
-            authMode: components["schemas"]["WebhookAuthMode"];
+            /** @enum {string} */
+            authMode: WebhookHMACConfigureRequestAuthMode;
             enforcementMode?: components["schemas"]["WebhookHMACEnforcementMode"];
         };
         /** @description Response when enabling or regenerating webhook HMAC (includes full secret) */
@@ -14094,6 +14095,10 @@ export enum WebhookAuthMode {
 export enum WebhookHMACEnforcementMode {
     strict = "strict",
     observe = "observe"
+}
+export enum WebhookHMACConfigureRequestAuthMode {
+    token_and_hmac = "token_and_hmac",
+    hmac_only = "hmac_only"
 }
 export enum Stream {
     stdout = "stdout",

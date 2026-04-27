@@ -280,6 +280,15 @@ func (a *API) EnableDAGWebhookHMAC(ctx context.Context, request api.EnableDAGWeb
 				},
 			}, nil
 		}
+		if errors.Is(err, authservice.ErrWebhookHMACNotSupported) {
+			return api.EnableDAGWebhookHMACdefaultJSONResponse{
+				StatusCode: http.StatusNotImplemented,
+				Body: api.Error{
+					Code:    api.ErrorCodeInternalError,
+					Message: err.Error(),
+				},
+			}, nil
+		}
 		logger.Error(ctx, "Failed to enable webhook HMAC", tag.Name(request.FileName), tag.Error(err))
 		return api.EnableDAGWebhookHMACdefaultJSONResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -341,6 +350,15 @@ func (a *API) ConfigureDAGWebhookHMAC(ctx context.Context, request api.Configure
 				},
 			}, nil
 		}
+		if errors.Is(err, authservice.ErrWebhookHMACNotSupported) {
+			return api.ConfigureDAGWebhookHMACdefaultJSONResponse{
+				StatusCode: http.StatusNotImplemented,
+				Body: api.Error{
+					Code:    api.ErrorCodeInternalError,
+					Message: err.Error(),
+				},
+			}, nil
+		}
 		logger.Error(ctx, "Failed to configure webhook HMAC", tag.Name(request.FileName), tag.Error(err))
 		return api.ConfigureDAGWebhookHMACdefaultJSONResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -381,6 +399,15 @@ func (a *API) RegenerateDAGWebhookHMACSecret(ctx context.Context, request api.Re
 				StatusCode: http.StatusBadRequest,
 				Body: api.Error{
 					Code:    api.ErrorCodeBadRequest,
+					Message: err.Error(),
+				},
+			}, nil
+		}
+		if errors.Is(err, authservice.ErrWebhookHMACNotSupported) {
+			return api.RegenerateDAGWebhookHMACSecretdefaultJSONResponse{
+				StatusCode: http.StatusNotImplemented,
+				Body: api.Error{
+					Code:    api.ErrorCodeInternalError,
 					Message: err.Error(),
 				},
 			}, nil

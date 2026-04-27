@@ -8051,7 +8051,10 @@ components:
         - authMode
       properties:
         authMode:
-          $ref: "#/components/schemas/WebhookAuthMode"
+          type: string
+          enum:
+            - token_and_hmac
+            - hmac_only
         enforcementMode:
           $ref: "#/components/schemas/WebhookHMACEnforcementMode"
 

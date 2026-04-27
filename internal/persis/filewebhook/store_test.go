@@ -225,7 +225,7 @@ func TestStore_RebuildIndexFailsWithoutEncryptorForEncryptedHMACSecret(t *testin
 
 	_, err = New(tmpDir)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "encrypt")
+	assert.ErrorIs(t, err, auth.ErrWebhookHMACEncryptorRequired)
 }
 
 func TestStore_EncryptedHMACSecretRoundTripAndRemoval(t *testing.T) {
