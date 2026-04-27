@@ -35,6 +35,8 @@ type DAGChangeEvent struct {
 	DAGName string    // always set (needed for delete)
 }
 
+const deletedWatermarkGrace = 2 * time.Minute
+
 // PlannedRun represents a run that the TickPlanner has decided should be dispatched.
 type PlannedRun struct {
 	DAG           *core.DAG
@@ -106,8 +108,8 @@ type TickPlannerConfig struct {
 // tracks progress via watermarks, and reacts to DAG lifecycle changes.
 //
 // Thread safety:
-//   - entries and buffers are protected by entryMu (accessed from drainEvents
-//     goroutine and cronLoop's Plan).
+//   - entries, buffers, and deletedGrace are protected by entryMu (accessed
+//     from drainEvents goroutine and cronLoop's Plan).
 //   - watermarkState is shared with the flusher goroutine and protected by mu.
 //   - Plan() holds entryMu during I/O calls (IsSuspended, IsRunning,
 //     GetLatestStatus, GenRunID). This is intentional: the lock prevents
@@ -124,9 +126,10 @@ type TickPlanner struct {
 	watermarkDirty atomic.Bool
 
 	// per-DAG tracking (protected by entryMu)
-	entryMu sync.Mutex
-	entries map[string]*plannerEntry
-	buffers map[string]*ScheduleBuffer
+	entryMu      sync.Mutex
+	entries      map[string]*plannerEntry
+	buffers      map[string]*ScheduleBuffer
+	deletedGrace map[string]time.Time
 
 	// lastPlanResult holds the runs from the most recent Plan() call.
 	// It is written by Plan() and read by Advance(). Both are called
@@ -204,9 +207,10 @@ func NewTickPlanner(cfg TickPlannerConfig) *TickPlanner {
 		}
 	}
 	return &TickPlanner{
-		cfg:     cfg,
-		entries: make(map[string]*plannerEntry),
-		buffers: make(map[string]*ScheduleBuffer),
+		cfg:          cfg,
+		entries:      make(map[string]*plannerEntry),
+		buffers:      make(map[string]*ScheduleBuffer),
+		deletedGrace: make(map[string]time.Time),
 	}
 }
 
@@ -382,6 +386,8 @@ func (tp *TickPlanner) initBuffers(ctx context.Context, dags []*core.DAG) {
 func (tp *TickPlanner) Plan(ctx context.Context, now time.Time) []PlannedRun {
 	tp.entryMu.Lock()
 	defer tp.entryMu.Unlock()
+
+	tp.pruneExpiredDeletedWatermarks(now)
 
 	var candidates []PlannedRun
 
@@ -649,6 +655,9 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 		// The latest run belongs to a removed/edited slot. Do not let its runtime
 		// timestamps suppress the current schedule.
 		return true
+	case latestScheduledSlotUnknown:
+		// Fall back to runtime-based suppression when the latest run does not carry
+		// a trustworthy scheduled slot identity.
 	}
 
 	// Guard 2 fallback: legacy/manual runs without an authoritative schedule slot.
@@ -1047,6 +1056,7 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		if event.DAG == nil {
 			return
 		}
+		delete(tp.deletedGrace, event.DAGName)
 		tp.entries[event.DAGName] = &plannerEntry{dag: event.DAG}
 		// Set watermark to now (new DAGs have no catchup)
 		flushNow = tp.advanceDAGWatermark(event.DAGName, tp.cfg.Clock())
@@ -1058,6 +1068,7 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 		if event.DAG == nil {
 			return
 		}
+		delete(tp.deletedGrace, event.DAGName)
 		tp.entries[event.DAGName] = &plannerEntry{dag: event.DAG}
 		// Remove existing buffer and recompute if catchupWindow > 0
 		delete(tp.buffers, event.DAGName)
@@ -1071,9 +1082,11 @@ func (tp *TickPlanner) handleEvent(ctx context.Context, event DAGChangeEvent) {
 	case DAGChangeDeleted:
 		delete(tp.entries, event.DAGName)
 		delete(tp.buffers, event.DAGName)
-		// Preserve persisted watermark state across delete+add rewrite cycles so
-		// the re-added DAG can detect schedule edits before its next slot. Truly
-		// deleted DAG watermarks are pruned on the next Init.
+		if tp.hasDAGWatermark(event.DAGName) {
+			tp.deletedGrace[event.DAGName] = tp.cfg.Clock().Add(deletedWatermarkGrace)
+		}
+		// Preserve watermark state briefly across delete+add rewrite cycles so
+		// the re-added DAG can detect schedule edits before its next slot.
 		logger.Info(ctx, "Planner: DAG deleted", tag.DAG(event.DAGName))
 	}
 
@@ -1126,6 +1139,50 @@ func (tp *TickPlanner) reconcileStartScheduleState(dag *core.DAG) bool {
 	}
 	tp.watermarkDirty.Store(true)
 	return true
+}
+
+func (tp *TickPlanner) hasDAGWatermark(dagName string) bool {
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+
+	if tp.watermarkState == nil {
+		return false
+	}
+	_, ok := tp.watermarkState.DAGs[dagName]
+	return ok
+}
+
+func (tp *TickPlanner) pruneExpiredDeletedWatermarks(now time.Time) {
+	if len(tp.deletedGrace) == 0 {
+		return
+	}
+
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	if tp.watermarkState == nil || tp.watermarkState.DAGs == nil {
+		return
+	}
+
+	changed := false
+	for dagName, expiresAt := range tp.deletedGrace {
+		if now.Before(expiresAt) {
+			continue
+		}
+		delete(tp.deletedGrace, dagName)
+		if _, active := tp.entries[dagName]; active {
+			continue
+		}
+		if _, ok := tp.watermarkState.DAGs[dagName]; !ok {
+			continue
+		}
+		delete(tp.watermarkState.DAGs, dagName)
+		changed = true
+	}
+
+	if changed {
+		tp.watermarkDirty.Store(true)
+	}
 }
 
 // reinsertCatchupItem puts a failed catchup run back at the front of the

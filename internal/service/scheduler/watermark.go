@@ -20,7 +20,7 @@ type SchedulerState struct {
 type DAGWatermark struct {
 	LastScheduledTime        time.Time                      `json:"lastScheduledTime"`
 	StartScheduleFingerprint string                         `json:"startScheduleFingerprint,omitempty"`
-	SkipSuccessResetAt       time.Time                      `json:"skipSuccessResetAt,omitempty"`
+	SkipSuccessResetAt       time.Time                      `json:"skipSuccessResetAt"`
 	OneOffs                  map[string]OneOffScheduleState `json:"oneOffs,omitempty"`
 }
 

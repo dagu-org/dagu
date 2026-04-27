@@ -459,6 +459,80 @@ func TestTickPlanner_HandleEvent_Deleted(t *testing.T) {
 	// Verify entry was removed
 	_, ok = tp.entries["del-dag"]
 	assert.False(t, ok, "del-dag should be removed from entries")
+
+	tp.mu.RLock()
+	_, hasWM := tp.watermarkState.DAGs["del-dag"]
+	tp.mu.RUnlock()
+	assert.True(t, hasWM, "del-dag watermark should be retained during the rewrite grace window")
+}
+
+func TestTickPlanner_DeletedWatermarkExpiresAfterGraceWindow(t *testing.T) {
+	t.Parallel()
+
+	const graceWindow = 2 * time.Minute
+
+	now := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	clock := now
+	eventCh := make(chan DAGChangeEvent, 256)
+	store := &mockWatermarkStore{}
+	tp := NewTickPlanner(TickPlannerConfig{
+		WatermarkStore: store,
+		QueuesEnabled:  true,
+		IsSuspended: func(_ context.Context, _ string) bool {
+			return false
+		},
+		GetLatestStatus: func(_ context.Context, _ *core.DAG) (exec.DAGRunStatus, error) {
+			return exec.DAGRunStatus{}, nil
+		},
+		Dispatch: func(_ context.Context, _ *core.DAG, _ string, _ core.TriggerType, _ time.Time) error {
+			return nil
+		},
+		GenRunID: func(_ context.Context) (string, error) {
+			return "test-run-id", nil
+		},
+		IsRunning: func(_ context.Context, _ *core.DAG) (bool, error) {
+			return false, nil
+		},
+		RunExists: func(_ context.Context, _ *core.DAG, _ string) (bool, error) {
+			return false, nil
+		},
+		Clock: func() time.Time {
+			return clock
+		},
+		Events: eventCh,
+	})
+
+	dag := &core.DAG{
+		Name:     "deleted-after-grace",
+		Schedule: []core.Schedule{mustParseSchedule(t, "0 * * * *")},
+	}
+	require.NoError(t, tp.Init(context.Background(), []*core.DAG{dag}))
+
+	tp.entryMu.Lock()
+	tp.handleEvent(context.Background(), DAGChangeEvent{
+		Type:    DAGChangeDeleted,
+		DAGName: dag.Name,
+	})
+	tp.entryMu.Unlock()
+
+	tp.mu.RLock()
+	_, hasWM := tp.watermarkState.DAGs[dag.Name]
+	tp.mu.RUnlock()
+	require.True(t, hasWM, "watermark should remain available during the rewrite grace window")
+
+	clock = now.Add(graceWindow + time.Second)
+	tp.Plan(context.Background(), clock)
+	tp.Flush(context.Background())
+
+	tp.mu.RLock()
+	_, hasWM = tp.watermarkState.DAGs[dag.Name]
+	tp.mu.RUnlock()
+	assert.False(t, hasWM, "watermark should be pruned after the grace window expires")
+
+	saved := store.lastSaved()
+	require.NotNil(t, saved)
+	_, hasPersisted := saved.DAGs[dag.Name]
+	assert.False(t, hasPersisted, "expired deleted watermark should not be persisted")
 }
 
 func TestTickPlanner_HandleEvent_Updated(t *testing.T) {
