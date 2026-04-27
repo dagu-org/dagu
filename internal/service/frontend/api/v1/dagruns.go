@@ -1852,6 +1852,15 @@ func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string
 		if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(status)); err != nil {
 			return api.GetDAGRunDetails200JSONResponse{}, err
 		}
+
+		ref := exec.NewDAGRunRef(dagName, status.DAGRunID)
+		status, err = a.dagRunMgr.GetSavedStatus(ctx, ref)
+		if err != nil {
+			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
+		}
+		if status == nil {
+			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		}
 		status = a.repairConfirmedStaleDistributedRunOnRead(ctx, status, attempt.ID())
 		return api.GetDAGRunDetails200JSONResponse{
 			DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *status),
