@@ -142,6 +142,14 @@ type TickPlanner struct {
 	wg          sync.WaitGroup
 }
 
+type latestScheduledSlotState int
+
+const (
+	latestScheduledSlotUnknown latestScheduledSlotState = iota
+	latestScheduledSlotCurrent
+	latestScheduledSlotStale
+)
+
 // plannerEntry tracks a single DAG's scheduling metadata.
 type plannerEntry struct {
 	dag *core.DAG
@@ -611,22 +619,41 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 		return false
 	}
 
-	// Guard 2: alreadyFinished — check if last run started at/after scheduled time
-	latestStartedAt, err := stringutil.ParseTime(latestStatus.StartedAt)
-	if err == nil {
-		// Consider queued time as well
-		if latestStatus.QueuedAt != "" {
-			queuedAt, parseErr := stringutil.ParseTime(latestStatus.QueuedAt)
-			if parseErr == nil && queuedAt.Before(latestStartedAt) {
-				latestStartedAt = queuedAt
+	latestScheduleTime, slotState := latestScheduledSlot(latestStatus, schedule)
+	switch slotState {
+	case latestScheduledSlotCurrent:
+		// Guard 2: alreadyFinished — exact scheduled slot already completed.
+		if !latestScheduleTime.Before(scheduledTime) {
+			return false
+		}
+
+		// Guard 3: skipIfSuccessful — only the current schedule's own slots may suppress.
+		if dag.SkipIfSuccessful && latestStatus.Status == core.Succeeded && schedule.Parsed != nil {
+			prevExecTime := computePrevExecTime(scheduledTime, schedule)
+			if !latestScheduleTime.Before(prevExecTime) && latestScheduleTime.Before(scheduledTime) {
+				logger.Info(ctx, "Skipping job due to successful prior run",
+					tag.DAG(dag.Name),
+					slog.String("schedule-time", latestScheduleTime.Format(time.RFC3339)),
+				)
+				return false
 			}
 		}
-		latestStartedAt = latestStartedAt.Truncate(time.Minute)
+
+		return true
+	case latestScheduledSlotStale:
+		// The latest run belongs to a removed/edited slot. Do not let its runtime
+		// timestamps suppress the current schedule.
+		return true
+	}
+
+	// Guard 2 fallback: legacy/manual runs without an authoritative schedule slot.
+	latestStartedAt, ok := latestRunReferenceTime(latestStatus)
+	if ok {
 		if !latestStartedAt.Before(scheduledTime) {
 			return false
 		}
 
-		// Guard 3: skipIfSuccessful
+		// Guard 3 fallback: preserve manual-run semantics when no slot identity exists.
 		if dag.SkipIfSuccessful && latestStatus.Status == core.Succeeded && schedule.Parsed != nil {
 			prevExecTime := computePrevExecTime(scheduledTime, schedule)
 			if !latestStartedAt.Before(prevExecTime) && latestStartedAt.Before(scheduledTime) {
@@ -640,6 +667,43 @@ func (tp *TickPlanner) shouldRun(ctx context.Context, dag *core.DAG, scheduledTi
 	}
 
 	return true
+}
+
+func latestRunReferenceTime(status exec.DAGRunStatus) (time.Time, bool) {
+	latestStartedAt, err := stringutil.ParseTime(status.StartedAt)
+	if err != nil {
+		return time.Time{}, false
+	}
+	if status.QueuedAt != "" {
+		queuedAt, parseErr := stringutil.ParseTime(status.QueuedAt)
+		if parseErr == nil && queuedAt.Before(latestStartedAt) {
+			latestStartedAt = queuedAt
+		}
+	}
+	return latestStartedAt.Truncate(time.Minute), true
+}
+
+func latestScheduledSlot(status exec.DAGRunStatus, schedule core.Schedule) (time.Time, latestScheduledSlotState) {
+	if status.ScheduleTime == "" {
+		return time.Time{}, latestScheduledSlotUnknown
+	}
+
+	scheduledAt, err := stringutil.ParseTime(status.ScheduleTime)
+	if err != nil {
+		return time.Time{}, latestScheduledSlotUnknown
+	}
+
+	scheduledAt = scheduledAt.Truncate(time.Minute)
+	if !scheduleMatchesFireTime(schedule, scheduledAt) {
+		return scheduledAt, latestScheduledSlotStale
+	}
+
+	return scheduledAt, latestScheduledSlotCurrent
+}
+
+func scheduleMatchesFireTime(schedule core.Schedule, scheduledTime time.Time) bool {
+	next, due := scheduleDueAt(schedule, scheduledTime)
+	return due && next.Equal(scheduledTime)
 }
 
 func (tp *TickPlanner) shouldRunOneOff(ctx context.Context, dag *core.DAG) bool {

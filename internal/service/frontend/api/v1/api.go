@@ -83,6 +83,7 @@ type API struct {
 	workspaceStore       workspace.Store
 	leaseStaleThreshold  time.Duration
 	schedulerStateStore  scheduler.WatermarkStore
+	dagMutationNotifier  func(fileName string)
 }
 
 // AuthService defines the interface for authentication operations.
@@ -242,6 +243,14 @@ func WithSchedulerStateStore(store scheduler.WatermarkStore) APIOption {
 	}
 }
 
+// WithDAGMutationNotifier returns an APIOption that is called after successful
+// DAG definition mutations that should invalidate live DAG views.
+func WithDAGMutationNotifier(fn func(fileName string)) APIOption {
+	return func(a *API) {
+		a.dagMutationNotifier = fn
+	}
+}
+
 // WithDAGRunLeaseStore sets the shared distributed run lease store.
 func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) APIOption {
 	return func(a *API) {
@@ -315,6 +324,12 @@ func New(
 	a.dagWritesDisabled = cfg.GitSync.Enabled && !cfg.GitSync.PushEnabled
 
 	return a
+}
+
+func (a *API) notifyDAGMutation(fileName string) {
+	if a.dagMutationNotifier != nil {
+		a.dagMutationNotifier(fileName)
+	}
 }
 
 func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router) error {
