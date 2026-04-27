@@ -48,40 +48,42 @@ import (
 var _ api.StrictServerInterface = (*API)(nil)
 
 type API struct {
-	dagStore            exec.DAGStore
-	dagRunStore         exec.DAGRunStore
-	dagRunMgr           runtime.Manager
-	queueStore          exec.QueueStore
-	procStore           exec.ProcStore
-	dagRunLeaseStore    exec.DAGRunLeaseStore
-	remoteNodeResolver  *remotenode.Resolver
-	remoteNodeStore     remotenode.Store
-	logEncodingCharset  string
-	config              *config.Config
-	metricsRegistry     *prometheus.Registry
-	coordinatorCli      coordinator.Client
-	serviceRegistry     exec.ServiceRegistry
-	subCmdBuilder       *runtime.SubCmdBuilder
-	resourceService     *resource.Service
-	authService         AuthService
-	auditService        *audit.Service
-	eventService        *eventstore.Service
-	syncService         SyncService
-	tunnelService       *tunnel.Service
-	defaultExecMode     config.ExecutionMode
-	dagWritesDisabled   bool // True when git sync read-only mode is active
-	agentConfigStore    agent.ConfigStore
-	agentModelStore     agent.ModelStore
-	agentMemoryStore    agent.MemoryStore
-	agentSoulStore      agent.SoulStore
-	agentOAuthManager   *agentoauth.Manager
-	agentAPI            *agent.API
-	docStore            agent.DocStore
-	baseConfigStore     baseconfig.Store
-	licenseManager      *license.Manager
-	workspaceStore      workspace.Store
-	leaseStaleThreshold time.Duration
-	schedulerStateStore scheduler.WatermarkStore
+	dagStore             exec.DAGStore
+	dagRunStore          exec.DAGRunStore
+	dagRunMgr            runtime.Manager
+	queueStore           exec.QueueStore
+	procStore            exec.ProcStore
+	dagRunLeaseStore     exec.DAGRunLeaseStore
+	workerHeartbeatStore exec.WorkerHeartbeatStore
+	remoteNodeResolver   *remotenode.Resolver
+	remoteNodeStore      remotenode.Store
+	logEncodingCharset   string
+	config               *config.Config
+	metricsRegistry      *prometheus.Registry
+	coordinatorCli       coordinator.Client
+	serviceRegistry      exec.ServiceRegistry
+	subCmdBuilder        *runtime.SubCmdBuilder
+	resourceService      *resource.Service
+	authService          AuthService
+	auditService         *audit.Service
+	eventService         *eventstore.Service
+	syncService          SyncService
+	tunnelService        *tunnel.Service
+	defaultExecMode      config.ExecutionMode
+	dagWritesDisabled    bool // True when git sync read-only mode is active
+	agentConfigStore     agent.ConfigStore
+	agentModelStore      agent.ModelStore
+	agentMemoryStore     agent.MemoryStore
+	agentSoulStore       agent.SoulStore
+	agentOAuthManager    *agentoauth.Manager
+	agentAPI             *agent.API
+	docStore             agent.DocStore
+	baseConfigStore      baseconfig.Store
+	licenseManager       *license.Manager
+	workspaceStore       workspace.Store
+	leaseStaleThreshold  time.Duration
+	schedulerStateStore  scheduler.WatermarkStore
+	dagMutationNotifier  func(fileName string)
 }
 
 // AuthService defines the interface for authentication operations.
@@ -241,10 +243,26 @@ func WithSchedulerStateStore(store scheduler.WatermarkStore) APIOption {
 	}
 }
 
+// WithDAGMutationNotifier returns an APIOption that is called after successful
+// DAG definition mutations that should invalidate live DAG views.
+func WithDAGMutationNotifier(fn func(fileName string)) APIOption {
+	return func(a *API) {
+		a.dagMutationNotifier = fn
+	}
+}
+
 // WithDAGRunLeaseStore sets the shared distributed run lease store.
 func WithDAGRunLeaseStore(store exec.DAGRunLeaseStore) APIOption {
 	return func(a *API) {
 		a.dagRunLeaseStore = store
+	}
+}
+
+// WithWorkerHeartbeatStore sets the shared worker heartbeat store used for
+// conservative distributed run auto-repair on single-run reads.
+func WithWorkerHeartbeatStore(store exec.WorkerHeartbeatStore) APIOption {
+	return func(a *API) {
+		a.workerHeartbeatStore = store
 	}
 }
 
@@ -306,6 +324,12 @@ func New(
 	a.dagWritesDisabled = cfg.GitSync.Enabled && !cfg.GitSync.PushEnabled
 
 	return a
+}
+
+func (a *API) notifyDAGMutation(fileName string) {
+	if a.dagMutationNotifier != nil {
+		a.dagMutationNotifier(fileName)
+	}
 }
 
 func (a *API) ConfigureRoutes(ctx context.Context, r chi.Router) error {

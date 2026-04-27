@@ -16,6 +16,7 @@ import (
 	"github.com/dagucloud/dagu/internal/cmn/telemetry"
 	"github.com/dagucloud/dagu/internal/service/coordinator"
 	"github.com/dagucloud/dagu/internal/service/frontend"
+	apiv1 "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -94,7 +95,11 @@ func (srv *Server) runServer(t *testing.T, listener net.Listener, errChan chan<-
 	mr := telemetry.NewRegistry(collector)
 
 	// Pass the pre-bound listener to the server to avoid port race conditions
-	serverOpts := append([]frontend.ServerOption{frontend.WithListener(listener)}, srv.ServerOptions...)
+	serverOpts := append([]frontend.ServerOption{
+		frontend.WithListener(listener),
+		frontend.WithAPIOption(apiv1.WithDAGRunLeaseStore(srv.DAGRunLeaseStore)),
+		frontend.WithAPIOption(apiv1.WithWorkerHeartbeatStore(srv.WorkerHeartbeatStore)),
+	}, srv.ServerOptions...)
 	server, err := frontend.NewServer(
 		srv.Context, srv.Config, srv.DAGStore, srv.DAGRunStore,
 		srv.QueueStore, srv.ProcStore, srv.DAGRunMgr, cc,

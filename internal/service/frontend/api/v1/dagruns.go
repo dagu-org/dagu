@@ -1837,41 +1837,124 @@ func isDAGRunLookupNotFound(err error) bool {
 
 // getDAGRunDetailsData returns DAG run details data. Used by both HTTP handler and SSE fetcher.
 func (a *API) getDAGRunDetailsData(ctx context.Context, dagName, dagRunId string) (api.GetDAGRunDetails200JSONResponse, error) {
-	if dagRunId == "latest" {
-		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
-		if err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("no dag-runs found for DAG %s", dagName)
-		}
-		status, err := attempt.ReadStatus(ctx)
-		if err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("error getting latest status: %w", err)
-		}
-		if status == nil {
-			return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
-		}
-		if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(status)); err != nil {
-			return api.GetDAGRunDetails200JSONResponse{}, err
-		}
-		return api.GetDAGRunDetails200JSONResponse{
-			DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *status),
-		}, nil
-	}
-
-	ref := exec.NewDAGRunRef(dagName, dagRunId)
-	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	attempt, dagStatus, err := a.loadRootDAGRunDetailsAttemptAndStatus(ctx, dagName, dagRunId)
 	if err != nil {
-		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
-	}
-	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
-	if err != nil {
-		return api.GetDAGRunDetails200JSONResponse{}, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
-	}
-	if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(dagStatus)); err != nil {
 		return api.GetDAGRunDetails200JSONResponse{}, err
 	}
 	return api.GetDAGRunDetails200JSONResponse{
 		DagRunDetails: a.toDAGRunDetailsWithSpecSource(ctx, attempt, *dagStatus),
 	}, nil
+}
+
+func (a *API) loadRootDAGRunDetailsAttemptAndStatus(
+	ctx context.Context,
+	dagName, dagRunId string,
+) (exec.DAGRunAttempt, *exec.DAGRunStatus, error) {
+	if dagRunId == "latest" {
+		attempt, err := a.dagRunStore.LatestAttempt(ctx, dagName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("no dag-runs found for DAG %s", dagName)
+		}
+
+		status, err := attempt.ReadStatus(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting latest status: %w", err)
+		}
+		if status == nil {
+			return nil, nil, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		}
+		if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(status)); err != nil {
+			return nil, nil, err
+		}
+
+		ref := exec.NewDAGRunRef(dagName, status.DAGRunID)
+		dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting latest status: %w", err)
+		}
+		if dagStatus == nil {
+			return nil, nil, fmt.Errorf("latest dag-run status is unavailable for DAG %s", dagName)
+		}
+
+		return attempt, a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID()), nil
+	}
+
+	ref := exec.NewDAGRunRef(dagName, dagRunId)
+	attempt, err := a.dagRunStore.FindAttempt(ctx, ref)
+	if err != nil {
+		return nil, nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+	}
+
+	dagStatus, err := a.dagRunMgr.GetSavedStatus(ctx, ref)
+	if err != nil {
+		return nil, nil, fmt.Errorf("dag-run ID %s not found for DAG %s", dagRunId, dagName)
+	}
+	if err := a.requireWorkspaceVisible(ctx, statusWorkspaceName(dagStatus)); err != nil {
+		return nil, nil, err
+	}
+
+	return attempt, a.repairConfirmedStaleDistributedRunOnRead(ctx, dagStatus, attempt.ID()), nil
+}
+
+func (a *API) repairConfirmedStaleDistributedRunOnRead(
+	ctx context.Context,
+	status *exec.DAGRunStatus,
+	fallbackAttemptID string,
+) *exec.DAGRunStatus {
+	if status == nil || a.dagRunLeaseStore == nil || a.workerHeartbeatStore == nil {
+		return status
+	}
+
+	attemptID := status.AttemptID
+	if attemptID == "" {
+		attemptID = fallbackAttemptID
+	}
+	fallbackWorkerID := status.WorkerID
+	if fallbackWorkerID == "" {
+		fallbackWorkerID = a.distributedFallbackWorkerIDFromLease(ctx, status, attemptID)
+	}
+
+	reconciled, _, err := runtime.ConfirmAndRepairStaleDistributedRun(ctx, runtime.DistributedRunRepairConfig{
+		DAGRunStore:          a.dagRunStore,
+		DAGRunLeaseStore:     a.dagRunLeaseStore,
+		WorkerHeartbeatStore: a.workerHeartbeatStore,
+		StaleLeaseThreshold:  a.leaseStaleThreshold,
+	}, status, attemptID, fallbackWorkerID)
+	if err != nil {
+		logger.Warn(ctx, "Failed to auto-repair stale distributed run on read",
+			tag.DAG(status.Name),
+			tag.RunID(status.DAGRunID),
+			tag.AttemptID(status.AttemptID),
+			tag.Error(err),
+		)
+		return status
+	}
+	if reconciled != nil {
+		return reconciled
+	}
+	return status
+}
+
+func (a *API) distributedFallbackWorkerIDFromLease(
+	ctx context.Context,
+	status *exec.DAGRunStatus,
+	fallbackAttemptID string,
+) string {
+	if status == nil || status.WorkerID != "" || a.dagRunLeaseStore == nil {
+		return ""
+	}
+
+	attemptKey := exec.AttemptKeyForStatus(status, fallbackAttemptID)
+	if attemptKey == "" {
+		return ""
+	}
+
+	lease, err := a.dagRunLeaseStore.Get(ctx, attemptKey)
+	if err != nil || lease == nil || !exec.IsRemoteWorkerID(lease.WorkerID) {
+		return ""
+	}
+
+	return lease.WorkerID
 }
 
 func (a *API) toDAGRunDetailsWithSpecSource(ctx context.Context, attempt exec.DAGRunAttempt, status exec.DAGRunStatus) api.DAGRunDetails {

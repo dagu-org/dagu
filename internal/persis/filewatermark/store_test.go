@@ -169,6 +169,21 @@ func TestStore_LoadMigratesVersionOneState(t *testing.T) {
 	assert.Equal(t, time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC), state.DAGs["legacy"].LastScheduledTime)
 }
 
+func TestStore_LoadMigratesVersionTwoState(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	store := New(dir)
+
+	data := []byte(`{"version":2,"lastTick":"2026-02-07T12:00:00Z","dags":{"legacy":{"lastScheduledTime":"2026-02-07T11:00:00Z"}}}`)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, stateFileName), data, 0o600))
+
+	state, err := store.Load(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, scheduler.SchedulerStateVersion, state.Version)
+	assert.Equal(t, time.Date(2026, 2, 7, 11, 0, 0, 0, time.UTC), state.DAGs["legacy"].LastScheduledTime)
+}
+
 func TestStore_LoadMigratesVersionZeroState(t *testing.T) {
 	t.Parallel()
 

@@ -391,6 +391,14 @@ func TestWorkerHeartbeatStore_UpsertListAndDeleteStale(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, records, 1)
 	assert.Equal(t, "worker-fresh", records[0].WorkerID)
+
+	record, err := store.Get(ctx, "worker-fresh")
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	assert.Equal(t, "worker-fresh", record.WorkerID)
+
+	_, err = store.Get(ctx, "worker-stale")
+	assert.ErrorIs(t, err, exec.ErrWorkerHeartbeatNotFound)
 }
 
 func TestDAGRunLeaseStore_UpsertTouchListAndDelete(t *testing.T) {

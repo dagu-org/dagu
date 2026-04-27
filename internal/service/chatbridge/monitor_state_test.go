@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagucloud/dagu/internal/cmn/dirlock"
 	"github.com/dagucloud/dagu/internal/core"
 	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/persis/fileeventstore"
@@ -741,22 +740,14 @@ func TestNotificationMonitor_LockTheftSelfFencesActiveOwner(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return monitor.ownsNotificationLock() && monitor.notificationSessionActive()
-	}, time.Second, 10*time.Millisecond)
+	}, notificationMonitorEventuallyTimeout(time.Second), 10*time.Millisecond)
 
 	lockDir := notificationStateLockDir(stateFile)
 	lockTokenPath := filepath.Join(lockDir, ".dagu_lock", "owner")
 	require.NoError(t, os.WriteFile(lockTokenPath, []byte("replacement-owner"), 0o600))
 	require.Eventually(t, func() bool {
 		return !monitor.ownsNotificationLock() && !monitor.notificationSessionActive()
-	}, 2*time.Second, 10*time.Millisecond)
-
-	require.NoError(t, dirlock.ForceUnlock(lockDir))
-	replacement := dirlock.New(lockDir, &dirlock.LockOptions{
-		StaleThreshold: time.Hour,
-		RetryInterval:  10 * time.Millisecond,
-	})
-	require.NoError(t, replacement.TryLock())
-	defer func() { _ = replacement.Unlock() }()
+	}, notificationMonitorEventuallyTimeout(2*time.Second), 10*time.Millisecond)
 
 	status := &exec.DAGRunStatus{
 		Name:       "briefing",

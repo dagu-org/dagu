@@ -18,8 +18,10 @@ type SchedulerState struct {
 
 // DAGWatermark tracks cron progress and one-off schedule state for a single DAG.
 type DAGWatermark struct {
-	LastScheduledTime time.Time                      `json:"lastScheduledTime"`
-	OneOffs           map[string]OneOffScheduleState `json:"oneOffs,omitempty"`
+	LastScheduledTime        time.Time                      `json:"lastScheduledTime"`
+	StartScheduleFingerprint string                         `json:"startScheduleFingerprint,omitempty"`
+	SkipSuccessResetAt       time.Time                      `json:"skipSuccessResetAt"`
+	OneOffs                  map[string]OneOffScheduleState `json:"oneOffs,omitempty"`
 }
 
 // OneOffScheduleStatus is the persisted state of a one-off schedule.

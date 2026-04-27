@@ -472,6 +472,13 @@ func NewServer(ctx context.Context, cfg *config.Config, dr exec.DAGStore, drs ex
 	if eventSvc != nil {
 		apiOpts = append(apiOpts, apiv1.WithEventService(eventSvc))
 	}
+	apiOpts = append(apiOpts, apiv1.WithDAGMutationNotifier(func(fileName string) {
+		if srv.sseMultiplexer == nil {
+			return
+		}
+		srv.sseMultiplexer.WakeTopicType(sse.TopicTypeDAGsList)
+		srv.sseMultiplexer.WakeTopic(sse.TopicTypeDAG, fileName)
+	}))
 
 	// Pass license manager to API
 	if srv.licenseManager != nil {
