@@ -5,6 +5,7 @@ package filewebhook
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagucloud/dagu/internal/auth"
+	"github.com/dagucloud/dagu/internal/cmn/crypto"
 	"github.com/dagucloud/dagu/internal/cmn/fileutil"
 	"github.com/dagucloud/dagu/internal/persis/testutil"
 	"github.com/stretchr/testify/assert"
@@ -197,6 +199,87 @@ func TestStore_RebuildIndexSkipsInvalidFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, list, 1)
 	assert.Equal(t, "valid-dag", list[0].DAGName)
+}
+
+func TestStore_RebuildIndexFailsWithoutEncryptorForEncryptedHMACSecret(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	payload := map[string]any{
+		"id":            "webhook-with-hmac",
+		"dagName":       "hmac-dag",
+		"tokenHash":     "token-hash",
+		"tokenPrefix":   "dagu_wh_abcd",
+		"enabled":       true,
+		"createdAt":     time.Now().UTC(),
+		"updatedAt":     time.Now().UTC(),
+		"createdBy":     "admin",
+		"hmacSecretEnc": "ciphertext-placeholder",
+	}
+	data, err := json.Marshal(payload)
+	require.NoError(t, err)
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(tmpDir, "webhook-with-hmac.json"), data, 0600),
+	)
+
+	_, err = New(tmpDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "encrypt")
+}
+
+func TestStore_EncryptedHMACSecretRoundTripAndRemoval(t *testing.T) {
+	t.Parallel()
+
+	enc, err := crypto.NewEncryptor("test-key")
+	require.NoError(t, err)
+
+	tmpDir := t.TempDir()
+	store, err := New(tmpDir, WithEncryptor(enc))
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	wh := newWebhook(t, "hmac-dag")
+	now := time.Now().UTC().Round(0)
+	wh.AuthMode = auth.WebhookAuthModeTokenAndHMAC
+	wh.HMACEnforcementMode = auth.WebhookHMACEnforcementModeStrict
+	wh.HMACSecret = "super-secret-value"
+	wh.HMACSecretGeneratedAt = &now
+
+	require.NoError(t, store.Create(ctx, wh))
+
+	path := filepath.Join(tmpDir, wh.ID+webhookFileExtension)
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(raw), wh.HMACSecret)
+	assert.Contains(t, string(raw), "hmacSecretEnc")
+
+	reloadedStore, err := New(tmpDir, WithEncryptor(enc))
+	require.NoError(t, err)
+
+	got, err := reloadedStore.GetByID(ctx, wh.ID)
+	require.NoError(t, err)
+	assert.Equal(t, auth.WebhookAuthModeTokenAndHMAC, got.AuthMode)
+	assert.Equal(t, auth.WebhookHMACEnforcementModeStrict, got.HMACEnforcementMode)
+	assert.Equal(t, wh.HMACSecret, got.HMACSecret)
+	assert.Equal(t, wh.HMACSecretGeneratedAt, got.HMACSecretGeneratedAt)
+
+	got.AuthMode = auth.WebhookAuthModeTokenOnly
+	got.HMACEnforcementMode = ""
+	got.HMACSecret = ""
+	got.HMACSecretGeneratedAt = nil
+	require.NoError(t, reloadedStore.Update(ctx, got))
+
+	raw, err = os.ReadFile(path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(raw), "hmacSecretEnc")
+	assert.NotContains(t, string(raw), "super-secret-value")
+
+	cleared, err := reloadedStore.GetByID(ctx, wh.ID)
+	require.NoError(t, err)
+	assert.Equal(t, auth.WebhookAuthModeTokenOnly, cleared.EffectiveAuthMode())
+	assert.Empty(t, cleared.HMACSecret)
+	assert.Nil(t, cleared.HMACSecretGeneratedAt)
 }
 
 func TestStore_UpdateDAGName(t *testing.T) {

@@ -56,6 +56,12 @@ var (
 	ErrInvalidWebhookID = errors.New("invalid webhook ID")
 	// ErrInvalidWebhookTokenHash is returned when the webhook token hash is empty.
 	ErrInvalidWebhookTokenHash = errors.New("invalid webhook token hash")
+	// ErrWebhookHMACEncryptorRequired is returned when encrypted HMAC secret
+	// storage is required but no encryptor is available.
+	ErrWebhookHMACEncryptorRequired = errors.New("webhook HMAC secret requires encryptor")
+	// ErrWebhookHMACDecryptFailed is returned when an encrypted HMAC secret
+	// cannot be decrypted from storage.
+	ErrWebhookHMACDecryptFailed = errors.New("failed to decrypt webhook HMAC secret")
 )
 
 // UserStore defines the interface for user persistence operations.

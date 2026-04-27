@@ -3853,8 +3853,8 @@ paths:
       summary: "Trigger DAG execution via webhook"
       description: |
         Triggers a DAG execution via webhook. The DAG must have a webhook configured
-        and enabled. Authentication is performed using a bearer token generated when
-        the webhook was created (format: 'dagu_wh_...').
+        and enabled. Authentication depends on the webhook auth mode:
+        bearer token only, bearer token plus HMAC, or HMAC only.
 
         The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
         variable. The DAG run is enqueued and the endpoint returns immediately
@@ -3871,7 +3871,13 @@ paths:
           required: false
           schema:
             type: string
-          description: "Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required for authentication but marked optional in schema so the handler can return proper 401 responses."
+          description: "Bearer token for webhook authentication (e.g., 'Bearer dagu_wh_...'). Required only when the webhook auth mode includes token authentication."
+        - name: X-Dagu-Signature
+          in: header
+          required: false
+          schema:
+            type: string
+          description: "HMAC webhook signature in the format 'sha256=<hex>'. Required only when the webhook auth mode includes HMAC authentication."
       requestBody:
         required: false
         content:
@@ -4084,6 +4090,143 @@ paths:
       responses:
         "200":
           description: "Webhook toggled successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/hmac/enable:
+    post:
+      summary: "Enable webhook HMAC"
+      description: |
+        Enables HMAC authentication for the existing webhook and returns the generated
+        HMAC secret exactly once. Developer, manager, or admin only.
+      operationId: "enableDAGWebhookHMAC"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookHMACConfigureRequest"
+      responses:
+        "200":
+          description: "Webhook HMAC enabled successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookHMACSecretResponse"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/hmac/configure:
+    post:
+      summary: "Configure webhook HMAC"
+      description: "Updates the webhook HMAC auth mode or enforcement mode without rotating the secret. Developer, manager, or admin only."
+      operationId: "configureDAGWebhookHMAC"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookHMACConfigureRequest"
+      responses:
+        "200":
+          description: "Webhook HMAC updated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDetails"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/hmac/regenerate:
+    post:
+      summary: "Regenerate webhook HMAC secret"
+      description: |
+        Generates a new HMAC secret for the existing webhook. The old secret becomes
+        invalid immediately. Returns the new secret exactly once.
+        Developer, manager, or admin only.
+      operationId: "regenerateDAGWebhookHMACSecret"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Webhook HMAC secret regenerated successfully"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookHMACSecretResponse"
+        "404":
+          description: "No webhook configured for this DAG"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          description: "Unexpected error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /dags/{fileName}/webhook/hmac/disable:
+    post:
+      summary: "Disable webhook HMAC"
+      description: "Disables HMAC authentication and returns the webhook to token-only mode. Developer, manager, or admin only."
+      operationId: "disableDAGWebhookHMAC"
+      tags:
+        - "webhooks"
+      parameters:
+        - $ref: "#/components/parameters/RemoteNode"
+        - $ref: "#/components/parameters/DAGFileName"
+      responses:
+        "200":
+          description: "Webhook HMAC disabled successfully"
           content:
             application/json:
               schema:
@@ -7777,6 +7920,50 @@ components:
           type: string
           description: "Name of the triggered DAG"
 
+    WebhookAuthMode:
+      type: string
+      description: "Authentication mode for a webhook trigger endpoint"
+      enum:
+        - token_only
+        - token_and_hmac
+        - hmac_only
+
+    WebhookHMACEnforcementMode:
+      type: string
+      description: "How HMAC validation is enforced when HMAC is enabled"
+      enum:
+        - strict
+        - observe
+
+    WebhookHMACDetails:
+      type: object
+      description: "Public webhook HMAC configuration details"
+      required:
+        - enabled
+        - secretConfigured
+      properties:
+        enabled:
+          type: boolean
+          description: "Whether HMAC authentication is currently enabled"
+        enforcementMode:
+          $ref: "#/components/schemas/WebhookHMACEnforcementMode"
+        algorithm:
+          type: string
+          description: "Fixed HMAC algorithm for v1"
+        headerName:
+          type: string
+          description: "Header containing the HMAC signature"
+        format:
+          type: string
+          description: "Expected signature header value format"
+        secretConfigured:
+          type: boolean
+          description: "Whether an HMAC secret is configured for the webhook"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When the HMAC secret was last generated"
+
     WebhookDetails:
       type: object
       description: "Webhook configuration details (token not included)"
@@ -7785,6 +7972,8 @@ components:
         - dagName
         - tokenPrefix
         - enabled
+        - authMode
+        - hmac
         - createdAt
         - updatedAt
       properties:
@@ -7801,6 +7990,10 @@ components:
         enabled:
           type: boolean
           description: "Whether the webhook is active"
+        authMode:
+          $ref: "#/components/schemas/WebhookAuthMode"
+        hmac:
+          $ref: "#/components/schemas/WebhookHMACDetails"
         createdAt:
           type: string
           format: date-time
@@ -7850,6 +8043,30 @@ components:
         enabled:
           type: boolean
           description: "Whether to enable or disable the webhook"
+
+    WebhookHMACConfigureRequest:
+      type: object
+      description: "Request to configure webhook HMAC auth mode and enforcement"
+      required:
+        - authMode
+      properties:
+        authMode:
+          $ref: "#/components/schemas/WebhookAuthMode"
+        enforcementMode:
+          $ref: "#/components/schemas/WebhookHMACEnforcementMode"
+
+    WebhookHMACSecretResponse:
+      type: object
+      description: "Response when enabling or regenerating webhook HMAC (includes full secret)"
+      required:
+        - webhook
+        - hmacSecret
+      properties:
+        webhook:
+          $ref: "#/components/schemas/WebhookDetails"
+        hmacSecret:
+          type: string
+          description: "Full HMAC secret (only shown once, store securely!)"
 
     Stream:
       type: string
