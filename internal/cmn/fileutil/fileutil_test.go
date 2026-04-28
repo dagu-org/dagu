@@ -343,6 +343,21 @@ func TestCreateTempDAGFile(t *testing.T) {
 			"basename without extension should be ≤ 40 chars, got %d: %s", len(nameWithoutExt), nameWithoutExt)
 	})
 
+	t.Run("PathLikeNameUsesBasename", func(t *testing.T) {
+		t.Parallel()
+
+		dagPath := filepath.Join(t.TempDir(), "nested", "worker-retry.yaml")
+		path, err := CreateTempDAGFile("test-subdir", dagPath, []byte("steps:\n  - name: step1\n"))
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		base := filepath.Base(path)
+		assert.Contains(t, base, "worker-retry")
+		assert.NotContains(t, base, string(os.PathSeparator))
+		assert.NotContains(t, base, ".yaml-")
+	})
+
 	t.Run("EmptyExtraDocs", func(t *testing.T) {
 		t.Parallel()
 

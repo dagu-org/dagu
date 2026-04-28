@@ -19,6 +19,8 @@ import (
 
 	"github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/license"
 	"github.com/dagucloud/dagu/internal/service/frontend"
 	apiimpl "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
@@ -871,6 +873,9 @@ steps:
 	assert.Equal(t, dagName, triggerResult.DagName)
 
 	test.ProcessQueuedInlineRun(t, server, dagName)
+	waitForStoredDAGRunStatus(t, server, dagName, triggerResult.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Succeeded
+	})
 
 	data, err := os.ReadFile(headersFile)
 	require.NoError(t, err)
