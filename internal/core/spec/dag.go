@@ -924,6 +924,8 @@ func valueReferencesRunArtifactsDir(v reflect.Value) bool {
 		reflect.Pointer,
 		reflect.UnsafePointer:
 		return false
+	default:
+		return false
 	}
 
 	return false
