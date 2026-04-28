@@ -77,8 +77,19 @@ defaults:
     limit: 2
     interval_sec: 5
 params:
-  - ENV: "production"
-  - BATCH_SIZE: "100"
+  - name: ENV
+    type: string
+    enum: [DEV, STG, PROD]
+    description: Target environment for the scheduled batch run
+    required: true
+    default: STG
+  - name: BATCH_SIZE
+    type: integer
+    minimum: 1
+    maximum: 1000
+    description: Number of records processed per batch
+    required: true
+    default: 100
 env:
   - LOG_LEVEL: "info"
   - TIMESTAMP: "` + "`date +%Y%m%d`" + `"
@@ -127,15 +138,20 @@ defaults:
     limit: 2
     interval_sec: 5
 params:
-  - ENV: "staging"
+  - name: ENV
+    type: string
+    enum: [DEV, STG, PROD]
+    description: Deployment environment; only PROD satisfies the gate
+    required: true
+    default: STG
 steps:
   - name: check-env
     command: echo "verifying environment"
   - name: deploy
     command: echo "deploying application"
     preconditions:
-      - condition: "echo ${ENV}"
-        expected: "production"
+      - condition: "${ENV}"
+        expected: "PROD"
     depends: [check-env]
   - name: notify
     command: echo "deployment complete"
@@ -202,15 +218,11 @@ container:
     - /tmp/dagu-example:/work
 steps:
   - name: write-data
-    command: python -c "
-      with open('/work/data.txt', 'w') as f:
-        f.write('Hello from Dagu!')
-      "
+    command: >-
+      python -c "with open('/work/data.txt', 'w') as f: f.write('Hello from Dagu!')"
   - name: process
-    command: python -c "
-      with open('/work/data.txt') as f:
-        print(f.read().upper())
-      "
+    command: >-
+      python -c "with open('/work/data.txt') as f: print(f.read().upper())"
     depends: [write-data]
 `,
 	},
@@ -228,9 +240,7 @@ steps:
     command: echo "starting main workflow"
   - name: run-etl
     call: etl-job
-    params:
-      SOURCE: "/data/input.csv"
-      TARGET: "/data/output.csv"
+    params: "SOURCE=/data/input.csv TARGET=/data/output.csv"
     depends: [prepare]
   - name: done
     command: echo "pipeline complete"
@@ -238,8 +248,16 @@ steps:
 ---
 name: etl-job
 params:
-  - SOURCE: ""
-  - TARGET: ""
+  - name: SOURCE
+    type: string
+    description: Input dataset or file path received from the parent DAG
+    required: true
+    default: /data/default-input.csv
+  - name: TARGET
+    type: string
+    description: Output dataset or file path produced by the sub-DAG
+    required: true
+    default: /data/default-output.csv
 type: graph
 steps:
   - name: extract
@@ -307,7 +325,7 @@ defaults:
     interval_sec: 5
 steps:
   - name: gather-logs
-    command: echo "error: connection timeout at 10:23 AM"
+    command: 'echo "error: connection timeout at 10:23 AM"'
     output: ERROR_LOG
   - name: analyze
     type: agent
