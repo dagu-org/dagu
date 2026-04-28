@@ -38,6 +38,32 @@ func isInlineJSONSchema(input any) bool {
 	return ok
 }
 
+func malformedInlineJSONSchemaShapeError(input any) error {
+	m, ok := input.(map[string]any)
+	if !ok {
+		return nil
+	}
+	if _, ok := extractParamsSchemaDeclaration(input); ok {
+		return nil
+	}
+	typeName, ok := m["type"].(string)
+	if !ok || strings.TrimSpace(typeName) != "object" {
+		return nil
+	}
+	props, ok := m["properties"]
+	if !ok {
+		return nil
+	}
+	if _, ok := props.(map[string]any); ok {
+		return nil
+	}
+	return core.NewValidationError(
+		"params",
+		props,
+		fmt.Errorf("inline JSON Schema properties must be an object keyed by parameter name"),
+	)
+}
+
 func buildInlineSchemaParamPlan(input any, skipValidation bool) (*dagParamPlan, error) {
 	root, resolved, err := parseInlineSchema(input, !skipValidation)
 	if err != nil {
