@@ -24,6 +24,8 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
+const dagRunArtifactsDirEnvKey = "DAG_RUN_ARTIFACTS_DIR"
+
 // dag is the intermediate representation of a DAG specification.
 // It mirrors the YAML structure and gets validated/transformed into core.DAG.
 type dag struct {
@@ -823,7 +825,12 @@ func buildLogDir(_ BuildContext, d *dag) (string, error) {
 }
 
 func buildArtifacts(_ BuildContext, d *dag) (*core.ArtifactsConfig, error) {
+	autoEnable := dagReferencesRunArtifactsDir(d)
+
 	if d.Artifacts == nil {
+		if autoEnable {
+			return &core.ArtifactsConfig{Enabled: true}, nil
+		}
 		return nil, nil
 	}
 
@@ -832,11 +839,58 @@ func buildArtifacts(_ BuildContext, d *dag) (*core.ArtifactsConfig, error) {
 	}
 	if d.Artifacts.Enabled != nil {
 		cfg.Enabled = *d.Artifacts.Enabled
+	} else if autoEnable {
+		cfg.Enabled = true
 	}
 	if d.Artifacts.Enabled == nil && cfg.Dir == "" {
-		return nil, nil
+		if !cfg.Enabled {
+			return nil, nil
+		}
 	}
 	return cfg, nil
+}
+
+func dagReferencesRunArtifactsDir(d *dag) bool {
+	return valueReferencesRunArtifactsDir(reflect.ValueOf(d))
+}
+
+func valueReferencesRunArtifactsDir(v reflect.Value) bool {
+	if !v.IsValid() {
+		return false
+	}
+
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return false
+		}
+		v = v.Elem()
+	}
+
+	switch v.Kind() {
+	case reflect.String:
+		return strings.Contains(v.String(), dagRunArtifactsDirEnvKey)
+	case reflect.Array, reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			if valueReferencesRunArtifactsDir(v.Index(i)) {
+				return true
+			}
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			if valueReferencesRunArtifactsDir(iter.Key()) || valueReferencesRunArtifactsDir(iter.Value()) {
+				return true
+			}
+		}
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			if valueReferencesRunArtifactsDir(v.Field(i)) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func buildLogOutput(_ BuildContext, d *dag) (core.LogOutputMode, error) {

@@ -71,6 +71,42 @@ func TestTemplateExecutor(t *testing.T) {
 		assert.Contains(t, string(content), "# Test Report")
 	})
 
+	t.Run("ArtifactOutputAutoEnablesArtifacts", func(t *testing.T) {
+		t.Parallel()
+
+		th := test.SetupCommand(t)
+		dagFile := th.CreateDAGFile(t, "template-artifact-auto-enable.yaml", `
+name: template-artifact-auto-enable
+steps:
+  - name: render
+    type: template
+    with:
+      output: "${DAG_RUN_ARTIFACTS_DIR}/greeting.txt"
+      data:
+        greeting: hello
+    script: |
+      {{ .greeting }}, world!
+`)
+
+		runID := uuid.Must(uuid.NewV7()).String()
+		th.RunCommand(t, cmd.Start(), test.CmdTest{
+			Args: []string{
+				"start",
+				"--run-id", runID,
+				dagFile,
+			},
+			ExpectedOut: []string{"DAG run finished"},
+		})
+
+		status, _ := readAttemptStatusAndOutputs(t, th, "template-artifact-auto-enable", runID)
+		require.Equal(t, core.Succeeded, status.Status)
+		require.NotEmpty(t, status.ArchiveDir)
+
+		content, err := os.ReadFile(filepath.Join(status.ArchiveDir, "greeting.txt"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "hello, world!")
+	})
+
 	t.Run("RelativeOutputPath", func(t *testing.T) {
 		t.Parallel()
 
