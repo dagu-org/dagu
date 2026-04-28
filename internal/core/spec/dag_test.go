@@ -765,6 +765,71 @@ func TestBuildWorkerSelector(t *testing.T) {
 	}
 }
 
+func TestBuildWebhookConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    *webhookConfig
+		expected *core.WebhookConfig
+		wantErr  string
+	}{
+		{
+			name:     "NilReturnsNil",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name: "NormalizesAndTrimsHeaderNames",
+			input: &webhookConfig{
+				ForwardHeaders: []string{" X-GitHub-Event ", "Stripe-Idempotency-Key"},
+			},
+			expected: &core.WebhookConfig{
+				ForwardHeaders: []string{"x-github-event", "stripe-idempotency-key"},
+			},
+		},
+		{
+			name: "RejectsBlankHeaderName",
+			input: &webhookConfig{
+				ForwardHeaders: []string{"x-github-event", "  "},
+			},
+			wantErr: "forward_headers[1]",
+		},
+		{
+			name: "RejectsAuthorizationHeader",
+			input: &webhookConfig{
+				ForwardHeaders: []string{"Authorization"},
+			},
+			wantErr: "authorization",
+		},
+		{
+			name: "RejectsInvalidHeaderToken",
+			input: &webhookConfig{
+				ForwardHeaders: []string{"my header"},
+			},
+			wantErr: "invalid HTTP header name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			d := &dag{Webhook: tt.input}
+			result, err := buildWebhookConfig(testBuildContext(), d)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestBuildSSH(t *testing.T) {
 	t.Parallel()
 

@@ -980,6 +980,19 @@ await fetch('${webhookUrl}', {
               env var.
             </li>
             <li>
+              Configure{' '}
+              <code className="bg-accent px-1 rounded-md border">
+                webhook.forward_headers
+              </code>{' '}
+              in the DAG YAML. It can also be inherited from{' '}
+              <code className="bg-accent px-1 rounded-md border">base.yaml</code>{' '}
+              to expose selected request headers as{' '}
+              <code className="bg-accent px-1 rounded-md border">
+                WEBHOOK_HEADERS
+              </code>
+              .
+            </li>
+            <li>
               <code className="bg-accent px-1 rounded-md border">dagRunId</code>{' '}
               (optional) can be used as an idempotency key.
             </li>

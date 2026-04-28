@@ -313,6 +313,38 @@ steps:
 	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_PAYLOAD":"{\"event\":\"push\"}"}`, resolved.ParamsJSON)
 }
 
+func TestResolveRuntimeParams_AcceptsWebhookHeaders_InlineTyped(t *testing.T) {
+	t.Parallel()
+
+	yaml := []byte(`
+name: accept-webhook-headers
+params:
+  - name: idea
+    type: string
+    required: true
+steps:
+  - name: echo
+    command: echo "$idea"
+`)
+
+	dag, err := LoadYAML(context.Background(), yaml, WithoutEval())
+	require.NoError(t, err)
+	dag.YamlData = yaml
+
+	resolved, err := ResolveRuntimeParams(
+		context.Background(),
+		dag,
+		`idea=ship WEBHOOK_HEADERS="{\"x-github-event\":[\"push\"]}"`,
+		ResolveRuntimeParamsOptions{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"idea=ship",
+		`WEBHOOK_HEADERS={"x-github-event":["push"]}`,
+	}, resolved.Params)
+	assert.JSONEq(t, `{"idea":"ship","WEBHOOK_HEADERS":"{\"x-github-event\":[\"push\"]}"}`, resolved.ParamsJSON)
+}
+
 func TestResolveLegacyRuntimePairs_InternalOverridesLastWriteWins(t *testing.T) {
 	t.Parallel()
 
@@ -327,6 +359,20 @@ func TestResolveLegacyRuntimePairs_InternalOverridesLastWriteWins(t *testing.T) 
 	}, pairs)
 }
 
+func TestResolveLegacyRuntimePairs_WebhookHeadersInternalOverridesLastWriteWins(t *testing.T) {
+	t.Parallel()
+
+	pairs, err := resolveLegacyRuntimePairs(
+		nil,
+		`WEBHOOK_HEADERS=first`,
+		[]string{`WEBHOOK_HEADERS=second`},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []paramPair{
+		{Name: "WEBHOOK_HEADERS", Value: "second"},
+	}, pairs)
+}
+
 func TestSplitInternalRuntimeOverridePairs_DeclaredWebhookPayloadStaysUserParam(t *testing.T) {
 	t.Parallel()
 
@@ -336,6 +382,18 @@ func TestSplitInternalRuntimeOverridePairs_DeclaredWebhookPayloadStaysUserParam(
 	)
 
 	assert.Equal(t, []paramPair{{Name: "WEBHOOK_PAYLOAD", Value: "42"}}, userPairs)
+	assert.Empty(t, internalPairs)
+}
+
+func TestSplitInternalRuntimeOverridePairs_DeclaredWebhookHeadersStaysUserParam(t *testing.T) {
+	t.Parallel()
+
+	userPairs, internalPairs := splitInternalRuntimeOverridePairs(
+		[]paramPair{{Name: "WEBHOOK_HEADERS", Value: "42"}},
+		map[string]struct{}{"WEBHOOK_HEADERS": {}},
+	)
+
+	assert.Equal(t, []paramPair{{Name: "WEBHOOK_HEADERS", Value: "42"}}, userPairs)
 	assert.Empty(t, internalPairs)
 }
 

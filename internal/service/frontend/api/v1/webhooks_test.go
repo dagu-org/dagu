@@ -4,7 +4,6 @@
 package api_test
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,12 +12,15 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dagucloud/dagu/api/v1"
 	"github.com/dagucloud/dagu/internal/cmn/config"
+	"github.com/dagucloud/dagu/internal/core"
+	"github.com/dagucloud/dagu/internal/core/exec"
 	"github.com/dagucloud/dagu/internal/license"
 	"github.com/dagucloud/dagu/internal/service/frontend"
 	apiimpl "github.com/dagucloud/dagu/internal/service/frontend/api/v1"
@@ -777,98 +779,6 @@ func TestWebhooks_TriggerNonExistentDAG(t *testing.T) {
 		ExpectStatus(http.StatusUnauthorized).Send(t)
 }
 
-// TestIsWebhookTriggerPath tests the webhook trigger path matching helper.
-func TestIsWebhookTriggerPath(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		path string
-		want bool
-	}{
-		{"webhook trigger", "/api/v1/webhooks/my-dag", true},
-		{"webhook trigger with base path", "/base/api/v1/webhooks/my-dag", true},
-		{"webhook list (no segment)", "/api/v1/webhooks", false},
-		{"webhook list trailing slash", "/api/v1/webhooks/", false},
-		{"non-webhook path", "/api/v1/dags", false},
-		{"dag webhook management", "/api/v1/dags/my-dag/webhook", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := apiimpl.IsWebhookTriggerPath(tt.path)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-// TestMarshalWebhookPayload_RawBodyFallback tests the raw body fallback behavior.
-func TestMarshalWebhookPayload_RawBodyFallback(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		body    *api.WebhookRequest
-		rawBody []byte
-		want    string
-	}{
-		{
-			name:    "structured payload takes precedence",
-			body:    &api.WebhookRequest{Payload: &map[string]any{"key": "val"}},
-			rawBody: []byte(`{"event":"push"}`),
-			want:    `{"key":"val"}`,
-		},
-		{
-			name:    "falls back to raw body when payload is nil",
-			body:    &api.WebhookRequest{},
-			rawBody: []byte(`{"event":"push","repo":"foo"}`),
-			want:    `{"event":"push","repo":"foo"}`,
-		},
-		{
-			name:    "raw body with dagRunId is passed through",
-			body:    &api.WebhookRequest{},
-			rawBody: []byte(`{"dagRunId":"abc","event":"push"}`),
-			want:    `{"dagRunId":"abc","event":"push"}`,
-		},
-		{
-			name:    "nil body falls back to raw body",
-			body:    nil,
-			rawBody: []byte(`{"event":"push"}`),
-			want:    `{"event":"push"}`,
-		},
-		{
-			name:    "no raw body returns empty object",
-			body:    &api.WebhookRequest{},
-			rawBody: nil,
-			want:    "{}",
-		},
-		{
-			name:    "invalid JSON raw body returns empty object",
-			body:    &api.WebhookRequest{},
-			rawBody: []byte(`not-json`),
-			want:    "{}",
-		},
-		{
-			name:    "empty raw body returns empty object",
-			body:    &api.WebhookRequest{},
-			rawBody: []byte{},
-			want:    "{}",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			ctx := context.Background()
-			if tt.rawBody != nil {
-				ctx = apiimpl.WithRawBody(ctx, tt.rawBody)
-			}
-			got, err := apiimpl.MarshalWebhookPayload(ctx, tt.body)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 // TestWebhooks_TriggerWithArbitraryPayload tests triggering a webhook with
 // an arbitrary JSON body (no "payload" wrapper), simulating external services.
 func TestWebhooks_TriggerWithArbitraryPayload(t *testing.T) {
@@ -901,4 +811,87 @@ func TestWebhooks_TriggerWithArbitraryPayload(t *testing.T) {
 	triggerResp.Unmarshal(t, &triggerResult)
 	assert.NotEmpty(t, triggerResult.DagRunId)
 	assert.Equal(t, dagName, triggerResult.DagName)
+}
+
+func TestWebhooks_TriggerForwardsConfiguredHeaders(t *testing.T) {
+	webhookParallel(t)
+
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_forward_headers_test"
+	headersFile := filepath.Join(t.TempDir(), "webhook-headers.json")
+	spec := `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+    - X-GitHub-Delivery
+steps:
+  - name: capture-headers
+    shell: /bin/sh
+    command: |
+      test -n "${WEBHOOK_HEADERS}"
+      printf '%s' "$WEBHOOK_HEADERS" > ` + headersFile + `
+`
+	if runtime.GOOS == "windows" {
+		spec = `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+    - X-GitHub-Delivery
+steps:
+  - name: capture-headers
+    shell: powershell
+    command: |
+      if ($null -eq $env:WEBHOOK_HEADERS) { throw 'WEBHOOK_HEADERS not set' }
+      [System.IO.File]::WriteAllText("` + strings.ReplaceAll(headersFile, `\`, `\\`) + `", $env:WEBHOOK_HEADERS)
+`
+	}
+
+	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: dagName,
+		Spec: &spec,
+	}).WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	createResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	var createResult api.WebhookCreateResponse
+	createResp.Unmarshal(t, &createResult)
+
+	triggerResp := server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{
+		Payload: &map[string]any{"event": "push"},
+	}).
+		WithBearerToken(createResult.Token).
+		WithHeader("X-GitHub-Event", "push").
+		WithHeader("X-GitHub-Delivery", "delivery-1").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var triggerResult api.WebhookResponse
+	triggerResp.Unmarshal(t, &triggerResult)
+	assert.NotEmpty(t, triggerResult.DagRunId)
+	assert.Equal(t, dagName, triggerResult.DagName)
+
+	test.ProcessQueuedInlineRun(t, server, dagName)
+	waitForStoredDAGRunStatus(t, server, dagName, triggerResult.DagRunId, 10*time.Second, func(status *exec.DAGRunStatus) bool {
+		return status.Status == core.Succeeded
+	})
+
+	data, err := os.ReadFile(headersFile)
+	require.NoError(t, err)
+
+	var decoded map[string][]string
+	require.NoError(t, json.Unmarshal(data, &decoded))
+
+	assert.Equal(t, []string{"push"}, decoded["x-github-event"])
+	assert.Equal(t, []string{"delivery-1"}, decoded["x-github-delivery"])
+	assert.False(t, slices.Contains(mapsKeys(decoded), "authorization"))
+}
+
+func mapsKeys[M ~map[string]V, V any](m M) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return keys
 }

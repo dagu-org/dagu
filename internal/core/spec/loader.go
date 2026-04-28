@@ -746,6 +746,19 @@ func (*mergeTransformer) Transformer(
 		}
 	}
 
+	if typ == reflect.TypeFor[core.WebhookConfig]() {
+		// Webhook forwarding config is a single DAG-level object. Replace the
+		// inherited object wholesale so child DAGs can override or clear the
+		// header allowlist deterministically.
+		return func(dst, src reflect.Value) error {
+			if dst.CanSet() {
+				dst.Set(src)
+			}
+
+			return nil
+		}
+	}
+
 	if typ == reflect.TypeFor[core.KubernetesConfig]() {
 		return func(dst, src reflect.Value) error {
 			if !dst.CanSet() || !src.IsValid() || src.IsNil() {

@@ -140,6 +140,8 @@ type dag struct {
 	Container any `yaml:"container,omitempty"`
 	// RunConfig contains configuration for controlling user interactions during DAG runs.
 	RunConfig *runConfig `yaml:"run_config,omitempty"`
+	// Webhook contains DAG-level webhook trigger behavior configuration.
+	Webhook *webhookConfig `yaml:"webhook,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Can be either a JSON string or a map of registry to auth config.
 	RegistryAuths any `yaml:"registry_auths,omitempty"`
@@ -313,6 +315,10 @@ type healthcheck struct {
 type runConfig struct {
 	DisableParamEdit bool `yaml:"disable_param_edit,omitempty"`  // Disable parameter editing when starting DAG
 	DisableRunIdEdit bool `yaml:"disable_run_id_edit,omitempty"` // Disable custom run ID specification
+}
+
+type webhookConfig struct {
+	ForwardHeaders []string `yaml:"forward_headers,omitempty"`
 }
 
 // ssh defines the SSH configuration for the DAG.
@@ -501,6 +507,7 @@ var fullTransformers = []transform{
 	{"log_output", newTransformer("LogOutput", buildLogOutput)},
 	{"mail_on", newTransformer("MailOn", buildMailOn)},
 	{"run_config", newTransformer("RunConfig", buildRunConfig)},
+	{"webhook", newTransformer("Webhook", buildWebhookConfig)},
 	{"hist_retention_days", newTransformer("HistRetentionDays", buildHistRetentionDays)},
 	{"max_clean_up_time_sec", newTransformer("MaxCleanUpTime", buildMaxCleanUpTime)},
 	{"shell", newTransformer("Shell", buildShell)},
@@ -959,6 +966,41 @@ func buildRunConfig(_ BuildContext, d *dag) (*core.RunConfig, error) {
 		DisableParamEdit: d.RunConfig.DisableParamEdit,
 		DisableRunIdEdit: d.RunConfig.DisableRunIdEdit,
 	}, nil
+}
+
+func buildWebhookConfig(_ BuildContext, d *dag) (*core.WebhookConfig, error) {
+	if d.Webhook == nil {
+		return nil, nil
+	}
+
+	headers := make([]string, 0, len(d.Webhook.ForwardHeaders))
+	for i, raw := range d.Webhook.ForwardHeaders {
+		header := core.NormalizeWebhookForwardHeader(raw)
+		if header == "" {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("webhook.forward_headers[%d]", i),
+				raw,
+				fmt.Errorf("header name cannot be empty"),
+			)
+		}
+		if !core.IsValidWebhookHeaderToken(header) {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("webhook.forward_headers[%d]", i),
+				raw,
+				fmt.Errorf("invalid HTTP header name"),
+			)
+		}
+		if core.IsDeniedWebhookForwardHeader(header) {
+			return nil, core.NewValidationError(
+				fmt.Sprintf("webhook.forward_headers[%d]", i),
+				raw,
+				fmt.Errorf("authorization header cannot be forwarded"),
+			)
+		}
+		headers = append(headers, header)
+	}
+
+	return &core.WebhookConfig{ForwardHeaders: headers}, nil
 }
 
 func buildHistRetentionDays(_ BuildContext, d *dag) (int, error) {

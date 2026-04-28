@@ -106,6 +106,24 @@ func TestDecode(t *testing.T) {
 		assert.False(t, errors.Is(err, ErrNameOrPathRequired))
 		assert.Contains(t, err.Error(), "unknown_key")
 	})
+
+	t.Run("SuggestsSnakeCaseForWebhookForwardHeaders", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := decode(map[string]any{
+			"steps": []any{
+				map[string]any{
+					"name":    "step-1",
+					"command": "echo hello",
+				},
+			},
+			"webhook": map[string]any{
+				"forwardHeaders": []any{"X-GitHub-Event"},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "forwardHeaders -> webhook.forward_headers")
+	})
 }
 
 // TestNewManifestDecoderSharesInstance verifies callers reuse the shared decoder instance.

@@ -534,37 +534,10 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 		}
 	}
 
-	// Prepare the WEBHOOK_PAYLOAD parameter
-	payload, err := marshalWebhookPayload(ctx, request.Body)
-	if err != nil {
-		logger.Warn(ctx, "Webhook: failed to marshal payload",
-			tag.Name(dag.Name),
-			tag.Error(err),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusBadRequest,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    "failed to process request body",
-		}
+	params, apiErr := buildWebhookRequestRuntimeParams(ctx, dag, request.Body)
+	if apiErr != nil {
+		return nil, apiErr
 	}
-	if len(payload) > maxWebhookPayloadSize {
-		logger.Warn(ctx, "Webhook: payload too large",
-			tag.Name(dag.Name),
-			tag.Key("size"), tag.Value(len(payload)),
-			tag.Key("maxSize"), tag.Value(maxWebhookPayloadSize),
-		)
-		return nil, &Error{
-			HTTPStatus: http.StatusRequestEntityTooLarge,
-			Code:       api.ErrorCodeBadRequest,
-			Message:    fmt.Sprintf("webhook payload too large (max %d bytes)", maxWebhookPayloadSize),
-		}
-	}
-
-	// Create the params string with WEBHOOK_PAYLOAD
-	// Use strconv.Quote to properly escape the JSON payload.
-	// The parameter parser regex splits on whitespace for unquoted values,
-	// so we need to quote the value to preserve spaces in JSON.
-	params := fmt.Sprintf("WEBHOOK_PAYLOAD=%s", strconv.Quote(payload))
 
 	// Determine the dag-run ID (use provided one for idempotency, or generate new)
 	var dagRunID string
@@ -611,6 +584,57 @@ func (a *API) TriggerWebhook(ctx context.Context, request api.TriggerWebhookRequ
 		DagRunId: dagRunID,
 		DagName:  dag.Name,
 	}, nil
+}
+
+func buildWebhookRequestRuntimeParams(
+	ctx context.Context,
+	dag *core.DAG,
+	body *api.TriggerWebhookJSONRequestBody,
+) (string, *Error) {
+	payload, err := marshalWebhookPayload(ctx, body)
+	if err != nil {
+		logger.Warn(ctx, "Webhook: failed to marshal payload",
+			tag.Name(dag.Name),
+			tag.Error(err),
+		)
+		return "", &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed to process request body",
+		}
+	}
+	if len(payload) > maxWebhookPayloadSize {
+		logger.Warn(ctx, "Webhook: payload too large",
+			tag.Name(dag.Name),
+			tag.Key("size"), tag.Value(len(payload)),
+			tag.Key("maxSize"), tag.Value(maxWebhookPayloadSize),
+		)
+		return "", &Error{
+			HTTPStatus: http.StatusRequestEntityTooLarge,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    fmt.Sprintf("webhook payload too large (max %d bytes)", maxWebhookPayloadSize),
+		}
+	}
+
+	headerAllowList := []string(nil)
+	if dag.Webhook != nil {
+		headerAllowList = dag.Webhook.ForwardHeaders
+	}
+
+	headers, err := marshalWebhookHeaders(ctx, headerAllowList)
+	if err != nil {
+		logger.Warn(ctx, "Webhook: failed to marshal headers",
+			tag.Name(dag.Name),
+			tag.Error(err),
+		)
+		return "", &Error{
+			HTTPStatus: http.StatusBadRequest,
+			Code:       api.ErrorCodeBadRequest,
+			Message:    "failed to process request headers",
+		}
+	}
+
+	return buildWebhookRuntimeParams(payload, headers), nil
 }
 
 // requireWebhookManagement checks if webhook management is enabled and
@@ -715,4 +739,45 @@ func marshalWebhookPayload(ctx context.Context, body *api.TriggerWebhookJSONRequ
 	}
 
 	return "{}", nil
+}
+
+// marshalWebhookHeaders returns the JSON representation of the selected webhook
+// request headers. Header names are matched case-insensitively and emitted as
+// lowercase keys with []string values. Authorization is never forwarded.
+func marshalWebhookHeaders(ctx context.Context, allowList []string) (string, error) {
+	forwarded := make(map[string][]string)
+	if len(allowList) == 0 {
+		return "{}", nil
+	}
+
+	headers := requestHeadersFromContext(ctx)
+	if len(headers) == 0 {
+		return "{}", nil
+	}
+
+	for _, raw := range allowList {
+		headerName := core.NormalizeWebhookForwardHeader(raw)
+		if headerName == "" || core.IsDeniedWebhookForwardHeader(headerName) {
+			continue
+		}
+		values := headers[headerName]
+		if len(values) == 0 {
+			continue
+		}
+		forwarded[headerName] = append([]string(nil), values...)
+	}
+
+	encoded, err := json.Marshal(forwarded)
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
+}
+
+func buildWebhookRuntimeParams(payload, headers string) string {
+	parts := []string{
+		fmt.Sprintf("WEBHOOK_PAYLOAD=%s", strconv.Quote(payload)),
+		fmt.Sprintf("WEBHOOK_HEADERS=%s", strconv.Quote(headers)),
+	}
+	return strings.Join(parts, " ")
 }

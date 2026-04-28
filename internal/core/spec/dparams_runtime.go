@@ -358,6 +358,8 @@ func isInternalRuntimeParam(name string) bool {
 	switch name {
 	case "WEBHOOK_PAYLOAD":
 		return true
+	case "WEBHOOK_HEADERS":
+		return true
 	default:
 		return false
 	}

@@ -215,6 +215,8 @@ type DAG struct {
 	Container *Container `json:"container,omitempty"`
 	// RunConfig contains configuration for controlling user interactions during DAG runs.
 	RunConfig *RunConfig `json:"runConfig,omitempty"`
+	// Webhook contains DAG-level webhook trigger behavior configuration.
+	Webhook *WebhookConfig `json:"webhook,omitempty"`
 	// RegistryAuths maps registry hostnames to authentication configs.
 	// Optional: If not specified, falls back to DOCKER_AUTH_CONFIG or docker config.
 	// Credentials are evaluated at runtime. Excluded from JSON: may contain passwords.
@@ -271,6 +273,13 @@ type ParamDef struct {
 	MinLength   *int     `json:"minLength,omitempty"`
 	MaxLength   *int     `json:"maxLength,omitempty"`
 	Pattern     *string  `json:"pattern,omitempty"`
+}
+
+// WebhookConfig contains DAG-level webhook trigger behavior.
+type WebhookConfig struct {
+	// ForwardHeaders is the allowlist of request headers to expose to
+	// webhook-triggered DAG runs via the WEBHOOK_HEADERS runtime variable.
+	ForwardHeaders []string `json:"forwardHeaders,omitempty"`
 }
 
 // ArtifactsConfig controls DAG run artifact storage.
@@ -358,6 +367,11 @@ func (d *DAG) Clone() *DAG {
 	if d.Artifacts != nil {
 		artifactsCopy := *d.Artifacts
 		clone.Artifacts = &artifactsCopy
+	}
+	if d.Webhook != nil {
+		webhookCopy := *d.Webhook
+		webhookCopy.ForwardHeaders = append([]string(nil), d.Webhook.ForwardHeaders...)
+		clone.Webhook = &webhookCopy
 	}
 	if d.Harness != nil {
 		clone.Harness = cloneHarnessConfig(d.Harness)
