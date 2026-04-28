@@ -86,6 +86,7 @@ params:
 
 	_, err := LoadYAML(context.Background(), yaml, SkipSchemaValidation(), WithoutEval())
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "params")
 	assert.Contains(t, err.Error(), "properties must be an object")
 }
 

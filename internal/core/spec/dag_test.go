@@ -2284,6 +2284,24 @@ steps:
 			expected: &core.ArtifactsConfig{Enabled: true},
 		},
 		{
+			name: "AutoEnableWhenPowerShellEnvReferenceArtifactsDir",
+			yaml: `
+steps:
+  - name: write
+    command: Write-Output $env:DAG_RUN_ARTIFACTS_DIR
+`,
+			expected: &core.ArtifactsConfig{Enabled: true},
+		},
+		{
+			name: "LiteralMentionWithoutEnvReferenceDoesNotAutoEnable",
+			yaml: `
+steps:
+  - name: write
+    command: printf 'DAG_RUN_ARTIFACTS_DIR'
+`,
+			expected: nil,
+		},
+		{
 			name: "ExplicitDisableWinsOverAutoEnable",
 			yaml: `
 artifacts:

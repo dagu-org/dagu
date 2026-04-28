@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -25,6 +26,14 @@ import (
 )
 
 const dagRunArtifactsDirEnvKey = "DAG_RUN_ARTIFACTS_DIR"
+
+var dagRunArtifactsDirReferencePattern = regexp.MustCompile(
+	`(?:\$\{` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `\}` +
+		`|\$` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `(?:\b|[^A-Za-z0-9_])` +
+		`|\$env:` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `(?:\b|[^A-Za-z0-9_])` +
+		`|%` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `%` +
+		`|env\(["']` + regexp.QuoteMeta(dagRunArtifactsDirEnvKey) + `["']\))`,
+)
 
 // dag is the intermediate representation of a DAG specification.
 // It mirrors the YAML structure and gets validated/transformed into core.DAG.
@@ -854,6 +863,10 @@ func dagReferencesRunArtifactsDir(d *dag) bool {
 	return valueReferencesRunArtifactsDir(reflect.ValueOf(d))
 }
 
+func referencesArtifactsEnvVar(s string) bool {
+	return dagRunArtifactsDirReferencePattern.MatchString(s)
+}
+
 func valueReferencesRunArtifactsDir(v reflect.Value) bool {
 	if !v.IsValid() {
 		return false
@@ -868,7 +881,7 @@ func valueReferencesRunArtifactsDir(v reflect.Value) bool {
 
 	switch v.Kind() {
 	case reflect.String:
-		return strings.Contains(v.String(), dagRunArtifactsDirEnvKey)
+		return referencesArtifactsEnvVar(v.String())
 	case reflect.Array, reflect.Slice:
 		for i := 0; i < v.Len(); i++ {
 			if valueReferencesRunArtifactsDir(v.Index(i)) {
