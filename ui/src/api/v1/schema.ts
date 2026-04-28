@@ -1642,8 +1642,10 @@ export interface paths {
          *     bearer token only, bearer token plus HMAC, or HMAC only.
          *
          *     The request body is passed to the DAG as the WEBHOOK_PAYLOAD environment
-         *     variable. The DAG run is enqueued and the endpoint returns immediately
-         *     with the dag-run ID.
+         *     variable. If the DAG configures `webhook.forward_headers`, the selected
+         *     request headers are passed as the WEBHOOK_HEADERS environment variable.
+         *     The DAG run is enqueued and the endpoint returns immediately with the
+         *     dag-run ID.
          *
          */
         post: operations["triggerWebhook"];

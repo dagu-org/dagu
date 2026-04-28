@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -869,6 +870,55 @@ func TestMarshalWebhookPayload_RawBodyFallback(t *testing.T) {
 	}
 }
 
+func TestMarshalWebhookHeaders_Filtering(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		allowList []string
+		headers   http.Header
+		want      string
+	}{
+		{
+			name:      "returns empty object when allowlist is empty",
+			allowList: nil,
+			headers: http.Header{
+				"X-GitHub-Event": []string{"push"},
+			},
+			want: "{}",
+		},
+		{
+			name:      "filters configured headers and preserves repeated values",
+			allowList: []string{"x-github-event", "x-github-delivery"},
+			headers: http.Header{
+				"X-GitHub-Event":    []string{"push"},
+				"X-GitHub-Delivery": []string{"abc", "def"},
+				"X-Unrelated":       []string{"ignored"},
+			},
+			want: `{"x-github-delivery":["abc","def"],"x-github-event":["push"]}`,
+		},
+		{
+			name:      "authorization is never forwarded",
+			allowList: []string{"authorization", "x-github-event"},
+			headers: http.Header{
+				"Authorization":  []string{"Bearer top-secret"},
+				"X-GitHub-Event": []string{"push"},
+			},
+			want: `{"x-github-event":["push"]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := apiimpl.WithRequestHeaders(context.Background(), tt.headers)
+			got, err := apiimpl.MarshalWebhookHeaders(ctx, tt.allowList)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want, got)
+		})
+	}
+}
+
 // TestWebhooks_TriggerWithArbitraryPayload tests triggering a webhook with
 // an arbitrary JSON body (no "payload" wrapper), simulating external services.
 func TestWebhooks_TriggerWithArbitraryPayload(t *testing.T) {
@@ -901,4 +951,84 @@ func TestWebhooks_TriggerWithArbitraryPayload(t *testing.T) {
 	triggerResp.Unmarshal(t, &triggerResult)
 	assert.NotEmpty(t, triggerResult.DagRunId)
 	assert.Equal(t, dagName, triggerResult.DagName)
+}
+
+func TestWebhooks_TriggerForwardsConfiguredHeaders(t *testing.T) {
+	webhookParallel(t)
+
+	server := setupWebhookTestServer(t)
+	token := getWebhookAdminToken(t, server)
+
+	dagName := "webhook_forward_headers_test"
+	headersFile := filepath.Join(t.TempDir(), "webhook-headers.json")
+	spec := `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+    - X-GitHub-Delivery
+steps:
+  - name: capture-headers
+    shell: /bin/sh
+    command: |
+      test -n "${WEBHOOK_HEADERS}"
+      printf '%s' "$WEBHOOK_HEADERS" > ` + headersFile + `
+`
+	if runtime.GOOS == "windows" {
+		spec = `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+    - X-GitHub-Delivery
+steps:
+  - name: capture-headers
+    shell: powershell
+    command: |
+      if ($null -eq $env:WEBHOOK_HEADERS) { throw 'WEBHOOK_HEADERS not set' }
+      [System.IO.File]::WriteAllText("` + strings.ReplaceAll(headersFile, `\`, `\\`) + `", $env:WEBHOOK_HEADERS)
+`
+	}
+
+	server.Client().Post("/api/v1/dags", api.CreateNewDAGJSONRequestBody{
+		Name: dagName,
+		Spec: &spec,
+	}).WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	createResp := server.Client().Post("/api/v1/dags/"+dagName+"/webhook", nil).
+		WithBearerToken(token).ExpectStatus(http.StatusCreated).Send(t)
+
+	var createResult api.WebhookCreateResponse
+	createResp.Unmarshal(t, &createResult)
+
+	triggerResp := server.Client().Post("/api/v1/webhooks/"+dagName, api.WebhookRequest{
+		Payload: &map[string]any{"event": "push"},
+	}).
+		WithBearerToken(createResult.Token).
+		WithHeader("X-GitHub-Event", "push").
+		WithHeader("X-GitHub-Delivery", "delivery-1").
+		ExpectStatus(http.StatusOK).Send(t)
+
+	var triggerResult api.WebhookResponse
+	triggerResp.Unmarshal(t, &triggerResult)
+	assert.NotEmpty(t, triggerResult.DagRunId)
+	assert.Equal(t, dagName, triggerResult.DagName)
+
+	test.ProcessQueuedInlineRun(t, server, dagName)
+
+	data, err := os.ReadFile(headersFile)
+	require.NoError(t, err)
+
+	var decoded map[string][]string
+	require.NoError(t, json.Unmarshal(data, &decoded))
+
+	assert.Equal(t, []string{"push"}, decoded["x-github-event"])
+	assert.Equal(t, []string{"delivery-1"}, decoded["x-github-delivery"])
+	assert.False(t, slices.Contains(mapsKeys(decoded), "authorization"))
+}
+
+func mapsKeys[M ~map[string]V, V any](m M) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return keys
 }

@@ -17,6 +17,8 @@ type contextKey string
 const (
 	// rawBodyContextKey stores the raw request body bytes in context.
 	rawBodyContextKey contextKey = "webhook_raw_body"
+	// requestHeadersContextKey stores a clone of the webhook request headers.
+	requestHeadersContextKey contextKey = "webhook_request_headers"
 )
 
 // WebhookRawBodyMiddleware is a chi middleware that captures the raw request
@@ -34,8 +36,10 @@ func WebhookRawBodyMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
+			ctx := withRequestHeaders(r.Context(), r.Header)
+
 			if r.Body == nil || r.Body == http.NoBody {
-				next.ServeHTTP(w, r)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
@@ -51,16 +55,14 @@ func WebhookRawBodyMiddleware() func(http.Handler) http.Handler {
 			// handing truncated JSON to the generated strict decoder.
 			if len(rawBody) > maxWebhookPayloadSize {
 				r.Body = io.NopCloser(bytes.NewReader([]byte("{}")))
-				ctx := context.WithValue(r.Context(), rawBodyContextKey, rawBody)
-				next.ServeHTTP(w, r.WithContext(ctx))
+				next.ServeHTTP(w, r.WithContext(withRawBody(ctx, rawBody)))
 				return
 			}
 
 			// Replace r.Body so the generated code can still read it.
 			r.Body = io.NopCloser(bytes.NewReader(rawBody))
 
-			ctx := context.WithValue(r.Context(), rawBodyContextKey, rawBody)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r.WithContext(withRawBody(ctx, rawBody)))
 		})
 	}
 }
@@ -75,6 +77,26 @@ func rawBodyFromContext(ctx context.Context) []byte {
 // withRawBody returns a context with the raw body attached (for testing).
 func withRawBody(ctx context.Context, body []byte) context.Context {
 	return context.WithValue(ctx, rawBodyContextKey, body)
+}
+
+// requestHeadersFromContext retrieves the request headers stored by
+// WebhookRawBodyMiddleware. Returns nil if not present.
+func requestHeadersFromContext(ctx context.Context) http.Header {
+	headers, _ := ctx.Value(requestHeadersContextKey).(http.Header)
+	return headers
+}
+
+// withRequestHeaders returns a context with a clone of the request headers attached.
+func withRequestHeaders(ctx context.Context, headers http.Header) context.Context {
+	if headers == nil {
+		return context.WithValue(ctx, requestHeadersContextKey, http.Header{})
+	}
+
+	normalized := make(http.Header, len(headers))
+	for key, values := range headers {
+		normalized[strings.ToLower(strings.TrimSpace(key))] = append([]string(nil), values...)
+	}
+	return context.WithValue(ctx, requestHeadersContextKey, normalized)
 }
 
 // isWebhookTriggerPath checks if the URL path matches the webhook trigger

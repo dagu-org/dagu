@@ -754,6 +754,96 @@ steps:
 		assert.Equal(t, "/override/artifacts", dag.Artifacts.Dir)
 	})
 
+	t.Run("InheritBaseWebhookForwardHeaders", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+    - X-GitHub-Delivery
+`)
+
+		childDAG := createTempYAMLFile(t, `
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Webhook)
+		assert.Equal(t, []string{"x-github-event", "x-github-delivery"}, dag.Webhook.ForwardHeaders)
+	})
+
+	t.Run("OverrideBaseWebhookForwardHeaders", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+    - X-GitHub-Delivery
+`)
+
+		childDAG := createTempYAMLFile(t, `
+webhook:
+  forward_headers:
+    - Stripe-Idempotency-Key
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Webhook)
+		assert.Equal(t, []string{"stripe-idempotency-key"}, dag.Webhook.ForwardHeaders)
+	})
+
+	t.Run("ClearInheritedWebhookForwardHeaders", func(t *testing.T) {
+		t.Parallel()
+
+		baseDAG := createTempYAMLFile(t, `
+webhook:
+  forward_headers:
+    - X-GitHub-Event
+`)
+
+		childDAG := createTempYAMLFile(t, `
+webhook:
+  forward_headers: []
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		dag, err := spec.Load(context.Background(), childDAG, spec.WithBaseConfig(baseDAG))
+		require.NoError(t, err)
+		require.NotNil(t, dag)
+		require.NotNil(t, dag.Webhook)
+		assert.Empty(t, dag.Webhook.ForwardHeaders)
+	})
+
+	t.Run("RejectAuthorizationInWebhookForwardHeaders", func(t *testing.T) {
+		t.Parallel()
+
+		dagPath := createTempYAMLFile(t, `
+webhook:
+  forward_headers:
+    - Authorization
+steps:
+  - name: "step1"
+    command: echo "test"
+`)
+
+		_, err := spec.Load(context.Background(), dagPath)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "authorization")
+	})
+
 	t.Run("InheritBaseWorkingDir", func(t *testing.T) {
 		t.Parallel()
 
