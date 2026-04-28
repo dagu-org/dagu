@@ -255,10 +255,12 @@ func waitForWebhookRunStatus(
 	}, intgTestTimeout(30*time.Second), 200*time.Millisecond)
 }
 
+//go:fix inline
 func dagRunIDPtr(id string) *string {
-	return &id
+	return new(id)
 }
 
+//go:fix inline
 func webhookHMACEnforcementModePtr(mode api.WebhookHMACEnforcementMode) *api.WebhookHMACEnforcementMode {
-	return &mode
+	return new(mode)
 }
