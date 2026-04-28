@@ -125,8 +125,11 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
-  const [draftAuthMode, setDraftAuthMode] =
-    useState<WebhookAuthMode>(WebhookAuthModeValue.token_only);
+  const [copiedHMACShell, setCopiedHMACShell] = useState(false);
+  const [copiedHMACNode, setCopiedHMACNode] = useState(false);
+  const [draftAuthMode, setDraftAuthMode] = useState<WebhookAuthMode>(
+    WebhookAuthModeValue.token_only
+  );
   const [draftEnforcementMode, setDraftEnforcementMode] =
     useState<WebhookHMACEnforcementMode>(
       WebhookHMACEnforcementModeValue.strict
@@ -463,16 +466,16 @@ function WebhookTab({ fileName }: WebhookTabProps) {
       );
 
       if (apiError || !data) {
-        throw new Error(apiError?.message || 'Failed to regenerate HMAC secret');
+        throw new Error(
+          apiError?.message || 'Failed to regenerate HMAC secret'
+        );
       }
 
       setWebhook(data.webhook);
       setSecretReveal({ kind: 'hmac', value: data.hmacSecret });
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to regenerate HMAC secret'
+        err instanceof Error ? err.message : 'Failed to regenerate HMAC secret'
       );
     } finally {
       setIsActioning(false);
@@ -539,9 +542,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-3 space-y-3">
           <div className="p-3 bg-warning/10 border border-warning/20 rounded-md">
-            <p className="text-sm text-warning-foreground">
-              {secretWarning}
-            </p>
+            <p className="text-sm text-warning-foreground">{secretWarning}</p>
           </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 p-2 text-xs bg-muted rounded-md break-all font-mono">
@@ -617,6 +618,36 @@ function WebhookTab({ fileName }: WebhookTabProps) {
   -H "Authorization: Bearer <YOUR_TOKEN>" \\
   -H "Content-Type: application/json" \\
   -d ${requestBody}`;
+  const hmacShellExample = `body='{"dagRunId":"my-unique-id","payload":{"key":"value"}}'
+sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$DAGU_HMAC_SECRET" -hex | sed 's/^.* //')
+
+curl -X POST "${webhookUrl}" \\
+  ${webhook.authMode === WebhookAuthModeValue.token_and_hmac ? '-H "Authorization: Bearer <YOUR_TOKEN>" \\\n  ' : ''}-H "X-Dagu-Signature: sha256=$sig" \\
+  -H "Content-Type: application/json" \\
+  -d "$body"`;
+  const hmacNodeExample = `import crypto from 'node:crypto';
+
+const body = JSON.stringify({
+  dagRunId: 'my-unique-id',
+  payload: { key: 'value' },
+});
+
+const signature =
+  'sha256=' +
+  crypto.createHmac('sha256', process.env.DAGU_HMAC_SECRET!)
+    .update(body, 'utf8')
+    .digest('hex');
+
+const headers = {
+  'Content-Type': 'application/json',
+  'X-Dagu-Signature': signature,
+  ${webhook.authMode === WebhookAuthModeValue.token_and_hmac ? "'Authorization': 'Bearer <YOUR_TOKEN>',\n  " : ''}}
+
+await fetch('${webhookUrl}', {
+  method: 'POST',
+  headers,
+  body,
+});`;
 
   // Webhook configured
   return (
@@ -722,8 +753,8 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             HMAC, callers must send{' '}
             <code className="bg-accent px-1 rounded-md border">
               X-Dagu-Signature: sha256=&lt;hex&gt;
-            </code>
-            {' '}computed from the exact raw request body.
+            </code>{' '}
+            computed from the exact raw request body.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-2 space-y-3">
@@ -792,8 +823,7 @@ function WebhookTab({ fileName }: WebhookTabProps) {
               <div className="rounded-md border bg-accent/40 px-3 py-2 text-xs text-muted-foreground space-y-1">
                 <div>Algorithm: {webhook.hmac.algorithm || 'HMAC-SHA256'}</div>
                 <div>
-                  Header:{' '}
-                  {webhook.hmac.headerName || 'X-Dagu-Signature'}{' '}
+                  Header: {webhook.hmac.headerName || 'X-Dagu-Signature'}{' '}
                   {webhook.hmac.format
                     ? `(${webhook.hmac.format})`
                     : '(sha256=<hex>)'}
@@ -866,6 +896,61 @@ function WebhookTab({ fileName }: WebhookTabProps) {
         </CardContent>
       </Card>
 
+      {isHMACEnabled && (
+        <Card className="gap-0 py-0">
+          <CardHeader className="pb-3 px-4 pt-3">
+            <CardTitle className="text-sm">Generate HMAC</CardTitle>
+            <CardDescription className="text-xs">
+              Compute the HMAC from the exact raw request body you send. If the
+              body is reformatted before sending, verification will fail.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 pt-2 space-y-3">
+            <div className="rounded-md border bg-accent/40 px-3 py-2 text-xs text-muted-foreground">
+              Use your webhook HMAC secret as{' '}
+              <code className="bg-accent px-1 rounded-md border">
+                DAGU_HMAC_SECRET
+              </code>
+              .
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Shell (OpenSSL)
+                </span>
+                <CopyButton
+                  copied={copiedHMACShell}
+                  onCopy={() =>
+                    handleCopy(hmacShellExample, setCopiedHMACShell)
+                  }
+                  label="Copy"
+                />
+              </div>
+              <pre className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto whitespace-pre-wrap">
+                {hmacShellExample}
+              </pre>
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Node.js
+                </span>
+                <CopyButton
+                  copied={copiedHMACNode}
+                  onCopy={() => handleCopy(hmacNodeExample, setCopiedHMACNode)}
+                  label="Copy"
+                />
+              </div>
+              <pre className="px-3 py-2 bg-accent rounded-md text-xs font-mono border overflow-x-auto whitespace-pre-wrap">
+                {hmacNodeExample}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Example Card */}
       <Card className="gap-0 py-0">
         <CardHeader className="pb-0 px-4 pt-3">
@@ -900,8 +985,8 @@ function WebhookTab({ fileName }: WebhookTabProps) {
             </li>
             {isHMACEnabled && (
               <li>
-                Sign the exact raw JSON request body bytes with your HMAC
-                secret and send the hex digest in{' '}
+                Sign the exact raw JSON request body bytes with your HMAC secret
+                and send the hex digest in{' '}
                 <code className="bg-accent px-1 rounded-md border">
                   X-Dagu-Signature
                 </code>
