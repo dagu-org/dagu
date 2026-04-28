@@ -30,10 +30,14 @@ func EvalBool(ctx context.Context, value any) (bool, error) {
 // EvalObject recursively evaluates the string fields of the given object
 // with the variables within the execution context.
 func EvalObject[T any](ctx context.Context, obj T) (T, error) {
-	return eval.Object(ctx, obj, configEvalVariables(GetEnv(ctx)))
+	return eval.Object(ctx, obj, GetEnv(ctx).UserEnvsMap())
 }
 
-func configEvalVariables(env Env) map[string]string {
+func evalObjectTreatingOmittedParamsAsEmpty[T any](ctx context.Context, obj T) (T, error) {
+	return eval.Object(ctx, obj, templateConfigEvalVariables(GetEnv(ctx)))
+}
+
+func templateConfigEvalVariables(env Env) map[string]string {
 	vars := env.UserEnvsMap()
 	if env.DAG == nil || len(env.DAG.ParamDefs) == 0 {
 		return vars

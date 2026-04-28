@@ -268,7 +268,7 @@ func TestEvalObjectWithExecutorConfig(t *testing.T) {
 	require.Equal(t, nestedExpected["value"], nestedResult["value"])
 }
 
-func TestEvalObjectWithExecutorConfig_DeclaredOptionalParamResolvesToEmptyString(t *testing.T) {
+func TestEvalObjectWithExecutorConfig_PreservesUnresolvedPlaceholderWhenOptionalParamIsOmitted(t *testing.T) {
 	t.Parallel()
 
 	ctx := exec.NewContext(
@@ -276,29 +276,20 @@ func TestEvalObjectWithExecutorConfig_DeclaredOptionalParamResolvesToEmptyString
 		&core.DAG{
 			Name: "test-dag",
 			ParamDefs: []core.ParamDef{
-				{Name: "name", Type: core.ParamDefTypeString, Required: true},
-				{Name: "favorite_color", Type: core.ParamDefTypeString},
+				{Name: "HOME", Type: core.ParamDefTypeString},
 			},
 		},
 		"",
 		"",
-		exec.WithParams([]string{"name=tom"}),
 	)
 	env := runtime.NewEnv(ctx, core.Step{Name: "test-step"})
 	ctx = runtime.WithEnv(ctx, env)
 
 	result, err := runtime.EvalObject(ctx, map[string]any{
-		"data": map[string]any{
-			"name":           "${name}",
-			"favorite_color": "${favorite_color}",
-		},
+		"key": "${HOME}/.ssh/id_ed25519",
 	})
 	require.NoError(t, err)
-
-	data, ok := result["data"].(map[string]any)
-	require.True(t, ok, "data should be a map[string]any")
-	require.Equal(t, "tom", data["name"])
-	require.Equal(t, "", data["favorite_color"])
+	require.Equal(t, "${HOME}/.ssh/id_ed25519", result["key"])
 }
 
 func TestGenerateSubDAGRunID(t *testing.T) {
