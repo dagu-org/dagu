@@ -358,6 +358,19 @@ func TestCreateTempDAGFile(t *testing.T) {
 		assert.NotContains(t, base, ".yaml-")
 	})
 
+	t.Run("WhitespaceOnlyNameUsesFallback", func(t *testing.T) {
+		t.Parallel()
+
+		path, err := CreateTempDAGFile("test-subdir", "   ", []byte("steps:\n  - name: step1\n"))
+		require.NoError(t, err)
+		require.NotEmpty(t, path)
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		base := filepath.Base(path)
+		assert.Contains(t, base, "dag-")
+		assert.NotContains(t, base, "   ")
+	})
+
 	t.Run("EmptyExtraDocs", func(t *testing.T) {
 		t.Parallel()
 
